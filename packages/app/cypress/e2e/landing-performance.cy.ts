@@ -48,6 +48,7 @@ describe('Landing page performance', () => {
     cy.request('/')
       .its('body')
       .should('contain', 'See full quotes')
+      .and('contain', 'href="/quotes#quote-minimax"')
       .and('contain', 'data-testid="launch-banner"');
 
     cy.intercept('GET', '**/_next/static/**/*.js', (request) => {

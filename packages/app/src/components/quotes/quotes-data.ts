@@ -1,3 +1,12 @@
+/** Stable anchor id for an org's quote on the quotes page (first occurrence wins). */
+export function orgAnchorId(org: string): string {
+  const slug = org
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, '-')
+    .replaceAll(/^-|-$/gu, '');
+  return `quote-${slug}`;
+}
+
 export interface Quote {
   text: string;
   /** Simplified Chinese translation of `text`, shown on /zh pages. */
