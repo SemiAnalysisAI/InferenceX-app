@@ -663,8 +663,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change), and powerValid filters rows by measured-power validity and cannot be combined with view=calculator.',
-      '按展示模型返回原始基准行。可用 date 获取截至该日的快照，exact=true 限定该日，runId 约束最新查询，或将 exactRun=true 与数字 runId 组合以仅返回该工作流运行。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）；powerValid 按实测功率有效性筛选行，且不能与 view=calculator 组合使用。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change), and powerValid filters rows by measured-power validity and cannot be combined with view=calculator (except powerValid=any, which is a no-op).',
+      '按展示模型返回原始基准行。可用 date 获取截至该日的快照，exact=true 限定该日，runId 约束最新查询，或将 exactRun=true 与数字 runId 组合以仅返回该工作流运行。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）；powerValid 按实测功率有效性筛选行，且不能与 view=calculator 组合使用（powerValid=any 除外，等同于不筛选）。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -744,8 +744,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        '1 keeps only rows with a validated power measurement (metrics.power_valid == 1); 0 keeps only explicitly invalidated rows; any applies no filter (default; includes legacy rows without a verdict); strictV2 keeps rows with power_valid == 1 and power_metric_schema_version == 2 (whole-deployment energy semantics) — stricter than the InferenceX UI, which also displays validated rows that predate schema versioning. Unknown values yield 400 Unknown powerValid filter; cannot be combined with view=calculator.',
-        '1 仅保留具有已验证功率测量的行（metrics.power_valid == 1）；0 仅保留被明确判定无效的行；any 不做筛选（默认值；包含没有判定结果的旧数据行）；strictV2 保留 power_valid == 1 且 power_metric_schema_version == 2（全部署能耗语义）的行——比 InferenceX 界面更严格，界面还会展示早于版本标注机制的已验证行。未知值返回 400 Unknown powerValid filter；不能与 view=calculator 组合使用。',
+        '1 keeps only rows with a validated power measurement (metrics.power_valid == 1); 0 keeps only explicitly invalidated rows; any applies no filter (default; includes legacy rows without a verdict); strictV2 keeps rows with power_valid == 1 and power_metric_schema_version == 2 (whole-deployment energy semantics) — stricter than the InferenceX UI, which also displays validated rows that predate schema versioning. Unknown values yield 400 Unknown powerValid filter; cannot be combined with view=calculator (except any, which is a no-op).',
+        '1 仅保留具有已验证功率测量的行（metrics.power_valid == 1）；0 仅保留被明确判定无效的行；any 不做筛选（默认值；包含没有判定结果的旧数据行）；strictV2 保留 power_valid == 1 且 power_metric_schema_version == 2（全部署能耗语义）的行——比 InferenceX 界面更严格，界面还会展示早于版本标注机制的已验证行。未知值返回 400 Unknown powerValid filter；不能与 view=calculator 组合使用（any 除外，等同于不筛选）。',
         { type: 'string', enum: POWER_VALIDITY_FILTERS, default: 'any' },
         'strictV2',
       ),
@@ -759,8 +759,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported, the calculator sequence is unknown, the powerValid filter is unknown, or powerValid is combined with view=calculator.',
-        '模型缺失或不受支持、计算器序列未知、powerValid 筛选值未知，或 powerValid 与 view=calculator 组合使用。',
+        'The model is missing or unsupported, the calculator sequence is unknown, the powerValid filter is unknown, or a non-any powerValid is combined with view=calculator.',
+        '模型缺失或不受支持、计算器序列未知、powerValid 筛选值未知，或非 any 的 powerValid 与 view=calculator 组合使用。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
