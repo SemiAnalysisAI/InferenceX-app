@@ -23,12 +23,15 @@ describe('measured-power API documentation', () => {
     }
   });
 
-  it('reserves optional power_invalid_reasons and power_audit row fields', () => {
+  it('documents optional power_invalid_reasons and power_audit row fields', () => {
     const reasons = benchmarkRowSchema?.properties?.power_invalid_reasons;
     expect(reasons?.type).toBe('array');
     expect(reasons?.items).toEqual({ type: 'string' });
+    // PLAN-07 turned the fields live; the reserved wording must not linger.
+    expect(reasons?.description).not.toMatch(/reserved|forthcoming/iu);
 
     const audit = benchmarkRowSchema?.properties?.power_audit;
+    expect(audit?.description).not.toMatch(/reserved|forthcoming/iu);
     expect(Object.keys(audit?.properties ?? {}).toSorted()).toEqual(
       [
         'window_start_unix',

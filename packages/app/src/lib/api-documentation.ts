@@ -248,7 +248,7 @@ const powerAuditSchema: ApiSchema = {
   },
   additionalProperties: true,
   description:
-    'Optional power measurement-window audit. Individual fields may be absent; legacy rows omit the object.',
+    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). Present on valid and invalid rows from provenance-aware producers; absent on legacy rows.',
 };
 const workerPowerSchema = objectSchemaWithOptional(
   {
@@ -297,7 +297,7 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     power_invalid_reasons: {
       ...arraySchema(stringSchema),
       description:
-        'Optional snake_case validation reason codes when metrics.power_valid == 0. Absent on legacy rows.',
+        'Producer snake_case reason codes explaining a withheld measurement, present when metrics.power_valid == 0. Absent on legacy rows and validated rows.',
     },
     power_audit: powerAuditSchema,
     date: { type: 'string', format: 'date' },
@@ -2678,8 +2678,8 @@ const overview = {
       id: 'measured-power',
       title: text('Measured power', '实测功率'),
       description: text(
-        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons and power_audit provide optional producer validation details. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
-        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示该数据行早于验证机制。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 与 power_audit 可包含生产端的验证详情。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists the producer reason codes (snake_case) on withheld rows (power_valid == 0), and power_audit carries the compact measurement-window audit (window bounds, GPU counts, sample statistics, producer identity) on valid and invalid rows alike; both are absent on rows ingested before the provenance contract. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示该数据行早于验证机制。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 在实测值被扣留的行（power_valid == 0）上列出生产端的 snake_case 原因码；power_audit 在有效与无效行上都携带精简的测量窗口审计信息（窗口边界、GPU 数量、采样统计、生产者标识）；早于溯源契约摄取的行均不含这两个字段。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
       ),
       shape: 'BenchmarkRows',
       example: {

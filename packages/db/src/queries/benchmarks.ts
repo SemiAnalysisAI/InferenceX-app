@@ -1,6 +1,6 @@
 import type { DbClient } from '../connection.js';
-import type { WorkerPower } from '../etl/benchmark-mapper.js';
-export type { WorkerPower } from '../etl/benchmark-mapper.js';
+import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
+export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
  * One entry in `BenchmarkRow.workers` — mirrors the runner's aggregate_power.py
@@ -47,6 +47,18 @@ export interface BenchmarkRow {
    * aggregate_power.py's multinode patch — surfaced as undefined here.
    */
   workers?: BenchmarkWorkerRow[];
+  /**
+   * Producer reason codes explaining a withheld power verdict. Stored in the
+   * dedicated `power_invalid_reasons` JSONB column (migration 014).
+   * Null/undefined on legacy rows and rows from valid runs.
+   */
+  power_invalid_reasons?: string[] | null;
+  /**
+   * Compact power measurement-window audit from the producer contract.
+   * Stored in the dedicated `power_audit` JSONB column (migration 014).
+   * Null/undefined on legacy rows predating the provenance contract.
+   */
+  power_audit?: PowerAudit | null;
   date: string;
   /** Producer identity and timestamp; preserved for per-point provenance. */
   workflow_run_id?: number;
@@ -256,6 +268,12 @@ function executeRecursiveBenchmarkQuery(
       br.recipe_fingerprint,
       ${plan.metricsExpression},
       br.workers,
+      -- Deploy-order tolerance (the #405/#407 lesson): a bare br.power_* column
+      -- reference fails at query PLAN time until the next ingest run applies
+      -- migration 014. The jsonb key lookup degrades to NULL while the column
+      -- is missing and is byte-identical once it exists.
+      to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons,
+      to_jsonb(br) -> 'power_audit' AS power_audit,
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
@@ -451,6 +469,10 @@ export async function getLatestBenchmarks(
       lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
+      -- Same deploy-order tolerance as the recursive branch: NULL until
+      -- migration 014 recreates latest_benchmarks, identical afterwards.
+      to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons,
+      to_jsonb(lb) -> 'power_audit' AS power_audit,
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,

@@ -73,6 +73,10 @@ export function normalizeArtifactRows(
       // Surface the same per-worker payload the DB path emits so unofficial
       // overlays carry the multinode measured-power breakdown too.
       workers: params.workers,
+      // Same parity for the power audit provenance: overlay rows explain a
+      // withheld verdict exactly like persisted rows do.
+      power_invalid_reasons: params.powerInvalidReasons,
+      power_audit: params.powerAudit,
       date,
       run_url: runUrl,
     });
