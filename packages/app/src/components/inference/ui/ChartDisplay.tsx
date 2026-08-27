@@ -41,6 +41,7 @@ import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/seg
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
@@ -1013,6 +1014,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             })()}
                           </h2>
                           <p className="text-sm text-muted-foreground mb-2">
+                            <ModelLogo model={graph.model as Model} className="mr-1.5" />
                             {getModelLabel(graph.model as Model)} •{' '}
                             {selectedPrecisions
                               .map((prec) => getPrecisionLabel(prec as Precision))

@@ -48,6 +48,13 @@ interface ModelConfig {
   prefix: string;
   category: CategoryTag;
   /**
+   * Filename under `public/logos/` for the model creator's logo, shown beside
+   * the model name in UI surfaces such as the inference chart caption. Absent =
+   * no logo rendered. Monochrome `currentColor`/black SVGs are inverted in dark
+   * mode by `ModelLogo`; colored raster assets (`.webp`) are shown as-is.
+   */
+  logo?: string;
+  /**
    * Data-driven exclusion rules for this model (see `exclusion.ts`). Each spec
    * partitions matching config keys into comparability groups that can't share
    * a graph with each other. Absent/empty = no exclusion.
@@ -129,6 +136,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
     category: 'default',
+    logo: 'deepseek.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
   },
   [Model.Kimi_K3]: {
@@ -137,6 +145,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
+    logo: 'moonshot-ai.svg',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
@@ -152,22 +161,40 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
+    logo: 'moonshot-ai.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
     category: 'default',
+    logo: 'minimax.svg',
   },
   [Model.DeepSeek_R1]: {
     label: 'DeepSeek R1 0528 671B',
     prefix: 'dsr1',
     category: 'maintenance',
+    logo: 'deepseek.svg',
   },
-  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'deprecated' },
+  [Model.GLM_5]: {
+    label: 'GLM5/5.1 744B',
+    prefix: 'glm5',
+    category: 'deprecated',
+    logo: 'zhipu.webp',
+  },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
-  [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3 744B', prefix: 'glm5.2', category: 'default' },
-  [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
+  [Model.GLM_5_2]: {
+    label: 'GLM5.2/GLM5.3 744B',
+    prefix: 'glm5.2',
+    category: 'default',
+    logo: 'zhipu.webp',
+  },
+  [Model.Qwen3_5]: {
+    label: 'Qwen3.5 397B',
+    prefix: 'qwen3.5',
+    category: 'default',
+    logo: 'qwen.webp',
+  },
   // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
   // per forward pass, and a separate 4B MTP head the parameter count excludes.
   // Default alongside the other current models, so it appears in the /overview
@@ -178,17 +205,34 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
     category: 'default',
+    logo: 'qwen.webp',
   },
-  [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
+  [Model.GptOss]: {
+    label: 'gpt-oss 120B',
+    prefix: 'gptoss',
+    category: 'deprecated',
+    logo: 'openai.svg',
+  },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
     // Superseded by MiniMax M3, so it's deprecated (no longer actively benchmarked).
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
     category: 'deprecated',
+    logo: 'minimax.svg',
   },
-  [Model.Llama3_3_70B]: { label: 'Llama 3.3 70B Instruct', prefix: '70b', category: 'deprecated' },
-  [Model.Llama3_1_70B]: { label: 'Llama 3.1 70B Instruct', prefix: '', category: 'hidden' },
+  [Model.Llama3_3_70B]: {
+    label: 'Llama 3.3 70B Instruct',
+    prefix: '70b',
+    category: 'deprecated',
+    logo: 'meta-icon.svg',
+  },
+  [Model.Llama3_1_70B]: {
+    label: 'Llama 3.1 70B Instruct',
+    prefix: '',
+    category: 'hidden',
+    logo: 'meta-icon.svg',
+  },
 };
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
@@ -227,6 +271,15 @@ export function getModelCategory(model: Model): CategoryTag {
 
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/**
+ * Filename under `public/logos/` for the model creator's logo, or null when the
+ * model has no configured logo. Callers render it via `ModelLogo`, which
+ * handles dark-mode inversion and load-failure fallback.
+ */
+export function getModelLogo(model: Model): string | null {
+  return MODEL_CONFIG[model]?.logo ?? null;
 }
 
 /**
