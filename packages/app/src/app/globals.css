@@ -380,6 +380,16 @@ html:not(.minecraft) .footer-ink {
   border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
 }
 
+/* From xl up the header is a left sidebar, so the grass strip moves to its
+   right edge and runs top-to-bottom instead of underlining a top bar. */
+@media (min-width: 80rem) {
+  .minecraft header {
+    border-bottom: 0 !important;
+    border-right: 3px solid transparent !important;
+    border-image: linear-gradient(to bottom, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
+  }
+}
+
 /* Sunken slot effect on cards */
 .minecraft .border-border {
   border: 2px solid;

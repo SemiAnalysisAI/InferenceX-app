@@ -224,8 +224,12 @@ export default async function RootLayout({
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
-              <div className="grow flex flex-col">{children}</div>
-              <Footer starCount={starCount} />
+              {/* From xl up the header renders as a fixed 18rem left sidebar,
+                  so the content column (pages + footer) shifts right to match. */}
+              <div className="grow flex flex-col min-w-0 xl:pl-72">
+                <div className="grow flex flex-col">{children}</div>
+                <Footer starCount={starCount} />
+              </div>
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}
