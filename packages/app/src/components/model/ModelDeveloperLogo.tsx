@@ -1,10 +1,10 @@
-import { getModelDeveloperLogo } from '@/lib/model-logos';
+import { getModelDeveloperLogo, isMonochromeLogo } from '@/lib/model-logos';
 
 /**
- * Developer logo for `/model` surfaces. Renders nothing when the developer
- * has no logo mapping, so pages can treat the logo as optional decoration.
- * Mirrors the quotes-page logo treatment (grayscale + dark-mode invert) so
- * monochrome `currentColor` SVGs stay visible on both themes.
+ * Full-color developer logo for `/model` surfaces. Renders nothing when the
+ * developer has no logo mapping, so pages can treat the logo as optional
+ * decoration. Monochrome (black `currentColor`) marks get a dark-mode invert
+ * so they stay visible on both themes; full-color logos render as-is.
  */
 export default function ModelDeveloperLogo({
   developer,
@@ -22,7 +22,7 @@ export default function ModelDeveloperLogo({
       alt={`${developer} logo`}
       width={48}
       height={48}
-      className={`shrink-0 object-contain grayscale opacity-70 dark:invert ${className ?? ''}`}
+      className={`shrink-0 object-contain ${isMonochromeLogo(logo) ? 'dark:invert' : ''} ${className ?? ''}`}
     />
   );
 }

@@ -1,19 +1,35 @@
 /**
- * Maps `/model/[slug]` frontmatter `developer` names to logo files under
- * `public/logos/`. Keys must match the `developer` field in
+ * Logo files under `public/logos/` whose brand mark is plain black
+ * (`currentColor` SVGs): they need a dark-mode invert to stay visible.
+ * Full-color logos render as-is in both themes. Shared by every surface that
+ * renders model/developer logos (`/model` pages, inference chart captions).
+ */
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['kimi.svg', 'openai.svg']);
+
+/** Whether a logo file needs a dark-mode invert to stay visible. */
+export function isMonochromeLogo(file: string): boolean {
+  return MONOCHROME_LOGO_FILES.has(file);
+}
+
+/**
+ * Maps `/model/[slug]` frontmatter `developer` names to full-color logo files
+ * under `public/logos/`. Keys must match the `developer` field in
  * `content/models/<slug>.mdx` exactly; a missing entry simply renders no logo
  * (the pages treat the logo as optional decoration).
  */
 export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
-  'Alibaba (Qwen)': 'qwen.webp',
-  DeepSeek: 'deepseek.svg',
-  // Square Meta mark — `meta.svg` is a wide wordmark that is illegible at
-  // the small sizes the model pages use.
-  Meta: 'meta-mark.svg',
-  MiniMax: 'minimax.svg',
-  'Moonshot AI': 'moonshot-ai.svg',
+  'Alibaba (Qwen)': 'qwen-color.svg',
+  DeepSeek: 'deepseek-color.svg',
+  Meta: 'meta-color.svg',
+  MiniMax: 'minimax-color.svg',
+  // Moonshot AI's model pages are all Kimi models; the Kimi product mark is
+  // the recognizable brand, and like Moonshot's own mark it is monochrome by
+  // design (the color variant is a white-on-blue app tile that vanishes on
+  // light backgrounds).
+  'Moonshot AI': 'kimi.svg',
+  // OpenAI's brand mark is monochrome by design — no color variant exists.
   OpenAI: 'openai.svg',
-  'Z.ai (Zhipu AI)': 'zhipu.webp',
+  'Z.ai (Zhipu AI)': 'zhipu-color.svg',
 };
 
 /** Logo filename under `/logos/` for a model developer, if one exists. */

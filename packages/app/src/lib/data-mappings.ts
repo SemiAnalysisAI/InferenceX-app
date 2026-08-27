@@ -136,7 +136,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
     category: 'default',
-    logo: 'deepseek.svg',
+    logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
   },
   [Model.Kimi_K3]: {
@@ -145,7 +145,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
-    logo: 'moonshot-ai.svg',
+    logo: 'kimi.svg',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
@@ -161,25 +161,25 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
-    logo: 'moonshot-ai.svg',
+    logo: 'kimi.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
     category: 'default',
-    logo: 'minimax.svg',
+    logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
     label: 'DeepSeek R1 0528 671B',
     prefix: 'dsr1',
     category: 'maintenance',
-    logo: 'deepseek.svg',
+    logo: 'deepseek-color.svg',
   },
   [Model.GLM_5]: {
     label: 'GLM5/5.1 744B',
     prefix: 'glm5',
     category: 'deprecated',
-    logo: 'zhipu.webp',
+    logo: 'zhipu-color.svg',
   },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
@@ -187,13 +187,13 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5.2/GLM5.3 744B',
     prefix: 'glm5.2',
     category: 'default',
-    logo: 'zhipu.webp',
+    logo: 'zhipu-color.svg',
   },
   [Model.Qwen3_5]: {
     label: 'Qwen3.5 397B',
     prefix: 'qwen3.5',
     category: 'default',
-    logo: 'qwen.webp',
+    logo: 'qwen-color.svg',
   },
   // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
   // per forward pass, and a separate 4B MTP head the parameter count excludes.
@@ -205,7 +205,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
     category: 'default',
-    logo: 'qwen.webp',
+    logo: 'qwen-color.svg',
   },
   [Model.GptOss]: {
     label: 'gpt-oss 120B',
@@ -219,19 +219,19 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
     category: 'deprecated',
-    logo: 'minimax.svg',
+    logo: 'minimax-color.svg',
   },
   [Model.Llama3_3_70B]: {
     label: 'Llama 3.3 70B Instruct',
     prefix: '70b',
     category: 'deprecated',
-    logo: 'meta-icon.svg',
+    logo: 'meta-color.svg',
   },
   [Model.Llama3_1_70B]: {
     label: 'Llama 3.1 70B Instruct',
     prefix: '',
     category: 'hidden',
-    logo: 'meta-icon.svg',
+    logo: 'meta-color.svg',
   },
 };
 
