@@ -1,3 +1,5 @@
+import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
+
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
@@ -22,6 +24,25 @@ export interface CollectiveXSeriesSelection {
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+
+/**
+ * CollectiveX artifacts identify runner pools in the SKU (for example,
+ * `b200-nscale` or `h100-dgxc`). Collapse known hardware identifiers to the
+ * canonical GPU key while leaving unknown SKU structure intact.
+ */
+export function normalizeCollectiveXSku(sku: string): string {
+  const normalized = sku.trim().toLowerCase();
+  const base = normalized.split(':').at(-1)?.split('-')[0] ?? normalized;
+  return GPU_KEYS.has(base) ? base : normalized;
+}
+
+export function collectiveXSkuLabel(sku: string): string {
+  return normalizeCollectiveXSku(sku).toUpperCase();
+}
+
+export function collectiveXCaseLabel(label: string, sku: string): string {
+  return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
+}
 
 /**
  * Stable within the newest-first run table. Preserve the six simple patterns,
@@ -57,7 +78,7 @@ export function collectiveXTopologyLabel(
 }
 
 export function collectiveXLegendLabel(series: CollectiveXSeries): string {
-  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
 }
 
 export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -66,7 +87,7 @@ export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRu
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
+  return `${series.system.vendor}_${normalizeCollectiveXSku(series.system.sku)}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
 /** Namespace series ids and attach the run's current selection-order style index. */
@@ -244,11 +265,11 @@ export interface CollectiveXKvChartPoint {
 }
 
 export function collectiveXKvColorKey(kase: CollectiveXKvCase): string {
-  return `${kase.vendor ?? 'unknown'}_${kase.sku}_${kase.backend}_${kase.fabric}_${kase.precision}`;
+  return `${kase.vendor ?? 'unknown'}_${normalizeCollectiveXSku(kase.sku)}_${kase.backend}_${kase.fabric}_${kase.precision}`;
 }
 
 export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
-  return `${kase.sku.toUpperCase()} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
+  return `${collectiveXSkuLabel(kase.sku)} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
 }
 
 /**

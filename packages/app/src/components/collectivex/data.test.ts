@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chartPoints,
+  collectiveXCaseLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
+  collectiveXSkuLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
   metricValue,
+  normalizeCollectiveXSku,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
   collectiveXKvChartPoints,
@@ -39,15 +42,21 @@ describe('collectiveXTopologyLabel', () => {
 });
 
 describe('collectiveXSeriesLabel', () => {
+  it('normalizes runner-pool suffixes in known SKU labels', () => {
+    expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
+    expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
+    expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
+    expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
+  });
+
   it('renders the varying identity axes of a series', () => {
-    expect(collectiveXSeriesLabel(scaleUp)).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
-    );
+    expect(collectiveXSeriesLabel(scaleUp)).toBe('H200 · deepep-v2 · EP8 · normal · decode · bf16');
   });
 
   it('distinguishes the dispatch precision', () => {
     expect(collectiveXSeriesLabel(makeCollectiveXSeries({ precision: 'fp8' }))).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · fp8',
+      'H200 · deepep-v2 · EP8 · normal · decode · fp8',
     );
   });
 
@@ -58,14 +67,14 @@ describe('collectiveXSeriesLabel', () => {
   it('includes the run id for namespaced multi-run series', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXSeriesLabel(runSeries)).toBe(
-      '#30165164821 · H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+      '#30165164821 · H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 
   it('keeps run ids out of the configuration label used by the legend', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXLegendLabel(runSeries)).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+      'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 });
@@ -108,6 +117,12 @@ describe('collectiveXColorKey', () => {
     const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
     const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
     expect(collectiveXColorKey(first)).toBe(collectiveXColorKey(second));
+  });
+
+  it('assigns the same hardware color across runner-pool SKU suffixes', () => {
+    const nscale = makeCollectiveXSeries({ sku: 'b200-nscale' });
+    const dgxc = makeCollectiveXSeries({ sku: 'b200-dgxc' });
+    expect(collectiveXColorKey(nscale)).toBe(collectiveXColorKey(dgxc));
   });
 });
 

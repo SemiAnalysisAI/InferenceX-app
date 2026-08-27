@@ -43,6 +43,11 @@ const kvDataset = buildDataset({
   ],
   meta: { run_id: '162', generated_at: '2026-08-07T12:20:00Z', source_sha: 'e'.repeat(40) },
 });
+const kvOnlyDataset = buildDataset({
+  shards: [],
+  kv: [{}],
+  meta: { run_id: '163', generated_at: '2026-08-08T12:20:00Z', source_sha: 'f'.repeat(40) },
+});
 const ADMIN_TOKEN_KEY = 'collectivex-admin-token';
 
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
@@ -174,7 +179,7 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'Payload rate is derived');
   });
 
-  it('allows both measured kernel modes to be selected together', () => {
+  it('selects normal and low-latency kernel modes by default', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],
     });
@@ -185,13 +190,6 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@run');
 
     cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
-    cy.get('[data-testid="collectivex-mode-toggle"] button')
-      .contains('Normal')
-      .should('have.attr', 'aria-pressed', 'true');
-    cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'deepep-v2');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-
-    cy.get('[data-testid="collectivex-mode-toggle"]').contains('Low-latency').click();
     cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
       'have.length',
       2,
@@ -212,6 +210,42 @@ describe('CollectiveX neutral run view', () => {
       2,
     );
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+  });
+
+  it('normalizes runner-pool suffixes in SKU controls and chart labels', () => {
+    const withRunnerPoolSkus = buildDataset({
+      shards: [
+        makeRawShard({ sku: 'b200-nscale' }),
+        makeRawShard({ sku: 'h100-dgxc', mode: 'low-latency' }),
+      ],
+    });
+    installRuns([withRunnerPoolSkus]);
+    installRun(withRunnerPoolSkus);
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="chart-legend"]')
+      .should('contain.text', 'B200')
+      .and('contain.text', 'H100')
+      .and('not.contain.text', 'B200-NSCALE')
+      .and('not.contain.text', 'H100-DGXC');
+    cy.get(`[data-testid="collectivex-run-row-${withRunnerPoolSkus.run.run_id}"]`)
+      .should('contain.text', 'B200')
+      .and('contain.text', 'H100')
+      .and('not.contain.text', 'B200-NSCALE')
+      .and('not.contain.text', 'H100-DGXC');
+    cy.get('[data-testid="collectivex-sku-select"]').click();
+    cy.get('[role="option"]').then(($options) => {
+      const labels = [...$options].map((option) => option.textContent?.trim());
+      expect(labels).to.include.members(['B200', 'H100']);
+      expect(labels).not.to.include.members(['B200-NSCALE', 'H100-DGXC']);
+    });
+    cy.contains('[role="option"]', 'B200').click();
+    cy.get('[data-testid="chart-legend"]')
+      .should('contain.text', 'B200')
+      .and('not.contain.text', 'H100');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
   it('selects the available phase when a partial run only measured prefill', () => {
@@ -333,27 +367,51 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
-  it('keeps the chart on top and presents the matrix inventory', () => {
-    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
-    cy.get('[data-testid="collectivex-inventory"]')
-      .should('contain.text', 'Matrix case inventory')
-      .and('contain.text', `${dataset.coverage.length} cases`);
-    cy.get('[data-testid="collectivex-inventory-table"]')
-      .should('contain.text', 'H200-DGXC')
-      .and('contain.text', 'B300');
+  it('filters the run table by EP and KV suite without hiding mixed-suite runs', () => {
+    installRuns([kvOnlyDataset, kvDataset, dataset]);
+    installRun(kvOnlyDataset, 'kvOnlyRun');
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@kvOnlyRun');
+
+    cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]').should(
+      'contain.text',
+      'All',
+    );
+    cy.get(`[data-testid="collectivex-run-row-${kvOnlyDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${kvDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${dataset.run.run_id}"]`).should('be.visible');
+
+    cy.get('[data-testid="collectivex-suite-filter"]').contains('[role="tab"]', 'EP').click();
+    cy.get(`[data-testid="collectivex-run-row-${kvOnlyDataset.run.run_id}"]`).should('not.exist');
+    cy.get(`[data-testid="collectivex-run-row-${kvDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${dataset.run.run_id}"]`).should('be.visible');
+
+    cy.get('[data-testid="collectivex-suite-filter"]').contains('[role="tab"]', 'KV').click();
+    cy.get(`[data-testid="collectivex-run-row-${kvOnlyDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${kvDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${dataset.run.run_id}"]`).should('not.exist');
   });
 
-  it('localizes the matrix inventory on the Chinese route', () => {
+  it('does not render the matrix case inventory', () => {
+    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
+    cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
+    cy.get('[data-testid="collectivex-display"]').should(
+      'not.contain.text',
+      'Matrix case inventory',
+    );
+  });
+
+  it('localizes the suite filter on the Chinese route', () => {
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
     cy.wait('@run');
 
-    cy.get('[data-testid="collectivex-inventory"]')
-      .should('contain.text', '矩阵测试用例清单')
-      .and('contain.text', '数据点状态')
-      .and('contain.text', '解码')
-      .and('contain.text', '常规')
-      .and('contain.text', '成功');
+    cy.get('[data-testid="collectivex-suite-filter"]')
+      .should('have.attr', 'aria-label', '按测试套件筛选 CollectiveX 运行')
+      .and('contain.text', '全部')
+      .and('contain.text', 'EP')
+      .and('contain.text', 'KV');
   });
 });
 
