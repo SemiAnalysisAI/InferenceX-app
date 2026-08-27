@@ -109,9 +109,17 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
       // The carousel only renders the active quote's logo, and it always starts on
       // the first (MiniMax) quote, so a mobile load fetches at most that one logo —
-      // never the full supporter set.
-      const carouselLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
-      expect(carouselLogos.size).to.be.lessThan(3);
+      // never the full supporter set. The AgentX ledger's model marks under
+      // /logos/models/ are excluded: they are visible mobile content (sub-KB
+      // inline-size SVGs, not decorative weight), and Firefox's lazy-load
+      // distance nondeterministically prefetches them on an 823px-tall
+      // viewport, which made this assertion flaky in CI.
+      const carouselLogos = new Set(
+        resourceNames.filter(
+          (name) => name.includes('/logos/') && !name.includes('/logos/models/'),
+        ),
+      );
+      expect(carouselLogos.size, JSON.stringify([...carouselLogos])).to.be.lessThan(3);
       expect(
         resourceNames.some(
           (name) => name.includes('/brand/logo-color.webp') && name.includes('w=128'),
