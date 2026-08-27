@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import type { RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
 
 import {
   type CollectiveXKvFrontierPoint,
@@ -48,6 +49,28 @@ function escapeHtml(value: string): string {
 
 function faded(color: string): string {
   return `color-mix(in srgb, ${color} 35%, transparent)`;
+}
+
+function renderFrontierRings(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  points: CollectiveXKvFrontierPoint[],
+  xScale: RenderContext['xScale'],
+  yScale: RenderContext['yScale'],
+): void {
+  const x = xScale as d3.ScaleLogarithmic<number, number>;
+  const y = yScale as d3.ScaleLogarithmic<number, number>;
+  group
+    .selectAll<SVGCircleElement, CollectiveXKvFrontierPoint>('.frontier-ring')
+    .data(points, (point) => `${point.seriesId}-${point.row.batch}`)
+    .join('circle')
+    .attr('class', 'frontier-ring')
+    .attr('cx', (point) => x(point.x))
+    .attr('cy', (point) => y(point.y))
+    .attr('r', 8)
+    .attr('fill', 'none')
+    .attr('stroke', 'var(--foreground)')
+    .attr('stroke-width', 1.25)
+    .attr('pointer-events', 'none');
 }
 
 export function CollectiveXKvFrontierChart({
@@ -151,22 +174,16 @@ export function CollectiveXKvFrontierChart({
             maxPoints: Infinity,
           },
         },
+        // A custom layer rather than a second point layer: renderPoints joins
+        // on the shared `.point` class inside the one zoom group, so two point
+        // layers would rebind each other's circles.
         {
-          type: 'point',
+          type: 'custom',
           key: 'collectivex-kv-frontier-rings',
-          data: skuFrontierPoints,
-          config: {
-            getCx: () => 0,
-            getCy: () => 0,
-            getX: (point) => point.x,
-            getY: (point) => point.y,
-            getColor: () => 'none',
-            getRadius: () => 8,
-            stroke: 'var(--foreground)',
-            strokeWidth: 1.25,
-            keyFn: (point) => `${point.seriesId}-${point.row.batch}-ring`,
-            maxPoints: Infinity,
-          },
+          render: (group, ctx: RenderContext) =>
+            renderFrontierRings(group, skuFrontierPoints, ctx.xScale, ctx.yScale),
+          onZoom: (group, ctx: ZoomContext) =>
+            renderFrontierRings(group, skuFrontierPoints, ctx.newXScale, ctx.newYScale),
         },
       ]}
       zoom={{
