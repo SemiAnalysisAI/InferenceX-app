@@ -25,7 +25,6 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
-import { CollectiveXInventory } from './CollectiveXInventory';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
@@ -34,6 +33,7 @@ import {
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXTopologyLabel,
+  normalizeCollectiveXSku,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
 } from './data';
@@ -55,6 +55,8 @@ interface SelectOption<T extends string | number> {
   value: T;
   label: string;
 }
+
+type CollectiveXSuiteFilter = 'all' | 'ep' | 'kv';
 
 const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p50', label: 'p50' },
@@ -102,6 +104,10 @@ const STRINGS = {
     runsDescription:
       'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
     runsShown: 'Runs shown',
+    suiteControl: 'Suites',
+    suiteAria: 'Filter CollectiveX runs by suite',
+    allSuites: 'All',
+    noSuiteRuns: 'No runs contain the selected suite.',
     selectRuns: 'Select one or more runs from the table to show their data.',
     selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
@@ -176,7 +182,6 @@ const STRINGS = {
       'gate-weighted': '门控加权合并',
     },
     tabs: {
-      inventory: 'Matrix case inventory',
       case: 'Selected matrix case',
       evidence: '证据',
     },
@@ -206,6 +211,10 @@ const STRINGS = {
     runsDescription:
       'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
     runsShown: 'Runs shown',
+    suiteControl: '测试套件',
+    suiteAria: '按测试套件筛选 CollectiveX 运行',
+    allSuites: '全部',
+    noSuiteRuns: '没有包含所选测试套件的运行。',
     selectRuns: 'Select one or more runs from the table to show their data.',
     selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
@@ -323,11 +332,21 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
+  const [suiteFilter, setSuiteFilter] = useState<CollectiveXSuiteFilter>('all');
   const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
   const [bulkDeletingRunIds, setBulkDeletingRunIds] = useState<Set<string>>(new Set());
   const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
   const runList = runsQuery.data?.runs ?? [];
+  const filteredRunList = useMemo(
+    () =>
+      runList.filter((run) => {
+        if (suiteFilter === 'all') return true;
+        const kvRequested = run.kv_cases?.requested ?? 0;
+        return suiteFilter === 'kv' ? kvRequested > 0 : run.requested_cases - kvRequested > 0;
+      }),
+    [runList, suiteFilter],
+  );
   const orderedVisibleRunIds = useMemo(() => {
     const liveRunIds = new Set(runList.map((run) => run.run_id));
     return [...visibleRunIds].filter((runId) => liveRunIds.has(runId));
@@ -366,9 +385,9 @@ export default function CollectiveXDisplay() {
   const [epSize, setEpSize] = useState(8);
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
-  // Normal (throughput) kernels are the baseline; the availability effect
-  // below falls back when a slice only measured low-latency kernels.
-  const [modes, setModes] = useState<CollectiveXMode[]>(['normal']);
+  // Compare throughput-oriented and low-latency kernels by default. The
+  // availability effect below falls back when a slice has neither preference.
+  const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
   // Prefer FP8 when the run measured it; the availability effect below falls
   // back to bf16 for runs (or EP/phase slices) without FP8 series.
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
@@ -508,7 +527,10 @@ export default function CollectiveXDisplay() {
     [combinedSeries, seriesSelection],
   );
   const skuOptions = useMemo(
-    () => ['all', ...new Set(matchedSeries.map((item) => item.system.sku))],
+    () => [
+      'all',
+      ...new Set(matchedSeries.map((item) => normalizeCollectiveXSku(item.system.sku))),
+    ],
     [matchedSeries],
   );
   const backendOptions = useMemo(
@@ -516,7 +538,7 @@ export default function CollectiveXDisplay() {
       'all',
       ...new Set(
         matchedSeries
-          .filter((item) => sku === 'all' || item.system.sku === sku)
+          .filter((item) => sku === 'all' || normalizeCollectiveXSku(item.system.sku) === sku)
           .map((item) => item.backend),
       ),
     ],
@@ -530,7 +552,7 @@ export default function CollectiveXDisplay() {
     () =>
       matchedSeries.filter(
         (item) =>
-          (sku === 'all' || item.system.sku === sku) &&
+          (sku === 'all' || normalizeCollectiveXSku(item.system.sku) === sku) &&
           (backend === 'all' || item.backend === backend),
       ),
     [backend, matchedSeries, sku],
@@ -800,6 +822,22 @@ export default function CollectiveXDisplay() {
             <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end md:w-auto">
+            <ControlGroup label={t.suiteControl}>
+              <SegmentedToggle
+                value={suiteFilter}
+                options={[
+                  { value: 'all', label: t.allSuites },
+                  { value: 'ep', label: 'EP' },
+                  { value: 'kv', label: 'KV' },
+                ]}
+                onValueChange={(suite) => {
+                  setSuiteFilter(suite);
+                  track('collectivex_suite_filter_changed', { suite });
+                }}
+                ariaLabel={t.suiteAria}
+                testId="collectivex-suite-filter"
+              />
+            </ControlGroup>
             <Button
               type="button"
               variant="destructive"
@@ -830,13 +868,14 @@ export default function CollectiveXDisplay() {
           </div>
         </div>
         <CollectiveXRunsTable
-          runs={runList}
+          runs={filteredRunList}
           selectedRunIndexById={selectedRunIndexById}
           visibleRunIds={visibleRunIds}
           loadingRunIds={loadingRunIds}
           deletingRunIds={deletingRunIds}
           onVisibleChange={handleVisibleRunChange}
           onDelete={(runId) => void handleDeleteRun(runId)}
+          emptyMessage={suiteFilter === 'all' ? undefined : t.noSuiteRuns}
         />
       </Card>
 
@@ -1084,10 +1123,6 @@ export default function CollectiveXDisplay() {
               />
             </div>
           </Card>
-          <CollectiveXInventory
-            key={`${version}-${datasets.map((dataset) => `${dataset.run.run_id}:${dataset.run.run_attempt}`).join(',')}`}
-            datasets={datasets}
-          />
         </>
       )}
     </section>

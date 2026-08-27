@@ -20,6 +20,7 @@ import {
   collectiveXKvColorKey,
   collectiveXKvLegendLabel,
   collectiveXRunDasharray,
+  collectiveXSkuLabel,
 } from './data';
 import type { CollectiveXDataset, CollectiveXOutcome } from './types';
 
@@ -177,7 +178,7 @@ export function CollectiveXKvSection({
         sortValue: (row) => Number(row.run_id),
         className: 'whitespace-nowrap',
       },
-      { header: 'SKU', cell: (row) => row.sku.toUpperCase(), sortValue: (row) => row.sku },
+      { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
         header: 'Backend',
         cell: (row) => row.backend,
