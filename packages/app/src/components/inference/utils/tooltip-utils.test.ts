@@ -799,6 +799,137 @@ describe('generateGPUGraphTooltipContent', () => {
 });
 
 // ===========================================================================
+// per-worker measured power drilldown (all three generators, pinned-only)
+// ===========================================================================
+describe('worker power drilldown', () => {
+  const workers = [
+    { role: 'frontend', worker_idx: 0, hosts: ['fe0'], num_gpus: 0, avg_power_w: 120 },
+    {
+      role: 'prefill',
+      worker_idx: 0,
+      hosts: ['pn0'],
+      num_gpus: 8,
+      avg_power_w: 612.3,
+      avg_temp_c: 68.4,
+      peak_temp_c: 79.2,
+      avg_util_pct: 88.5,
+      avg_mem_used_mb: 71234.5,
+    },
+    { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+  ];
+
+  const overlayData = {
+    label: 'feature-branch',
+    hardwareConfig: mockHardwareConfig,
+    data: [],
+    runUrl: 'https://example.com',
+  } as any;
+
+  it('renders the worker table on a pinned tooltip in all three generators', () => {
+    const config = tooltipConfig({ data: pt({ workers }), isPinned: true });
+    const outputs = [
+      generateTooltipContent(config),
+      generateOverlayTooltipContent({ ...config, overlayData }),
+      generateGPUGraphTooltipContent(config),
+    ];
+    for (const html of outputs) {
+      expect(html).toContain('data-testid="tooltip-worker-power"');
+      expect(html).toContain('Measured Worker Power');
+      expect(html).toContain('<strong>prefill[0]</strong>');
+      expect(html).toContain('612.3 W');
+      expect(html).toContain('<strong>decode[0]</strong>');
+      expect(html).toContain('701.5 W');
+      expect(html).toContain('<strong>frontend[0]</strong>');
+      expect(html).toContain('0 chips');
+      expect(html).toContain('pn0');
+    }
+  });
+
+  it('includes optional telemetry cells only when the worker carries them', () => {
+    const html = generateTooltipContent(tooltipConfig({ data: pt({ workers }), isPinned: true }));
+    // Prefill worker: avg/peak temp, util %, mem in GiB (71234.5 MB ≈ 69.565 GiB).
+    expect(html).toContain('68.4/79.2°C');
+    expect(html).toContain('88.5%');
+    expect(html).toContain('69.565 GiB');
+    // Decode worker row (no telemetry) keeps only role/chips/watts/hosts.
+    const decodeRow = html.split('<strong>decode[0]</strong>')[1].split('</div>')[0];
+    expect(decodeRow).not.toContain('°C');
+    expect(decodeRow).not.toContain('%');
+    expect(decodeRow).not.toContain('GiB');
+  });
+
+  it('renders nothing when the tooltip is not pinned', () => {
+    const config = tooltipConfig({ data: pt({ workers }), isPinned: false });
+    expect(generateTooltipContent(config)).not.toContain('tooltip-worker-power');
+    expect(generateOverlayTooltipContent({ ...config, overlayData })).not.toContain(
+      'tooltip-worker-power',
+    );
+    expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
+  });
+
+  it('renders nothing when workers is absent or empty', () => {
+    expect(generateTooltipContent(tooltipConfig({ isPinned: true }))).not.toContain(
+      'tooltip-worker-power',
+    );
+    expect(
+      generateTooltipContent(tooltipConfig({ data: pt({ workers: [] }), isPinned: true })),
+    ).not.toContain('tooltip-worker-power');
+  });
+
+  it('caps the table at 8 rows with a "+N more workers" line', () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({
+      role: 'decode',
+      worker_idx: i,
+      num_gpus: 8,
+      avg_power_w: 700 + i,
+    }));
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: many }), isPinned: true }),
+    );
+    expect(html).toContain('<strong>decode[7]</strong>');
+    expect(html).not.toContain('<strong>decode[8]</strong>');
+    expect(html).toContain('+2 more workers');
+  });
+
+  it('renders the ZH strings under the zh locale', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers }), isPinned: true, locale: 'zh' }),
+    );
+    expect(html).toContain('各 Worker 实测功耗');
+    expect(html).toContain('8 芯片');
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      role: 'decode',
+      worker_idx: i,
+      num_gpus: 8,
+      avg_power_w: 700,
+    }));
+    const capped = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: many }), isPinned: true, locale: 'zh' }),
+    );
+    expect(capped).toContain('另有 1 个 worker');
+  });
+
+  it('HTML-escapes role and hosts strings from the JSONB boundary', () => {
+    const hostile = [
+      {
+        role: '<img src=x onerror=alert(1)>',
+        worker_idx: 0,
+        hosts: ['<script>evil</script>'],
+        num_gpus: 8,
+        avg_power_w: 700,
+      },
+    ];
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: hostile }), isPinned: true }),
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('&lt;script&gt;evil&lt;/script&gt;');
+  });
+});
+
+// ===========================================================================
 // measured-power certification tier line (all three generators)
 // ===========================================================================
 describe('power tier tooltip line', () => {

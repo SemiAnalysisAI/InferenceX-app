@@ -215,6 +215,12 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_measuredJPerSuccessfulQuery')).toBe(
       'y_measuredJPerSuccessfulQuery',
     );
+    expect(resolveMetricConfigKey('y_measuredPrefillJPerInputToken')).toBe(
+      'y_measuredPrefillJPerInputToken',
+    );
+    expect(resolveMetricConfigKey('y_measuredDecodeJPerOutputToken')).toBe(
+      'y_measuredDecodeJPerOutputToken',
+    );
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
@@ -231,5 +237,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokensPerDollarN')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_measuredPrefillJPerInputToken')).toBe('input');
+    expect(tokenMetricTypeForConfigKey('y_measuredDecodeJPerOutputToken')).toBe('output');
   });
 });
