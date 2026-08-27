@@ -20,14 +20,17 @@ describe('vendor logo icons', () => {
     expect(getLineLabelVendorIcon('gb200_dynamo')).toBe(VENDOR_LOGO_ICONS.NVIDIA);
   });
 
-  it('returns no icon for unknown hardware or vendors without a public logo', () => {
+  it('maps Jalapeño (Teacup/OpenAI) to the OpenAI mark', () => {
+    expect(getLineLabelVendorIcon('jalapeno')).toBe(VENDOR_LOGO_ICONS.Teacup);
+  });
+
+  it('returns no icon for unknown hardware', () => {
     expect(getLineLabelVendorIcon('unknown-hw')).toBeUndefined();
-    // Anonymized preview silicon (Teacup Jalapeño) has no official mark.
-    expect(getLineLabelVendorIcon('jalapeno')).toBeUndefined();
   });
 
   it('inlines brand colors in the data URIs', () => {
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.NVIDIA.href)).toContain('#76B900');
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.AMD.href)).toContain('#000000');
+    expect(decodeURIComponent(VENDOR_LOGO_ICONS.Teacup.href)).toContain('#ffffff');
   });
 });
