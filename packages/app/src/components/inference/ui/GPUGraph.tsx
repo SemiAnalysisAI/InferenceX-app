@@ -173,6 +173,7 @@ const GPUGraph = React.memo(
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
@@ -184,17 +185,20 @@ const GPUGraph = React.memo(
       quickFilters.vendors.length +
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
+      quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
+      setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     ]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates

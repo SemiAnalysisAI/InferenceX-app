@@ -96,7 +96,9 @@ import { bestSeriesPerSku } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
+  parsePowerTiers,
   type DeploymentMode,
+  type PowerTier,
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
@@ -442,7 +444,7 @@ export function InferenceProvider({
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
 
-  // ── Quick filters (vendor / framework / deployment / mtp-stp) ───────────────
+  // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
   // Coarse pre-filters applied to the point set. Empty = no constraint.
   //
   // Initialized empty rather than from the URL so the first client render matches
@@ -455,8 +457,9 @@ export function InferenceProvider({
   const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
+  const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
   useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power') => {
       const v = getUrlParam(key);
       return v ? v.split(',').filter(Boolean) : [];
     };
@@ -466,10 +469,12 @@ export function InferenceProvider({
     // point, so expand it to both aggregate deployment modes.
     const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
+    const power = parsePowerTiers(parse('i_power'));
     if (vendors.length > 0) setQuickFilterVendors(vendors);
     if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
+    if (power.length > 0) setQuickFilterPower(power);
   }, [getUrlParam]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
@@ -477,8 +482,15 @@ export function InferenceProvider({
       frameworks: quickFilterFrameworks,
       deployment: quickFilterDeployment,
       spec: quickFilterSpec,
+      power: quickFilterPower,
     }),
-    [quickFilterVendors, quickFilterFrameworks, quickFilterDeployment, quickFilterSpec],
+    [
+      quickFilterVendors,
+      quickFilterFrameworks,
+      quickFilterDeployment,
+      quickFilterSpec,
+      quickFilterPower,
+    ],
   );
   // Historical Trends hides Quick Filters, so never apply invisible selections there.
   // Agentic charts expose vendor, framework, and deployment filters, but speculative
@@ -1491,6 +1503,7 @@ export function InferenceProvider({
       i_fw: quickFilterFrameworks.join(','),
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
+      i_power: quickFilterPower.join(','),
     },
     [
       selectedYAxisMetric,
@@ -1517,6 +1530,7 @@ export function InferenceProvider({
       quickFilterFrameworks,
       quickFilterDeployment,
       quickFilterSpec,
+      quickFilterPower,
     ],
   );
 
@@ -1783,6 +1797,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
+    setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
     setShowPointLabels,

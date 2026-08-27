@@ -4,6 +4,7 @@ import { ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
+import type { PowerTier } from '@/lib/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 
 import {
@@ -29,9 +30,9 @@ const STRINGS = {
   en: {
     title: 'Quick Filters',
     description:
-      'Narrow the chart by chip vendor, serving framework, deployment mode, and speculative decoding. Selecting none in a group shows all.',
+      'Narrow the chart by chip vendor, serving framework, deployment mode, speculative decoding, and measured-power certification. Selecting none in a group shows all.',
     agenticDescription:
-      'Narrow the chart by chip vendor, serving framework, and deployment mode. Selecting none in a group shows all.',
+      'Narrow the chart by chip vendor, serving framework, deployment mode, and measured-power certification. Selecting none in a group shows all.',
     selected: 'selected',
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show only the best configuration for each chip',
@@ -42,14 +43,19 @@ const STRINGS = {
     multiNode: 'Multi-node',
     disaggregated: 'Disaggregated',
     specDecoding: 'Spec Decoding',
+    power: 'Measured Power',
+    certified: 'Certified',
+    legacyTier: 'Legacy',
     noData: 'No data for the current selection',
     clear: 'Clear filters',
     done: 'Done',
   },
   zh: {
     title: '快捷筛选',
-    description: '按芯片厂商、推理框架、部署模式和投机解码筛选图表。某组不选则显示全部。',
-    agenticDescription: '按芯片厂商、推理框架和部署模式筛选图表。某组不选则显示全部。',
+    description:
+      '按芯片厂商、推理框架、部署模式、投机解码和实测功耗认证筛选图表。某组不选则显示全部。',
+    agenticDescription:
+      '按芯片厂商、推理框架、部署模式和实测功耗认证筛选图表。某组不选则显示全部。',
     selected: '项已选',
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片只显示表现最佳的配置',
@@ -60,6 +66,9 @@ const STRINGS = {
     multiNode: '多节点聚合',
     disaggregated: '分离式',
     specDecoding: '投机解码',
+    power: '实测功耗',
+    certified: '已认证',
+    legacyTier: '旧版',
     noData: '当前选择无可用数据',
     clear: '清除筛选',
     done: '完成',
@@ -75,6 +84,7 @@ const SPEC_MODES: { value: SpecMode; label: string }[] = [
   { value: 'mtp', label: 'MTP' },
   { value: 'stp', label: 'STP' },
 ];
+const POWER_TIERS: PowerTier[] = ['certified', 'legacy'];
 
 function toggleValue<T extends string>(current: T[], value: T): T[] {
   return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
@@ -98,6 +108,7 @@ export function QuickFiltersDialog({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
+    setQuickFilterPower,
   } = useInferenceActions();
   const { selectedSequence, quickFilters } = useInferenceFilters();
   const { availableQuickFilters } = useInferenceData();
@@ -114,7 +125,7 @@ export function QuickFiltersDialog({
   }));
 
   const groups: {
-    key: 'vendor' | 'framework' | 'deployment' | 'spec';
+    key: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power';
     label: string;
     options: readonly { value: string; label: string; available: boolean }[];
     selected: readonly string[];
@@ -166,12 +177,24 @@ export function QuickFiltersDialog({
             selected: quickFilters.spec,
           },
         ]),
+    // Shown for agentic too — the pills auto-disable when no measured
+    // telemetry exists for the current selection.
+    {
+      key: 'power' as const,
+      label: t.power,
+      options: POWER_TIERS.map((value) => ({
+        value,
+        label: value === 'certified' ? t.certified : t.legacyTier,
+        available: availableQuickFilters.power.includes(value),
+      })),
+      selected: quickFilters.power,
+    },
   ];
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
 
   const handleToggle = (
-    category: 'vendor' | 'framework' | 'deployment' | 'spec',
+    category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power',
     value: string,
   ) => {
     const wasActive =
@@ -181,12 +204,16 @@ export function QuickFiltersDialog({
           ? quickFilters.frameworks.includes(value)
           : category === 'deployment'
             ? quickFilters.deployment.includes(value as DeploymentMode)
-            : quickFilters.spec.includes(value as SpecMode);
+            : category === 'power'
+              ? quickFilters.power.includes(value as PowerTier)
+              : quickFilters.spec.includes(value as SpecMode);
     if (category === 'vendor') setQuickFilterVendors(toggleValue(quickFilters.vendors, value));
     else if (category === 'framework')
       setQuickFilterFrameworks(toggleValue(quickFilters.frameworks, value));
     else if (category === 'deployment')
       setQuickFilterDeployment(toggleValue(quickFilters.deployment, value as DeploymentMode));
+    else if (category === 'power')
+      setQuickFilterPower(toggleValue(quickFilters.power, value as PowerTier));
     else setQuickFilterSpec(toggleValue(quickFilters.spec, value as SpecMode));
     track('inference_quick_filter_toggled', { category, value, active: !wasActive });
   };
@@ -196,6 +223,7 @@ export function QuickFiltersDialog({
     setQuickFilterFrameworks([]);
     setQuickFilterDeployment([]);
     setQuickFilterSpec([]);
+    setQuickFilterPower([]);
     track('inference_quick_filters_cleared', { source: 'dialog' });
   };
 
