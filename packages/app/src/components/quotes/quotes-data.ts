@@ -582,6 +582,8 @@ export const CAROUSEL_ORGS = [
   'Alibaba Qwen',
   'Zhipu GLM',
   'OpenAI',
+  'AMD',
+  'NVIDIA',
   'Microsoft',
   'Meta Superintelligence Labs',
   'Oracle',
@@ -589,7 +591,6 @@ export const CAROUSEL_ORGS = [
   'GPU Mode',
   'PyTorch Foundation',
   'CoreWeave',
-  'TensorWave',
   'SGLang',
   'WEKA',
   'Stanford',
@@ -613,4 +614,6 @@ export const CAROUSEL_LABELS: Record<string, string> = {
   'PyTorch Foundation': 'PyTorch',
   'Meta Superintelligence Labs': 'Meta',
   'Moonshot AI': 'Moonshot Kimi',
+  AMD: 'AMD Lisa Su',
+  NVIDIA: 'NVIDIA Jensen',
 };
