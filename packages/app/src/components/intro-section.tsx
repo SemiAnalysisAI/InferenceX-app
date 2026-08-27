@@ -2,15 +2,26 @@ import { Quote } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { SupportersStrip } from '@/components/supporters-strip';
-import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
+import {
+  QUOTES,
+  CAROUSEL_ORGS,
+  CAROUSEL_LABELS,
+  orgAnchorId,
+} from '@/components/quotes/quotes-data';
 import type { Locale } from '@/lib/i18n';
 
 // Strip order follows QUOTES order — supporter orgs are listed first there.
-const supporterOrgs = [
+const stripOrgs = [
   ...new Set(
     QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org)).map((q) => q.org),
   ),
-].map((org) => CAROUSEL_LABELS[org] ?? org);
+];
+
+const supporterOrgs = (quotesPath: string) =>
+  stripOrgs.map((org) => ({
+    label: CAROUSEL_LABELS[org] ?? org,
+    href: `${quotesPath}#${orgAnchorId(org)}`,
+  }));
 
 const HEADING = {
   en: 'Open-Source Continuous Agentic Inference Benchmark Trusted by GigaWatt Token Factories',
@@ -32,7 +43,7 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
         {/* Quote text lives on /quotes now — the band keeps just the org
             strip and a link out, saving vertical space above the fold. */}
         <SupportersStrip
-          orgs={supporterOrgs}
+          orgs={supporterOrgs(isZh ? '/zh/quotes' : '/quotes')}
           moreHref={isZh ? '/zh/quotes' : '/quotes'}
           moreLabel={isZh ? '查看完整评价与更多支持者 →' : undefined}
         />

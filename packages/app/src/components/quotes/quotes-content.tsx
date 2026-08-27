@@ -10,7 +10,7 @@ import { track } from '@/lib/analytics';
 import type { Locale } from '@/lib/i18n';
 
 import { CompanyLogo, highlightBrand } from './quote-utils';
-import { QUOTES } from './quotes-data';
+import { QUOTES, orgAnchorId } from './quotes-data';
 
 const STRINGS = {
   en: {
@@ -26,15 +26,6 @@ const STRINGS = {
     jumpTo: (org: string) => `查看 ${org} 的评价`,
   },
 } as const;
-
-/** Stable anchor id for an org's quote (first occurrence wins). */
-function orgAnchorId(org: string): string {
-  const slug = org
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, '-')
-    .replaceAll(/^-|-$/gu, '');
-  return `quote-${slug}`;
-}
 
 /** Deduplicated logos from all quote orgs. */
 const orgLogos: { org: string; logo: string }[] = [];
