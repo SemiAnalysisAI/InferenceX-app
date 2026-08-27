@@ -119,7 +119,7 @@ describe('Landing page performance', () => {
     });
   });
 
-  it('preloads only the default font and initially visible supporter logo', () => {
+  it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
       // Next emits resource preloads as a `Link` response header (when `/` renders
       // dynamically) and/or as inlined <link rel="preload"> tags in the document
@@ -156,10 +156,9 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      expect([...logos]).to.have.length(1);
-      // MiniMax is pinned first in the carousel order, so it's the initially
-      // visible supporter the server renders (index 0) and preloads.
-      expect([...logos][0]).to.eq('/logos/minimax.svg');
+      // The supporters band no longer renders a quote block, so no supporter
+      // logo is visible on the landing page and none should be preloaded.
+      expect([...logos]).to.have.length(0);
     });
   });
 
