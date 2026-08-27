@@ -18,10 +18,14 @@ import { cn } from '@/lib/utils';
  * assistive technology.
  */
 export function ModelLogo({ model, className }: { model: Model; className?: string }) {
-  const [failed, setFailed] = useState(false);
+  // Track WHICH asset failed rather than a boolean: chart sections are keyed by
+  // index, so one ModelLogo instance is reused across model switches and a
+  // stale boolean would keep suppressing every later model's logo after a
+  // single load error.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const logo = getModelLogo(model);
 
-  if (!logo || failed) return null;
+  if (!logo || failedSrc === logo) return null;
 
   return (
     <img
@@ -35,7 +39,7 @@ export function ModelLogo({ model, className }: { model: Model; className?: stri
         logo.endsWith('.svg') && 'dark:invert',
         className,
       )}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(logo)}
     />
   );
 }
