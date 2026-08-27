@@ -4,6 +4,7 @@ import {
   MEASURED_POWER_METRIC_KEY_LIST,
   MEASURED_POWER_METRIC_KEYS,
   METRIC_KEYS,
+  POWER_METRIC_KEYS,
 } from './metric-keys';
 
 describe('MEASURED_POWER_METRIC_KEYS', () => {
@@ -51,5 +52,26 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
     ]) {
       expect(MEASURED_POWER_METRIC_KEYS.has(key)).toBe(false);
     }
+  });
+});
+
+describe('POWER_METRIC_KEYS', () => {
+  it('is a subset of METRIC_KEYS', () => {
+    for (const key of POWER_METRIC_KEYS) {
+      expect(METRIC_KEYS.has(key)).toBe(true);
+    }
+  });
+
+  it('has no duplicate keys', () => {
+    expect(new Set(POWER_METRIC_KEYS).size).toBe(POWER_METRIC_KEYS.length);
+  });
+
+  it('contains exactly the contract discriminators plus the 13 measured keys', () => {
+    // The public API documentation types every one of these keys on
+    // BenchmarkRow.metrics, so membership changes are contract changes.
+    expect(new Set(POWER_METRIC_KEYS)).toEqual(
+      new Set(['power_valid', 'power_metric_schema_version', ...MEASURED_POWER_METRIC_KEY_LIST]),
+    );
+    expect(POWER_METRIC_KEYS).toHaveLength(15);
   });
 });
