@@ -225,7 +225,12 @@ export function GlobalFilterProvider({
 
   const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
     if (initialSequence) return initialSequence;
-    const urlSeq = getUrlParam('i_seq');
+    // Only honor `i_seq` when the CURRENT navigation's URL carries it. The
+    // module-level snapshot retains self-written params across soft
+    // navigations (the URL-sync effect pins the resolved sequence on every
+    // dashboard visit), so an unguarded read would revive the previous page's
+    // sequence — e.g. a paramless AgentX hero link opening on a stale 8k/1k.
+    const urlSeq = hasExplicitUrlParam('i_seq') ? getUrlParam('i_seq') : undefined;
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
     // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
     // below prefers the Agentic scenario when availability confirms the model
@@ -339,7 +344,13 @@ export function GlobalFilterProvider({
     if (pathModel === null || hasExplicitUrlParam('g_model')) {
       applyIfEnum('g_model', Model, setSelectedModel);
     }
-    applyIfEnum('i_seq', Sequence, setSelectedSequence);
+    // Same guard as the initializer above: `i_seq` applies (and flips
+    // `sequenceExplicit`, which blocks the availability-driven AgentX default)
+    // only when the current URL actually carries it — never from the snapshot's
+    // retained self-writes of a previously visited page.
+    if (hasExplicitUrlParam('i_seq')) {
+      applyIfEnum('i_seq', Sequence, setSelectedSequence);
+    }
     const urlPrec = getUrlParam('i_prec');
     if (urlPrec) {
       const precs = urlPrec
