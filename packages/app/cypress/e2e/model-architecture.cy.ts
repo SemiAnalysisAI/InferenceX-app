@@ -504,7 +504,7 @@ describe('Model Architecture Diagram', () => {
     });
   });
 
-  describe('Dashboard architecture link (replaces the drawer)', () => {
+  describe('Dashboard architecture icon link (replaces the banner row)', () => {
     before(() => {
       cy.viewport(1280, 800);
       cy.visit('/inference?g_model=DeepSeek-R1-0528', {
@@ -515,19 +515,29 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
     });
 
-    it('renders a link row with architecture badges instead of the drawer', () => {
+    it('renders an icon link beside the model selector instead of a banner row', () => {
       cy.get('[data-testid="model-architecture-toggle"]').should('not.exist');
       cy.get('[data-testid="model-architecture-link"]').should('be.visible');
       cy.get('[data-testid="model-architecture-link"]').should(
-        'contain.text',
+        'have.attr',
+        'aria-label',
         'Learn more about the DeepSeek R1 0528 671B architecture',
       );
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MLA');
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', '671B');
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
+      // The former banner copy and badges now live in the tooltip; Radix
+      // tooltips open on keyboard focus, which is more reliable in Cypress
+      // than synthetic hover.
+      cy.get('[data-testid="model-architecture-link"]').focus();
+      cy.get('[data-testid="model-architecture-tooltip"]')
+        .should('be.visible')
+        .and('contain.text', 'Learn more about the DeepSeek R1 0528 671B architecture')
+        .and('contain.text', 'MoE')
+        .and('contain.text', 'MLA')
+        .and('contain.text', '671B');
+      // Dismiss the tooltip so it doesn't cover the link for the next test.
+      cy.get('body').type('{esc}');
     });
 
     it('navigates to the model deep-dive page', () => {
