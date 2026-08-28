@@ -150,12 +150,13 @@ function buildTrtllmSeries(
   endpoint_url: string,
   dynamo_component: 'prefill' | 'backend',
   value: number,
-  field: 'rate' | 'avg',
+  field: 'rate' | 'avg' | 'sum',
+  durationNs = 1e9,
 ) {
   return {
     endpoint_url,
     labels: { dynamo_component, worker_id: `${dynamo_component}-worker` },
-    timeslices: [{ start_ns: 0, end_ns: 1e9, [field]: value }],
+    timeslices: [{ start_ns: 0, end_ns: durationNs, [field]: value }],
   };
 }
 
@@ -736,10 +737,10 @@ describe('computeChartSeries', () => {
         trtllm_kv_cache_host_utilization: {
           series: [buildTrtllmSeries(prefillUrl, 'prefill', 0.25, 'avg')],
         },
-        trtllm_prompt_tokens: {
+        trtllm_prefill_batch_tokens: {
           series: [
-            buildTrtllmSeries(prefillUrl, 'prefill', 100, 'rate'),
-            buildTrtllmSeries(decodeUrl, 'backend', 200, 'rate'),
+            buildTrtllmSeries(prefillUrl, 'prefill', 30, 'sum', 0.5e9),
+            buildTrtllmSeries(decodeUrl, 'backend', 60, 'sum', 0.5e9),
           ],
         },
         trtllm_prompt_cached_tokens: {

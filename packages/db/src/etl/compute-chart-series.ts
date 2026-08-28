@@ -122,8 +122,13 @@ import {
  *
  * v16: extract TensorRT-LLM's native `trtllm_*` token, cache, queue, and KV
  * metrics, including per-prefill/decode source series for Dynamo disaggregation.
+ *
+ * v17: derive TensorRT-LLM prompt throughput from its actual metric shape:
+ * cached-token counter rate plus the prefill-batch-token histogram sum per
+ * timeslice. TRT-LLM does not currently expose the prompt-token counter that
+ * v16 expected.
  */
-export const CHART_SERIES_VERSION = 16;
+export const CHART_SERIES_VERSION = 17;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -206,7 +211,10 @@ interface RawSlice {
   end_ns?: number;
   avg?: number;
   rate?: number;
+  sum?: number;
 }
+
+type RawSliceField = 'avg' | 'rate' | 'sumRate';
 
 interface RawSeries {
   endpoint_url?: string;
@@ -254,6 +262,7 @@ export const CHART_METRIC_KEYS = new Set([
   'trtllm_prompt_cached_tokens_total',
   'trtllm_prompt_tokens',
   'trtllm_prompt_tokens_total',
+  'trtllm_prefill_batch_tokens',
   'trtllm_generation_tokens',
   'trtllm_generation_tokens_total',
   'trtllm_num_requests_running',
@@ -487,7 +496,7 @@ const MIRROR_RATE_RELATIVE_TOLERANCE = 0.05;
  * request counts) whose mirrors agree almost exactly. Rates need a relative
  * test because their magnitude is unbounded.
  */
-function looksMirrored(means: readonly number[], field: 'avg' | 'rate'): boolean {
+function looksMirrored(means: readonly number[], field: RawSliceField): boolean {
   const spread = Math.max(...means) - Math.min(...means);
   if (field === 'avg') return spread <= MIRROR_MEAN_TOLERANCE;
   const scale = Math.max(...means.map((m) => Math.abs(m)));
@@ -569,7 +578,7 @@ function spanOf(scrapes: ScrapeMap): number {
 function resolveComponents(
   series: readonly RawSeries[] | undefined,
   tOf: (ns: number) => number,
-  field: 'avg' | 'rate' = 'avg',
+  field: RawSliceField = 'avg',
 ): ResolvedEngine[] {
   const groups = new Map<string, EngineGroup>();
   for (const s of series ?? []) {
@@ -587,7 +596,16 @@ function resolveComponents(
     }
     for (const ts of s.timeslices ?? []) {
       if (typeof ts.start_ns !== 'number' || !Number.isFinite(ts.start_ns)) continue;
-      const value = ts[field];
+      const durationS =
+        typeof ts.start_ns === 'number' && typeof ts.end_ns === 'number'
+          ? (ts.end_ns - ts.start_ns) / 1e9
+          : 0;
+      const value =
+        field === 'sumRate'
+          ? typeof ts.sum === 'number' && durationS > 0
+            ? ts.sum / durationS
+            : undefined
+          : ts[field];
       if (typeof value !== 'number' || !Number.isFinite(value)) continue;
       const at = scrapes.get(ts.start_ns);
       if (at) {
@@ -929,7 +947,7 @@ function sumOntoGrid(
 function summedSeries(
   series: readonly RawSeries[] | undefined,
   tOf: (ns: number) => number,
-  field: 'avg' | 'rate',
+  field: RawSliceField,
   tickS: number | null,
 ): TimeSeriesPoint[] {
   const components = resolveComponents(series, tOf, field).map((c) => c.points);
@@ -1062,7 +1080,7 @@ function buildSeriesFromMetrics(
   // work.
   const counterRate = (...names: string[]): TimeSeriesPoint[] =>
     summedSeries(pickSeries(...names), tOf, 'rate', tickS);
-  const prefillTps = counterRate(
+  const promptCounterTps = counterRate(
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
     'trtllm_prompt_tokens',
@@ -1082,6 +1100,25 @@ function buildSeriesFromMetrics(
     'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
+  const trtllmComputedPromptTps = summedSeries(
+    metrics['trtllm_prefill_batch_tokens']?.series,
+    tOf,
+    'sumRate',
+    tickS,
+  );
+  const prefillTps =
+    promptCounterTps.length > 0
+      ? promptCounterTps
+      : sumOntoGrid([trtllmComputedPromptTps, prefixCacheHitsTps], tickS);
+  if (prefixCacheHitRate.length === 0 && (!qsSeries || qsSeries.length === 0)) {
+    const prefillByT = byT(prefillTps);
+    for (const { t, value: cached } of prefixCacheHitsTps) {
+      const prompt = prefillByT.get(t);
+      if (prompt !== undefined && prompt > 0) {
+        prefixCacheHitRate.push({ t, value: cached / prompt });
+      }
+    }
+  }
 
   // SGLang hicache: host-pool KV cache utilization as used/total per
   // timeslice. Both metrics are gauges in absolute tokens. Total stays
@@ -1175,28 +1212,17 @@ function buildSeriesFromMetrics(
     if (arr.length > 0) promptTokensBySource[source] = arr;
   }
   if (Object.keys(promptTokensBySource).length === 0) {
-    const promptPoints = summedSeries(
-      pickSeries('trtllm_prompt_tokens', 'trtllm_prompt_tokens_total'),
-      tOf,
-      'rate',
-      tickS,
-    );
-    const cachedByT = byT(
-      summedSeries(
-        pickSeries('trtllm_prompt_cached_tokens', 'trtllm_prompt_cached_tokens_total'),
-        tOf,
-        'rate',
-        tickS,
-      ),
-    );
-    const cached: TimeSeriesPoint[] = [];
-    const computed: TimeSeriesPoint[] = [];
-    for (const { t, value: prompt } of promptPoints) {
-      const cachedValue = Math.max(0, cachedByT.get(t) ?? 0);
-      if (cachedValue > 0) cached.push({ t, value: cachedValue });
-      const computedValue = Math.max(0, prompt - cachedValue);
-      if (computedValue > 0) computed.push({ t, value: computedValue });
-    }
+    const cached = prefixCacheHitsTps.filter((point) => point.value > 0);
+    const cachedByT = byT(prefixCacheHitsTps);
+    const computed =
+      trtllmComputedPromptTps.length > 0
+        ? trtllmComputedPromptTps.filter((point) => point.value > 0)
+        : promptCounterTps
+            .map(({ t, value: prompt }) => ({
+              t,
+              value: Math.max(0, prompt - (cachedByT.get(t) ?? 0)),
+            }))
+            .filter((point) => point.value > 0);
     if (cached.length > 0) promptTokensBySource['cache hit (HBM)'] = cached;
     if (computed.length > 0) promptTokensBySource['compute (miss)'] = computed;
   }
