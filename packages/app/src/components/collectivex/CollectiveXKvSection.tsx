@@ -13,6 +13,7 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXKvChart } from './CollectiveXKvChart';
+import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';
 import {
   type CollectiveXKvChartSelection,
   type CollectiveXKvRunCase,
@@ -20,6 +21,7 @@ import {
   collectiveXKvColorKey,
   collectiveXKvLegendLabel,
   collectiveXRunDasharray,
+  collectiveXSkuLabel,
 } from './data';
 import type { CollectiveXDataset, CollectiveXOutcome } from './types';
 
@@ -33,10 +35,19 @@ const STRINGS = {
       'b1/bmax are requests posted per burst.',
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
+    frontierCaption:
+      'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
+      'A backend that serializes requests collapses to a single point; hover a point for its ' +
+      'Pareto status.',
+    frontierOption: 'Frontier',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
     opControl: 'Direction',
+    metricAriaLabel: 'CollectiveX KV metric',
+    xAriaLabel: 'CollectiveX KV X axis',
+    pageAriaLabel: 'CollectiveX KV page size',
+    opAriaLabel: 'CollectiveX KV direction',
   },
   zh: {
     heading: 'KV 缓存传输',
@@ -46,10 +57,18 @@ const STRINGS = {
       'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
+    frontierCaption:
+      '每条线连接最大实测 ISL 下的批大小阶梯，越靠右下越优。' +
+      '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
+    frontierOption: '帕累托前沿',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
     opControl: '方向',
+    metricAriaLabel: 'CollectiveX KV 指标',
+    xAriaLabel: 'CollectiveX KV X 轴',
+    pageAriaLabel: 'CollectiveX KV 页大小',
+    opAriaLabel: 'CollectiveX KV 传输方向',
   },
 } as const;
 
@@ -87,7 +106,7 @@ export function CollectiveXKvSection({
   const locale = useLocale();
   const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const [yAxis, setYAxis] = useState<CollectiveXKvChartSelection['y']>('bandwidth');
-  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x']>('batch');
+  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier'>('batch');
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
   // Legend toggles are keyed to the current series set: when checked runs
@@ -97,7 +116,9 @@ export function CollectiveXKvSection({
     ids: Set<string>;
     signature: string;
   } | null>(null);
-  const [legendExpanded, setLegendExpanded] = useState(false);
+  // Default open: with the closable sidebar panel, `false` now means fully
+  // hidden (reopen button only), so the legend must start expanded.
+  const [legendExpanded, setLegendExpanded] = useState(true);
 
   const rows = useMemo<CollectiveXKvRunCase[]>(
     () =>
@@ -177,7 +198,7 @@ export function CollectiveXKvSection({
         sortValue: (row) => Number(row.run_id),
         className: 'whitespace-nowrap',
       },
-      { header: 'SKU', cell: (row) => row.sku.toUpperCase(), sortValue: (row) => row.sku },
+      { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
         header: 'Backend',
         cell: (row) => row.backend,
@@ -245,7 +266,7 @@ export function CollectiveXKvSection({
   if (rows.length === 0) return null;
   const measured = rows.filter((row) => row.outcome === 'success').length;
   const selection: CollectiveXKvChartSelection = {
-    x: xAxis,
+    x: xAxis === 'frontier' ? 'batch' : xAxis,
     y: yAxis,
     op,
     pageTokens: Number(pageTokens),
@@ -259,22 +280,24 @@ export function CollectiveXKvSection({
       {measuredCases.length > 0 && (
         <>
           <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
-            <div className="grid gap-1.5">
-              <Label className="text-xs text-muted-foreground">{strings.yControl}</Label>
-              <SegmentedToggle
-                value={yAxis}
-                onValueChange={(value) => {
-                  setYAxis(value);
-                  track('collectivex_kv_metric_changed', { metric: value });
-                }}
-                ariaLabel="CollectiveX kv metric"
-                testId="collectivex-kv-metric-toggle"
-                options={[
-                  { value: 'bandwidth', label: 'GB/s' },
-                  { value: 'latency', label: 'ms' },
-                ]}
-              />
-            </div>
+            {xAxis !== 'frontier' && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.yControl}</Label>
+                <SegmentedToggle
+                  value={yAxis}
+                  onValueChange={(value) => {
+                    setYAxis(value);
+                    track('collectivex_kv_metric_changed', { metric: value });
+                  }}
+                  ariaLabel={strings.metricAriaLabel}
+                  testId="collectivex-kv-metric-toggle"
+                  options={[
+                    { value: 'bandwidth', label: 'GB/s' },
+                    { value: 'latency', label: 'ms' },
+                  ]}
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">{strings.xControl}</Label>
               <SegmentedToggle
@@ -283,11 +306,12 @@ export function CollectiveXKvSection({
                   setXAxis(value);
                   track('collectivex_kv_xaxis_changed', { axis: value });
                 }}
-                ariaLabel="CollectiveX kv x axis"
+                ariaLabel={strings.xAriaLabel}
                 testId="collectivex-kv-xaxis-toggle"
                 options={[
                   { value: 'batch', label: 'Batch' },
                   { value: 'isl', label: 'ISL' },
+                  { value: 'frontier', label: strings.frontierOption },
                 ]}
               />
             </div>
@@ -296,7 +320,7 @@ export function CollectiveXKvSection({
               <SegmentedToggle
                 value={pageTokens}
                 onValueChange={setPageTokens}
-                ariaLabel="CollectiveX kv page size"
+                ariaLabel={strings.pageAriaLabel}
                 testId="collectivex-kv-page-toggle"
                 options={[
                   { value: '64', label: '64' },
@@ -309,7 +333,7 @@ export function CollectiveXKvSection({
               <SegmentedToggle
                 value={op}
                 onValueChange={setOp}
-                ariaLabel="CollectiveX kv direction"
+                ariaLabel={strings.opAriaLabel}
                 testId="collectivex-kv-op-toggle"
                 options={[
                   { value: 'pull', label: 'pull' },
@@ -319,28 +343,52 @@ export function CollectiveXKvSection({
             </div>
           </div>
           <div className="relative mt-3">
-            <CollectiveXKvChart
-              chartId="collectivex-kv"
-              testId="collectivex-kv-chart"
-              cases={activeCases}
-              colors={colors}
-              selection={selection}
-              caption={
-                <p className="text-sm text-muted-foreground">
-                  {op} · page {pageTokens} ·{' '}
-                  {xAxis === 'batch' ? strings.batchCaption : strings.islCaption}
-                </p>
-              }
-              legendElement={
-                <ChartLegend
-                  variant="sidebar"
-                  legendItems={legendItems}
-                  disableActiveSort
-                  isLegendExpanded={legendExpanded}
-                  onExpandedChange={setLegendExpanded}
-                />
-              }
-            />
+            {xAxis === 'frontier' ? (
+              <CollectiveXKvFrontierChart
+                chartId="collectivex-kv-frontier"
+                testId="collectivex-kv-frontier-chart"
+                cases={activeCases}
+                colors={colors}
+                selection={{ op, pageTokens: Number(pageTokens) }}
+                caption={
+                  <p className="text-sm text-muted-foreground">
+                    {op} · page {pageTokens} · {strings.frontierCaption}
+                  </p>
+                }
+                legendElement={
+                  <ChartLegend
+                    variant="sidebar"
+                    legendItems={legendItems}
+                    disableActiveSort
+                    isLegendExpanded={legendExpanded}
+                    onExpandedChange={setLegendExpanded}
+                  />
+                }
+              />
+            ) : (
+              <CollectiveXKvChart
+                chartId="collectivex-kv"
+                testId="collectivex-kv-chart"
+                cases={activeCases}
+                colors={colors}
+                selection={selection}
+                caption={
+                  <p className="text-sm text-muted-foreground">
+                    {op} · page {pageTokens} ·{' '}
+                    {xAxis === 'batch' ? strings.batchCaption : strings.islCaption}
+                  </p>
+                }
+                legendElement={
+                  <ChartLegend
+                    variant="sidebar"
+                    legendItems={legendItems}
+                    disableActiveSort
+                    isLegendExpanded={legendExpanded}
+                    onExpandedChange={setLegendExpanded}
+                  />
+                }
+              />
+            )}
           </div>
         </>
       )}

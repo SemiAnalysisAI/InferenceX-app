@@ -1,7 +1,8 @@
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 // Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
-// matrix row order.
+// row order within each scenario group — AgentX rows lead the matrix, 8K/1K
+// rows follow.
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 0813 1.6T',
   'Kimi K3 2.8T',
@@ -21,8 +22,9 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Five models, three of them with both a single-turn and an AgentX row. */
-const MATRIX_ROWS = 8;
+/** Six models: three with both a single-turn and an AgentX row, and three
+ *  curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next). */
+const MATRIX_ROWS = 9;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -1282,9 +1284,10 @@ describe('Overview page', () => {
       'have.length',
       2,
     );
-    // Single-turn first, AgentX directly below it, both under the same label.
+    // The AgentX row sits in the leading AgentX group; the single-turn row
+    // follows in the 8K/1K group below it, both under the same label.
     cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').then(($rows) => {
-      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([SINGLE_TURN, AGENTX]);
+      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([AGENTX, SINGLE_TURN]);
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {

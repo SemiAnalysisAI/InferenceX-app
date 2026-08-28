@@ -155,7 +155,7 @@ export const TopologyDiagram = forwardRef<
         aria-label={getScaleOutExpandAriaLabel(spec.name, locale)}
       >
         <TopologyD3 spec={spec} config={compactConfig} compact locale={locale} />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">{t.expandHint}</p>
+        <p className="text-3xs text-muted-foreground mt-1 text-center">{t.expandHint}</p>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

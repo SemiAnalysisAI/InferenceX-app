@@ -1,3 +1,12 @@
+/** Stable anchor id for an org's quote on the quotes page (first occurrence wins). */
+export function orgAnchorId(org: string): string {
+  const slug = org
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, '-')
+    .replaceAll(/^-|-$/gu, '');
+  return `quote-${slug}`;
+}
+
 export interface Quote {
   text: string;
   /** Simplified Chinese translation of `text`, shown on /zh pages. */
@@ -573,6 +582,8 @@ export const CAROUSEL_ORGS = [
   'Alibaba Qwen',
   'Zhipu GLM',
   'OpenAI',
+  'AMD',
+  'NVIDIA',
   'Microsoft',
   'Meta Superintelligence Labs',
   'Oracle',
@@ -580,7 +591,6 @@ export const CAROUSEL_ORGS = [
   'GPU Mode',
   'PyTorch Foundation',
   'CoreWeave',
-  'TensorWave',
   'SGLang',
   'WEKA',
   'Stanford',
@@ -604,4 +614,6 @@ export const CAROUSEL_LABELS: Record<string, string> = {
   'PyTorch Foundation': 'PyTorch',
   'Meta Superintelligence Labs': 'Meta',
   'Moonshot AI': 'Moonshot Kimi',
+  AMD: 'AMD Lisa Su',
+  NVIDIA: 'NVIDIA Jensen',
 };

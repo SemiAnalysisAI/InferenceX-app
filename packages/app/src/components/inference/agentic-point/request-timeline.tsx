@@ -492,7 +492,7 @@ export function RequestTimelineView({
                 className="sticky top-0 z-20 border-b border-border/60 bg-card flex items-end px-2 pb-1"
                 style={{ height: HEADER_HEIGHT }}
               >
-                <span className="text-[9px] font-mono font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                <span className="text-[9px] font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
                   {rowMode === 'conversation' ? 'Conversation' : 'Worker'}
                 </span>
               </div>
@@ -524,7 +524,7 @@ export function RequestTimelineView({
                         aria-label={isExpanded ? 'Collapse streams' : 'Expand streams'}
                         title={isExpanded ? 'Collapse streams' : 'Expand streams'}
                       >
-                        <span className="text-[10px] leading-none">{isExpanded ? '▾' : '▸'}</span>
+                        <span className="text-3xs leading-none">{isExpanded ? '▾' : '▸'}</span>
                       </button>
                     ) : (
                       <span className="size-3.5 shrink-0" />
@@ -537,7 +537,7 @@ export function RequestTimelineView({
                       }}
                     />
                     <span
-                      className="text-[10px] font-mono truncate"
+                      className="text-3xs font-mono truncate"
                       style={{
                         color: row.color,
                         opacity: isChildRow ? 0.7 : isSubagentRow ? 0.85 : 1,
@@ -613,7 +613,7 @@ export function RequestTimelineView({
       </div>
 
       {/* Footer — interaction hint only. */}
-      <div className="flex items-center px-1 text-[11px] text-muted-foreground">
+      <div className="flex items-center px-1 text-2xs text-muted-foreground">
         <span className="ml-auto opacity-70">
           shift+scroll to zoom · drag to pan · double-click to reset
         </span>

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +66,7 @@ export default function LegendPointsDialog({
   onRowClick,
 }: LegendPointsDialogProps) {
   const [sort, setSort] = useState<{ key: LegendPointsSortKey; dir: 'asc' | 'desc' } | null>(null);
+  const ephemeralUrlState = useEphemeralUrlState();
 
   const hasOffload = rows.some((r) => r.offload !== null);
   const columns = useMemo(
@@ -185,8 +187,10 @@ export default function LegendPointsDialog({
                   onClick={() => {
                     // In-app detail links are full-document navigations, so the
                     // chart state has to be written into this history entry
-                    // before we leave or Back lands on a default chart.
-                    if (!row.isExternal) rememberChartStateInUrl();
+                    // before we leave or Back lands on a default chart. Skipped
+                    // in ephemeral scopes (/model embeds): the store holds the
+                    // primary dashboard's state there, not this chart's.
+                    if (!row.isExternal && !ephemeralUrlState) rememberChartStateInUrl();
                     onRowClick?.(row);
                   }}
                   className="col-span-full grid grid-cols-subgrid items-center rounded-sm hover:bg-accent whitespace-nowrap"
@@ -207,7 +211,7 @@ export default function LegendPointsDialog({
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground/70 leading-tight">
+        <p className="text-3xs text-muted-foreground/70 leading-tight">
           {isOverlay
             ? 'Unofficial overlay points have no stored benchmark records — metrics only, no detail links.'
             : 'Click a row for the point detail — agentic points open the trace detail page, fixed-seq points open the GitHub Actions run.'}{' '}

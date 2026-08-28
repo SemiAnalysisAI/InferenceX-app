@@ -35,7 +35,7 @@ import {
   type Model,
   type Percentile,
 } from '@/lib/data-mappings';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
+import { DEFAULT_LIFECYCLE_RAMP_MONTHS, readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
@@ -335,9 +335,9 @@ const STRINGS = {
 const DEFAULTS = {
   mtbiDays: 24,
   recoveryHours: 12,
-  // A nominal quarter to bring a fleet to full load. Purely an assumption, and
-  // labelled as one — no measurement in this repo speaks to it.
-  rampMonths: 3,
+  // A nominal half-month to bring a fleet to full load. Purely an assumption,
+  // and labelled as one — no measurement in this repo speaks to it.
+  rampMonths: Number(DEFAULT_LIFECYCLE_RAMP_MONTHS),
   /**
    * A cached input token sells for a tenth of a fresh one — the ratio DeepSeek
    * and Anthropic both publish, and the order of magnitude the others sit at.
@@ -1343,7 +1343,7 @@ export default function FleetLifecycle({
                 data-testid={`${input.id}-input`}
                 type="number"
                 min={0}
-                step="any"
+                step={input.id === 'calc-lifecycle-ramp' ? 0.25 : 'any'}
                 value={input.value}
                 onChange={input.onChange}
                 className="w-32 h-9"

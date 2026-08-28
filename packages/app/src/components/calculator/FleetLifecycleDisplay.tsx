@@ -39,7 +39,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics';
 import { getModelSortIndex } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
@@ -154,7 +154,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   // Owned here so the `c_mw` URL seed is read once, at the page level — the
   // lifecycle section renders the input and is its only consumer.
-  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
+  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
 

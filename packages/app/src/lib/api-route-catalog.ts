@@ -668,7 +668,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: 'f54940c63a16d1c97a491b901aebcf9cb8893023eefef9f80ddace8936cabba8',
+    sourceSha256: '8ca280fec5bbe633493cf021fee294927aead799742ac07ac7dbe8c5092e38f2',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -687,7 +687,7 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: 'f8f46a341bf57384c0080c2ed75d867801142675ded08225281cf7c102236628',
+    sourceSha256: '9faf1ed1ed1712ee04741b6aa2291d42b2c202c2dadbb1a2681b5391da555e6c',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

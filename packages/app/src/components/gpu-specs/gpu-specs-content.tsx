@@ -59,7 +59,7 @@ function VendorBadge({ vendor }: { vendor: GpuSpec['vendor'] }) {
   const isNvidia = vendor === 'nvidia';
   return (
     <span
-      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-3xs font-medium ${
         isNvidia ? 'bg-[#76b900]/15 text-[#76b900]' : 'bg-[#ed1c24]/15 text-[#ed1c24]'
       }`}
     >

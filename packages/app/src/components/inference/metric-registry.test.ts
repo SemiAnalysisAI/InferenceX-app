@@ -18,6 +18,8 @@ describe('metric registry', () => {
     expect(e2e.chartType).toBe('e2e');
     expect(interactivity.y_tpPerGpu_roofline).toBe('upper_left');
     expect(e2e.y_tpPerGpu_roofline).toBe('upper_right');
+    expect(interactivity.y_tokenRevenuePerGpuHour_roofline).toBe('upper_left');
+    expect(e2e.y_tokenRevenuePerGpuHour_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
@@ -63,6 +65,7 @@ describe('metric compatibility', () => {
     );
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
+    expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
   });
@@ -72,6 +75,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_jOutput')).toBe('output');
     expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
   });
 });

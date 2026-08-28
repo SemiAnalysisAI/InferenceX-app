@@ -134,7 +134,10 @@ async function buildOverviewPageData(
   );
 }
 
-const getCachedOverviewPageData = cachedDerivedData(buildOverviewPageData, 'overview-page-v1');
+// v2: AgentX rows group above 8K/1K rows (#918). The assembled models array is
+// stored in the derived cache, so the display-order change needs a new key —
+// v1 entries keep serving the old order until they expire otherwise.
+const getCachedOverviewPageData = cachedDerivedData(buildOverviewPageData, 'overview-page-v2');
 
 export function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,

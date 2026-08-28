@@ -125,7 +125,7 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
             (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
           ) && (
             <p
-              className="mt-2 text-[11px] leading-snug text-muted-foreground"
+              className="mt-2 text-2xs leading-snug text-muted-foreground"
               data-testid="hybrid-attention-note"
             >
               <span className="font-medium text-foreground">Local</span> and{' '}
@@ -139,10 +139,7 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
           ['altBlock0', 'altBlock1', 'hashBlock', 'transformer', 'denseTransformer'].some((id) =>
             expandedBlocks.has(id),
           ) && (
-            <p
-              className="mt-2 text-[11px] leading-snug text-muted-foreground"
-              data-testid="mhc-note"
-            >
+            <p className="mt-2 text-2xs leading-snug text-muted-foreground" data-testid="mhc-note">
               <span className="font-medium text-foreground">
                 Hyper-Connections (mHC ×{arch.hyperConnections})
               </span>{' '}

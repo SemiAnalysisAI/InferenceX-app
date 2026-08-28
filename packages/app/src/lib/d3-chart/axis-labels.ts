@@ -1,5 +1,7 @@
 import * as d3 from 'd3';
 
+import { CHART_TYPE, px } from './typography';
+
 export type LabelSplitMode = 'last-space' | 'newline' | 'parens';
 
 export interface TwoRowLabelOptions {
@@ -7,9 +9,9 @@ export interface TwoRowLabelOptions {
   split?: LabelSplitMode;
   /** Vertical offset in px. Default: 0 */
   yOffset?: number;
-  /** CSS font-size for the first row. Default: '12px' */
+  /** CSS font-size for the first row. Default: CHART_TYPE.axisLabel. */
   primarySize?: string;
-  /** CSS font-size for the second row. Default: '10px' */
+  /** CSS font-size for the second row. Default: CHART_TYPE.axisLabelSub. */
   secondarySize?: string;
 }
 
@@ -46,7 +48,12 @@ export function splitLabel(label: string, mode: LabelSplitMode): [string, string
 export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {
   // Backwards compat: accept bare number as yOffset
   const opts = typeof options === 'number' ? { yOffset: options } : options;
-  const { split = 'last-space', yOffset = 0, primarySize = '12px', secondarySize = '10px' } = opts;
+  const {
+    split = 'last-space',
+    yOffset = 0,
+    primarySize = px(CHART_TYPE.axisLabel),
+    secondarySize = px(CHART_TYPE.axisLabelSub),
+  } = opts;
 
   return (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
     axisGroup.selectAll('.tick text').each(function () {

@@ -35,6 +35,10 @@ const STRINGS = {
 interface MultiSelectOption {
   value: string;
   label: string;
+  /** Optional leading visual (e.g. a brand logo) rendered before the label. */
+  icon?: React.ReactNode;
+  /** Optional trailing visual (e.g. a NEW pill) rendered after the label. */
+  badge?: React.ReactNode;
 }
 
 export interface MultiSelectSection {
@@ -270,10 +274,10 @@ function MultiSelect({
   };
 
   // Preserve the order of selected values, not the order of options
-  const selectedLabels = value.map((val) => {
-    const option = flatOptions.find((opt) => opt.value === val);
-    return option ? option.label : val;
-  });
+  const selectedOptions = value.map(
+    (val) => flatOptions.find((opt) => opt.value === val) ?? { value: val, label: val },
+  );
+  const selectedLabels = selectedOptions.map((opt) => opt.label);
 
   return (
     <div ref={containerRef} className="relative">
@@ -298,8 +302,9 @@ function MultiSelect({
         <div className="flex gap-1 flex-1 min-w-0 items-center min-h-5 flex-wrap">
           {value.length > 0 ? (
             plainSelectedText ? (
-              <span className="text-foreground block min-w-0 truncate">
-                {selectedLabels.join(', ')}
+              <span className="text-foreground flex min-w-0 items-center gap-1.5">
+                {selectedOptions.length === 1 && selectedOptions[0].icon}
+                <span className="block min-w-0 truncate">{selectedLabels.join(', ')}</span>
               </span>
             ) : (
               selectedLabels.map((label, index) => (
@@ -307,6 +312,7 @@ function MultiSelect({
                   key={value[index]}
                   className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
+                  {selectedOptions[index]?.icon}
                   {label}
                   <span
                     role="button"
@@ -456,7 +462,11 @@ function MultiSelect({
                             <span className="absolute right-2 flex size-3.5 items-center justify-center">
                               {isSelected && <CheckIcon className="size-4 text-primary" />}
                             </span>
-                            <span className="flex items-center gap-2">{option.label}</span>
+                            <span className="flex min-w-0 items-center gap-2">
+                              {option.icon}
+                              {option.label}
+                              {option.badge}
+                            </span>
                           </div>
                         );
                       })}
@@ -485,7 +495,11 @@ function MultiSelect({
                       <span className="absolute right-2 flex size-3.5 items-center justify-center">
                         {isSelected && <CheckIcon className="size-4 text-primary" />}
                       </span>
-                      <span className="flex items-center gap-2">{option.label}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        {option.icon}
+                        {option.label}
+                        {option.badge}
+                      </span>
                     </div>
                   );
                 })}

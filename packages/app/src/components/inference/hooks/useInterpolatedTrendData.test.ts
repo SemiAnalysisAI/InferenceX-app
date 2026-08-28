@@ -83,6 +83,28 @@ describe('rowToLightweightPoint', () => {
     expect(point?.costhOutput?.y).toBeGreaterThan(0);
     expect(point?.outputTokensPerDollarH?.y).toBeGreaterThan(0);
   });
+
+  it('applies OpenRouter input and output prices to historical points', () => {
+    const point = rowToLightweightPoint(
+      makeBenchmarkRow({
+        metrics: {
+          tput_per_gpu: 400,
+          input_tput_per_gpu: 320,
+          output_tput_per_gpu: 80,
+          median_intvty: 20,
+        },
+      }),
+      ['tokenRevenuePerGpuHour'],
+      {
+        source: 'openrouter',
+        inputPerMillion: 1.122,
+        outputPerMillion: 3.366,
+        openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
+      },
+    );
+
+    expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(2.261952, 10);
+  });
 });
 
 describe('rowSupportsTrendMetric', () => {
@@ -366,6 +388,25 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result).not.toBeNull();
     expect(result!).toBeGreaterThan(300);
     expect(result!).toBeLessThan(700);
+  });
+
+  it('keeps token revenue proportional to the interpolated total throughput', () => {
+    const points = [
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        tokenRevenuePerGpuHour: { y: 2.88, roof: false },
+      }),
+      makePoint({
+        x: 60,
+        tpPerGpu: { y: 400, roof: false },
+        tokenRevenuePerGpuHour: { y: 1.44, roof: false },
+      }),
+    ];
+
+    const throughput = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
+    const revenue = interpolateMetricAtInteractivity(points, 40, 'tokenRevenuePerGpuHour');
+    expect(revenue).toBeCloseTo(throughput! * 0.0036, 10);
   });
 
   it('returns exact boundary value at the lowest frontier x', () => {

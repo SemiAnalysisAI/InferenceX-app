@@ -35,7 +35,7 @@
  *    is paid for in full while it earns its way up from zero, which is what puts
  *    the opening months below the rule and gives payback its meaning.
  * 2. **The ramp is an assumption; the steps are not.** Ramp length is a user
- *    input, defaulting to a nominal quarter, and it applies to every rollout.
+ *    input, defaulting to half a month, and it applies to every rollout.
  *    Which configs exist, when, and how fast they ran are all measured.
  * 3. **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
  *    over a multi-year window is thousands of events, each far under a pixel, so

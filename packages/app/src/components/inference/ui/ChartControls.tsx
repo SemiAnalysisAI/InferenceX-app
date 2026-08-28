@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { replaceRouterPathname } from '@/lib/client-navigation';
+import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare-agentx';
 import { inferenceModelRouteForSelection } from '@/lib/inference-model-slug';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 
@@ -32,7 +33,9 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
+import { formatTokenPrice } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
+import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 
@@ -40,7 +43,7 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -58,11 +61,21 @@ const STRINGS = {
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
     dateRangePlaceholder: 'Select date range',
+    revenuePriceSource: 'Revenue Price Source',
+    revenuePriceSourceTooltip:
+      'Choose the token sale prices used for revenue. Normalized prices input and output at $1/M tok. OpenRouter reads the selected model’s current public input and output prices.',
+    normalizedPrice: 'Normalized ($1/M input + output)',
+    openRouterPrice: 'OpenRouter current pricing',
+    openRouterLoading: 'Loading OpenRouter pricing…',
+    openRouterUnavailable: 'OpenRouter pricing is unavailable for this model.',
+    openRouterSummary: (input: string, output: string) =>
+      `Input $${input}/M tok · Output $${output}/M tok`,
+    viewOpenRouter: 'View OpenRouter pricing',
   },
   zh: {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标，包括吞吐量、每百万 token 成本、每 1 美元可购买的 token 数以及自定义用户值。',
+      '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元可购买的 token 数以及自定义值。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -79,6 +92,16 @@ const STRINGS = {
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
     dateRangePlaceholder: '选择日期范围',
+    revenuePriceSource: '收入计价来源',
+    revenuePriceSourceTooltip:
+      '选择计算 token 收入所用的售价。标准化模式将输入和输出 token 均按 $1/百万计价；OpenRouter 模式读取所选模型当前公开的输入和输出价格。',
+    normalizedPrice: '标准化（输入和输出均为 $1/百万）',
+    openRouterPrice: 'OpenRouter 当前价格',
+    openRouterLoading: '正在加载 OpenRouter 价格…',
+    openRouterUnavailable: 'OpenRouter 暂无该模型的价格。',
+    openRouterSummary: (input: string, output: string) =>
+      `输入 $${input}/百万 token · 输出 $${output}/百万 token`,
+    viewOpenRouter: '查看 OpenRouter 定价',
   },
 } as const;
 
@@ -120,13 +143,23 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     availableSequences,
     availableModels,
   } = useInferenceData();
-  const { selectedYAxisMetric, selectedPercentile, selectedXAxisMetric, scaleType } =
-    useInferenceDisplay();
+  const {
+    selectedYAxisMetric,
+    tokenRevenuePriceSource,
+    tokenRevenuePricing,
+    openRouterModelId,
+    openRouterPricingLoading,
+    openRouterPricingError,
+    selectedPercentile,
+    selectedXAxisMetric,
+    scaleType,
+  } = useInferenceDisplay();
   const {
     setSelectedModel,
     setSelectedSequence,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
+    setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedGPUs,
     setSelectedDateRange,
@@ -272,6 +305,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             onOpenChange={handleDropdownOpenChange('model')}
             availableModels={availableModels}
             data-testid="model-selector"
+            trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
+            newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
           />
           <ScenarioSelector
             value={selectedSequence}
@@ -322,6 +357,64 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
             />
           </div>
+
+          {mounted && selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && (
+            <div className="flex flex-col space-y-1.5 lg:col-span-2">
+              <LabelWithTooltip
+                htmlFor="token-revenue-price-source"
+                label={t.revenuePriceSource}
+                tooltip={t.revenuePriceSourceTooltip}
+              />
+              <Select
+                value={tokenRevenuePriceSource}
+                onValueChange={(value) => {
+                  setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
+                  track('inference_token_revenue_price_source_selected', { source: value });
+                }}
+              >
+                <SelectTrigger
+                  id="token-revenue-price-source"
+                  data-testid="token-revenue-price-source"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent portalled={false}>
+                  <SelectItem value="normalized">{t.normalizedPrice}</SelectItem>
+                  <SelectItem value="openrouter">{t.openRouterPrice}</SelectItem>
+                </SelectContent>
+              </Select>
+              {tokenRevenuePriceSource === 'openrouter' && (
+                <p data-testid="openrouter-price-summary" className="text-xs text-muted-foreground">
+                  {openRouterPricingLoading
+                    ? t.openRouterLoading
+                    : openRouterPricingError || !tokenRevenuePricing
+                      ? t.openRouterUnavailable
+                      : t.openRouterSummary(
+                          formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                          formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                        )}{' '}
+                  {openRouterModelId && (
+                    <a
+                      href={`https://openrouter.ai/${openRouterModelId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                      data-testid="openrouter-pricing-link"
+                      onClick={() => {
+                        track('inference_openrouter_pricing_opened', {
+                          model: selectedModel,
+                          openRouterModelId,
+                        });
+                      }}
+                    >
+                      {t.viewOpenRouter}
+                    </a>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
             isInputMetric &&

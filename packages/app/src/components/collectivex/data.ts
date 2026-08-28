@@ -1,3 +1,5 @@
+import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
+
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
@@ -22,6 +24,25 @@ export interface CollectiveXSeriesSelection {
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+
+/**
+ * CollectiveX artifacts identify runner pools in the SKU (for example,
+ * `b200-nscale` or `h100-dgxc`). Collapse known hardware identifiers to the
+ * canonical GPU key while leaving unknown SKU structure intact.
+ */
+export function normalizeCollectiveXSku(sku: string): string {
+  const normalized = sku.trim().toLowerCase();
+  const base = normalized.split(':').at(-1)?.split('-')[0] ?? normalized;
+  return GPU_KEYS.has(base) ? base : normalized;
+}
+
+export function collectiveXSkuLabel(sku: string): string {
+  return normalizeCollectiveXSku(sku).toUpperCase();
+}
+
+export function collectiveXCaseLabel(label: string, sku: string): string {
+  return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
+}
 
 /**
  * Stable within the newest-first run table. Preserve the six simple patterns,
@@ -57,7 +78,7 @@ export function collectiveXTopologyLabel(
 }
 
 export function collectiveXLegendLabel(series: CollectiveXSeries): string {
-  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
 }
 
 export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -66,7 +87,7 @@ export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRu
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
+  return `${series.system.vendor}_${normalizeCollectiveXSku(series.system.sku)}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
 /** Namespace series ids and attach the run's current selection-order style index. */
@@ -244,11 +265,11 @@ export interface CollectiveXKvChartPoint {
 }
 
 export function collectiveXKvColorKey(kase: CollectiveXKvCase): string {
-  return `${kase.vendor ?? 'unknown'}_${kase.sku}_${kase.backend}_${kase.fabric}_${kase.precision}`;
+  return `${kase.vendor ?? 'unknown'}_${normalizeCollectiveXSku(kase.sku)}_${kase.backend}_${kase.fabric}_${kase.precision}`;
 }
 
 export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
-  return `${kase.sku.toUpperCase()} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
+  return `${collectiveXSkuLabel(kase.sku)} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
 }
 
 /**
@@ -257,6 +278,86 @@ export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
  * story); ISL on the x axis reads at batch 1 (a single request's handoff).
  * Paged rows only: the single-descriptor bulk ceiling stays a table column.
  */
+export interface CollectiveXKvFrontierSelection {
+  op: 'pull' | 'push';
+  pageTokens: number;
+}
+
+export interface CollectiveXKvFrontierPoint {
+  seriesId: string;
+  seriesLabel: string;
+  colorKey: string;
+  sku: string;
+  /** Aggregate burst bandwidth at p50 (GB/s). */
+  x: number;
+  /** Burst p95 latency divided by requests in flight (ms per request). */
+  y: number;
+  onSeriesFrontier: boolean;
+  onSkuFrontier: boolean;
+  row: CollectiveXKvRow;
+}
+
+/** More throughput at no worse per-request cost, strictly better in one. */
+function frontierDominates(
+  a: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
+  b: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
+): boolean {
+  return a.x >= b.x && a.y <= b.y && (a.x > b.x || a.y < b.y);
+}
+
+/**
+ * Concurrency-frontier points: each case's batch ladder at the largest
+ * measured ISL (the same slice the batch view plots), re-expressed as
+ * aggregate GB/s against p95 latency per in-flight request. A backend that
+ * overlaps requests traces a curve toward the lower right; a serializing
+ * backend collapses to a point (constant aggregate rate, constant
+ * per-request cost). Two dominance tiers: within a series (its own best
+ * operating points) and across every series of the same SKU (which backend
+ * to deploy on that machine).
+ */
+export function collectiveXKvFrontierPoints(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvFrontierSelection,
+): CollectiveXKvFrontierPoint[] {
+  const points = cases.flatMap((kase) => {
+    const matching = kase.rows.filter(
+      (row) =>
+        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
+    );
+    if (matching.length === 0) return [];
+    const isl = Math.max(...matching.map((row) => row.isl));
+    return matching
+      .filter((row) => row.isl === isl)
+      .flatMap((row) => {
+        const x = row.gbps_p50;
+        const y = row.latency_ms.p95 / row.batch;
+        if (!Number.isFinite(x) || x <= 0 || !Number.isFinite(y) || y <= 0) return [];
+        return [
+          {
+            seriesId: `${kase.run_id}:${kase.case_id}`,
+            seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+            colorKey: collectiveXKvColorKey(kase),
+            sku: normalizeCollectiveXSku(kase.sku),
+            x,
+            y,
+            onSeriesFrontier: false,
+            onSkuFrontier: false,
+            row,
+          },
+        ];
+      });
+  });
+  for (const point of points) {
+    point.onSeriesFrontier = !points.some(
+      (other) => other.seriesId === point.seriesId && frontierDominates(other, point),
+    );
+    point.onSkuFrontier = !points.some(
+      (other) => other.sku === point.sku && frontierDominates(other, point),
+    );
+  }
+  return points;
+}
+
 export function collectiveXKvChartPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvChartSelection,

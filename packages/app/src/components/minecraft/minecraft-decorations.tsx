@@ -170,7 +170,7 @@ export function MinecraftDecorations() {
         />
       </div>
 
-      <div className="hidden lg:block fixed bottom-1 right-2 z-0 text-[10px] text-foreground/50 text-right leading-tight">
+      <div className="hidden lg:block fixed bottom-1 right-2 z-0 text-3xs text-foreground/50 text-right leading-tight">
         <div>
           art:{' '}
           <a

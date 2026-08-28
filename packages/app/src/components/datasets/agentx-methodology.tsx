@@ -179,7 +179,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
   return (
     <Card className="overflow-hidden p-0" data-testid="agentx-methodology">
       <header className="border-b border-border/60 bg-muted/20 px-5 py-5 sm:px-6">
-        <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
+        <p className="mb-2 font-mono text-2xs font-medium uppercase tracking-eyebrow text-primary">
           {t.eyebrow}
         </p>
         <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
@@ -208,7 +208,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
             {t.steps.map((step, index) => (
               <li key={step.title} className="bg-card p-4" data-testid="agentx-methodology-step">
                 <div className="mb-2 flex items-baseline gap-2">
-                  <span className="font-mono text-[11px] text-primary">
+                  <span className="font-mono text-2xs text-primary">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <h3 className="text-sm font-semibold text-foreground">{step.title}</h3>
@@ -225,7 +225,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">{t.datasetIntro}</p>
           <div className="mt-4 border-y border-border/70 py-4">
-            <p className="mb-3 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+            <p className="mb-3 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
               {t.profileLabel}
             </p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4 lg:grid-cols-4">

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/json-ld';
+import ModelDeveloperLogo from '@/components/model/ModelDeveloperLogo';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { toModel } from '@/lib/compare-enum-coerce';
@@ -88,7 +89,8 @@ export default function ModelIndexPage() {
                     className="group h-full rounded-lg border border-border/50 bg-muted/30 px-4 py-3 flex flex-col gap-2 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-base font-semibold group-hover:text-primary transition-colors">
+                      <span className="flex items-center gap-2 text-base font-semibold group-hover:text-primary transition-colors">
+                        <ModelDeveloperLogo developer={page.meta.developer} className="size-5" />
                         {page.meta.title}
                       </span>
                       <span className="text-sm shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">

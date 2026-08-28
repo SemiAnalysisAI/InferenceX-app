@@ -4,6 +4,8 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getOpenRouterModelId,
+  MODEL_OPTIONS,
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
@@ -284,6 +286,15 @@ describe('getModelLabel', () => {
   it('falls back to the model value for unknown model', () => {
     const result = getModelLabel('NewModel-XYZ' as Model);
     expect(result).toBe('NewModel-XYZ');
+  });
+});
+
+describe('getOpenRouterModelId', () => {
+  it('maps every selectable dashboard model to an exact OpenRouter catalog id', () => {
+    for (const model of MODEL_OPTIONS) {
+      expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
+    }
+    expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
   });
 });
 

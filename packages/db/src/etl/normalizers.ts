@@ -94,6 +94,14 @@ export const MODEL_TO_KEY: Record<string, string> = {
   // Qwen3.5
   'Qwen/Qwen3.5-397B-A17B': 'qwen3.5',
   'Qwen/Qwen3.5-397B-A17B-FP8': 'qwen3.5',
+  // Qwen3.8-Flash-Next (Qwen4 architecture preview — distinct bucket from 3.5).
+  // Hopper has no NVFP4 path, so H200 serves the FP8 checkpoint while Blackwell
+  // serves NVFP4. Both paths are taken from executed sweeps rather than inferred:
+  // FP8 from run 33038487711 (H200, PR #2753), NVFP4 from run 33039186365
+  // (B300, PR #2752). Both report `infmax_model_prefix: qwen3.8next`, so no
+  // PREFIX_ALIASES entry is needed.
+  'Qwen/Qwen3.8-Flash-Next-FP8': 'qwen3.8next',
+  'RadixArk/Qwen3.8-Flash-Next-NVFP4': 'qwen3.8next',
   // Kimi-K2.5 / K2.6 / K2.7-Code (same architecture, distinct DB buckets)
   'moonshotai/Kimi-K2.5': 'kimik2.5',
   'moonshotai/Kimi-K2.6': 'kimik2.6',

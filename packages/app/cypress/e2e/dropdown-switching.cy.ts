@@ -49,6 +49,21 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-slot="select-content"]').should('not.exist');
   });
 
+  it('marks the featured AgentX models with a NEW pill in the dropdown', () => {
+    cy.get('[data-testid="model-selector"]').click();
+
+    // A featured AgentX model carries the pill… (MiniMax M3 rather than the
+    // Kimi K3 default because the availability fixtures don't ship kimik3 rows)
+    cy.contains('[role="option"]', 'MiniMax M3 428B')
+      .find('[data-new-badge="model-option"]')
+      .should('be.visible')
+      .and('have.text', 'NEW');
+    // …while non-featured models render without one.
+    cy.contains('[role="option"]', 'DeepSeek R1 0528 671B')
+      .find('[data-new-badge="model-option"]')
+      .should('not.exist');
+  });
+
   it('separates maintenance-mode models from deprecated models', () => {
     cy.get('[data-testid="model-selector"]').click();
 

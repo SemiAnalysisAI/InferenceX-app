@@ -774,7 +774,7 @@ describe('TCO Calculator', () => {
     it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
       cy.get('[data-testid="calculator-costcap-section"]')
         .find('[data-testid="calc-costcap-mw-input"]')
-        .should('exist');
+        .should('have.value', '10');
       cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
       // A pointer to the new page replaces the section.
       cy.get('[data-testid="calculator-fleet-pointer-link"]')

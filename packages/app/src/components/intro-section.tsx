@@ -1,16 +1,27 @@
 import { Quote } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
-import { QuoteCarousel } from '@/components/quote-carousel';
-import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
+import { SupportersStrip } from '@/components/supporters-strip';
+import {
+  QUOTES,
+  CAROUSEL_ORGS,
+  CAROUSEL_LABELS,
+  orgAnchorId,
+} from '@/components/quotes/quotes-data';
 import type { Locale } from '@/lib/i18n';
 
-// Carousel order follows QUOTES order — carousel orgs are listed first there.
-const carouselQuotes = QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org));
+// Strip order follows QUOTES order — supporter orgs are listed first there.
+const stripOrgs = [
+  ...new Set(
+    QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org)).map((q) => q.org),
+  ),
+];
 
-const CAROUSEL_OVERRIDES = {
-  labels: CAROUSEL_LABELS,
-};
+const supporterOrgs = (quotesPath: string) =>
+  stripOrgs.map((org) => ({
+    label: CAROUSEL_LABELS[org] ?? org,
+    href: `${quotesPath}#${orgAnchorId(org)}`,
+  }));
 
 const HEADING = {
   en: 'Open-Source Continuous Agentic Inference Benchmark Trusted by GigaWatt Token Factories',
@@ -19,14 +30,6 @@ const HEADING = {
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
-  // Quotes fall back to the English original until a translation lands.
-  const quotes = isZh
-    ? carouselQuotes.map((q) => ({
-        ...q,
-        text: q.textZh ?? q.text,
-        title: q.titleZh ?? q.title,
-      }))
-    : carouselQuotes;
   return (
     <section>
       <Card data-testid="intro-section">
@@ -37,14 +40,13 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
           <Quote className="size-5 shrink-0 mt-1 text-brand" />
           <h2 className="text-lg font-semibold">{HEADING[locale]}</h2>
         </div>
-        <div>
-          <QuoteCarousel
-            quotes={quotes}
-            overrides={CAROUSEL_OVERRIDES}
-            moreHref={isZh ? '/zh/quotes' : '/quotes'}
-            moreLabel={isZh ? '查看业界评价 →' : undefined}
-          />
-        </div>
+        {/* Quote text lives on /quotes now — the band keeps just the org
+            strip and a link out, saving vertical space above the fold. */}
+        <SupportersStrip
+          orgs={supporterOrgs(isZh ? '/zh/quotes' : '/quotes')}
+          moreHref={isZh ? '/zh/quotes' : '/quotes'}
+          moreLabel={isZh ? '查看完整评价与更多支持者 →' : undefined}
+        />
       </Card>
     </section>
   );

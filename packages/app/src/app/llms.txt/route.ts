@@ -1,5 +1,6 @@
 import { getAllPosts } from '@/lib/blog';
 import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
+import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/rankings';
 import { inferenceModelMeta } from '@/lib/inference-model-meta';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -41,6 +42,18 @@ export async function GET() {
       (page) =>
         `- [${page.a.label} vs ${page.b.label}](${SITE_URL}/chips/${page.slug}): head-to-head comparison`,
     ),
+    '',
+    `## GPU Rankings`,
+    '',
+    `- [GPU Rankings for LLM Inference](${SITE_URL}/rankings): live fastest and cheapest GPU leaderboards per model`,
+    ...getAllRankingPageEntries().map(
+      (entry) =>
+        `- [${rankingPageHeading(entry)}](${SITE_URL}/rankings/${entry.slug}): live benchmark ranking`,
+    ),
+    '',
+    `## Model on GPU Results`,
+    '',
+    `- [Run Any Model on Any GPU](${SITE_URL}/run): measured throughput and cost for every benchmarked model and GPU pairing`,
     '',
     `## Articles`,
     '',
