@@ -144,16 +144,14 @@ describe('evaluation chart blocking state', () => {
 });
 
 describe('evaluation chart initialization state', () => {
-  it('stops showing the loading skeleton after a successful empty response settles', () => {
+  it('shows the loading skeleton until the evaluation query settles', () => {
     expect(
       evaluationChartIsInitializing({
-        loading: true,
         isEvaluationDataSettled: false,
       }),
     ).toBe(true);
     expect(
       evaluationChartIsInitializing({
-        loading: false,
         isEvaluationDataSettled: true,
       }),
     ).toBe(false);

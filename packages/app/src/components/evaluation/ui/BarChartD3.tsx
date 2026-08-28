@@ -344,13 +344,11 @@ export function evaluationChartBlockingState({
 }
 
 export function evaluationChartIsInitializing({
-  loading,
   isEvaluationDataSettled,
 }: {
-  loading: boolean;
   isEvaluationDataSettled: boolean;
 }): boolean {
-  return loading && !isEvaluationDataSettled;
+  return !isEvaluationDataSettled;
 }
 
 export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
@@ -1190,8 +1188,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     ],
   );
 
-  // A successful empty response has no benchmark selection, but it has finished loading.
-  const isInitializing = evaluationChartIsInitializing({ loading, isEvaluationDataSettled });
+  // Wait for a success or error before treating missing chart data as an empty result.
+  const isInitializing = evaluationChartIsInitializing({ isEvaluationDataSettled });
   if (isInitializing && chartData.length === 0 && unofficialChartData.length === 0) {
     return (
       <div className="p-3">
