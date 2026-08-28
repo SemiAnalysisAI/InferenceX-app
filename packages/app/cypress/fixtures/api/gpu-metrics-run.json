@@ -1,0 +1,2038 @@
+{
+  "runInfo": {
+    "id": 22806827144,
+    "name": "Benchmark Sweep",
+    "branch": "main",
+    "sha": "fixture000sha",
+    "createdAt": "2026-03-01T00:00:00Z",
+    "url": "https://github.com/example/example/actions/runs/22806827144",
+    "conclusion": "success",
+    "status": "completed"
+  },
+  "artifacts": [
+    {
+      "name": "gpu_metrics_fixture_config",
+      "data": [
+        {
+          "timestamp": "1755000000",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000001",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000002",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000003",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000004",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000005",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000006",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000007",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000008",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000009",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000010",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000011",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000012",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000013",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000014",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000015",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000016",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000017",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000018",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000019",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000020",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000021",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000022",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000023",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000024",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000025",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000026",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000027",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000028",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000029",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000030",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000031",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000032",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000033",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000034",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000035",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000036",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000037",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000038",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000039",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000040",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000041",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000042",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000043",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000044",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000045",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000046",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000047",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000048",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000049",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000050",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000051",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000052",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000053",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000054",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000055",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000056",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000057",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000058",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000059",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000060",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000061",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000062",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000063",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000064",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000065",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000066",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000067",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000068",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000069",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000070",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000071",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000072",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000073",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000074",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000075",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000076",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000077",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000078",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000079",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000080",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000081",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000082",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000083",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000084",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000085",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000086",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000087",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000088",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000089",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000090",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000091",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000092",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000093",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000094",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000095",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000096",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000097",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000098",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000099",
+          "index": 0,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000000",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000001",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000002",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000003",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000004",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000005",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000006",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000007",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000008",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000009",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000010",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000011",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000012",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000013",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000014",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000015",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000016",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000017",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000018",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000019",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000020",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000021",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000022",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000023",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000024",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000025",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000026",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000027",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000028",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000029",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000030",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000031",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000032",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000033",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000034",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000035",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000036",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000037",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000038",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000039",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000040",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000041",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000042",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000043",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000044",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000045",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000046",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000047",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000048",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000049",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000050",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000051",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000052",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000053",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000054",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000055",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000056",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000057",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000058",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000059",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000060",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000061",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000062",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000063",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000064",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000065",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000066",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000067",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000068",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000069",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000070",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000071",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000072",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000073",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000074",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000075",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000076",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000077",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000078",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000079",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000080",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000081",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000082",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000083",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000084",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000085",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000086",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000087",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000088",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000089",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000090",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000091",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000092",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000093",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000094",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000095",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000096",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000097",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000098",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        },
+        {
+          "timestamp": "1755000099",
+          "index": 1,
+          "power": 400,
+          "temperature": 60,
+          "smClock": 1500,
+          "memClock": 2000,
+          "gpuUtil": 90,
+          "memUtil": 70
+        }
+      ],
+      "power": {
+        "power_valid": 1,
+        "reasons": [],
+        "window": {
+          "start_unix": 1755000020,
+          "end_unix": 1755000080
+        },
+        "expected_gpu_count": 2,
+        "observed_gpu_count": 2,
+        "published": {
+          "avg_power_w": 402,
+          "avg_total_gpu_power_w": 804,
+          "power_metric_schema_version": 1,
+          "source": "bmk_artifact"
+        },
+        "producer_sha": "abc123def4567890",
+        "exporter_image_sha256": null,
+        "sources": ["bmk_fixture_config"]
+      }
+    }
+  ]
+}

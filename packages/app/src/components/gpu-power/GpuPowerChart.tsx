@@ -4,9 +4,11 @@ import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { type AlignedWindow, alignWindowToTrace } from './power-window';
 import {
   type GpuMetricKey,
   type GpuMetricRow,
+  type PowerWindow,
   ALL_METRIC_OPTIONS,
   detectTdpFromArtifactName,
 } from './types';
@@ -18,6 +20,12 @@ interface ParsedPoint {
   raw: GpuMetricRow;
 }
 
+export interface MeasurementWindowLabels {
+  window: string;
+  warmup: string;
+  after: string;
+}
+
 interface GpuMetricsChartProps {
   data: GpuMetricRow[];
   visibleGpus: Set<number>;
@@ -27,6 +35,9 @@ interface GpuMetricsChartProps {
   caption?: React.ReactNode;
   /** Max interactive points before LTTB downsampling. Infinity to disable. */
   maxPoints?: number;
+  /** Formal power-measurement window (unix epoch bounds) to shade, when known. */
+  measurementWindow?: PowerWindow | null;
+  windowLabels?: MeasurementWindowLabels;
 }
 
 function parseTimestamp(raw: string): Date | null {
@@ -75,6 +86,104 @@ const GPU_COLORS = d3.schemeTableau10;
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
 
+const WINDOW_COLOR = '#10b981';
+const DIM_COLOR = '#6b7280';
+const DEFAULT_WINDOW_LABELS: MeasurementWindowLabels = {
+  window: 'Measurement window',
+  warmup: 'Warmup / ramp',
+  after: 'Post-benchmark',
+};
+/** Minimum region width (px) before its label is worth drawing. */
+const WINDOW_LABEL_MIN_PX = 60;
+
+/**
+ * Draw (or clear) the measurement-window band, dashed bounds, and dimmed
+ * warmup/post overlays. Re-invoked with `ctx.newXScale` on every x-zoom; the
+ * group is kept as the first child so re-draws stay beneath the data layers.
+ */
+function drawMeasurementWindow(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  xScale: d3.ScaleLinear<number, number>,
+  width: number,
+  height: number,
+  aligned: AlignedWindow | null,
+  labels: MeasurementWindowLabels,
+): void {
+  group.selectAll('g.measurement-window').remove();
+  if (!aligned || width <= 0) return;
+
+  const clampX = (x: number) => Math.max(0, Math.min(width, x));
+  const rawStart = xScale(aligned.startSeconds);
+  const rawEnd = xScale(aligned.endSeconds);
+  const xStart = clampX(rawStart);
+  const xEnd = clampX(rawEnd);
+
+  const windowGroup = group
+    .insert('g', ':first-child')
+    .attr('class', 'measurement-window')
+    .attr('pointer-events', 'none');
+
+  const addRegionLabel = (x0: number, x1: number, text: string, color: string) => {
+    if (x1 - x0 < WINDOW_LABEL_MIN_PX) return;
+    windowGroup
+      .append('text')
+      .attr('x', (x0 + x1) / 2)
+      .attr('y', 12)
+      .attr('text-anchor', 'middle')
+      .attr('fill', color)
+      .attr('font-size', '10px')
+      .attr('font-weight', '600')
+      .text(text);
+  };
+
+  const addDimRegion = (x0: number, x1: number, text: string) => {
+    windowGroup
+      .append('rect')
+      .attr('x', x0)
+      .attr('y', 0)
+      .attr('width', x1 - x0)
+      .attr('height', height)
+      .attr('fill', DIM_COLOR)
+      .attr('opacity', 0.05);
+    addRegionLabel(x0, x1, text, DIM_COLOR);
+  };
+
+  if (xEnd <= xStart) {
+    // Visible x-range lies wholly on one side of the window (deep zoom into
+    // warmup or post-benchmark): keep the dim overlay so the region is not
+    // mistaken for measured data.
+    if (rawEnd <= 0) addDimRegion(0, width, labels.after);
+    else if (rawStart >= width) addDimRegion(0, width, labels.warmup);
+    return;
+  }
+
+  // Dimmed warmup/post regions outside the formal window
+  if (xStart > 0) addDimRegion(0, xStart, labels.warmup);
+  if (xEnd < width) addDimRegion(xEnd, width, labels.after);
+
+  // Measurement window band + dashed boundary lines
+  windowGroup
+    .append('rect')
+    .attr('x', xStart)
+    .attr('y', 0)
+    .attr('width', xEnd - xStart)
+    .attr('height', height)
+    .attr('fill', WINDOW_COLOR)
+    .attr('opacity', 0.08);
+  for (const x of [xStart, xEnd]) {
+    windowGroup
+      .append('line')
+      .attr('x1', x)
+      .attr('x2', x)
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', WINDOW_COLOR)
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,3');
+  }
+  addRegionLabel(xStart, xEnd, labels.window, WINDOW_COLOR);
+}
+
 const GpuMetricsChart = React.memo(
   ({
     data,
@@ -84,6 +193,8 @@ const GpuMetricsChart = React.memo(
     legendElement,
     caption,
     maxPoints,
+    measurementWindow,
+    windowLabels,
   }: GpuMetricsChartProps) => {
     const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
 
@@ -91,6 +202,15 @@ const GpuMetricsChart = React.memo(
       () => buildGroupedData(data, visibleGpus, metricKey),
       [data, visibleGpus, metricKey],
     );
+
+    // Align over the same visible-GPU row set buildGroupedData consumes so the
+    // seconds origin matches the rendered axis (UTC vs viewer-TZ parsing only
+    // shifts every sample by the same constant, so relative seconds agree).
+    const alignedWindow = useMemo(() => {
+      if (!measurementWindow) return null;
+      const visibleRows = data.filter((row) => visibleGpus.has(row.index));
+      return alignWindowToTrace(visibleRows, measurementWindow);
+    }, [data, visibleGpus, measurementWindow]);
 
     const allPoints = useMemo(() => {
       const pts: ParsedPoint[] = [];
@@ -149,6 +269,35 @@ const GpuMetricsChart = React.memo(
         xAxis={{ label: 'Seconds', tickCount: 10 }}
         yAxis={{ label: metricConfig.yAxisLabel, tickCount: 8 }}
         layers={[
+          // Measurement-window shading (drawn first so it sits beneath data).
+          // The render function always runs so a stale band is cleared when
+          // the window disappears (artifact switch, alignment loss).
+          {
+            type: 'custom',
+            key: 'measurement-window',
+            render: (group, ctx) => {
+              drawMeasurementWindow(
+                group,
+                ctx.xScale as d3.ScaleLinear<number, number>,
+                ctx.width,
+                ctx.height,
+                alignedWindow,
+                windowLabels ?? DEFAULT_WINDOW_LABELS,
+              );
+            },
+            onZoom: alignedWindow
+              ? (group, ctx) => {
+                  drawMeasurementWindow(
+                    group,
+                    ctx.newXScale as d3.ScaleLinear<number, number>,
+                    ctx.width,
+                    ctx.height,
+                    alignedWindow,
+                    windowLabels ?? DEFAULT_WINDOW_LABELS,
+                  );
+                }
+              : null,
+          },
           // TDP reference line (power metric only)
           {
             type: 'custom',
@@ -235,7 +384,8 @@ const GpuMetricsChart = React.memo(
           onHoverEnd: (sel) => {
             sel.attr('r', 2).attr('stroke', 'none');
           },
-          attachToLayer: 2,
+          // gpu-points layer index (measurement-window layer shifted it by one)
+          attachToLayer: 3,
         }}
         legendElement={legendElement}
         caption={caption}
