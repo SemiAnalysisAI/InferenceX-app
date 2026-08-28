@@ -95,29 +95,41 @@ describe('Inference Replay', () => {
         cy.log('Replay history fixture has < 2 dates; skipping animation check');
         return;
       }
-      cy.get('[data-testid="replay-scrubber"]')
-        .invoke('val')
-        .then((startVal) => {
-          cy.get('[data-testid="replay-date-overlay"]')
-            .invoke('text')
-            .then((startDate) => {
-              cy.get('[data-testid="replay-play-pause"]').click();
-              // Poll for the first frame advance instead of racing it with a
-              // fixed wait: under forced reduced motion (the chromium e2e
-              // launch flag) playback steps discretely at 1.2s per date, so
-              // any fixed wait shorter than one step fails deterministically.
-              cy.get('[data-testid="replay-scrubber"]', { timeout: 10_000 })
-                .invoke('val')
-                .should((endVal) => {
-                  expect(Number(endVal)).to.be.greaterThan(Number(startVal));
-                });
-              cy.get('[data-testid="replay-play-pause"]').click();
-              cy.get('[data-testid="replay-date-overlay"]')
-                .invoke('text')
-                .should((endDate) => {
-                  expect(endDate).not.to.equal(startDate);
-                });
+      // Rewind first: earlier tests in this file (and failed retry attempts —
+      // testIsolation is off) leave the playhead wherever they stopped, and a
+      // playhead at the end would turn Play into a restart-from-zero whose
+      // scrubber value can never exceed the recorded start.
+      cy.get('[data-testid="replay-reset"]').click();
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+      cy.get('[data-testid="replay-date-overlay"]')
+        .invoke('text')
+        .then((startDate) => {
+          cy.get('[data-testid="replay-play-pause"]').click();
+          // Poll both signals BEFORE pausing, each with headroom for the
+          // slowest path. Scrubber: reduced motion (the chromium e2e launch
+          // flag) steps discretely at 1.2s per date, so any fixed wait
+          // shorter than one step fails deterministically. Date overlay: the
+          // continuous path (Firefox has no reduced-motion flag) commits
+          // scrubber ticks every few ms but only flips the label when the
+          // eased playhead crosses a whole segment — pausing as soon as the
+          // scrubber moves would freeze the label on the first date forever.
+          // The timeout must ride on .invoke: a cy.get timeout does not
+          // extend the retries of chained queries.
+          cy.get('[data-testid="replay-scrubber"]')
+            .invoke({ timeout: 10_000 }, 'val')
+            .should((endVal) => {
+              expect(Number(endVal)).to.be.greaterThan(0);
             });
+          cy.get('[data-testid="replay-date-overlay"]')
+            .invoke({ timeout: 10_000 }, 'text')
+            .should((endDate) => {
+              expect(endDate).not.to.equal(startDate);
+            });
+          // Playback may already have completed; clicking Play again would
+          // restart it and leak a running animation into the next test.
+          cy.get('[data-testid="replay-play-pause"]').then(($btn) => {
+            if ($btn.text().includes('Pause')) cy.wrap($btn).click();
+          });
         });
     });
   });

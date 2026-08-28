@@ -78,7 +78,7 @@ function handleDesktopClick(tab: DashboardRouteKey) {
  * paint, no-JS, or a gated tab active in the popover — each link's static
  * `border-b` fallback renders instead, so the active state is never lost.
  */
-function useTabIndicator(current: DashboardRouteKey) {
+function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
   const navRef = useRef<HTMLElement>(null);
   const hasAnimatedRef = useRef(false);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
@@ -95,6 +95,16 @@ function useTabIndicator(current: DashboardRouteKey) {
   }, []);
 
   useLayoutEffect(measure, [measure, current]);
+
+  // The gated "Hidden" trigger mounts a tick after hydration (the feature
+  // gate reads localStorage in an effect), which shifts every sibling under
+  // `justify-evenly` WITHOUT resizing the nav box — the ResizeObserver below
+  // stays silent, so the indicator would keep pre-unlock coordinates.
+  // Reposition without animating, exactly as for a resize.
+  useLayoutEffect(() => {
+    hasAnimatedRef.current = false;
+    measure();
+  }, [measure, gateUnlocked]);
 
   // Only slide between positions after the first measurement has painted;
   // the initial placement (and any resize reflow) must not animate.
@@ -132,7 +142,7 @@ export function TabNav() {
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
-  const { navRef, indicator, animate } = useTabIndicator(current);
+  const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
   const searchParams = useClientSearchParams();
   const unofficialIds = useMemo(() => {
     for (const [key, value] of searchParams) {
