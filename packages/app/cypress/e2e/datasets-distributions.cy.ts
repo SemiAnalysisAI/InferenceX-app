@@ -34,7 +34,7 @@ const LAYOUT_DATASET = {
 };
 
 describe('Dataset distribution percentiles', () => {
-  before(() => {
+  beforeEach(() => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset', {
       body: {
         id: 'test-dataset',
@@ -94,6 +94,13 @@ describe('Dataset distribution percentiles', () => {
             p95: 400,
             max: 500,
           }),
+          turnsPerConversation: distribution({
+            median: 12,
+            p75: 20,
+            p90: 30,
+            p95: 40,
+            max: 50,
+          }),
         },
         ingested_at: '2026-06-23T00:00:00Z',
       },
@@ -146,6 +153,36 @@ describe('Dataset distribution percentiles', () => {
       });
     }
   });
+
+  it('localizes the distribution cards and conversation controls', () => {
+    cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+
+    // Representative labels only; exhaustive copy lives with the translations.
+    cy.get('input[aria-label="搜索对话"]').should('exist');
+    cy.contains('[data-slot="card"]', '每对话轮次数').within(() => {
+      cy.get('[data-testid="distribution-unit"]').should('have.text', '轮次');
+      // Keyboard access keeps working on the localized route.
+      cy.get('rect[role="slider"]')
+        .focus()
+        .should('have.attr', 'aria-valuetext')
+        .and('include', '轮次');
+      cy.get('[role="tooltip"]').should('be.visible');
+    });
+  });
+
+  it('keeps the conversation table reachable through internal scrolling on mobile', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="dataset-conversations-table-scroll"]').should(($scroll) => {
+      const element = $scroll[0];
+      expect(getComputedStyle(element).overflowX).to.eq('auto');
+      expect(element.scrollWidth).to.be.greaterThan(element.clientWidth);
+    });
+    cy.window().then((win) => {
+      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
+    });
+  });
 });
 
 describe('Dataset detail loading stability', () => {
@@ -171,4 +208,47 @@ describe('Dataset detail loading stability', () => {
       cy.contains('h1', 'Layout dataset').should('be.visible');
     });
   }
+
+  it('renders a localized request error separately from 404 and retries at 390px', () => {
+    let completedFailures = 0;
+    cy.intercept('GET', '/api/v1/datasets/layout-dataset', (request) => {
+      const shouldFail = completedFailures < 2;
+      request.alias = shouldFail ? 'datasetFailureRequest' : 'datasetRetryRequest';
+      request.on('after:response', () => {
+        if (shouldFail) completedFailures += 1;
+      });
+      request.reply(
+        shouldFail ? { statusCode: 503, body: {} } : { statusCode: 200, body: LAYOUT_DATASET },
+      );
+    });
+    cy.intercept('GET', '/api/v1/datasets/layout-dataset/conversations*', {
+      body: { total: 0, items: [] },
+    });
+
+    cy.viewport(390, 844);
+    cy.visit('/zh/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="dataset-detail-error"]')
+      .should('have.attr', 'data-locale', 'zh')
+      .and('have.attr', 'role', 'alert');
+    cy.get('[data-testid="dataset-detail-not-found"]').should('not.exist');
+    cy.get('[data-testid="dataset-detail-error"] a').should('have.attr', 'href', '/zh/agentx');
+    cy.contains('[data-testid="dataset-detail-error"] button', '重试').click();
+    cy.wait('@datasetRetryRequest').its('response.statusCode').should('eq', 200);
+    cy.contains('h1', 'Layout dataset').should('be.visible');
+    cy.window().then((win) => {
+      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
+    });
+  });
+
+  it('reserves the not-found state for a successful 404 response', () => {
+    cy.intercept('GET', '/api/v1/datasets/missing-dataset', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/datasets/missing-dataset/conversations*', { statusCode: 404 });
+
+    cy.viewport(1280, 800);
+    cy.visit('/agentx/missing-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="dataset-detail-not-found"]')
+      .should('have.attr', 'data-locale', 'en')
+      .and('be.visible');
+    cy.get('[data-testid="dataset-detail-error"]').should('not.exist');
+  });
 });

@@ -1,6 +1,5 @@
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
-import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { createHighlighterCore } from 'shiki/core';
@@ -9,6 +8,7 @@ import type { HighlighterCore } from 'shiki/types';
 
 import { createMdxComponents } from '@/components/blog/mdx-components';
 import type { BlogLocale } from '@/lib/blog';
+import { rehypeKatex } from '@/lib/rehype-katex';
 
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 
