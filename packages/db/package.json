@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
-    "@noble/ciphers": "^2.3.0",
+    "@noble/ciphers": "^2.4.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "postgres": "^3.4.9",
     "stream-chain": "^4.2.5",
@@ -44,11 +44,11 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/stream-json": "^1.7.8",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "adm-zip": "^0.6.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

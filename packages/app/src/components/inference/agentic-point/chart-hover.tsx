@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 /** Vertical crosshair + floating value tooltip overlay shared by every chart. */
 export interface HoverItem {
@@ -23,6 +23,12 @@ interface ChartHoverProps {
    * Returns `null` to hide the tooltip (e.g. cursor outside data range).
    */
   resolve: (xFraction: number) => { items: HoverItem[]; title?: string } | null;
+  /** Optional accessible name that enables keyboard exploration of discrete values. */
+  ariaLabel?: string;
+  /** Number of discrete x-axis values available to keyboard users. */
+  keyboardSteps?: number;
+  /** Optional locale-aware formatter for the screen-reader value summary. */
+  formatAriaValueText?: (items: HoverItem[]) => string;
   children: ReactNode;
 }
 
@@ -34,7 +40,18 @@ interface ChartHoverProps {
  * vertical line that follows the cursor, and a floating tooltip on the right
  * of the cursor (auto-flipping to the left when it would overflow).
  */
-export function ChartHover({ pad, width, height, resolve, children }: ChartHoverProps) {
+export function ChartHover({
+  pad,
+  width,
+  height,
+  resolve,
+  ariaLabel,
+  keyboardSteps,
+  formatAriaValueText,
+  children,
+}: ChartHoverProps) {
+  const tooltipId = useId();
+  const [keyboardIndex, setKeyboardIndex] = useState(0);
   const [hover, setHover] = useState<{
     xPx: number;
     yPx: number;
@@ -45,6 +62,33 @@ export function ChartHover({ pad, width, height, resolve, children }: ChartHover
 
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
+  const accessible = Boolean(ariaLabel && keyboardSteps && keyboardSteps > 0);
+  const steps = accessible ? keyboardSteps! : 0;
+  const keyboardFraction = steps > 0 ? (keyboardIndex + 0.5) / steps : 0;
+  const keyboardResolved = accessible ? resolve(keyboardFraction) : null;
+  const ariaValueText = keyboardResolved
+    ? (formatAriaValueText?.(keyboardResolved.items) ??
+      keyboardResolved.items.map((item) => `${item.label}: ${item.value}`).join('; '))
+    : undefined;
+
+  const showKeyboardStep = (index: number) => {
+    if (!accessible) return;
+    const nextIndex = Math.max(0, Math.min(steps - 1, index));
+    const fraction = (nextIndex + 0.5) / steps;
+    const resolved = resolve(fraction);
+    setKeyboardIndex(nextIndex);
+    if (!resolved) {
+      setHover(null);
+      return;
+    }
+    setHover({
+      xPx: pad.left + fraction * innerW,
+      yPx: pad.top + innerH / 2,
+      fraction,
+      items: resolved.items,
+      title: resolved.title,
+    });
+  };
 
   const onMove = (e: React.MouseEvent<SVGRectElement>) => {
     const svg = e.currentTarget.ownerSVGElement;
@@ -59,10 +103,27 @@ export function ChartHover({ pad, width, height, resolve, children }: ChartHover
       setHover(null);
       return;
     }
+    if (accessible) {
+      setKeyboardIndex(Math.min(steps - 1, Math.floor(fraction * steps)));
+    }
     setHover({ xPx: sx, yPx: sy, fraction, items: resolved.items, title: resolved.title });
   };
 
-  const onLeave = () => setHover(null);
+  const onLeave = (e: React.MouseEvent<SVGRectElement>) => {
+    if (e.currentTarget.ownerDocument.activeElement !== e.currentTarget) setHover(null);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<SVGRectElement>) => {
+    if (!accessible) return;
+    let nextIndex: number | null = null;
+    if (e.key === 'ArrowLeft') nextIndex = keyboardIndex - 1;
+    if (e.key === 'ArrowRight') nextIndex = keyboardIndex + 1;
+    if (e.key === 'Home') nextIndex = 0;
+    if (e.key === 'End') nextIndex = steps - 1;
+    if (nextIndex === null) return;
+    e.preventDefault();
+    showKeyboardStep(nextIndex);
+  };
 
   return (
     <div className="relative w-full">
@@ -93,6 +154,22 @@ export function ChartHover({ pad, width, height, resolve, children }: ChartHover
           fill="transparent"
           onMouseMove={onMove}
           onMouseLeave={onLeave}
+          {...(accessible
+            ? {
+                role: 'slider',
+                tabIndex: 0,
+                'aria-label': ariaLabel,
+                'aria-orientation': 'horizontal' as const,
+                'aria-valuemin': 1,
+                'aria-valuemax': steps,
+                'aria-valuenow': keyboardIndex + 1,
+                'aria-valuetext': ariaValueText,
+                'aria-describedby': hover ? tooltipId : undefined,
+                onFocus: () => showKeyboardStep(keyboardIndex),
+                onBlur: () => setHover(null),
+                onKeyDown,
+              }
+            : {})}
         />
       </svg>
       {hover && hover.items.length > 0 && (
@@ -103,6 +180,7 @@ export function ChartHover({ pad, width, height, resolve, children }: ChartHover
           innerW={innerW}
           title={hover.title}
           items={hover.items}
+          id={tooltipId}
         />
       )}
     </div>
@@ -116,6 +194,7 @@ function HoverTooltip({
   innerW,
   title,
   items,
+  id,
 }: {
   xFraction: number;
   containerWidth: number;
@@ -123,6 +202,7 @@ function HoverTooltip({
   innerW: number;
   title?: string;
   items: HoverItem[];
+  id: string;
 }) {
   // Position tooltip near the crosshair as a % of the container.
   // We flip to the cursor's left side when it would overflow the right edge.
@@ -132,6 +212,8 @@ function HoverTooltip({
   const right = onRight ? 'auto' : `${((containerWidth - xPx) / containerWidth) * 100}%`;
   return (
     <div
+      id={id}
+      role="tooltip"
       className="pointer-events-none absolute top-2 z-10 rounded-md border border-border bg-popover px-2 py-1.5 text-xs shadow-md"
       style={{ left, right, marginLeft: onRight ? 8 : 0, marginRight: onRight ? 0 : 8 }}
     >

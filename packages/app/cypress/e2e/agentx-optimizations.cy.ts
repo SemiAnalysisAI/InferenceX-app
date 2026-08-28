@@ -9,7 +9,32 @@ const FRAMEWORK_SLUGS = [
   'dynamo',
   'lmcache',
   'mooncake',
-];
+] as const;
+
+const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
+  vllm: 'vLLM',
+  sglang: 'SGLang',
+  'tensorrt-llm': 'TensorRT-LLM',
+  atom: 'AMD ATOM',
+  aiter: 'ROCm AITER',
+  dynamo: 'NVIDIA Dynamo',
+  lmcache: 'LMCache',
+  mooncake: 'Mooncake',
+};
+
+const ROUTE_VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+] as const;
+
+function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
+}
 
 describe('AgentX optimizations', () => {
   beforeEach(() => {
@@ -91,10 +116,44 @@ describe('AgentX optimizations', () => {
       });
   });
 
-  it('serves every project page and pairs each with its Chinese sibling', () => {
-    for (const slug of FRAMEWORK_SLUGS) {
-      cy.request(`/agentx/optimizations/${slug}`).its('status').should('eq', 200);
-      cy.request(`/zh/agentx/optimizations/${slug}`).its('status').should('eq', 200);
+  it('renders the index and every project at 1440px and 390px in both locales', () => {
+    for (const viewport of ROUTE_VIEWPORTS) {
+      for (const locale of ['', '/zh']) {
+        cy.viewport(viewport.width, viewport.height);
+        cy.visit(`${locale}/agentx/optimizations`, { onBeforeLoad: unlockAgenticGate });
+        cy.get('[data-testid="agentx-optimizations-index"]').should('be.visible');
+        cy.get('[data-testid="agentx-optimizations-card"]').should(
+          'have.length',
+          FRAMEWORK_SLUGS.length,
+        );
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale === '/zh' ? '/agentx/optimizations' : '/zh/agentx/optimizations',
+        );
+        expectNoPageOverflow();
+
+        for (const slug of FRAMEWORK_SLUGS) {
+          cy.visit(`${locale}/agentx/optimizations/${slug}`, {
+            onBeforeLoad: unlockAgenticGate,
+          });
+          cy.get('[data-testid="agentx-optimizations-article"]')
+            .should('be.visible')
+            .and('have.attr', 'data-framework', slug)
+            .find('h1')
+            .should('have.text', FRAMEWORK_NAMES[slug]);
+          cy.get('[data-testid="agentx-optimizations-pr"]')
+            .first()
+            .should('have.attr', 'href')
+            .and('match', /^https:\/\/github\.com\/.+\/pull\/\d+$/u);
+          cy.get('[data-testid="language-toggle"]').should(
+            'have.attr',
+            'href',
+            locale === '/zh' ? `/agentx/optimizations/${slug}` : `/zh/agentx/optimizations/${slug}`,
+          );
+          expectNoPageOverflow();
+        }
+      }
     }
   });
 
@@ -144,5 +203,15 @@ describe('AgentX optimizations', () => {
         .should('have.attr', 'href')
         .and('match', /^https:\/\/github\.com\/sgl-project\/sglang\/pull\/\d+$/u);
     });
+    cy.get('link[rel="alternate"][hreflang="en"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/agentx/optimizations/sglang',
+    );
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/zh/agentx/optimizations/sglang',
+    );
   });
 });
