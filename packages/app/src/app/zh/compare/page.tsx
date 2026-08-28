@@ -97,7 +97,7 @@ export default async function CompareIndexPageZh() {
 
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
-          <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
             对比结果目录
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">

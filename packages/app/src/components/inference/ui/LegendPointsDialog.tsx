@@ -211,7 +211,7 @@ export default function LegendPointsDialog({
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground/70 leading-tight">
+        <p className="text-3xs text-muted-foreground/70 leading-tight">
           {isOverlay
             ? 'Unofficial overlay points have no stored benchmark records — metrics only, no detail links.'
             : 'Click a row for the point detail — agentic points open the trace detail page, fixed-seq points open the GitHub Actions run.'}{' '}

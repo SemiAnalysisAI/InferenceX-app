@@ -113,7 +113,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
         aria-label={`Expand ${spec.name} scale-up topology diagram`}
       >
         <ScaleUpTopologyD3 spec={spec} config={compactConfig} compact />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">Click to expand</p>
+        <p className="text-3xs text-muted-foreground mt-1 text-center">Click to expand</p>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

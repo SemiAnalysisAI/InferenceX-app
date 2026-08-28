@@ -146,16 +146,16 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 AI 推理术语表
               </Link>
               <div className="mt-8 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-brand uppercase">
+                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
                   {GLOSSARY_CATEGORY_LABELS_ZH[entry.category]}
                 </span>
                 {entry.abbreviation && (
-                  <span className="font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
+                  <span className="font-mono text-xs tracking-eyebrow text-muted-foreground uppercase">
                     {entry.abbreviation}
                   </span>
                 )}
               </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
                 {entry.term}
               </h1>
               {entry.aliases && entry.aliases.length > 0 && (
@@ -173,7 +173,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 >
                   <p
                     id="plain-language-heading"
-                    className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase"
+                    className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase"
                   >
                     先用大白话
                   </p>
@@ -194,7 +194,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
 
                 {entry.measurement && (
                   <div className="mt-8 border-l-2 border-brand bg-brand/6 px-5 py-4">
-                    <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                    <p className="text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
                       {entry.measurement.label}
                     </p>
                     <p className="mt-1 font-mono text-sm leading-relaxed text-foreground">
@@ -226,7 +226,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
               </div>
 
               <aside className="border-t border-border/50 bg-muted/10 px-5 py-8 lg:border-t-0 lg:border-l lg:px-6 lg:py-12">
-                <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
                   相关术语
                 </p>
                 <nav aria-label="相关术语" className="mt-4 flex flex-col">
@@ -257,7 +257,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
               <Card>
                 <div className="flex flex-col gap-2 border-b border-border/50 pb-5 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+                    <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
                       参考资料
                     </p>
                     <h2 id="further-reading" className="mt-2 text-2xl font-semibold tracking-tight">
@@ -302,7 +302,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 href={`/zh/glossary/${adjacent.previous.slug}`}
                 className="rounded-xl border border-border/40 bg-background/20 p-5 backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5"
               >
-                <span className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
+                <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
                   ← 上一条
                 </span>
                 <span className="mt-2 block font-semibold">{adjacent.previous.term}</span>
@@ -315,7 +315,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 href={`/zh/glossary/${adjacent.next.slug}`}
                 className="rounded-xl border border-border/40 bg-background/20 p-5 text-right backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5"
               >
-                <span className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
+                <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
                   下一条 →
                 </span>
                 <span className="mt-2 block font-semibold">{adjacent.next.term}</span>

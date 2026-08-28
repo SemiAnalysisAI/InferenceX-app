@@ -61,7 +61,7 @@ export default function ZhRankingsIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {title}
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">

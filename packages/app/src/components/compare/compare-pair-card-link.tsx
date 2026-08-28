@@ -71,7 +71,7 @@ export function ComparePairCardLink({
               )}
             </h3>
             {scenarioLabel && (
-              <span className="inline-flex min-h-5 items-center rounded-full border border-brand/30 bg-brand/10 px-2 font-mono text-[10px] font-semibold leading-none text-brand">
+              <span className="inline-flex min-h-5 items-center rounded-full border border-brand/30 bg-brand/10 px-2 font-mono text-3xs font-semibold leading-none text-brand">
                 {scenarioLabel}
               </span>
             )}

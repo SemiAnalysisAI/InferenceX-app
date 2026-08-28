@@ -227,7 +227,7 @@ export function TraceFlamegraph({
       </div>
 
       {braces.overflowLanes > 0 && (
-        <p className="mb-2 text-[11px] text-muted-foreground">
+        <p className="mb-2 text-2xs text-muted-foreground">
           {t.denseParallel(MAX_LANES, braces.overflowLanes)}
         </p>
       )}
@@ -337,7 +337,7 @@ export function TraceFlamegraph({
                   </div>
 
                   <div
-                    className="w-36 shrink-0 text-[11px] tabular-nums text-muted-foreground"
+                    className="w-36 shrink-0 text-2xs tabular-nums text-muted-foreground"
                     data-testid={`flamegraph-time-${row.key}`}
                   >
                     {row.timeLabel ?? '—'}
@@ -360,7 +360,7 @@ export function TraceFlamegraph({
                     </div>
                   </div>
 
-                  <div className="w-16 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                  <div className="w-16 shrink-0 text-right text-2xs tabular-nums text-muted-foreground">
                     {compact(row.total)}
                   </div>
                 </div>

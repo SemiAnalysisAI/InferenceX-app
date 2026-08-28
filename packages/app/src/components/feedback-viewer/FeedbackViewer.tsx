@@ -329,7 +329,7 @@ function FeedbackRow({ row }: { row: DecryptedRow }) {
         )}
         {row.wantToSee && <FieldRow label={t.wouldLikeToSee} value={row.wantToSee} tone="want" />}
         {row.userAgent && (
-          <p className="text-[10px] text-muted-foreground/70 font-mono">{row.userAgent}</p>
+          <p className="text-3xs text-muted-foreground/70 font-mono">{row.userAgent}</p>
         )}
       </div>
     </Card>
@@ -353,7 +353,7 @@ function FieldRow({
         : 'border-l-2 border-sky-500/40';
   return (
     <div className={`pl-3 ${toneClass}`}>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-3xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <p className="text-sm whitespace-pre-wrap break-words">{value}</p>
     </div>
   );
