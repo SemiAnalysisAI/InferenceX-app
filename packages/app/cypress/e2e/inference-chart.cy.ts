@@ -119,10 +119,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should(
-        'have.text',
-        'Uncached input $1.122/M tok · Cached input $0.08/M tok · Output $3.366/M tok',
-      )
+      .should('have.text', 'Uncached $1.122/M tok · Cached $0.08/M tok · Output $3.366/M tok')
       .then(($prices) => {
         const subtitle = $prices.parent().text();
         expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('Updated:'));
@@ -192,7 +189,7 @@ describe('Inference Chart', () => {
       .find('[data-testid="token-revenue-subtitle-prices"]')
       .should(
         'have.text',
-        '未缓存输入 $1.122/百万 token · 缓存输入 $0.08/百万 token · 输出 $3.366/百万 token',
+        '未缓存 $1.122/百万 token · 缓存 $0.08/百万 token · 输出 $3.366/百万 token',
       )
       .then(($prices) => {
         const subtitle = $prices.parent().text();
