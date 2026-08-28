@@ -50,11 +50,13 @@ function exerciseEveryBlogJourney({
         cy.get('[data-testid="blog-post-page"]')
           .should('be.visible')
           .and('have.attr', 'data-blog-slug', slug);
-        cy.get(`link[rel="alternate"][hreflang="${alternateLocale}"]`).should(
-          'have.attr',
-          'href',
-          `${CONTENT_SITE_URL}${alternatePath}`,
-        );
+        // Next.js streams head metadata after the body during client-side
+        // navigation, so match the fully-updated link instead of asserting on
+        // whichever (possibly stale) alternate is first in document order.
+        cy.get(
+          `link[rel="alternate"][hreflang="${alternateLocale}"][href="${CONTENT_SITE_URL}${alternatePath}"]`,
+          { timeout: 15000 },
+        ).should('exist');
         cy.go('back');
         cy.location('pathname').should('eq', basePath);
         cy.get(`[data-testid="blog-post-card"][data-blog-slug="${slug}"]`).should('exist');
@@ -86,11 +88,12 @@ function exerciseEveryGlossaryJourney({
         cy.get('[data-testid="glossary-detail-page"]')
           .should('be.visible')
           .and('have.attr', 'data-glossary-slug', slug);
-        cy.get(`link[rel="alternate"][hreflang="${alternateLocale}"]`).should(
-          'have.attr',
-          'href',
-          `${CONTENT_SITE_URL}${alternatePath}`,
-        );
+        // See the blog journey above: retry until the streamed head metadata
+        // for this term has replaced the listing page's alternate link.
+        cy.get(
+          `link[rel="alternate"][hreflang="${alternateLocale}"][href="${CONTENT_SITE_URL}${alternatePath}"]`,
+          { timeout: 15000 },
+        ).should('exist');
         cy.go('back');
         cy.location('pathname').should('eq', basePath);
         cy.get(`[data-testid="glossary-entry-link"][data-glossary-slug="${slug}"]`).should('exist');
