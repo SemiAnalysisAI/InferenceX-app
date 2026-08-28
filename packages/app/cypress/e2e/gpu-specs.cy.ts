@@ -1,3 +1,37 @@
+/**
+ * Hover a chart point until its tooltip opens, then assert the tooltip text.
+ * The D3 charts re-render after the container is measured, which can detach
+ * the hovered point (so the first synthetic mouseenter is lost) and can hide
+ * the tooltip again before a retrying `:visible` assertion samples it — so
+ * re-trigger (bounded) and assert the content at the moment it is displayed.
+ */
+function hoverGpuSpecsPointAndAssertTooltip(
+  pointSelector: string,
+  tooltipSelector: string,
+  expectedTexts: string[],
+  attempts = 20,
+) {
+  cy.get(pointSelector).first().trigger('mouseenter', { force: true });
+  cy.document().then((doc) => {
+    const tip = doc.querySelector<HTMLElement>(tooltipSelector);
+    if (tip && tip.style.display === 'block') {
+      for (const text of expectedTexts) {
+        expect(tip.textContent, `tooltip ${tooltipSelector}`).to.include(text);
+      }
+    } else if (attempts > 0) {
+      cy.wait(200);
+      hoverGpuSpecsPointAndAssertTooltip(
+        pointSelector,
+        tooltipSelector,
+        expectedTexts,
+        attempts - 1,
+      );
+    } else {
+      throw new Error(`tooltip ${tooltipSelector} never became visible`);
+    }
+  });
+}
+
 describe('GPU Specs Tab', () => {
   before(() => {
     cy.window().then((win) => {
@@ -526,17 +560,19 @@ describe('GPU Specs Chinese route', () => {
       .should('contain.text', '指标：')
       .and('contain.text', '悬停柱形可查看详情');
     cy.get('[data-testid="gpu-specs-bar-d3-chart"] svg').should('contain.text', '显存容量 (GB)');
-    cy.get('[data-testid="gpu-specs-bar-d3-chart"] svg .bar')
-      .first()
-      .trigger('mouseenter', { force: true });
-    cy.get('[data-chart-tooltip]:visible').should('contain.text', '显存容量：');
+    hoverGpuSpecsPointAndAssertTooltip(
+      '[data-testid="gpu-specs-bar-d3-chart"] svg .bar',
+      '[data-chart-tooltip="gpu-specs-bar-chart"]',
+      ['显存容量：'],
+    );
     cy.get('[data-testid="gpu-specs-radar-view-btn"]').click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg').should('contain.text', '显存容量');
     cy.get('[data-testid="gpu-specs-radar-chart"]').should('contain.text', '归一化');
-    cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-dot')
-      .first()
-      .trigger('mouseenter', { force: true });
-    cy.get('[data-chart-tooltip]:visible').should('contain.text', '显存容量：');
+    hoverGpuSpecsPointAndAssertTooltip(
+      '[data-testid="gpu-specs-radar-chart"] svg .radar-dot',
+      '[data-chart-tooltip="gpu-radar-chart"]',
+      ['显存容量：'],
+    );
   });
 
   it('supports table, topology, chart, and radar navigation at 1440px', () => {

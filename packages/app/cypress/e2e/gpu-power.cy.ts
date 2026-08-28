@@ -1,3 +1,37 @@
+/**
+ * Hover a chart point until its tooltip opens, then assert the tooltip text.
+ * The D3 charts re-render after the container is measured, which can detach
+ * the hovered point (so the first synthetic mouseenter is lost) and can hide
+ * the tooltip again before a retrying `:visible` assertion samples it — so
+ * re-trigger (bounded) and assert the content at the moment it is displayed.
+ */
+function hoverGpuPowerPointAndAssertTooltip(
+  pointSelector: string,
+  tooltipSelector: string,
+  expectedTexts: string[],
+  attempts = 20,
+) {
+  cy.get(pointSelector).first().trigger('mouseenter', { force: true });
+  cy.document().then((doc) => {
+    const tip = doc.querySelector<HTMLElement>(tooltipSelector);
+    if (tip && tip.style.display === 'block') {
+      for (const text of expectedTexts) {
+        expect(tip.textContent, `tooltip ${tooltipSelector}`).to.include(text);
+      }
+    } else if (attempts > 0) {
+      cy.wait(200);
+      hoverGpuPowerPointAndAssertTooltip(
+        pointSelector,
+        tooltipSelector,
+        expectedTexts,
+        attempts - 1,
+      );
+    } else {
+      throw new Error(`tooltip ${tooltipSelector} never became visible`);
+    }
+  });
+}
+
 /** Send the ↑↑↓↓ unlock sequence to reveal the Hidden popover. */
 function unlockPowerX() {
   cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
@@ -189,12 +223,11 @@ describe('PowerX Chinese route', () => {
     });
     cy.wait('@gpuMetrics');
     cy.get('button[title="相关性散点图"]').click();
-    cy.get('[data-testid="gpu-metrics-correlation"] svg .point')
-      .first()
-      .trigger('mouseenter', { force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '功耗：')
-      .and('contain.text', '温度：');
+    hoverGpuPowerPointAndAssertTooltip(
+      '[data-testid="gpu-metrics-correlation"] svg .point',
+      '[data-chart-tooltip="gpu-metrics-correlation"]',
+      ['功耗：', '温度：'],
+    );
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });

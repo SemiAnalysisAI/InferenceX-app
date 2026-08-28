@@ -66,7 +66,7 @@ describe('Current InferenceX Image localized routes', () => {
       .and('contain.text', 'lmsysorg/sglang:v0.5.2')
       .and('not.contain.text', '0d');
     cy.get('td[title^="上次提交："]').should('have.length.greaterThan', 0);
-    cy.contains('label', '节点类型').find('button').trigger('mouseover');
+    cy.contains('label', '节点类型').parent().find('svg.cursor-help').trigger('pointermove');
     cy.get('[role="tooltip"]')
       .should('contain.text', '单节点指非分离式推理')
       .and('contain.text', '独立的 prefill/decode 池')
@@ -86,7 +86,7 @@ describe('Current InferenceX Image localized routes', () => {
       .and('contain.text', '0d')
       .and('not.contain.text', '关闭');
     cy.get('td[title^="Last submission:"]').should('have.length.greaterThan', 0);
-    cy.contains('label', 'Node Type').find('button').trigger('mouseover');
+    cy.contains('label', 'Node Type').parent().find('svg.cursor-help').trigger('pointermove');
     cy.get('[role="tooltip"]')
       .should('contain.text', 'Single node = non-disaggregated serving.')
       .and('contain.text', 'Mori')

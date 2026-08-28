@@ -878,7 +878,7 @@ describe('TCO Calculator Chinese route', () => {
   it('localizes chart internals, table headers, and preserved units', () => {
     cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
       'contain.text',
-      '每芯片总吞吐量 (tok/s/chip)',
+      '每芯片吞吐量 (tok/s/chip)',
     );
     cy.get('[data-testid="calculator-bar-chart"]').should('contain.text', 'Shift+滚轮横向缩放');
     cy.get('[data-testid="calculator-bar-chart"] svg .bar')
@@ -887,7 +887,8 @@ describe('TCO Calculator Chinese route', () => {
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '吞吐量：')
       .and('contain.text', '成本：');
-    cy.get('[data-testid="calculator-table-view-btn"]').click();
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
     cy.get('[data-testid="calculator-results-table"] thead')
       .should('contain.text', '芯片')
       .and('contain.text', '成本 ($/M tok)')
@@ -908,9 +909,10 @@ describe('TCO Calculator Chinese route', () => {
   });
 
   it('keeps dense tables internally scrollable without body overflow at 390px', () => {
-    cy.get('[data-testid="calculator-table-view-btn"]').click();
-    cy.get('[data-testid="calculator-results-table"]')
-      .parents('.overflow-x-auto')
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    // DataTable renders its horizontal scroller inside the testid wrapper.
+    cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
       .first()
       .then(($scroller) => {
         expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
@@ -924,7 +926,7 @@ describe('TCO Calculator Chinese route', () => {
     cy.viewport(375, 812);
     cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
       'contain.text',
-      '每芯片总吞吐量 (tok/s/chip)',
+      '每芯片吞吐量 (tok/s/chip)',
     );
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
