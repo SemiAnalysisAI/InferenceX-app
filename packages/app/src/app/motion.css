@@ -1,31 +1,14 @@
-/* ============================================================
- * InferenceX motion system — restrained, evidence-focused.
- *
- * Principles:
- * - Animate transform and opacity only (compositor-friendly, CLS-safe).
- * - Entrances decelerate into place; micro-feedback stays under 200ms.
- * - The hidden pre-reveal state exists only while JavaScript is running
- *   AND the visitor has not requested reduced motion, so crawlers,
- *   no-JS visitors, and reduced-motion users always get static content.
- *
- * Usage: wrap a block in <Reveal> (src/components/motion/reveal.tsx),
- * which flips `data-inview` once the block enters the viewport.
- * Stagger siblings with the `delayMs` prop (sets --motion-reveal-delay).
- * ============================================================ */
+/* InferenceX motion system. Transform/opacity only; entrances decelerate;
+ * micro-feedback stays under 200ms. Everything is gated so no-JS visitors,
+ * crawlers, and reduced-motion users get static content. */
 
 :root {
-  /* Decelerating "settle" curve shared by every entrance. */
   --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Section/card reveals. Hover and press feedback stays at 150–200ms
-     and is declared per component (Tailwind motion-safe utilities or
-     .motion-press below), not here. */
   --motion-reveal-duration: 550ms;
   --motion-reveal-distance: 12px;
 }
 
-/* Reveal-on-view primitive. `scripting: enabled` keeps the hidden state
-   away from no-JS visitors and crawlers; older browsers that don't know
-   the feature simply never hide content (query evaluates to false). */
+/* Reveal-on-view primitive (<Reveal> flips data-inview; delayMs staggers). */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   [data-reveal] {
     opacity: 0;
@@ -42,9 +25,7 @@
   }
 }
 
-/* Press feedback for buttons and button-shaped links. Extends the usual
-   `transition-colors` set with transform so hover tints keep animating.
-   Declared outside Tailwind's layers so it wins over the utility. */
+/* Press feedback for buttons and button-shaped links. */
 @media (prefers-reduced-motion: no-preference) {
   .motion-press {
     transition-property: color, background-color, border-color, opacity, transform;
@@ -57,12 +38,7 @@
   }
 }
 
-/* ============================================================
- * Motion tokens — tiered durations and easings.
- * fast  (150ms): direct-manipulation feedback — menus, fades, dims.
- * base  (220ms): contextual movement — tab indicator, route cross-fade.
- * reveal(550ms): scroll-triggered section entrances (declared above).
- * ============================================================ */
+/* Motion tokens: fast = direct feedback, base = contextual movement. */
 :root {
   --motion-dur-fast: 150ms;
   --motion-dur-base: 220ms;
@@ -70,28 +46,14 @@
   --motion-ease-exit: cubic-bezier(0.3, 0, 1, 1);
 }
 
-/* ============================================================
- * Route transitions (progressive enhancement).
- *
- * Client-side navigations: React's <ViewTransition> wrapper in the root
- * layout (components/motion/route-transition.tsx) tags the page content
- * with the `vt-page` view-transition-class when Next.js's experimental
- * `viewTransition` flag is active.
- *
- * Full-document navigations (e.g. the compare catalog cards, which
- * intentionally use `window.location.href`): the `@view-transition`
- * rule opts into cross-document view transitions.
- *
- * Fallback: browsers without the View Transitions API (Firefox by
- * default) ignore all of this and get today's instant swap. Reduced
- * motion collapses every transition to a near-instant cut.
- * ============================================================ */
+/* Route transitions (progressive enhancement; no-VT browsers get an
+ * instant swap). Cross-document transitions cover full-document navs
+ * such as the compare catalog cards. */
 @view-transition {
   navigation: auto;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Old page: quick, quiet exit. New page: settle in with a small rise. */
   ::view-transition-old(root),
   ::view-transition-old(*.vt-page) {
     animation: motion-vt-out 90ms var(--motion-ease-exit) forwards;
@@ -102,9 +64,7 @@
     animation: motion-vt-in var(--motion-dur-base) var(--motion-ease-enter) both;
   }
 
-  /* The sticky header and dashboard tab rail are visually identical across
-     pages — naming them removes them from the root cross-fade so chrome
-     stays rock-still while content transitions beneath it. */
+  /* Naming the cross-page chrome removes it from the root cross-fade. */
   .vt-site-header {
     view-transition-name: site-header;
   }
@@ -113,9 +73,8 @@
     view-transition-name: dashboard-tabs;
   }
 
-  /* Shared element: compare-catalog card title → detail page <h1>.
-     The name is applied to at most one element per page (set on the
-     clicked card at click time; static on the detail heading). */
+  /* Shared element: compare card title → detail page <h1>. Applied to at
+   * most one element per page. */
   .vt-compare-title {
     view-transition-name: compare-title;
   }
@@ -138,8 +97,8 @@
   }
 }
 
-/* Reduced motion: collapse view transitions to a near-instant cut.
-   (`animation: none` would freeze the old snapshot; ~0ms plays cleanly.) */
+/* Reduced motion: near-instant cut (`animation: none` would freeze the
+ * old snapshot). */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-image-pair(*),
@@ -149,13 +108,8 @@
   }
 }
 
-/* ============================================================
- * Async-state cues.
- * ============================================================ */
-
-/* Stale-while-refetching dim for charts/tables: content stays visible
-   (keepPreviousData) but quietly signals that fresher data is loading.
-   A non-moving opacity fade, so it is not gated on reduced motion. */
+/* Stale-while-refetching dim for charts. Non-moving opacity fade, so not
+ * gated on reduced motion. */
 .motion-stale {
   transition: opacity var(--motion-dur-fast) ease;
 }
@@ -164,16 +118,13 @@
   opacity: 0.55;
 }
 
-/* Pending cue for full-document navigations (compare catalog cards):
-   confirms the click registered while the next document loads. */
+/* Pending cue for full-document navigations (compare catalog cards). */
 .motion-nav-pending[data-pending='true'] {
   opacity: 0.6;
 }
 
-/* ============================================================
- * Dashboard tab rail: sliding active indicator (2px underline).
- * Falls back to the per-link static border when JS hasn't measured.
- * ============================================================ */
+/* Dashboard tab rail: sliding active indicator. Falls back to the per-link
+ * static border until JS has measured. */
 .tab-indicator {
   position: absolute;
   bottom: 0;
@@ -191,9 +142,7 @@
   }
 }
 
-/* ============================================================
- * Small popover-style entrances (header mobile menu).
- * ============================================================ */
+/* Small popover-style entrances (header mobile menu). */
 @media (prefers-reduced-motion: no-preference) {
   .motion-pop-in {
     animation: motion-pop-in var(--motion-dur-fast) var(--motion-ease-enter) both;

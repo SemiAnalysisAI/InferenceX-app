@@ -286,6 +286,8 @@ export function useChartData(
   const {
     data: baseRows,
     isLoading: baseLoading,
+    isFetching: baseFetching,
+    isPlaceholderData: basePlaceholder,
     error: baseError,
   } = useBenchmarks(
     selectedModel,
@@ -296,6 +298,9 @@ export function useChartData(
     undefined,
     !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
     benchmarkQueryScope,
+    // Same-model key changes (date/run/scope) keep the previous rows rendered
+    // while the new result fetches; `refreshing` below surfaces that window.
+    true,
   );
   const {
     data: runRows,
@@ -344,6 +349,10 @@ export function useChartData(
 
   // Loading = query is fetching OR we haven't received any data yet (waiting for date/filters)
   const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  // Refreshing = data is on screen but a fresh result is on the way: either the
+  // base query is showing previous-key placeholder rows, or a same-key refetch
+  // is in flight. Distinct from `loading`, which means nothing renderable yet.
+  const refreshing = !loading && (basePlaceholder || baseFetching);
   const error = queryError ? queryError.message : null;
 
   // Stable identity for comparison query data — useQueries returns a new array ref every render,
@@ -679,6 +688,7 @@ export function useChartData(
     graphs,
     selectionPoints,
     loading,
+    refreshing,
     error,
     hardwareConfig,
     availableQuickFilters,

@@ -208,6 +208,7 @@ export function createMockInferenceContextValues(
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions'),
     loading: false,
+    refreshing: false,
     error: null,
     selectedYAxisMetric: 'y_tpPerGpu',
     setSelectedYAxisMetric: namedStub('setSelectedYAxisMetric'),

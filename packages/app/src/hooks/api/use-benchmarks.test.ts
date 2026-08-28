@@ -136,4 +136,49 @@ describe('benchmarkQueryOptions', () => {
     const opts = benchmarkQueryOptions('', '2026-03-01', true);
     expect(opts.enabled).toBe(false);
   });
+
+  describe('keepPreviousForModel placeholder data', () => {
+    const rows = [{ model: 'DeepSeek-R1-0528' }] as never[];
+    const prevQuery = {
+      queryKey: ['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'latest', 'all', 'asof'] as const,
+    };
+
+    it('is omitted by default so other consumers keep current semantics', () => {
+      const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01');
+      expect('placeholderData' in opts).toBe(false);
+    });
+
+    it('carries previous rows across key changes for the same model', () => {
+      const opts = benchmarkQueryOptions(
+        'DeepSeek-R1-0528',
+        '2026-03-08',
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      expect(opts.placeholderData?.(rows, prevQuery)).toBe(rows);
+    });
+
+    it('never shows another model\u2019s rows as placeholder', () => {
+      const opts = benchmarkQueryOptions(
+        'Kimi-K2',
+        '2026-03-08',
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      expect(opts.placeholderData?.(rows, prevQuery)).toBeUndefined();
+      expect(opts.placeholderData?.(rows, undefined)).toBeUndefined();
+    });
+  });
 });

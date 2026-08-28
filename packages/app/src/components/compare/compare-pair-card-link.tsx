@@ -7,6 +7,30 @@ import { track } from '@/lib/analytics';
 
 import { HwVendorLogo } from '@/components/ui/hw-vendor-logo';
 
+/**
+ * Marks the clicked card's title as the outgoing half of the `compare-title`
+ * shared-element view transition (the detail <h1> carries the incoming half
+ * via the static `vt-compare-title` class).
+ *
+ * This must be imperative and happen inside the click handler:
+ * - `view-transition-name` values must be unique per document, so the name
+ *   can only ever be on one card — the clicked one, known only at click time.
+ * - The browser snapshots the old page synchronously when the navigation
+ *   starts, so a React state update would not commit in time; the style has
+ *   to be set on the DOM node before `location.href` is assigned.
+ * - The inline style bypasses the reduced-motion media query that gates
+ *   `.vt-compare-title` in motion.css, hence the explicit matchMedia check.
+ */
+function tagSharedElementForNavigation(title: HTMLElement | null) {
+  if (
+    title &&
+    typeof document.startViewTransition === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: no-preference)').matches
+  ) {
+    title.style.viewTransitionName = 'compare-title';
+  }
+}
+
 /** One side of the "A vs B" pair: display label plus vendor for the logo. */
 interface PairHardware {
   label: string;
@@ -52,22 +76,10 @@ export function ComparePairCardLink({
           label,
           ...(scenarioLabel ? { scenario: scenarioLabel } : {}),
         });
-        // This is intentionally a full-document navigation (see the original
-        // `window.location.href` below). Two cues cover the load gap:
-        // 1. `data-pending` dims the card immediately (motion.css) so the
-        //    click visibly registered.
-        // 2. In browsers with cross-document View Transitions and no
-        //    reduced-motion preference, tagging only the clicked card's
-        //    title lets it morph into the detail page <h1> (which carries
-        //    the static `vt-compare-title` name).
+        // Intentionally a full-document navigation (pre-existing behavior).
+        // `data-pending` dims the card so the click visibly registered.
         setPending(true);
-        if (
-          typeof document.startViewTransition === 'function' &&
-          window.matchMedia('(prefers-reduced-motion: no-preference)').matches &&
-          titleRef.current
-        ) {
-          titleRef.current.style.viewTransitionName = 'compare-title';
-        }
+        tagSharedElementForNavigation(titleRef.current);
         window.location.href = href;
       }}
     >

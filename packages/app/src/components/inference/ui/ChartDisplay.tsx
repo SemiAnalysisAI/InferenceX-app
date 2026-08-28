@@ -230,7 +230,7 @@ export function formatTokenLength(value: number): string {
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
+  const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {
     selectedGPUs,
     selectedPrecisions,
@@ -622,13 +622,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     throw new Error('Something went wrong.');
   }
 
-  // Show skeletons only on first load (no data yet). During refetch, keepPreviousData
-  // keeps old graphs visible so we never flash skeletons when switching filters.
+  // Show skeletons only on first load (no data yet). Same-model query-key
+  // changes keep the previous rows rendered (placeholderData in
+  // benchmarkQueryOptions), so switching dates/runs/scopes never flashes
+  // skeletons — those windows surface as `refreshing` instead.
   const isFirstLoad = loading && graphs.length === 0;
   // Stale-while-refetching: previous charts stay rendered but dim slightly
-  // (motion.css `.motion-stale`) so filter changes read as "updating", not
+  // (motion.css `.motion-stale`) so the update reads as "updating", not
   // "frozen". aria-busy mirrors the cue for assistive tech.
-  const isRefetching = loading && graphs.length > 0;
+  const isRefetching = refreshing && graphs.length > 0;
 
   // When the selected model has no DB data but an unofficial run provides overlay
   // data for this (model, sequence), synthesize empty-data stub graphs from the
