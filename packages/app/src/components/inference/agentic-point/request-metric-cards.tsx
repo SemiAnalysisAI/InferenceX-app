@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 import { Distribution } from './distribution';
@@ -30,10 +31,54 @@ const LATENCY_METRIC_OPTIONS: SegmentedToggleOption<'ttft' | 'e2e'>[] = [
 
 type SequenceMetricView = 'distribution' | 'inflight';
 
-const SEQUENCE_METRIC_OPTIONS: SegmentedToggleOption<SequenceMetricView>[] = [
-  { value: 'distribution', label: 'Distribution' },
-  { value: 'inflight', label: 'In-flight avg' },
-];
+const REQUEST_CARD_STRINGS = {
+  en: {
+    distribution: 'Distribution',
+    inflight: 'In-flight avg',
+    e2eLatency: 'E2E latency',
+    interactivity: 'Interactivity',
+    latencyMetric: 'Latency metric',
+    points: (count?: number) =>
+      count === undefined
+        ? '— points'
+        : `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`,
+    percentile: (metric: string) => `${metric} percentile`,
+    overTime: (metric: string) => `${metric} over time`,
+    rolling: (pct: string) => `${pct} (rolling 50 req)`,
+    cumulative: (pct: string, metric: string) => `Cumulative ${pct} ${metric}`,
+    inverseTpot: (pct: string) => `1 / cumulative ${pct} TPOT`,
+    inputLength: 'Input sequence length',
+    outputLength: 'Output sequence length',
+    distributionTitle: (name: string) => `${name} distribution`,
+    avgInflight: (name: string) => `Average ${name} in flight`,
+    chartView: (name: string) => `${name} chart view`,
+    retrospective: "Retrospective: final observed OSL is assigned across each request's lifetime.",
+    avgSeries: (name: string) => `Average ${name} in flight (30s avg)`,
+    tokensPerRequest: 'Tokens / request',
+  },
+  zh: {
+    distribution: '分布',
+    inflight: '在途请求平均值',
+    e2eLatency: 'E2E 延迟',
+    interactivity: '交互性',
+    latencyMetric: '延迟指标',
+    points: (count?: number) =>
+      count === undefined ? '— 个数据点' : `${count.toLocaleString('zh-CN')} 个数据点`,
+    percentile: (metric: string) => `${metric} 分位数`,
+    overTime: (metric: string) => `${metric} 随时间变化`,
+    rolling: (pct: string) => `${pct}（滚动窗口：50 个请求）`,
+    cumulative: (pct: string, metric: string) => `截至当前全部请求的 ${pct} ${metric}`,
+    inverseTpot: (pct: string) => `截至当前全部请求的 ${pct} TPOT 倒数`,
+    inputLength: '输入序列长度',
+    outputLength: '输出序列长度',
+    distributionTitle: (name: string) => `${name}分布`,
+    avgInflight: (name: string) => `在途请求平均 ${name}`,
+    chartView: (name: string) => `${name} 图表视图`,
+    retrospective: '回溯口径：按请求最终观测到的 OSL 计算，并将该值计入请求的整个存续期。',
+    avgSeries: (name: string) => `在途请求平均 ${name}（30 秒滑动平均）`,
+    tokensPerRequest: '每个请求的 token 数',
+  },
+} as const;
 
 // Unofficial-run overlays cannot open this persisted point-detail route: they
 // have no benchmark_results id or stored request timeline. These charts are
@@ -51,6 +96,8 @@ export function RequestMetricOverTime({
   isLoading: boolean;
   latencySelector?: boolean;
 }) {
+  const locale = useLocale();
+  const t = REQUEST_CARD_STRINGS[locale];
   const [percentile, setPercentile] = useState<RequestPercentile>('p90');
   const [latencyMetric, setLatencyMetric] = useState<'ttft' | 'e2e'>('ttft');
   const selectedMetric = latencySelector ? latencyMetric : metric;
@@ -60,7 +107,7 @@ export function RequestMetricOverTime({
     [timeline, selectedMetric, percentile],
   );
   const metricLabel =
-    selectedMetric === 'ttft' ? 'TTFT' : selectedMetric === 'e2e' ? 'E2E latency' : 'Interactivity';
+    selectedMetric === 'ttft' ? 'TTFT' : selectedMetric === 'e2e' ? t.e2eLatency : t.interactivity;
   const color =
     selectedMetric === 'ttft' ? '#f59e0b' : selectedMetric === 'e2e' ? '#a855f7' : '#06b6d4';
   const pointCount = result?.raw.length;
@@ -76,7 +123,7 @@ export function RequestMetricOverTime({
             setLatencyMetric(value);
             track('inference_agentic_latency_metric_changed', { metric: value });
           }}
-          ariaLabel="Latency metric"
+          ariaLabel={t.latencyMetric}
           testId="latency-metric-toggle"
         />
       )}
@@ -84,9 +131,7 @@ export function RequestMetricOverTime({
         className="text-xs tabular-nums text-muted-foreground"
         data-testid={`${selectedMetric}-point-count`}
       >
-        {pointCount === undefined
-          ? '— points'
-          : `${pointCount.toLocaleString()} ${pointCount === 1 ? 'point' : 'points'}`}
+        {t.points(pointCount)}
       </span>
       <SegmentedToggle
         value={percentile}
@@ -98,7 +143,7 @@ export function RequestMetricOverTime({
             percentile: value,
           });
         }}
-        ariaLabel={`${metricLabel} percentile`}
+        ariaLabel={t.percentile(metricLabel)}
         testId={`${selectedMetric}-percentile-toggle`}
       />
     </div>
@@ -106,7 +151,7 @@ export function RequestMetricOverTime({
 
   return (
     <ExpandableChart
-      title={latencySelector ? `${metricLabel} over time` : title}
+      title={latencySelector ? t.overTime(metricLabel) : title}
       controls={controls}
       testId={`${metric}-over-time-chart`}
       render={(expanded) => {
@@ -116,7 +161,7 @@ export function RequestMetricOverTime({
           <TimeSeriesChart
             series={[
               {
-                name: `${percentile.toUpperCase()} (rolling 50 req)`,
+                name: t.rolling(percentile.toUpperCase()),
                 data: result?.trend ?? [],
                 rawData: result?.raw,
                 color,
@@ -124,8 +169,8 @@ export function RequestMetricOverTime({
               },
               {
                 name: isLatency
-                  ? `Cumulative ${percentile.toUpperCase()} ${metricLabel}`
-                  : `1 / cumulative ${percentile.toUpperCase()} TPOT`,
+                  ? t.cumulative(percentile.toUpperCase(), metricLabel)
+                  : t.inverseTpot(percentile.toUpperCase()),
                 data: result?.cumulative ?? [],
                 color: '#ef4444',
                 strokeWidth: 3,
@@ -137,7 +182,7 @@ export function RequestMetricOverTime({
                 ? (value) => `${value < 10 ? value.toFixed(1) : value.toFixed(0)}s`
                 : (value) => `${value.toFixed(0)}`
             }
-            yAxisLabel={isLatency ? `${metricLabel} (s)` : 'Interactivity (tok/s/user)'}
+            yAxisLabel={isLatency ? `${metricLabel} (s)` : `${t.interactivity} (tok/s/user)`}
             {...size}
           />
         );
@@ -156,9 +201,15 @@ export function SequenceMetricCard({
   timeline: RequestChartData | null | undefined;
   timelineLoading: boolean;
 }) {
+  const locale = useLocale();
+  const t = REQUEST_CARD_STRINGS[locale];
   const [view, setView] = useState<SequenceMetricView>('distribution');
   const acronym = metric.toUpperCase();
-  const fullName = metric === 'isl' ? 'Input sequence length' : 'Output sequence length';
+  const fullName = metric === 'isl' ? t.inputLength : t.outputLength;
+  const sequenceOptions: SegmentedToggleOption<SequenceMetricView>[] = [
+    { value: 'distribution', label: t.distribution },
+    { value: 'inflight', label: t.inflight },
+  ];
   const testPrefix = `${metric}-metric`;
   // Per-request ISL/OSL for the selected phase (request_timeline carries both,
   // so the distribution honours the warmup/profiling toggle for free).
@@ -177,12 +228,12 @@ export function SequenceMetricCard({
   );
   return (
     <ExpandableChart
-      title={view === 'distribution' ? `${fullName} distribution` : `Average ${acronym} in flight`}
+      title={view === 'distribution' ? t.distributionTitle(fullName) : t.avgInflight(acronym)}
       testId={`${testPrefix}-chart`}
       controls={
         <SegmentedToggle
           value={view}
-          options={SEQUENCE_METRIC_OPTIONS.map((option) => ({
+          options={sequenceOptions.map((option) => ({
             ...option,
             testId: `${testPrefix}-${option.value}`,
           }))}
@@ -190,7 +241,7 @@ export function SequenceMetricCard({
             setView(value);
             track('inference_agentic_sequence_metric_view_changed', { metric, view: value });
           }}
-          ariaLabel={`${acronym} chart view`}
+          ariaLabel={t.chartView(acronym)}
           testId={`${testPrefix}-toggle`}
           buttonClassName="px-2 py-1 text-xs"
         />
@@ -199,7 +250,9 @@ export function SequenceMetricCard({
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (view === 'distribution') {
           if (values && values.length > 0)
-            return <Distribution values={values} unit="tokens" {...size} />;
+            return (
+              <Distribution values={values} unit={locale === 'zh' ? 'token' : 'tokens'} {...size} />
+            );
           return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
         }
         if (!timeline) return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
@@ -207,14 +260,12 @@ export function SequenceMetricCard({
         return (
           <div>
             {metric === 'osl' && (
-              <p className="mb-2 text-xs text-muted-foreground">
-                Retrospective: final observed OSL is assigned across each request&apos;s lifetime.
-              </p>
+              <p className="mb-2 text-xs text-muted-foreground">{t.retrospective}</p>
             )}
             <TimeSeriesChart
               series={[
                 {
-                  name: `Average ${acronym} in flight (30s avg)`,
+                  name: t.avgSeries(acronym),
                   data: timeRollingAverage(raw, 30),
                   rawData: raw,
                   color: metric === 'isl' ? '#3b82f6' : '#a855f7',
@@ -222,7 +273,7 @@ export function SequenceMetricCard({
                 },
               ]}
               durationS={timeline.durationS}
-              yAxisLabel="Tokens / request"
+              yAxisLabel={t.tokensPerRequest}
               {...size}
             />
           </div>

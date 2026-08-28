@@ -3,6 +3,7 @@
 import { memo } from 'react';
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
+import type { Locale } from '@/lib/i18n';
 
 import {
   CHART_WIDTH,
@@ -41,6 +42,7 @@ export interface TimelineBarsProps {
   vStart: number;
   vEnd: number;
   datasetSlug?: string | null;
+  locale: Locale;
   onBarHover: (e: React.MouseEvent, row: RequestTimelineRow, req: RequestRecord) => void;
   onBarLeave: () => void;
   /** Plain left-click SPA navigation; modified clicks fall through to the href. */
@@ -64,6 +66,7 @@ export const TimelineBars = memo(
     vStart,
     vEnd,
     datasetSlug,
+    locale,
     onBarHover,
     onBarLeave,
     onBarClick,
@@ -252,7 +255,7 @@ export const TimelineBars = memo(
               return (
                 <a
                   key={barKey}
-                  href={conversationHref(datasetSlug, req)}
+                  href={conversationHref(datasetSlug, req, locale)}
                   onMouseMove={(e) => onBarHover(e, row, req)}
                   onMouseLeave={onBarLeave}
                   onClick={(e) => onBarClick(e, req)}

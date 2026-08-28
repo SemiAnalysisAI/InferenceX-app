@@ -379,7 +379,10 @@ export interface ChartDefinition {
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
+  /** Resolved field represented by `InferenceData.x`; stable across locales. */
+  x_scale_field: string;
   x_label: string;
+  x_labelZh: string;
   y: keyof AggDataEntry;
   y_label?: string;
 
