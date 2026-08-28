@@ -114,6 +114,10 @@ const STRINGS = {
       cached === null
         ? `Input $${input}/M tok · Output $${output}/M tok`
         : `Uncached $${input}/M tok · Cached $${cached}/M tok · Output $${output}/M tok`,
+    revenueMethodAgentic:
+      'Method: Revenue prices uncached input, cached input, and output separately using the prices shown above. Input share comes from compatible measured input/output throughput, or from measured prompt/generation tokens for disaggregated runs. Cache hit combines GPU and external cache when external cache is reported, otherwise GPU and CPU cache. Interpolated points estimate total throughput, input share, and cache hit separately before pricing. A partially measured cache frontier receives no cache discount.',
+    revenueMethodFixed:
+      "Method: Revenue prices input and output separately using the prices shown above. Input share comes from compatible measured input/output throughput, or from the scenario's ISL:OSL ratio for disaggregated runs. Interpolated points estimate total throughput and input share separately before pricing.",
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
@@ -136,6 +140,10 @@ const STRINGS = {
       cached === null
         ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
         : `未缓存 $${input}/百万 token · 缓存 $${cached}/百万 token · 输出 $${output}/百万 token`,
+    revenueMethodAgentic:
+      '方法：按上方价格分别计算未缓存输入、缓存输入与输出收入。输入 token 占比优先采用口径一致的实测输入/输出吞吐量；对于解耦运行，则采用实测 prompt/generation token 构成。已报告 external cache 时，缓存命中率由 GPU 与 external cache 相加；否则由 GPU 与 CPU cache 相加。插值点会先分别估算总吞吐量、输入 token 占比与缓存命中率，再进行计价。缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。',
+    revenueMethodFixed:
+      '方法：按上方价格分别计算输入与输出收入。输入 token 占比优先采用口径一致的实测输入/输出吞吐量；对于解耦运行，则采用该场景的 ISL:OSL。插值点会先分别估算总吞吐量与输入 token 占比，再进行计价。',
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
@@ -1126,6 +1134,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
+                    {selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+                      getViewMode(graphIndex) !== 'table' && (
+                        <p
+                          className="no-export mt-4 text-xs leading-relaxed text-muted-foreground"
+                          data-testid="token-revenue-method"
+                        >
+                          {isAgenticSequence ? t.revenueMethodAgentic : t.revenueMethodFixed}
+                        </p>
+                      )}
                     <AxisMetricFooter
                       chartId={`chart-${graphIndex}`}
                       metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}

@@ -133,6 +133,15 @@ describe('Inference Chart', () => {
       .first()
       .find('h2')
       .should('contain.text', 'Token Revenue per GPU Hour at OpenRouter Pricing');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="token-revenue-method"]')
+      .should('contain.text', 'Method: Revenue prices uncached input, cached input, and output')
+      .and('contain.text', 'Cache hit combines GPU and external cache')
+      .and('contain.text', 'A partially measured cache frontier receives no cache discount.')
+      .and(($note) => {
+        expect($note.text()).not.to.include('—');
+      });
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -199,6 +208,15 @@ describe('Inference Chart', () => {
       .first()
       .find('h2')
       .should('contain.text', '按 OpenRouter 价格计算的每 GPU 小时 token 收入');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="token-revenue-method"]')
+      .should('contain.text', '方法：按上方价格分别计算未缓存输入、缓存输入与输出收入。')
+      .and('contain.text', '已报告 external cache 时，缓存命中率由 GPU 与 external cache 相加')
+      .and('contain.text', '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。')
+      .and(($note) => {
+        expect($note.text()).not.to.include('—');
+      });
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {
