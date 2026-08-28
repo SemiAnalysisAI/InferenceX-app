@@ -57,6 +57,7 @@ const supportMatrixDataset = buildDataset({
       backend: 'mori',
       mode: 'low-latency',
       status: 'failed',
+      reasons: ['case-timeout'],
     }),
     makeRawShard({ sku: 'h100-dgxc', backend: 'deepep-v2', rows: [] }),
   ],
@@ -416,8 +417,11 @@ describe('CollectiveX neutral run view', () => {
 
     cy.get('[data-testid="collectivex-support-matrices"]')
       .should('contain.text', 'Kernel support matrices')
-      .and('contain.text', 'Supported')
-      .and('contain.text', 'Absent')
+      .and('contain.text', 'Measured')
+      .and('contain.text', 'Unsupported on this platform')
+      .and('contain.text', 'Requested, all attempts failed')
+      .and('contain.text', 'Requested, not measured')
+      .and('contain.text', 'Not requested')
       .and('contain.text', 'B200')
       .and('contain.text', 'H100')
       .and('not.contain.text', 'B200-NSCALE')
@@ -434,22 +438,44 @@ describe('CollectiveX neutral run view', () => {
       '[data-testid="collectivex-support-cell"][data-mode="normal"][data-sku="b200"][data-library="deepep-v2"]',
     )
       .should('have.attr', 'data-supported', 'true')
+      .and('have.attr', 'data-status', 'measured')
       .and('have.class', 'bg-emerald-500/15')
       .find('[role="img"]')
-      .should('have.attr', 'aria-label', 'B200 × deepep-v2: Supported');
+      .should('have.attr', 'aria-label', 'B200 × deepep-v2: Measured');
+    // A success shard whose ladder measured nothing: requested, not measured.
     cy.get(
       '[data-testid="collectivex-support-cell"][data-mode="normal"][data-sku="h100"][data-library="deepep-v2"]',
     )
       .should('have.attr', 'data-supported', 'false')
-      .and('have.class', 'bg-red-500/10')
+      .and('have.attr', 'data-status', 'pending')
+      .and('have.class', 'bg-amber-500/10')
       .find('[role="img"]')
-      .should('have.attr', 'aria-label', 'H100 × deepep-v2: Absent');
+      .should('have.attr', 'aria-label', 'H100 × deepep-v2: Requested, not measured');
     cy.get(
       '[data-testid="collectivex-support-cell"][data-mode="low-latency"][data-sku="h100"][data-library="mori"]',
     ).should('have.attr', 'data-supported', 'true');
+    // Attempted and failed: the cell says so and carries the machine reason.
     cy.get(
       '[data-testid="collectivex-support-cell"][data-mode="low-latency"][data-sku="b200"][data-library="mori"]',
-    ).should('have.attr', 'data-supported', 'false');
+    )
+      .should('have.attr', 'data-supported', 'false')
+      .and('have.attr', 'data-status', 'failed')
+      .and('have.class', 'bg-orange-500/15')
+      .find('[role="img"]')
+      .should(
+        'have.attr',
+        'aria-label',
+        'B200 × mori: Requested, all attempts failed — case-timeout',
+      )
+      .and('have.attr', 'title', 'Requested, all attempts failed — case-timeout');
+    // A cross-product cell no run asked for stays visually distinct.
+    cy.get(
+      '[data-testid="collectivex-support-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"]',
+    )
+      .should('have.attr', 'data-status', 'unrequested')
+      .and('have.class', 'bg-muted/20')
+      .find('[role="img"]')
+      .should('have.attr', 'aria-label', 'H100 × mori: Not requested');
     cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
   });
 
@@ -467,8 +493,9 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'Kernel 支持矩阵')
       .and('contain.text', '吞吐量 Kernel')
       .and('contain.text', '低延迟 Kernel')
-      .and('contain.text', '支持')
-      .and('contain.text', '未发现');
+      .and('contain.text', '已测')
+      .and('contain.text', '平台不支持')
+      .and('contain.text', '未请求');
   });
 });
 

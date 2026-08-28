@@ -24,10 +24,33 @@ export interface CollectiveXSeriesSelection {
   precision: CollectiveXPrecision;
 }
 
+/**
+ * Why a SKU-by-library cell is (or is not) green, from strongest to weakest
+ * evidence: `measured` has at least one measured point in the checked runs;
+ * `unsupported` was requested but declared unrunnable by the sweep matrix (a
+ * registry wall, e.g. `backend-platform-unsupported`); `failed` was requested
+ * and attempted but every attempt ended failed/invalid/diagnostic; `pending`
+ * was requested and never reached a terminal measurement (cancelled or
+ * still-running legs); `unrequested` is a cross-product cell no checked run
+ * ever asked for.
+ */
+export type CollectiveXSupportStatus =
+  | 'measured'
+  | 'unsupported'
+  | 'failed'
+  | 'pending'
+  | 'unrequested';
+
+export interface CollectiveXSupportCell {
+  status: CollectiveXSupportStatus;
+  /** Distinct machine reasons from the coverage rows (e.g. `backend-platform-unsupported`). */
+  reasons: string[];
+}
+
 export interface CollectiveXSupportMatrixData {
   skus: string[];
   libraries: string[];
-  supportedByMode: Record<CollectiveXMode, ReadonlySet<string>>;
+  cellsByMode: Record<CollectiveXMode, ReadonlyMap<string, CollectiveXSupportCell>>;
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
@@ -55,11 +78,33 @@ function supportCellKey(sku: string, library: string): string {
   return JSON.stringify([sku, library]);
 }
 
+/** Strongest status wins when a cell aggregates several coverage cases. */
+const SUPPORT_STATUS_PRECEDENCE: readonly CollectiveXSupportStatus[] = [
+  'measured',
+  'unsupported',
+  'failed',
+  'pending',
+];
+
+function caseSupportStatus(item: CollectiveXDataset['coverage'][number]): CollectiveXSupportStatus {
+  if (item.points.some((point) => point.terminal_status === 'measured')) return 'measured';
+  if (item.outcome === 'unsupported') return 'unsupported';
+  if (item.outcome === 'failed' || item.outcome === 'invalid' || item.outcome === 'diagnostic') {
+    return 'failed';
+  }
+  // `pending` proper, plus a nominally-successful case whose ladder never
+  // produced a measured row: requested, but not measured in the checked runs.
+  return 'pending';
+}
+
 /**
  * Build two SKU-by-library support matrices from the EP cases in the checked
- * runs. A cell is supported only when at least one case actually measured a
- * point; failed, unsupported, pending, and unrequested combinations stay
- * absent. Axes are shared across modes so the two matrices compare directly.
+ * runs. A cell is `measured` (green) as soon as one case measured a point;
+ * otherwise it records WHY it is not: declared unsupported, attempted but
+ * failed, or requested but never measured — with the coverage rows' machine
+ * reasons collected for display. Cells absent from the map were never
+ * requested. Axes are shared across modes so the two matrices compare
+ * directly.
  */
 export function buildCollectiveXSupportMatrix(
   datasets: readonly CollectiveXDataset[],
@@ -73,17 +118,50 @@ export function buildCollectiveXSupportMatrix(
   const libraries = [...new Set(coverage.map((item) => item.backend))].toSorted((left, right) =>
     left.localeCompare(right),
   );
-  const supportedByMode: Record<CollectiveXMode, Set<string>> = {
-    normal: new Set(),
-    'low-latency': new Set(),
+  const cellsByMode: Record<CollectiveXMode, Map<string, CollectiveXSupportCell>> = {
+    normal: new Map(),
+    'low-latency': new Map(),
   };
 
   for (const item of coverage) {
-    if (!item.points.some((point) => point.terminal_status === 'measured')) continue;
-    supportedByMode[item.mode].add(supportCellKey(normalizeCollectiveXSku(item.sku), item.backend));
+    const key = supportCellKey(normalizeCollectiveXSku(item.sku), item.backend);
+    const status = caseSupportStatus(item);
+    const cell = cellsByMode[item.mode].get(key) ?? { status, reasons: [] };
+    if (
+      SUPPORT_STATUS_PRECEDENCE.indexOf(status) < SUPPORT_STATUS_PRECEDENCE.indexOf(cell.status)
+    ) {
+      cell.status = status;
+    }
+    // A measured cell needs no excuse; otherwise keep the case's machine
+    // reasons (deduplicated, order of first appearance) so the UI can say why.
+    if (status !== 'measured') {
+      for (const reason of [item.reason, item.detail]) {
+        if (reason && !cell.reasons.includes(reason)) cell.reasons.push(reason);
+      }
+    }
+    cellsByMode[item.mode].set(key, cell);
+  }
+  for (const cells of Object.values(cellsByMode)) {
+    for (const cell of cells.values()) {
+      if (cell.status === 'measured') cell.reasons = [];
+    }
   }
 
-  return { skus, libraries, supportedByMode };
+  return { skus, libraries, cellsByMode };
+}
+
+const UNREQUESTED_CELL: CollectiveXSupportCell = { status: 'unrequested', reasons: [] };
+
+export function collectiveXKernelSupportCell(
+  matrix: CollectiveXSupportMatrixData,
+  mode: CollectiveXMode,
+  sku: string,
+  library: string,
+): CollectiveXSupportCell {
+  return (
+    matrix.cellsByMode[mode].get(supportCellKey(normalizeCollectiveXSku(sku), library)) ??
+    UNREQUESTED_CELL
+  );
 }
 
 export function collectiveXKernelIsSupported(
@@ -92,7 +170,7 @@ export function collectiveXKernelIsSupported(
   sku: string,
   library: string,
 ): boolean {
-  return matrix.supportedByMode[mode].has(supportCellKey(normalizeCollectiveXSku(sku), library));
+  return collectiveXKernelSupportCell(matrix, mode, sku, library).status === 'measured';
 }
 
 /**

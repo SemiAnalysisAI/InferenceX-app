@@ -6,6 +6,7 @@ import {
   collectiveXCaseLabel,
   collectiveXColorKey,
   collectiveXKernelIsSupported,
+  collectiveXKernelSupportCell,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
@@ -137,12 +138,21 @@ describe('buildCollectiveXSupportMatrix', () => {
   const supportDataset = buildDataset({
     shards: [
       makeRawShard({ sku: 'b200-nscale', backend: 'deepep-v2' }),
+      // Same cell as the measured bf16 case above but failed: measured wins.
+      makeRawShard({
+        sku: 'b200-nscale',
+        backend: 'deepep-v2',
+        precision: 'fp8',
+        status: 'failed',
+        reasons: ['flake'],
+      }),
       makeRawShard({ sku: 'h100-dgxc', backend: 'mori', mode: 'low-latency' }),
       makeRawShard({
         sku: 'b200-nscale',
         backend: 'mori',
         mode: 'low-latency',
         status: 'failed',
+        reasons: ['case-timeout'],
       }),
       makeRawShard({ sku: 'h100-dgxc', backend: 'deepep-v2', rows: [] }),
     ],
@@ -161,9 +171,50 @@ describe('buildCollectiveXSupportMatrix', () => {
     expect(collectiveXKernelIsSupported(matrix, 'normal', 'h100', 'deepep-v2')).toBe(false);
   });
 
-  it('keeps unrequested cross-product cells absent', () => {
-    expect(collectiveXKernelIsSupported(matrix, 'normal', 'h100', 'mori')).toBe(false);
-    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'b200', 'deepep-v2')).toBe(false);
+  it('says why a requested cell is not measured', () => {
+    // Attempted, every attempt failed: the shard's machine reason surfaces.
+    expect(collectiveXKernelSupportCell(matrix, 'low-latency', 'b200', 'mori')).toEqual({
+      status: 'failed',
+      reasons: ['case-timeout'],
+    });
+    // Nominally-successful case whose ladder measured nothing: requested, not measured.
+    expect(collectiveXKernelSupportCell(matrix, 'normal', 'h100', 'deepep-v2')).toEqual({
+      status: 'pending',
+      reasons: [],
+    });
+  });
+
+  it('surfaces registry walls as unsupported with the matrix reason', () => {
+    // makeCollectiveXDataset carries the b300 deepep-v2 EP16 unsupported row.
+    const walled = buildCollectiveXSupportMatrix([dataset]);
+    expect(collectiveXKernelSupportCell(walled, 'normal', 'b300', 'deepep-v2')).toEqual({
+      status: 'unsupported',
+      // The machine reason, then the matrix's human-readable detail.
+      reasons: ['backend-platform-unsupported', 'unsupported by the selected backend/platform'],
+    });
+    // ...and the b200-dgxc requested-but-never-run row.
+    expect(collectiveXKernelSupportCell(walled, 'normal', 'b200', 'deepep-v2')).toEqual({
+      status: 'pending',
+      reasons: ['pending'],
+    });
+  });
+
+  it('lets a measured case win the cell and drop the excuses', () => {
+    expect(collectiveXKernelSupportCell(matrix, 'normal', 'b200', 'deepep-v2')).toEqual({
+      status: 'measured',
+      reasons: [],
+    });
+  });
+
+  it('keeps unrequested cross-product cells distinct from requested-but-absent ones', () => {
+    expect(collectiveXKernelSupportCell(matrix, 'normal', 'h100', 'mori')).toEqual({
+      status: 'unrequested',
+      reasons: [],
+    });
+    expect(collectiveXKernelSupportCell(matrix, 'low-latency', 'b200', 'deepep-v2')).toEqual({
+      status: 'unrequested',
+      reasons: [],
+    });
   });
 });
 
