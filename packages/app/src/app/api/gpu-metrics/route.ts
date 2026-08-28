@@ -16,6 +16,7 @@ import {
   type GithubWorkflowRun,
 } from '@/lib/github-artifacts';
 import {
+  hasPowerContent,
   mergeArtifactPower,
   powerFromAggRow,
   powerFromValidationSidecar,
@@ -94,8 +95,13 @@ async function resolveArtifactPower(
       const aggRow =
         findNamedAggEntry(entries, suffix) ?? (entries.length === 1 ? entries[0].json : null);
       if (aggRow) {
-        fromAgg = powerFromAggRow(aggRow, 'bmk_artifact');
-        sources.push(bmkArtifact.name);
+        const parsed = powerFromAggRow(aggRow, 'bmk_artifact');
+        // A row with no power fields contributes nothing: keep it out of the
+        // sources footer and let Tier 2's agg fallback take over.
+        if (hasPowerContent(parsed)) {
+          fromAgg = parsed;
+          sources.push(bmkArtifact.name);
+        }
       }
     }
   }
@@ -107,14 +113,20 @@ async function resolveArtifactPower(
     const entries = await downloadJsonEntries(auditArtifact, githubToken);
     if (entries) {
       const sidecar = selectValidationEntry(entries, suffix);
-      if (sidecar) fromSidecar = powerFromValidationSidecar(sidecar);
+      const parsedSidecar = sidecar ? powerFromValidationSidecar(sidecar) : null;
+      if (hasPowerContent(parsedSidecar)) fromSidecar = parsedSidecar;
+      let bundleAggContributed = false;
       if (!fromAgg) {
         const aggRow = findNamedAggEntry(entries, suffix);
-        if (aggRow) fromAgg = powerFromAggRow(aggRow, 'power_audit_agg');
+        if (aggRow) {
+          const parsed = powerFromAggRow(aggRow, 'power_audit_agg');
+          if (hasPowerContent(parsed)) {
+            fromAgg = parsed;
+            bundleAggContributed = true;
+          }
+        }
       }
-      if (sidecar || fromAgg?.published?.source === 'power_audit_agg') {
-        sources.push(auditArtifact.name);
-      }
+      if (fromSidecar || bundleAggContributed) sources.push(auditArtifact.name);
     }
   }
 

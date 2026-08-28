@@ -152,6 +152,12 @@ const DELTA_LEVEL_CLASSES = {
   alert: 'text-red-700 dark:text-red-300',
 } as const;
 
+/** ISO-format a unix-seconds window bound; Date throws outside ±8.64e15 ms. */
+function formatWindowBound(unixSeconds: number): string {
+  const ms = unixSeconds * 1000;
+  return Math.abs(ms) <= 8.64e15 ? new Date(ms).toISOString() : String(unixSeconds);
+}
+
 type GpuMetricsView = 'chart' | 'correlation';
 
 const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
@@ -562,8 +568,8 @@ export default function GpuMetricsDisplay() {
                       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-2">
                         <span>
                           <span className="text-muted-foreground">{t.windowLabel}</span>{' '}
-                          {new Date(window.start_unix * 1000).toISOString()} →{' '}
-                          {new Date(window.end_unix * 1000).toISOString()}
+                          {formatWindowBound(window.start_unix)} →{' '}
+                          {formatWindowBound(window.end_unix)}
                         </span>
                         <span>
                           <span className="text-muted-foreground">{t.windowDurationLabel}</span>{' '}

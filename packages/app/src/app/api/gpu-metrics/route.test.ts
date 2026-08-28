@@ -530,6 +530,37 @@ describe('GET /api/gpu-metrics', () => {
       });
     });
 
+    it('keeps a no-op bmk artifact out of sources and falls through to the bundle', async () => {
+      zipRegistry.set('zip:bmk-noop', [
+        // Agg row with no power fields at all (e.g. an eval-style row).
+        { entryName: 'agg_dsr1_h200.json', contents: JSON.stringify({ output_toks_per_sec: 1 }) },
+      ]);
+      zipRegistry.set('zip:audit-sidecar-only', [
+        { entryName: 'power_validation_dsr1_h200.json', contents: SIDECAR_JSON },
+      ]);
+      installFetch([
+        { id: 1, name: 'gpu_metrics_dsr1_h200' },
+        { id: 2, name: 'bmk_dsr1_h200', zipKey: 'zip:bmk-noop' },
+        { id: 3, name: 'power_audit_dsr1_h200', zipKey: 'zip:audit-sidecar-only' },
+      ]);
+
+      const res = await GET(req('/api/gpu-metrics?runId=12345'));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // The bmk artifact contributed nothing, so only the bundle is credited.
+      expect(body.artifacts[0].power.sources).toEqual(['power_audit_dsr1_h200']);
+      expect(body.artifacts[0].power.published).toEqual({
+        avg_power_w: 401.5,
+        avg_total_gpu_power_w: 3212,
+        power_metric_schema_version: null,
+        source: 'validation_metrics',
+      });
+      expect(body.artifacts[0].power.window).toEqual({
+        start_unix: 1755000020,
+        end_unix: 1755000080,
+      });
+    });
+
     it('omits power but keeps the CSV view when the sidecar JSON is malformed', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
