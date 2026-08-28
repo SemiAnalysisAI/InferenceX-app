@@ -49,7 +49,8 @@ export function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRa
     const rowTime = new Date(row.date).getTime();
     for (const [range, cutoff] of ranges) {
       if (cutoff !== null && rowTime < cutoff) continue;
-      const stats = (aggregates[range][row.hardware] ??= { n_success: 0, total: 0 });
+      aggregates[range][row.hardware] ??= { n_success: 0, total: 0 };
+      const stats = aggregates[range][row.hardware];
       stats.n_success += row.n_success;
       stats.total += row.total;
     }
