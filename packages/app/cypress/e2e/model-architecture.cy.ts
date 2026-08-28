@@ -557,6 +557,12 @@ describe('Model Architecture Diagram', () => {
           .find('a[href^="/zh/inference?"]')
           .should('contain.text', '在完整仪表板中查看');
         cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
+
+        // The click assertions above cover the client transition. Canonical and
+        // hreflang are SSR contracts, so verify them from a fresh document rather
+        // than racing streamed App Router head updates after the soft navigation.
+        cy.reload();
+        cy.get('[data-testid="model-detail-page"]').should('be.visible');
         cy.get('link[rel="canonical"]').should(
           'have.attr',
           'href',
