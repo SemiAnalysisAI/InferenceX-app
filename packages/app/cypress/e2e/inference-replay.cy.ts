@@ -106,26 +106,25 @@ describe('Inference Replay', () => {
         cy.log('Replay history fixture has < 2 dates; skipping animation check');
         return;
       }
-      cy.get('[data-testid="replay-scrubber"]')
-        .invoke('val')
-        .then((startVal) => {
+      // Earlier tests can leave the playhead at the end, where Play restarts
+      // from zero and "value > start" can never hold — reset to origin first.
+      cy.get('[data-testid="replay-reset"]').click();
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+      cy.get('[data-testid="replay-date-overlay"]')
+        .invoke('text')
+        .then((startDate) => {
+          cy.get('[data-testid="replay-play-pause"]').click();
+          cy.get('[data-testid="replay-scrubber"]').should(($scrubber) => {
+            expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(0);
+          });
           cy.get('[data-testid="replay-date-overlay"]')
             .invoke('text')
-            .then((startDate) => {
-              cy.get('[data-testid="replay-play-pause"]').click();
-              cy.get('[data-testid="replay-scrubber"]')
-                .should(($scrubber) => {
-                  expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(
-                    Number(startVal),
-                  );
-                })
-                .then(() => cy.get('[data-testid="replay-play-pause"]').click());
-              cy.get('[data-testid="replay-date-overlay"]')
-                .invoke('text')
-                .should((endDate) => {
-                  expect(endDate).not.to.equal(startDate);
-                });
+            .should((endDate) => {
+              expect(endDate).not.to.equal(startDate);
             });
+          // Park paused at the origin so later tests start from a known frame.
+          cy.get('[data-testid="replay-reset"]').click();
+          cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
         });
     });
   });
@@ -133,32 +132,31 @@ describe('Inference Replay', () => {
   it('re-renders the replay frame when a parent-chart toggle changes', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      // The log-scale switch lives in the collapsed-by-default Advanced drawer,
-      // so expand it on the parent chart's legend (not the replay panel's).
-      cy.get('[data-testid="legend-advanced-toggle"]').then(($toggles) => {
-        const parentAdvanced = [...$toggles].find(
-          (toggle) => !toggle.closest('[data-testid^="replay-panel-chart-"]'),
-        );
-        if (!parentAdvanced) throw new Error('Parent chart Advanced toggle is missing');
-        if (parentAdvanced.getAttribute('aria-expanded') !== 'true') {
-          cy.wrap(parentAdvanced).click({ force: true });
-        }
-      });
+      // Rooflines only draw once a hw/precision group has >1 visible point,
+      // so move off frame 0 — the earliest date can render a single point.
+      setReplayScrubber(1_000_000); // clamps to the scrubber max → last frame
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
       // Capture the SVG path data for the first roofline as a stable signature.
       cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
         .first()
         .invoke('attr', 'd')
         .then((beforeD) => {
-          // Toggle the control on the parent chart rather than mutating the address
-          // bar. Dashboard URL state is intentionally snapshotted on load, so a
-          // synthetic popstate is not a supported control update.
-          cy.get('[data-testid="scatter-log-scale"]').then(($toggles) => {
-            const parentToggle = [...$toggles].find(
-              (toggle) => !toggle.closest('[data-testid^="replay-panel-chart-"]'),
-            );
-            if (!parentToggle) throw new Error('Parent chart log-scale toggle is missing');
-            cy.wrap(parentToggle).click({ force: true });
-          });
+          // The parent chart's controls sit behind the dialog, and any outside
+          // interaction closes it — so close, toggle log scale on the parent,
+          // and reopen instead of force-clicking through the overlay.
+          cy.get('body').type('{esc}');
+          cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
+          cy.get('[data-testid="chart-figure"]')
+            .first()
+            .within(() => {
+              cy.get('[data-testid="legend-advanced-toggle"]').then(($toggle) => {
+                if ($toggle.attr('aria-expanded') !== 'true') cy.wrap($toggle).click();
+              });
+              cy.get('[data-testid="scatter-log-scale"]').click();
+            });
+          openReplayDialog();
+          setReplayScrubber(1_000_000);
+          cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
           cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
             .first()
             .invoke('attr', 'd')
@@ -311,9 +309,11 @@ describe('Inference Replay — Simplified Chinese', () => {
       cy.get('[data-testid="replay-history-query-error"]')
         .should('contain.text', '基准测试历史加载失败。')
         .and('contain.text', '重试');
-      cy.get('[data-testid="replay-history-query-error"]').contains('重试').click();
+      cy.get('[data-testid="replay-history-query-error"]').contains('button', '重试').click();
       cy.get('[data-testid="replay-history-query-error"]').should('not.exist');
-      cy.get('[data-testid="replay-play-pause"]').should('be.visible');
+      // The dialog scrolls internally at 390px — the controls row can sit
+      // below the fold, so bring it into view before asserting visibility.
+      cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
       cy.then(() => expect(attempts).to.equal(3));
     });
   });

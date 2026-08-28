@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const timelineRequest = (
   index: number,
@@ -587,24 +587,32 @@ describe('Agentic point request metric time series', () => {
             },
       );
     });
-    cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
+    // Distinct URL: the previous test visits this same logs view, and with
+    // testIsolation off a same-URL visit does not reliably reload, so these
+    // failing intercepts would never be exercised.
+    cy.visit('/zh/inference/agentic/206885?view=logs&e2e=log-retries', {
+      onBeforeLoad: unlockAgenticGate,
+    });
 
     cy.get('[data-testid="server-log-files-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="server-log-files-query-error"]').contains('重试').click();
+    cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
+    // Wait for the refetch to land before counting attempts — asserting right
+    // after the click races the request.
+    cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
     cy.then(() => expect(fileAttempts).to.equal(3));
 
     cy.get('[data-testid="server-log-content-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="server-log-content-query-error"]').contains('重试').click();
+    cy.get('[data-testid="server-log-content-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO recovered log');
     cy.then(() => expect(contentAttempts).to.equal(3));
 
     cy.get('[data-testid="server-log-search"]').type('recovered');
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
-    cy.get('[data-testid="server-log-search-query-error"]').contains('重试').click();
+    cy.get('[data-testid="server-log-search-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
     cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
     cy.then(() => expect(searchAttempts).to.equal(3));
@@ -637,7 +645,9 @@ describe('Agentic point request metric time series', () => {
       .should(($scroller) => {
         expect($scroller[0].scrollLeft).to.be.greaterThan(0);
       });
-    cy.get('[data-testid="request-timeline-svg"] g > rect').then(($rects) => {
+    // Bars on a dataset-linked run render inside SVG <a> anchors (open-in-new-tab
+    // support), not plain <g> groups.
+    cy.get('[data-testid="request-timeline-svg"] a > rect').then(($rects) => {
       const viewport = $rects[0].ownerDocument.documentElement;
       const visibleRect = [...$rects].find((element) => {
         const bounds = element.getBoundingClientRect();
@@ -665,9 +675,7 @@ describe('Agentic point request metric time series', () => {
         expect(bounds.width).to.be.greaterThan(0);
         expect(bounds.height).to.be.greaterThan(0);
       });
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
+    expectNoPageOverflow();
     cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]')
       .first()
       .should('have.attr', 'href')
@@ -735,7 +743,7 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-request-charts-query-error"]')
       .should('contain.text', '请求图表数据加载失败。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-request-charts-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-request-charts-query-error"]').contains('button', '重试').click();
     cy.contains('h2', '输入序列长度分布').should('be.visible');
     cy.then(() => expect(requestChartAttempts).to.equal(3));
 
@@ -743,7 +751,7 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-aggregates-query-error"]')
       .should('contain.text', '跨配置聚合数据加载失败。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-aggregates-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-aggregates-query-error"]').contains('button', '重试').click();
     cy.contains('h2', '各配置的 ISL 分布').should('be.visible');
     cy.then(() => expect(aggregateAttempts).to.equal(3));
 
@@ -751,7 +759,7 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-timeline-query-error"]')
       .should('contain.text', '请求时间线加载失败。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-timeline-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-timeline-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="request-timeline-svg"]').should('be.visible');
     cy.then(() => expect(timelineAttempts).to.equal(3));
   });
@@ -778,14 +786,14 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-trace-query-error"]')
       .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-trace-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-trace-query-error"]').should('not.exist');
     cy.then(() => expect(traceAttempts).to.equal(3));
 
     cy.get('[data-testid="agentic-siblings-query-error"]')
       .should('contain.text', 'SKU 导航数据加载失败。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-siblings-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-siblings-query-error"]').contains('button', '重试').click();
     cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
     cy.then(() => expect(siblingAttempts).to.equal(3));
   });
@@ -1012,7 +1020,7 @@ describe('Agentic point orchestrator metric sources', () => {
     cy.get('[data-testid="agentic-metric-source-query-error"]')
       .should('contain.text', '无法加载所选服务器指标来源。')
       .and('contain.text', '重试');
-    cy.get('[data-testid="agentic-metric-source-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-metric-source-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-metric-source-query-error"]').should('not.exist');
     cy.contains('h2', '吞吐量 · 解码 · decode-a').should('be.visible');
     cy.then(() => expect(attempts).to.equal(3));

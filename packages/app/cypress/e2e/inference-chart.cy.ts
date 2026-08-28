@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
 
 describe('Inference Chart', () => {
@@ -230,40 +230,17 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
     cy.get('[data-testid="export-button"]')
       .should('be.visible')
       .and('have.attr', 'aria-label', '下载图表');
-    cy.document().then((doc) => {
-      const viewportWidth = doc.documentElement.clientWidth;
-      const overflow = [...doc.querySelectorAll<HTMLElement>('body *')]
-        .map((element) => ({
-          element,
-          bounds: element.getBoundingClientRect(),
-        }))
-        .filter(({ bounds }) => bounds.right > viewportWidth + 0.5)
-        .map(
-          ({ element, bounds }) =>
-            `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${
-              element.className && typeof element.className === 'string'
-                ? `.${element.className.split(/\s+/u).filter(Boolean).join('.')}`
-                : ''
-            }=${bounds.left.toFixed(1)}..${bounds.right.toFixed(1)} text=${JSON.stringify(
-              element.textContent?.trim().slice(0, 24),
-            )} parent=${element.parentElement?.getAttribute('class')}`,
-        )
-        .slice(0, 10);
-      expect(
-        doc.documentElement.scrollWidth,
-        `overflowing elements: ${overflow.join(', ')}`,
-      ).to.be.at.most(viewportWidth);
-    });
+    expectNoPageOverflow();
   });
 
   it('localizes architecture and changelog overlays without changing technical model data', () => {
     cy.viewport(1440, 900);
-    cy.get('[data-testid="model-architecture-toggle"]')
-      .should('contain.text', '模型架构')
-      .and('contain.text', 'MoE')
-      .click();
-    cy.contains('特性：').should('be.visible');
-    cy.contains('发布方 DeepSeek').should('be.visible');
+    cy.get('[data-testid="model-architecture-link"]')
+      .should('have.attr', 'aria-label')
+      .and('match', /^了解 .*DeepSeek.*模型架构$/u);
+    cy.get('[data-testid="model-architecture-link"]')
+      .should('have.attr', 'href')
+      .and('match', /^\/model\//u);
     cy.contains('button', '变更日志').should('be.visible').click();
     cy.contains('说明').should('be.visible');
   });
