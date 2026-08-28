@@ -3,7 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import {
@@ -71,6 +71,57 @@ function handleDesktopClick(tab: DashboardRouteKey) {
   track('tab_changed', { tab });
 }
 
+/**
+ * Sliding active-tab indicator. Measures the active link and translates a
+ * 2px bar under it (transform + width on an absolutely positioned element,
+ * so no layout impact on the tabs themselves). While unmeasured — first
+ * paint, no-JS, or a gated tab active in the popover — each link's static
+ * `border-b` fallback renders instead, so the active state is never lost.
+ */
+function useTabIndicator(current: DashboardRouteKey) {
+  const navRef = useRef<HTMLElement>(null);
+  const hasAnimatedRef = useRef(false);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  const measure = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const active = nav.querySelector<HTMLElement>('[data-tab-active="true"]');
+    if (!active) {
+      setIndicator(null);
+      return;
+    }
+    setIndicator({ left: active.offsetLeft, width: active.offsetWidth });
+  }, []);
+
+  useLayoutEffect(measure, [measure, current]);
+
+  // Only slide between positions after the first measurement has painted;
+  // the initial placement (and any resize reflow) must not animate.
+  useLayoutEffect(() => {
+    if (indicator) {
+      const id = requestAnimationFrame(() => {
+        hasAnimatedRef.current = true;
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    hasAnimatedRef.current = false;
+  }, [indicator]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      hasAnimatedRef.current = false;
+      measure();
+    });
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  return { navRef, indicator, animate: hasAnimatedRef.current };
+}
+
 export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -81,6 +132,7 @@ export function TabNav() {
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
+  const { navRef, indicator, animate } = useTabIndicator(current);
   const searchParams = useClientSearchParams();
   const unofficialIds = useMemo(() => {
     for (const [key, value] of searchParams) {
@@ -145,8 +197,9 @@ export function TabNav() {
 
       {/* Desktop: Nav links */}
       <div className="hidden lg:flex flex-col mb-4">
-        <Card className="overflow-x-auto py-6 md:py-6">
+        <Card className="vt-dashboard-tabs overflow-x-auto py-6 md:py-6">
           <nav
+            ref={navRef}
             data-testid="chart-section-tabs"
             className="relative flex items-center justify-evenly min-w-0"
           >
@@ -156,12 +209,30 @@ export function TabNav() {
                 href={tabHref(localePath(route.path, locale))}
                 data-testid={`tab-trigger-${route.key}`}
                 data-ph-capture-attribute-tab={route.key}
+                data-tab-active={current === route.key || undefined}
                 onClick={() => handleDesktopClick(route.key)}
-                className={cn(tabLinkClass, currentTabClass(current === route.key))}
+                className={cn(
+                  tabLinkClass,
+                  // The static border is the no-JS/unmeasured fallback; once the
+                  // sliding indicator is live it owns the underline.
+                  currentTabClass(current === route.key && !indicator),
+                  current === route.key && 'text-secondary dark:text-primary',
+                )}
               >
                 {tabLabel(route)}
               </Link>
             ))}
+            {indicator && (
+              <span
+                aria-hidden
+                className="tab-indicator bg-secondary dark:bg-primary"
+                style={{
+                  width: indicator.width,
+                  transform: `translateX(${indicator.left}px)`,
+                  ...(animate ? null : { transition: 'none' }),
+                }}
+              />
+            )}
             {featureGateUnlocked && (
               <HiddenTabsPopover
                 current={current}

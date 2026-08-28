@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -33,11 +34,16 @@ export function ComparePairCardLink({
   hardwareA,
   hardwareB,
 }: ComparePairCardLinkProps) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [pending, setPending] = useState(false);
+
   return (
     <a
       href={href}
       data-scenario={scenarioLabel}
-      className="group relative flex flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
+      data-pending={pending || undefined}
+      aria-busy={pending || undefined}
+      className="motion-nav-pending group relative flex flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         e.preventDefault();
@@ -46,6 +52,22 @@ export function ComparePairCardLink({
           label,
           ...(scenarioLabel ? { scenario: scenarioLabel } : {}),
         });
+        // This is intentionally a full-document navigation (see the original
+        // `window.location.href` below). Two cues cover the load gap:
+        // 1. `data-pending` dims the card immediately (motion.css) so the
+        //    click visibly registered.
+        // 2. In browsers with cross-document View Transitions and no
+        //    reduced-motion preference, tagging only the clicked card's
+        //    title lets it morph into the detail page <h1> (which carries
+        //    the static `vt-compare-title` name).
+        setPending(true);
+        if (
+          typeof document.startViewTransition === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: no-preference)').matches &&
+          titleRef.current
+        ) {
+          titleRef.current.style.viewTransitionName = 'compare-title';
+        }
         window.location.href = href;
       }}
     >
@@ -53,7 +75,10 @@ export function ComparePairCardLink({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200">
+            <h3
+              ref={titleRef}
+              className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200"
+            >
               {hardwareA && hardwareB ? (
                 <>
                   <span className="inline-flex items-center gap-1.5">

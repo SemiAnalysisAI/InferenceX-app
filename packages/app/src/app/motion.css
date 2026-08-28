@@ -56,3 +56,157 @@
     transform: scale(0.98);
   }
 }
+
+/* ============================================================
+ * Motion tokens — tiered durations and easings.
+ * fast  (150ms): direct-manipulation feedback — menus, fades, dims.
+ * base  (220ms): contextual movement — tab indicator, route cross-fade.
+ * reveal(550ms): scroll-triggered section entrances (declared above).
+ * ============================================================ */
+:root {
+  --motion-dur-fast: 150ms;
+  --motion-dur-base: 220ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-exit: cubic-bezier(0.3, 0, 1, 1);
+}
+
+/* ============================================================
+ * Route transitions (progressive enhancement).
+ *
+ * Client-side navigations: React's <ViewTransition> wrapper in the root
+ * layout (components/motion/route-transition.tsx) tags the page content
+ * with the `vt-page` view-transition-class when Next.js's experimental
+ * `viewTransition` flag is active.
+ *
+ * Full-document navigations (e.g. the compare catalog cards, which
+ * intentionally use `window.location.href`): the `@view-transition`
+ * rule opts into cross-document view transitions.
+ *
+ * Fallback: browsers without the View Transitions API (Firefox by
+ * default) ignore all of this and get today's instant swap. Reduced
+ * motion collapses every transition to a near-instant cut.
+ * ============================================================ */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Old page: quick, quiet exit. New page: settle in with a small rise. */
+  ::view-transition-old(root),
+  ::view-transition-old(*.vt-page) {
+    animation: motion-vt-out 90ms var(--motion-ease-exit) forwards;
+  }
+
+  ::view-transition-new(root),
+  ::view-transition-new(*.vt-page) {
+    animation: motion-vt-in var(--motion-dur-base) var(--motion-ease-enter) both;
+  }
+
+  /* The sticky header and dashboard tab rail are visually identical across
+     pages — naming them removes them from the root cross-fade so chrome
+     stays rock-still while content transitions beneath it. */
+  .vt-site-header {
+    view-transition-name: site-header;
+  }
+
+  .vt-dashboard-tabs {
+    view-transition-name: dashboard-tabs;
+  }
+
+  /* Shared element: compare-catalog card title → detail page <h1>.
+     The name is applied to at most one element per page (set on the
+     clicked card at click time; static on the detail heading). */
+  .vt-compare-title {
+    view-transition-name: compare-title;
+  }
+}
+
+@keyframes motion-vt-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reduced motion: collapse view transitions to a near-instant cut.
+   (`animation: none` would freeze the old snapshot; ~0ms plays cleanly.) */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+ * Async-state cues.
+ * ============================================================ */
+
+/* Stale-while-refetching dim for charts/tables: content stays visible
+   (keepPreviousData) but quietly signals that fresher data is loading.
+   A non-moving opacity fade, so it is not gated on reduced motion. */
+.motion-stale {
+  transition: opacity var(--motion-dur-fast) ease;
+}
+
+.motion-stale[data-stale='true'] {
+  opacity: 0.55;
+}
+
+/* Pending cue for full-document navigations (compare catalog cards):
+   confirms the click registered while the next document loads. */
+.motion-nav-pending[data-pending='true'] {
+  opacity: 0.6;
+}
+
+/* ============================================================
+ * Dashboard tab rail: sliding active indicator (2px underline).
+ * Falls back to the per-link static border when JS hasn't measured.
+ * ============================================================ */
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 9999px;
+  will-change: transform, width;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab-indicator {
+    transition:
+      transform var(--motion-dur-base) var(--motion-ease-standard),
+      width var(--motion-dur-base) var(--motion-ease-standard);
+  }
+}
+
+/* ============================================================
+ * Small popover-style entrances (header mobile menu).
+ * ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-pop-in {
+    animation: motion-pop-in var(--motion-dur-fast) var(--motion-ease-enter) both;
+  }
+}
+
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
