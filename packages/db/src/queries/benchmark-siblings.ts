@@ -12,6 +12,8 @@ export interface BenchmarkSibling {
   conc: number;
   /** "on" | "off" | null. */
   offload_mode: string | null;
+  /** Physical KV-cache tier selection reported by the benchmark runner. */
+  kv_offloading: string | null;
   decode_tp: number;
   decode_ep: number;
   decode_pp: number | null;
@@ -32,6 +34,10 @@ export interface BenchmarkSibling {
   is_multinode: boolean;
   /** Throughput per GPU (tok/s/gpu) for this point; null if the metric is absent. */
   tput_per_gpu: number | null;
+  /** P90 interactivity (tok/s/user), used by the AgentX Pareto navigator. */
+  p90_intvty: number | null;
+  /** P90 time to first token (s), used by the AgentX Pareto navigator. */
+  p90_ttft: number | null;
   /**
    * Total requests for this point — `total_requests_completed` (aiperf runner)
    * falling back to the legacy `num_requests_total`; null if neither is present.
@@ -96,6 +102,7 @@ export async function getBenchmarkSiblings(
   const rows = (await sql`
     select
       br.id, br.conc, br.offload_mode,
+      nullif(br.metrics->>'kv_offloading', '') as kv_offloading,
       c.decode_tp, c.decode_ep, (br.metrics->>'decode_pp')::int as decode_pp,
       coalesce(
         (br.metrics->>'decode_dcp_size')::int,
@@ -118,6 +125,8 @@ export async function getBenchmarkSiblings(
       c.prefill_dp_attention, c.prefill_num_workers,
       c.num_prefill_gpu, c.num_decode_gpu, c.disagg, c.is_multinode,
       (br.metrics->>'tput_per_gpu')::float8 as tput_per_gpu,
+      (br.metrics->>'p90_intvty')::float8 as p90_intvty,
+      (br.metrics->>'p90_ttft')::float8 as p90_ttft,
       coalesce(
         (br.metrics->>'total_requests_completed')::float8,
         (br.metrics->>'num_requests_total')::float8
@@ -137,6 +146,7 @@ export async function getBenchmarkSiblings(
     id: number;
     conc: number;
     offload_mode: string | null;
+    kv_offloading: string | null;
     decode_tp: number;
     decode_ep: number;
     decode_pp: number | null;
@@ -156,6 +166,8 @@ export async function getBenchmarkSiblings(
     disagg: boolean;
     is_multinode: boolean;
     tput_per_gpu: number | null;
+    p90_intvty: number | null;
+    p90_ttft: number | null;
     total_requests: number | null;
     has_trace: boolean;
   }[];
@@ -164,6 +176,7 @@ export async function getBenchmarkSiblings(
     id: Number(r.id),
     conc: r.conc,
     offload_mode: r.offload_mode,
+    kv_offloading: r.kv_offloading,
     decode_tp: r.decode_tp,
     decode_ep: r.decode_ep,
     decode_pp: r.decode_pp === null ? null : Number(r.decode_pp),
@@ -183,6 +196,8 @@ export async function getBenchmarkSiblings(
     disagg: r.disagg,
     is_multinode: r.is_multinode,
     tput_per_gpu: r.tput_per_gpu === null ? null : Number(r.tput_per_gpu),
+    p90_intvty: r.p90_intvty === null ? null : Number(r.p90_intvty),
+    p90_ttft: r.p90_ttft === null ? null : Number(r.p90_ttft),
     total_requests: r.total_requests === null ? null : Number(r.total_requests),
     is_current: Number(r.id) === benchmarkResultId,
     has_trace: r.has_trace,

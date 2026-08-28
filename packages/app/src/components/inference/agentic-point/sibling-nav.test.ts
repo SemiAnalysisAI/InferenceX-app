@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkSibling } from '@/hooks/api/use-benchmark-siblings';
 
-import { chipLabel } from './sibling-nav';
+import { chipLabel, dualParetoSiblingIds } from './sibling-nav';
 
 function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
   return {
     id: 437312,
     conc: 2,
     offload_mode: 'off',
+    kv_offloading: 'none',
     decode_tp: 0,
     decode_ep: 0,
     decode_pp: 1,
@@ -28,6 +29,8 @@ function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
     disagg: false,
     is_multinode: true,
     tput_per_gpu: 348.31,
+    p90_intvty: 40,
+    p90_ttft: 2,
     total_requests: 169,
     is_current: true,
     has_trace: true,
@@ -73,5 +76,46 @@ describe('chipLabel', () => {
         }),
       ),
     ).toBe('1xTP8PP2/DCP2/PCP4+1xTP8/DCP8 • c=2');
+  });
+
+  it('names each physical offload tier without the legacy off=ON suffix', () => {
+    expect(chipLabel(sibling({ kv_offloading: 'dram', offload_mode: 'on' }))).toBe(
+      'TP8PP2 • c=2 • DRAM',
+    );
+    expect(chipLabel(sibling({ kv_offloading: 'nvme', offload_mode: 'on' }))).toBe(
+      'TP8PP2 • c=2 • NVMe',
+    );
+    expect(chipLabel(sibling({ kv_offloading: 'dram+nvme', offload_mode: 'on' }))).toBe(
+      'TP8PP2 • c=2 • DRAM+NVMe',
+    );
+  });
+
+  it('falls back to a readable legacy label when an enabled point has no tier metadata', () => {
+    expect(chipLabel(sibling({ kv_offloading: null, offload_mode: 'on' }))).toBe(
+      'TP8PP2 • c=2 • Offload',
+    );
+  });
+});
+
+describe('dualParetoSiblingIds', () => {
+  it('intersects the P90 interactivity and TTFT frontiers using throughput per GPU', () => {
+    const rows = [
+      sibling({ id: 1, p90_intvty: 100, p90_ttft: 1, tput_per_gpu: 100 }),
+      sibling({ id: 2, p90_intvty: 80, p90_ttft: 2, tput_per_gpu: 200 }),
+      sibling({ id: 3, p90_intvty: 50, p90_ttft: 3, tput_per_gpu: 50 }),
+      sibling({ id: 4, p90_intvty: 120, p90_ttft: 4, tput_per_gpu: 150 }),
+    ];
+
+    expect([...dualParetoSiblingIds(rows)]).toEqual([2]);
+  });
+
+  it('excludes points missing any frontier coordinate', () => {
+    const rows = [
+      sibling({ id: 1, p90_intvty: 100, p90_ttft: 1, tput_per_gpu: 200 }),
+      sibling({ id: 2, p90_intvty: null, p90_ttft: 0.5, tput_per_gpu: 100 }),
+      sibling({ id: 3, p90_intvty: 200, p90_ttft: null, tput_per_gpu: 100 }),
+    ];
+
+    expect([...dualParetoSiblingIds(rows)]).toEqual([1]);
   });
 });

@@ -9,6 +9,7 @@ import {
   meaningfulParallelismSize,
   parallelismLabel,
 } from '@/components/inference/utils/parallelism-label';
+import { offloadTypeLabel } from '@/components/inference/utils/runtime-metadata-labels';
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
+import { isFrontierEligible, paretoFrontUpperLeft, paretoFrontUpperRight } from '@/lib/chart-utils';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
 
 const HW_LABELS: Record<string, string> = {
@@ -61,7 +63,15 @@ function frameworkLabel(fw: string) {
   return fw;
 }
 
-/** Short label for a sibling chip: parallelism + concurrency. */
+function offloadTierLabel(s: BenchmarkSibling): string | null {
+  const descriptor = s.kv_offloading?.trim();
+  if (descriptor) {
+    return descriptor.toLowerCase() === 'none' ? null : offloadTypeLabel(descriptor);
+  }
+  return s.offload_mode?.toLowerCase() === 'on' ? 'Offload' : null;
+}
+
+/** Short label for a sibling chip: parallelism + concurrency + physical KV tier. */
 export function chipLabel(s: BenchmarkSibling): string {
   const usePrefill =
     !s.disagg &&
@@ -117,8 +127,42 @@ export function chipLabel(s: BenchmarkSibling): string {
     decodeDpAttention: s.decode_dp_attention,
     decodeNumWorkers: s.decode_num_workers,
   });
-  const offload = s.offload_mode === 'on' ? ' • off=ON' : '';
-  return `${parallel} • c=${s.conc}${offload}`;
+  const offload = offloadTierLabel(s);
+  return `${parallel} • c=${s.conc}${offload ? ` • ${offload}` : ''}`;
+}
+
+interface SiblingParetoPoint {
+  id: number;
+  x: number;
+  y: number;
+}
+
+const siblingParetoPoints = (
+  siblings: BenchmarkSibling[],
+  xMetric: 'p90_intvty' | 'p90_ttft',
+): SiblingParetoPoint[] =>
+  siblings
+    .map((sibling) => ({
+      id: sibling.id,
+      x: sibling[xMetric] ?? Number.NaN,
+      y: sibling.tput_per_gpu ?? Number.NaN,
+    }))
+    .filter((point) => isFrontierEligible(point) && Number.isFinite(point.y));
+
+/**
+ * Point IDs that lie on both P90 frontiers used by AgentX: interactivity vs.
+ * throughput (upper-left in the reversed chart) and TTFT vs. throughput
+ * (upper-right). The shared chart helpers keep tie behavior identical to the
+ * plotted Pareto lines.
+ */
+export function dualParetoSiblingIds(siblings: BenchmarkSibling[]): Set<number> {
+  const interactivity = new Set(
+    paretoFrontUpperLeft(siblingParetoPoints(siblings, 'p90_intvty')).map((point) => point.id),
+  );
+  const ttft = new Set(
+    paretoFrontUpperRight(siblingParetoPoints(siblings, 'p90_ttft')).map((point) => point.id),
+  );
+  return new Set([...interactivity].filter((id) => ttft.has(id)));
 }
 
 type SortMode = 'default' | 'conc' | 'parallelism' | 'tput' | 'requests';
@@ -182,9 +226,8 @@ const isSortMode = (v: string | null): v is SortMode =>
 export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: BenchmarkSibling[] }) {
   const router = useRouter();
   const pathname = usePathname();
-  const agenticBase = isZhPathname(pathname)
-    ? `${ZH_PREFIX}/inference/agentic`
-    : '/inference/agentic';
+  const isZh = isZhPathname(pathname);
+  const agenticBase = isZh ? `${ZH_PREFIX}/inference/agentic` : '/inference/agentic';
   // Persist the sort in the URL so clicking a point (which remounts this
   // component on the new route) keeps the chosen order instead of resetting.
   // Read it once from the URL on mount — this component only renders after the
@@ -197,6 +240,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   });
 
   const sorted = useMemo(() => sortSiblings(siblings, sortMode), [siblings, sortMode]);
+  const dualParetoIds = useMemo(() => dualParetoSiblingIds(siblings), [siblings]);
 
   // prev/next follow the displayed (sorted) order so navigation matches the row.
   const currentIdx = sorted.findIndex((s) => s.is_current);
@@ -272,6 +316,17 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
         <div className="flex items-center gap-1 flex-wrap">
           {sorted.map((s) => {
             const active = s.is_current;
+            const isDualPareto = dualParetoIds.has(s.id);
+            const title = [
+              isDualPareto
+                ? isZh
+                  ? '同时位于 P90 交互性与 TTFT Pareto 前沿'
+                  : 'On both P90 interactivity and TTFT Pareto frontiers'
+                : null,
+              s.has_trace ? null : isZh ? '无已存储的追踪数据' : 'No stored trace data',
+            ]
+              .filter(Boolean)
+              .join(' · ');
             return (
               <button
                 key={s.id}
@@ -286,8 +341,18 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                   active
                     ? 'border-primary bg-primary text-primary-foreground font-medium'
                     : 'border-border/40 text-foreground hover:bg-accent'
+                } ${
+                  isDualPareto ? 'ring-2 ring-primary/70 ring-offset-1 ring-offset-background' : ''
                 } ${s.has_trace ? '' : 'opacity-60'}`}
-                title={s.has_trace ? undefined : 'No stored trace data'}
+                title={title || undefined}
+                aria-label={`${chipLabel(s)}${
+                  isDualPareto
+                    ? isZh
+                      ? '，同时位于两个 P90 Pareto 前沿'
+                      : ', on both P90 Pareto frontiers'
+                    : ''
+                }`}
+                data-dual-pareto={isDualPareto || undefined}
               >
                 {chipLabel(s)}
               </button>
@@ -309,6 +374,15 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           next <ChevronRight className="size-3.5" />
         </button>
       </div>
+      {dualParetoIds.size > 0 && (
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="inline-block h-3 w-5 rounded-sm border border-border ring-2 ring-primary/70 ring-offset-1 ring-offset-background"
+            aria-hidden="true"
+          />
+          <span>{isZh ? 'P90 交互性 + TTFT Pareto' : 'P90 interactivity + TTFT Pareto'}</span>
+        </div>
+      )}
     </div>
   );
 }

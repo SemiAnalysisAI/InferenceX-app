@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
 
 const getCachedSiblings = cachedQuery(
   (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
-  // v3 adds DCP/PCP. Roll the blob namespace so cached sibling payloads gain
-  // the complete parallelism mapping used by chart point labels.
-  'benchmark-siblings-v3',
+  // v4 adds the physical KV tier and P90 frontier coordinates. Roll the blob
+  // namespace so cached sibling payloads can label and mark AgentX points.
+  'benchmark-siblings-v4',
 );
 
 /**
