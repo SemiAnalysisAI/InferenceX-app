@@ -8,6 +8,7 @@ import {
   conversationHref,
   parseTimelineViewSnapshot,
   requestIdleStats,
+  shouldHandleTimelineBarClick,
   splitTimelineCid,
   type TimelineViewSnapshot,
 } from './request-timeline';
@@ -240,6 +241,12 @@ describe('conversationHref', () => {
     ).toBe('/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
+  it('keeps Chinese conversation links inside the /zh tree', () => {
+    expect(
+      conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }, 'zh'),
+    ).toBe('/zh/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
+  });
+
   it('carries the subagent id and strips the ::sa suffix from the conv id', () => {
     expect(
       conversationHref('slug', {
@@ -277,6 +284,17 @@ describe('conversationHref', () => {
     ).toBe(
       '/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
     );
+  });
+});
+
+describe('shouldHandleTimelineBarClick', () => {
+  it('uses SPA navigation only for an unmodified primary-button click', () => {
+    expect(shouldHandleTimelineBarClick({ button: 0 })).toBe(true);
+    expect(shouldHandleTimelineBarClick({ button: 0, metaKey: true })).toBe(false);
+    expect(shouldHandleTimelineBarClick({ button: 0, ctrlKey: true })).toBe(false);
+    expect(shouldHandleTimelineBarClick({ button: 0, shiftKey: true })).toBe(false);
+    expect(shouldHandleTimelineBarClick({ button: 0, altKey: true })).toBe(false);
+    expect(shouldHandleTimelineBarClick({ button: 1 })).toBe(false);
   });
 });
 

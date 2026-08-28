@@ -92,6 +92,8 @@ export interface GlobalFilterAvailabilityContextType {
   /** True once the database availability request has either succeeded or failed. */
   availabilitySettled: boolean;
   availabilityError: string | null;
+  availabilityIsError: boolean;
+  retryAvailability: () => void;
 }
 
 export interface GlobalFilterWorkflowContextType {
@@ -379,10 +381,15 @@ export function GlobalFilterProvider({
   const {
     data: availabilityRows,
     error: availabilityQueryError,
+    isError: availabilityIsError,
     isPending: availabilityPending,
+    refetch: refetchAvailability,
   } = useAvailability();
   const availabilitySettled = !availabilityPending;
   const availabilityError = availabilityQueryError ? availabilityQueryError.message : null;
+  const retryAvailability = useCallback(() => {
+    void refetchAvailability();
+  }, [refetchAvailability]);
   const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
   const dbModelKeys = useMemo<string[]>(
@@ -668,6 +675,8 @@ export function GlobalFilterProvider({
       availabilityRows,
       availabilitySettled,
       availabilityError,
+      availabilityIsError,
+      retryAvailability,
     }),
     [
       availableModels,
@@ -677,6 +686,8 @@ export function GlobalFilterProvider({
       availabilityRows,
       availabilitySettled,
       availabilityError,
+      availabilityIsError,
+      retryAvailability,
     ],
   );
 

@@ -3,6 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useLocale } from '@/lib/use-locale';
+
+const DEFAULT_CHART_INSTRUCTIONS = {
+  en: 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
+  zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
+} as const;
+
 /**
  * Renders the d3 tooltip element via React Portal to document.body so it
  * escapes any parent stacking context (e.g. the chart Card's backdrop-filter
@@ -73,10 +80,13 @@ export function D3ChartWrapper({
   legendElement,
   noDataOverlay,
   caption,
-  instructions = 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
+  instructions,
   testId,
   grabCursor = true,
 }: D3ChartWrapperProps) {
+  const locale = useLocale();
+  const resolvedInstructions = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+
   return (
     <div id={chartId} data-testid={testId}>
       {caption && <figcaption>{caption}</figcaption>}
@@ -125,7 +135,9 @@ export function D3ChartWrapper({
             />
             {noDataOverlay}
           </div>
-          <p className="no-export text-xs text-muted-foreground text-center mt-2">{instructions}</p>
+          <p className="no-export text-xs text-muted-foreground text-center mt-2">
+            {resolvedInstructions}
+          </p>
           <div className="overflow-hidden max-h-0">
             <div id={`${chartId}-export`} className="p-4"></div>
           </div>

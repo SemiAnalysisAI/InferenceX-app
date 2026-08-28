@@ -12,8 +12,9 @@ import { notifyClientSearchChange } from '@/lib/client-navigation';
 import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 import { useLocale } from '@/lib/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
+import { formatEvaluationDate } from './BarChartD3';
 
-const STRINGS = {
+export const EVALUATION_TABLE_STRINGS = {
   en: {
     prompts: 'Prompts',
     promptsTitle: 'View per-sample prompts and responses',
@@ -30,6 +31,9 @@ const STRINGS = {
     unofficialTitle: 'Data from an unofficial / un-ingested workflow run',
     prefill: 'prefill',
     decode: 'decode',
+    chip: 'Chip',
+    slots: 'slots',
+    dpaValues: 'DPA true/false',
   },
   zh: {
     prompts: '提示词',
@@ -37,15 +41,18 @@ const STRINGS = {
     promptsAriaLabel: (configLabel: string) => `查看 ${configLabel} 的逐样本提示词与模型响应`,
     precision: '精度',
     score: '得分',
-    min: '最小',
-    max: '最大',
-    conc: '并发',
+    min: '最低',
+    max: '最高',
+    conc: '并发数',
     benchmark: '基准测试',
     date: '日期',
     unofficial: '非官方',
-    unofficialTitle: '来自非官方/未入库工作流运行的数据',
+    unofficialTitle: '数据来自尚未入库的非官方工作流运行',
     prefill: '预填充',
     decode: '解码',
+    chip: '芯片',
+    slots: '字段顺序',
+    dpaValues: 'DPA 是/否',
   },
 } as const;
 
@@ -56,7 +63,7 @@ interface EvaluationTableProps {
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const { runIndexByUrl } = useUnofficialRun();
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = EVALUATION_TABLE_STRINGS[locale];
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
@@ -140,7 +147,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         className: 'whitespace-nowrap',
       },
       {
-        header: 'Chip',
+        header: t.chip,
         cell: (row) => {
           const isUnofficial = row.evalResultId <= 0;
           // Inset a per-run colored dot — same palette the unofficial banner and
@@ -218,7 +225,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       },
       {
         header: t.date,
-        cell: (row) => row.date,
+        cell: (row) => formatEvaluationDate(row.date, locale),
         sortValue: (row) => row.date,
         className: 'whitespace-nowrap',
       },
@@ -236,10 +243,10 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             <span className="font-mono">D(·/·/·/·)</span> {t.decode}
           </div>
           <div>
-            slots: <span className="font-mono">tp/ep/dpa/nw</span>
+            {t.slots}: <span className="font-mono">tp/ep/dpa/nw</span>
             <span className="mx-1">·</span>
-            <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA
-            true/false
+            <span className="font-mono">T</span>/<span className="font-mono">F</span> ={' '}
+            {t.dpaValues}
           </div>
         </div>
       )}

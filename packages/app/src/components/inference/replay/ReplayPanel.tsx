@@ -31,6 +31,9 @@ import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { track } from '@/lib/analytics';
 import { Sequence } from '@/lib/data-mappings';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 
 import {
   buildReplayTimeline,
@@ -47,11 +50,84 @@ type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
 // Lowercase pipeline tokens like "mux"/"flush" are jargon in a user-facing
 // banner. The raw stage still flows through telemetry — only the user copy
 // is humanized.
-const STAGE_LABELS: Partial<Record<Mp4ExportStage, string>> = {
-  render: 'while rendering frames',
-  encode: 'while encoding video',
-  flush: 'while finalizing video',
-  mux: 'while finalizing video',
+const STAGE_LABELS: Record<Locale, Partial<Record<Mp4ExportStage, string>>> = {
+  en: {
+    render: 'while rendering frames',
+    encode: 'while encoding video',
+    flush: 'while finalizing video',
+    mux: 'while finalizing video',
+  },
+  zh: {
+    render: '渲染帧时',
+    encode: '编码视频时',
+    flush: '完成视频时',
+    mux: '完成视频时',
+  },
+};
+
+const REPLAY_STRINGS = {
+  en: {
+    heading: 'Replay over time',
+    loading: 'Loading benchmark history…',
+    loadError: 'Failed to load benchmark history.',
+    insufficient:
+      'Not enough history yet to replay this chart — at least two distinct benchmark dates are required.',
+    dates: (count: number) => `${count} dates`,
+    configs: (count: number) => `${count} configs`,
+    pauseReplay: 'Pause replay',
+    playReplay: 'Play replay',
+    pause: 'Pause',
+    play: 'Play',
+    reset: 'Reset to start',
+    timeline: 'Replay timeline',
+    speed: 'Playback speed',
+    fixedAxes: 'Fixed axes',
+    fixedAxesTitle:
+      'Keep the axes fixed across the whole run so you can see the frontier improve over time, or let them refit to each frame.',
+    chromiumRequired: 'MP4 export requires a Chromium-based browser (Chrome, Edge).',
+    webCodecsRequired:
+      'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
+    exporting: 'Exporting…',
+    exportingProgress: (percent: number) => `Exporting ${percent}%`,
+    exportMp4: 'Export MP4',
+    cancel: 'Cancel',
+    exportFailed: 'MP4 export failed:',
+    fallbackError: 'Export failed.',
+    dismiss: 'Dismiss',
+  },
+  zh: {
+    heading: '按时间回放',
+    loading: '正在加载基准测试历史……',
+    loadError: '基准测试历史加载失败。',
+    insufficient: '历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。',
+    dates: (count: number) => `${count} 个日期`,
+    configs: (count: number) => `${count} 个配置`,
+    pauseReplay: '暂停回放',
+    playReplay: '播放回放',
+    pause: '暂停',
+    play: '播放',
+    reset: '重置到起点',
+    timeline: '回放时间线',
+    speed: '播放速度',
+    fixedAxes: '固定坐标轴',
+    fixedAxesTitle:
+      '在整次运行中固定坐标轴，以观察 Pareto 前沿随时间改善；也可关闭，让坐标轴随每一帧重新拟合。',
+    chromiumRequired: 'MP4 导出需要基于 Chromium 的浏览器（Chrome、Edge）。',
+    webCodecsRequired: 'MP4 导出需要 WebCodecs（Chrome、Edge 或 Chromium），当前浏览器不支持。',
+    exporting: '正在导出……',
+    exportingProgress: (percent: number) => `正在导出 ${percent}%`,
+    exportMp4: '导出 MP4',
+    cancel: '取消',
+    exportFailed: 'MP4 导出失败：',
+    fallbackError: '导出失败。',
+    dismiss: '关闭',
+  },
+} as const;
+
+const formatReplayDate = (date: string, locale: Locale) => {
+  if (locale === 'en' || !date) return date;
+  const [year, month, day] = date.split('-').map(Number);
+  return `${year}年${month}月${day}日`;
 };
 
 interface ReplayPanelProps {
@@ -154,6 +230,8 @@ export default function ReplayPanel({
       fixedExtent={fixedExtent}
       selectedModel={selectedModel}
       isLoading={history.isLoading}
+      isError={history.isError}
+      onRetry={() => void history.refetch()}
     />
   );
 }
@@ -163,6 +241,8 @@ interface ReplayPanelContentProps extends ReplayPanelProps {
   fixedExtent: StepDomain | null;
   selectedModel: string;
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
 }
 
 function ReplayPanelContent({
@@ -174,7 +254,11 @@ function ReplayPanelContent({
   fixedExtent,
   selectedModel,
   isLoading,
+  isError,
+  onRetry,
 }: ReplayPanelContentProps) {
+  const locale = useLocale();
+  const t = REPLAY_STRINGS[locale];
   // Track the SVG's position inside our relative wrapper so the date overlay
   // can anchor its bottom-right to the chart plot's top-right (the wrapper
   // also contains the legend, so we can't anchor to the wrapper edge).
@@ -474,10 +558,10 @@ function ReplayPanelContent({
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
         durationSec,
         signal: ac.signal,
-        renderFrame: async (t) => {
+        renderFrame: async (frameFraction) => {
           // flushSync forces React to commit synchronously; two RAFs let the
           // browser paint before the capture step reads back the DOM.
-          flushSync(() => commitFraction(t, { force: true }));
+          flushSync(() => commitFraction(frameFraction, { force: true }));
           await new Promise<void>((resolve) => {
             requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
           });
@@ -508,7 +592,7 @@ function ReplayPanelContent({
         return;
       }
       console.error('MP4 export failed', error);
-      const message = error instanceof Error ? error.message : 'Export failed.';
+      const message = error instanceof Error ? error.message : t.fallbackError;
       const errorName = error instanceof Error ? error.name : 'unknown';
       let encoderState: VideoEncoder['state'] | 'unknown' = 'unknown';
       let queuedFrames = 0;
@@ -518,11 +602,9 @@ function ReplayPanelContent({
         queuedFrames = error.queuedFrames;
       }
       const elapsedSinceLastProgressMs = Math.round(performance.now() - lastProgressAt);
-      const stageLabel = STAGE_LABELS[stage];
+      const stageLabel = STAGE_LABELS[locale][stage];
       setExportError(
-        hasWebCodecs
-          ? `${message}${stageLabel ? ` (${stageLabel})` : ''}`
-          : 'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
+        hasWebCodecs ? `${message}${stageLabel ? ` (${stageLabel})` : ''}` : t.webCodecsRequired,
       );
       track('inference_replay_export_failed', {
         reason: message.slice(0, 500),
@@ -541,7 +623,27 @@ function ReplayPanelContent({
       setExportProgress(null);
       abortRef.current = null;
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
+  }, [chartDefinition.chartType, selectedModel, timeline, hasWebCodecs, locale, t]);
+
+  if (isError) {
+    return (
+      <div
+        className="p-4 sm:p-6 flex flex-col"
+        data-testid={`replay-panel-${parentChartId}`}
+        style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
+      >
+        <h3 className="text-base font-semibold">{t.heading}</h3>
+        <div className="flex flex-1 items-center justify-center">
+          <RetryableQueryError
+            message={t.loadError}
+            analyticsEvent="inference_replay_history_retry_clicked"
+            onRetry={onRetry}
+            testId="replay-history-query-error"
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading || !timeline) {
     return (
@@ -550,9 +652,9 @@ function ReplayPanelContent({
         data-testid={`replay-panel-${parentChartId}`}
         style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
       >
-        <h3 className="text-base font-semibold">Replay over time</h3>
+        <h3 className="text-base font-semibold">{t.heading}</h3>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Loading benchmark history…</p>
+          <p className="text-sm text-muted-foreground">{t.loading}</p>
         </div>
       </div>
     );
@@ -565,12 +667,9 @@ function ReplayPanelContent({
         data-testid={`replay-panel-${parentChartId}`}
         style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
       >
-        <h3 className="text-base font-semibold">Replay over time</h3>
+        <h3 className="text-base font-semibold">{t.heading}</h3>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            Not enough history yet to replay this chart — at least two distinct benchmark dates are
-            required.
-          </p>
+          <p className="text-sm text-muted-foreground">{t.insufficient}</p>
         </div>
       </div>
     );
@@ -579,10 +678,11 @@ function ReplayPanelContent({
   return (
     <div ref={panelRef} className="p-4 sm:p-6" data-testid={`replay-panel-${parentChartId}`}>
       <div className="flex flex-wrap items-baseline gap-3 mb-3 pr-8">
-        <h3 className="text-base font-semibold">Replay over time</h3>
+        <h3 className="text-base font-semibold">{t.heading}</h3>
         <p className="text-xs text-muted-foreground">
-          {timeline.dates[0]} → {timeline.dates.at(-1)} • {timeline.dates.length} dates •{' '}
-          {timeline.configs.length} configs
+          {formatReplayDate(timeline.dates[0], locale)} →{' '}
+          {formatReplayDate(timeline.dates.at(-1) ?? '', locale)} • {t.dates(timeline.dates.length)}{' '}
+          • {t.configs(timeline.configs.length)}
         </p>
       </div>
 
@@ -605,7 +705,7 @@ function ReplayPanelContent({
           style={{ top: svgOffset?.top ?? 24, right: svgOffset?.right ?? 10 }}
           data-testid="replay-date-overlay"
         >
-          {currentDate}
+          {formatReplayDate(currentDate, locale)}
         </div>
       </div>
 
@@ -619,18 +719,18 @@ function ReplayPanelContent({
           size="sm"
           variant="outline"
           onClick={handlePlayPause}
-          aria-label={playing ? 'Pause replay' : 'Play replay'}
+          aria-label={playing ? t.pauseReplay : t.playReplay}
           data-testid="replay-play-pause"
           className="gap-1"
         >
           {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-          {playing ? 'Pause' : 'Play'}
+          {playing ? t.pause : t.play}
         </Button>
         <Button
           size="icon"
           variant="ghost"
           onClick={handleReset}
-          aria-label="Reset to start"
+          aria-label={t.reset}
           data-testid="replay-reset"
         >
           <RotateCcw className="size-4" />
@@ -644,17 +744,17 @@ function ReplayPanelContent({
           onChange={(e) => handleScrub(Number(e.target.value) / 1000)}
           onKeyDown={handleScrubKeyDown}
           className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
-          aria-label="Replay timeline"
-          aria-valuetext={currentDate || undefined}
+          aria-label={t.timeline}
+          aria-valuetext={formatReplayDate(currentDate, locale) || undefined}
           data-testid="replay-scrubber"
         />
         <span className="text-xs tabular-nums text-muted-foreground min-w-[5.5rem] text-right">
-          {currentDate}
+          {formatReplayDate(currentDate, locale)}
         </span>
         <Select value={String(speed)} onValueChange={(v) => handleSpeedChange(Number(v))}>
           <SelectTrigger
             className="h-8 w-[5.5rem]"
-            aria-label="Playback speed"
+            aria-label={t.speed}
             data-testid="replay-speed-select"
           >
             <SelectValue />
@@ -680,9 +780,9 @@ function ReplayPanelContent({
           <Label
             htmlFor="replay-fixed-axes"
             className="text-xs text-muted-foreground hover:text-foreground cursor-pointer whitespace-nowrap"
-            title="Keep the axes fixed across the whole run so you can see the frontier improve over time, or let them refit to each frame."
+            title={t.fixedAxesTitle}
           >
-            Fixed axes
+            {t.fixedAxes}
           </Label>
         </div>
         <Button
@@ -692,18 +792,14 @@ function ReplayPanelContent({
           disabled={isExporting || !hasWebCodecs}
           data-testid="replay-export-mp4"
           className="gap-1"
-          title={
-            hasWebCodecs
-              ? undefined
-              : 'MP4 export requires a Chromium-based browser (Chrome, Edge).'
-          }
+          title={hasWebCodecs ? undefined : t.chromiumRequired}
         >
           <Video className="size-4" />
           {isExporting
             ? exportProgress === null
-              ? 'Exporting…'
-              : `Exporting ${Math.round(exportProgress * 100)}%`
-            : 'Export MP4'}
+              ? t.exporting
+              : t.exportingProgress(Math.round(exportProgress * 100))
+            : t.exportMp4}
         </Button>
         {isExporting && (
           <Button
@@ -713,7 +809,7 @@ function ReplayPanelContent({
             data-testid="replay-export-cancel"
             className="pointer-events-auto"
           >
-            Cancel
+            {t.cancel}
           </Button>
         )}
       </div>
@@ -723,12 +819,14 @@ function ReplayPanelContent({
           data-testid="replay-export-error"
           className="no-export mt-3 flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
-          <span className="flex-1">MP4 export failed: {exportError}</span>
+          <span className="flex-1">
+            {t.exportFailed} {exportError}
+          </span>
           <button
             type="button"
             onClick={() => setExportError(null)}
             className="text-destructive/70 hover:text-destructive cursor-pointer"
-            aria-label="Dismiss"
+            aria-label={t.dismiss}
           >
             ✕
           </button>
