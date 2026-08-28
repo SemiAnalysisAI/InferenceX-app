@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { ConversationView } from '@/components/datasets/conversation-view';
-import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { zhAlternates } from '@/lib/i18n';
 
 interface Props {
   params: Promise<{ slug: string; convId: string }>;
@@ -12,13 +12,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, convId } = await params;
   const short = convId.slice(0, 12);
   const title = `对话 ${short} | ${slug}`;
-  const description = `${slug} agentic trace 数据集中对话 ${short} 的逐轮 token 火焰图（缓存前缀 vs 未缓存 input vs output）。`;
+  const description = `${slug} agentic trace 数据集中对话 ${short} 的逐轮 token 火焰图（缓存前缀、未缓存输入与输出）。`;
+  const path = `/agentx/${slug}/conversations/${encodeURIComponent(convId)}`;
   return {
     title,
     description,
-    alternates: {
-      canonical: `${SITE_URL}/zh/agentx/${slug}/conversations/${encodeURIComponent(convId)}`,
-    },
+    alternates: zhAlternates(path),
     robots: { index: false },
   };
 }

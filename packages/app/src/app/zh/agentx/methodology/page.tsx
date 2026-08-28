@@ -9,22 +9,22 @@ const DESCRIPTION =
   'AgentX 如何将自愿采集的编码智能体 trace 转换为回放图，并统一 KV cache warmup 与基准测试配置。';
 
 export const metadata: Metadata = {
-  title: 'AgentX 方法论',
+  title: 'AgentX 测试方法',
   description: DESCRIPTION,
   alternates: zhAlternates('/agentx/methodology'),
   openGraph: {
-    title: 'AgentX 方法论 | InferenceX',
+    title: 'AgentX 测试方法 | InferenceX',
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/agentx/methodology`,
     locale: ZH_OG_LOCALE,
   },
-  twitter: { title: 'AgentX 方法论 | InferenceX', description: DESCRIPTION },
+  twitter: { title: 'AgentX 测试方法 | InferenceX', description: DESCRIPTION },
 };
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
-  headline: 'AgentX 方法论',
+  headline: 'AgentX 测试方法',
   description: DESCRIPTION,
   url: `${SITE_URL}/zh/agentx/methodology`,
   inLanguage: ZH_LANG_TAG,

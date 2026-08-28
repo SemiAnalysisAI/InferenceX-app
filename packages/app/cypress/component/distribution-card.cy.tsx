@@ -79,4 +79,42 @@ describe('DistributionCard', () => {
     cy.contains('p90 320').should('be.visible');
     cy.contains('NaN').should('not.exist');
   });
+
+  it('exposes localized bin values to keyboard and screen-reader users', () => {
+    cy.mount(
+      <DistributionCard title="Input tokens per turn" unit="tokens" distribution={distribution} />,
+    );
+
+    cy.get('rect[role="slider"]')
+      .should('have.attr', 'tabindex', '0')
+      .and('have.attr', 'aria-label', 'Input tokens per turn')
+      .focus()
+      .should('have.attr', 'aria-valuemin', '1')
+      .and('have.attr', 'aria-valuemax', '4')
+      .and('have.attr', 'aria-valuenow', '1')
+      .and('have.attr', 'aria-valuetext')
+      .and('include', 'Range: 0–100 tokens');
+
+    cy.get('[role="tooltip"]').should('be.visible').and('contain.text', 'Count5');
+    cy.get('rect[role="slider"]').type('{rightarrow}').should('have.attr', 'aria-valuenow', '2');
+    cy.get('rect[role="slider"]').should('have.attr', 'aria-valuetext').and('include', 'Count: 20');
+    cy.get('[role="tooltip"]').should('contain.text', '100–200 tokens');
+  });
+
+  it('renders each distribution tick only once for small bin counts', () => {
+    cy.mount(
+      <DistributionCard
+        title="Small distribution"
+        unit="tokens"
+        distribution={{ bins: distribution.bins.slice(0, 2), stats: distribution.stats }}
+      />,
+    );
+
+    cy.get('svg text').then(($texts) => {
+      const ticks = [...$texts]
+        .map((node) => node.textContent)
+        .filter((text) => text === '0' || text === '100');
+      expect(ticks).to.deep.equal(['0', '100']);
+    });
+  });
 });

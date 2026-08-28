@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { TraceFlamegraph } from '@/components/datasets/trace-flamegraph';
 import { useDatasetConversation } from '@/hooks/api/use-datasets';
+import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { compact, formatShare } from './format';
 import { Stat } from './stat';
@@ -13,7 +14,9 @@ import { Stat } from './stat';
 const STRINGS = {
   en: {
     loading: 'Loading conversation…',
+    loadError: 'Failed to load conversation.',
     notFound: 'Conversation not found.',
+    retry: 'Retry',
     backToDataset: 'Back to AgentX dataset',
     breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: 'conversation',
@@ -29,7 +32,9 @@ const STRINGS = {
   },
   zh: {
     loading: '正在加载对话…',
+    loadError: '对话加载失败。',
     notFound: '未找到对话。',
+    retry: '重试',
     backToDataset: '返回 AgentX 数据集',
     breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: '对话',
@@ -46,7 +51,7 @@ const STRINGS = {
 } as const;
 
 export function ConversationView({ slug, convId }: { slug: string; convId: string }) {
-  const { data, isLoading, isError } = useDatasetConversation(slug, convId);
+  const { data, isLoading, isError, refetch } = useDatasetConversation(slug, convId);
   const locale = useLocale();
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
@@ -65,9 +70,38 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
   if (isLoading) {
     return <div className="py-12 text-center text-sm text-muted-foreground">{t.loading}</div>;
   }
-  if (isError || !data) {
+  if (isError) {
     return (
-      <div className="py-12 text-center text-sm text-destructive">
+      <div
+        className="flex flex-wrap items-center justify-center gap-2 py-12 text-center text-sm text-destructive"
+        role="alert"
+        data-testid="conversation-view-error"
+        data-locale={locale}
+      >
+        <span>{t.loadError}</span>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => {
+            track('datasets_conversation_retry_clicked', { slug });
+            void refetch();
+          }}
+        >
+          {t.retry}
+        </button>
+        <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
+          {t.backToDataset}
+        </Link>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div
+        className="py-12 text-center text-sm text-destructive"
+        data-testid="conversation-view-not-found"
+        data-locale={locale}
+      >
         {t.notFound}{' '}
         <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
           {t.backToDataset}

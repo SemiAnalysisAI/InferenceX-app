@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { useDatasets, type DatasetRecord } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import { compact, formatPct, perConversation } from './format';
+import { compact, formatPct, localeNumber, perConversation } from './format';
 
 const STRINGS = {
   en: {
@@ -61,9 +61,15 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
           <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
         )}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <Stat label={t.conversations} value={d.conversation_count.toLocaleString()} />
-          <Stat label={t.medianReqConvo} value={perConversation(s.medianRequestsPerConversation)} />
-          <Stat label={t.meanReqConvo} value={perConversation(s.meanRequestsPerConversation)} />
+          <Stat label={t.conversations} value={localeNumber(d.conversation_count, locale)} />
+          <Stat
+            label={t.medianReqConvo}
+            value={perConversation(s.medianRequestsPerConversation, locale)}
+          />
+          <Stat
+            label={t.meanReqConvo}
+            value={perConversation(s.meanRequestsPerConversation, locale)}
+          />
           <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
           <Stat label={t.subagentGroups} value={compact(s.subagentGroups ?? 0)} />
           <Stat label={t.cachedInput} value={cachedPct} />
