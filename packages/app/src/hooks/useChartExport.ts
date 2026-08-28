@@ -257,13 +257,14 @@ export function useChartExport({
   const exportToImage = useCallback(async () => {
     setIsExporting(true);
 
-    // Temporarily expand the legend so the clone captures expanded state
-    let wasCollapsed = false;
+    // A fully-closed sidebar legend renders only its reopen button (no
+    // .legend-container), so temporarily open it for the clone and restore
+    // the closed state right after.
+    let wasClosed = false;
     if (setIsLegendExpanded) {
       const el = document.querySelector(`#${chartId}`);
-      const legend = el?.getElementsByClassName('legend-container')[0];
-      wasCollapsed = Boolean(legend) && !legend!.classList.contains('bg-accent');
-      if (wasCollapsed) {
+      wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
+      if (wasClosed) {
         setIsLegendExpanded(true);
         await waitForRender();
       }
@@ -305,8 +306,8 @@ export function useChartExport({
 
       exportElement.append(clone);
 
-      // Restore collapsed state immediately after cloning
-      if (wasCollapsed && setIsLegendExpanded) {
+      // Restore closed state immediately after cloning
+      if (wasClosed && setIsLegendExpanded) {
         setIsLegendExpanded(false);
       }
 
@@ -491,7 +492,7 @@ export function useChartExport({
     } catch (error) {
       console.error('Error exporting image:', error);
       alert('Failed to export image. Please try again.');
-      if (wasCollapsed && setIsLegendExpanded) setIsLegendExpanded(false);
+      if (wasClosed && setIsLegendExpanded) setIsLegendExpanded(false);
     } finally {
       setIsExporting(false);
       const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
