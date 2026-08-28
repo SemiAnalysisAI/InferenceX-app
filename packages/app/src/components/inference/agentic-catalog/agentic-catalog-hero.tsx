@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
 import type { Locale } from '@/lib/i18n';
 
@@ -34,9 +35,7 @@ export function AgenticCatalogHero({ locale }: { locale: Locale }) {
   return (
     <section data-testid="agentic-catalog-hero">
       <Card>
-        <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
-          {guide.eyebrow}
-        </p>
+        <Eyebrow as="p">{guide.eyebrow}</Eyebrow>
         <h1 className="mt-2 max-w-3xl text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
           {guide.title}
         </h1>

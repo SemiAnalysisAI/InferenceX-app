@@ -229,7 +229,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   return (
     <>
       {hasDisaggConfigs && (
-        <div className="mt-2 mb-2 text-[11px] text-muted-foreground/80 leading-tight">
+        <div className="mt-2 mb-2 text-2xs text-muted-foreground/80 leading-tight">
           <div>
             <span className="font-mono">P(·/·/·/·)</span> {t.prefill}
             <span className="mx-1">·</span>

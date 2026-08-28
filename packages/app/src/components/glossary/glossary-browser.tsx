@@ -265,7 +265,7 @@ export function GlossaryBrowser({
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-[0.68rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                        <p className="mt-1 text-2xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
                           {categoryLabels?.[entry.category] ?? entry.category}
                         </p>
                       </div>
@@ -287,7 +287,7 @@ export function GlossaryBrowser({
         </div>
       ) : (
         <div className="border-t border-border/50 px-6 py-20 text-center">
-          <p className="font-mono text-xs tracking-[0.18em] text-brand uppercase">
+          <p className="font-mono text-xs tracking-eyebrow text-brand uppercase">
             {labels.noMatch}
           </p>
           <h2 className="mt-3 text-2xl font-semibold">{labels.noResultsTitle}</h2>

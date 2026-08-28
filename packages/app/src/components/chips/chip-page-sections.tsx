@@ -370,7 +370,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
   return (
     <div className="mt-10 grid gap-8 border-t border-border/50 pt-10 md:grid-cols-3">
       <section aria-label={t.relatedArticles}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedArticles}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -387,7 +387,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedTerms}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedTerms}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -404,7 +404,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedChips}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedChips}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -455,11 +455,11 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
                 {t.backToIndex}
               </Link>
               <div className="mt-8 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-brand uppercase">
+                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
                   {hw.vendor} · {hw.arch}
                 </span>
               </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
                 {entry.title}
               </h1>
             </header>
@@ -531,7 +531,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
                 <span aria-hidden="true">←</span>
                 {t.backToIndex}
               </Link>
-              <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-6xl">
+              <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
                 {title}
               </h1>
               <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">
@@ -620,7 +620,7 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="py-8 md:py-12">
-            <h1 className="text-4xl font-bold tracking-[-0.035em] md:text-5xl">{t.indexTitle}</h1>
+            <h1 className="text-4xl font-bold tracking-heading md:text-5xl">{t.indexTitle}</h1>
             <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">{t.indexIntro}</p>
           </header>
           <section aria-labelledby="chips-list">

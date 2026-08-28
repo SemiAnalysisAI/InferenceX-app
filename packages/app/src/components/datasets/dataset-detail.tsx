@@ -366,7 +366,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                         {c.conv_id.slice(0, 20)}…
                       </Link>
                       {c.models.length > 0 && (
-                        <span className="ml-2 text-[11px] text-muted-foreground">
+                        <span className="ml-2 text-2xs text-muted-foreground">
                           {t.modelSuffix(c.models.length)}
                         </span>
                       )}

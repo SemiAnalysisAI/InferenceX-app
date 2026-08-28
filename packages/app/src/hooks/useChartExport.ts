@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 
+import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+
 interface UseChartExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
@@ -24,10 +26,10 @@ export function getExportFontFamily(): string {
       document.body.classList.contains('minecraft'));
 
   if (isMinecraftTheme) {
-    return 'var(--font-minecraft), "Monocraft", monospace';
+    return CHART_FONT_MINECRAFT;
   }
 
-  return 'var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  return CHART_FONT_SANS;
 }
 
 function getResolvedExportFontFamily(): string {

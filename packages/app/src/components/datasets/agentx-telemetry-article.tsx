@@ -145,7 +145,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
         >
           {guide.ui.backToAgentX}
         </AgentXTelemetryLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
           {guide.eyebrow}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
@@ -172,7 +172,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
         </div>
 
         <nav aria-label={guide.ui.onThisPage} className="mt-10">
-          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
             {guide.ui.onThisPage}
           </p>
           <ul className="mt-2 grid gap-x-8 gap-y-1 sm:grid-cols-2">

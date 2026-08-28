@@ -120,7 +120,7 @@
 
   /* Fonts */
   --font-sans: var(--font-dm-sans);
-  --font-mono: monospace;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
 
   /* Breakpoints */
   --breakpoint-2xl: 80rem;
@@ -135,6 +135,24 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+}
+
+/* Typography tokens — the governed alternative to arbitrary values like
+   text-[11px] or tracking-[0.16em]. New arbitrary font-size/tracking values
+   are blocked by scripts/check-typography.ts; use these instead.
+   See docs/typography.md. */
+@theme {
+  /* Micro label sizes (smaller than text-xs). Deliberately no paired
+     --text-*--line-height: the arbitrary values these replace set only
+     font-size and inherited line-height, and dense tables depend on that. */
+  --text-2xs: 0.6875rem; /* 11px */
+  --text-3xs: 0.625rem; /* 10px */
+
+  /* Named letter-spacing for the recurring uppercase-eyebrow and
+     tightened-heading recipes. */
+  --tracking-eyebrow: 0.16em;
+  --tracking-eyebrow-wide: 0.2em;
+  --tracking-heading: -0.04em;
 }
 
 :root {

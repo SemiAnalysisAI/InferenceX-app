@@ -72,12 +72,12 @@ export function AgenticCatalogCardLink({
             <h4 className="text-sm font-semibold leading-tight transition-colors duration-200 group-hover:text-brand">
               {label}
             </h4>
-            <span className="inline-flex min-h-5 items-center rounded-full border border-brand/30 bg-brand/10 px-2 font-mono text-[10px] font-semibold leading-none text-brand">
+            <span className="inline-flex min-h-5 items-center rounded-full border border-brand/30 bg-brand/10 px-2 font-mono text-3xs font-semibold leading-none text-brand">
               {precisionLabel}
             </span>
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{archLine}</p>
-          <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-1 font-mono text-2xs leading-relaxed text-muted-foreground">
             {detailLine}
           </p>
         </div>
