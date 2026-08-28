@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildCollectiveXSupportMatrix,
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
-  collectiveXKernelIsSupported,
-  collectiveXKernelSupportCell,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
@@ -23,12 +20,7 @@ import {
   collectiveXKvCell,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
-import {
-  buildDataset,
-  makeCollectiveXDataset,
-  makeCollectiveXSeries,
-  makeRawShard,
-} from './test-fixture';
+import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
 // series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
@@ -131,90 +123,6 @@ describe('collectiveXColorKey', () => {
     const nscale = makeCollectiveXSeries({ sku: 'b200-nscale' });
     const dgxc = makeCollectiveXSeries({ sku: 'b200-dgxc' });
     expect(collectiveXColorKey(nscale)).toBe(collectiveXColorKey(dgxc));
-  });
-});
-
-describe('buildCollectiveXSupportMatrix', () => {
-  const supportDataset = buildDataset({
-    shards: [
-      makeRawShard({ sku: 'b200-nscale', backend: 'deepep-v2' }),
-      // Same cell as the measured bf16 case above but failed: measured wins.
-      makeRawShard({
-        sku: 'b200-nscale',
-        backend: 'deepep-v2',
-        precision: 'fp8',
-        status: 'failed',
-        reasons: ['flake'],
-      }),
-      makeRawShard({ sku: 'h100-dgxc', backend: 'mori', mode: 'low-latency' }),
-      makeRawShard({
-        sku: 'b200-nscale',
-        backend: 'mori',
-        mode: 'low-latency',
-        status: 'failed',
-        reasons: ['case-timeout'],
-      }),
-      makeRawShard({ sku: 'h100-dgxc', backend: 'deepep-v2', rows: [] }),
-    ],
-  });
-  const matrix = buildCollectiveXSupportMatrix([supportDataset]);
-
-  it('shares normalized, stable axes across throughput and low-latency modes', () => {
-    expect(matrix.skus).toEqual(['b200', 'h100']);
-    expect(matrix.libraries).toEqual(['deepep-v2', 'mori']);
-  });
-
-  it('marks only SKU/library pairs with measured points as supported', () => {
-    expect(collectiveXKernelIsSupported(matrix, 'normal', 'b200', 'deepep-v2')).toBe(true);
-    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'h100', 'mori')).toBe(true);
-    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'b200', 'mori')).toBe(false);
-    expect(collectiveXKernelIsSupported(matrix, 'normal', 'h100', 'deepep-v2')).toBe(false);
-  });
-
-  it('says why a requested cell is not measured', () => {
-    // Attempted, every attempt failed: the shard's machine reason surfaces.
-    expect(collectiveXKernelSupportCell(matrix, 'low-latency', 'b200', 'mori')).toEqual({
-      status: 'failed',
-      reasons: ['case-timeout'],
-    });
-    // Nominally-successful case whose ladder measured nothing: requested, not measured.
-    expect(collectiveXKernelSupportCell(matrix, 'normal', 'h100', 'deepep-v2')).toEqual({
-      status: 'pending',
-      reasons: [],
-    });
-  });
-
-  it('surfaces registry walls as unsupported with the matrix reason', () => {
-    // makeCollectiveXDataset carries the b300 deepep-v2 EP16 unsupported row.
-    const walled = buildCollectiveXSupportMatrix([dataset]);
-    expect(collectiveXKernelSupportCell(walled, 'normal', 'b300', 'deepep-v2')).toEqual({
-      status: 'unsupported',
-      // The machine reason, then the matrix's human-readable detail.
-      reasons: ['backend-platform-unsupported', 'unsupported by the selected backend/platform'],
-    });
-    // ...and the b200-dgxc requested-but-never-run row.
-    expect(collectiveXKernelSupportCell(walled, 'normal', 'b200', 'deepep-v2')).toEqual({
-      status: 'pending',
-      reasons: ['pending'],
-    });
-  });
-
-  it('lets a measured case win the cell and drop the excuses', () => {
-    expect(collectiveXKernelSupportCell(matrix, 'normal', 'b200', 'deepep-v2')).toEqual({
-      status: 'measured',
-      reasons: [],
-    });
-  });
-
-  it('keeps unrequested cross-product cells distinct from requested-but-absent ones', () => {
-    expect(collectiveXKernelSupportCell(matrix, 'normal', 'h100', 'mori')).toEqual({
-      status: 'unrequested',
-      reasons: [],
-    });
-    expect(collectiveXKernelSupportCell(matrix, 'low-latency', 'b200', 'deepep-v2')).toEqual({
-      status: 'unrequested',
-      reasons: [],
-    });
   });
 });
 

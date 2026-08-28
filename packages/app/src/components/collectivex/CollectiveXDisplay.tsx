@@ -902,7 +902,6 @@ export default function CollectiveXDisplay() {
 
       {datasets.length > 0 && (
         <>
-          <CollectiveXSupportMatrices datasets={datasets} />
           {phaseSeries.length === 0 && (
             <Card data-testid="collectivex-empty-state" className="py-4">
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
@@ -1127,6 +1126,10 @@ export default function CollectiveXDisplay() {
           </Card>
         </>
       )}
+      {/* The curated support picture is run-independent, so it renders even
+          with nothing checked, and last: it is reference material, not data
+          from the selection above. */}
+      <CollectiveXSupportMatrices />
     </section>
   );
 }

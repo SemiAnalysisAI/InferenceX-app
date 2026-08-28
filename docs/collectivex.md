@@ -97,15 +97,15 @@ cannot blank the initial explorer. Deletion is available per row or as one confi
 currently shown runs; both paths keep the same tombstone semantics described above.
 The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
 both appears under both filters, and changing the filter does not alter the checked-run selection.
-The EP coverage from the checked runs is also summarized as two SKU-by-library support matrices:
-one for throughput-oriented (`normal`) kernels and one for `low-latency` kernels. A cell is measured
-(green) when at least one requested case measured a point; every other cell states why it is not:
-`unsupported` (the sweep matrix declares the combination unrunnable on that platform), `failed`
-(requested and attempted, but every attempt ended failed/invalid/diagnostic), `pending` (requested
-but never reached a terminal measurement), or `unrequested` (a cross-product cell no checked run
-asked for). Hovering a cell shows the coverage rows' machine reasons and detail verbatim (for
-example `backend-platform-unsupported`). Both matrices share normalized SKU and library axes for
-direct comparison.
+The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
+throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of which runs are
+checked. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
+carrying a numbered note with the investigated reason (upstream issue references included, e.g.
+ROCm/mori#610); gray degrees do not exist for that pairing (vendor-mismatched library, a kernel
+with no such mode, or a pool the library was never brought up on). The table is maintained by hand
+in `known-support.ts`, mirroring the InferenceX repo's `platform_config.json` registry plus its
+wall investigations — when a registry row flips or a wall falls upstream, the cell and its note
+change here.
 
 ## The raw-rows exception
 
