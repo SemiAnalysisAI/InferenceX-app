@@ -22,6 +22,7 @@ import {
 import { hasZhSibling, switchLocalePath, zhPath } from '@/lib/i18n';
 import { pushInApp } from '@/lib/client-navigation';
 import { useClientPathname } from '@/hooks/useClientPathname';
+import { useClientSearch } from '@/hooks/useClientSearch';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 import { matchesSearch } from '@/lib/search-match';
@@ -103,6 +104,7 @@ export function CommandPalette() {
   // Live pathname: per-model dashboard routes rewrite the URL outside the
   // Next router, which usePathname alone would miss (same as LanguageToggle).
   const pathname = useClientPathname(routerPathname);
+  const search = useClientSearch();
   const locale = useLocale();
   const t = STRINGS[locale];
   const { setTheme, theme } = useTheme();
@@ -123,21 +125,6 @@ export function CommandPalette() {
     track('command_palette_opened', { source });
   }, []);
 
-  // Global ⌘K / Ctrl+K shortcut. Toggles, so a second press closes.
-  React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey) {
-        event.preventDefault();
-        setOpen((prev) => {
-          if (!prev) track('command_palette_opened', { source: 'shortcut' });
-          return !prev;
-        });
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
-
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) {
@@ -145,6 +132,30 @@ export function CommandPalette() {
       setActiveIndex(0);
     }
   }, []);
+
+  // Mirror of `open` for the document-level shortcut listener, so toggling
+  // goes through handleOpenChange (which resets the query on close).
+  const openRef = React.useRef(false);
+  React.useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Global ⌘K / Ctrl+K shortcut. Toggles, so a second press closes.
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey) {
+        event.preventDefault();
+        if (openRef.current) {
+          handleOpenChange(false);
+        } else {
+          handleOpenChange(true);
+          track('command_palette_opened', { source: 'shortcut' });
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [handleOpenChange]);
 
   const navItems = React.useMemo(() => buildPaletteNavItems(locale), [locale]);
 
@@ -178,7 +189,9 @@ export function CommandPalette() {
         keywords: t.switchLocaleKeywords,
         icon: LanguagesIcon,
         run: () => {
-          router.push(switchLocalePath(pathname));
+          // Same contract as the header language toggle: keep the current
+          // query string (dashboard filters) and use the commit-retry push.
+          pushInApp(router, switchLocalePath(pathname) + search);
         },
       },
       {
@@ -191,7 +204,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [t, theme, setTheme, router, pathname],
+    [t, theme, setTheme, router, pathname, search],
   );
 
   const sections = React.useMemo<Section[]>(() => {
@@ -261,6 +274,9 @@ export function CommandPalette() {
       setActiveIndex(flatEntries.length - 1);
       scrollRowIntoView(flatEntries.length - 1);
     } else if (event.key === 'Enter') {
+      // Ignore the Enter that confirms an IME composition (CJK input),
+      // otherwise committing Chinese text would also run the selection.
+      if (event.nativeEvent.isComposing || event.keyCode === 229) return;
       event.preventDefault();
       flatEntries[clampedIndex]?.select();
     }

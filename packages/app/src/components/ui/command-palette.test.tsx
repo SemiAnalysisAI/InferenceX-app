@@ -115,6 +115,41 @@ describe('CommandPalette', () => {
     expect(active).not.toBeNull();
   });
 
+  it('ignores Enter while an IME composition is being confirmed', () => {
+    render();
+    openViaTrigger();
+    setQuery('kimi k3');
+    const input = document.body.querySelector(
+      '[data-testid="command-palette-input"]',
+    ) as HTMLInputElement;
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
+      );
+    });
+    expect(push).not.toHaveBeenCalled();
+    // The palette stays open, still showing the query.
+    expect(document.body.querySelector('[data-testid="command-palette"]')).not.toBeNull();
+  });
+
+  it('clears the query when closed via the keyboard shortcut', () => {
+    render();
+    openViaTrigger();
+    setQuery('kimi');
+    // Close and reopen via Ctrl+K — the old filter must not persist.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+    });
+    expect(document.body.querySelector('[data-testid="command-palette"]')).toBeNull();
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+    });
+    const input = document.body.querySelector(
+      '[data-testid="command-palette-input"]',
+    ) as HTMLInputElement;
+    expect(input.value).toBe('');
+  });
+
   it('shows an empty state for unmatched queries', () => {
     render();
     openViaTrigger();
