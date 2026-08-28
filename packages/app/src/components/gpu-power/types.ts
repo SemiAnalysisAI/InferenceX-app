@@ -31,9 +31,41 @@ export interface GpuPowerRunInfo {
   status: string;
 }
 
+export interface PowerWindow {
+  start_unix: number;
+  end_unix: number;
+}
+
+/**
+ * Normalized power-measurement contract assembled server-side from same-suffix
+ * sibling artifacts (`bmk_*` agg rows and `power_audit_*` validation sidecars).
+ * Field names are snake_case to mirror the producer sidecars.
+ */
+export interface GpuArtifactPower {
+  /** null = verdict unknown */
+  power_valid: 0 | 1 | null;
+  /** snake_case producer reason codes; [] when valid/unknown */
+  reasons: string[];
+  window: PowerWindow | null;
+  expected_gpu_count: number | null;
+  observed_gpu_count: number | null;
+  published: {
+    avg_power_w: number | null;
+    avg_total_gpu_power_w: number | null;
+    power_metric_schema_version: number | null;
+    source: 'bmk_artifact' | 'power_audit_agg' | 'validation_metrics';
+  } | null;
+  /** agg power_audit.producer_sha or sidecar producer.producer_git_commit */
+  producer_sha: string | null;
+  exporter_image_sha256: string | null;
+  /** artifact names consulted, for the panel footer */
+  sources: string[];
+}
+
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
+  power?: GpuArtifactPower;
 }
 
 export interface GpuPowerApiResponse {
