@@ -272,6 +272,7 @@ describe('compareModelSeoName', () => {
     'glm-5-2': 'GLM-5.2',
     'minimax-m3': 'MiniMax M3',
     'minimax-m27': 'MiniMax M2.7',
+    'qwen-3-8-flash-next': 'Qwen3.8-Flash-Next',
     'qwen-3-5': 'Qwen3.5',
     'gptoss-120b': 'gpt-oss-120b',
     'llama-3-3-70b': 'Llama 3.3 70B',

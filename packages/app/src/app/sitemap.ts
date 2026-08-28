@@ -26,6 +26,8 @@ import {
   MODEL_ROUTES,
   modelRoutePath,
 } from '@/lib/model-routes';
+import { getAllRankingPageEntries } from '@/lib/rankings';
+import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
@@ -53,11 +55,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
   // Only emit (model, pair) URLs that have benchmark data on both sides —
   // avoids polluting the sitemap with empty pages that hurt crawl budget.
-  const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets] = await Promise.all([
+  const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries] = await Promise.all([
     getAllComparableCompareSlugs(),
     getAllComparablePrecisionSlugs(),
     getAllComparableSpecDecodeSlugs(),
     FIXTURES_MODE ? Promise.resolve([]) : listDatasets(getDb()),
+    getAvailableRunEntries(),
   ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
 
@@ -179,6 +182,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       localizedPair(`/chips/${slug}`, {
         lastModified: now,
         changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }),
+    ),
+    // Live GPU rankings per model (fastest / cheapest). The registry is
+    // static; page bodies render from live benchmark data on request.
+    ...localizedPair('/rankings', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
+    ...getAllRankingPageEntries().flatMap((entry) =>
+      localizedPair(`/rankings/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      }),
+    ),
+    // Model-on-hardware pages, availability-filtered so only pairings with
+    // benchmark rows enter the sitemap (same crawl-budget rule as /compare).
+    ...localizedPair('/run', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
+    ...runEntries.flatMap((entry) =>
+      localizedPair(`/run/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'daily' as const,
         priority: 0.7,
       }),
     ),

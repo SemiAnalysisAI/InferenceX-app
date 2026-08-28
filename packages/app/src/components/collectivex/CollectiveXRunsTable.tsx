@@ -7,7 +7,7 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
-import { collectiveXRunDasharray } from './data';
+import { collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import type { CollectiveXRunSummary } from './types';
 
 interface CollectiveXRunsTableProps {
@@ -18,6 +18,7 @@ interface CollectiveXRunsTableProps {
   deletingRunIds: ReadonlySet<string>;
   onVisibleChange: (runId: string, visible: boolean) => void;
   onDelete: (runId: string) => void;
+  emptyMessage?: string;
 }
 
 const STRINGS = {
@@ -43,7 +44,7 @@ const STRINGS = {
     shown: 'Shown',
     run: 'Run',
     result: 'Result',
-    suites: 'Suites',
+    suites: '测试套件',
     cases: 'Measured cases',
     points: 'Terminal points',
     skus: 'SKUs',
@@ -86,12 +87,15 @@ export function CollectiveXRunsTable({
   deletingRunIds,
   onVisibleChange,
   onDelete,
+  emptyMessage,
 }: CollectiveXRunsTableProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
 
   if (runs.length === 0) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">{t.empty}</p>;
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">{emptyMessage ?? t.empty}</p>
+    );
   }
 
   return (
@@ -197,7 +201,7 @@ export function CollectiveXRunsTable({
                 <td className="px-3 py-1.5">
                   <span
                     className={cn(
-                      'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                      'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                       CONCLUSION_CLASSES[conclusion] ?? CONCLUSION_FALLBACK_CLASS,
                     )}
                   >
@@ -211,7 +215,7 @@ export function CollectiveXRunsTable({
                         title={`EP: ${epMeasured}/${epRequested} measured`}
                         data-testid={`collectivex-run-suite-ep-${run.run_id}`}
                         className={cn(
-                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                           SUITE_BADGE_CLASSES.ep,
                         )}
                       >
@@ -223,7 +227,7 @@ export function CollectiveXRunsTable({
                         title={`KV transfer: ${kvMeasured}/${kvRequested} measured`}
                         data-testid={`collectivex-run-suite-kv-${run.run_id}`}
                         className={cn(
-                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                           SUITE_BADGE_CLASSES.kv,
                         )}
                       >
@@ -240,7 +244,7 @@ export function CollectiveXRunsTable({
                 </td>
                 <td className="px-3 py-1.5">
                   {run.covered_skus.length > 0
-                    ? run.covered_skus.map((sku) => sku.toUpperCase()).join(', ')
+                    ? [...new Set(run.covered_skus.map(collectiveXSkuLabel))].join(', ')
                     : '—'}
                 </td>
                 <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">

@@ -103,7 +103,7 @@ describe('official preview notices', () => {
     cy.get('[role="option"]').contains('Output Tokens').click();
     cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('contain.text', 'Vera Rubin');
     cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();
-    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
       .and('contain.text', 'Vera Rubin (July) results are an official preview')

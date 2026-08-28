@@ -49,7 +49,7 @@ import {
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 import { localePath } from '@/lib/i18n';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -364,7 +364,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   // The `c_mw` URL seed is read once here; the cost-target panel renders the
   // input and consumes the budget. The Fleet Lifecycle page shares the param.
-  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
+  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [barSelectionIntent, setBarSelectionIntent] = useState<{
     resultsKey: string;

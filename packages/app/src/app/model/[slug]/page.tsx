@@ -7,7 +7,9 @@ import 'katex/dist/katex.min.css';
 import { JsonLd } from '@/components/json-ld';
 import EmbeddedModelDashboard from '@/components/model/EmbeddedModelDashboard';
 import ModelArchitectureInline from '@/components/model/ModelArchitectureInline';
+import ModelDeveloperLogo from '@/components/model/ModelDeveloperLogo';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { compileBlogMdx } from '@/lib/blog-mdx';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { COMPARE_MODEL_ALIASES } from '@/lib/compare-slug';
@@ -105,7 +107,12 @@ export default async function ModelPage({ params }: Props) {
                 Model
               </Link>
             </p>
-            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
+            <div className="flex items-center gap-3">
+              <ModelDeveloperLogo developer={meta.developer} className="size-8 lg:size-10" />
+              <Heading as="h1" level="page">
+                {meta.title}
+              </Heading>
+            </div>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.description}</p>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
               <span>{meta.developer}</span>

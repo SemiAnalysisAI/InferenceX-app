@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -46,6 +47,7 @@ import {
 } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
+import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -461,6 +463,7 @@ const ScatterGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
 
@@ -1889,8 +1892,10 @@ const ScatterGraph = React.memo(
               btnEvent.stopPropagation();
               // Full-document navigation: stamp the chart state onto THIS
               // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults.
-              rememberChartStateInUrl();
+              // rebuilds from defaults. Skipped in ephemeral scopes (/model
+              // embeds): the store holds the primary dashboard's state there,
+              // not this chart's.
+              if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
@@ -2257,6 +2262,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-hw-key',
+            iconFor: (label) => getLineLabelVendorIcon(label.seriesId),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
@@ -3671,7 +3677,6 @@ const ScatterGraph = React.memo(
                   },
                 },
               ]}
-              precisionIndicators={selectedPrecisions}
               hideAtomFootnote
               enableTooltips={true}
             />

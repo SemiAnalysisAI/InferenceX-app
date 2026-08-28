@@ -7,21 +7,11 @@ describe('Chinese (/zh) pages', () => {
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
-      cy.contains('h2', '探索 InferenceX').should('exist');
       // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
       // landing-page.tsx; the card and its Chinese strings still exist in the
       // source, so assert it is not rendered rather than dropping the check.
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
-    });
-
-    it('links to the Chinese overview and full dashboard', () => {
-      cy.get('[data-testid="landing-overview-link"]')
-        .should('have.attr', 'href', '/zh/overview')
-        .and('have.text', '总览');
-      cy.get('[data-testid="landing-full-dashboard-link"]')
-        .should('have.attr', 'href', '/zh/inference')
-        .and('have.text', '查看完整仪表板');
     });
 
     it('sets hreflang alternates to the English homepage', () => {
@@ -46,6 +36,10 @@ describe('Chinese (/zh) pages', () => {
           .should('contain.text', '总览')
           .and('have.attr', 'href', '/zh/overview');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
+        // Ledger NEW pills localize to 新 on the Chinese landing page.
+        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
+          .should('have.length', 6)
+          .each(($badge) => expect($badge.text()).to.equal('新'));
       });
     });
 
@@ -71,9 +65,7 @@ describe('Chinese (/zh) pages', () => {
         'href',
         '/zh/land-acknowledgement',
       );
-      cy.get('[data-testid="footer-link-zh"]')
-        .should('contain.text', 'English')
-        .and('have.attr', 'href', '/');
+      cy.get('[data-testid="footer-link-zh"]').should('not.exist');
     });
   });
 

@@ -211,7 +211,7 @@ export function QuickFiltersDialog({
             {t.title}
             {selectedCount > 0 && (
               <span
-                className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+                className="rounded-full bg-brand/10 px-2 py-0.5 text-2xs font-medium text-brand"
                 data-testid="quick-filters-selected-count"
               >
                 {selectedCount} {t.selected}
@@ -226,7 +226,7 @@ export function QuickFiltersDialog({
             <section className="flex items-center justify-between gap-3 px-3 py-3">
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground">{t.bestPerSku}</h3>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/70">{t.bestPerSkuHint}</p>
+                <p className="mt-0.5 text-2xs text-muted-foreground/70">{t.bestPerSkuHint}</p>
               </div>
               <Switch
                 data-testid="quick-filter-best-per-sku"

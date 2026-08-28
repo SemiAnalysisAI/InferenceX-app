@@ -417,7 +417,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
           <h2 className="text-sm font-semibold text-foreground">{t.title}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
         </div>
-        <span className="shrink-0 rounded-full border border-border/60 bg-background px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 rounded-full border border-border/60 bg-background px-2.5 py-0.5 font-mono text-2xs tabular-nums text-muted-foreground">
           {formatter.format(files.length)} {files.length === 1 ? t.fileOne : t.fileMany}
         </span>
       </header>
@@ -511,7 +511,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground">{t.searchHint}</p>
+        <p className="text-2xs text-muted-foreground">{t.searchHint}</p>
 
         {searchTerm && searchQuery.isError ? (
           <p className="text-xs text-destructive" role="alert">
@@ -521,7 +521,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         {searchTerm && searchQuery.data ? (
           <div className="grid gap-1.5 pt-1" data-testid="server-log-search-results">
             <p
-              className="font-mono text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase"
+              className="font-mono text-3xs font-semibold tracking-eyebrow text-muted-foreground uppercase"
               aria-live="polite"
             >
               {searchQuery.data.truncated ? `${t.firstMatches} ` : ''}
@@ -541,7 +541,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               >
                 {searchQuery.data.matches.map((result) => (
                   <article key={`${result.fileName}:${result.offset}`} className="grid gap-1.5 p-3">
-                    <div className="flex min-w-0 items-center gap-3 font-mono text-[11px]">
+                    <div className="flex min-w-0 items-center gap-3 font-mono text-2xs">
                       <span className="min-w-0 truncate text-zinc-300" title={result.fileName}>
                         <FilePath path={result.fileName} className="[&>span]:text-zinc-500" />
                       </span>
@@ -552,7 +552,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-6 shrink-0 gap-1 px-2 text-[11px] text-amber-200/90 hover:bg-amber-300/10 hover:text-amber-100"
+                        className="h-6 shrink-0 gap-1 px-2 text-2xs text-amber-200/90 hover:bg-amber-300/10 hover:text-amber-100"
                         onClick={() => goToSearchMatch(result)}
                         data-testid="go-to-server-log-match"
                       >
@@ -620,7 +620,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       </pre>
 
       <footer className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span className="font-mono text-[11px] tabular-nums">
+        <span className="font-mono text-2xs tabular-nums">
           {formatter.format(log.length)} {t.loadedCharacters}
         </span>
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -647,7 +647,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               {query.isFetchingNextPage ? t.loadingMore : t.loadMore}
             </Button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="inline-flex items-center gap-1.5 font-mono text-2xs">
               <Check className="size-3.5 text-emerald-500" aria-hidden="true" />
               {t.endOfLog}
             </span>

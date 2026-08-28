@@ -123,6 +123,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'MiniMax M2.7',
   },
   {
+    slug: 'qwen-3-8-flash-next',
+    displayName: 'Qwen3.8-Flash-Next',
+    dbKeys: ['qwen3.8next'],
+    // 176B total: a 125B main model plus a 51B n-gram embedding table, with 6B
+    // active per forward pass (MoE). The 4B MTP head sits outside that total.
+    label: 'Qwen 3.8 Flash Next 176B-A6B',
+    seoName: 'Qwen3.8-Flash-Next',
+  },
+  {
     slug: 'qwen-3-5',
     displayName: 'Qwen-3.5-397B-A17B',
     dbKeys: ['qwen3.5'],

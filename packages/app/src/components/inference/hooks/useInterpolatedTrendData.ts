@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
+import type {
+  InferenceData,
+  TokenRevenuePricing,
+  TrendDataPoint,
+  YAxisMetricKey,
+} from '@/components/inference/types';
+import {
+  applyTokenRevenuePricing,
+  NORMALIZED_TOKEN_REVENUE_PRICING,
+} from '@/components/inference/token-revenue';
 import {
   isBenchmarkMetricKey,
   resolveMetricConfigKey,
@@ -37,6 +46,7 @@ export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: s
 export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
+  tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
@@ -49,7 +59,7 @@ export function rowToLightweightPoint(
       : entry;
   if (!isKnownGpu(hwKey)) return null;
 
-  return {
+  const point = {
     x: row.metrics.median_intvty ?? 0,
     y: row.metrics.tput_per_gpu ?? 0,
     hwKey,
@@ -57,8 +67,19 @@ export function rowToLightweightPoint(
     tp: row.decode_tp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
+    tput_per_gpu: entry.tput_per_gpu,
+    input_tput_per_gpu: entry.input_tput_per_gpu,
+    output_tput_per_gpu: entry.output_tput_per_gpu,
+    isl: entry.isl,
+    osl: entry.osl,
+    total_prompt_tokens: entry.total_prompt_tokens,
+    total_generation_tokens: entry.total_generation_tokens,
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
+
+  return requestedMetrics.includes('tokenRevenuePerGpuHour')
+    ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]!
+    : point;
 }
 
 /**
@@ -90,12 +111,13 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
 };
 
 /**
- * Purchasing-power metrics mapped to the throughput they scale. Their Pareto
- * knots must come from this throughput too: choosing the total-throughput
- * frontier for output/input tokens can select a different serving envelope
- * from the corresponding tokens-per-dollar chart.
+ * Business metrics mapped to the throughput they scale. When the multiplier is
+ * constant, interpolation preserves that identity. OpenRouter revenue can use
+ * a point-specific input/output mix; in that case multiplier recovery fails
+ * safely and the metric itself is splined on the total-throughput frontier.
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  tokenRevenuePerGpuHour: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
   tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',
@@ -163,8 +185,8 @@ export function interpolateMetricAtInteractivity(
 ): number | null {
   if (points.length === 0) return null;
 
-  // Tokens/$ uses the corresponding total/output/input throughput frontier so
-  // its knots exactly match the throughput/interactivity serving envelope.
+  // Proportional business metrics use the corresponding total/output/input
+  // throughput frontier so their knots exactly match the serving envelope.
   const proportionalThroughputKey = PROPORTIONAL_TO_THROUGHPUT[metricKey];
   const frontierThroughputKey = proportionalThroughputKey ?? 'tpPerGpu';
   for (const point of points) {
@@ -206,9 +228,10 @@ export function interpolateMetricAtInteractivity(
     metricYs.push(v);
   }
 
-  // Tokens/$ is `throughput * 3600 / hourlyCost`. Spline the matching
-  // throughput and apply that constant multiplier so the purchasing-power
-  // curve cannot drift from its throughput/interactivity Pareto curve.
+  // When a business metric is a fixed multiple of throughput, spline the
+  // matching throughput and apply that multiplier so the derived curve cannot
+  // drift from its throughput/interactivity Pareto curve. OpenRouter revenue
+  // falls through to a direct metric spline when the token mix varies by point.
   if (proportionalThroughputKey) {
     const tputYs = sorted.map((p) => extractMetric(p, proportionalThroughputKey)!);
     const multiplier = recoverProportionalMultiplier(metricYs, tputYs);
@@ -262,6 +285,7 @@ interface UseInterpolatedTrendDataParams {
   selectedYAxisMetric: string;
   targetInteractivity: number;
   availableDates: string[];
+  tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
 }
 
@@ -285,6 +309,7 @@ export function useInterpolatedTrendData({
   selectedPrecisions,
   selectedYAxisMetric,
   targetInteractivity,
+  tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
@@ -309,7 +334,7 @@ export function useInterpolatedTrendData({
       if (!selectedPrecisions.includes(row.precision)) continue;
       if (!rowSupportsTrendMetric(row, selectedYAxisMetric)) continue;
 
-      const point = rowToLightweightPoint(row, requestedMetrics);
+      const point = rowToLightweightPoint(row, requestedMetrics, tokenRevenuePricing);
       if (!point) continue;
 
       const curveDate = benchmarkCurveDate(row);
@@ -331,7 +356,7 @@ export function useInterpolatedTrendData({
     }
 
     return result;
-  }, [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric]);
+  }, [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric, tokenRevenuePricing]);
 
   // Interpolation memo — instant when slider moves or metric changes
   const { trendLines, hwKeysWithData } = useMemo(() => {

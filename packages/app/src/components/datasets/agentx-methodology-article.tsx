@@ -513,7 +513,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
         >
           {locale === 'zh' ? '← 返回 AgentX' : '← Back to AgentX'}
         </AgentXMethodologyLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
           {t.eyebrow}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">

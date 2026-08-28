@@ -2,17 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chartPoints,
+  collectiveXCaseLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
+  collectiveXSkuLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
   metricValue,
+  normalizeCollectiveXSku,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
   collectiveXKvChartPoints,
+  collectiveXKvFrontierPoints,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
 } from './data';
@@ -39,15 +43,21 @@ describe('collectiveXTopologyLabel', () => {
 });
 
 describe('collectiveXSeriesLabel', () => {
+  it('normalizes runner-pool suffixes in known SKU labels', () => {
+    expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
+    expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
+    expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
+    expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
+  });
+
   it('renders the varying identity axes of a series', () => {
-    expect(collectiveXSeriesLabel(scaleUp)).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
-    );
+    expect(collectiveXSeriesLabel(scaleUp)).toBe('H200 · deepep-v2 · EP8 · normal · decode · bf16');
   });
 
   it('distinguishes the dispatch precision', () => {
     expect(collectiveXSeriesLabel(makeCollectiveXSeries({ precision: 'fp8' }))).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · fp8',
+      'H200 · deepep-v2 · EP8 · normal · decode · fp8',
     );
   });
 
@@ -58,14 +68,14 @@ describe('collectiveXSeriesLabel', () => {
   it('includes the run id for namespaced multi-run series', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXSeriesLabel(runSeries)).toBe(
-      '#30165164821 · H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+      '#30165164821 · H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 
   it('keeps run ids out of the configuration label used by the legend', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXLegendLabel(runSeries)).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+      'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 });
@@ -108,6 +118,12 @@ describe('collectiveXColorKey', () => {
     const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
     const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
     expect(collectiveXColorKey(first)).toBe(collectiveXColorKey(second));
+  });
+
+  it('assigns the same hardware color across runner-pool SKU suffixes', () => {
+    const nscale = makeCollectiveXSeries({ sku: 'b200-nscale' });
+    const dgxc = makeCollectiveXSeries({ sku: 'b200-dgxc' });
+    expect(collectiveXColorKey(nscale)).toBe(collectiveXColorKey(dgxc));
   });
 });
 
@@ -292,6 +308,8 @@ describe('chartPoints', () => {
   });
 });
 
+const p95 = (value: number) => ({ p50: value, p95: value, min: value, max: value, n: 24 });
+
 const kvRow = ({
   latency_p50,
   ...overrides
@@ -422,5 +440,72 @@ describe('collectiveXKvChartPoints', () => {
       pageTokens: 64,
     });
     expect(points).toEqual([]);
+  });
+
+  describe('collectiveXKvFrontierPoints', () => {
+    const selection = { op: 'pull', pageTokens: 64 } as const;
+
+    it('plots aggregate GB/s against p95 per in-flight request at the largest ISL', () => {
+      const points = collectiveXKvFrontierPoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 5, latency_ms: p95(2) },
+            { isl: 32768, batch: 1, gbps_p50: 7.5, latency_ms: p95(24) },
+            { isl: 32768, batch: 16, gbps_p50: 30, latency_ms: p95(96) },
+            { isl: 32768, batch: 16, op: 'push', gbps_p50: 99, latency_ms: p95(1) },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [7.5, 24],
+        [30, 6],
+      ]);
+      expect(points[0].sku).toBe('gb200');
+    });
+
+    it('fades within-series dominated points and keeps the ladder frontier', () => {
+      const points = collectiveXKvFrontierPoints(
+        [
+          kase([
+            // batch 4 beats batch 1 on both axes; batch 16 trades latency for rate.
+            { batch: 1, gbps_p50: 7.5, latency_ms: p95(26) },
+            { batch: 4, gbps_p50: 20, latency_ms: p95(40) },
+            { batch: 16, gbps_p50: 30, latency_ms: p95(320) },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([false, true, true]);
+    });
+
+    it('rings only the SKU-wide frontier across backends of the same SKU', () => {
+      const points = collectiveXKvFrontierPoints(
+        [
+          kase([{ batch: 1, gbps_p50: 20, latency_ms: p95(10) }]),
+          kase([{ batch: 1, gbps_p50: 8, latency_ms: p95(30) }], {
+            case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+            backend: 'mooncake',
+          }),
+        ],
+        selection,
+      );
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, true]);
+      expect(points.map((point) => point.onSkuFrontier)).toEqual([true, false]);
+    });
+
+    it('never lets one SKU dominate another', () => {
+      const points = collectiveXKvFrontierPoints(
+        [
+          kase([{ batch: 1, gbps_p50: 20, latency_ms: p95(10) }]),
+          kase([{ batch: 1, gbps_p50: 8, latency_ms: p95(30) }], {
+            case_id: 'h200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+            sku: 'h200',
+          }),
+        ],
+        selection,
+      );
+      expect(points.map((point) => point.onSkuFrontier)).toEqual([true, true]);
+    });
   });
 });

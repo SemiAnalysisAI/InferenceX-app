@@ -74,6 +74,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
+  it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
+  });
+
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');
@@ -82,9 +87,13 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.r_active).toBe('');
   });
 
-  it('has empty string defaults for calculator fleet-planner params', async () => {
-    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.c_mw).toBe('');
+  it('keeps the fleet defaults aligned with URL-state stripping', async () => {
+    const { DEFAULT_FLEET_MW, DEFAULT_LIFECYCLE_RAMP_MONTHS, PARAM_DEFAULTS } =
+      await import('@/lib/url-state');
+    expect(DEFAULT_FLEET_MW).toBe('10');
+    expect(DEFAULT_LIFECYCLE_RAMP_MONTHS).toBe('0.5');
+    expect(PARAM_DEFAULTS.c_mw).toBe(DEFAULT_FLEET_MW);
+    expect(PARAM_DEFAULTS.c_ramp).toBe(DEFAULT_LIFECYCLE_RAMP_MONTHS);
     expect(PARAM_DEFAULTS.c_costcap).toBe('');
   });
 });
@@ -114,6 +123,12 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.i_gradlabel).toBe('0');
     expect(params.i_advlabel).toBe('1');
+  });
+
+  it('reads the token-revenue price source from the URL', async () => {
+    setupWindow('?i_revenue=openrouter');
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().i_revenue).toBe('openrouter');
   });
 
   it('returns empty object when no URL params exist', async () => {
@@ -295,6 +310,18 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(url).not.toContain('g_model');
   });
 
+  it('removes the revenue source instead of emitting an empty query param off-metric', async () => {
+    setupWindow('?i_revenue=openrouter', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    // InferenceContext writes the default source when token revenue is not the
+    // active metric, which must clear stale state without serializing i_revenue=.
+    writeUrlParams({ i_revenue: 'normalized' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).not.toContain('i_revenue');
+  });
+
   it('removes params with undefined value', async () => {
     setupWindow('?g_model=custom', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
@@ -453,7 +480,7 @@ describe('buildShareUrl tab filtering', () => {
       g_model: 'x',
       i_seq: 'y',
       i_pctl: 'p75',
-      c_mw: '10',
+      c_mw: '20',
       c_costcap: '0.5',
       r_range: 'last-7-days',
     });
@@ -463,7 +490,7 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).toContain('g_model=x');
     expect(url).toContain('i_seq=y');
     expect(url).toContain('i_pctl=p75');
-    expect(url).toContain('c_mw=10');
+    expect(url).toContain('c_mw=20');
     expect(url).toContain('c_costcap=0.5');
     expect(url).not.toContain('r_range');
   });

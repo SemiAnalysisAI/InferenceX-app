@@ -2,30 +2,50 @@ import { ArrowRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
+import { NewBadge } from '@/components/ui/new-badge';
 import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
+
+/**
+ * Full-color brand marks for the ledger rows, sharing the `*-color.svg`
+ * assets used by `/model` pages and inference chart captions. Keyed by
+ * compare slug so a featured model without a registered mark simply renders
+ * without one instead of breaking the row.
+ */
+const MODEL_LOGOS: Record<string, string> = {
+  'kimi-k3': '/logos/kimi-color.svg',
+  'deepseek-v4': '/logos/deepseek-color.svg',
+  // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
+  // mark rather than the Zhipu corporate dot cluster.
+  'glm-5-2': '/logos/zai-color.svg',
+  'minimax-m3': '/logos/minimax-color.svg',
+  'qwen-3-8-flash-next': '/logos/qwen-color.svg',
+  'qwen-3-5': '/logos/qwen-color.svg',
+};
 
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
     title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
+      'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv7/v8 & Rubin NVL72 & MI455X UALoE72',
     overview: 'Overview',
     dashboard: 'Full dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
+    newModel: 'NEW',
   },
   zh: {
     eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
-      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
+      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv7/v8、Rubin NVL72 与 MI455X UALoE72。',
     overview: '总览',
     dashboard: '查看完整仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
+    newModel: '新',
   },
 } as const;
 
@@ -52,14 +72,14 @@ export function AgentXCompareHero({
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
           <div className="flex flex-col justify-center px-6 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               {t.eyebrow}
             </p>
             {/* `relative` anchors the splash, which positions itself absolutely
                 at the top right. Landing only: /compare is not the launch
                 surface, and the announcement belongs on the front page. */}
             <div className="relative">
-              <Heading className="mt-3 max-w-2xl text-[1.5rem]/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
               </Heading>
               {surface === 'landing' && <MinecraftSplash />}
@@ -109,12 +129,26 @@ export function AgentXCompareHero({
                   appNavigation
                   className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                      {model.label}
-                    </span>
-                    <span className="mt-1 block font-mono text-[10px] tracking-[0.14em] text-brand uppercase">
-                      AgentX
+                  <span className="flex min-w-0 items-center gap-3">
+                    {MODEL_LOGOS[model.slug] && (
+                      <img
+                        src={MODEL_LOGOS[model.slug]}
+                        alt=""
+                        aria-hidden="true"
+                        width={32}
+                        height={32}
+                        loading="lazy"
+                        className="size-8 shrink-0 object-contain"
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                        <span className="min-w-0">{model.label}</span>
+                        <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                      </span>
+                      <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                        AgentX
+                      </span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">

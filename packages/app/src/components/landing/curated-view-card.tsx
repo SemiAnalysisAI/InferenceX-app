@@ -38,7 +38,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
         <h3 className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200">
           <span className="align-middle">{title}</span>
           {isNew && (
-            <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+            <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-3xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
               New
             </span>
           )}
@@ -53,7 +53,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
           <Badge
             key={tag}
             variant="outline"
-            className="text-[10px] px-2 py-0.5 leading-tight border-border/60 text-muted-foreground group-hover:border-brand/30 group-hover:text-foreground/80 transition-colors duration-200"
+            className="text-3xs px-2 py-0.5 leading-tight border-border/60 text-muted-foreground group-hover:border-brand/30 group-hover:text-foreground/80 transition-colors duration-200"
           >
             {tag}
           </Badge>

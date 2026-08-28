@@ -266,6 +266,21 @@ function yScaleRange(scale: (value: number) => number): [number, number] | null 
     : null;
 }
 
+/** Full-color icon rendered on a white chip at the left edge of a pill. */
+export interface LineLabelIconSpec {
+  href: string;
+  width: number;
+  height: number;
+}
+
+/** Gap between the icon and the label text. */
+const ICON_TEXT_GAP = 4;
+
+/** Horizontal space an icon occupies to the left of the label text. */
+function iconSpace(icon: LineLabelIconSpec | undefined): number {
+  return icon ? icon.width + ICON_TEXT_GAP : 0;
+}
+
 export function renderLineLabels(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   labels: readonly LineLabelPlacement[],
@@ -274,6 +289,8 @@ export function renderLineLabels(
     opacity?: number;
     offsetX?: number;
     offsetY?: number;
+    /** Optional full-color icon (e.g. vendor mark) per label. */
+    iconFor?: (label: LineLabelPlacement) => LineLabelIconSpec | undefined;
     configureText?: (
       text: d3.Selection<SVGTextElement, LineLabelPlacement, null, undefined>,
       label: LineLabelPlacement,
@@ -320,6 +337,11 @@ export function renderLineLabels(
     const labelGroup = d3.select<SVGGElement, LineLabelPlacement>(this);
     options.configureGroup?.(labelGroup, label);
     const text = labelGroup.select<SVGTextElement>('.ll-text');
+    // Shift the text right to leave room for the icon chip; the background
+    // sizing pass below expands the pill back over that space.
+    const space = iconSpace(options.iconFor?.(label));
+    if (space > 0) text.attr('x', space);
+    else text.attr('x', null);
     if (options.configureText) options.configureText(text, label);
     else text.text(label.label);
   });
@@ -330,13 +352,30 @@ export function renderLineLabels(
     if (text) measured.push({ node: this, label, bbox: text.getBBox() });
   });
   for (const { node, label, bbox } of measured) {
-    d3.select(node)
+    const labelGroup = d3.select(node);
+    const icon = options.iconFor?.(label);
+    const space = iconSpace(icon);
+    labelGroup
       .select('.ll-bg')
-      .attr('x', bbox.x - 5)
+      .attr('x', bbox.x - space - 5)
       .attr('y', bbox.y - 3)
-      .attr('width', bbox.width + 10)
+      .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
       .attr('fill', label.color);
+
+    // Full-color mark drawn directly on the pill — transparent background, so
+    // the icon shares the label's own fill shade (including gradient fills).
+    labelGroup
+      .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')
+      .data(icon ? [icon] : [])
+      .join('image')
+      .attr('class', 'll-logo')
+      .attr('href', (d) => d.href)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .attr('x', bbox.x - space)
+      .attr('y', (d) => bbox.y + bbox.height / 2 - d.height / 2)
+      .attr('width', (d) => d.width)
+      .attr('height', (d) => d.height);
   }
 }
 

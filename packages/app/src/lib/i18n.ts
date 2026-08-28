@@ -58,6 +58,8 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/glossary' },
   { path: '/chips' },
   { path: '/agentx' },
+  { path: '/rankings' },
+  { path: '/run' },
 ];
 
 export function hasZhSibling(enPathname: string): boolean {

@@ -65,8 +65,15 @@ export const OVERVIEW_DEFAULT_ROW_SCOPE: OverviewRowScope = 'all';
 export type OverviewHardwareRowScope = 'priced' | 'all';
 export const OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE: OverviewHardwareRowScope = 'all';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
-/** Row order within a model: the single-turn workload first, AgentX below it. */
+/** Canonical scenario list. Its order decides headline selection on stat-led
+ *  surfaces (single-turn first), NOT matrix row order — the matrix groups
+ *  AgentX rows first via OVERVIEW_SCENARIO_ROW_ORDER below. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
+/** Matrix display order: the AgentX rows lead and the fixed-sequence 8K/1K
+ *  rows follow, so the workload the overview headlines is not buried under
+ *  legacy single-turn rows. Deliberately separate from OVERVIEW_SCENARIOS so
+ *  /run and /rankings keep quoting single-turn where it exists. */
+export const OVERVIEW_SCENARIO_ROW_ORDER = ['agentx', 'single_turn_8k1k'] as const;
 
 export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
@@ -118,7 +125,9 @@ export function resolveOverviewHardwareRowScope(
 
 // Note (wenyao): row order is a contract — defaults, then maintenance, then
 // deprecated, each in MODEL_CONFIG declaration order; the overview e2e asserts
-// inactive rows always sit below the default rows.
+// inactive rows always sit below the default rows. Within each category band
+// the matrix additionally groups AgentX rows above 8K/1K rows (see
+// sortOverviewSummaries), which never reorders across bands.
 export function overviewModelsForScope(scope: OverviewModelScope): Model[] {
   return scope === 'all'
     ? [...DEFAULT_MODELS, ...MAINTENANCE_MODELS, ...DEPRECATED_MODELS]
@@ -333,7 +342,9 @@ export function overviewScenarioForModel(
     return 'single_turn_8k1k';
   }
   if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
-  return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
+  return model === Model.Kimi_K3 || model === Model.GLM_5_2 || model === Model.Qwen3_8_Flash_Next
+    ? 'agentx'
+    : 'single_turn_8k1k';
 }
 
 /**
@@ -348,6 +359,7 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],
+  [Model.Qwen3_8_Flash_Next]: ['agentx'],
 };
 
 /** The scenarios this model gets a row for. Unlisted models keep the single
@@ -362,6 +374,24 @@ export function overviewScenariosForModel(
     : // Normalized through OVERVIEW_SCENARIOS so row order stays single-turn
       // first however an entry above happens to be written.
       OVERVIEW_SCENARIOS.filter((scenario) => curated.includes(scenario));
+}
+
+/**
+ * The single scenario a stat-led SEO surface quotes for a model: the first
+ * curated scenario that actually has rows, then the first curated scenario.
+ * Keeps /run and /rankings from headlining a workload the overview matrix
+ * does not show for the model (Kimi K3 and GLM 5.2 stay on AgentX even when
+ * single-turn rows exist).
+ */
+export function overviewHeadlineScenarioForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario {
+  const scenarios = overviewScenariosForModel(model, rows);
+  return (
+    scenarios.find((scenario) => rows.some((row) => overviewScenarioOfRow(row) === scenario)) ??
+    scenarios[0]
+  );
 }
 
 function overviewEngineRows(
@@ -795,11 +825,53 @@ export function buildOverviewModelSummary(
   };
 }
 
-/** DEFAULT_MODELS fixes the row order, and a model benchmarked on both
- *  scenarios contributes one row per scenario; a rowless model still renders
- *  all platforms with missing reasons. Live and fixture paths both feed this.
- *  Scenario presence reads the unscoped rows so switching the engine scope
- *  changes cell contents, never the shape of the matrix. */
+/**
+ * Tier reads for one hardware SKU without the OVERVIEW_HARDWARE restriction.
+ * Same config building and read selection as the overview matrix, so a /run
+ * page for H100-class hardware quotes the number the overview would show if
+ * its matrix listed that SKU.
+ */
+export function overviewHardwareTierReader(
+  model: Model,
+  rows: BenchmarkRow[],
+  scenario: OverviewScenario = overviewScenarioForModel(model, rows),
+  engineScope: OverviewEngineScope = 'community',
+): (
+  hardware: string,
+  tier: OverviewTier,
+) => { read: OverviewTierRead; costPerMtok: number | null } {
+  const scopedRows = overviewEngineRows(rows, engineScope);
+  const scenarioRows = overviewScenarioRows(scenario, scopedRows);
+  const configs = buildConfigs(model, scenario, scenarioRows);
+  return (hardware, tier) => {
+    const read = selectPlatformRead(configs, hardware, tier);
+    return { read, costPerMtok: overviewCostPerMtok(hardware, read.value) };
+  };
+}
+
+const overviewCategoryRank = (category: CategoryTag): number =>
+  category === 'default' ? 0 : category === 'maintenance' ? 1 : 2;
+const overviewScenarioRank = (scenario: OverviewScenario): number =>
+  OVERVIEW_SCENARIO_ROW_ORDER.indexOf(scenario);
+
+/** Category bands stay in place (defaults, then maintenance, then deprecated)
+ *  while AgentX rows lead within each band — 8K/1K rows follow — and each
+ *  (band, scenario) group keeps MODEL_CONFIG declaration order. The sort is
+ *  stable, so ties never shuffle. */
+function sortOverviewSummaries(summaries: OverviewModelSummary[]): OverviewModelSummary[] {
+  return summaries.toSorted(
+    (a, b) =>
+      overviewCategoryRank(a.category) - overviewCategoryRank(b.category) ||
+      overviewScenarioRank(a.scenario) - overviewScenarioRank(b.scenario),
+  );
+}
+
+/** DEFAULT_MODELS fixes the row order within each (category, scenario) group,
+ *  AgentX rows sit above 8K/1K rows (see sortOverviewSummaries), and a model
+ *  benchmarked on both scenarios contributes one row per scenario; a rowless
+ *  model still renders all platforms with missing reasons. Live and fixture
+ *  paths both feed this. Scenario presence reads the unscoped rows so switching
+ *  the engine scope changes cell contents, never the shape of the matrix. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -812,9 +884,11 @@ export function assembleOverviewPageData(
     rows: rowsByModel[model] ?? [],
   }));
   return {
-    models: perModel.flatMap(({ model, rows }) =>
-      overviewScenariosForModel(model, rows).map((scenario) =>
-        buildOverviewModelSummary(model, rows, tier, engineScope, scenario, referenceHardware),
+    models: sortOverviewSummaries(
+      perModel.flatMap(({ model, rows }) =>
+        overviewScenariosForModel(model, rows).map((scenario) =>
+          buildOverviewModelSummary(model, rows, tier, engineScope, scenario, referenceHardware),
+        ),
       ),
     ),
     tier,

@@ -11,6 +11,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   gptoss120b: 'gpt-oss-120b',
   llama70b: 'Llama-3.3-70B-Instruct-FP8',
   'qwen3.5': 'Qwen-3.5-397B-A17B',
+  // Qwen4-architecture preview, not a Qwen3.5 point release (GatedDeltaNet plus
+  // Qwen Sparse Attention, 512 experts), so it gets its own display bucket.
+  'qwen3.8next': 'Qwen3.8-Flash-Next',
   'kimik2.5': 'Kimi-K2.5',
   'kimik2.6': 'Kimi-K2.5',
   'kimik2.7-code': 'Kimi-K2.5',
@@ -140,6 +143,13 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // Qwen/Qwen3.5-397B-A17B on 2026-02-16 — the same day InferenceX first swept
   // it. sweep: 2026-02-16 — day zero.
   'Qwen-3.5-397B-A17B': '2026-02-16',
+  // Qwen announced the open-sourcing of Qwen3.8-Flash-Next and its FP8 sibling
+  // for 23:00 Beijing time on 2026-08-26, which is also the day the SGLang
+  // bring-up image tag was published. Some coverage puts the Hugging Face repo
+  // live on 08-24; the announced date is the one used here, and either way it
+  // precedes the first sweep on 08-27. The model card itself states no date.
+  // sweep: 2026-08-27 — day zero.
+  'Qwen3.8-Flash-Next': '2026-08-26',
   // Bucket covers M2.5 and M2.7, so the date is M2.5's: announced 2026-02-12
   // with weights on Hugging Face, architecturally unchanged from M2 (230B/10B).
   // Was 2025-10-25, which is M2's launch, not M2.5's — `model-architectures.ts`

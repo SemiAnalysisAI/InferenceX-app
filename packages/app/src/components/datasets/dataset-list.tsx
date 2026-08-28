@@ -53,7 +53,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
       <Card className="h-full p-4 transition-colors hover:border-primary/40">
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <h3 className="text-base font-semibold text-foreground">{d.label}</h3>
-          <span className="rounded-full border border-border/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="rounded-full border border-border/50 px-2 py-0.5 text-3xs uppercase tracking-wide text-muted-foreground">
             {d.variant}
           </span>
         </div>

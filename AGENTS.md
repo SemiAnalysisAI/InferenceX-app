@@ -127,6 +127,7 @@ Static content routes (no DB):
 - **Linter**: oxlint — `bun run lint` / `bun run lint:fix`
 - **Formatter**: oxfmt — `bun run fmt` / `bun run fmt:fix`
 - **Type checking**: `bun run typecheck` (tsc --noEmit, strict mode)
+- **Typography gate**: `bun run check:typography` (CI + pre-commit) — no new arbitrary font sizes (`text-[11px]`) or letter-spacing (`tracking-[0.16em]`) in class strings, and no quoted font-size literals in `src/lib/d3-chart/`. Use `text-2xs`/`text-3xs`, `tracking-eyebrow`/`tracking-eyebrow-wide`/`tracking-heading`, the `<Heading>`/`<Eyebrow>` components, or `CHART_TYPE` from `@/lib/d3-chart/typography` (chart font sizes must stay in TS — CSS variables don't survive PNG export). Existing offenders live in `packages/app/scripts/typography-allowlist.json` and migrate on touch. See [Typography](./docs/typography.md).
 - **Node**: 24.x
 
 ## Environment Variables
@@ -225,6 +226,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 | Kimi-K2.6              | 1T    | 32B         | `moonshotai/Kimi-K2.6`              | HF model card                      |
 | Kimi-K2.7-Code         | 1T    | 32B         | `moonshotai/Kimi-K2.7-Code`         | HF model card                      |
 | Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
+| Qwen3.8-Flash-Next     | 176B  | 6B          | `Qwen/Qwen3.8-Flash-Next-FP8`       | HF model card                      |
 | GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
 | GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
 | MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
@@ -234,6 +236,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 **Common mislabel traps** (have all bitten this repo at least once — do not repeat):
 
+- **Qwen3.8-Flash-Next is 176B, not 125B.** The model card leads with "125B with 6B activated", but that is the main model only; the 51B n-gram embedding table brings the total to 176B. The separate 4B MTP head sits outside both figures. It is a Qwen4-architecture preview (GatedDeltaNet + Qwen Sparse Attention, 512 experts, 10 routed + 1 shared), not a Qwen3.5 point release, so it gets its own DB bucket.
 - **GLM-5 ≠ 355B.** 355B is GLM-4.5. GLM-5 jumped to 744B / 40B active (256-expert MoE with DSA).
 - **MiniMax-M2.5/M2.7 ≠ 456B.** 456B is the older MiniMax-Text-01 / M1 (32 large experts). The M2 series is a different architecture: 230B / 10B active, 256 small experts.
 - **DeepSeek-R1 is 671B, not 685B.** HF metadata shows 685B because the bundled MTP head adds ~14B; the core MoE is 671B / 37B active.

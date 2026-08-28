@@ -1,5 +1,7 @@
 import * as d3 from 'd3';
 
+import { CHART_TYPE, px } from '../typography';
+
 export interface RadarConfig<T = any> {
   /** Labels for each axis spoke. */
   axes: { label: string; unit?: string }[];
@@ -95,7 +97,7 @@ export function renderRadar<T>(
     .attr('class', 'radar-grid-label')
     .attr('x', 4)
     .attr('y', (d) => -rPerLevel * d + 4)
-    .attr('font-size', '9px')
+    .attr('font-size', px(CHART_TYPE.micro))
     .attr('fill', 'var(--border)')
     .attr('opacity', 0.6)
     .text((d) => `${Math.round((d / levels) * 100)}%`);
@@ -130,7 +132,7 @@ export function renderRadar<T>(
       return cos > 0 ? 'start' : 'end';
     })
     .attr('dominant-baseline', 'central')
-    .attr('font-size', '10px')
+    .attr('font-size', px(CHART_TYPE.dataLabel))
     .attr('font-weight', '500')
     .attr('fill', 'var(--foreground)')
     .text((d) => d.label);

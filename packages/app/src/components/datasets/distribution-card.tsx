@@ -120,7 +120,7 @@ export function DistributionCard({
       <div className="mb-0.5 flex items-baseline justify-between gap-2">
         <span className="text-sm font-medium text-foreground">{title}</span>
         {scale === 'log' && (
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="text-3xs uppercase tracking-wide text-muted-foreground">
             {t.logScale}
           </span>
         )}

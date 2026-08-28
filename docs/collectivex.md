@@ -95,6 +95,8 @@ visible legend labels while retaining them in the legend item's accessible title
 The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
 cannot blank the initial explorer. Deletion is available per row or as one confirmed action for all
 currently shown runs; both paths keep the same tombstone semantics described above.
+The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
+both appears under both filters, and changing the filter does not alter the checked-run selection.
 
 ## The raw-rows exception
 

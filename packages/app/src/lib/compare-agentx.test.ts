@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentxDashboardHref,
+  AGENTX_NEW_MODEL_DISPLAY_NAMES,
   comparisonPairHref,
   comparisonScenarioForModel,
   FEATURED_AGENTX_MODELS,
@@ -16,23 +17,31 @@ describe('AgentX comparison links', () => {
       'glm-5-2',
       'minimax-m3',
       'qwen-3-5',
+      'qwen-3-8-flash-next',
     ]);
   });
 
-  it('opens the selected model subroute directly in the Agentic Traces scenario', () => {
-    expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
-      '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1',
-    );
-    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[1])).toBe(
-      '/zh/inference/deepseek-v4?i_seq=agentic-traces&i_optimal=1',
+  it('marks exactly the featured models as NEW for the dashboard selector', () => {
+    expect(AGENTX_NEW_MODEL_DISPLAY_NAMES).toEqual(
+      new Set([
+        'Kimi-K3',
+        'DeepSeek-V4-Pro',
+        'GLM-5.2',
+        'MiniMax-M3',
+        'Qwen-3.5-397B-A17B',
+        'Qwen3.8-Flash-Next',
+      ]),
     );
   });
 
-  it('routes every featured model to a registered inference page', () => {
+  it('opens the bare model subroute — Agentic + Optimal Only are already the defaults', () => {
+    expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe('/inference/kimi-k3');
+    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[1])).toBe('/zh/inference/deepseek-v4');
+  });
+
+  it('routes every featured model to a registered inference page without query params', () => {
     for (const model of FEATURED_AGENTX_MODELS) {
-      expect(agentxDashboardHref('en', model)).toBe(
-        `/inference/${model.slug}?i_seq=agentic-traces&i_optimal=1`,
-      );
+      expect(agentxDashboardHref('en', model)).toBe(`/inference/${model.slug}`);
     }
   });
 

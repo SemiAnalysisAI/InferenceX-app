@@ -35,6 +35,7 @@ import type {
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
@@ -53,11 +54,18 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING, Sequence, sequenceKind } from '@/lib/data-mappings';
+import {
+  getOpenRouterModelId,
+  MODEL_PREFIX_MAPPING,
+  Sequence,
+  sequenceKind,
+} from '@/lib/data-mappings';
+import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -347,6 +355,26 @@ export function InferenceProvider({
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
+  const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
+    () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
+  );
+  const openRouterModelId = getOpenRouterModelId(selectedModel);
+  const openRouterPricingQuery = useOpenRouterPricing(
+    openRouterModelId,
+    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && tokenRevenuePriceSource === 'openrouter',
+  );
+  const tokenRevenuePricing =
+    tokenRevenuePriceSource === 'normalized'
+      ? NORMALIZED_TOKEN_REVENUE_PRICING
+      : (openRouterPricingQuery.data ?? null);
+  const openRouterPricingError =
+    tokenRevenuePriceSource === 'openrouter'
+      ? openRouterModelId
+        ? openRouterPricingQuery.error instanceof Error
+          ? openRouterPricingQuery.error.message
+          : null
+        : 'No OpenRouter model mapping is configured.'
+      : null;
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
   );
@@ -614,6 +642,8 @@ export function InferenceProvider({
     selectedDateRange,
     userCosts,
     userPowers,
+    tokenRevenuePricing,
+    tokenRevenuePriceSource,
     effectiveRunDate,
     // Gate benchmark fetching on sequenceResolved: before availability loads we
     // don't yet know the model's real sequence, and the selection (e.g. an
@@ -878,7 +908,11 @@ export function InferenceProvider({
   // the gated benchmark query never produces rows and `chartDataLoading` would
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
-  const loading = availabilityError ? false : chartDataLoading;
+  const openRouterPricingLoading =
+    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+    tokenRevenuePriceSource === 'openrouter' &&
+    openRouterPricingQuery.isLoading;
+  const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1413,6 +1447,8 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_revenue:
+        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1440,6 +1476,7 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
@@ -1659,6 +1696,11 @@ export function InferenceProvider({
   const displayValue = useMemo<InferenceDisplayContextType>(
     () => ({
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1676,6 +1718,11 @@ export function InferenceProvider({
     }),
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1707,6 +1754,7 @@ export function InferenceProvider({
     setSelectedSequence: setSelectedSequenceAndClear,
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+    setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
