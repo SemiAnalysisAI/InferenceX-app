@@ -146,7 +146,11 @@ describe('Chinese (/zh) pages', () => {
 
       cy.contains('h1', '404 - 页面不存在').should('be.visible');
       cy.contains('找不到该页面。').should('be.visible');
-      cy.get('a[href="/zh"]').should('have.text', '返回首页');
+      // The shared header also links to /zh (brand + Home nav) on zh pages,
+      // so target the 404 CTA by test id instead of matching every /zh link.
+      cy.get('[data-testid="not-found-home"]')
+        .should('have.text', '返回首页')
+        .and('have.attr', 'href', '/zh');
       cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
       cy.get('link[rel="canonical"]').should('not.exist');
       cy.get('link[rel="alternate"][hreflang]').should('not.exist');
