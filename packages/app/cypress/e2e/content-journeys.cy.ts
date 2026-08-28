@@ -1,6 +1,6 @@
 const CONTENT_SITE_URL = 'https://inferencex.semianalysis.com';
-const BLOG_POST_COUNT = 19;
-const GLOSSARY_ENTRY_COUNT = 54;
+const BLOG_POST_COUNT = 31;
+const GLOSSARY_ENTRY_COUNT = 118;
 
 const BLOG_JOURNEY_MATRIX = [
   { basePath: '/blog', detailPrefix: '/blog/', alternateLocale: 'zh-CN', width: 1440 },

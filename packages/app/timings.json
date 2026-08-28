@@ -45,10 +45,6 @@
       "duration": 3125
     },
     {
-      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
-      "duration": 18000
-    },
-    {
       "spec": "cypress/e2e/calculator-overlay.cy.ts",
       "duration": 9124
     },
@@ -89,6 +85,10 @@
       "duration": 1597
     },
     {
+      "spec": "cypress/e2e/content-journeys.cy.ts",
+      "duration": 150000
+    },
+    {
       "spec": "cypress/e2e/csv-export-overlay.cy.ts",
       "duration": 1116
     },
@@ -123,6 +123,10 @@
     {
       "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
       "duration": 1528
+    },
+    {
+      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
+      "duration": 18000
     },
     {
       "spec": "cypress/e2e/gpu-compare-agentic-detail.cy.ts",

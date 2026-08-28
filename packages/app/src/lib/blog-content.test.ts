@@ -79,8 +79,8 @@ function inlineCodeSpans(raw: string): string[] {
   );
 }
 
-it('checks all 19 current locale pairs in both directions', () => {
-  expect(enFiles).toHaveLength(19);
+it('checks all 31 current locale pairs in both directions', () => {
+  expect(enFiles).toHaveLength(31);
   expect(zhFiles).toEqual(enFiles);
 });
 
