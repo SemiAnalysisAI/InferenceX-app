@@ -27,6 +27,7 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { exportToCsv } from '@/lib/csv-export';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
 import {
   getModelLabel,
@@ -343,7 +344,7 @@ const DEFAULTS = {
    * and Anthropic both publish, and the order of magnitude the others sit at.
    * An assumption like the rest; the cached *fraction* it applies to is measured.
    */
-  cachedInputPct: 10,
+  cachedInputPct: DEFAULT_CACHED_INPUT_PRICE_RATIO * 100,
   /**
    * An output token sells for four times an input one until the user says
    * otherwise — DeepSeek's own published API pricing is $0.27 / $1.10, and the

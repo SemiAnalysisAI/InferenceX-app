@@ -167,27 +167,39 @@ at every interpolated point.
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page also exposes tokens-per-dollar and normalized token revenue
-as separate Y-axis metrics; neither replaces the cost-per-million metrics.
-Historical trends for these proportional metrics select Pareto knots from the
-matching throughput, spline that throughput, and apply the constant multiplier.
-Tokens-per-dollar uses `3600 / $/GPU-hr`; normalized token revenue uses
-`3600 / 1,000,000` at the axis's explicit `$1/M tok` sale price. Reusing the
-matching throughput frontier is essential: total-throughput knots are not
-necessarily the output- or input-throughput Pareto knots.
+The `/inference` page also exposes tokens-per-dollar and token revenue as
+separate Y-axis metrics; neither replaces the cost-per-million metrics.
+Historical tokens-per-dollar trends select Pareto knots from the matching
+throughput, spline that throughput, and apply the constant `3600 / $/GPU-hr`
+multiplier. Revenue selects the total-throughput Pareto knots, interpolates their
+throughput, token mix, and cache hit independently, and then applies the selected
+prices. Reusing the matching frontier remains essential: total-throughput knots
+are not necessarily the output- or input-throughput Pareto knots.
 
-The revenue axis defaults to pricing every input and output token at the same
-`$1/M tok` rate, making it a model-independent SLA comparison. Its OpenRouter
-option fetches the selected model's current public prompt/completion prices from
-`https://openrouter.ai/api/v1/models` and prices the streams separately. Aggregate
-rows use their measured input/output split. Disaggregated rows cannot use the raw
-per-prefill/per-decode rates together, so they apply the fixed ISL:OSL shape or
-the measured agentic prompt:generation mix to total tok/s/GPU. The OpenRouter
-option uses standard prompt/completion prices and does not apply cache discounts.
+The revenue axis defaults to normalized cache-aware pricing: uncached input and
+output are `$1/M tok`, while cached input is `$0.10/M tok`, matching Fleet
+Lifecycle's default cache-read assumption. Its OpenRouter option fetches the
+selected model's current public prompt/completion/cache-read prices from
+`https://openrouter.ai/api/v1/models`; when the catalog omits a cache-read price,
+the same 10%-of-input fallback is used and the resulting price is printed in the
+plot subtitle. Aggregate rows use their measured input/output split.
+Disaggregated rows cannot use the raw per-prefill/per-decode rates together, so
+they apply the fixed ISL:OSL shape or the measured agentic prompt:generation mix
+to total tok/s/GPU.
+
+Agentic points use the same measured cache-tier rule as Fleet Lifecycle: GPU plus
+external when the external metric is present, otherwise GPU plus CPU, clamped to
+`[0,1]`. Missing cache telemetry bills the input stream at the uncached price.
+Historical Trends uses the same component-wise calculation as Fleet Lifecycle:
+it splines total throughput, input-token share, and measured cache hit separately
+on the total-throughput frontier, clamps each to its measured range, and only then
+applies the selected prices. A frontier with cache telemetry on only some knots
+opts out of the cache discount instead of inventing zero-hit measurements.
 
 Neither mode is the fleet lifecycle section's realized-revenue model: it does not
-model availability, rollout, or a user-supplied cached-input discount. Those
-business assumptions remain in Fleet Lifecycle below.
+model availability or rollout, and its cached price comes from the selected price
+source rather than Fleet Lifecycle's user-editable assumption. Those business
+assumptions remain in Fleet Lifecycle below.
 
 ### The consistency guard
 
@@ -854,8 +866,8 @@ Three properties are worth stating, because they are what make this safe:
 - **A partly-measured frontier opts out.** `interpolateForGPU` splines the rate
   only when _every_ frontier point carries one; substituting 0 for the missing
   points would invent a dip in the cached fraction and overstate the billable
-  rate. Opting out bills every input token at full price instead — wrong in the
-  direction that understates margin.
+  rate. Opting out bills every input token at full price instead, which
+  overstates revenue and margin when the missing point actually had cache hits.
 
 `cacheReadRatio` is the one user input here, labelled `Cached input (% of price)`
 and defaulting to 10% (the ratio DeepSeek and Anthropic both publish). The cached
@@ -879,7 +891,7 @@ The middle two rows carry the decision. Where an external rate is reported,
 adding CPU on top breaches the ceiling 56 times out of 106 — the router-side
 external figure already contains the offload tier, so summing double-counts it.
 Where no external rate is reported the CPU tier is real and disjoint: 0 breaches
-across all 26, every one of them an offload-on row. Hence `cacheHitRateOf` adds
+across all 26, every one of them an offload-on row. Hence `measuredCacheHitRate` adds
 external when present and CPU only in its absence.
 
 Dropping the CPU tier outright, which this did until 2026-08-19, understated the

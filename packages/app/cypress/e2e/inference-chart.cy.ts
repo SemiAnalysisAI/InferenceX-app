@@ -84,6 +84,7 @@ describe('Inference Chart', () => {
             id: 'deepseek/deepseek-v4-pro-0813',
             pricing: {
               prompt: '0.000001122',
+              input_cache_read: '0.00000008',
               completion: '0.000003366',
             },
           },
@@ -112,12 +113,16 @@ describe('Inference Chart', () => {
       'OpenRouter current pricing',
     );
     cy.get('[data-testid="openrouter-price-summary"]')
-      .should('contain.text', 'Input $1.122/M tok')
+      .should('contain.text', 'Uncached input $1.122/M tok')
+      .and('contain.text', 'Cached input $0.08/M tok')
       .and('contain.text', 'Output $3.366/M tok');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should('have.text', 'Input $1.122/M tok · Output $3.366/M tok')
+      .should(
+        'have.text',
+        'Uncached input $1.122/M tok · Cached input $0.08/M tok · Output $3.366/M tok',
+      )
       .then(($prices) => {
         const subtitle = $prices.parent().text();
         expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('Updated:'));
@@ -156,6 +161,7 @@ describe('Inference Chart', () => {
             id: 'deepseek/deepseek-v4-pro-0813',
             pricing: {
               prompt: '0.000001122',
+              input_cache_read: '0.00000008',
               completion: '0.000003366',
             },
           },
@@ -178,12 +184,16 @@ describe('Inference Chart', () => {
       'OpenRouter 当前价格',
     );
     cy.get('[data-testid="openrouter-price-summary"]')
-      .should('contain.text', '输入 $1.122/百万 token')
+      .should('contain.text', '未缓存输入 $1.122/百万 token')
+      .and('contain.text', '缓存输入 $0.08/百万 token')
       .and('contain.text', '输出 $3.366/百万 token');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should('have.text', '输入 $1.122/百万 token · 输出 $3.366/百万 token')
+      .should(
+        'have.text',
+        '未缓存输入 $1.122/百万 token · 缓存输入 $0.08/百万 token · 输出 $3.366/百万 token',
+      )
       .then(($prices) => {
         const subtitle = $prices.parent().text();
         expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('更新时间：'));

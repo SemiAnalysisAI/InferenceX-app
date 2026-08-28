@@ -22,13 +22,12 @@ export interface GPUDataPoint {
   inputThroughput: number; // input tokens/sec/gpu
   /**
    * Fraction of this config's input tokens served from cache rather than
-   * prefilled — `server_gpu_cache_hit_rate + server_external_cache_hit_rate`,
-   * clamped to [0,1].
+   * prefilled — GPU plus external when external is reported, otherwise GPU plus
+   * CPU, clamped to [0,1].
    *
-   * Summed because the two are disjoint in the measured data: across the
-   * production rows carrying both, the sum never exceeds 1 and never exceeds
-   * `theoretical_cache_hit_rate`. Clamped anyway — the GPU figure alone reaches
-   * 1.185 on some rows.
+   * External already contains the CPU/offload tier on rows that report both, so
+   * CPU is used only in external's absence. Clamped because the GPU figure alone
+   * reaches 1.185 on some rows.
    *
    * Undefined for fixed sequences, which carry neither metric on any row. That
    * absence is what makes cached-input billing a no-op outside agentic traces.

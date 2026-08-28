@@ -10,7 +10,11 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import { applyTokenRevenuePricing, formatTokenPrice } from '@/components/inference/token-revenue';
+import {
+  applyTokenRevenuePricing,
+  cachedInputPricePerMillion,
+  formatTokenPrice,
+} from '@/components/inference/token-revenue';
 import {
   useInferenceActions,
   useInferenceData,
@@ -106,8 +110,10 @@ const STRINGS = {
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `Input $${input}/M tok · Output $${output}/M tok`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `Input $${input}/M tok · Output $${output}/M tok`
+        : `Uncached input $${input}/M tok · Cached input $${cached}/M tok · Output $${output}/M tok`,
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
@@ -126,8 +132,10 @@ const STRINGS = {
     table: '表格',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `输入 $${input}/百万 token · 输出 $${output}/百万 token`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
+        : `未缓存输入 $${input}/百万 token · 缓存输入 $${cached}/百万 token · 输出 $${output}/百万 token`,
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
@@ -983,6 +991,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                   <span data-testid="token-revenue-subtitle-prices">
                                     {t.revenuePrices(
                                       formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                      graph.sequence === Sequence.AgenticTraces
+                                        ? formatTokenPrice(
+                                            cachedInputPricePerMillion(tokenRevenuePricing),
+                                          )
+                                        : null,
                                       formatTokenPrice(tokenRevenuePricing.outputPerMillion),
                                     )}
                                   </span>

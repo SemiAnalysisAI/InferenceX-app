@@ -108,16 +108,19 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
     description: {
       en:
         'Gross token revenue a GPU could earn per hour at this operating point. The normalized ' +
-        'source prices every input and output token at $1 per million; the OpenRouter source uses ' +
-        "the selected model's current public input and output prices. This turns the " +
+        'source prices uncached input and output at $1 per million and cached input at $0.10 per ' +
+        'million. The OpenRouter source uses the selected model’s current public prices, with a ' +
+        '10%-of-input fallback when no cache-read price is published. Agentic cache shares are ' +
+        'measured per operating point. This turns the ' +
         'throughput/interactivity tradeoff into a business-facing SLA curve.',
       zh:
-        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式将输入和输出 token 均按每百万 1 美元计价；' +
-        'OpenRouter 模式采用所选模型当前公开的输入和输出价格。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
+        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式下，未缓存输入和输出均按每百万 1 美元计价，' +
+        '缓存输入按每百万 0.10 美元计价。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。' +
+        'Agentic 场景的缓存占比来自各运行点的实测数据。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
     },
     formula: {
-      en: '$/GPU/hr = total tok/s/GPU × (input share × input $/M + output share × output $/M) × 3,600 ÷ 1,000,000',
-      zh: '$/GPU/hr = 总 tok/s/GPU ×（输入占比 × 输入 $/百万 + 输出占比 × 输出 $/百万）× 3,600 ÷ 1,000,000',
+      en: '$/GPU/hr = (uncached input × input price + cached input × cache-read price + output × output price) per GPU-second, scaled to one hour',
+      zh: '$/GPU/hr = 每 GPU 秒的（未缓存输入 × 输入价格 + 缓存输入 × 缓存读取价格 + 输出 × 输出价格），再换算为一小时',
     },
   };
 }

@@ -207,6 +207,8 @@ export interface AggDataEntry {
   router_version?: string;
   /** Actual server-observed GPU prefix-cache hit rate (0..1). */
   server_gpu_cache_hit_rate?: number;
+  /** Actual server-observed external/router prefix-cache hit rate (0..1). */
+  server_external_cache_hit_rate?: number;
   /** Actual server-observed CPU prefix-cache hit rate (0..1). */
   server_cpu_cache_hit_rate?: number;
   /** Infinite-cache theoretical hit rate (0..1) computed from trace. */
@@ -274,7 +276,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerGpu: { y: number; roof: boolean };
   outputTputPerGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
-  /** Gross token revenue using the selected normalized or OpenRouter prices. */
+  /** Cache-aware gross token revenue using normalized or OpenRouter prices. */
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
@@ -353,8 +355,10 @@ export type TokenRevenuePriceSource = 'normalized' | 'openrouter';
 
 export interface TokenRevenuePricing {
   source: TokenRevenuePriceSource;
-  /** Published or assumed input-token sale price, $/M tok. */
+  /** Published or assumed fresh input-token sale price, $/M tok. */
   inputPerMillion: number;
+  /** Published or assumed cached input-token sale price, $/M tok. */
+  cachedInputPerMillion?: number;
   /** Published or assumed output-token sale price, $/M tok. */
   outputPerMillion: number;
   /** Exact OpenRouter catalog id when `source` is `openrouter`. */

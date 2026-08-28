@@ -545,11 +545,12 @@ export function useChartData(
                 }
               : {
                   y_tokenRevenuePerGpuHour_label:
-                    'Token Revenue per GPU Hour at $1/M tok ($/GPU/hr)',
+                    'Token Revenue per GPU Hour at Normalized Pricing ($/GPU/hr)',
                   y_tokenRevenuePerGpuHour_labelZh:
-                    '按 $1/百万 token 计价的每 GPU 小时 token 收入（$/GPU/hr）',
-                  y_tokenRevenuePerGpuHour_title: 'Token Revenue per GPU Hour at $1/M tok',
-                  y_tokenRevenuePerGpuHour_titleZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+                    '按标准化价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;

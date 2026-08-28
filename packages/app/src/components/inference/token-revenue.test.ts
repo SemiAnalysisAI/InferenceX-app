@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { InferenceData, TokenRevenuePricing } from './types';
 import {
   applyTokenRevenuePricing,
+  cachedInputPricePerMillion,
   formatTokenPrice,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
   tokenRevenuePerGpuHour,
+  tokenRevenueFromRatesPerGpuHour,
 } from './token-revenue';
 
 function point(overrides: Partial<InferenceData> = {}): InferenceData {
@@ -49,6 +51,56 @@ describe('token revenue', () => {
 
   it('keeps the normalized $1/M axis equal to million total tokens per GPU hour', () => {
     expect(tokenRevenuePerGpuHour(point(), NORMALIZED_TOKEN_REVENUE_PRICING)).toBe(7.2);
+  });
+
+  it('prices measured Agentic cache hits at the separate cached-input price', () => {
+    const agentic = point({
+      tput_per_gpu: 1_000,
+      input_tput_per_gpu: 800,
+      output_tput_per_gpu: 200,
+      server_gpu_cache_hit_rate: 0.8,
+      server_external_cache_hit_rate: 0.1,
+      // External already contains this offload tier, so it must not be added.
+      server_cpu_cache_hit_rate: 0.05,
+    });
+    const pricing: TokenRevenuePricing = {
+      source: 'openrouter',
+      inputPerMillion: 2,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 10,
+    };
+
+    // 80 fresh input tok/s at $2/M, 720 cached at $0.2/M, 200 output at $10/M.
+    expect(tokenRevenuePerGpuHour(agentic, pricing)).toBeCloseTo(8.2944, 10);
+  });
+
+  it('applies cache pricing to the normalized source too', () => {
+    const agentic = point({
+      tput_per_gpu: 1_000,
+      input_tput_per_gpu: 800,
+      output_tput_per_gpu: 200,
+      server_gpu_cache_hit_rate: 0.9,
+    });
+
+    expect(tokenRevenuePerGpuHour(agentic, NORMALIZED_TOKEN_REVENUE_PRICING)).toBeCloseTo(
+      1.2672,
+      10,
+    );
+  });
+
+  it('falls back to 10% of fresh-input price when no cached price is supplied', () => {
+    expect(cachedInputPricePerMillion(openRouterPricing)).toBe(0.2);
+  });
+
+  it('prices pre-interpolated throughput, token share, and cache hit', () => {
+    expect(
+      tokenRevenueFromRatesPerGpuHour(1_000, 0.8, 0.9, {
+        source: 'openrouter',
+        inputPerMillion: 2,
+        cachedInputPerMillion: 0.2,
+        outputPerMillion: 10,
+      }),
+    ).toBeCloseTo(8.2944, 10);
   });
 
   it('prices compatible aggregate input and output rates separately', () => {

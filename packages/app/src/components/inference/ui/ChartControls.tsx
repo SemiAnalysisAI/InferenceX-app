@@ -33,7 +33,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
-import { formatTokenPrice } from '@/components/inference/token-revenue';
+import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
@@ -63,13 +63,15 @@ const STRINGS = {
     dateRangePlaceholder: 'Select date range',
     revenuePriceSource: 'Revenue Price Source',
     revenuePriceSourceTooltip:
-      'Choose the token sale prices used for revenue. Normalized prices input and output at $1/M tok. OpenRouter reads the selected model’s current public input and output prices.',
-    normalizedPrice: 'Normalized ($1/M input + output)',
+      'Choose the token sale prices used for revenue. For Agentic traces, measured cache hits use a separate cached-input price. Normalized pricing uses $1/M uncached input and output plus $0.10/M cached input. OpenRouter uses the selected model’s current public prices, falling back to 10% of its input price when no cache-read price is published.',
+    normalizedPrice: 'Normalized ($1/M uncached + output, $0.10/M cached)',
     openRouterPrice: 'OpenRouter current pricing',
     openRouterLoading: 'Loading OpenRouter pricing…',
     openRouterUnavailable: 'OpenRouter pricing is unavailable for this model.',
-    openRouterSummary: (input: string, output: string) =>
-      `Input $${input}/M tok · Output $${output}/M tok`,
+    openRouterSummary: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `Input $${input}/M tok · Output $${output}/M tok`
+        : `Uncached input $${input}/M tok · Cached input $${cached}/M tok · Output $${output}/M tok`,
     viewOpenRouter: 'View OpenRouter pricing',
   },
   zh: {
@@ -94,13 +96,15 @@ const STRINGS = {
     dateRangePlaceholder: '选择日期范围',
     revenuePriceSource: '收入计价来源',
     revenuePriceSourceTooltip:
-      '选择计算 token 收入所用的售价。标准化模式将输入和输出 token 均按 $1/百万计价；OpenRouter 模式读取所选模型当前公开的输入和输出价格。',
-    normalizedPrice: '标准化（输入和输出均为 $1/百万）',
+      '选择计算 token 收入所用的售价。Agentic trace 按实测缓存命中率采用单独的缓存输入价格。标准化模式下，未缓存输入和输出均为 $1/百万，缓存输入为 $0.10/百万。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。',
+    normalizedPrice: '标准化（未缓存输入和输出 $1/百万，缓存输入 $0.10/百万）',
     openRouterPrice: 'OpenRouter 当前价格',
     openRouterLoading: '正在加载 OpenRouter 价格…',
     openRouterUnavailable: 'OpenRouter 暂无该模型的价格。',
-    openRouterSummary: (input: string, output: string) =>
-      `输入 $${input}/百万 token · 输出 $${output}/百万 token`,
+    openRouterSummary: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
+        : `未缓存输入 $${input}/百万 token · 缓存输入 $${cached}/百万 token · 输出 $${output}/百万 token`,
     viewOpenRouter: '查看 OpenRouter 定价',
   },
 } as const;
@@ -392,6 +396,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                       ? t.openRouterUnavailable
                       : t.openRouterSummary(
                           formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                          selectedSequence === Sequence.AgenticTraces
+                            ? formatTokenPrice(cachedInputPricePerMillion(tokenRevenuePricing))
+                            : null,
                           formatTokenPrice(tokenRevenuePricing.outputPerMillion),
                         )}{' '}
                   {openRouterModelId && (

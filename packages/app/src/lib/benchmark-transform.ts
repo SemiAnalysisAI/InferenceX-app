@@ -277,6 +277,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     router_name: stringMetric('router_name'),
     router_version: stringMetric('router_version'),
     server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+    server_external_cache_hit_rate: m.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
     num_requests_total: m.num_requests_total,
