@@ -102,13 +102,16 @@ describe('Inference Replay', () => {
             .invoke('text')
             .then((startDate) => {
               cy.get('[data-testid="replay-play-pause"]').click();
-              cy.wait(800);
-              cy.get('[data-testid="replay-play-pause"]').click();
-              cy.get('[data-testid="replay-scrubber"]')
+              // Poll for the first frame advance instead of racing it with a
+              // fixed wait: under forced reduced motion (the chromium e2e
+              // launch flag) playback steps discretely at 1.2s per date, so
+              // any fixed wait shorter than one step fails deterministically.
+              cy.get('[data-testid="replay-scrubber"]', { timeout: 10_000 })
                 .invoke('val')
                 .should((endVal) => {
                   expect(Number(endVal)).to.be.greaterThan(Number(startVal));
                 });
+              cy.get('[data-testid="replay-play-pause"]').click();
               cy.get('[data-testid="replay-date-overlay"]')
                 .invoke('text')
                 .should((endDate) => {

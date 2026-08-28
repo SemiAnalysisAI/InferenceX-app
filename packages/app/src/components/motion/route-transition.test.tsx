@@ -7,7 +7,6 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import {
   CompareDetailRouteSkeleton,
   CompareRouteSkeleton,
-  DashboardRouteSkeleton,
 } from '@/components/motion/route-skeletons';
 
 let container: HTMLDivElement;
@@ -45,9 +44,9 @@ describe('RouteTransition', () => {
 });
 
 describe('route skeletons', () => {
-  it('renders the dashboard fallback with a reserved chart area', () => {
+  it('renders the compare detail fallback with a reserved chart area', () => {
     act(() => {
-      root.render(<DashboardRouteSkeleton />);
+      root.render(<CompareDetailRouteSkeleton />);
     });
     const skeleton = container.querySelector('[data-testid="route-skeleton"]');
     expect(skeleton).not.toBeNull();
