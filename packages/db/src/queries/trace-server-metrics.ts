@@ -86,8 +86,8 @@ export interface TraceServerMetrics {
   queueDepth: QueueDepthPoint[];
   /**
    * Per-source prompt-token counts over time (counter rate per scrape).
-   * Keyed by the value of the `source` label (typically `local_cache_hit`,
-   * `external_cache_hit`, `miss`, etc.). Plot as stacked area.
+   * Fresh prefill is combined with physical cache-tier hits when the producer
+   * exposes them; older rows retain their logical cache-hit buckets.
    */
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
   /** Prefill throughput: vllm:prompt_tokens rate (tokens/sec) per scrape. */

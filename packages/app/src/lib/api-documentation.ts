@@ -2408,8 +2408,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回点元数据，以及缓存使用率、队列深度、预填充和解码吞吐、提示 token 来源的图表聚合时间序列。metricSources 仅包含来源描述信息；详情页只会在用户选中某个来源时加载其专属数组。',
+      'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. When vLLM exports physical cache-tier attribution, promptTokensBySource separates HBM, CPU, NVMe, and connector-defined hits while retaining fresh prefill; older rows keep the logical cache-hit fallback. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
+      '返回点元数据，以及 cache 使用率、队列深度、prefill 和 decode 吞吐、prompt token 来源的图表聚合时间序列。当 vLLM 导出物理 cache 层级归因时，promptTokensBySource 会区分 HBM、CPU、NVMe 和 connector 自定义命中来源，同时保留新计算的 prefill；旧数据继续使用逻辑 cache 命中回退。metricSources 仅包含来源描述信息；详情页只会在用户选中某个来源时加载其专属数组。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2463,7 +2463,11 @@ export const apiOperations: readonly ApiOperation[] = [
           kvCacheUsage: [{ t: 0, v: 0.44 }],
           prefixCacheHitRate: [],
           queueDepth: [],
-          promptTokensBySource: {},
+          promptTokensBySource: {
+            local_compute: [{ t: 0, value: 2200 }],
+            'cache hit (HBM)': [{ t: 0, value: 6800 }],
+            'cache hit (NVMe offload)': [{ t: 0, value: 1000 }],
+          },
           prefillTps: [],
           decodeTps: [],
           prefixCacheHitsTps: [],
