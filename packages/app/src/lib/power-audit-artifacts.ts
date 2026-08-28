@@ -46,10 +46,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+// Upper bound on plausible unix-second epochs (2100-01-01T00:00:00Z). Rejects
+// ms-scale and garbage values, and keeps bound*1000 inside Date's ±8.64e15 ms
+// representable range so the client can always ISO-format the window.
+const MAX_UNIX_SECONDS = 4_102_444_800;
+
 function windowFromUnixPair(start: unknown, end: unknown): PowerWindow | null {
   const startUnix = asFiniteNumber(start);
   const endUnix = asFiniteNumber(end);
   if (startUnix === null || endUnix === null) return null;
+  if (startUnix <= 0 || endUnix <= 0) return null;
+  if (startUnix > MAX_UNIX_SECONDS || endUnix > MAX_UNIX_SECONDS) return null;
   return { start_unix: startUnix, end_unix: endUnix };
 }
 
@@ -141,7 +148,9 @@ export function powerFromValidationSidecar(
       result.published = {
         avg_power_w: avgPowerW,
         avg_total_gpu_power_w: avgTotalGpuPowerW,
-        power_metric_schema_version: asFiniteNumber(sidecar.schema_version),
+        // The sidecar's schema_version versions the sidecar itself, a
+        // different axis than the agg row's power_metric_schema_version.
+        power_metric_schema_version: null,
         source: 'validation_metrics',
       };
     }
@@ -195,7 +204,8 @@ export function selectValidationEntry(
   return null;
 }
 
-function hasContent(
+/** True when a mapped partial carries at least one power field. */
+export function hasPowerContent(
   partial: Partial<GpuArtifactPower> | null,
 ): partial is Partial<GpuArtifactPower> {
   return partial !== null && Object.keys(partial).length > 0;
@@ -212,7 +222,7 @@ export function mergeArtifactPower(
   fromSidecar: Partial<GpuArtifactPower> | null,
   sources: string[],
 ): GpuArtifactPower | null {
-  if (!hasContent(fromAgg) && !hasContent(fromSidecar)) return null;
+  if (!hasPowerContent(fromAgg) && !hasPowerContent(fromSidecar)) return null;
   const agg = fromAgg ?? {};
   const sidecar = fromSidecar ?? {};
 

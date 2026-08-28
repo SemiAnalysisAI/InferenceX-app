@@ -113,9 +113,10 @@ function drawMeasurementWindow(
   if (!aligned || width <= 0) return;
 
   const clampX = (x: number) => Math.max(0, Math.min(width, x));
-  const xStart = clampX(xScale(aligned.startSeconds));
-  const xEnd = clampX(xScale(aligned.endSeconds));
-  if (xEnd <= xStart) return;
+  const rawStart = xScale(aligned.startSeconds);
+  const rawEnd = xScale(aligned.endSeconds);
+  const xStart = clampX(rawStart);
+  const xEnd = clampX(rawEnd);
 
   const windowGroup = group
     .insert('g', ':first-child')
@@ -135,29 +136,30 @@ function drawMeasurementWindow(
       .text(text);
   };
 
+  const addDimRegion = (x0: number, x1: number, text: string) => {
+    windowGroup
+      .append('rect')
+      .attr('x', x0)
+      .attr('y', 0)
+      .attr('width', x1 - x0)
+      .attr('height', height)
+      .attr('fill', DIM_COLOR)
+      .attr('opacity', 0.05);
+    addRegionLabel(x0, x1, text, DIM_COLOR);
+  };
+
+  if (xEnd <= xStart) {
+    // Visible x-range lies wholly on one side of the window (deep zoom into
+    // warmup or post-benchmark): keep the dim overlay so the region is not
+    // mistaken for measured data.
+    if (rawEnd <= 0) addDimRegion(0, width, labels.after);
+    else if (rawStart >= width) addDimRegion(0, width, labels.warmup);
+    return;
+  }
+
   // Dimmed warmup/post regions outside the formal window
-  if (xStart > 0) {
-    windowGroup
-      .append('rect')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('width', xStart)
-      .attr('height', height)
-      .attr('fill', DIM_COLOR)
-      .attr('opacity', 0.05);
-    addRegionLabel(0, xStart, labels.warmup, DIM_COLOR);
-  }
-  if (xEnd < width) {
-    windowGroup
-      .append('rect')
-      .attr('x', xEnd)
-      .attr('y', 0)
-      .attr('width', width - xEnd)
-      .attr('height', height)
-      .attr('fill', DIM_COLOR)
-      .attr('opacity', 0.05);
-    addRegionLabel(xEnd, width, labels.after, DIM_COLOR);
-  }
+  if (xStart > 0) addDimRegion(0, xStart, labels.warmup);
+  if (xEnd < width) addDimRegion(xEnd, width, labels.after);
 
   // Measurement window band + dashed boundary lines
   windowGroup

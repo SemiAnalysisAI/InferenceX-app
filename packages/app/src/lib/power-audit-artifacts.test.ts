@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  hasPowerContent,
   mergeArtifactPower,
   powerFromAggRow,
   powerFromValidationSidecar,
@@ -108,6 +109,25 @@ describe('powerFromAggRow', () => {
   it('returns an empty partial for a row with no power fields', () => {
     expect(powerFromAggRow({ output_toks_per_sec: 1000 })).toEqual({});
   });
+
+  it('rejects implausible window epochs (garbage, ms-scale, non-positive)', () => {
+    // 1e16 s → new Date(1e19 ms) would throw RangeError in the client render.
+    expect(
+      powerFromAggRow({
+        power_audit: { window_start_unix: 1e16, window_end_unix: 1e16 + 60 },
+      }).window,
+    ).toBeUndefined();
+    expect(
+      powerFromAggRow({
+        power_audit: { window_start_unix: 1_755_000_020_000, window_end_unix: 1_755_000_080_000 },
+      }).window,
+    ).toBeUndefined();
+    expect(
+      powerFromAggRow({
+        power_audit: { window_start_unix: -5, window_end_unix: 1_755_000_080 },
+      }).window,
+    ).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -138,9 +158,19 @@ describe('powerFromValidationSidecar', () => {
     expect(result.published).toEqual({
       avg_power_w: 401.25,
       avg_total_gpu_power_w: 3210,
-      power_metric_schema_version: 1,
+      // The sidecar's own schema_version is a different versioning axis than
+      // the agg row's power_metric_schema_version — never mapped through.
+      power_metric_schema_version: null,
       source: 'validation_metrics',
     });
+  });
+
+  it('rejects implausible window epochs in the sidecar', () => {
+    expect(
+      powerFromValidationSidecar({
+        benchmark_window: { start_time_unix: 1_755_000_020_000, end_time_unix: 1_755_000_080_000 },
+      }).window,
+    ).toBeUndefined();
   });
 
   it('maps an invalid verdict with reasons', () => {
@@ -249,6 +279,19 @@ describe('selectValidationEntry', () => {
     expect(
       selectValidationEntry([{ entryName: `agg_${suffix}.json`, json: {} }], suffix),
     ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasPowerContent
+// ---------------------------------------------------------------------------
+
+describe('hasPowerContent', () => {
+  it('distinguishes empty partials from ones carrying a power field', () => {
+    expect(hasPowerContent(null)).toBe(false);
+    expect(hasPowerContent({})).toBe(false);
+    expect(hasPowerContent({ power_valid: 1 })).toBe(true);
+    expect(hasPowerContent(powerFromAggRow({ output_toks_per_sec: 1000 }))).toBe(false);
   });
 });
 

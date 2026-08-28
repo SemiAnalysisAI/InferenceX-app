@@ -56,7 +56,7 @@ export const apiRouteCatalog = [
     },
     // 2026-08: additive optional `power` block assembled from same-suffix
     // bmk_*/power_audit_* sibling artifacts; still a UI-only unstable shape.
-    sourceSha256: 'e2e860cca7365a49fa56e39657a2e7d272a061544415f3adcf445a5a24f94e3c',
+    sourceSha256: 'a752682622d9685ab7f76a1bd0d49d94df4dcc659fde36e62d56681f6146df7a',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
