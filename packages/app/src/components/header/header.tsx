@@ -254,7 +254,11 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
-            <CommandPalette />
+            {/* Hidden on ultra-narrow (<360px) viewports — the 320px header is
+                already at capacity (see the 320x700 component test). */}
+            <span className="hidden min-[360px]:flex">
+              <CommandPalette />
+            </span>
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>

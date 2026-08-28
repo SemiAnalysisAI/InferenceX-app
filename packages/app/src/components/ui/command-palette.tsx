@@ -233,9 +233,9 @@ export function CommandPalette() {
   const clampedIndex = Math.min(activeIndex, Math.max(0, flatEntries.length - 1));
 
   const scrollRowIntoView = (index: number) => {
-    listRef.current
-      ?.querySelector(`[data-palette-index="${index}"]`)
-      ?.scrollIntoView({ block: 'nearest' });
+    const row = listRef.current?.querySelector(`[data-palette-index="${index}"]`);
+    // scrollIntoView is missing from some DOM test environments.
+    if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' });
   };
 
   const moveActive = (delta: number) => {
