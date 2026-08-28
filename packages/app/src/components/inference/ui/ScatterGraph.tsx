@@ -3677,7 +3677,6 @@ const ScatterGraph = React.memo(
                   },
                 },
               ]}
-              precisionIndicators={selectedPrecisions}
               hideAtomFootnote
               enableTooltips={true}
             />

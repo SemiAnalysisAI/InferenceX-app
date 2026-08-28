@@ -416,7 +416,6 @@ export default function HistoricalTrendsDisplay() {
                         : []
                     }
                     enableTooltips={true}
-                    precisionIndicators={selectedPrecisions}
                   />
                 }
               />
