@@ -61,6 +61,14 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(explanation.description.en).toContain('OpenRouter');
     expect(explanation.description.zh).toContain('每百万 1 美元');
     expect(explanation.description.zh).toContain('OpenRouter');
+    expect(explanation.description.en).toContain(
+      'Agentic cache hit combines GPU and external cache',
+    );
+    expect(explanation.description.en).toContain('partially measured cache frontier');
+    expect(explanation.description.zh).toContain('缓存命中率由 GPU 与 external cache 相加');
+    expect(explanation.description.zh).toContain('缓存指标仅覆盖部分 frontier 数据点');
+    expect(explanation.description.en).not.toContain('—');
+    expect(explanation.description.zh).not.toContain('—');
     expect(explanation.formula.en).toContain('$/GPU/hr =');
   });
 });
