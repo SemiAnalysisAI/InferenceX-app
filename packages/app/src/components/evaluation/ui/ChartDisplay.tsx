@@ -72,10 +72,13 @@ export const EVALUATION_DISPLAY_STRINGS = {
 export function evaluationTableDisplayState({
   isEvaluationDataSettled,
   isEvaluationDataError,
+  hasDisplayData,
 }: {
   isEvaluationDataSettled: boolean;
   isEvaluationDataError: boolean;
+  hasDisplayData: boolean;
 }): 'loading' | 'ready' | 'error' {
+  if (hasDisplayData) return 'ready';
   if (isEvaluationDataError) return 'error';
   return isEvaluationDataSettled ? 'ready' : 'loading';
 }
@@ -111,6 +114,7 @@ export default function EvaluationChartDisplay() {
   const tableDisplayState = evaluationTableDisplayState({
     isEvaluationDataSettled,
     isEvaluationDataError,
+    hasDisplayData: tableData.length > 0,
   });
   const handleViewModeChange = (value: EvalViewMode) => {
     setViewMode(value);
@@ -208,7 +212,7 @@ export default function EvaluationChartDisplay() {
               testId="evaluation-query-error"
             />
           )}
-          {!isEvaluationDataError &&
+          {tableDisplayState !== 'error' &&
             (viewMode === 'table' ? (
               tableDisplayState === 'loading' ? (
                 <div

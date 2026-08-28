@@ -135,6 +135,15 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(container.textContent).not.toContain('Released by');
   });
 
+  it('localizes the inline architecture chrome and renderer', () => {
+    mocks.pathname.value = '/zh/model/deepseek-r1';
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    expect(container.textContent).toContain('模型架构');
+    expect(container.textContent).not.toContain('Model Architecture');
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
+  });
+
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
     render();
     expand();

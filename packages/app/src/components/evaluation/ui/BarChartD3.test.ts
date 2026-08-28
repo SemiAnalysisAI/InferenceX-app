@@ -121,7 +121,7 @@ describe('evaluation chart locale presentation', () => {
 });
 
 describe('evaluation chart blocking state', () => {
-  it('keeps valid chart data visible when only aggregate availability metadata failed', () => {
+  it('keeps valid official or unofficial chart data visible when either query failed', () => {
     expect(
       evaluationChartBlockingState({
         hasChartData: true,
@@ -131,6 +131,12 @@ describe('evaluation chart blocking state', () => {
     expect(
       evaluationChartBlockingState({
         hasChartData: true,
+        isEvaluationDataError: true,
+      }),
+    ).toBeNull();
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: false,
         isEvaluationDataError: true,
       }),
     ).toBe('data-error');

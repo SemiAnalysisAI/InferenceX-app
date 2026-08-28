@@ -86,6 +86,8 @@ function Probe() {
     { startDate: '', endDate: '' },
     null,
     null,
+    null,
+    'normalized',
   );
   return null;
 }

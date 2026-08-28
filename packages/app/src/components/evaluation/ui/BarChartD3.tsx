@@ -338,8 +338,9 @@ export function evaluationChartBlockingState({
   hasChartData: boolean;
   isEvaluationDataError: boolean;
 }): 'data-error' | 'empty' | null {
+  if (hasChartData) return null;
   if (isEvaluationDataError) return 'data-error';
-  return hasChartData ? null : 'empty';
+  return 'empty';
 }
 
 export function evaluationChartIsInitializing({

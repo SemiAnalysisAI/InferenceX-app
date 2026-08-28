@@ -242,7 +242,7 @@ export default function ModelArchitectureDiagram({
         data-testid="model-architecture-inline"
       >
         <div className="px-4 py-2 flex items-center gap-2">
-          <span className="text-sm font-medium">Model Architecture</span>
+          <span className="text-sm font-medium">{t.heading}</span>
           <Badge variant="outline" className="text-xs py-0">
             {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
           </Badge>
@@ -253,7 +253,7 @@ export default function ModelArchitectureDiagram({
             {formatParamCount(arch.totalParams)}
           </Badge>
         </div>
-        <ArchitectureContent key={model} model={model} arch={arch} isExpanded />
+        <ArchitectureContent key={model} model={model} arch={arch} isExpanded locale={locale} />
       </div>
     );
   }
