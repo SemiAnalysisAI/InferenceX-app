@@ -27,7 +27,12 @@ import {
   bulkUpsertAvailability,
   type BenchmarkPersistenceInput,
 } from './etl/benchmark-ingest';
-import { normalizePowerContractMetrics, scrubWithheldPowerMetrics } from './etl/benchmark-mapper';
+import {
+  extractPowerAudit,
+  extractPowerInvalidReasons,
+  normalizePowerContractMetrics,
+  scrubWithheldPowerMetrics,
+} from './etl/benchmark-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 
 const sql = createAdminSql({
@@ -180,6 +185,10 @@ interface SupplementalBmk {
   is_multinode?: boolean;
   prefill_num_workers?: number;
   decode_num_workers?: number;
+  /** Producer power-audit provenance (PLAN-06 contract), sibling to `metrics`
+   * like on artifact rows; narrowed by the shared extractors. */
+  power_invalid_reasons?: unknown;
+  power_audit?: unknown;
 }
 
 async function ingestSupplementalBmk(
@@ -271,6 +280,17 @@ async function ingestSupplementalBmk(
       // then strip withheld measurements when power_valid=0.
       normalizePowerContractMetrics(entry.metrics, entry.metrics);
       scrubWithheldPowerMetrics(entry.metrics);
+      // The provenance companions ride the entry itself (sibling to the flat
+      // numeric `metrics` record), but accept a nesting under `metrics` too —
+      // power_valid lives there in this format. Delete the keys from `metrics`
+      // either way so the structured companions never enter the persisted
+      // metrics jsonb (the NON_METRIC_KEYS guarantee on the mapper path).
+      const powerInvalidReasons = extractPowerInvalidReasons(
+        entry.power_invalid_reasons ?? entry.metrics.power_invalid_reasons,
+      );
+      const powerAudit = extractPowerAudit(entry.power_audit ?? entry.metrics.power_audit);
+      delete entry.metrics.power_invalid_reasons;
+      delete entry.metrics.power_audit;
 
       rows.push({
         configId,
@@ -282,6 +302,8 @@ async function ingestSupplementalBmk(
         image: entry.image,
         recipeFingerprint: null,
         metrics: entry.metrics,
+        powerInvalidReasons,
+        powerAudit,
       });
     }
 
