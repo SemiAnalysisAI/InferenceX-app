@@ -27,6 +27,7 @@ import { useLocale } from '@/lib/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
+import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXColorKey,
   collectiveXLegendLabel,
@@ -901,6 +902,7 @@ export default function CollectiveXDisplay() {
 
       {datasets.length > 0 && (
         <>
+          <CollectiveXSupportMatrices datasets={datasets} />
           {phaseSeries.length === 0 && (
             <Card data-testid="collectivex-empty-state" className="py-4">
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>

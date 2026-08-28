@@ -1,8 +1,9 @@
-import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
+import { GPU_KEYS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
+  CollectiveXDataset,
   CollectiveXKvCase,
   CollectiveXKvRow,
   CollectiveXMode,
@@ -21,6 +22,12 @@ export interface CollectiveXSeriesSelection {
   phase: CollectiveXPhase;
   modes: readonly CollectiveXMode[];
   precision: CollectiveXPrecision;
+}
+
+export interface CollectiveXSupportMatrixData {
+  skus: string[];
+  libraries: string[];
+  supportedByMode: Record<CollectiveXMode, ReadonlySet<string>>;
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
@@ -42,6 +49,50 @@ export function collectiveXSkuLabel(sku: string): string {
 
 export function collectiveXCaseLabel(label: string, sku: string): string {
   return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
+}
+
+function supportCellKey(sku: string, library: string): string {
+  return JSON.stringify([sku, library]);
+}
+
+/**
+ * Build two SKU-by-library support matrices from the EP cases in the checked
+ * runs. A cell is supported only when at least one case actually measured a
+ * point; failed, unsupported, pending, and unrequested combinations stay
+ * absent. Axes are shared across modes so the two matrices compare directly.
+ */
+export function buildCollectiveXSupportMatrix(
+  datasets: readonly CollectiveXDataset[],
+): CollectiveXSupportMatrixData {
+  const coverage = datasets.flatMap((dataset) => dataset.coverage);
+  const skus = [...new Set(coverage.map((item) => normalizeCollectiveXSku(item.sku)))].toSorted(
+    (left, right) =>
+      (HW_REGISTRY[left]?.sort ?? Number.MAX_SAFE_INTEGER) -
+        (HW_REGISTRY[right]?.sort ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right),
+  );
+  const libraries = [...new Set(coverage.map((item) => item.backend))].toSorted((left, right) =>
+    left.localeCompare(right),
+  );
+  const supportedByMode: Record<CollectiveXMode, Set<string>> = {
+    normal: new Set(),
+    'low-latency': new Set(),
+  };
+
+  for (const item of coverage) {
+    if (!item.points.some((point) => point.terminal_status === 'measured')) continue;
+    supportedByMode[item.mode].add(supportCellKey(normalizeCollectiveXSku(item.sku), item.backend));
+  }
+
+  return { skus, libraries, supportedByMode };
+}
+
+export function collectiveXKernelIsSupported(
+  matrix: CollectiveXSupportMatrixData,
+  mode: CollectiveXMode,
+  sku: string,
+  library: string,
+): boolean {
+  return matrix.supportedByMode[mode].has(supportCellKey(normalizeCollectiveXSku(sku), library));
 }
 
 /**

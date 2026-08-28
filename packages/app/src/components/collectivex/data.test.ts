@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCollectiveXSupportMatrix,
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
+  collectiveXKernelIsSupported,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
@@ -20,7 +22,12 @@ import {
   collectiveXKvCell,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
-import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
+import {
+  buildDataset,
+  makeCollectiveXDataset,
+  makeCollectiveXSeries,
+  makeRawShard,
+} from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
 // series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
@@ -123,6 +130,40 @@ describe('collectiveXColorKey', () => {
     const nscale = makeCollectiveXSeries({ sku: 'b200-nscale' });
     const dgxc = makeCollectiveXSeries({ sku: 'b200-dgxc' });
     expect(collectiveXColorKey(nscale)).toBe(collectiveXColorKey(dgxc));
+  });
+});
+
+describe('buildCollectiveXSupportMatrix', () => {
+  const supportDataset = buildDataset({
+    shards: [
+      makeRawShard({ sku: 'b200-nscale', backend: 'deepep-v2' }),
+      makeRawShard({ sku: 'h100-dgxc', backend: 'mori', mode: 'low-latency' }),
+      makeRawShard({
+        sku: 'b200-nscale',
+        backend: 'mori',
+        mode: 'low-latency',
+        status: 'failed',
+      }),
+      makeRawShard({ sku: 'h100-dgxc', backend: 'deepep-v2', rows: [] }),
+    ],
+  });
+  const matrix = buildCollectiveXSupportMatrix([supportDataset]);
+
+  it('shares normalized, stable axes across throughput and low-latency modes', () => {
+    expect(matrix.skus).toEqual(['b200', 'h100']);
+    expect(matrix.libraries).toEqual(['deepep-v2', 'mori']);
+  });
+
+  it('marks only SKU/library pairs with measured points as supported', () => {
+    expect(collectiveXKernelIsSupported(matrix, 'normal', 'b200', 'deepep-v2')).toBe(true);
+    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'h100', 'mori')).toBe(true);
+    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'b200', 'mori')).toBe(false);
+    expect(collectiveXKernelIsSupported(matrix, 'normal', 'h100', 'deepep-v2')).toBe(false);
+  });
+
+  it('keeps unrequested cross-product cells absent', () => {
+    expect(collectiveXKernelIsSupported(matrix, 'normal', 'h100', 'mori')).toBe(false);
+    expect(collectiveXKernelIsSupported(matrix, 'low-latency', 'b200', 'deepep-v2')).toBe(false);
   });
 });
 

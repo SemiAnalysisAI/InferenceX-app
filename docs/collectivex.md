@@ -97,6 +97,10 @@ cannot blank the initial explorer. Deletion is available per row or as one confi
 currently shown runs; both paths keep the same tombstone semantics described above.
 The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
 both appears under both filters, and changing the filter does not alter the checked-run selection.
+The EP coverage from the checked runs is also summarized as two SKU-by-library support matrices:
+one for throughput-oriented (`normal`) kernels and one for `low-latency` kernels. A cell is supported
+when at least one requested case measured a point; unsupported, failed, pending, and unrequested
+combinations remain absent. Both matrices share normalized SKU and library axes for direct comparison.
 
 ## The raw-rows exception
 
