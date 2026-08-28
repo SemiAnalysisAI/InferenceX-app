@@ -28,14 +28,11 @@ describe('vendor logo icons', () => {
     expect(getLineLabelVendorIcon('unknown-hw')).toBeUndefined();
   });
 
-  it('outlines the NVIDIA mark in black so it stays visible on green pills', () => {
-    const svg = decodeURIComponent(VENDOR_LOGO_ICONS.NVIDIA.href);
-    expect(svg).toContain('stroke="#000000"');
-    expect(svg).toContain('paint-order="stroke"');
+  it('uses the black PNG eye mark for NVIDIA so it stays visible on green pills', () => {
+    expect(VENDOR_LOGO_ICONS.NVIDIA.href).toMatch(/^data:image\/png;base64,/);
   });
 
-  it('inlines brand colors in the data URIs', () => {
-    expect(decodeURIComponent(VENDOR_LOGO_ICONS.NVIDIA.href)).toContain('#76B900');
+  it('inlines brand colors in the SVG data URIs', () => {
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.AMD.href)).toContain('#000000');
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.Teacup.href)).toContain('#ffffff');
   });
