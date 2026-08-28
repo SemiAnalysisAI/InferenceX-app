@@ -302,11 +302,14 @@ export function AgenticPointDetail({ id }: Props) {
           testId="agentic-trace-query-error"
         />
       )}
-      {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
-        <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-          {withId(t.missingTrace)}
-        </div>
-      )}
+      {view !== 'logs' &&
+        metricsQuery.data === null &&
+        !metricsQuery.isLoading &&
+        !metricsQuery.isError && (
+          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+            {withId(t.missingTrace)}
+          </div>
+        )}
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
@@ -449,6 +452,7 @@ export function AgenticPointDetail({ id }: Props) {
               sliced={sliced}
               phaseTimeline={phaseRequestData}
               timelineLoading={requestChartQuery.isLoading}
+              timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
               view={requestActivityView}
               onViewChange={setRequestActivityView}
             />

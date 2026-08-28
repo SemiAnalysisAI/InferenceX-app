@@ -236,12 +236,15 @@ export function RequestActivityCard({
   sliced,
   phaseTimeline,
   timelineLoading,
+  timelineError,
   view,
   onViewChange,
 }: {
   sliced: SlicedServerSeries;
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
+  /** Failure message for the Completed view when the timeline query errored. */
+  timelineError?: string;
   view: RequestActivityView;
   onViewChange: (view: RequestActivityView) => void;
 }) {
@@ -276,7 +279,10 @@ export function RequestActivityCard({
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (view === 'completed') {
           if (!phaseTimeline) {
-            return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
+            if (timelineLoading) return <ChartSkeleton />;
+            // A failed timeline query is not "no data" — surface the failure;
+            // the page-level banner above the cards carries the retry action.
+            return <ChartEmpty message={timelineError} />;
           }
           return (
             <TimeSeriesChart

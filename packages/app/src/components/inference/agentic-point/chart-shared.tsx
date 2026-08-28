@@ -45,11 +45,11 @@ export const fmtSeconds = (s: number): string => {
 };
 
 /** "No data" placeholder sized to match the chart it replaces. */
-export function ChartEmpty({ height = 260 }: { height?: number }) {
+export function ChartEmpty({ height = 260, message }: { height?: number; message?: string }) {
   const locale = useLocale();
   return (
     <div className="grid place-items-center text-xs text-muted-foreground" style={{ height }}>
-      {locale === 'zh' ? '暂无数据' : 'No data'}
+      {message ?? (locale === 'zh' ? '暂无数据' : 'No data')}
     </div>
   );
 }
