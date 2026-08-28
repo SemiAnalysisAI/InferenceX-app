@@ -1033,6 +1033,7 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
+            precisionIndicators={selectedPrecisions}
             hideAtomFootnote
             keyIndicators={
               <>
