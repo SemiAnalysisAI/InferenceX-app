@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -21,12 +21,23 @@ import { HwVendorLogo } from '@/components/ui/hw-vendor-logo';
  * - The inline style bypasses the reduced-motion media query that gates
  *   `.vt-compare-title` in motion.css, hence the explicit matchMedia check.
  */
+let lastTaggedTitle: HTMLElement | null = null;
+
 function tagSharedElementForNavigation(title: HTMLElement | null) {
   if (
     title &&
     typeof document.startViewTransition === 'function' &&
     window.matchMedia('(prefers-reduced-motion: no-preference)').matches
   ) {
+    // A bfcache restore (Back) revives the document with the previously
+    // clicked card still tagged — its name deliberately survives the restore
+    // so the reverse h1→card morph can pair with it. But the name must be
+    // unique per document, so before tagging a *different* card, untag the
+    // survivor or the browser skips the transition entirely.
+    if (lastTaggedTitle && lastTaggedTitle !== title) {
+      lastTaggedTitle.style.viewTransitionName = '';
+    }
+    lastTaggedTitle = title;
     title.style.viewTransitionName = 'compare-title';
   }
 }
@@ -60,6 +71,17 @@ export function ComparePairCardLink({
 }: ComparePairCardLinkProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [pending, setPending] = useState(false);
+
+  // A bfcache restore (Back from the detail page) revives the frozen JS heap,
+  // pending state included — without this the card stays dimmed/aria-busy
+  // forever. pageshow with `persisted` is the only signal for that path.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setPending(false);
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
 
   return (
     <a
