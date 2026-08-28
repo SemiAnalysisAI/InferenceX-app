@@ -31,6 +31,7 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
+import { alignWindowToTrace, classifyDelta, integrateWindowPower } from './power-window';
 import {
   type GpuMetricKey,
   type GpuPowerApiResponse,
@@ -67,6 +68,27 @@ const STRINGS = {
     downsample: 'Downsample',
     perGpuStats: 'Per-Chip Statistics',
     rows: 'rows',
+    reconciliationHeading: 'Measurement window & reconciliation',
+    verdictValid: 'Power valid',
+    verdictInvalid: 'Power invalid',
+    verdictUnknown: 'Verdict unknown',
+    windowLabel: 'Window:',
+    windowDurationLabel: 'Duration:',
+    gpuCountLabel: 'Chips (observed / expected):',
+    publishedLabel: 'Published avg power:',
+    recomputedLabel: 'Viewer recomputed:',
+    recomputedMethodNote: 'trapezoid, all chips',
+    deltaLabel: 'Delta:',
+    alignmentFailed: 'The trace could not be aligned to the measurement window.',
+    publishedUnavailable: 'published value unavailable',
+    recomputeUnavailable: 'not enough samples to recompute',
+    partialCoverageNote: 'window partially covered by the trace',
+    producerLabel: 'Producer:',
+    exporterLabel: 'Exporter image:',
+    sourcesLabel: 'Sources:',
+    chartWindowLabel: 'Measurement window',
+    chartWarmupLabel: 'Warmup / ramp',
+    chartAfterLabel: 'Post-benchmark',
   },
   zh: {
     heading: 'PowerX',
@@ -94,7 +116,40 @@ const STRINGS = {
     downsample: '降采样',
     perGpuStats: '每芯片统计信息',
     rows: '行',
+    reconciliationHeading: '测量窗口与对账',
+    verdictValid: '功耗有效',
+    verdictInvalid: '功耗无效',
+    verdictUnknown: '结论未知',
+    windowLabel: '窗口：',
+    windowDurationLabel: '时长：',
+    gpuCountLabel: '芯片数（实测 / 预期）：',
+    publishedLabel: '已发布平均功耗：',
+    recomputedLabel: '查看器重算：',
+    recomputedMethodNote: '梯形积分，全部芯片',
+    deltaLabel: '偏差：',
+    alignmentFailed: '无法将原始轨迹与测量窗口对齐。',
+    publishedUnavailable: '已发布值不可用',
+    recomputeUnavailable: '样本不足，无法重算',
+    partialCoverageNote: '窗口未被轨迹完全覆盖',
+    producerLabel: '生产者：',
+    exporterLabel: '导出镜像：',
+    sourcesLabel: '数据来源：',
+    chartWindowLabel: '测量窗口',
+    chartWarmupLabel: '预热 / 爬坡',
+    chartAfterLabel: '基准结束后',
   },
+} as const;
+
+const VERDICT_BADGE_CLASSES = {
+  valid: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  invalid: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
+  unknown: 'border-border bg-muted text-muted-foreground',
+} as const;
+
+const DELTA_LEVEL_CLASSES = {
+  ok: 'text-emerald-700 dark:text-emerald-300',
+  warn: 'text-amber-700 dark:text-amber-300',
+  alert: 'text-red-700 dark:text-red-300',
 } as const;
 
 type GpuMetricsView = 'chart' | 'correlation';
@@ -172,6 +227,28 @@ export default function GpuMetricsDisplay() {
   const currentData = useMemo(
     () => artifacts.find((artifact) => artifact.name === selectedArtifact)?.data ?? [],
     [artifacts, selectedArtifact],
+  );
+  const currentPower = useMemo(
+    () => artifacts.find((artifact) => artifact.name === selectedArtifact)?.power ?? null,
+    [artifacts, selectedArtifact],
+  );
+  // The recompute mirrors the producer: all chips in the trace, never the
+  // visible-GPU filter, so legend toggles cannot change the panel numbers.
+  const windowAlignment = useMemo(
+    () => (currentPower?.window ? alignWindowToTrace(currentData, currentPower.window) : null),
+    [currentData, currentPower],
+  );
+  const windowRecompute = useMemo(
+    () => (currentPower?.window ? integrateWindowPower(currentData, currentPower.window) : null),
+    [currentData, currentPower],
+  );
+  const publishedAvgPowerW = currentPower?.published?.avg_power_w ?? null;
+  const reconciliationDelta = useMemo(
+    () =>
+      windowRecompute !== null && publishedAvgPowerW !== null
+        ? classifyDelta(windowRecompute.avgPowerPerGpuW, publishedAvgPowerW)
+        : null,
+    [windowRecompute, publishedAvgPowerW],
   );
   const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
   const urlMetric = searchParams.get('gm_metric');
@@ -449,6 +526,136 @@ export default function GpuMetricsDisplay() {
             </div>
           </Card>
 
+          {currentPower &&
+            (() => {
+              const verdict =
+                currentPower.power_valid === 1
+                  ? 'valid'
+                  : currentPower.power_valid === 0
+                    ? 'invalid'
+                    : 'unknown';
+              const verdictText =
+                verdict === 'valid'
+                  ? t.verdictValid
+                  : verdict === 'invalid'
+                    ? t.verdictInvalid
+                    : t.verdictUnknown;
+              const window = currentPower.window;
+              return (
+                <Card className="mb-4" data-testid="gpu-metrics-reconciliation">
+                  <h3 className="text-sm font-semibold mb-3">{t.reconciliationHeading}</h3>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <span
+                      data-testid="gpu-metrics-power-verdict"
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${VERDICT_BADGE_CLASSES[verdict]}`}
+                    >
+                      {verdictText}
+                    </span>
+                    {currentPower.reasons.map((reason) => (
+                      <code key={reason} className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {reason}
+                      </code>
+                    ))}
+                  </div>
+                  {window && (
+                    <>
+                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-2">
+                        <span>
+                          <span className="text-muted-foreground">{t.windowLabel}</span>{' '}
+                          {new Date(window.start_unix * 1000).toISOString()} →{' '}
+                          {new Date(window.end_unix * 1000).toISOString()}
+                        </span>
+                        <span>
+                          <span className="text-muted-foreground">{t.windowDurationLabel}</span>{' '}
+                          {(window.end_unix - window.start_unix).toFixed(1)}s
+                        </span>
+                        {(currentPower.observed_gpu_count !== null ||
+                          currentPower.expected_gpu_count !== null) && (
+                          <span>
+                            <span className="text-muted-foreground">{t.gpuCountLabel}</span>{' '}
+                            {currentPower.observed_gpu_count ?? '—'} /{' '}
+                            {currentPower.expected_gpu_count ?? '—'}
+                          </span>
+                        )}
+                      </div>
+                      {!windowAlignment && (
+                        <p className="text-sm text-muted-foreground mb-2">{t.alignmentFailed}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                        <span>
+                          <span className="text-muted-foreground">{t.publishedLabel}</span>{' '}
+                          {publishedAvgPowerW === null ? (
+                            <span className="text-muted-foreground italic">
+                              {t.publishedUnavailable}
+                            </span>
+                          ) : (
+                            <>
+                              {publishedAvgPowerW.toFixed(1)} W{' '}
+                              {currentPower.published && (
+                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                                  {currentPower.published.source}
+                                </code>
+                              )}
+                            </>
+                          )}
+                        </span>
+                        <span>
+                          <span className="text-muted-foreground">{t.recomputedLabel}</span>{' '}
+                          {windowRecompute ? (
+                            <>
+                              {windowRecompute.avgPowerPerGpuW.toFixed(1)} W{' '}
+                              <span className="text-muted-foreground text-xs">
+                                ({t.recomputedMethodNote}
+                                {windowRecompute.partialCoverage
+                                  ? `, ${t.partialCoverageNote}`
+                                  : ''}
+                                )
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground italic">
+                              {t.recomputeUnavailable}
+                            </span>
+                          )}
+                        </span>
+                        {reconciliationDelta && (
+                          <span
+                            data-testid="gpu-metrics-reconciliation-delta"
+                            className={`font-medium ${DELTA_LEVEL_CLASSES[reconciliationDelta.level]}`}
+                          >
+                            {t.deltaLabel} {reconciliationDelta.deltaPct >= 0 ? '+' : ''}
+                            {reconciliationDelta.deltaPct.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {(currentPower.producer_sha ||
+                    currentPower.exporter_image_sha256 ||
+                    currentPower.sources.length > 0) && (
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mt-3">
+                      {currentPower.producer_sha && (
+                        <span>
+                          {t.producerLabel} <code>{currentPower.producer_sha.slice(0, 12)}</code>
+                        </span>
+                      )}
+                      {currentPower.exporter_image_sha256 && (
+                        <span>
+                          {t.exporterLabel}{' '}
+                          <code>{currentPower.exporter_image_sha256.slice(0, 12)}</code>
+                        </span>
+                      )}
+                      {currentPower.sources.length > 0 && (
+                        <span>
+                          {t.sourcesLabel} {currentPower.sources.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
+
           <Card
             id="gpu-metrics-chart"
             data-testid="gpu-metrics-chart-container"
@@ -537,6 +744,12 @@ export default function GpuMetricsDisplay() {
                 metricKey={selectedMetric}
                 artifactName={selectedArtifact}
                 maxPoints={downsample ? 2000 : Infinity}
+                measurementWindow={currentPower?.window ?? null}
+                windowLabels={{
+                  window: t.chartWindowLabel,
+                  warmup: t.chartWarmupLabel,
+                  after: t.chartAfterLabel,
+                }}
                 caption={
                   <>
                     <h2 className="text-lg font-semibold">
