@@ -90,5 +90,41 @@ describe('PowerX', () => {
         .should('contain.text', 'gpu_metrics')
         .and('contain.text', 'GitHub Actions run ID');
     });
+
+    it('shades the measurement window and reconciles trace vs published power', () => {
+      cy.intercept('GET', '/api/gpu-metrics*', { fixture: 'api/gpu-metrics-run.json' }).as(
+        'gpuMetricsRun',
+      );
+      openPowerX();
+      cy.get('[data-testid="gpu-metrics-load-button"]').click();
+      cy.wait('@gpuMetricsRun');
+
+      cy.get('[data-testid="gpu-metrics-chart-svg"] .measurement-window rect').should('exist');
+      cy.get('[data-testid="gpu-metrics-reconciliation"]').should('be.visible');
+      cy.get('[data-testid="gpu-metrics-power-verdict"]').should('contain.text', 'Power valid');
+      // Published 402 W vs viewer-recomputed 400 W (constant trace) → Δ −0.5%
+      cy.get('[data-testid="gpu-metrics-reconciliation"]').should('contain.text', '402');
+      cy.get('[data-testid="gpu-metrics-reconciliation"]').should('contain.text', '400');
+      cy.get('[data-testid="gpu-metrics-reconciliation-delta"]').should('contain.text', '0.5');
+    });
+
+    it('renders the legacy view unchanged when the response has no power block', () => {
+      cy.fixture('api/gpu-metrics-run.json').then(
+        (fixture: { artifacts: Record<string, unknown>[] }) => {
+          const legacy = {
+            ...fixture,
+            artifacts: fixture.artifacts.map(({ power: _power, ...rest }) => rest),
+          };
+          cy.intercept('GET', '/api/gpu-metrics*', { body: legacy }).as('gpuMetricsLegacy');
+        },
+      );
+      openPowerX();
+      cy.get('[data-testid="gpu-metrics-load-button"]').click();
+      cy.wait('@gpuMetricsLegacy');
+
+      cy.get('[data-testid="gpu-metrics-chart-svg"]').should('exist');
+      cy.get('[data-testid="gpu-metrics-reconciliation"]').should('not.exist');
+      cy.get('[data-testid="gpu-metrics-chart-svg"] .measurement-window').should('not.exist');
+    });
   });
 });

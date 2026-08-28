@@ -58,6 +58,13 @@
       "source": null,
       "topLevel": "array"
     },
+    "gpu-metrics-run": {
+      "bytes": 48347,
+      "capturedAt": null,
+      "sha256": "f4c5ab868fdae610430a4800a0f69a96579b55b5fb73c2fb50532cf9a4f9d2d4",
+      "source": "synthetic://gpu-metrics",
+      "topLevel": "object"
+    },
     "overview-history-rows": {
       "bytes": 5002,
       "capturedAt": null,
