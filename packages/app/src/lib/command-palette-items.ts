@@ -101,7 +101,9 @@ export function buildPaletteNavItems(locale: Locale): PaletteNavItem[] {
       group: 'dashboard',
       href: route.path,
       label: locale === 'zh' ? TAB_LABELS_ZH[key] : TAB_LABELS_EN[key],
-      keywords: locale === 'zh' ? TAB_LABELS_EN[key] : TAB_LABELS_ZH[key],
+      // Include the header's "Dashboard" label (both locales) so the words
+      // users actually see in the nav also hit these destinations.
+      keywords: `${locale === 'zh' ? TAB_LABELS_EN[key] : TAB_LABELS_ZH[key]} dashboard 仪表板`,
     };
   });
 

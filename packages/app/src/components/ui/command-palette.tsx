@@ -159,14 +159,29 @@ export function CommandPalette() {
 
   const navItems = React.useMemo(() => buildPaletteNavItems(locale), [locale]);
 
+  // Dashboard tab jumps carry the unofficialruns param, same as TabNav.
+  const unofficialIds = React.useMemo(() => {
+    for (const [key, value] of new URLSearchParams(search)) {
+      if (/^unofficialruns?$/iu.test(key) && value) return value;
+    }
+    return '';
+  }, [search]);
+
   const selectNav = React.useCallback(
     (item: PaletteNavItem) => {
       const target = locale === 'zh' && hasZhSibling(item.href) ? zhPath(item.href) : item.href;
       track('command_palette_selected', { id: item.id, query });
       handleOpenChange(false);
-      pushInApp(router, target);
+      // Selecting the current page is a no-op — a refetch would only wipe the
+      // dashboard filters (header links behave the same way).
+      if (target === pathname) return;
+      const href =
+        item.group === 'dashboard' && unofficialIds
+          ? `${target}?unofficialruns=${unofficialIds}`
+          : target;
+      pushInApp(router, href);
     },
-    [locale, query, router, handleOpenChange],
+    [locale, query, router, handleOpenChange, pathname, unofficialIds],
   );
 
   const actionItems = React.useMemo<ActionItem[]>(

@@ -49,6 +49,17 @@ describe('buildPaletteNavItems', () => {
     }
   });
 
+  it('dashboard tabs are searchable via the header label in both locales', () => {
+    // The header calls this section "Dashboard" / 「仪表板」 — the words users
+    // actually see must hit every dashboard destination.
+    for (const items of [en, zh]) {
+      for (const item of items.filter((i) => i.group === 'dashboard')) {
+        expect(item.keywords).toContain('dashboard');
+        expect(item.keywords).toContain('仪表板');
+      }
+    }
+  });
+
   it('every href with a zh sibling resolves; dashboard/page hrefs are mirrored', () => {
     // All palette destinations should exist in the English tree; the mirrored
     // ones (all of them today) must round-trip through hasZhSibling.

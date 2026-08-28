@@ -159,7 +159,7 @@ describe('CommandPalette', () => {
   });
 
   it('navigates to the /zh sibling and renders Chinese labels on /zh pages', () => {
-    mockPathname = '/zh';
+    mockPathname = '/zh/glossary';
     render();
     openViaTrigger();
     const input = document.body.querySelector(
@@ -169,5 +169,15 @@ describe('CommandPalette', () => {
     setQuery('首页');
     pressOnInput('Enter');
     expect(push).toHaveBeenCalledWith('/zh');
+  });
+
+  it('treats selecting the current page as a no-op', () => {
+    // Re-pushing the same route would only wipe live dashboard filters.
+    mockPathname = '/zh';
+    render();
+    openViaTrigger();
+    setQuery('首页');
+    pressOnInput('Enter');
+    expect(push).not.toHaveBeenCalled();
   });
 });
