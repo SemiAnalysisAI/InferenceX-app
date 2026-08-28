@@ -54,7 +54,9 @@ export const apiRouteCatalog = [
       en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
       zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    // 2026-08: additive optional `power` block assembled from same-suffix
+    // bmk_*/power_audit_* sibling artifacts; still a UI-only unstable shape.
+    sourceSha256: '80035a01f4a1af5331095be1b4655361aab868d7ebaefb3d0a01fce9078b863c',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
