@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const EMPTY_CONVERSATION = {
   conv_id: 'retry-conversation',
@@ -193,9 +193,7 @@ describe('Dataset conversation flamegraph timing', () => {
       expect(getComputedStyle(element).overflowX).to.eq('auto');
       expect(element.scrollWidth).to.be.greaterThan(element.clientWidth);
     });
-    cy.window().then((win) => {
-      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
-    });
+    expectNoPageOverflow();
   });
 });
 
@@ -235,9 +233,7 @@ describe('Dataset conversation request states', () => {
     cy.contains('[data-testid="conversation-view-error"] button', '重试').click();
     cy.wait('@conversationRetryRequest').its('response.statusCode').should('eq', 200);
     cy.contains('h1', 'retry-conversation').should('be.visible');
-    cy.window().then((win) => {
-      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
-    });
+    expectNoPageOverflow();
   });
 
   it('reserves the not-found state for a successful 404 response', () => {
