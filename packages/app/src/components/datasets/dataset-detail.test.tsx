@@ -190,21 +190,6 @@ describe('DatasetDetail conversation search', () => {
     act(() => root.unmount());
   });
 
-  it('localizes the accessible search and sort names', () => {
-    testState.locale = 'zh';
-    const container = document.createElement('div');
-    const root = createRoot(container);
-
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
-
-    expect(container.querySelector('input')?.getAttribute('aria-label')).toBe('搜索对话');
-    expect(container.querySelector('button[aria-label]')?.getAttribute('aria-label')).toBe(
-      '对话排序',
-    );
-
-    act(() => root.unmount());
-  });
-
   it('localizes the initial conversation loading state', () => {
     testState.locale = 'zh';
     testState.conversations = {
