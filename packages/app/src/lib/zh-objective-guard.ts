@@ -560,7 +560,7 @@ function markdownLinkTargets(raw: string): string[] {
     const target = markdownDestination(raw, index + 2);
     if (target !== null) targets.push(target);
   }
-  for (const match of raw.matchAll(/^ {0,3}\[(?:\\.|[^\]\n])+\]:[ \t]*(?<destination>.*)$/gmu)) {
+  for (const match of raw.matchAll(/^ {0,3}\[(?:\\.|[^\\\]\n])+\]:[ \t]*(?<destination>.*)$/gmu)) {
     const destination = match.groups?.destination ?? '';
     const target = markdownDestination(destination, 0, true);
     if (target !== null) targets.push(target);
@@ -759,13 +759,25 @@ export function compareBlogPair(
   return violations;
 }
 
+/**
+ * Markdown link destinations are verbatim URL slugs — often English words like
+ * `.../inference-chip/` — not translatable copy, so drop them before scanning.
+ */
+function withoutMarkdownLinkDestinations(source: string): string {
+  return source.replaceAll(/\]\([^()\s]*\)/gu, ']');
+}
+
 function mdxChineseSegments(source: string): string[] {
-  const literals = (source.match(STRING_LITERAL) ?? []).filter((text) => HAN.test(text));
-  const visible = source
-    .replaceAll(STRING_LITERAL, 'X')
-    .replaceAll(/<[^>]*>/gsu, '')
-    .split('\n')
-    .filter((text) => HAN.test(text));
+  const scannable = withoutMarkdownLinkDestinations(source);
+  const literals = (scannable.match(STRING_LITERAL) ?? []).filter((text) => HAN.test(text));
+  // Strip MDX/HTML tags to a fixed point so nested or adjacent delimiters cannot
+  // leave a reassembled tag fragment behind after a single pass.
+  let stripped = scannable.replaceAll(STRING_LITERAL, 'X');
+  for (let previous = ''; previous !== stripped;) {
+    previous = stripped;
+    stripped = stripped.replaceAll(/<[^>]*>/gsu, '');
+  }
+  const visible = stripped.split('\n').filter((text) => HAN.test(text));
   return [...literals, ...visible];
 }
 

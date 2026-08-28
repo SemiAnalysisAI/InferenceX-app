@@ -551,6 +551,17 @@ $$
       expect(findMechanicalCopyViolations('copy.ts', after)).toEqual([]);
     });
 
+    it('keeps markdown link destinations exempt in MDX prose and attributes', () => {
+      const source = [
+        '今年 6 月，[OpenAI 公布了这项计划](https://example.com/inference-chip/)。',
+        '<Figure caption="来源：[OpenAI](https://example.com/inference-chip/)" />',
+      ].join('\n');
+      expect(findMechanicalCopyViolations('content/blog/zh/post.mdx', source)).toEqual([]);
+      expect(
+        findMechanicalCopyViolations('content/blog/zh/post.mdx', '这颗 chip 尚未翻译。'),
+      ).toContainEqual(expect.objectContaining({ rule: 'chip-untranslated' }));
+    });
+
     it('keeps units, identifiers, Chinese-first explanations, and valid punctuation exempt', () => {
       expect(
         findMechanicalCopyViolations(

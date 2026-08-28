@@ -39,7 +39,14 @@ describe('actual App Router Chinese sibling coverage', () => {
   });
 
   it('pairs every English page with a Chinese page in both directions', () => {
-    expect(findRoutePairViolations(pages)).toEqual([]);
+    // /model and /model/[slug] are intentionally English-only: their metadata
+    // declares a canonical URL without hreflang alternates (see the comment in
+    // src/app/model/page.tsx), and they are absent from ZH_MIRRORED_ROUTES.
+    const EN_ONLY_ROUTES = new Set(['/model', '/model/[slug]']);
+    for (const route of EN_ONLY_ROUTES) {
+      expect(hasZhSibling(route), `${route} gained a /zh sibling; drop its exemption`).toBe(false);
+    }
+    expect(findRoutePairViolations(pages, EN_ONLY_ROUTES)).toEqual([]);
   });
 });
 

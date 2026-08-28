@@ -2,6 +2,39 @@
   "blog": [
     {
       "rule": "inline-code",
+      "file": "agentx-inferencexv3-does-cuda-moat.mdx",
+      "en": "",
+      "zh": "--enable-prefill-delayer",
+      "reason": "The baseline Chinese article wraps the SGLang flag in inline code while the English article spells it in prose. The content branch owns that editorial correction; this exact pair prevents the guard branch from copying the rewrite.",
+      "removeWhen": "Delete this row when both articles format --enable-prefill-delayer identically."
+    },
+    {
+      "rule": "inline-code",
+      "file": "agentx-inferencexv3-does-cuda-moat.mdx",
+      "en": "",
+      "zh": "hipMemcpyBatchAsync",
+      "reason": "The baseline Chinese article wraps the ROCm API name in inline code while the English article spells it in prose. The content branch owns that editorial correction.",
+      "removeWhen": "Delete this row when both articles format hipMemcpyBatchAsync identically."
+    },
+    {
+      "rule": "inline-code",
+      "file": "agentx-inferencexv3-does-cuda-moat.mdx",
+      "en": "",
+      "zh": "/btw",
+      "reason": "The baseline Chinese article wraps the Claude Code /btw command in inline code while the English article quotes it in prose. The content branch owns that editorial correction.",
+      "removeWhen": "Delete this row when both articles format /btw identically."
+    },
+    {
+      "rule": "protected-token",
+      "file": "agentx-inferencexv3-does-cuda-moat.mdx",
+      "en": "--enable-prefill-delayer",
+      "zh": "",
+      "pairSha256": "6b00b67dae7c43f2165727893f07dfd13faad25b566f4429178b92a8c3221880",
+      "reason": "The English article carries the SGLang flag in prose where the Chinese article uses inline code, so the prose-token multisets differ by exactly this occurrence; the content branch owns the correction.",
+      "removeWhen": "Delete this row when both articles format --enable-prefill-delayer identically."
+    },
+    {
+      "rule": "inline-code",
       "file": "deepseekv4-16t-day-0-to-day-43-performance.mdx",
       "en": "“mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)”",
       "zh": "\"mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)\"",
@@ -211,6 +244,71 @@
     },
     {
       "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "tok/s/user",
+      "pairSha256": "3bde581165647beaceb8c8cac6d156f8082c6cfe914f149303d988ba83287687",
+      "reason": "The paired baseline articles differ by eight MW occurrences and three tok/s/user occurrences; the Blog rewrite branch owns that content correction.",
+      "removeWhen": "Delete this row when the article pair has equal protected-token multisets."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "tok/s/user",
+      "reason": "The paired baseline articles differ by a second MW and tok/s/user occurrence; the Blog rewrite branch owns that content correction.",
+      "removeWhen": "Delete this row when the second extra MW and tok/s/user mismatch is removed."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "tok/s/user",
+      "reason": "The paired baseline articles differ by a third MW and tok/s/user occurrence; the Blog rewrite branch owns that content correction.",
+      "removeWhen": "Delete this row when the third extra MW and tok/s/user mismatch is removed."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "",
+      "reason": "The baseline Chinese article is missing a fourth English MW occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the fourth missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "",
+      "reason": "The baseline Chinese article is missing a fifth English MW occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the fifth missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "",
+      "reason": "The baseline Chinese article is missing a sixth English MW occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the sixth missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "",
+      "reason": "The baseline Chinese article is missing a seventh English MW occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the seventh missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
+      "file": "openai-jalapeno-better-than-nvidia.mdx",
+      "en": "MW",
+      "zh": "",
+      "reason": "The baseline Chinese article is missing an eighth English MW occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the eighth missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
       "file": "vera-rubin-nvl72-vs-gb200-nvl72-inference.mdx",
       "en": "MW",
       "zh": "tok/s",
@@ -262,8 +360,8 @@
   "dictionaries": [
     {
       "file": "src/components/collectivex/CollectiveXDisplay.tsx",
-      "mismatchSha256": "baf66a66ba86581f6b4a990865c5c9fced310c7cb69813f59d163e39fb0dd080",
-      "reason": "The baseline CollectiveX Chinese dictionary contains 74 Chinese-only keys from an unfinished page localization. The data-tools branch owns that rewrite. The digest fingerprints the exact missing-key set, so any added, removed, or renamed mismatch still fails.",
+      "mismatchSha256": "8bcba1419a24503eb8188c8cb12bf6aa27b4f3e094c96a987ecf4cc394be634e",
+      "reason": "The baseline CollectiveX Chinese dictionary contains 73 Chinese-only keys from an unfinished page localization. The data-tools branch owns that rewrite. The digest fingerprints the exact missing-key set, so any added, removed, or renamed mismatch still fails.",
       "removeWhen": "Delete this row when the CollectiveX en/zh dictionary has structural key parity."
     }
   ]
