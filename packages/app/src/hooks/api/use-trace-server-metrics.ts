@@ -57,6 +57,7 @@ export interface MetricSourceSeries {
   kvCacheUsage: TimeSeriesPoint[];
   prefixCacheHitRate: TimeSeriesPoint[];
   queueDepth: QueueDepthPoint[];
+  /** Fresh prefill plus physical cache tiers when available; logical fallback otherwise. */
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
   promptTps: TimeSeriesPoint[];
   generationTps: TimeSeriesPoint[];

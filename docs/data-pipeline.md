@@ -192,6 +192,14 @@ Summing on an exact `start_ns` emitted one point per component per tick, each ho
 
 Every summed series is therefore evaluated by `sumOntoGrid` on one canonical grid at the blob's native scrape cadence (`canonicalTickNs`, the median gap of the best-sampled series), with each component holding its last sample between its own scrapes and contributing only inside its observed window. The lattice is anchored at `t=0` and shared by every metric, so the pairs that get divided or added downstream (hits/queries, used/total, running+waiting) land on identical `t` values — anchoring each metric at its own first sample instead silently emptied the prefix-cache-hit-rate chart, because `sglang:cached_tokens` starts ~0.18 s off the grid `sglang:prompt_tokens` starts on.
 
+For vLLM builds that expose `prompt_tokens_cached_by_source`, the prompt-token
+breakdown combines only `local_compute` from the older logical
+`prompt_tokens_by_source` metric with the new physical cached-token buckets.
+The logical `local_cache_hit` and `external_kv_transfer` series are replaced,
+not added, so HBM, CPU, NVMe, and connector-defined cache tiers do not double
+count the same cached tokens. Older vLLM builds retain the logical breakdown,
+and SGLang keeps its `cached_tokens{cache_source=...}` mapping.
+
 Mirrored endpoints are collapsed here too, on a **relative** tolerance rather than the gauge path's absolute one — a throughput mean is O(10⁵), so an absolute threshold would never fire and every mirror would be counted twice. This is a correction as well as a de-duplication: the two-API-server vLLM rows were double-counting their queue depth and token totals exactly 2× before v14.
 
 Nothing groups on an exact `start_ns` any more; `aggregateByStart` was removed in v14.

@@ -3,14 +3,34 @@
 import { useMemo } from 'react';
 
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
+import { useLocale } from '@/lib/use-locale';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { CHART_PAD, ChartEmpty, fmtCount, fmtSeconds } from './chart-shared';
 import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
 
-// Historical entry point: the pure data-shaping helpers lived in this module
-// before being extracted; re-export them so both import paths stay valid.
-export * from './time-series-math';
+// Historical entry point: keep the extracted data-shaping helpers available
+// here through named exports, which also compile in the Cypress component app.
+export { interpAt, maxTimeSeriesValue };
+export type { ChartSeries };
+export {
+  averageSequenceLengthInFlight,
+  buildThroughputChartSeries,
+  cumulativeAverage,
+  cumulativeCompletedRequests,
+  cumulativeDifferenceMonotonic,
+  cumulativeTimeAverage,
+  cumulativeUniqueInputTokens,
+  inflightUniqueTokens,
+  quantile,
+  rollingAverage,
+  rollingRatioFromComponents,
+  rollingRatioOfSums,
+  rollingRequestMetric,
+  timeRollingAverage,
+  toggleThroughputSeries,
+} from './time-series-math';
+export type { RequestMetric, RequestPercentile, ThroughputSeriesKey } from './time-series-math';
 
 /** A constant horizontal reference line (e.g. a capacity ceiling). */
 export interface ReferenceLine {
@@ -284,16 +304,63 @@ const KNOWN_SOURCE_COLORS: Record<string, string> = {
   miss: '#f97316',
   'cache hit (HBM)': '#3b82f6',
   'cache hit (CPU offload)': '#22c55e',
+  'cache hit (NVMe offload)': '#a855f7',
+  'cache hit (P2P)': '#06b6d4',
+  'cache hit (filesystem)': '#14b8a6',
+  'cache hit (object store)': '#ec4899',
+  'cache hit (mixed tiers)': '#ef4444',
+  'cache hit (external)': '#64748b',
   'cache hit': '#3b82f6',
   'compute (miss)': '#f97316',
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  local_compute: 'Prefill',
-  local_cache_hit: 'HBM Cache Hit',
-  external_kv_transfer: 'Offload Cache Hit',
-  miss: 'Miss',
+const SOURCE_LABELS = {
+  en: {
+    local_compute: 'Prefill',
+    local_cache_hit: 'HBM Cache Hit',
+    external_kv_transfer: 'Offload Cache Hit',
+    miss: 'Miss',
+    'cache hit (HBM)': 'HBM Cache Hit',
+    'cache hit (CPU offload)': 'CPU Offload Cache Hit',
+    'cache hit (NVMe offload)': 'NVMe Offload Cache Hit',
+    'cache hit (P2P)': 'P2P Cache Hit',
+    'cache hit (filesystem)': 'Filesystem Cache Hit',
+    'cache hit (object store)': 'Object Store Cache Hit',
+    'cache hit (mixed tiers)': 'Mixed-Tier Cache Hit',
+    'cache hit (external)': 'External Cache Hit',
+    'cache hit': 'Cache Hit',
+    'compute (miss)': 'Prefill',
+  },
+  zh: {
+    local_compute: 'Prefill',
+    local_cache_hit: 'HBM cache 命中',
+    external_kv_transfer: 'Offload cache 命中',
+    miss: '未命中',
+    'cache hit (HBM)': 'HBM cache 命中',
+    'cache hit (CPU offload)': 'CPU offload cache 命中',
+    'cache hit (NVMe offload)': 'NVMe offload cache 命中',
+    'cache hit (P2P)': 'P2P cache 命中',
+    'cache hit (filesystem)': '文件系统 cache 命中',
+    'cache hit (object store)': '对象存储 cache 命中',
+    'cache hit (mixed tiers)': '混合层级 cache 命中',
+    'cache hit (external)': '外部 cache 命中',
+    'cache hit': 'Cache 命中',
+    'compute (miss)': 'Prefill',
+  },
+} as const;
+
+const STACKED_AREA_STRINGS = {
+  en: { time: 'time', share: '% of prefill tokens' },
+  zh: { time: '时间', share: 'prefill token 占比' },
 };
+
+function sourceLabel(source: string, locale: 'en' | 'zh'): string {
+  const known = SOURCE_LABELS[locale] as Record<string, string>;
+  if (known[source]) return known[source];
+  const customTier = /^cache hit \((?<tier>.+)\)$/u.exec(source)?.groups?.tier;
+  if (!customTier) return source;
+  return locale === 'zh' ? `${customTier} cache 命中` : `Cache Hit (${customTier})`;
+}
 
 // Fallback palette for any source name not in KNOWN_SOURCE_COLORS so we never
 // emit two layers in the same shade. Cycles by stack (insertion) order.
@@ -320,6 +387,8 @@ export function StackedAreaChart({
   width?: number;
   height?: number;
 }) {
+  const locale = useLocale();
+  const strings = STACKED_AREA_STRINGS[locale];
   const W = width;
   const H = height;
 
@@ -421,7 +490,7 @@ export function StackedAreaChart({
     }
     const items: HoverItem[] = stackOrder.map((name) => ({
       color: colorFor(name),
-      label: SOURCE_LABELS[name] ?? name,
+      label: sourceLabel(name, locale),
       value: `${((shares[name]?.[idx] ?? 0) * 100).toFixed(1)}%`,
     }));
     return { items, title: fmtSeconds(t) };
@@ -493,7 +562,7 @@ export function StackedAreaChart({
         opacity={0.55}
         textAnchor="middle"
       >
-        time
+        {strings.time}
       </text>
       <text
         x={10}
@@ -504,7 +573,7 @@ export function StackedAreaChart({
         textAnchor="middle"
         transform={`rotate(-90 10 ${H / 2})`}
       >
-        % of prefill tokens
+        {strings.share}
       </text>
       {(() => {
         const chipY = H - 8;
@@ -515,7 +584,7 @@ export function StackedAreaChart({
             <g key={`leg${i}`}>
               <rect x={x + 2} y={chipY - 9} width={12} height={8} fill={l.color} opacity={0.75} />
               <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                {SOURCE_LABELS[l.name] ?? l.name}
+                {sourceLabel(l.name, locale)}
               </text>
             </g>
           );

@@ -6,6 +6,7 @@ import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
@@ -386,9 +387,12 @@ export function ThroughputCard({
 }
 
 export function PromptTokenSourceCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const locale = useLocale();
   return (
     <ExpandableChart
-      title="Cumulative prompt token source breakdown"
+      title={
+        locale === 'zh' ? '累计 prompt token 来源构成' : 'Cumulative prompt token source breakdown'
+      }
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;

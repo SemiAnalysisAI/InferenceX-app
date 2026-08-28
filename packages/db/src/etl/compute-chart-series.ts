@@ -120,8 +120,15 @@ import {
  * per-rank detail stays reachable as that source's own
  * `kvCacheUsageByEngine`.
  *
+ * v16: consume vLLM's physical cached-token source metric. The existing
+ * `prompt_tokens_by_source` metric remains the source of freshly computed
+ * prompt tokens, while `prompt_tokens_cached_by_source` replaces its coarse
+ * local/external cache-hit buckets with device, CPU, disk, and connector-tier
+ * attribution. Keeping only the logical compute bucket prevents double
+ * counting and makes the stacked breakdown sum to total prompt-token volume.
+ *
  */
-export const CHART_SERIES_VERSION = 15;
+export const CHART_SERIES_VERSION = 16;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -218,6 +225,22 @@ export interface RawMetric {
 
 export type MetricsMap = Record<string, RawMetric>;
 
+const VLLM_CACHE_SOURCE_BUCKETS: Record<string, string> = {
+  device: 'cache hit (HBM)',
+  cpu: 'cache hit (CPU offload)',
+  disk: 'cache hit (NVMe offload)',
+  p2p: 'cache hit (P2P)',
+  fs: 'cache hit (filesystem)',
+  obj: 'cache hit (object store)',
+  mixed: 'cache hit (mixed tiers)',
+  external: 'cache hit (external)',
+};
+
+/** Canonical chart bucket for vLLM's physical cached-token source labels. */
+function vllmCacheSourceBucket(source: string): string {
+  return VLLM_CACHE_SOURCE_BUCKETS[source] ?? `cache hit (${source})`;
+}
+
 /**
  * The set of metric subtrees the chart consumes. Includes both vllm:* and
  * sglang:* names so the stream-parse fallback collects whichever framework
@@ -234,6 +257,7 @@ export const CHART_METRIC_KEYS = new Set([
   'vllm:prompt_tokens',
   'vllm:generation_tokens',
   'vllm:prompt_tokens_by_source',
+  'vllm:prompt_tokens_cached_by_source',
   // SGLang
   'sglang:token_usage',
   'sglang:cached_tokens',
@@ -1051,9 +1075,10 @@ function buildSeriesFromMetrics(
   }
 
   // Per-source prompt tokens — sum across engines per source label.
-  //   vllm: vllm:prompt_tokens_by_source has one series per source label
-  //         (local_cache_hit, external_cache_hit, miss, ...). Use the
-  //         `source`/`reason`/`kind` label as the breakdown key.
+  //   vllm: the logical prompt_tokens_by_source metric supplies fresh
+  //         prefill. When prompt_tokens_cached_by_source is available, its
+  //         physical cache tiers replace the logical local/external hit
+  //         buckets so the two metrics are combined without double counting.
   //   sglang: sglang:realtime_tokens uses a `mode` label with values
   //         {prefill_cache, prefill_compute, decode}. Filter to prefill_*
   //         since decode isn't prompt-token volume.
@@ -1070,10 +1095,27 @@ function buildSeriesFromMetrics(
     if (existing) existing.push(series);
     else promptBySrc.set(label, [series]);
   };
-  for (const series of metrics['vllm:prompt_tokens_by_source']?.series ?? []) {
-    const labels = series.labels ?? {};
-    const source = labels['source'] ?? labels['reason'] ?? labels['kind'] ?? JSON.stringify(labels);
-    addSeriesRates(source, series);
+  const logicalVllmSeries = metrics['vllm:prompt_tokens_by_source']?.series ?? [];
+  const physicalVllmSeries = metrics['vllm:prompt_tokens_cached_by_source']?.series ?? [];
+  if (physicalVllmSeries.length > 0) {
+    for (const series of logicalVllmSeries) {
+      const labels = series.labels ?? {};
+      const source = labels['source'] ?? labels['reason'] ?? labels['kind'] ?? '';
+      if (source === 'local_compute' || source === 'miss') {
+        addSeriesRates(source, series);
+      }
+    }
+    for (const series of physicalVllmSeries) {
+      const source = series.labels?.['source'] || 'external';
+      addSeriesRates(vllmCacheSourceBucket(source), series);
+    }
+  } else {
+    for (const series of logicalVllmSeries) {
+      const labels = series.labels ?? {};
+      const source =
+        labels['source'] ?? labels['reason'] ?? labels['kind'] ?? JSON.stringify(labels);
+      addSeriesRates(source, series);
+    }
   }
   // SGLang fallback: only consider when the vllm metric wasn't found.
   //   - Cache misses (fresh prefill): `sglang:realtime_tokens[mode=prefill_compute]`

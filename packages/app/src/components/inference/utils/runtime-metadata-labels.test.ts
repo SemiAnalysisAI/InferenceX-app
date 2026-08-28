@@ -21,6 +21,8 @@ describe('runtime metadata labels', () => {
 
   it('formats DRAM and other offload types consistently', () => {
     expect(offloadTypeLabel('dram')).toBe('DRAM');
+    expect(offloadTypeLabel('nvme')).toBe('NVMe');
+    expect(offloadTypeLabel('dram+nvme')).toBe('DRAM+NVMe');
     expect(offloadTypeLabel('cpu')).toBe('CPU');
   });
 });

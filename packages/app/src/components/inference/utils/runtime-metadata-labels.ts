@@ -16,10 +16,19 @@ const CACHE_IMPLEMENTATION_LABELS: Record<string, string> = {
 export const cacheImplementationLabel = (value: string): string =>
   CACHE_IMPLEMENTATION_LABELS[value.toLowerCase()] ?? value;
 
-export const offloadTypeLabel = (value: string): string => {
-  if (value.toLowerCase() === 'dram') return 'DRAM';
-  return value.toUpperCase();
+const OFFLOAD_TIER_LABELS: Record<string, string> = {
+  dram: 'DRAM',
+  nvme: 'NVMe',
 };
+
+export const offloadTypeLabel = (value: string): string =>
+  value
+    .split('+')
+    .map((tier) => {
+      const normalized = tier.trim().toLowerCase();
+      return OFFLOAD_TIER_LABELS[normalized] ?? normalized.toUpperCase();
+    })
+    .join('+');
 
 export const versionedComponentLabel = (
   name: string | null | undefined,

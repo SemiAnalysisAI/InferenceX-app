@@ -4,6 +4,7 @@ export interface BenchmarkSibling {
   id: number;
   conc: number;
   offload_mode: string | null;
+  kv_offloading: string | null;
   decode_tp: number;
   decode_ep: number;
   decode_pp: number | null;
@@ -23,6 +24,8 @@ export interface BenchmarkSibling {
   disagg: boolean;
   is_multinode: boolean;
   tput_per_gpu: number | null;
+  p90_intvty: number | null;
+  p90_ttft: number | null;
   total_requests: number | null;
   is_current: boolean;
   has_trace: boolean;

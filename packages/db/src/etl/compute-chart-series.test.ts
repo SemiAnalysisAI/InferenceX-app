@@ -63,6 +63,13 @@ function makeBlob(opts?: {
   return gzipSync(Buffer.from(json));
 }
 
+function sourceRateSeries(source: string, rate: number) {
+  return {
+    labels: { source },
+    timeslices: [{ start_ns: 0, end_ns: 1e9, rate }],
+  };
+}
+
 /** Build a synthetic per-engine vLLM metric series for the multi-engine test. */
 function buildEngineSeries(engineId: number, baseRunning: number) {
   const labels = { engine: String(engineId) };
@@ -237,6 +244,81 @@ describe('computeChartSeries', () => {
     ]);
     expect(series!.promptTokensBySource['local_cache_hit']).toEqual([{ t: 0, value: 200 }]);
     expect(series!.promptTokensBySource['miss']).toEqual([{ t: 0, value: 800 }]);
+  });
+
+  it('combines vLLM fresh prefill with physical cache tiers without double counting', async () => {
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          metrics: {
+            'vllm:prompt_tokens_by_source': {
+              series: [
+                sourceRateSeries('local_compute', 300),
+                sourceRateSeries('local_cache_hit', 400),
+                sourceRateSeries('external_kv_transfer', 300),
+              ],
+            },
+            'vllm:prompt_tokens_cached_by_source': {
+              series: [
+                sourceRateSeries('device', 400),
+                sourceRateSeries('cpu', 200),
+                sourceRateSeries('disk', 100),
+                sourceRateSeries('external', 0),
+                sourceRateSeries('mixed', 0),
+              ],
+            },
+          },
+        }),
+      ),
+    );
+
+    const series = await computeChartSeries(blob);
+    expect(series?.promptTokensBySource).toEqual({
+      local_compute: [{ t: 0, value: 300 }],
+      'cache hit (HBM)': [{ t: 0, value: 400 }],
+      'cache hit (CPU offload)': [{ t: 0, value: 200 }],
+      'cache hit (NVMe offload)': [{ t: 0, value: 100 }],
+    });
+    expect(total(Object.values(series!.promptTokensBySource).flat())).toBe(1000);
+    expect(series?.promptTokensBySource).not.toHaveProperty('local_cache_hit');
+    expect(series?.promptTokensBySource).not.toHaveProperty('external_kv_transfer');
+  });
+
+  it('preserves connector-defined vLLM tiers and treats a missing label as external', async () => {
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          metrics: {
+            'vllm:prompt_tokens_by_source': {
+              series: [
+                {
+                  labels: { source: 'local_compute' },
+                  timeslices: [{ start_ns: 0, end_ns: 1e9, rate: 5 }],
+                },
+              ],
+            },
+            'vllm:prompt_tokens_cached_by_source': {
+              series: [
+                {
+                  labels: { source: 'weka' },
+                  timeslices: [{ start_ns: 0, end_ns: 1e9, rate: 7 }],
+                },
+                {
+                  timeslices: [{ start_ns: 0, end_ns: 1e9, rate: 3 }],
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
+
+    const series = await computeChartSeries(blob);
+    expect(series?.promptTokensBySource).toEqual({
+      local_compute: [{ t: 0, value: 5 }],
+      'cache hit (weka)': [{ t: 0, value: 7 }],
+      'cache hit (external)': [{ t: 0, value: 3 }],
+    });
   });
 
   it('computes timing metadata from the widest metric window', async () => {

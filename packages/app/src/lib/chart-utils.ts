@@ -637,10 +637,15 @@ export const getNestedYValue = <T extends InferenceData>(point: T, key: string):
  */
 export const isFrontierEligible = (p: { x: number }): boolean => Number.isFinite(p.x) && p.x > 0;
 
+interface ParetoPoint {
+  x: number;
+  y: number;
+}
+
 /**
  * Calculates the Pareto front (upper right) for a given set of points.
  */
-export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] => {
+export const paretoFrontUpperRight = <T extends ParetoPoint>(points: T[]): T[] => {
   if (points.length === 0) {
     return [];
   }
@@ -652,7 +657,7 @@ export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] 
     return a.x - b.x;
   });
 
-  const front: InferenceData[] = [];
+  const front: T[] = [];
   let maxY = -Infinity;
 
   for (const point of points) {
@@ -671,7 +676,7 @@ export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] 
 /**
  * Calculates the Pareto front (upper left) for a given set of points.
  */
-export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] => {
+export const paretoFrontUpperLeft = <T extends ParetoPoint>(points: T[]): T[] => {
   if (points.length === 0) {
     return [];
   }
@@ -683,7 +688,7 @@ export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] =
     return a.x - b.x;
   });
 
-  const front: InferenceData[] = [];
+  const front: T[] = [];
 
   for (const point of points) {
     if (front.length > 0 && point.x === front.at(-1)!.x) {
@@ -704,7 +709,7 @@ export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] =
 /**
  * Calculates the Pareto front (lower left) for a given set of points.
  */
-export const paretoFrontLowerLeft = (points: InferenceData[]): InferenceData[] => {
+export const paretoFrontLowerLeft = <T extends ParetoPoint>(points: T[]): T[] => {
   if (points.length === 0) {
     return [];
   }
@@ -716,7 +721,7 @@ export const paretoFrontLowerLeft = (points: InferenceData[]): InferenceData[] =
     return a.x - b.x;
   });
 
-  const front: InferenceData[] = [];
+  const front: T[] = [];
   let minY = Infinity;
 
   for (const point of points) {
@@ -731,7 +736,7 @@ export const paretoFrontLowerLeft = (points: InferenceData[]): InferenceData[] =
 /**
  * Calculates the Pareto front (lower right) for a given set of points.
  */
-export const paretoFrontLowerRight = (points: InferenceData[]): InferenceData[] => {
+export const paretoFrontLowerRight = <T extends ParetoPoint>(points: T[]): T[] => {
   if (points.length === 0) {
     return [];
   }
@@ -743,7 +748,7 @@ export const paretoFrontLowerRight = (points: InferenceData[]): InferenceData[] 
     return b.x - a.x;
   });
 
-  const front: InferenceData[] = [];
+  const front: T[] = [];
   let minY = Infinity;
 
   for (const point of points) {
@@ -767,7 +772,7 @@ export type ParetoDirection = keyof typeof PARETO_BY_DIRECTION;
 /** Look up the Pareto frontier function for a roofline direction. */
 export const paretoFrontForDirection = (
   dir: ParetoDirection,
-): ((points: InferenceData[]) => InferenceData[]) => PARETO_BY_DIRECTION[dir];
+): (<T extends ParetoPoint>(points: T[]) => T[]) => PARETO_BY_DIRECTION[dir];
 
 // ---------------------------------------------------------------------------
 // Locale-aware metric label/title helpers
