@@ -127,6 +127,7 @@ Static content routes (no DB):
 - **Linter**: oxlint — `bun run lint` / `bun run lint:fix`
 - **Formatter**: oxfmt — `bun run fmt` / `bun run fmt:fix`
 - **Type checking**: `bun run typecheck` (tsc --noEmit, strict mode)
+- **Typography gate**: `bun run check:typography` (CI + pre-commit) — no new arbitrary font sizes (`text-[11px]`) or letter-spacing (`tracking-[0.16em]`) in class strings, and no quoted font-size literals in `src/lib/d3-chart/`. Use `text-2xs`/`text-3xs`, `tracking-eyebrow`/`tracking-eyebrow-wide`/`tracking-heading`, the `<Heading>`/`<Eyebrow>` components, or `CHART_TYPE` from `@/lib/d3-chart/typography` (chart font sizes must stay in TS — CSS variables don't survive PNG export). Existing offenders live in `packages/app/scripts/typography-allowlist.json` and migrate on touch. See [Typography](./docs/typography.md).
 - **Node**: 24.x
 
 ## Environment Variables

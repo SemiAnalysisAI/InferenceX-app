@@ -348,7 +348,7 @@ export default function EvalSamplesDrawer({
             </p>
           )}
           {!liveUnavailable && isUnofficial && (
-            <p className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-[11px] text-primary">
+            <p className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-2xs text-primary">
               {t.unofficialNotice}
             </p>
           )}
@@ -384,7 +384,7 @@ export default function EvalSamplesDrawer({
                   aria-expanded={expanded.has(s.docId)}
                 >
                   <PassFailBadge passed={s.passed} />
-                  <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+                  <span className="font-mono text-3xs text-muted-foreground tabular-nums">
                     #{s.docId}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-xs">{s.prompt ?? t.noPrompt}</span>
@@ -422,7 +422,7 @@ export default function EvalSamplesDrawer({
                       <button
                         type="button"
                         onClick={() => handleShare(s.docId)}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         aria-label={t.shareSample}
                         title={t.shareSample}
                         data-testid={`eval-sample-share-${s.docId}`}
@@ -521,7 +521,7 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
       aria-pressed={active}
     >
       {label}
-      <span className="ml-1.5 text-[10px] tabular-nums opacity-70">{count}</span>
+      <span className="ml-1.5 text-3xs tabular-nums opacity-70">{count}</span>
     </button>
   );
 }
@@ -529,14 +529,14 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
 function PassFailBadge({ passed }: { passed: boolean | null }) {
   if (passed === null) {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-3xs text-muted-foreground">
         ?
       </span>
     );
   }
   return (
     <span
-      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-3xs font-bold ${
         passed
           ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
           : 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400'
@@ -590,16 +590,16 @@ function FewShotBlock({
               key={i}
               className="rounded border border-border/40 bg-muted/30 p-2"
             >
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t.exampleQuestion(i + 1)}
               </div>
-              <pre className="mb-2 whitespace-pre-wrap font-mono text-[11px] leading-snug wrap-break-word">
+              <pre className="mb-2 whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
                 {d.question}
               </pre>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t.exampleAnswer(i + 1)}
               </div>
-              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-snug wrap-break-word">
+              <pre className="whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
                 {d.answer}
               </pre>
             </div>
@@ -621,10 +621,10 @@ function Block({
 }) {
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded border border-border/40 bg-muted/30 p-2 font-mono text-[11px] leading-snug wrap-break-word">
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded border border-border/40 bg-muted/30 p-2 font-mono text-2xs leading-snug wrap-break-word">
         {value ?? <span className="italic text-muted-foreground">{emptyText}</span>}
       </pre>
     </div>

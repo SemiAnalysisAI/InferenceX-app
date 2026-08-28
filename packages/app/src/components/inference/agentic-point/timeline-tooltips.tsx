@@ -20,7 +20,7 @@ export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkabl
   const queueMs = (req.start - req.credit) / 1e6;
   return (
     <div
-      className="fixed z-50 pointer-events-none rounded-md border border-border bg-card p-2.5 shadow-lg text-[11px]"
+      className="fixed z-50 pointer-events-none rounded-md border border-border bg-card p-2.5 shadow-lg text-2xs"
       style={{ left: data.x + 12, top: data.y - 10, maxWidth: 280 }}
     >
       <div className="flex items-center gap-2 font-medium text-foreground">
@@ -71,11 +71,11 @@ export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkabl
         <span>Worker</span>
         <span className="text-foreground text-right truncate">{shortenWid(req.wid)}</span>
       </div>
-      <div className="mt-1.5 pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
+      <div className="mt-1.5 pt-1 border-t border-border/40 text-3xs text-muted-foreground">
         Started at {formatTickLabel(req.start)}
       </div>
       {linkable && (
-        <div className="mt-1 text-[10px] font-medium text-primary">
+        <div className="mt-1 text-3xs font-medium text-primary">
           Click to view this conversation in the dataset →
         </div>
       )}
@@ -115,7 +115,7 @@ export function CursorPopover({
       : cursor.clientX - 220;
   return (
     <div
-      className="fixed z-40 pointer-events-none rounded-md border border-border bg-card/95 backdrop-blur p-2 shadow-lg text-[11px] font-mono"
+      className="fixed z-40 pointer-events-none rounded-md border border-border bg-card/95 backdrop-blur p-2 shadow-lg text-2xs font-mono"
       style={{ left, top: cursor.clientY - 60, minWidth: 180 }}
     >
       <div className="flex justify-between gap-3 text-foreground">
@@ -127,9 +127,9 @@ export function CursorPopover({
       <div className="mt-1 pt-1 border-t border-border/40 grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground">
         <span>In flight</span>
         <span className="text-foreground text-right tabular-nums">{inflight}</span>
-        <span className="pl-3 text-[10px]">running</span>
+        <span className="pl-3 text-3xs">running</span>
         <span className="text-foreground text-right tabular-nums">{running}</span>
-        <span className="pl-3 text-[10px]">waiting</span>
+        <span className="pl-3 text-3xs">waiting</span>
         <span className="text-foreground text-right tabular-nums">{waiting}</span>
         <span>Completed</span>
         <span className="text-foreground text-right tabular-nums">{completed}</span>

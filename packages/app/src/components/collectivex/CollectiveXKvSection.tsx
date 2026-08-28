@@ -116,7 +116,9 @@ export function CollectiveXKvSection({
     ids: Set<string>;
     signature: string;
   } | null>(null);
-  const [legendExpanded, setLegendExpanded] = useState(false);
+  // Default open: with the closable sidebar panel, `false` now means fully
+  // hidden (reopen button only), so the legend must start expanded.
+  const [legendExpanded, setLegendExpanded] = useState(true);
 
   const rows = useMemo<CollectiveXKvRunCase[]>(
     () =>

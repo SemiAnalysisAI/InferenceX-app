@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import type { ChartLayout, ChartSetupConfig } from './types';
+import { CHART_TYPE, px } from './typography';
 import {
   createLogoWatermark,
   createUnofficialWatermark,
@@ -115,7 +116,7 @@ export function setupChartStructure(
         .attr('x', -(margin.top + height / 2))
         .attr('y', 14)
         .attr('text-anchor', 'middle')
-        .attr('font-size', '12px')
+        .attr('font-size', px(CHART_TYPE.axisLabel))
         .text(config.yLabel);
     }
 
@@ -126,7 +127,7 @@ export function setupChartStructure(
         .attr('x', margin.left + width / 2)
         .attr('y', containerHeight - 10)
         .attr('text-anchor', 'middle')
-        .attr('font-size', '12px')
+        .attr('font-size', px(CHART_TYPE.axisLabel))
         .text(config.xLabel);
     }
 

@@ -9,6 +9,7 @@ import {
 } from '@/lib/chart-rendering';
 
 import type { ContinuousScale } from '../types';
+import { CHART_TYPE, px } from '../typography';
 
 export interface ScatterPointConfig<T> {
   getColor: (d: T) => string;
@@ -150,7 +151,7 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
         .attr('class', 'point-label')
         .attr('text-anchor', 'middle')
         .attr('fill', config.foreground!)
-        .attr('font-size', '10px')
+        .attr('font-size', px(CHART_TYPE.dataLabel))
         .attr('font-weight', '700')
         .attr('pointer-events', 'none');
       const firstDy = -(0.8 + (lines.length - 1) * 1.1);

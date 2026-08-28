@@ -29,7 +29,7 @@ const STRINGS = {
     eyebrow: 'AgentX / live results',
     title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
+      'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv7/v8 & Rubin NVL72 & MI455X UALoE72',
     overview: 'Overview',
     dashboard: 'Full dashboard',
     ledgerTitle: 'Models with AgentX results',
@@ -40,7 +40,7 @@ const STRINGS = {
     eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
-      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
+      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv7/v8、Rubin NVL72 与 MI455X UALoE72。',
     overview: '总览',
     dashboard: '查看完整仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
@@ -72,14 +72,14 @@ export function AgentXCompareHero({
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
           <div className="flex flex-col justify-center px-6 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               {t.eyebrow}
             </p>
             {/* `relative` anchors the splash, which positions itself absolutely
                 at the top right. Landing only: /compare is not the launch
                 surface, and the announcement belongs on the front page. */}
             <div className="relative">
-              <Heading className="mt-3 max-w-2xl text-[1.5rem]/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
               </Heading>
               {surface === 'landing' && <MinecraftSplash />}
@@ -152,7 +152,7 @@ export function AgentXCompareHero({
                         <span className="min-w-0">{model.label}</span>
                         <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
                       </span>
-                      <span className="mt-1 block font-mono text-[10px] tracking-[0.14em] text-brand uppercase">
+                      <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
                         AgentX
                       </span>
                     </span>

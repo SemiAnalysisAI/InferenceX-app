@@ -570,7 +570,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   );
 
   const parallelismKey = hasDisaggConfigs ? (
-    <div className="mt-2 px-1 pr-2 text-[10px] text-muted-foreground/80 leading-tight no-export">
+    <div className="mt-2 px-1 pr-2 text-3xs text-muted-foreground/80 leading-tight no-export">
       <div>
         <span className="font-mono">P(·/·/·/·)</span> prefill
         <span className="mx-1">·</span>
