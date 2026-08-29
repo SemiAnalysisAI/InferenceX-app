@@ -863,3 +863,82 @@ describe('TCO Calculator', () => {
     });
   });
 });
+
+describe('TCO Calculator Chinese route', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/calculator', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+  });
+
+  it('localizes chart internals, table headers, and preserved units', () => {
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.get('[data-testid="calculator-bar-chart"]').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '吞吐量：')
+      .and('contain.text', '成本：');
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    cy.get('[data-testid="calculator-results-table"] thead')
+      .should('contain.text', '芯片')
+      .and('contain.text', '成本 ($/M tok)')
+      .and('contain.text', '并发数');
+  });
+
+  it('supports the complete chart-to-table path at 1440px', () => {
+    cy.viewport(1440, 900);
+    cy.reload();
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
+    cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
+    cy.get('[data-testid="calculator-table-view-btn"]').click();
+    cy.get('[data-testid="calculator-results-table"]').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps dense tables internally scrollable without body overflow at 390px', () => {
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    // DataTable renders its horizontal scroller inside the testid wrapper.
+    cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
+      .first()
+      .then(($scroller) => {
+        expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+      });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps the localized chart contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('emits bidirectional hreflang metadata', () => {
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/calculator');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/calculator');
+  });
+});

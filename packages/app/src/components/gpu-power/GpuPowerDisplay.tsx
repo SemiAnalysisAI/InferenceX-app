@@ -35,6 +35,7 @@ import {
   type GpuMetricKey,
   type GpuPowerApiResponse,
   ALL_METRIC_OPTIONS,
+  getGpuMetricLabel,
   getAvailableMetrics,
 } from './types';
 
@@ -67,6 +68,15 @@ const STRINGS = {
     downsample: 'Downsample',
     perGpuStats: 'Per-Chip Statistics',
     rows: 'rows',
+    error: 'Failed to load chip metrics.',
+    numericError: 'Run ID must be numeric.',
+    retry: 'Retry',
+    empty: 'This run has no chip metrics artifacts to display.',
+    viewMode: 'View mode',
+    lineChart: 'Line chart',
+    correlationScatter: 'Correlation scatter',
+    shareTitle: 'Copy share link',
+    chip: 'Chip',
   },
   zh: {
     heading: 'PowerX',
@@ -92,27 +102,22 @@ const STRINGS = {
     metricCorrelation: '指标相关性',
     resetFilter: '重置筛选',
     downsample: '降采样',
-    perGpuStats: '每芯片统计信息',
+    perGpuStats: '单芯片统计信息',
     rows: '行',
+    error: '无法加载芯片指标。',
+    numericError: '运行 ID 必须为数字。',
+    retry: '重试',
+    empty: '该运行没有可显示的芯片指标产物。',
+    viewMode: '显示模式',
+    lineChart: '折线图',
+    correlationScatter: '相关性散点图',
+    shareTitle: '复制分享链接',
+    chip: '芯片',
   },
 } as const;
 
 type GpuMetricsView = 'chart' | 'correlation';
 
-const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
-  {
-    value: 'chart',
-    icon: <BarChart3 className="size-3.5" />,
-    ariaLabel: 'Line chart',
-    title: 'Line chart',
-  },
-  {
-    value: 'correlation',
-    icon: <ScatterChart className="size-3.5" />,
-    ariaLabel: 'Correlation scatter',
-    title: 'Correlation scatter',
-  },
-];
 async function fetchGpuPowerRun(runId: string, signal: AbortSignal): Promise<GpuPowerApiResponse> {
   const response = await fetch(`/api/gpu-metrics?runId=${encodeURIComponent(runId)}`, {
     cache: 'no-store',
@@ -152,7 +157,11 @@ export default function GpuMetricsDisplay() {
   const artifacts = query.data?.artifacts ?? [];
   const runInfo = query.data?.runInfo ?? null;
   const loading = Boolean(requestedRunId) && query.isFetching;
-  const error = query.error instanceof Error ? query.error.message : null;
+  const error = query.error
+    ? /^\d+$/u.test(requestedRunId ?? '')
+      ? t.error
+      : t.numericError
+    : null;
 
   const [selection, setSelection] = useState<{
     searchKey: string;
@@ -206,6 +215,23 @@ export default function GpuMetricsDisplay() {
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
+  const viewOptions = useMemo<SegmentedToggleOption<GpuMetricsView>[]>(
+    () => [
+      {
+        value: 'chart',
+        icon: <BarChart3 className="size-3.5" />,
+        ariaLabel: t.lineChart,
+        title: t.lineChart,
+      },
+      {
+        value: 'correlation',
+        icon: <ScatterChart className="size-3.5" />,
+        ariaLabel: t.correlationScatter,
+        title: t.correlationScatter,
+      },
+    ],
+    [t],
+  );
 
   const handleLoad = useCallback(() => {
     const runId = runIdInput.trim();
@@ -305,6 +331,12 @@ export default function GpuMetricsDisplay() {
     track('gpu_metrics_view_changed', { view: value });
   }, []);
 
+  const handleCorrelationMetricChange = useCallback((axis: 'x' | 'y', value: string) => {
+    track('gpu_metrics_correlation_metric_changed', { axis, metric: value });
+    if (axis === 'x') setCorrXMetric(value as GpuMetricKey);
+    else setCorrYMetric(value as GpuMetricKey);
+  }, []);
+
   return (
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
@@ -328,7 +360,7 @@ export default function GpuMetricsDisplay() {
                   track('powerx_relocked');
                   router.push(localePath('/inference', locale));
                 }}
-                title="Re-lock feature gate"
+                title={t.relockButton}
               >
                 <Lock className="size-3" />
                 {t.relockButton}
@@ -370,7 +402,25 @@ export default function GpuMetricsDisplay() {
 
       {error && (
         <Card className="mb-4 border-destructive" data-testid="gpu-metrics-error">
-          <p className="text-sm text-destructive">{error}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                track('gpu_metrics_retry_clicked', { runId: requestedRunId });
+                void query.refetch();
+              }}
+            >
+              {t.retry}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {runInfo && artifacts.length === 0 && !error && (
+        <Card className="mb-4" data-testid="gpu-metrics-empty">
+          <p className="text-sm text-muted-foreground">{t.empty}</p>
         </Card>
       )}
 
@@ -394,14 +444,18 @@ export default function GpuMetricsDisplay() {
               </span>
               <span>
                 <span className="text-muted-foreground">{t.dateLabel}</span>{' '}
-                {new Date(runInfo.createdAt).toLocaleDateString()}
+                {locale === 'zh'
+                  ? new Date(runInfo.createdAt).toLocaleDateString('zh-CN')
+                  : new Date(runInfo.createdAt).toLocaleDateString()}
               </span>
               <span>
                 <span className="text-muted-foreground">{t.statusLabel}</span> {runInfo.conclusion}
               </span>
               <span>
                 <span className="text-muted-foreground">{t.dataPointsLabel}</span>{' '}
-                {currentData.length.toLocaleString()}
+                {locale === 'zh'
+                  ? currentData.length.toLocaleString('zh-CN')
+                  : currentData.length.toLocaleString()}
               </span>
             </div>
 
@@ -440,7 +494,7 @@ export default function GpuMetricsDisplay() {
                   <SelectContent>
                     {availableMetrics.map((m) => (
                       <SelectItem key={m.key} value={m.key}>
-                        {m.label} ({m.unit})
+                        {getGpuMetricLabel(m, locale)} ({m.unit})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -458,9 +512,9 @@ export default function GpuMetricsDisplay() {
               <div className="flex items-center gap-1.5 no-export">
                 <SegmentedToggle
                   value={chartView}
-                  options={GPU_METRICS_VIEW_OPTIONS}
+                  options={viewOptions}
                   onValueChange={handleChartViewChange}
-                  ariaLabel="View mode"
+                  ariaLabel={t.viewMode}
                   className="rounded-md border p-0 gap-0"
                   buttonClassName="p-1.5 rounded-none first:rounded-l-md last:rounded-r-md"
                   activeButtonClassName="bg-muted text-foreground"
@@ -471,7 +525,7 @@ export default function GpuMetricsDisplay() {
                   size="sm"
                   onClick={handleShare}
                   className="h-7 gap-1.5 text-xs"
-                  title="Copy share link"
+                  title={t.shareTitle}
                   data-testid="gpu-metrics-share-button"
                 >
                   {copied ? (
@@ -495,7 +549,7 @@ export default function GpuMetricsDisplay() {
                   <Label className="text-xs">{t.xAxis}</Label>
                   <Select
                     value={corrXMetric}
-                    onValueChange={(v) => setCorrXMetric(v as GpuMetricKey)}
+                    onValueChange={(v) => handleCorrelationMetricChange('x', v)}
                   >
                     <SelectTrigger className="h-8 w-[160px] text-xs">
                       <SelectValue />
@@ -503,7 +557,7 @@ export default function GpuMetricsDisplay() {
                     <SelectContent>
                       {availableMetrics.map((m) => (
                         <SelectItem key={m.key} value={m.key}>
-                          {m.label}
+                          {getGpuMetricLabel(m, locale)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -513,7 +567,7 @@ export default function GpuMetricsDisplay() {
                   <Label className="text-xs">{t.yAxis}</Label>
                   <Select
                     value={corrYMetric}
-                    onValueChange={(v) => setCorrYMetric(v as GpuMetricKey)}
+                    onValueChange={(v) => handleCorrelationMetricChange('y', v)}
                   >
                     <SelectTrigger className="h-8 w-[160px] text-xs">
                       <SelectValue />
@@ -521,7 +575,7 @@ export default function GpuMetricsDisplay() {
                     <SelectContent>
                       {availableMetrics.map((m) => (
                         <SelectItem key={m.key} value={m.key}>
-                          {m.label}
+                          {getGpuMetricLabel(m, locale)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -540,7 +594,7 @@ export default function GpuMetricsDisplay() {
                 caption={
                   <>
                     <h2 className="text-lg font-semibold">
-                      {metricConfig.label}
+                      {getGpuMetricLabel(metricConfig, locale)}
                       {t.metricOverTimeSuffix}
                     </h2>
                     <UnofficialDomainNotice />
@@ -551,9 +605,9 @@ export default function GpuMetricsDisplay() {
                     variant="sidebar"
                     onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `Chip ${gpuIndex}`,
+                      name: `${t.chip} ${gpuIndex}`,
                       hw: String(gpuIndex),
-                      label: `Chip ${gpuIndex}`,
+                      label: `${t.chip} ${gpuIndex}`,
                       color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
                       isActive: visibleGpus.has(gpuIndex),
                       onClick: () => toggleGpu(gpuIndex),
@@ -607,9 +661,9 @@ export default function GpuMetricsDisplay() {
                     variant="sidebar"
                     onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `Chip ${gpuIndex}`,
+                      name: `${t.chip} ${gpuIndex}`,
                       hw: String(gpuIndex),
-                      label: `Chip ${gpuIndex}`,
+                      label: `${t.chip} ${gpuIndex}`,
                       color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
                       isActive: visibleGpus.has(gpuIndex),
                       onClick: () => toggleGpu(gpuIndex),
@@ -650,7 +704,7 @@ export default function GpuMetricsDisplay() {
           {/* Statistics Table */}
           <Card className="mt-4">
             <h3 className="text-sm font-semibold mb-2">
-              {t.perGpuStats} ({metricConfig.label})
+              {t.perGpuStats} ({getGpuMetricLabel(metricConfig, locale)})
             </h3>
             <GpuStatsTable data={currentData} metricKey={selectedMetric} />
           </Card>

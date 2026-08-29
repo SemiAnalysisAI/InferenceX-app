@@ -292,7 +292,7 @@ const STRINGS = {
   },
 } as const;
 
-function getChartTitleZh(
+export function getChartTitleZh(
   barMetric: BarMetric,
   mode: CalculatorMode,
   targetValue: number,
@@ -310,10 +310,10 @@ function getChartTitleZh(
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
     case 'power': {
-      return `${targetLabel}下每满配兆瓦${tokenTypeLabel} token 数`;
+      return `${targetLabel}下每全电源配置兆瓦${tokenTypeLabel} token 吞吐量`;
     }
     case 'cost': {
-      const providerLabel = getCostProviderLabel(costProvider || 'costh');
+      const providerLabel = getCostProviderLabel(costProvider || 'costh', 'zh');
       return `${targetLabel}下每百万${tokenTypeLabel} token 成本（${providerLabel}）`;
     }
     default: {

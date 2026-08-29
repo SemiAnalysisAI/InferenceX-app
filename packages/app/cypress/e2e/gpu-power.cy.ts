@@ -1,3 +1,37 @@
+/**
+ * Hover a chart point until its tooltip opens, then assert the tooltip text.
+ * The D3 charts re-render after the container is measured, which can detach
+ * the hovered point (so the first synthetic mouseenter is lost) and can hide
+ * the tooltip again before a retrying `:visible` assertion samples it — so
+ * re-trigger (bounded) and assert the content at the moment it is displayed.
+ */
+function hoverGpuPowerPointAndAssertTooltip(
+  pointSelector: string,
+  tooltipSelector: string,
+  expectedTexts: string[],
+  attempts = 20,
+) {
+  cy.get(pointSelector).first().trigger('mouseenter', { force: true });
+  cy.document().then((doc) => {
+    const tip = doc.querySelector<HTMLElement>(tooltipSelector);
+    if (tip && tip.style.display === 'block') {
+      for (const text of expectedTexts) {
+        expect(tip.textContent, `tooltip ${tooltipSelector}`).to.include(text);
+      }
+    } else if (attempts > 0) {
+      cy.wait(200);
+      hoverGpuPowerPointAndAssertTooltip(
+        pointSelector,
+        tooltipSelector,
+        expectedTexts,
+        attempts - 1,
+      );
+    } else {
+      throw new Error(`tooltip ${tooltipSelector} never became visible`);
+    }
+  });
+}
+
 /** Send the ↑↑↓↓ unlock sequence to reveal the Hidden popover. */
 function unlockPowerX() {
   cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
@@ -89,6 +123,168 @@ describe('PowerX', () => {
       cy.get('[data-testid="gpu-metrics-display"]')
         .should('contain.text', 'gpu_metrics')
         .and('contain.text', 'GitHub Actions run ID');
+    });
+  });
+});
+
+const gpuMetricsResponse = {
+  runInfo: {
+    id: 12345,
+    name: 'GPU metrics test',
+    branch: 'feat/test',
+    sha: 'abc123',
+    createdAt: '2026-08-23T10:00:00Z',
+    url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/12345',
+    conclusion: 'success',
+    status: 'completed',
+  },
+  artifacts: [
+    {
+      name: 'gpu_metrics_h200_test',
+      data: [
+        {
+          timestamp: '2026-08-23T10:00:00Z',
+          index: 0,
+          power: 250,
+          temperature: 65,
+          smClock: 1900,
+          memClock: 1500,
+          gpuUtil: 90,
+          memUtil: 70,
+        },
+        {
+          timestamp: '2026-08-23T10:00:01Z',
+          index: 0,
+          power: 260,
+          temperature: 66,
+          smClock: 1910,
+          memClock: 1500,
+          gpuUtil: 92,
+          memUtil: 71,
+        },
+      ],
+    },
+  ],
+};
+
+describe('PowerX Chinese route', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+  });
+
+  it('localizes metric registries, chart internals, controls, dates, legends, and statistics', () => {
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', gpuMetricsResponse).as('gpuMetrics');
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@gpuMetrics');
+    cy.get('[data-testid="gpu-metrics-metric-select"]').should('contain.text', '功耗 (W)');
+    cy.get('[data-testid="gpu-metrics-chart-container"] [role="tablist"]').should(
+      'have.attr',
+      'aria-label',
+      '显示模式',
+    );
+    cy.get('[data-testid="gpu-metrics-share-button"]').should('have.attr', 'title', '复制分享链接');
+    cy.get('[data-testid="gpu-metrics-display"]')
+      .should('contain.text', '2026/8/23')
+      .and('contain.text', '芯片 0')
+      .and('contain.text', '单芯片统计信息')
+      .and('contain.text', '样本数')
+      .and('contain.text', '最小值');
+    cy.get('[data-testid="gpu-metrics-chart-svg"] svg')
+      .should('contain.text', '秒')
+      .and('contain.text', '功耗 (W)');
+    cy.get('[data-testid="gpu-metrics-chart-svg"]').should('contain.text', '点击数据点固定提示框');
+    cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '芯片 0')
+      .and('contain.text', '功耗：');
+    cy.get('[data-testid="gpu-metrics-display"] table').contains('button', '样本数').click();
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/gpu-metrics');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/gpu-metrics');
+  });
+
+  it('supports the correlation click path at 1440px', () => {
+    cy.viewport(1440, 900);
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', gpuMetricsResponse).as('gpuMetrics');
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@gpuMetrics');
+    cy.get('button[title="相关性散点图"]').click();
+    hoverGpuPowerPointAndAssertTooltip(
+      '[data-testid="gpu-metrics-correlation"] svg .point',
+      '[data-chart-tooltip="gpu-metrics-correlation"]',
+      ['功耗：', '温度：'],
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('hides upstream error details and retries the selected run', () => {
+    let attempts = 0;
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', (req) => {
+      attempts += 1;
+      req.reply(
+        attempts === 1
+          ? { statusCode: 500, body: { error: 'sensitive upstream detail' } }
+          : { statusCode: 200, body: gpuMetricsResponse },
+      );
+    }).as('gpuMetricsRetry');
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@gpuMetricsRetry');
+    cy.get('[data-testid="gpu-metrics-error"]')
+      .should('contain.text', '无法加载芯片指标。')
+      .and('not.contain.text', 'sensitive upstream detail');
+    cy.get('[data-testid="gpu-metrics-error"]').contains('button', '重试').click();
+    cy.wait('@gpuMetricsRetry');
+    cy.get('[data-testid="gpu-metrics-chart-container"]').should('be.visible');
+  });
+
+  it('shows a localized empty-artifact state and keeps mobile width bounded', () => {
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', {
+      ...gpuMetricsResponse,
+      artifacts: [],
+    });
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.get('[data-testid="gpu-metrics-empty"]').should('contain.text', '没有可显示的芯片指标产物');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps localized chart controls contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', gpuMetricsResponse).as('gpuMetrics');
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@gpuMetrics');
+    cy.get('[data-testid="gpu-metrics-metric-select"]').should('contain.text', '功耗 (W)');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
   });
 });

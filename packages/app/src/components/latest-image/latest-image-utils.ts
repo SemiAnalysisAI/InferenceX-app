@@ -30,6 +30,13 @@ export const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
 /** Age past which the cell is rendered at max red — anything older looks identical. */
 export const AGE_MAX_RED_DAYS = 60;
 
+/** Preserve the legacy English product spelling while using the reviewed Chinese copy. */
+export function getCurrentImageNodeTypeTooltip(locale: 'en' | 'zh'): string {
+  return locale === 'zh'
+    ? '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。'
+    : 'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.';
+}
+
 /** Whole-day delta between today (UTC) and an ISO date string (YYYY-MM-DD). */
 export function daysSince(dateStr: string, today: Date): number {
   const submitted = new Date(`${dateStr}T00:00:00Z`).getTime();
