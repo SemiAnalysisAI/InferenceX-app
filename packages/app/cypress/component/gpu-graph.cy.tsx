@@ -6,6 +6,7 @@ import {
   createMockHardwareConfig,
 } from '../support/mock-data';
 import { Precision, Sequence } from '@/lib/data-mappings';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
@@ -73,6 +74,35 @@ describe('GPUGraph', () => {
     );
 
     cy.contains('No data available').should('be.visible');
+  });
+
+  it('localizes the Chinese comparison empty state', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 390, height: 600 }}>
+          <GPUGraph
+            chartId="test-gpu-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="并发数"
+            yLabel="单芯片吞吐量 (tok/s)"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['h100'],
+          selectedDates: ['2025-03-01'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2025-03-01_h100']),
+          selectedPrecisions: [Precision.FP4],
+        },
+      },
+    );
+    cy.contains('暂无数据').should('be.visible');
+    cy.contains('请调整模型、序列长度、精度、日期范围或芯片选项。').should('be.visible');
   });
 
   it('renders chart with points when data and selectedGPUs are provided', () => {

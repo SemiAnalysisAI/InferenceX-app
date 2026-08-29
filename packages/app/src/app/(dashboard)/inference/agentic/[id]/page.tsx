@@ -3,11 +3,21 @@ import { notFound } from 'next/navigation';
 
 import { AgenticPointDetail } from '@/components/inference/agentic-point/agentic-point-detail';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { enAlternates } from '@/lib/i18n';
 
-export const metadata: Metadata = {
-  title: 'Agentic trace detail | InferenceX',
-  robots: { index: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: 'Agentic trace detail | InferenceX',
+    description: `Inspect request timelines, server metrics, aggregates, and logs for Agentic benchmark point #${id}.`,
+    alternates: enAlternates(`/inference/agentic/${id}`),
+    robots: { index: false },
+  };
+}
 
 export default async function AgenticPointDetailPage({
   params,

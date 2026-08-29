@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const FRAMEWORK_SLUGS = [
   'vllm',
@@ -26,15 +26,6 @@ const ROUTE_VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
 ] as const;
-
-function expectNoPageOverflow(): void {
-  cy.window().should((win) => {
-    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
-    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
-      win.innerWidth,
-    );
-  });
-}
 
 describe('AgentX optimizations', () => {
   beforeEach(() => {
@@ -116,7 +107,11 @@ describe('AgentX optimizations', () => {
       });
   });
 
-  it('renders the index and every project at 1440px and 390px in both locales', () => {
+  it('renders the index and representative projects at 1440px and 390px in both locales', () => {
+    // Project pages share one template and differ only in typechecked data, so
+    // the route matrix visits two representatives (one with a hyphenated slug)
+    // instead of all eight; the tests above deep-cover vllm (en) and sglang (zh).
+    const matrixSlugs = ['tensorrt-llm', 'mooncake'] as const;
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);
@@ -133,7 +128,7 @@ describe('AgentX optimizations', () => {
         );
         expectNoPageOverflow();
 
-        for (const slug of FRAMEWORK_SLUGS) {
+        for (const slug of matrixSlugs) {
           cy.visit(`${locale}/agentx/optimizations/${slug}`, {
             onBeforeLoad: unlockAgenticGate,
           });

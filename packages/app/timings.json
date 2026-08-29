@@ -93,6 +93,10 @@
       "duration": 2629
     },
     {
+      "spec": "cypress/e2e/current-inferencex-image.cy.ts",
+      "duration": 8000
+    },
+    {
       "spec": "cypress/e2e/custom-user-values.cy.ts",
       "duration": 15019
     },

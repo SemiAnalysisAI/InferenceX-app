@@ -18,9 +18,59 @@ import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { getHardwareConfig } from '@/lib/constants';
 import { Sequence, type Sequence as SequenceType } from '@/lib/data-mappings';
 import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
+
+const COMPARISON_CHANGELOG_STRINGS = {
+  en: {
+    gitCommit: 'Git Commit',
+    workflowRun: 'Workflow Run',
+    label: (count: number) =>
+      `Config Changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
+    loading: 'Config Changelog (loading...)',
+    emptyLabel: (count: number) =>
+      `Config Changelog (${count} date${count === 1 ? '' : 's'} queried — no matching changelog data)`,
+    addAll: 'Add all to chart',
+    empty:
+      'No config changelog data matching the selected chips and precisions for this date range. Changelog tracking began Dec 30, 2025.',
+    remove: 'Remove from chart',
+    add: 'Add to chart',
+    onChart: 'On chart',
+    noRunNotes: 'No changelog notes for this run',
+    firstRun: 'First benchmark run for this configuration',
+    beforeTracking: 'No changelog data (tracking began Dec 30, 2025)',
+    unchanged: 'No config changes — same configuration as previous run',
+    initial: 'Initial configuration — no changelog entry recorded',
+  },
+  zh: {
+    gitCommit: 'Git Commit',
+    workflowRun: '工作流运行记录',
+    label: (count: number) => `配置变更日志（${count} 个日期有变更）`,
+    loading: '配置变更日志（加载中……）',
+    emptyLabel: (count: number) => `配置变更日志（已查询 ${count} 个日期，无匹配数据）`,
+    addAll: '全部添加到图表',
+    empty:
+      '该日期范围内没有与所选芯片和精度匹配的配置变更日志。变更日志自 2025 年 12 月 30 日起开始记录。',
+    remove: '从图表移除',
+    add: '添加到图表',
+    onChart: '已在图表中',
+    noRunNotes: '本次运行没有变更日志说明',
+    firstRun: '该配置的首次基准测试运行',
+    beforeTracking: '无变更日志数据（自 2025 年 12 月 30 日起开始记录）',
+    unchanged: '配置未变更，与上一次运行相同',
+    initial: '初始配置，未记录变更日志条目',
+  },
+} as const;
+
+const formatComparisonDate = (date: string, locale: Locale) => {
+  if (locale === 'en') return date;
+  const [year, month, day] = date.split('-').map(Number);
+  return `${year}年${month}月${day}日`;
+};
 
 /** Git Commit and Workflow Run external links for a run, each shown when known. */
-function renderRunLinks(headRef?: string, runUrl?: string) {
+function renderRunLinks(locale: Locale, headRef?: string, runUrl?: string) {
+  const t = COMPARISON_CHANGELOG_STRINGS[locale];
   return (
     <>
       {headRef && (
@@ -30,7 +80,7 @@ function renderRunLinks(headRef?: string, runUrl?: string) {
           rel="noopener noreferrer"
           className="text-sm hover:underline text-foreground underline"
         >
-          Git Commit
+          {t.gitCommit}
           <ExternalLinkIcon />
         </a>
       )}
@@ -41,7 +91,7 @@ function renderRunLinks(headRef?: string, runUrl?: string) {
           rel="noopener noreferrer"
           className="text-sm hover:underline text-foreground underline"
         >
-          Workflow Run
+          {t.workflowRun}
           <ExternalLinkIcon />
         </a>
       )}
@@ -103,6 +153,8 @@ export default function ComparisonChangelog({
   firstAvailableDate,
   defaultExpanded = true,
 }: ComparisonChangelogProps) {
+  const locale = useLocale();
+  const t = COMPARISON_CHANGELOG_STRINGS[locale];
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const benchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
@@ -247,10 +299,10 @@ export default function ComparisonChangelog({
 
   const label =
     filteredChangelogs.length > 0
-      ? `Config Changelog (${filteredChangelogs.length} date${filteredChangelogs.length === 1 ? '' : 's'} with changes)`
+      ? t.label(filteredChangelogs.length)
       : loading
-        ? 'Config Changelog (loading...)'
-        : `Config Changelog (${totalDatesQueried} date${totalDatesQueried === 1 ? '' : 's'} queried — no matching changelog data)`;
+        ? t.loading
+        : t.emptyLabel(totalDatesQueried);
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all">
@@ -281,7 +333,7 @@ export default function ComparisonChangelog({
             className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-1"
           >
             <Plus className="size-3" />
-            Add all to chart
+            {t.addAll}
           </button>
         )}
       </div>
@@ -293,10 +345,7 @@ export default function ComparisonChangelog({
       >
         <div className="px-4 pt-2 pb-4 flex flex-col gap-3">
           {filteredChangelogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No config changelog data matching the selected chips and precisions for this date
-              range. Changelog tracking began Dec 30, 2025.
-            </p>
+            <p className="text-sm text-muted-foreground">{t.empty}</p>
           ) : (
             filteredChangelogs.map((item) => {
               const runs = runMetaFor(item);
@@ -314,11 +363,11 @@ export default function ComparisonChangelog({
                     <div key={entry} className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold">
-                          {item.date}
+                          {formatComparisonDate(item.date, locale)}
                           {gpuLabel ? ` ${gpuLabel}` : ''} #{idx + 1}
                         </span>
                         <span className="text-muted-foreground">&mdash;</span>
-                        {renderRunLinks(run.headRef, run.runUrl)}
+                        {renderRunLinks(locale, run.headRef, run.runUrl)}
                         {onChart ? (
                           <button
                             type="button"
@@ -332,7 +381,7 @@ export default function ComparisonChangelog({
                             className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                           >
                             <Minus className="size-3" />
-                            Remove from chart
+                            {t.remove}
                           </button>
                         ) : (
                           <button
@@ -347,7 +396,7 @@ export default function ComparisonChangelog({
                             className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                           >
                             <Plus className="size-3" />
-                            Add to chart
+                            {t.add}
                           </button>
                         )}
                       </div>
@@ -355,7 +404,7 @@ export default function ComparisonChangelog({
                         run.entries.map((e, i) => renderDescription(e, i))
                       ) : (
                         <span className="text-sm text-muted-foreground italic pl-5">
-                          No changelog notes for this run
+                          {t.noRunNotes}
                         </span>
                       )}
                     </div>
@@ -373,13 +422,13 @@ export default function ComparisonChangelog({
                 <div key={item.date} className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold">
-                      {item.date}
+                      {formatComparisonDate(item.date, locale)}
                       {dateGpuLabel ? ` ${dateGpuLabel}` : ''}
                     </span>
                     {item.entries.length > 0 && (headRef || runUrl) && (
                       <>
                         <span className="text-muted-foreground">&mdash;</span>
-                        {renderRunLinks(headRef, runUrl)}
+                        {renderRunLinks(locale, headRef, runUrl)}
                       </>
                     )}
                     {datesOnChart.has(item.date) ? (
@@ -393,12 +442,12 @@ export default function ComparisonChangelog({
                           className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                         >
                           <Minus className="size-3" />
-                          Remove from chart
+                          {t.remove}
                         </button>
                       ) : (
                         <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                           <Lock className="size-3" />
-                          On chart
+                          {t.onChart}
                         </span>
                       )
                     ) : (
@@ -411,7 +460,7 @@ export default function ComparisonChangelog({
                         className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                       >
                         <Plus className="size-3" />
-                        Add to chart
+                        {t.add}
                       </button>
                     )}
                   </div>
@@ -420,14 +469,14 @@ export default function ComparisonChangelog({
                   ) : (
                     <span className="text-sm text-muted-foreground italic pl-5">
                       {item.date === firstAvailableDate
-                        ? 'First benchmark run for this configuration'
+                        ? t.firstRun
                         : item.date < '2025-12-30'
-                          ? 'No changelog data (tracking began Dec 30, 2025)'
+                          ? t.beforeTracking
                           : filteredChangelogs.some(
                                 (c) => c.date < item.date && c.entries.length > 0,
                               )
-                            ? 'No config changes — same configuration as previous run'
-                            : 'Initial configuration — no changelog entry recorded'}
+                            ? t.unchanged
+                            : t.initial}
                     </span>
                   )}
                 </div>

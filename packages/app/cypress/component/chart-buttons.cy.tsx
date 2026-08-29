@@ -1,4 +1,5 @@
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 describe('ChartButtons', () => {
   describe('without CSV export', () => {
@@ -98,5 +99,29 @@ describe('ChartButtons', () => {
       cy.get('[data-testid="zoom-reset-button"]').should('not.exist');
       cy.get('[data-testid="export-button"]').should('be.visible');
     });
+  });
+
+  it('renders localized accessible actions on mobile when explicitly enabled', () => {
+    cy.viewport(375, 700);
+    cy.mount(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ position: 'relative', width: 360, height: 200 }}>
+          <div id="test-chart">Chart content</div>
+          <ChartButtons
+            chartId="test-chart"
+            analyticsPrefix="test"
+            onExportCsv={cy.stub()}
+            mobileVisible
+          />
+        </div>
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="export-button"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', '下载图表')
+      .click();
+    cy.get('[data-testid="export-png-button"]').should('contain.text', '下载 PNG');
+    cy.get('[data-testid="export-csv-button"]').should('contain.text', '下载 CSV');
+    cy.get('[data-testid="zoom-reset-button"]').should('have.attr', 'aria-label', '重置缩放');
   });
 });

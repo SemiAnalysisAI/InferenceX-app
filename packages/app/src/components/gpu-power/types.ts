@@ -60,35 +60,138 @@ export type GpuMetricKey =
 export interface GpuMetricConfig {
   key: GpuMetricKey;
   label: string;
+  labelZh: string;
   unit: string;
   yAxisLabel: string;
+  yAxisLabelZh: string;
+}
+
+export function getGpuMetricLabel(metric: GpuMetricConfig, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? metric.labelZh : metric.label;
+}
+
+export function getGpuMetricYAxisLabel(metric: GpuMetricConfig, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? metric.yAxisLabelZh : metric.yAxisLabel;
 }
 
 /** Common metrics available on both NVIDIA and AMD GPUs. */
 export const GPU_METRIC_OPTIONS: GpuMetricConfig[] = [
-  { key: 'power', label: 'Power Draw', unit: 'W', yAxisLabel: 'Power Draw (W)' },
-  { key: 'temperature', label: 'Temperature', unit: '°C', yAxisLabel: 'Temperature (°C)' },
-  { key: 'smClock', label: 'GFX Clock', unit: 'MHz', yAxisLabel: 'GFX Clock (MHz)' },
-  { key: 'memClock', label: 'Memory Clock', unit: 'MHz', yAxisLabel: 'Memory Clock (MHz)' },
-  { key: 'gpuUtil', label: 'Chip Utilization', unit: '%', yAxisLabel: 'Chip Utilization (%)' },
-  { key: 'memUtil', label: 'Memory Utilization', unit: '%', yAxisLabel: 'Memory Utilization (%)' },
+  {
+    key: 'power',
+    label: 'Power Draw',
+    labelZh: '功耗',
+    unit: 'W',
+    yAxisLabel: 'Power Draw (W)',
+    yAxisLabelZh: '功耗 (W)',
+  },
+  {
+    key: 'temperature',
+    label: 'Temperature',
+    labelZh: '温度',
+    unit: '°C',
+    yAxisLabel: 'Temperature (°C)',
+    yAxisLabelZh: '温度 (°C)',
+  },
+  {
+    key: 'smClock',
+    label: 'GFX Clock',
+    labelZh: 'GFX 时钟',
+    unit: 'MHz',
+    yAxisLabel: 'GFX Clock (MHz)',
+    yAxisLabelZh: 'GFX 时钟 (MHz)',
+  },
+  {
+    key: 'memClock',
+    label: 'Memory Clock',
+    labelZh: '显存时钟',
+    unit: 'MHz',
+    yAxisLabel: 'Memory Clock (MHz)',
+    yAxisLabelZh: '显存时钟 (MHz)',
+  },
+  {
+    key: 'gpuUtil',
+    label: 'Chip Utilization',
+    labelZh: '芯片利用率',
+    unit: '%',
+    yAxisLabel: 'Chip Utilization (%)',
+    yAxisLabelZh: '芯片利用率 (%)',
+  },
+  {
+    key: 'memUtil',
+    label: 'Memory Utilization',
+    labelZh: '显存利用率',
+    unit: '%',
+    yAxisLabel: 'Memory Utilization (%)',
+    yAxisLabelZh: '显存利用率 (%)',
+  },
 ];
 
 /** AMD-specific metrics (only present when data comes from amd-smi). */
 export const AMD_METRIC_OPTIONS: GpuMetricConfig[] = [
-  { key: 'edgeTemp', label: 'Edge Temperature', unit: '°C', yAxisLabel: 'Edge Temperature (°C)' },
+  {
+    key: 'edgeTemp',
+    label: 'Edge Temperature',
+    labelZh: '边缘温度',
+    unit: '°C',
+    yAxisLabel: 'Edge Temperature (°C)',
+    yAxisLabelZh: '边缘温度 (°C)',
+  },
   {
     key: 'memTemp',
     label: 'Memory Temperature',
+    labelZh: '显存温度',
     unit: '°C',
     yAxisLabel: 'Memory Temperature (°C)',
+    yAxisLabelZh: '显存温度 (°C)',
   },
-  { key: 'gfxVoltage', label: 'GFX Voltage', unit: 'mV', yAxisLabel: 'GFX Voltage (mV)' },
-  { key: 'socVoltage', label: 'SoC Voltage', unit: 'mV', yAxisLabel: 'SoC Voltage (mV)' },
-  { key: 'memVoltage', label: 'Memory Voltage', unit: 'mV', yAxisLabel: 'Memory Voltage (mV)' },
-  { key: 'fclk', label: 'Fabric Clock', unit: 'MHz', yAxisLabel: 'Fabric Clock (MHz)' },
-  { key: 'socClk', label: 'SoC Clock', unit: 'MHz', yAxisLabel: 'SoC Clock (MHz)' },
-  { key: 'mmActivity', label: 'MM Activity', unit: '%', yAxisLabel: 'Multimedia Activity (%)' },
+  {
+    key: 'gfxVoltage',
+    label: 'GFX Voltage',
+    labelZh: 'GFX 电压',
+    unit: 'mV',
+    yAxisLabel: 'GFX Voltage (mV)',
+    yAxisLabelZh: 'GFX 电压 (mV)',
+  },
+  {
+    key: 'socVoltage',
+    label: 'SoC Voltage',
+    labelZh: 'SoC 电压',
+    unit: 'mV',
+    yAxisLabel: 'SoC Voltage (mV)',
+    yAxisLabelZh: 'SoC 电压 (mV)',
+  },
+  {
+    key: 'memVoltage',
+    label: 'Memory Voltage',
+    labelZh: '显存电压',
+    unit: 'mV',
+    yAxisLabel: 'Memory Voltage (mV)',
+    yAxisLabelZh: '显存电压 (mV)',
+  },
+  {
+    key: 'fclk',
+    label: 'Fabric Clock',
+    labelZh: 'Fabric 时钟',
+    unit: 'MHz',
+    yAxisLabel: 'Fabric Clock (MHz)',
+    yAxisLabelZh: 'Fabric 时钟 (MHz)',
+  },
+  {
+    key: 'socClk',
+    label: 'SoC Clock',
+    labelZh: 'SoC 时钟',
+    unit: 'MHz',
+    yAxisLabel: 'SoC Clock (MHz)',
+    yAxisLabelZh: 'SoC 时钟 (MHz)',
+  },
+  {
+    key: 'mmActivity',
+    label: 'MM Activity',
+    labelZh: '多媒体活动率',
+    unit: '%',
+    yAxisLabel: 'Multimedia Activity (%)',
+    yAxisLabelZh: '多媒体活动率 (%)',
+  },
 ];
 
 /** All metric options combined. */
