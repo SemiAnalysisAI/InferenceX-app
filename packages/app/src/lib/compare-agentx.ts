@@ -7,7 +7,9 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
   'deepseek-v4',
   'glm-5-2',
   'minimax-m3',
+  // Editorial call: Flash Next sits below Qwen 3.5, the family's flagship row.
   'qwen-3-5',
+  'qwen-3-8-flash-next',
 ] as const;
 
 const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
@@ -25,19 +27,34 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
   },
 );
 
+/**
+ * `Model` enum values (the dashboard's model identifiers) for the featured
+ * AgentX set. The landing/compare hero ledger and the /inference model
+ * selector both mark these models with a NEW badge, so the badge follows the
+ * single featured list instead of maintaining a second one.
+ */
+export const AGENTX_NEW_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
+  FEATURED_AGENTX_MODELS.map((model) => model.displayName),
+);
+
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {
   // The model rides in the path — the indexable `/inference/<model>` subroute
   // — so these hero links point crawlers at the canonical model page instead
   // of a `?g_model=` variant of the base dashboard. Models without a
   // registered inference page (none of the featured set today) fall back to
   // the query form.
+  //
+  // No `i_seq` / `i_optimal` params: every model here has AgentX data, and the
+  // dashboard already defaults such models to the Agentic scenario
+  // (resolveEffectiveSequence) with "Optimal Only" on (i_optimal !== '0'), so
+  // the bare model page IS the AgentX optimal-only view — and the canonical,
+  // shareable address for it.
   const entry = getInferenceModelBySlug(model.slug);
-  const query = new URLSearchParams();
-  if (!entry) query.set('g_model', model.displayName);
-  query.set('i_seq', 'agentic-traces');
-  query.set('i_optimal', '1');
   const path = entry ? inferenceModelPath(entry.slug) : '/inference';
-  return `${locale === 'zh' ? `/zh${path}` : path}?${query}`;
+  const localizedPath = locale === 'zh' ? `/zh${path}` : path;
+  if (entry) return localizedPath;
+  const query = new URLSearchParams({ g_model: model.displayName });
+  return `${localizedPath}?${query}`;
 }
 
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {

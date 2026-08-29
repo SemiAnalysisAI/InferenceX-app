@@ -5,10 +5,18 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { computeToggle } from '@/hooks/useTogglableSet';
+import type * as NextNavigation from 'next/navigation';
 
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
+vi.hoisted(() => {
+  globalThis.__scatterPathnameState = { value: '/inference' };
+});
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  usePathname: () => globalThis.__scatterPathnameState.value,
+}));
 
 declare global {
   var __scatterLegendState: { current: Record<string, any> | null };
@@ -16,6 +24,7 @@ declare global {
   var __scatterOverlayState: { current: Record<string, unknown> };
   var __scatterTraceAvailabilityState: { current: Record<number, boolean> | undefined };
   var __scatterLogAvailabilityState: { current: Record<number, boolean> | undefined };
+  var __scatterPathnameState: { value: string };
 }
 const availabilityIdsGlobal = vi.hoisted(() => ({
   traceIds: [] as number[],
@@ -114,6 +123,16 @@ export function baseInferenceState() {
       computeToggle(prev, item, allItems),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
+    tokenRevenuePriceSource: 'normalized' as const,
+    tokenRevenuePricing: {
+      source: 'normalized' as const,
+      inputPerMillion: 1,
+      outputPerMillion: 1,
+    },
+    openRouterModelId: null,
+    openRouterPricingLoading: false,
+    openRouterPricingError: null,
+    setTokenRevenuePriceSource: noop,
     quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
     availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
     availableRuns: {},
@@ -194,6 +213,7 @@ export const dotGroups = (container: HTMLElement, hwKey?: string) =>
 export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.length;
 
 beforeEach(() => {
+  globalThis.__scatterPathnameState.value = '/inference';
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
   Object.defineProperty(SVGElement.prototype, 'getBBox', {
     configurable: true,

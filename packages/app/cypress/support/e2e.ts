@@ -2,36 +2,24 @@
  * Global e2e setup. Loaded before every `cy.visit` via `supportFile` in
  * `cypress.config.ts`.
  *
- * Suppresses the two centered modals (feedback-modal on the dashboard, the
- * agentic-results launch modal on the landing page) so their backdrops don't
- * sit on top of the UI under test. Specs that want to exercise the
+ * Suppresses the centered feedback-modal on the dashboard so its backdrop
+ * doesn't sit on top of the UI under test. Specs that want to exercise the
  * feedback-modal flow can clear `inferencex-feedback-modal-snoozed` in their
- * own `onBeforeLoad`, which runs after this hook; specs that exercise the
- * launch modal call `keepLaunchModal()` instead — see below.
+ * own `onBeforeLoad`, which runs after this hook.
  */
 import 'cypress-axe';
 
-let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
 let suppressAgenticCoachMark = true;
 
 /**
- * Opt the whole spec out of the launch-modal suppression.
+ * Opt the whole spec out of the telemetry-tutorial suppression.
  *
  * Clearing the key in a visit's `onBeforeLoad` is not enough: this hook also
  * fires on `cy.reload()`, which takes no `onBeforeLoad`, so the key would be
  * re-seeded behind the test and a "still dismissed after reload" assertion
  * would pass even if dismissal never persisted anything. Call this at the top
- * of any spec that owns launch-modal state.
- */
-export function keepLaunchModal(): void {
-  suppressLaunchModal = false;
-}
-
-/**
- * Opt the whole spec out of the telemetry-tutorial suppression, for the same
- * reason as `keepLaunchModal` — the card is seeded on `cy.reload()` too, so a
- * per-visit `onBeforeLoad` clear cannot own its state.
+ * of any spec that owns telemetry-tutorial state.
  *
  * The card is a bottom-right modal on /inference/agentic/[id]. It has no
  * backdrop, but it sits over the last chart in the grid, so agentic specs
@@ -43,8 +31,8 @@ export function keepTelemetryTutorial(): void {
 
 /**
  * Opt the whole spec out of the agentic point coach-mark suppression, for the
- * same reason as `keepLaunchModal` — the key is re-seeded on `cy.reload()`, so
- * a per-visit `onBeforeLoad` clear cannot own its state.
+ * same reason as `keepTelemetryTutorial` — the key is re-seeded on
+ * `cy.reload()`, so a per-visit `onBeforeLoad` clear cannot own its state.
  *
  * The callout is anchored to a point inside `[data-testid="scatter-graph"]`,
  * so on the agentic view it sits over the plot area that other specs click.
@@ -54,11 +42,36 @@ export function keepAgenticCoachMark(): void {
 }
 
 Cypress.on('window:before:load', (win) => {
+  // Skip cross-document view transitions (`@view-transition` in motion.css).
+  // Inside the Cypress AUT iframe Chrome starts the transition on every
+  // same-origin cy.visit but never finishes it, and while a transition is
+  // active the page's real DOM is excluded from hit-testing —
+  // `elementFromPoint` returns bare <html>, clicks stall, and the
+  // viewport-sized snapshot registers as horizontal overflow. Real top-level
+  // windows finish the transition in ~200ms; only the iframe hangs, so skip
+  // it here rather than gating the production feature.
+  win.addEventListener('pagereveal', (event) => {
+    const viewTransition = (
+      event as Event & {
+        viewTransition?: {
+          skipTransition: () => void;
+          ready?: Promise<void>;
+          finished?: Promise<void>;
+          updateCallbackDone?: Promise<void>;
+        };
+      }
+    ).viewTransition;
+    if (!viewTransition) return;
+    // Skipping rejects the transition's promises with
+    // "AbortError: Transition was skipped"; swallow those so Cypress
+    // doesn't fail the test on an unhandled rejection.
+    viewTransition.ready?.catch(() => {});
+    viewTransition.finished?.catch(() => {});
+    viewTransition.updateCallbackDone?.catch(() => {});
+    viewTransition.skipTransition();
+  });
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
-    if (suppressLaunchModal) {
-      win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
-    }
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
     }
@@ -118,4 +131,18 @@ export function interceptDerivedAgenticMetrics(): void {
       ),
     });
   }).as('derivedAgenticMetrics');
+}
+
+/**
+ * Assert the page has no horizontal overflow at the current viewport — wide
+ * content (tables, flamegraphs) must scroll inside its own container, never
+ * the page body. Call after the route under test has rendered.
+ */
+export function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
 }

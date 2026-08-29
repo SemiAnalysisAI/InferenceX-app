@@ -668,7 +668,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: 'd31d0d0601b077836562dc032cc81b47ca66f1497a2c2ee98e2f90f73dcb1e25',
+    sourceSha256: '8ca280fec5bbe633493cf021fee294927aead799742ac07ac7dbe8c5092e38f2',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

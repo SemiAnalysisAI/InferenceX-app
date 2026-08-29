@@ -329,6 +329,11 @@ export function buildDerivedChartFields(
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
+  if (wants('tokenRevenuePerGpuHour')) {
+    // At $1 per million total tokens, million tokens per GPU hour is
+    // numerically equal to gross token revenue in $/GPU/hr.
+    fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
+  }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
@@ -782,4 +787,9 @@ export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale
     if (typeof zh === 'string' && zh) return zh;
   }
   return (chartDef[`${metricKey}_label`] as string) || '';
+}
+
+/** Resolve the rendered x-axis label without mutating the canonical English label. */
+export function xAxisLabel(chartDef: ChartDefinition, locale: Locale): string {
+  return locale === 'zh' && chartDef.x_labelZh ? chartDef.x_labelZh : chartDef.x_label;
 }

@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -46,6 +47,7 @@ import {
 } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
+import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -121,6 +123,7 @@ import {
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
+import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
 import {
   type ParetoPointLabel,
@@ -371,6 +374,12 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
+    noData: 'No data available',
+    noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialRun: 'UNOFFICIAL RUN',
+    branch: 'Branch',
+    viewWorkflow: 'View workflow run',
   },
   zh: {
     logScale: '对数缩放',
@@ -391,6 +400,12 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
+    noData: '暂无数据',
+    noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    unofficialTitle: (branch: string) => `非官方：${branch}`,
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewWorkflow: '查看工作流运行记录',
   },
 } as const;
 
@@ -461,6 +476,7 @@ const ScatterGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
 
@@ -1191,15 +1207,16 @@ const ScatterGraph = React.memo(
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
           : ([0, 100] as [number, number]));
 
-      let useLog = false;
-      if (isInputTputMetric) {
-        const isTTFT =
-          xLabel.toLowerCase().includes('time to first token') ||
-          xLabel.toLowerCase().includes('ttft');
-        if (scaleType === 'log') useLog = ext[0] > 0;
-        else if (scaleType === 'linear') useLog = false;
-        else useLog = isTTFT && ext[0] > 0 && ext[1] / ext[0] > 10;
-      }
+      // `x_scale_field` comes from useChartData and follows remapped `data[].x`
+      // through both the live chart and Replay. Unlike `xLabel`, it is stable
+      // across locales and distinct from the registry's natural `x` field.
+      const useLog =
+        resolveScatterXAxisScale({
+          extent: ext,
+          selectedYAxisMetric,
+          xAxisField: chartDefinition.x_scale_field,
+          scaleType,
+        }) === 'log';
 
       const domain: [number, number] = useLog ? [ext[0] * 0.9, ext[1] * 1.05] : [0, ext[1] * 1.05];
       return {
@@ -1208,7 +1225,14 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
+    }, [
+      visiblePoints,
+      selectedYAxisMetric,
+      chartDefinition.x_scale_field,
+      scaleType,
+      niceAxes,
+      xExtentOverride,
+    ]);
     const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
     const yScaleConfigRaw = useMemo(() => {
@@ -1889,8 +1913,10 @@ const ScatterGraph = React.memo(
               btnEvent.stopPropagation();
               // Full-document navigation: stamp the chart state onto THIS
               // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults.
-              rememberChartStateInUrl();
+              // rebuilds from defaults. Skipped in ephemeral scopes (/model
+              // embeds): the store holds the primary dashboard's state there,
+              // not this chart's.
+              if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
@@ -2257,6 +2283,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-hw-key',
+            iconFor: (label) => getLineLabelVendorIcon(label.seriesId),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
@@ -3331,10 +3358,8 @@ const ScatterGraph = React.memo(
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <h3 className="text-sm font-medium mb-1">No data available</h3>
-              <p className="text-xs">
-                Please change the model, sequence, precision, date range or chip selection.
-              </p>
+              <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
+              <p className="text-xs">{legendT.noDataHint}</p>
               <Button
                 type="button"
                 size="sm"
@@ -3391,10 +3416,8 @@ const ScatterGraph = React.memo(
                 style={{ zIndex: 100 }}
               >
                 <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
-                  <p className="text-sm font-medium">No data available</p>
-                  <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or chip selection.
-                  </p>
+                  <p className="text-sm font-medium">{legendT.noData}</p>
+                  <p className="text-xs mt-1">{legendT.noDataHint}</p>
                 </div>
               </div>
             ) : undefined
@@ -3423,7 +3446,7 @@ const ScatterGraph = React.memo(
                           name: `✕ unofficial-run-${info.id}`,
                           label: `✕ ${branch}`,
                           color: overlayRunColor(idx),
-                          title: `UNOFFICIAL: ${branch}`,
+                          title: legendT.unofficialTitle(branch),
                           isHighlighted: true,
                           hw: `overlay-run-${info.id}`,
                           isActive: true,
@@ -3442,8 +3465,12 @@ const ScatterGraph = React.memo(
                           },
                           tooltip: (
                             <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                              <div>Branch: {branch}</div>
+                              <div className="text-red-500 font-semibold">
+                                {legendT.unofficialRun}
+                              </div>
+                              <div>
+                                {legendT.branch}: {branch}
+                              </div>
                               {info.url && (
                                 <a
                                   href={info.url}
@@ -3451,7 +3478,7 @@ const ScatterGraph = React.memo(
                                   rel="noopener noreferrer"
                                   className="underline"
                                 >
-                                  View workflow run
+                                  {legendT.viewWorkflow}
                                 </a>
                               )}
                             </div>
@@ -3671,7 +3698,6 @@ const ScatterGraph = React.memo(
                   },
                 },
               ]}
-              precisionIndicators={selectedPrecisions}
               hideAtomFootnote
               enableTooltips={true}
             />

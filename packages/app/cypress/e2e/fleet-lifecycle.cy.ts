@@ -55,7 +55,7 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
  * state. Without this, a test that reads the table leaves the next one looking
  * for a chart that is not mounted — an ordering coupling that fails in whichever
  * order the file happens to be written in. Tolerant of the tab not existing yet:
- * before a power budget is entered there is no figure at all.
+ * when the power budget is cleared there is no figure at all.
  */
 const resetToChart = () =>
   cy.get('body').then(($body) => {
@@ -162,25 +162,16 @@ describe('Fleet — Fleet Lifecycle', () => {
 
   beforeEach(resetToChart);
 
-  it('renders the section with a prompt for a power budget, and fetches nothing yet', () => {
+  it('defaults the power budget to 10 MW and renders the lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('be.visible')
       .and('contain.text', 'Fleet Lifecycle');
-    cy.get('[data-testid="calculator-lifecycle-empty"]')
-      .should('be.visible')
-      .and('contain.text', 'Enter a facility power budget');
-    // The history payload is multi-MB, so it must not be requested until the
-    // section can produce something.
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
   });
 
-  it('entering a MW budget in this section drives the lifecycle table', () => {
-    // The input lives here now: it used to sit in a separate Fleet Projection
-    // section, which is what made the empty state above have to point at another
-    // part of the page.
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .find('[data-testid="calc-fleet-mw-input"]')
-      .type('10');
+  it('the default MW budget drives the lifecycle table', () => {
     // The figure opens on the chart; the table is the other tab.
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
@@ -645,7 +636,9 @@ describe('Fleet — Fleet Lifecycle', () => {
   it('rolls each config out over the ramp instead of stepping instantly', () => {
     // Reads both views, so it switches deliberately: `firstRowCell` moves to the
     // table, and the vertex counts are only meaningful on the chart.
-    cy.get('[data-testid="calc-lifecycle-ramp-input"]').should('have.value', '3');
+    cy.get('[data-testid="calc-lifecycle-ramp-input"]')
+      .should('have.value', '0.5')
+      .and('have.attr', 'step', '0.25');
     lineVertices().then((curved) => {
       // Rollouts are sampled into curves, so the line cannot be a bare staircase.
       expect(curved).to.be.greaterThan(20);
@@ -899,7 +892,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
     // The agentic fixture exposes a single scenario, so the scenario
     // control disappears entirely — no dropdown, no static readout.
     cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.wait('@agenticHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     showTable();
@@ -977,8 +970,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
   it('translates the section, including the table headers and notes', () => {
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', '集群生命周期')
-      .and('contain.text', '设施功率预算');
-    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+      .and('contain.text', '设施功率 (MW)');
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     // The caption's price line is translated too, units and all.
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', '每百万 token');

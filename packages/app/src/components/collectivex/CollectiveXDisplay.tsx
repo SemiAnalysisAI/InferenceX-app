@@ -312,7 +312,7 @@ const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
@@ -752,7 +752,7 @@ export default function CollectiveXDisplay() {
               <h1 className="text-xl font-semibold">CollectiveX</h1>
               <span
                 data-testid="collectivex-run-conclusion"
-                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                className={`rounded-md border px-2 py-0.5 text-2xs font-medium ${
                   singleDataset ? singleConclusionClass : CONCLUSION_FALLBACK_CLASS
                 }`}
               >

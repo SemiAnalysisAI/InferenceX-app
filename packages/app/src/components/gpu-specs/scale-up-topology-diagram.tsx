@@ -15,10 +15,53 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
+  formatScaleUpTopology,
   getScaleUpTopologyConfig,
   type GpuSpec,
   type ScaleUpTopologyConfig,
 } from '@/lib/gpu-specs';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    expand: 'Expand',
+    expandHint: 'Click to expand',
+    previous: 'Previous Chip',
+    next: 'Next Chip',
+    title: 'Scale-Up Topology',
+    diagram: 'scale-up topology diagram',
+    nodes: 'nodes',
+    chips: 'Chips',
+    interconnect: 'Interconnect:',
+    bandwidth: 'Bandwidth:',
+    topology: 'Topology:',
+    domain: 'Domain:',
+    perChip: 'per Chip (unidirectional)',
+    total: 'Chips total',
+    links: 'links',
+    node: 'Node',
+    chip: 'Chip',
+  },
+  zh: {
+    expand: '展开',
+    expandHint: '点击展开',
+    previous: '上一款芯片',
+    next: '下一款芯片',
+    title: '纵向扩展拓扑',
+    diagram: '纵向扩展拓扑图',
+    nodes: '个节点',
+    chips: '颗芯片',
+    interconnect: '互联技术：',
+    bandwidth: '带宽：',
+    topology: '拓扑：',
+    domain: '互联域：',
+    perChip: '每芯片（单向）',
+    total: '颗芯片',
+    links: '条链路',
+    node: '节点',
+    chip: '芯片',
+  },
+} as const;
 
 export interface ScaleUpTopologyDiagramHandle {
   openDialog: () => void;
@@ -36,6 +79,8 @@ export const ScaleUpTopologyDiagram = forwardRef<
   ScaleUpTopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
 >(({ spec, allSpecs }, ref) => {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);
@@ -98,7 +143,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
       <div className="flex items-center gap-2 mb-2">
         <h4 className="text-sm font-semibold">{spec.name}</h4>
         <span className="text-xs text-muted-foreground">
-          {spec.scaleUpTopology} &middot; {compactConfig.techName}
+          {formatScaleUpTopology(spec.scaleUpTopology, locale)} &middot; {compactConfig.techName}
         </span>
       </div>
       <button
@@ -110,10 +155,10 @@ export const ScaleUpTopologyDiagram = forwardRef<
           setOpen(true);
           track('gpu_specs_scaleup_topology_expanded', { gpu: spec.name });
         }}
-        aria-label={`Expand ${spec.name} scale-up topology diagram`}
+        aria-label={`${t.expand} ${spec.name} ${t.diagram}`}
       >
-        <ScaleUpTopologyD3 spec={spec} config={compactConfig} compact />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">Click to expand</p>
+        <ScaleUpTopologyD3 spec={spec} config={compactConfig} compact locale={locale} />
+        <p className="text-3xs text-muted-foreground mt-1 text-center">{t.expandHint}</p>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -123,18 +168,21 @@ export const ScaleUpTopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('prev')}
-              aria-label="Previous Chip"
+              aria-label={t.previous}
               data-testid="scaleup-topology-nav-prev"
             >
               <ChevronLeft className="size-5" />
             </Button>
             <DialogHeader className="flex-1">
-              <DialogTitle>{displayedSpec.name} Scale-Up Topology</DialogTitle>
+              <DialogTitle>
+                {displayedSpec.name} {t.title}
+              </DialogTitle>
               <DialogDescription>
-                {displayedSpec.scaleUpBandwidth} {displayedSpec.scaleUpTopology} &middot;{' '}
+                {displayedSpec.scaleUpBandwidth}{' '}
+                {formatScaleUpTopology(displayedSpec.scaleUpTopology, locale)} &middot;{' '}
                 {displayedConfig.techName}
                 {displayedConfig.nodeCount > 1 &&
-                  ` · ${displayedConfig.nodeCount} nodes × ${displayedConfig.gpusPerNode} Chips`}
+                  ` · ${displayedConfig.nodeCount} ${t.nodes} × ${displayedConfig.gpusPerNode} ${t.chips}`}
                 <span className="ml-2 opacity-60">
                   ({displayedIndex + 1} / {allSpecs.length})
                 </span>
@@ -144,33 +192,40 @@ export const ScaleUpTopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('next')}
-              aria-label="Next Chip"
+              aria-label={t.next}
               data-testid="scaleup-topology-nav-next"
             >
               <ChevronRight className="size-5" />
             </Button>
           </div>
           <div className="overflow-x-auto">
-            <ScaleUpTopologyD3 spec={displayedSpec} config={displayedConfig} compact={false} />
+            <ScaleUpTopologyD3
+              spec={displayedSpec}
+              config={displayedConfig}
+              compact={false}
+              locale={locale}
+            />
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
             <p>
-              <span className="font-medium">Interconnect:</span> {displayedConfig.techName}
+              <span className="font-medium">{t.interconnect}</span> {displayedConfig.techName}
             </p>
             <p>
-              <span className="font-medium">Bandwidth:</span> {displayedSpec.scaleUpBandwidth} per
-              Chip (unidirectional)
+              <span className="font-medium">{t.bandwidth}</span> {displayedSpec.scaleUpBandwidth}{' '}
+              {t.perChip}
             </p>
             <p>
-              <span className="font-medium">Topology:</span> {displayedSpec.scaleUpTopology}
+              <span className="font-medium">{t.topology}</span>{' '}
+              {formatScaleUpTopology(displayedSpec.scaleUpTopology, locale)}
               {displayedConfig.switchCount > 0 && ` · ${displayedConfig.switchCount} NVSwitches`}
               {displayedConfig.type === 'mesh' &&
-                ` · ${(displayedConfig.gpuCount * (displayedConfig.gpuCount - 1)) / 2} links`}
+                ` · ${(displayedConfig.gpuCount * (displayedConfig.gpuCount - 1)) / 2} ${t.links}`}
             </p>
             {displayedConfig.nodeCount > 1 && (
               <p>
-                <span className="font-medium">Domain:</span> {displayedConfig.nodeCount} nodes ×{' '}
-                {displayedConfig.gpusPerNode} Chips = {displayedConfig.gpuCount} Chips total
+                <span className="font-medium">{t.domain}</span> {displayedConfig.nodeCount}{' '}
+                {t.nodes} × {displayedConfig.gpusPerNode} {t.chips} = {displayedConfig.gpuCount}{' '}
+                {t.total}
               </p>
             )}
           </div>
@@ -184,9 +239,10 @@ interface ScaleUpD3Props {
   spec: GpuSpec;
   config: ScaleUpTopologyConfig;
   compact: boolean;
+  locale: 'en' | 'zh';
 }
 
-function ScaleUpTopologyD3({ spec, config, compact }: ScaleUpD3Props) {
+function ScaleUpTopologyD3({ spec, config, compact, locale }: ScaleUpD3Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -196,17 +252,17 @@ function ScaleUpTopologyD3({ spec, config, compact }: ScaleUpD3Props) {
     container.selectAll('*').remove();
 
     if (config.type === 'mesh') {
-      renderMeshTopology(container, spec, config, compact);
+      renderMeshTopology(container, spec, config, compact, locale);
     } else if (config.nodeCount > 1) {
-      renderSwitchedNvl72Topology(container, spec, config, compact);
+      renderSwitchedNvl72Topology(container, spec, config, compact, locale);
     } else {
-      renderSwitchedTopology(container, spec, config, compact);
+      renderSwitchedTopology(container, spec, config, compact, locale);
     }
 
     return () => {
       container.selectAll('*').remove();
     };
-  }, [spec, config, compact]);
+  }, [spec, config, compact, locale]);
 
   return <div ref={containerRef} />;
 }
@@ -218,6 +274,7 @@ function renderSwitchedTopology(
   spec: GpuSpec,
   config: ScaleUpTopologyConfig,
   compact: boolean,
+  locale: 'en' | 'zh',
 ) {
   const { gpuCount, switchCount } = config;
   const isNvidia = spec.vendor === 'nvidia';
@@ -263,7 +320,10 @@ function renderSwitchedTopology(
     .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
     .attr('class', compact ? 'w-full max-w-[500px]' : 'w-full min-w-[600px]')
     .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
+    .attr(
+      'aria-label',
+      `${spec.name} ${formatScaleUpTopology(spec.scaleUpTopology, locale)} ${STRINGS[locale].diagram}`,
+    );
 
   if (!isUnofficialHostname(window.location.hostname)) {
     // Add background logo watermark
@@ -351,7 +411,7 @@ function renderSwitchedTopology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`Chip ${i}`);
+      .text(`${STRINGS[locale].chip} ${i}`);
   }
 
   // Subtitle label
@@ -364,7 +424,7 @@ function renderSwitchedTopology(
       .attr('class', 'fill-muted-foreground')
       .style('font-size', smallFont)
       .html(
-        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${spec.scaleUpTopology}`,
+        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${formatScaleUpTopology(spec.scaleUpTopology, locale)}`,
       );
   }
 }
@@ -376,6 +436,7 @@ function renderMeshTopology(
   spec: GpuSpec,
   config: ScaleUpTopologyConfig,
   compact: boolean,
+  locale: 'en' | 'zh',
 ) {
   const { gpuCount } = config;
   const vendorColor = '#ed1c24'; // AMD red
@@ -418,7 +479,10 @@ function renderMeshTopology(
       compact ? 'w-full max-w-[300px] mx-auto' : 'w-full max-w-[400px] mx-auto min-w-[350px]',
     )
     .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
+    .attr(
+      'aria-label',
+      `${spec.name} ${formatScaleUpTopology(spec.scaleUpTopology, locale)} ${STRINGS[locale].diagram}`,
+    );
 
   if (!isUnofficialHostname(window.location.hostname)) {
     // Add background logo watermark
@@ -491,7 +555,7 @@ function renderMeshTopology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`Chip ${i}`);
+      .text(`${STRINGS[locale].chip} ${i}`);
   }
 
   // Center label
@@ -515,6 +579,7 @@ function renderSwitchedNvl72Topology(
   spec: GpuSpec,
   config: ScaleUpTopologyConfig,
   compact: boolean,
+  locale: 'en' | 'zh',
 ) {
   const { switchCount, gpusPerNode, nodeCount } = config;
   const vendorColor = '#76b900'; // NVIDIA green
@@ -588,7 +653,10 @@ function renderSwitchedNvl72Topology(
     .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
     .attr('class', compact ? 'w-full max-w-[500px]' : 'w-full min-w-[550px]')
     .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
+    .attr(
+      'aria-label',
+      `${spec.name} ${formatScaleUpTopology(spec.scaleUpTopology, locale)} ${STRINGS[locale].diagram}`,
+    );
 
   if (!isUnofficialHostname(window.location.hostname)) {
     // Add background logo watermark
@@ -666,7 +734,7 @@ function renderSwitchedNvl72Topology(
     .attr('class', 'fill-amber-500/70')
     .style('font-size', smallFont)
     .style('font-weight', '500')
-    .text('Node 0');
+    .text(`${STRINGS[locale].node} 0`);
 
   // GPU boxes inside Node 1
   const gpuGroup = svg.append('g').attr('class', 'gpus');
@@ -691,7 +759,7 @@ function renderSwitchedNvl72Topology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`Chip ${i}`);
+      .text(`${STRINGS[locale].chip} ${i}`);
   }
 
   // Abstracted node boxes
@@ -792,7 +860,7 @@ function renderSwitchedNvl72Topology(
       .attr('class', 'fill-muted-foreground')
       .style('font-size', smallFont)
       .html(
-        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${nodeCount} nodes &times; ${gpusPerNode} Chips`,
+        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${nodeCount} ${STRINGS[locale].nodes} &times; ${gpusPerNode} ${STRINGS[locale].chips}`,
       );
   }
 }

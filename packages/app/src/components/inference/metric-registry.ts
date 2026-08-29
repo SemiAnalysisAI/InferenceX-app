@@ -13,6 +13,7 @@ export interface MetricDefinition {
   x?: string;
   source?: 'custom';
   xLabel?: string;
+  xLabelZh?: string;
   heading?: string;
 }
 
@@ -34,6 +35,7 @@ export const METRIC_REGISTRY = {
     polarity: 'higher',
     x: 'p90_ttft',
     xLabel: 'P90 Time To First Token (s)',
+    xLabelZh: 'P90 首 token 延迟 (s)',
     heading: 'vs. P90 Time To First Token',
   },
   outputTputPerGpu: {
@@ -42,6 +44,14 @@ export const METRIC_REGISTRY = {
     labelZh: '每芯片输出 token 吞吐量（tok/s/chip）',
     title: 'Output Token Throughput per Chip',
     titleZh: '每芯片输出 token 吞吐量',
+    polarity: 'higher',
+  },
+  tokenRevenuePerGpuHour: {
+    field: 'tokenRevenuePerGpuHour.y',
+    label: 'Token Revenue per GPU Hour ($/GPU/hr)',
+    labelZh: '每 GPU 小时 token 收入（$/GPU/hr）',
+    title: 'Token Revenue per GPU Hour',
+    titleZh: '每 GPU 小时 token 收入',
     polarity: 'higher',
   },
   tpPerMw: {
@@ -489,6 +499,11 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     ],
   },
   {
+    label: 'Token Revenue per GPU Hour',
+    labelZh: '每 GPU 小时 token 收入',
+    metrics: ['y_tokenRevenuePerGpuHour'],
+  },
+  {
     label: 'Total Tokens per $1 USD',
     labelZh: '每 1 美元可购买的总 token 数',
     metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
@@ -573,8 +588,10 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     chartType,
     heading: chartType === 'interactivity' ? 'vs. Interactivity' : 'vs. End-to-end Latency',
     x: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
+    x_scale_field: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
     x_label:
       chartType === 'interactivity' ? 'Interactivity (tok/s/user)' : 'End-to-end Latency (s)',
+    x_labelZh: chartType === 'interactivity' ? '交互性 (tok/s/user)' : '端到端延迟 (s)',
     y: 'tput_per_gpu',
     y_cost_limit: 5,
     y_latency_limit: 60,
@@ -595,6 +612,7 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     }
     if ('x' in metric) definition[`${configKey}_x`] = metric.x;
     if ('xLabel' in metric) definition[`${configKey}_x_label`] = metric.xLabel;
+    if ('xLabelZh' in metric) definition[`${configKey}_x_labelZh`] = metric.xLabelZh;
     if ('heading' in metric && chartType === 'interactivity') {
       definition[`${configKey}_heading`] = metric.heading;
     }

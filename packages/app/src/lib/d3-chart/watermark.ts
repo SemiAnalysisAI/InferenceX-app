@@ -1,6 +1,7 @@
 import type * as d3 from 'd3';
 
 import type { ChartMargin } from './types';
+import { CHART_TYPE, px } from './typography';
 
 const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/kanye-west.png';
 
@@ -97,7 +98,7 @@ export function createUnofficialWatermark(
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .attr('fill', '#dc2626')
-      .attr('font-size', '20px')
+      .attr('font-size', px(CHART_TYPE.watermark))
       .attr('font-weight', 'bold')
       .attr('opacity', 0.25);
 

@@ -35,6 +35,7 @@ import type {
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
@@ -53,11 +54,19 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING, Sequence, sequenceKind } from '@/lib/data-mappings';
+import {
+  getOpenRouterModelId,
+  MODEL_PREFIX_MAPPING,
+  Sequence,
+  sequenceKind,
+} from '@/lib/data-mappings';
+import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
+import { useLocale } from '@/lib/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -96,6 +105,20 @@ const InferenceDataContext = createContext<InferenceDataContextType | undefined>
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
 const InferenceDisplayContext = createContext<InferenceDisplayContextType | undefined>(undefined);
 const InferenceActionsContext = createContext<InferenceActionsContextType | undefined>(undefined);
+
+export const INFERENCE_CONTEXT_STRINGS = {
+  en: {
+    dateRangeResetTitle: 'Date Range Reset',
+    dateRangeResetDescription:
+      'The chip configs are not available in the selected date range. The date range will be reset.',
+    ok: 'OK',
+  },
+  zh: {
+    dateRangeResetTitle: '重置日期范围',
+    dateRangeResetDescription: '所选日期范围内没有这些芯片配置，将重置日期范围。',
+    ok: '确定',
+  },
+} as const;
 
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
@@ -217,6 +240,8 @@ export function InferenceProvider({
    */
   autoSelectAllGpus?: boolean;
 }) {
+  const locale = useLocale();
+  const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
@@ -347,6 +372,26 @@ export function InferenceProvider({
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
+  const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
+    () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
+  );
+  const openRouterModelId = getOpenRouterModelId(selectedModel);
+  const openRouterPricingQuery = useOpenRouterPricing(
+    openRouterModelId,
+    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && tokenRevenuePriceSource === 'openrouter',
+  );
+  const tokenRevenuePricing =
+    tokenRevenuePriceSource === 'normalized'
+      ? NORMALIZED_TOKEN_REVENUE_PRICING
+      : (openRouterPricingQuery.data ?? null);
+  const openRouterPricingError =
+    tokenRevenuePriceSource === 'openrouter'
+      ? openRouterModelId
+        ? openRouterPricingQuery.error instanceof Error
+          ? openRouterPricingQuery.error.message
+          : null
+        : 'No OpenRouter model mapping is configured.'
+      : null;
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
   );
@@ -599,6 +644,7 @@ export function InferenceProvider({
     graphs,
     selectionPoints,
     loading: chartDataLoading,
+    refreshing: chartDataRefreshing,
     error: chartDataError,
     hardwareConfig,
     availableQuickFilters,
@@ -614,6 +660,8 @@ export function InferenceProvider({
     selectedDateRange,
     userCosts,
     userPowers,
+    tokenRevenuePricing,
+    tokenRevenuePriceSource,
     effectiveRunDate,
     // Gate benchmark fetching on sequenceResolved: before availability loads we
     // don't yet know the model's real sequence, and the selection (e.g. an
@@ -878,7 +926,12 @@ export function InferenceProvider({
   // the gated benchmark query never produces rows and `chartDataLoading` would
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
-  const loading = availabilityError ? false : chartDataLoading;
+  const openRouterPricingLoading =
+    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+    tokenRevenuePriceSource === 'openrouter' &&
+    openRouterPricingQuery.isLoading;
+  const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
+  const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1413,6 +1466,8 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_revenue:
+        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1440,6 +1495,7 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
@@ -1587,6 +1643,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1603,6 +1660,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1659,6 +1717,11 @@ export function InferenceProvider({
   const displayValue = useMemo<InferenceDisplayContextType>(
     () => ({
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1676,6 +1739,11 @@ export function InferenceProvider({
     }),
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1707,6 +1775,7 @@ export function InferenceProvider({
     setSelectedSequence: setSelectedSequenceAndClear,
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+    setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
@@ -1753,14 +1822,11 @@ export function InferenceProvider({
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Date Range Reset</DialogTitle>
-            <DialogDescription>
-              The chip configs are not available in the selected date range. The date range will be
-              reset.
-            </DialogDescription>
+            <DialogTitle>{localeStrings.dateRangeResetTitle}</DialogTitle>
+            <DialogDescription>{localeStrings.dateRangeResetDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={handleDateRangeDialogOk}>OK</Button>
+            <Button onClick={handleDateRangeDialogOk}>{localeStrings.ok}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

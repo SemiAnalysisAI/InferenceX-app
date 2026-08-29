@@ -81,7 +81,8 @@ export default function HistoricalTrendsDisplay() {
   const { graphs, loading, hardwareConfig, hwTypesWithData, availableDates } = useInferenceData();
   const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
     useInferenceFilters();
-  const { selectedYAxisMetric, logScale, isLegendExpanded, highContrast } = useInferenceDisplay();
+  const { selectedYAxisMetric, tokenRevenuePricing, logScale, isLegendExpanded, highContrast } =
+    useInferenceDisplay();
   const {
     toggleHwType,
     removeHwType,
@@ -154,6 +155,7 @@ export default function HistoricalTrendsDisplay() {
     selectedYAxisMetric,
     targetInteractivity,
     availableDates,
+    tokenRevenuePricing,
     enabled: hasInteractivityChart,
   });
 

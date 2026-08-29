@@ -121,10 +121,10 @@ export default function ZhGlossaryPage() {
             />
             <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
               <div>
-                <p className="font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+                <p className="font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
                   技术指南 / AI 基础设施
                 </p>
-                <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.045em] text-balance md:text-6xl lg:text-7xl">
+                <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl lg:text-7xl">
                   读懂推理曲线背后的语言。
                 </h1>
                 <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
@@ -135,13 +135,13 @@ export default function ZhGlossaryPage() {
 
               <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border/50 bg-border/50 lg:grid-cols-1">
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     术语
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">{entries.length}</dd>
                 </div>
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     类别
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
@@ -149,7 +149,7 @@ export default function ZhGlossaryPage() {
                   </dd>
                 </div>
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     参考文章
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">{articleCount}</dd>
@@ -170,7 +170,7 @@ export default function ZhGlossaryPage() {
 
         <section className="mt-4 grid gap-4 md:grid-cols-2">
           <Card>
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               阅读基准曲线
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">完整曲线更能说明问题。</h2>
@@ -192,7 +192,7 @@ export default function ZhGlossaryPage() {
           </Card>
 
           <Card>
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               基于实测数据
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">每个定义都连接真实方案。</h2>

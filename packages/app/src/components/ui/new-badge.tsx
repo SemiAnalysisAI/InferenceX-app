@@ -10,7 +10,7 @@ export function NewBadge({ children, className, ...props }: ComponentPropsWithou
         // slack rather than padding to spend: `min-w-8` holds the shared size
         // for short labels (zh `新`) while letting an unusually wide label
         // widen the pill instead of spilling its glyphs past the edge.
-        'inline-flex h-4 min-w-8 shrink-0 items-center justify-center rounded-full bg-brand px-0.5 text-[10px] font-bold leading-none uppercase tracking-normal text-primary-foreground shadow-sm',
+        'inline-flex h-4 min-w-8 shrink-0 items-center justify-center rounded-full bg-brand px-0.5 text-3xs font-bold leading-none uppercase tracking-normal text-primary-foreground shadow-sm',
         className,
       )}
       {...props}

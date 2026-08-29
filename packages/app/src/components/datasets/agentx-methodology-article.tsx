@@ -249,8 +249,8 @@ const CONTENT = {
     },
   },
   zh: {
-    eyebrow: 'Field guide / AI infrastructure',
-    title: 'AgentX 方法论',
+    eyebrow: '实践指南 / AI 基础设施',
+    title: 'AgentX 测试方法',
     lead: 'AgentX 将自愿采集的 Claude Code 代理 trace 转换为确定性的 AIPerf 工作负载。本页说明采集元数据如何生成回放，以及有效基准测试结果所遵循的控制规则。',
     facts: [
       { value: '393', label: '个公开会话' },
@@ -262,7 +262,7 @@ const CONTENT = {
     collectionParagraphs: [
       '参与者主动启用 HTTP 代理后，代理会记录请求到达与完成时间、input 和 output token 数、conversation ID 与 subagent ID。公开语料不包含 prompt、源代码、tool argument 或 tool result。',
       '代理以 64-token block 为单位，将每段 input 表示为会话内串联 hash。同一会话中相同的 block ID 会保留共享 prefix。回放前，AIPerf 会使用确定性的合成编码与 tool-use token 替换这些 block。',
-      '客户端无法看到服务端 chat template、专有 tokenizer、服务端 tool、加密的 reasoning 内容，也无法精确得知图片和文档最终展开成多少 token。AgentX 使用针对模型校准的 padding 和确定性 placeholder 处理这些字段；其中不包含原始 prompt、代码或 tool payload。',
+      '客户端无法看到服务端 chat template、专有 tokenizer、服务端 tool、加密的 reasoning 内容，也无法精确得知图片和文档最终展开成多少 token。AgentX 使用模型专用的 padding 和确定性 placeholder 处理这些字段；其中不包含原始 prompt、代码或 tool payload。',
     ],
     datasetTitle: 'v1.0 数据集',
     datasetParagraphs: [
@@ -291,7 +291,7 @@ const CONTENT = {
     ],
     dramTitle: 'DRAM offload 规则',
     dramParagraphs: [
-      'KV cache offload 会改变长会话可用的容量。没有标准化 DRAM 配置的服务器上限为 3 TB；GB200 NVL72、GB300 NVL72 和 TPUv7 等标准化系统可使用实际装机容量。',
+      'KV cache offload 会改变长会话可用的容量。没有标准化 DRAM 配置的服务器上限为 3 TB；标准 GB200 NVL72、GB300 NVL72 和 TPUv7 系统可使用实际装机容量。',
       '每种基准测试配置只能按其 GPU 占比使用对应的 host DRAM，避免较小的 GPU 分区占用整台服务器的内存预算。',
     ],
     limitsTitle: '适用范围与复现',
@@ -312,8 +312,7 @@ const CONTENT = {
     figures: {
       corpus: {
         alt: '语料仪表板显示 8,271 个会话、341 万个请求、6132.7 亿 token、99% cache-hit rate 及 token 来源占比。',
-        caption:
-          '筛选数据集时使用的语料快照。图中的费用按该快照和公开 API 标价估算，并非基准测试输出指标。',
+        caption: '筛选数据集时使用的语料快照。图中的费用按该快照的标价估算，并非基准测试输出指标。',
       },
       hashRatio: {
         alt: '按序列长度展示重建 hash token 与服务商 token 数的中位比值，并分别给出整体和各模型结果。',
@@ -514,7 +513,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
         >
           {locale === 'zh' ? '← 返回 AgentX' : '← Back to AgentX'}
         </AgentXMethodologyLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
           {t.eyebrow}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">

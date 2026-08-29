@@ -39,10 +39,30 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('Inference legend', () => {
-    it('i_legend=0 collapses the sidebar legend on load', () => {
+    it('i_legend=0 hides the sidebar legend on load and the reopen button restores it', () => {
       visitWithDismissedModal('/inference?i_legend=0');
+      cy.get('[data-testid="legend-open-button"]').first().should('be.visible');
+      cy.get('.sidebar-legend').should('not.exist');
+
+      cy.get('[data-testid="legend-open-button"]').first().click();
       cy.get('.sidebar-legend').first().should('be.visible');
-      cy.get('.sidebar-legend').first().should('not.have.class', 'bg-accent');
+      cy.get('[data-testid="legend-open-button"]').should('not.exist');
+    });
+
+    // The address bar is deliberately left clean after load (see url-state.ts)
+    // — filter changes like closing the legend only reach the in-memory share
+    // state, so this asserts the UI transition rather than location.search.
+    it('legend close button hides the panel and the reopen button restores it', () => {
+      visitWithDismissedModal('/inference');
+      cy.get('.sidebar-legend').first().should('be.visible');
+
+      cy.get('[data-testid="legend-close-button"]').first().click();
+      cy.get('.sidebar-legend').should('not.exist');
+      cy.get('[data-testid="legend-open-button"]').first().should('be.visible');
+
+      cy.get('[data-testid="legend-open-button"]').first().click();
+      cy.get('.sidebar-legend').first().should('be.visible');
+      cy.get('[data-testid="legend-open-button"]').should('not.exist');
     });
 
     it('preserves a legend subset when chart metrics change', () => {

@@ -38,9 +38,6 @@ const STRINGS = {
     chipSpecs: 'Chip Specs & Pricing',
     rankings: 'GPU Rankings',
     runPages: 'Model on GPU Results',
-    languageLink: '中文版',
-    languageHref: '/zh',
-    languageHrefLang: 'zh-CN',
     cta: 'If this data helps your work, consider starring us on GitHub or sharing with your network.',
     rights: 'All rights reserved.',
   },
@@ -72,9 +69,6 @@ const STRINGS = {
     chipSpecs: '芯片规格与价格',
     rankings: 'GPU 排行榜',
     runPages: '模型在 GPU 上的实测结果',
-    languageLink: 'English',
-    languageHref: '/',
-    languageHrefLang: 'en',
     cta: '如果这些数据对您的工作有帮助，欢迎在 GitHub 上点个 Star，或分享给同事。',
     rights: '版权所有。',
   },
@@ -118,7 +112,10 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
 
           {/* Center — Links */}
-          <div data-testid="footer-links" className="grid grid-cols-3 gap-x-6 gap-y-8">
+          <div
+            data-testid="footer-links"
+            className="grid grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)] gap-x-6 gap-y-8 break-words hyphens-auto min-w-0"
+          >
             <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">{t.semianalysis}</span>
               <a
@@ -207,106 +204,105 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.visualization}
               </a>
             </div>
-            <div data-testid="footer-links-more" className="flex flex-col gap-2.5">
+            {/* "More" holds many links, so it gets a double-width column with
+                the links flowing in two sub-columns. This keeps every group on
+                one balanced row instead of wrapping below the others. */}
+            <div
+              data-testid="footer-links-more"
+              className="col-span-2 xl:col-span-1 flex flex-col gap-2.5"
+            >
               <span className="text-sm font-medium text-foreground">{t.more}</span>
-              <Link
-                data-testid="footer-link-supporters"
-                href={`${prefix}/quotes`}
-                onClick={() => track('footer_supporters_clicked')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.supporters}
-              </Link>
-              <Link
-                data-testid="footer-link-agentx"
-                href={`${prefix}/agentx`}
-                onClick={() => track('footer_agentx_clicked')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.agentx}
-              </Link>
-              <Link
-                data-testid="footer-link-telemetry"
-                href={`${prefix}/inference/agentic`}
-                onClick={() => track('footer_telemetry_clicked')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.telemetry}
-              </Link>
-              <Link
-                data-testid="footer-link-articles"
-                href={`${prefix}/blog`}
-                onClick={() => track('footer_articles_clicked')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.articles}
-              </Link>
-              <Link
-                data-testid="footer-link-api"
-                href={`${prefix}/api`}
-                onClick={() => track('footer_api_clicked')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.apiReference}
-              </Link>
-              <Link
-                data-testid="footer-link-reliability"
-                href={`${prefix}/reliability`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.gpuReliability}
-              </Link>
-              <Link
-                data-testid="footer-link-compare-per-dollar"
-                href={`${prefix}/compare-per-dollar`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.perfPerDollar}
-              </Link>
-              <Link
-                data-testid="footer-link-model-architectures"
-                // English-only route (not zh-mirrored), so no locale prefix.
-                href="/model"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.modelArchitectures}
-              </Link>
-              <Link
-                data-testid="footer-link-glossary"
-                href={`${prefix}/glossary`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.glossary}
-              </Link>
-              <Link
-                data-testid="footer-link-chips"
-                href={`${prefix}/chips`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.chipSpecs}
-              </Link>
-              <Link
-                data-testid="footer-link-rankings"
-                href={`${prefix}/rankings`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.rankings}
-              </Link>
-              <Link
-                data-testid="footer-link-run"
-                href={`${prefix}/run`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.runPages}
-              </Link>
-              <Link
-                data-testid="footer-link-zh"
-                href={t.languageHref}
-                hrefLang={t.languageHrefLang}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t.languageLink}
-              </Link>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                <Link
+                  data-testid="footer-link-supporters"
+                  href={`${prefix}/quotes`}
+                  onClick={() => track('footer_supporters_clicked')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.supporters}
+                </Link>
+                <Link
+                  data-testid="footer-link-agentx"
+                  href={`${prefix}/agentx`}
+                  onClick={() => track('footer_agentx_clicked')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.agentx}
+                </Link>
+                <Link
+                  data-testid="footer-link-telemetry"
+                  href={`${prefix}/inference/agentic`}
+                  onClick={() => track('footer_telemetry_clicked')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.telemetry}
+                </Link>
+                <Link
+                  data-testid="footer-link-articles"
+                  href={`${prefix}/blog`}
+                  onClick={() => track('footer_articles_clicked')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.articles}
+                </Link>
+                <Link
+                  data-testid="footer-link-api"
+                  href={`${prefix}/api`}
+                  onClick={() => track('footer_api_clicked')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.apiReference}
+                </Link>
+                <Link
+                  data-testid="footer-link-reliability"
+                  href={`${prefix}/reliability`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.gpuReliability}
+                </Link>
+                <Link
+                  data-testid="footer-link-compare-per-dollar"
+                  href={`${prefix}/compare-per-dollar`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.perfPerDollar}
+                </Link>
+                <Link
+                  data-testid="footer-link-model-architectures"
+                  href={`${prefix}/model`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.modelArchitectures}
+                </Link>
+                <Link
+                  data-testid="footer-link-glossary"
+                  href={`${prefix}/glossary`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.glossary}
+                </Link>
+                <Link
+                  data-testid="footer-link-chips"
+                  href={`${prefix}/chips`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.chipSpecs}
+                </Link>
+                <Link
+                  data-testid="footer-link-rankings"
+                  href={`${prefix}/rankings`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.rankings}
+                </Link>
+                <Link
+                  data-testid="footer-link-run"
+                  href={`${prefix}/run`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t.runPages}
+                </Link>
+              </div>
             </div>
           </div>
 

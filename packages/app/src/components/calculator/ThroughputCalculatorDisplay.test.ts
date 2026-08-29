@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getChartTitleZh,
   resolveCalculatorBarSelection,
   resolveCalculatorTarget,
   resolveCalculatorTargetInputValue,
   resolveCalculatorVisibility,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
+
+describe('calculator Chinese chart titles', () => {
+  it('describes power efficiency as token throughput per all-in provisioned megawatt', () => {
+    expect(
+      getChartTitleZh('power', 'interactivity_to_throughput', 25, 'input', undefined, 'p90'),
+    ).toBe('25 tok/s/user P90 交互性下每全电源配置兆瓦输入 token 吞吐量');
+  });
+});
 
 describe('calculator effective state selectors', () => {
   it('starts a new data scope with every available GPU visible', () => {

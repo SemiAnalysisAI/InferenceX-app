@@ -189,7 +189,7 @@ export interface NudgeDefinition {
 
   /**
    * A secondary localStorage key that permanently suppresses the nudge.
-   * Example: `inferencex-starred` suppresses both star-nudge and github-star-modal.
+   * Example: `inferencex-starred` suppresses the star-nudge toast.
    */
   permanentSuppressKey?: string;
   /**

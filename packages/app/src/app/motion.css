@@ -1,0 +1,161 @@
+/* InferenceX motion system. Transform/opacity only; entrances decelerate;
+ * micro-feedback stays under 200ms. Everything is gated so no-JS visitors,
+ * crawlers, and reduced-motion users get static content. */
+
+:root {
+  --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-reveal-duration: 550ms;
+  --motion-reveal-distance: 12px;
+}
+
+/* Reveal-on-view primitive (<Reveal> flips data-inview; delayMs staggers). */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(var(--motion-reveal-distance));
+    transition:
+      opacity var(--motion-reveal-duration) var(--motion-ease-enter),
+      transform var(--motion-reveal-duration) var(--motion-ease-enter);
+    transition-delay: var(--motion-reveal-delay, 0ms);
+  }
+
+  [data-reveal][data-inview='true'] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Press feedback for buttons and button-shaped links. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-press {
+    transition-property: color, background-color, border-color, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-press:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Motion tokens: fast = direct feedback, base = contextual movement. */
+:root {
+  --motion-dur-fast: 150ms;
+  --motion-dur-base: 220ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-exit: cubic-bezier(0.3, 0, 1, 1);
+}
+
+/* Route transitions (progressive enhancement; no-VT browsers get an
+ * instant swap). Cross-document transitions cover full-document navs
+ * such as the compare catalog cards. */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-old(*.vt-page) {
+    animation: motion-vt-out 90ms var(--motion-ease-exit) forwards;
+  }
+
+  ::view-transition-new(root),
+  ::view-transition-new(*.vt-page) {
+    animation: motion-vt-in var(--motion-dur-base) var(--motion-ease-enter) both;
+  }
+
+  /* Naming the cross-page chrome removes it from the root cross-fade. */
+  .vt-site-header {
+    view-transition-name: site-header;
+  }
+
+  .vt-dashboard-tabs {
+    view-transition-name: dashboard-tabs;
+  }
+
+  /* Shared element: compare card title → detail page <h1>. Applied to at
+   * most one element per page. */
+  .vt-compare-title {
+    view-transition-name: compare-title;
+  }
+}
+
+@keyframes motion-vt-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reduced motion: near-instant cut (`animation: none` would freeze the
+ * old snapshot). */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Stale-while-refetching dim for charts. Non-moving opacity fade, so not
+ * gated on reduced motion. */
+.motion-stale {
+  transition: opacity var(--motion-dur-fast) ease;
+}
+
+.motion-stale[data-stale='true'] {
+  opacity: 0.55;
+}
+
+/* Pending cue for full-document navigations (compare catalog cards). */
+.motion-nav-pending[data-pending='true'] {
+  opacity: 0.6;
+}
+
+/* Dashboard tab rail: sliding active indicator. Falls back to the per-link
+ * static border until JS has measured. */
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 9999px;
+  will-change: transform, width;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab-indicator {
+    transition:
+      transform var(--motion-dur-base) var(--motion-ease-standard),
+      width var(--motion-dur-base) var(--motion-ease-standard);
+  }
+}
+
+/* Small popover-style entrances (header mobile menu). */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-pop-in {
+    animation: motion-pop-in var(--motion-dur-fast) var(--motion-ease-enter) both;
+  }
+}
+
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

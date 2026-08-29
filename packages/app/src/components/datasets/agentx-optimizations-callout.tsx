@@ -21,7 +21,7 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
       className="rounded-lg border border-primary/30 bg-primary/5"
     >
       <div className="px-4 py-4 sm:px-5 sm:py-5">
-        <p className="mb-2 font-mono text-[11px] font-medium tracking-[0.18em] text-primary uppercase">
+        <p className="mb-2 font-mono text-2xs font-medium tracking-eyebrow text-primary uppercase">
           {overview.eyebrow}
         </p>
         <h2 id="agentx-optimizations-title" className="text-lg font-semibold text-foreground">

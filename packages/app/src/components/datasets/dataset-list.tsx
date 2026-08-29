@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { useDatasets, type DatasetRecord } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import { compact, formatPct, perConversation } from './format';
+import { compact, formatPct, localeNumber, perConversation } from './format';
 
 const STRINGS = {
   en: {
@@ -53,7 +53,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
       <Card className="h-full p-4 transition-colors hover:border-primary/40">
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <h3 className="text-base font-semibold text-foreground">{d.label}</h3>
-          <span className="rounded-full border border-border/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="rounded-full border border-border/50 px-2 py-0.5 text-3xs uppercase tracking-wide text-muted-foreground">
             {d.variant}
           </span>
         </div>
@@ -61,9 +61,15 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
           <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
         )}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <Stat label={t.conversations} value={d.conversation_count.toLocaleString()} />
-          <Stat label={t.medianReqConvo} value={perConversation(s.medianRequestsPerConversation)} />
-          <Stat label={t.meanReqConvo} value={perConversation(s.meanRequestsPerConversation)} />
+          <Stat label={t.conversations} value={localeNumber(d.conversation_count, locale)} />
+          <Stat
+            label={t.medianReqConvo}
+            value={perConversation(s.medianRequestsPerConversation, locale)}
+          />
+          <Stat
+            label={t.meanReqConvo}
+            value={perConversation(s.meanRequestsPerConversation, locale)}
+          />
           <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
           <Stat label={t.subagentGroups} value={compact(s.subagentGroups ?? 0)} />
           <Stat label={t.cachedInput} value={cachedPct} />

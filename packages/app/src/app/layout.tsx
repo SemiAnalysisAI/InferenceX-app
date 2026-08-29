@@ -9,6 +9,7 @@ import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
+import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
@@ -225,7 +226,9 @@ export default async function RootLayout({
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
-              <div className="grow flex flex-col">{children}</div>
+              <div className="grow flex flex-col">
+                <RouteTransition>{children}</RouteTransition>
+              </div>
               <Footer starCount={starCount} />
             </ThemeProvider>
           </QueryProvider>

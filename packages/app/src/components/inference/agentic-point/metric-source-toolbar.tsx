@@ -10,36 +10,63 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 
 import type { StagePhase } from './phase-slice';
 
-const SOURCE_ROLE_LABEL: Record<MetricSource['role'], string> = {
-  router: 'Router',
-  prefill: 'Prefill',
-  decode: 'Decode',
-  combined: 'Combined',
-  unknown: 'Unknown',
+const SOURCE_ROLE_LABEL: Record<Locale, Record<MetricSource['role'], string>> = {
+  en: {
+    router: 'Router',
+    prefill: 'Prefill',
+    decode: 'Decode',
+    combined: 'Combined',
+    unknown: 'Unknown',
+  },
+  zh: { router: '路由', prefill: '预填充', decode: '解码', combined: '合并', unknown: '未知' },
 };
 
 /** "Role · instance" label for one server-metrics endpoint. */
-export function metricSourceLabel(source: MetricSource): string {
+export function metricSourceLabel(source: MetricSource, locale: Locale = 'en'): string {
+  const engineLabel = (engine: string) => (locale === 'zh' ? `引擎 ${engine}` : `engine ${engine}`);
   const instance =
     source.workerId ??
     (source.dpRank ? `DP ${source.dpRank}` : null) ??
     source.endpointUrl ??
-    (source.engine ? `engine ${source.engine}` : null);
+    (source.engine ? engineLabel(source.engine) : null);
   return instance
-    ? `${SOURCE_ROLE_LABEL[source.role]} · ${instance}`
-    : SOURCE_ROLE_LABEL[source.role];
+    ? `${SOURCE_ROLE_LABEL[locale][source.role]} · ${instance}`
+    : SOURCE_ROLE_LABEL[locale][source.role];
 }
 
 // Warmup vs profiling stage selector. Drives the server-metric charts AND the
 // request-derived charts (ISL/OSL, latency-over-time, in-flight). Only shown
 // when the point actually has a warmup phase.
-const STAGE_PHASE_OPTIONS: SegmentedToggleOption<StagePhase>[] = [
-  { value: 'profiling', label: 'Profiling', testId: 'stage-phase-profiling' },
-  { value: 'warmup', label: 'Warmup', testId: 'stage-phase-warmup' },
-];
+const TOOLBAR_STRINGS = {
+  en: {
+    stage: 'Stage',
+    profiling: 'Profiling',
+    warmup: 'Warmup',
+    stageAria: 'Stage phase',
+    metrics: 'Server metrics',
+    sourceAria: 'Server metrics source',
+    all: 'All endpoints',
+  },
+  zh: {
+    stage: '阶段',
+    profiling: 'profiling',
+    warmup: 'warmup',
+    stageAria: '运行阶段',
+    metrics: '服务器指标',
+    sourceAria: '服务器指标来源',
+    all: '所有端点',
+  },
+} as const;
+
+export function stagePhaseLabels(locale: Locale): { profiling: string; warmup: string } {
+  const t = TOOLBAR_STRINGS[locale];
+  return { profiling: t.profiling, warmup: t.warmup };
+}
 
 /**
  * Sticky per-point toolbar: warmup/profiling stage toggle (when the point has
@@ -64,6 +91,13 @@ export function MetricSourceToolbar({
   /** Adapter reported in analytics when the selected source lookup misses. */
   fallbackAdapter: string | undefined;
 }) {
+  const locale = useLocale();
+  const t = TOOLBAR_STRINGS[locale];
+  const phaseLabels = stagePhaseLabels(locale);
+  const stageOptions: SegmentedToggleOption<StagePhase>[] = [
+    { value: 'profiling', label: phaseLabels.profiling, testId: 'stage-phase-profiling' },
+    { value: 'warmup', label: phaseLabels.warmup, testId: 'stage-phase-warmup' },
+  ];
   return (
     <div
       className="sticky top-16 z-40 flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/90 px-3 py-2 shadow-sm backdrop-blur"
@@ -71,15 +105,15 @@ export function MetricSourceToolbar({
     >
       {hasWarmup ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Stage</span>
+          <span className="text-xs text-muted-foreground">{t.stage}</span>
           <SegmentedToggle
             value={phase}
-            options={STAGE_PHASE_OPTIONS}
+            options={stageOptions}
             onValueChange={(value) => {
               onPhaseChange(value);
               track('inference_agentic_phase_changed', { phase: value });
             }}
-            ariaLabel="Stage phase"
+            ariaLabel={t.stageAria}
             testId="stage-phase-toggle"
             buttonClassName="px-2.5 py-1 text-xs"
           />
@@ -89,7 +123,7 @@ export function MetricSourceToolbar({
       )}
       {metricSources.length > 1 ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Server metrics</span>
+          <span className="text-xs text-muted-foreground">{t.metrics}</span>
           <Select
             value={selectedSource?.source.id ?? 'all'}
             onValueChange={(value) => {
@@ -105,20 +139,20 @@ export function MetricSourceToolbar({
             <SelectTrigger
               size="sm"
               className="max-w-72"
-              aria-label="Server metrics source"
+              aria-label={t.sourceAria}
               data-testid="metric-source-select"
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All endpoints</SelectItem>
+              <SelectItem value="all">{t.all}</SelectItem>
               {metricSources.map(({ source }) => (
                 <SelectItem
                   key={source.id}
                   value={source.id}
                   title={source.endpointUrl ?? undefined}
                 >
-                  {metricSourceLabel(source)}
+                  {metricSourceLabel(source, locale)}
                 </SelectItem>
               ))}
             </SelectContent>

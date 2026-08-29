@@ -19,6 +19,7 @@ import {
   paretoFrontUpperLeft,
   metricTitle,
   metricLabel,
+  xAxisLabel,
 } from '@/lib/chart-utils';
 
 // mock constants so createChartDataPoint (also in this module) doesn't call
@@ -676,6 +677,13 @@ describe('createChartDataPoint', () => {
     expect(point.tpPerGpu).toEqual({ y: 2000, roof: false });
   });
 
+  it('computes token revenue per GPU hour at the normalized $1/M token price', () => {
+    const e = entry({ tput_per_gpu: 2000 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // 2,000 tok/s/GPU × 3,600 s/hr ÷ 1,000,000 tok × $1/M tok = $7.20/GPU/hr.
+    expect(point.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
+  });
+
   it('sets outputTputPerGpu when output_tput_per_gpu > 0', () => {
     const e = entry({ output_tput_per_gpu: 800 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
@@ -858,6 +866,16 @@ describe('buildDerivedChartFields', () => {
     expect(historicalFields).toEqual({
       outputTputPerGpu: fullPoint.outputTputPerGpu,
       costhOutput: fullPoint.costhOutput,
+    });
+  });
+
+  it('selectively derives normalized token revenue for historical trends', () => {
+    const historicalFields = buildDerivedChartFields(entry({ tput_per_gpu: 1250 }), 'h100', [
+      'tokenRevenuePerGpuHour',
+    ]);
+
+    expect(historicalFields).toEqual({
+      tokenRevenuePerGpuHour: { y: 4.5, roof: false },
     });
   });
 
@@ -1632,7 +1650,9 @@ describe('metricTitle', () => {
     chartType: 'interactivity',
     heading: 'vs. Interactivity',
     x: 'median_intvty',
+    x_scale_field: 'median_intvty',
     x_label: 'Interactivity (tok/s/user)',
+    x_labelZh: '交互性 (tok/s/user)',
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
@@ -1663,7 +1683,9 @@ describe('metricLabel', () => {
     chartType: 'interactivity',
     heading: 'vs. Interactivity',
     x: 'median_intvty',
+    x_scale_field: 'median_intvty',
     x_label: 'Interactivity (tok/s/user)',
+    x_labelZh: '交互性 (tok/s/user)',
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
@@ -1684,5 +1706,17 @@ describe('metricLabel', () => {
 
   it('returns empty string for unknown metric', () => {
     expect(metricLabel(chartDef, 'y_unknown', 'en')).toBe('');
+  });
+});
+
+describe('xAxisLabel', () => {
+  it('preserves exact English and resolves the Chinese sibling for every consumer', () => {
+    const chartDef = {
+      x_label: 'End-to-end Latency (s)',
+      x_labelZh: '端到端延迟 (s)',
+    } as ChartDefinition;
+
+    expect(xAxisLabel(chartDef, 'en')).toBe('End-to-end Latency (s)');
+    expect(xAxisLabel(chartDef, 'zh')).toBe('端到端延迟 (s)');
   });
 });

@@ -1,4 +1,4 @@
-import { keepTelemetryTutorial, unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, keepTelemetryTutorial, unlockAgenticGate } from '../support/e2e';
 
 // This spec owns the telemetry-tutorial card's storage, so it opts out of the
 // global suppression seeded in support/e2e.ts (which also re-seeds on reload).
@@ -20,6 +20,11 @@ const FIGURE_KEYS = [
   'requestTimeline',
   'flamegraph',
 ];
+
+const ROUTE_VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+] as const;
 
 describe('AgentX telemetry tutorial — English page', () => {
   beforeEach(() => {
@@ -81,6 +86,16 @@ describe('AgentX telemetry tutorial — Chinese page', () => {
       'href',
       '/zh/inference?i_seq=agentic-traces',
     );
+    cy.get('link[rel="alternate"][hreflang="en"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/agentx/telemetry',
+    );
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/zh/agentx/telemetry',
+    );
   });
 });
 
@@ -97,6 +112,33 @@ describe('AgentX telemetry tutorial — entry point on /agentx', () => {
     cy.get('[data-testid="agentx-telemetry-callout"]').should('be.visible');
     cy.get('[data-testid="agentx-telemetry-cta"]').click();
     cy.location('pathname').should('eq', '/zh/agentx/telemetry');
+  });
+});
+
+describe('AgentX telemetry tutorial — responsive locale routes', () => {
+  it('renders the full telemetry surface at 1440px and 375px in both locales', () => {
+    for (const viewport of ROUTE_VIEWPORTS) {
+      for (const locale of ['', '/zh']) {
+        cy.viewport(viewport.width, viewport.height);
+        cy.visit(`${locale}/agentx/telemetry`, { onBeforeLoad: unlockAgenticGate });
+        cy.get('[data-testid="agentx-telemetry-article"]').should('be.visible');
+        cy.get('[data-testid^="agentx-telemetry-section-"]').should(
+          'have.length',
+          SECTION_IDS.length,
+        );
+        cy.get('[data-testid="agentx-telemetry-results-cta"]').should(
+          'have.attr',
+          'href',
+          `${locale}/inference?i_seq=agentic-traces`,
+        );
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale === '/zh' ? '/agentx/telemetry' : '/zh/agentx/telemetry',
+        );
+        expectNoPageOverflow();
+      }
+    }
   });
 });
 

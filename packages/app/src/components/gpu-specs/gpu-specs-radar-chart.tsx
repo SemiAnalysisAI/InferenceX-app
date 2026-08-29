@@ -66,8 +66,16 @@ interface GpuSpecsRadarChartProps {
 }
 
 const RADAR_STRINGS = {
-  en: { resetFilter: 'Reset filter' },
-  zh: { resetFilter: '重置筛选' },
+  en: {
+    resetFilter: 'Reset filter',
+    empty: 'Select at least one chip to display the radar chart.',
+    note: 'Values are normalized to percentages of the maximum across all chips for each metric. chips without FP4 support show 0% on the FP4 axis.',
+  },
+  zh: {
+    resetFilter: '重置筛选',
+    empty: '请至少选择一款芯片以显示雷达图。',
+    note: '每项指标均按所有芯片中的最大值归一化为百分比；不支持 FP4 的芯片在 FP4 轴上显示为 0%。',
+  },
 } as const;
 
 export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
@@ -76,7 +84,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
   );
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const locale = useLocale();
-  const legendT = RADAR_STRINGS[locale];
+  const t = RADAR_STRINGS[locale];
 
   const metrics = RADAR_METRICS;
 
@@ -131,7 +139,10 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
       key: 'gpu-radar',
       data: visibleData,
       config: {
-        axes: metrics.map((m) => ({ label: m.label, unit: m.unit })),
+        axes: metrics.map((m) => ({
+          label: locale === 'zh' ? m.labelZh : m.label,
+          unit: locale === 'zh' ? m.unitZh : m.unit,
+        })),
         getValue: (d, i) => d.values[i],
         getRawValue: (d, i) => metrics[i].getValue(d.gpu),
         getColor: (d) => d.color,
@@ -139,7 +150,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         keyFn: (d) => d.gpu.name,
       },
     }),
-    [visibleData, metrics],
+    [visibleData, metrics, locale],
   );
 
   const tooltip = useMemo(
@@ -159,7 +170,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               <span style="font-size: 10px; color: ${vendorColor}; font-weight: 500;">${vendorLabel}</span>
             </div>
             <div style="color: var(--muted-foreground); font-size: 11px;">
-              <strong>${metric.label}:</strong> ${rawValue === null ? '—' : rawValue.toLocaleString('en-US')} ${metric.unit}
+              <strong>${locale === 'zh' ? metric.labelZh : metric.label}${locale === 'zh' ? '：' : ':'}</strong> ${rawValue === null ? '—' : rawValue.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')} ${locale === 'zh' ? metric.unitZh : metric.unit}
             </div>
           </div>`;
       },
@@ -171,7 +182,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
       },
       attachToLayer: 0,
     }),
-    [metrics],
+    [locale, metrics],
   );
 
   const layers = useMemo(() => [radarLayer], [radarLayer]);
@@ -179,9 +190,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
   if (selectedGpus.size === 0) {
     return (
       <div data-testid="gpu-specs-radar-chart">
-        <div className="flex items-center justify-center h-60 text-muted-foreground">
-          Select at least one chip to display the radar chart.
-        </div>
+        <div className="flex items-center justify-center h-60 text-muted-foreground">{t.empty}</div>
       </div>
     );
   }
@@ -214,7 +223,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
                 ? [
                     {
                       id: 'radar-reset-filter',
-                      label: legendT.resetFilter,
+                      label: t.resetFilter,
                       onClick: () => {
                         selectAll();
                         track('gpu_specs_radar_reset_filter');
@@ -228,10 +237,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         }
       />
       <div className="px-4 md:px-8 pt-2">
-        <p className="text-xs text-muted-foreground">
-          Values are normalized to percentages of the maximum across all chips for each metric.
-          chips without FP4 support show 0% on the FP4 axis.
-        </p>
+        <p className="text-xs text-muted-foreground">{t.note}</p>
       </div>
     </div>
   );

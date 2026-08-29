@@ -774,7 +774,7 @@ describe('TCO Calculator', () => {
     it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
       cy.get('[data-testid="calculator-costcap-section"]')
         .find('[data-testid="calc-costcap-mw-input"]')
-        .should('exist');
+        .should('have.value', '10');
       cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
       // A pointer to the new page replaces the section.
       cy.get('[data-testid="calculator-fleet-pointer-link"]')
@@ -861,5 +861,97 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-costcap-collapse"]').click();
       cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
     });
+  });
+});
+
+describe('TCO Calculator Chinese route', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/calculator', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+  });
+
+  it('localizes chart internals, table headers, and preserved units', () => {
+    cy.contains('label', '计价方式').should('be.visible');
+    cy.contains('label', '目标交互性 (tok/s/user)')
+      .parent()
+      .find('svg.cursor-help')
+      .trigger('pointermove');
+    cy.get('[role="tooltip"]')
+      .should('contain.text', '用于插值计算的交互性目标值。')
+      .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
+    cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.get('[data-testid="calculator-bar-chart"]').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '吞吐量：')
+      .and('contain.text', '成本：');
+    cy.get('[data-testid="calculator-metric-power"]').click();
+    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗：');
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    cy.get('[data-testid="calculator-results-table"] thead')
+      .should('contain.text', '芯片')
+      .and('contain.text', '成本 ($/M tok)')
+      .and('contain.text', '并发数');
+  });
+
+  it('supports the complete chart-to-table path at 1440px', () => {
+    cy.viewport(1440, 900);
+    cy.reload();
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
+    cy.get('[data-testid="calculator-comparison-banner"]')
+      .should('be.visible')
+      .and('contain.text', '已选中。点击其他柱形即可对比。');
+    cy.get('[data-testid="calculator-table-view-btn"]').click();
+    cy.get('[data-testid="calculator-results-table"]').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps dense tables internally scrollable without body overflow at 390px', () => {
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    // DataTable renders its horizontal scroller inside the testid wrapper.
+    cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
+      .first()
+      .then(($scroller) => {
+        expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+      });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps the localized chart contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('emits bidirectional hreflang metadata', () => {
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/calculator');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/calculator');
   });
 });

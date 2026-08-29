@@ -167,13 +167,27 @@ at every interpolated point.
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page also exposes tokens-per-dollar as separate Y-axis metrics;
-it does not replace the cost-per-million metrics. Historical trends for these
-purchasing-power metrics select Pareto knots from the matching total, output, or
-input throughput, spline that throughput, and apply the constant
-`3600 / $/GPU-hr` multiplier. Reusing the matching throughput frontier is
-essential: total-throughput knots are not necessarily the output- or
-input-throughput Pareto knots.
+The `/inference` page also exposes tokens-per-dollar and normalized token revenue
+as separate Y-axis metrics; neither replaces the cost-per-million metrics.
+Historical trends for these proportional metrics select Pareto knots from the
+matching throughput, spline that throughput, and apply the constant multiplier.
+Tokens-per-dollar uses `3600 / $/GPU-hr`; normalized token revenue uses
+`3600 / 1,000,000` at the axis's explicit `$1/M tok` sale price. Reusing the
+matching throughput frontier is essential: total-throughput knots are not
+necessarily the output- or input-throughput Pareto knots.
+
+The revenue axis defaults to pricing every input and output token at the same
+`$1/M tok` rate, making it a model-independent SLA comparison. Its OpenRouter
+option fetches the selected model's current public prompt/completion prices from
+`https://openrouter.ai/api/v1/models` and prices the streams separately. Aggregate
+rows use their measured input/output split. Disaggregated rows cannot use the raw
+per-prefill/per-decode rates together, so they apply the fixed ISL:OSL shape or
+the measured agentic prompt:generation mix to total tok/s/GPU. The OpenRouter
+option uses standard prompt/completion prices and does not apply cache discounts.
+
+Neither mode is the fleet lifecycle section's realized-revenue model: it does not
+model availability, rollout, or a user-supplied cached-input discount. Those
+business assumptions remain in Fleet Lifecycle below.
 
 ### The consistency guard
 
@@ -375,8 +389,9 @@ Four conventions the numbers depend on:
   energised, not from the moment they are loaded. So the opening rollout is paid for
   in full while it earns its way up from zero, which is what puts the first months
   below the rule and gives payback its meaning.
-- **The ramp is an assumption; the steps are not.** It defaults to a nominal
-  quarter (`c_ramp`), and 0 means every config takes effect instantly.
+- **The ramp is an assumption; the steps are not.** It defaults to half a month
+  (`c_ramp`) and moves in quarter-month increments; 0 means every config takes
+  effect instantly.
 - **Markers sit at the release instant** — the foot of each rollout, not its top —
   so every dot on the chart is a sweep the user can open.
 - **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
@@ -980,6 +995,6 @@ against that allowlist so a stale or hand-edited link falls back to `margin` rat
 than seeding an unknown metric).
 The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
-the comment there. The MW budget is
-`c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet
-planner and this section so one input drives both.
+the comment there. The MW budget is `c_mw`, defaults to 10 MW, and is shared by
+the calculator and Fleet Lifecycle page so a budget set on either seeds the
+other.

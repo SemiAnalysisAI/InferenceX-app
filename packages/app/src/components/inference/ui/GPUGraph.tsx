@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -106,6 +107,8 @@ const GPU_STRINGS = {
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    noData: 'No data available',
+    noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
   },
   zh: {
     logScale: '对数缩放',
@@ -117,6 +120,8 @@ const GPU_STRINGS = {
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
+    noData: '暂无数据',
+    noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
   },
 } as const;
 
@@ -172,6 +177,7 @@ const GPUGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
+    const ephemeralUrlState = useEphemeralUrlState();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
@@ -693,10 +699,8 @@ const GPUGraph = React.memo(
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <h3 className="text-sm font-medium mb-1">No data available</h3>
-              <p className="text-xs">
-                Please change the model, sequence, precision, date range or chip selection.
-              </p>
+              <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
+              <p className="text-xs">{legendT.noDataHint}</p>
               <Button
                 type="button"
                 size="sm"
@@ -838,8 +842,10 @@ const GPUGraph = React.memo(
                 event.stopPropagation();
                 // Full-document navigation: stamp the chart state onto THIS
                 // history entry first, or Back returns to a bare /inference
-                // that rebuilds from defaults.
-                rememberChartStateInUrl();
+                // that rebuilds from defaults. Skipped in ephemeral scopes
+                // (/model embeds): the store holds the primary dashboard's
+                // state there, not this chart's.
+                if (!ephemeralUrlState) rememberChartStateInUrl();
                 track('gpu_timeseries_view_charts_opened', {
                   id: d.id,
                   hwKey: String(d.hwKey),

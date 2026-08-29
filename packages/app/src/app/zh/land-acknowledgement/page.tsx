@@ -53,7 +53,7 @@ export default function LandAcknowledgementPageZh() {
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
               土地致谢
             </p>
-            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl">
+            <h1 className="text-4xl font-semibold tracking-heading text-foreground md:text-5xl">
               我们致敬与我们美国基础设施所在土地相关的原住民家园。
             </h1>
             <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
@@ -79,7 +79,7 @@ export default function LandAcknowledgementPageZh() {
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
                   {entry.region}
                 </p>
-                <h2 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-foreground">
+                <h2 className="mt-3 text-xl font-semibold tracking-heading text-foreground">
                   {entry.peoples}
                 </h2>
                 <p className="mt-4 text-sm leading-6 text-muted-foreground">
