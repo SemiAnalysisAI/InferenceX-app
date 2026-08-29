@@ -152,7 +152,7 @@ export function getMetricLabel(
     const tokenTypePrefix = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '';
     switch (barMetric) {
       case 'power': {
-        return `每满配兆瓦${tokenTypePrefix} token 数 (tok/s/MW)`;
+        return `每全电源配置兆瓦${tokenTypePrefix} token 吞吐量 (tok/s/MW)`;
       }
       case 'cost': {
         return `成本 ($${getCostTypeLabel(costType)})`;

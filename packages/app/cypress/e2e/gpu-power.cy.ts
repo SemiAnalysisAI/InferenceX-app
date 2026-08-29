@@ -191,7 +191,7 @@ describe('PowerX Chinese route', () => {
     cy.get('[data-testid="gpu-metrics-display"]')
       .should('contain.text', '2026/8/23')
       .and('contain.text', '芯片 0')
-      .and('contain.text', '每芯片统计信息')
+      .and('contain.text', '单芯片统计信息')
       .and('contain.text', '样本数')
       .and('contain.text', '最小值');
     cy.get('[data-testid="gpu-metrics-chart-svg"] svg')

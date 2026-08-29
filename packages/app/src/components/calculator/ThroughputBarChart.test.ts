@@ -186,7 +186,7 @@ describe('getMetricLabel', () => {
       '成本 ($/M input tok)',
     );
     expect(getMetricLabel('power', 'interactivity_to_throughput', 'input', 'zh')).toBe(
-      '每满配兆瓦输入 token 数 (tok/s/MW)',
+      '每全电源配置兆瓦输入 token 吞吐量 (tok/s/MW)',
     );
   });
 

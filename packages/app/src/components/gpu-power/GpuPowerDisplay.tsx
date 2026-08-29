@@ -102,7 +102,7 @@ const STRINGS = {
     metricCorrelation: '指标相关性',
     resetFilter: '重置筛选',
     downsample: '降采样',
-    perGpuStats: '每芯片统计信息',
+    perGpuStats: '单芯片统计信息',
     rows: '行',
     error: '无法加载芯片指标。',
     numericError: '运行 ID 必须为数字。',
