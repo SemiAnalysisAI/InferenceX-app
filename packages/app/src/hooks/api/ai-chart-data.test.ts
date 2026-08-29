@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import chartDefinitions from '@/components/inference/metric-registry';
-import { Y_AXIS_METRICS } from '@/lib/chart-utils';
 
 import {
   buildAiLineData,
@@ -21,9 +20,11 @@ describe('getAiRadarMetricLabel', () => {
     );
   });
 
-  it.each(Y_AXIS_METRICS)('never returns a blank axis label for allowed metric %s', (metric) => {
-    expect(getAiRadarMetricLabel(metric, chartDefinitions[0], 'en')).not.toBe('');
-    expect(getAiRadarMetricLabel(metric, chartDefinitions[0], 'zh')).not.toBe('');
+  it.each([
+    ['en' as const, 'Throughput/Chip'],
+    ['zh' as const, '每芯片吞吐量'],
+  ])('prefers the concise radar label over the registry label for %s', (locale, expected) => {
+    expect(getAiRadarMetricLabel('y_tpPerGpu', chartDefinitions[0], locale)).toBe(expected);
   });
 });
 

@@ -18,7 +18,7 @@ describe('AI chart locale instructions', () => {
     );
 
     expect(prompt).toContain('"title": "short chart title"');
-    expect(prompt).not.toContain('Write title, description, and yAxisLabel in Simplified Chinese');
+    expect(prompt).not.toContain('Simplified Chinese');
     expect(summaryPrompt)
       .toBe(`You are an expert performance analyst. Based on the following benchmark data, provide a concise 2-3 sentence summary highlighting the key takeaway.
 

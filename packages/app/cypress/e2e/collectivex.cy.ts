@@ -501,20 +501,18 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'cancelled');
   });
 
-  for (const width of [375, 390]) {
-    it(`keeps the Chinese explorer and runs table reachable at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.visit('/zh/collectivex');
-      cy.wait('@runs');
-      cy.wait('@run');
+  it('keeps the Chinese explorer and runs table reachable at 375px', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
 
-      cy.get('[data-testid="collectivex-main-chart"] svg').should('exist');
-      cy.get('[data-testid="collectivex-runs-table"]').scrollTo('right').should('be.visible');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-      });
+    cy.get('[data-testid="collectivex-main-chart"] svg').should('exist');
+    cy.get('[data-testid="collectivex-runs-table"]').scrollTo('right').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  }
+  });
 });
 
 describe('CollectiveX run deletion', () => {

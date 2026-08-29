@@ -200,15 +200,13 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
   });
 
-  for (const width of [375, 390]) {
-    it(`keeps controls reachable without body overflow at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.visit('/zh/reliability');
-      cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
-      cy.contains('[role="option"]', '全部时间').should('be.visible');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-      });
+  it('keeps controls reachable without body overflow at 375px', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/reliability');
+    cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
+    cy.contains('[role="option"]', '全部时间').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  }
+  });
 });

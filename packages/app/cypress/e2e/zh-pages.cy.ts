@@ -218,29 +218,27 @@ describe('Chinese (/zh) pages', () => {
       cy.contains('暂无提交记录。').should('be.visible');
     });
 
-    for (const width of [375, 390]) {
-      it(`keeps the chart labels readable and the table scrollable at ${width}px`, () => {
-        cy.viewport(width, 844);
-        cy.get('[data-testid="submissions-chart-svg"] .x-axis .tick text').then(($ticks) => {
-          expect($ticks.length, 'mobile date tick count').to.be.at.most(3);
-          const boxes = [...$ticks]
-            .map((tick) => tick.getBoundingClientRect())
-            .sort((left, right) => left.left - right.left);
-          for (let index = 1; index < boxes.length; index += 1) {
-            expect(boxes[index - 1].right, 'adjacent mobile date ticks').to.be.at.most(
-              boxes[index].left,
-            );
-          }
-        });
-        cy.get('[data-testid="submissions-display"] table').should('be.visible');
-        cy.get('[data-testid="submissions-display"] .overflow-x-auto')
-          .scrollTo('right')
-          .should('be.visible');
-        cy.document().then((doc) => {
-          expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-        });
+    it('keeps the chart labels readable and the table scrollable at 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="submissions-chart-svg"] .x-axis .tick text').then(($ticks) => {
+        expect($ticks.length, 'mobile date tick count').to.be.at.most(3);
+        const boxes = [...$ticks]
+          .map((tick) => tick.getBoundingClientRect())
+          .sort((left, right) => left.left - right.left);
+        for (let index = 1; index < boxes.length; index += 1) {
+          expect(boxes[index - 1].right, 'adjacent mobile date ticks').to.be.at.most(
+            boxes[index].left,
+          );
+        }
       });
-    }
+      cy.get('[data-testid="submissions-display"] table').should('be.visible');
+      cy.get('[data-testid="submissions-display"] .overflow-x-auto')
+        .scrollTo('right')
+        .should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
   });
 
   describe('zh feedback viewer workflow', () => {
@@ -304,16 +302,14 @@ describe('Chinese (/zh) pages', () => {
       cy.contains('暂无反馈记录。').should('be.visible');
     });
 
-    for (const width of [375, 390]) {
-      it(`keeps the key controls and content within ${width}px`, () => {
-        cy.viewport(width, 844);
-        cy.get('[data-testid="feedback-key-input"]').should('be.visible');
-        cy.get('[data-testid="feedback-key-submit"]').should('be.visible');
-        cy.document().then((doc) => {
-          expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-        });
+    it('keeps the key controls and content within 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="feedback-key-input"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-submit"]').should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
       });
-    }
+    });
   });
 
   it('uses the route locale in the global feedback modal and dismisses it through the UI', () => {

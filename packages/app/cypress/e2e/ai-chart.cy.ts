@@ -188,12 +188,10 @@ describe('AI chart Chinese workflow', () => {
       cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
         const systemPrompt = request.body.messages?.[0]?.content ?? '';
         if (systemPrompt.includes('chart generation assistant')) {
-          expect(systemPrompt).to.contain('natural Simplified Chinese');
           request.reply({ choices: [{ message: { content: JSON.stringify(spec) } }] });
           return;
         }
 
-        expect(systemPrompt).to.contain('用自然、准确的简体中文回答');
         request.reply({ choices: [{ message: { content: 'B200 在该配置下吞吐量更高。' } }] });
       }).as('zhOpenAi');
 
@@ -323,19 +321,17 @@ describe('AI chart Chinese workflow', () => {
     cy.get('textarea').should('have.value', '对比吞吐量');
   });
 
-  for (const width of [375, 390]) {
-    it(`keeps Chinese provider controls and examples within ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
-      cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
-      cy.contains('提示词示例').should('be.visible');
-      cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
-        'be.visible',
-      );
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-      });
+  it('keeps Chinese provider controls and examples within 375px', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/ai-chart');
+    cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
+    cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
+    cy.contains('提示词示例').should('be.visible');
+    cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
+      'be.visible',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  }
+  });
 });

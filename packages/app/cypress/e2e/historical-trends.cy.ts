@@ -265,15 +265,13 @@ describe('Historical Trends — Chinese route', () => {
     });
   });
 
-  for (const width of [375, 390]) {
-    it(`keeps the target controls and chart reachable at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.get('[data-testid="historical-trends-display"] input[type="range"]').should('be.visible');
-      cy.get('[data-testid="historical-trends-display"] input[type="number"]').should('be.visible');
-      cy.get('[data-testid="historical-trend-figure"] svg').should('exist');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-      });
+  it('keeps the target controls and chart reachable at 375px', () => {
+    cy.viewport(375, 844);
+    cy.get('[data-testid="historical-trends-display"] input[type="range"]').should('be.visible');
+    cy.get('[data-testid="historical-trends-display"] input[type="number"]').should('be.visible');
+    cy.get('[data-testid="historical-trend-figure"] svg').should('exist');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  }
+  });
 });

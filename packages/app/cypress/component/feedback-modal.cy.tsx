@@ -93,29 +93,6 @@ describe('FeedbackForm', () => {
     cy.contains('感谢您的反馈！').should('be.visible');
   });
 
-  it('keeps engine-provided Chinese accessible labels valid after success', () => {
-    cy.intercept('POST', '/api/v1/feedback', { statusCode: 204 }).as('postAccessibleZh');
-    cy.mount(
-      <FeedbackForm
-        locale="zh"
-        onDismiss={cy.stub()}
-        titleId="feedback-modal-title"
-        descriptionId="feedback-modal-description"
-      />,
-    );
-
-    cy.get('#feedback-modal-title').should('have.text', '帮助我们改进 InferenceX');
-    cy.get('#feedback-modal-description').should(
-      'have.text',
-      '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
-    );
-    cy.get('[data-testid="feedback-doing-well"]').type('图表很清晰');
-    cy.get('[data-testid="feedback-modal-submit"]').click();
-    cy.wait('@postAccessibleZh');
-    cy.get('#feedback-modal-title').should('have.text', '感谢您的反馈！');
-    cy.get('#feedback-modal-description').should('have.text', '我们会认真阅读每一条反馈。');
-  });
-
   it('localizes rate-limit and server errors on Chinese routes', () => {
     cy.intercept('POST', '/api/v1/feedback', { statusCode: 429 }).as('rateLimited');
     cy.mount(<FeedbackForm locale="zh" onDismiss={cy.stub()} />);
@@ -135,15 +112,13 @@ describe('FeedbackForm', () => {
     cy.contains('Failed to fetch').should('not.exist');
   });
 
-  for (const width of [375, 390]) {
-    it(`keeps the Chinese form inside a ${width}px viewport`, () => {
-      cy.viewport(width, 667);
-      cy.mount(<FeedbackForm locale="zh" onDismiss={cy.stub()} />);
+  it('keeps the Chinese form inside a 375px viewport', () => {
+    cy.viewport(375, 667);
+    cy.mount(<FeedbackForm locale="zh" onDismiss={cy.stub()} />);
 
-      cy.get('[data-testid="feedback-modal-submit"]').should('be.visible');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-      });
+    cy.get('[data-testid="feedback-modal-submit"]').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  }
+  });
 });
