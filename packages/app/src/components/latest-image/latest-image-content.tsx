@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { Button } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -27,6 +28,7 @@ import {
   baseFramework,
   daysSince,
   getActualLatestTag,
+  getCurrentImageNodeTypeTooltip,
   isOutdated,
 } from './latest-image-utils';
 
@@ -36,6 +38,8 @@ const STRINGS = {
     description: 'Docker image tags for each model and chip configuration.',
     loading: 'Loading...',
     error: 'Failed to load image data.',
+    releaseError: 'Failed to load current framework release tags. Image rows remain available.',
+    retry: 'Retry',
     noMatch: 'No image data matches the selected filters.',
     labelModel: 'Model',
     tooltipModel: 'Filter by language model.',
@@ -48,8 +52,6 @@ const STRINGS = {
     labelGpuSku: 'Chip SKU',
     tooltipGpuSku: 'Filter by Chip model (e.g. H200, MI300X, B200).',
     labelNodeType: 'Node Type',
-    tooltipNodeType:
-      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
     labelFramework: 'Framework',
     tooltipFramework:
       'Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks.',
@@ -65,13 +67,19 @@ const STRINGS = {
     thCurrentTag: 'Current InferenceX Image Tag',
     thActualLatest: 'Actual Latest Tag',
     thDaysSince: 'Days Since Update',
+    off: 'Off',
+    lastSubmission: 'Last submission:',
+    days: (count: number) => `${count}d`,
+    ageClamp: (days: number) => ` (≥${days}d clamps to max red)`,
   },
   zh: {
     title: 'InferenceX 当前镜像',
     description: '各模型与芯片配置的 Docker 镜像标签。',
     loading: '加载中……',
     error: '无法加载镜像数据。',
-    noMatch: '没有符合当前筛选条件的镜像数据。',
+    releaseError: '无法加载框架最新版本标签，但镜像记录仍可查看。',
+    retry: '重试',
+    noMatch: '当前筛选组合没有镜像记录，请调整一个或多个筛选条件。',
     labelModel: '模型',
     tooltipModel: '按语言模型筛选。',
     labelPrecision: '精度',
@@ -79,15 +87,13 @@ const STRINGS = {
     labelIslOsl: 'ISL / OSL',
     tooltipIslOsl: '输入序列长度 / 输出序列长度（token 数）。',
     labelSpecDecode: '投机解码',
-    tooltipSpecDecode: '投机解码方式。MTP = 多 Token 预测。',
+    tooltipSpecDecode: '投机解码方式。MTP 指多 token 预测。',
     labelGpuSku: '芯片型号',
     tooltipGpuSku: '按芯片型号筛选（如 H200、MI300X、B200）。',
     labelNodeType: '节点类型',
-    tooltipNodeType:
-      '单节点 = 非分离式服务。分离式 = 使用独立预填充/解码池，包括 Dynamo、Mori 和 llm-d。',
     labelFramework: '框架',
     tooltipFramework:
-      '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式框架变体归入基础引擎。留空 = 全部框架。',
+      '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式框架变体归入基础引擎；不选择框架时显示全部框架。',
     allModels: '全部模型',
     all: '全部',
     singleNode: '单节点',
@@ -100,6 +106,10 @@ const STRINGS = {
     thCurrentTag: '当前 InferenceX 镜像标签',
     thActualLatest: '实际最新标签',
     thDaysSince: '距上次更新天数',
+    off: '关闭',
+    lastSubmission: '上次提交：',
+    days: (count: number) => `${count} 天`,
+    ageClamp: (days: number) => `（≥${days} 天时按最高红色等级显示）`,
   },
 } as const;
 
@@ -134,13 +144,18 @@ function deriveOptions(data: LatestImageRow[]) {
   };
 }
 
-function formatSpecMethod(method: string) {
-  return method === 'none' ? 'Off' : method.toUpperCase();
+function formatSpecMethod(method: string, offLabel: string) {
+  return method === 'none' ? offLabel : method.toUpperCase();
 }
 
 export function CurrentImageContent() {
-  const { data, isLoading, error } = useLatestImages();
-  const { data: releases } = useFrameworkReleases();
+  const { data, isLoading, error, refetch: refetchImages } = useLatestImages();
+  const {
+    data: releases,
+    error: releasesError,
+    refetch: refetchReleases,
+    isFetching: releasesFetching,
+  } = useFrameworkReleases();
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -199,7 +214,7 @@ export function CurrentImageContent() {
   ]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
         <p className="mt-2 text-muted-foreground">{t.description}</p>
@@ -207,7 +222,40 @@ export function CurrentImageContent() {
 
       {isLoading && <div className="py-12 text-center text-muted-foreground">{t.loading}</div>}
 
-      {error && <div className="py-12 text-center text-destructive">{t.error}</div>}
+      {error && (
+        <div className="py-12 text-center" data-testid="current-image-error">
+          <p className="mb-3 text-destructive">{t.error}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              track('current_image_retry_clicked');
+              void refetchImages();
+            }}
+          >
+            {t.retry}
+          </Button>
+        </div>
+      )}
+
+      {data && releasesError && (
+        <div
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4"
+          data-testid="current-image-releases-error"
+        >
+          <p className="text-sm text-destructive">{t.releaseError}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={releasesFetching}
+            onClick={() => {
+              track('current_image_releases_retry_clicked');
+              void refetchReleases();
+            }}
+          >
+            {t.retry}
+          </Button>
+        </div>
+      )}
 
       {options && (
         <TooltipProvider delayDuration={0}>
@@ -312,7 +360,7 @@ export function CurrentImageContent() {
                   <SelectItem value="all">{t.all}</SelectItem>
                   {options.specMethods.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {formatSpecMethod(m)}
+                      {formatSpecMethod(m, t.off)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -350,7 +398,7 @@ export function CurrentImageContent() {
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
                 label={t.labelNodeType}
-                tooltip={t.tooltipNodeType}
+                tooltip={getCurrentImageNodeTypeTooltip(locale)}
               />
               <Select
                 value={selectedNodeType}
@@ -403,7 +451,7 @@ export function CurrentImageContent() {
 
       {filtered.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full border-collapse">
+          <table className="w-full min-w-[900px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-3 text-left text-sm font-semibold">{t.thModel}</th>
@@ -443,7 +491,7 @@ export function CurrentImageContent() {
                     <td className="px-4 py-3 text-sm">{gpuLabel}</td>
                     <td className="px-4 py-3 text-sm">
                       {row.spec_method === 'none' ? (
-                        <span className="text-muted-foreground">Off</span>
+                        <span className="text-muted-foreground">{t.off}</span>
                       ) : (
                         <span className="uppercase">{row.spec_method}</span>
                       )}
@@ -471,9 +519,9 @@ export function CurrentImageContent() {
                         ageStyle ? 'font-medium' : 'text-muted-foreground'
                       }`}
                       style={ageStyle}
-                      title={`Last submission: ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? ` (≥${AGE_MAX_RED_DAYS}d clamps to max red)` : ''}`}
+                      title={`${t.lastSubmission} ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? t.ageClamp(AGE_MAX_RED_DAYS) : ''}`}
                     >
-                      {ageDays}d
+                      {t.days(ageDays)}
                     </td>
                   </tr>
                 );

@@ -11,7 +11,7 @@ import {
   versionedComponentLabel,
 } from '@/components/inference/utils/runtime-metadata-labels';
 
-const STRINGS = {
+export const POINT_SUMMARY_STRINGS = {
   en: {
     selectedPoint: 'Selected point',
     disagg: 'disagg',
@@ -30,16 +30,16 @@ const STRINGS = {
   },
   zh: {
     selectedPoint: '已选数据点',
-    disagg: '解耦',
+    disagg: '分离式',
     multiNodeAggregate: '多节点聚合',
-    githubRun: 'GitHub Actions 运行 →',
+    githubRun: 'GitHub Actions 运行记录 →',
     offloadType: 'offload 类型',
     offloadBackend: 'KV offload 引擎',
     transferEngine: 'KV 传输引擎',
     router: '路由器',
     concurrency: '并发数',
-    gpuCacheHit: '芯片 Cache 命中率',
-    cpuCacheHit: 'CPU Cache 命中率',
+    gpuCacheHit: '芯片 cache 命中率',
+    cpuCacheHit: 'CPU cache 命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',
     none: '无',
@@ -59,7 +59,7 @@ function MetaLine({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function offloadDisplay(meta: PointMeta, locale: Locale): string {
-  const t = STRINGS[locale];
+  const t = POINT_SUMMARY_STRINGS[locale];
   const type = meta.kv_offloading?.trim();
   if (type) return type.toLowerCase() === 'none' ? t.none : offloadTypeLabel(type);
   if (!meta.offload_mode) return t.none;
@@ -69,7 +69,7 @@ function offloadDisplay(meta: PointMeta, locale: Locale): string {
 /** Selected-point header: runtime components, concurrency, cache hit rates, and ISL/OSL. */
 export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = POINT_SUMMARY_STRINGS[locale];
   const showCpuCacheHit = isKvOffloadEnabled(meta);
   const offloadBackend = versionedComponentLabel(
     meta.kv_offload_backend,

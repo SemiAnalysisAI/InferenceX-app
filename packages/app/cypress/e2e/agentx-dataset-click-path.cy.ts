@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const SLUG = 'click-path-dataset';
 const CONVERSATION_ID = 'click-path-conversation-0001';
@@ -84,15 +84,6 @@ function stubDatasetJourney(): void {
   cy.intercept('GET', `/api/v1/datasets/${SLUG}/conversations/${CONVERSATION_ID}`, {
     statusCode: 200,
     body: CONVERSATION,
-  });
-}
-
-function expectNoPageOverflow(): void {
-  cy.window().should((win) => {
-    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
-    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
-      win.innerWidth,
-    );
   });
 }
 

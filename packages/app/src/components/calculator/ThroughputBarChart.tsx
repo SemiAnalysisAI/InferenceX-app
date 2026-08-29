@@ -20,6 +20,7 @@ import type {
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import type { Locale } from '@/lib/i18n';
 import { escapeHtml, getDisplayLabel } from '@/lib/utils';
 
 import type {
@@ -30,10 +31,7 @@ import type {
   InterpolatedResult,
 } from './types';
 
-/**
- * Overlay-only tooltip strings. The rest of the tooltip is English-only today;
- * these are new user-visible strings, so they ship with a Chinese version.
- */
+/** Locale-specific tooltip strings; technical identifiers and units remain unchanged. */
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'UNOFFICIAL RUN',
@@ -148,7 +146,24 @@ export function getMetricLabel(
   barMetric: BarMetric,
   mode: CalculatorMode,
   costType: CostType,
+  locale: Locale = 'en',
 ): string {
+  if (locale === 'zh') {
+    const tokenTypePrefix = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '';
+    switch (barMetric) {
+      case 'power': {
+        return `每全电源配置兆瓦${tokenTypePrefix} token 吞吐量 (tok/s/MW)`;
+      }
+      case 'cost': {
+        return `成本 ($${getCostTypeLabel(costType)})`;
+      }
+      default: {
+        return mode === 'interactivity_to_throughput'
+          ? `每芯片${tokenTypePrefix}吞吐量 (tok/s/chip)`
+          : '交互性 (tok/s/user)';
+      }
+    }
+  }
   const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
   switch (barMetric) {
     case 'power': {
@@ -186,7 +201,20 @@ export function getValueLabel(
   }
 }
 
-export function getCostProviderLabel(provider: CostProvider): string {
+export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'en'): string {
+  if (locale === 'zh') {
+    switch (provider) {
+      case 'costh': {
+        return '自有设备 · Hyperscaler';
+      }
+      case 'costn': {
+        return '自有设备 · Neocloud';
+      }
+      case 'costr': {
+        return '租赁设备 · 3 年期';
+      }
+    }
+  }
   switch (provider) {
     case 'costh': {
       return 'Owning - Hyperscaler';
@@ -298,6 +326,7 @@ export function generateTooltipHTML(
   runUrl?: string,
   isPinned?: boolean,
   overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
+  locale: Locale = 'en',
 ): string {
   // Everything interpolated below is escaped if it can carry text this codebase
   // did not author — today that is the overlay branch name and run URL, which
@@ -307,14 +336,23 @@ export function generateTooltipHTML(
   const costValue = getCostForType(d, costType);
 
   const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
+  const zhTokenTypePrefix = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '';
+  const labelColon = locale === 'zh' ? '：' : ':';
+  const dpaValue = locale === 'zh' ? overlayStrings.yes : 'True';
   const metricName =
     barMetric === 'power'
       ? 'tok/s/MW'
       : barMetric === 'cost'
-        ? 'Cost'
+        ? locale === 'zh'
+          ? '成本'
+          : 'Cost'
         : mode === 'interactivity_to_throughput'
-          ? `${tokenTypePrefix}Throughput`
-          : 'Interactivity';
+          ? locale === 'zh'
+            ? `${zhTokenTypePrefix}吞吐量`
+            : `${tokenTypePrefix}Throughput`
+          : locale === 'zh'
+            ? '交互性'
+            : 'Interactivity';
   const metricUnit =
     barMetric === 'power'
       ? 'tok/s/MW'
@@ -337,9 +375,9 @@ export function generateTooltipHTML(
   if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.parallelism}</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
   } else if (ep !== null && ep !== undefined && ep > 1) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
+    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}, <strong>EP${labelColon}</strong> ${ep}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
   } else {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
+    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
   }
 
   const metricDisplay =
@@ -350,7 +388,11 @@ export function generateTooltipHTML(
   // Overlay bars link to their own workflow run, not the official run behind
   // the DB data — the two are unrelated.
   const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
-  const runLinkLabel = d.isOverlay ? overlayStrings.viewRun : 'View raw result on GitHub';
+  const runLinkLabel = d.isOverlay
+    ? overlayStrings.viewRun
+    : locale === 'zh'
+      ? '在 GitHub 查看原始结果'
+      : 'View raw result on GitHub';
   const runLinkHtml = effectiveRunUrl
     ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
     : '';
@@ -380,7 +422,7 @@ export function generateTooltipHTML(
       </div>
       ${clampedHtml}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${metricName}:</strong> ${metricDisplay}
+        <strong>${metricName}${labelColon}</strong> ${metricDisplay}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${overlayStrings.cost}</strong> $${costValue.toFixed(3)}${costLabel}
@@ -684,6 +726,7 @@ export default function ThroughputBarChart({
           state.runUrl,
           isPinned,
           OVERLAY_STRINGS[state.locale],
+          state.locale,
         );
       },
       getRulerX: () => hoveredBarXRef.current,
@@ -746,13 +789,13 @@ export default function ThroughputBarChart({
         .attr('text-anchor', 'middle')
         .attr('font-size', '12px')
         .style('fill', 'var(--muted-foreground)')
-        .text(getMetricLabel(barMetric, mode, costType));
+        .text(getMetricLabel(barMetric, mode, costType, locale));
 
       // Apply initial selection opacities — use g (not zoomGroup) since clipContent=false
       const renderGroup = layout.g;
       applySelectionOpacities(renderGroup, selectedBarsRef.current);
     },
-    [barMetric, mode, costType],
+    [barMetric, mode, costType, locale],
   );
 
   // React to selection changes without full re-render
@@ -796,7 +839,11 @@ export default function ThroughputBarChart({
       yAxis={yAxisConfig}
       layers={layers}
       zoom={zoomConfig}
-      instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select"
+      instructions={
+        locale === 'zh'
+          ? 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击柱形进行选择'
+          : 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select'
+      }
       tooltip={tooltip}
       onRender={onRender}
       legendElement={legendElement}

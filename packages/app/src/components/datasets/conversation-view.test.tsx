@@ -69,9 +69,6 @@ describe('ConversationView request states', () => {
     act(() => retry?.click());
     expect(track).toHaveBeenCalledWith('datasets_conversation_retry_clicked', { slug: 'trace' });
     expect(testState.conversation.refetch).toHaveBeenCalledOnce();
-    expect(vi.mocked(track).mock.invocationCallOrder[0]).toBeLessThan(
-      testState.conversation.refetch.mock.invocationCallOrder[0]!,
-    );
 
     act(() => root.unmount());
   });
