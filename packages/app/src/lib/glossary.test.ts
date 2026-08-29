@@ -147,6 +147,17 @@ describe('Chinese glossary content', () => {
     );
     expect(getZhGlossaryEntry('sglang')?.benchmarkContext).toContain('回归或提升');
   });
+
+  it('explains closed-loop concurrency in natural Chinese', () => {
+    const entry = getZhGlossaryEntry('closed-loop-benchmark');
+
+    expect(entry?.explanation).toContain('并发量表示活跃客户端或会话的数量');
+    expect(entry?.benchmarkContext).toContain('AgentX 采用闭环并发');
+    expect(entry?.benchmarkContext).toContain('请求批次大小会不断变化');
+    expect(entry?.explanation).not.toContain('Concurrency');
+    expect(entry?.benchmarkContext).not.toContain('concurrency');
+    expect(entry?.benchmarkContext).not.toContain('request batch');
+  });
 });
 
 describe('glossary navigation', () => {

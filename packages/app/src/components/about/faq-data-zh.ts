@@ -19,14 +19,14 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     id: 'faq-chips',
     question: 'InferenceX 测试了哪些芯片？',
-    answer: '我们会在新加速器可用时持续添加。',
+    answer: '新加速器可用后，我们会持续将其纳入基准测试。',
     list: GENERATED_FAQ_DATA.gpuGroups,
   },
   {
     id: 'faq-models',
     question: '测试了哪些 AI 模型？',
     answer:
-      '各模型会在其已有数据所覆盖的固定序列配置（1k/1k、1k/8k、8k/1k tokens）与多个并发级别下进行测试。具备对应数据的模型还包含 AgentX 长上下文多轮智能体编码运行。',
+      '各模型会在相应的固定序列配置（1k/1k、1k/8k、8k/1k tokens）和多个并发级别下接受测试；如果已有对应数据，还会运行 AgentX 长上下文多轮智能体编码场景。',
     list: GENERATED_FAQ_DATA.modelNames,
   },
   {
@@ -95,7 +95,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-raw-logs',
     question: '在哪里可以查看原始基准测试日志？',
     answer:
-      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和芯片功耗遥测数据）。',
+      '点击图表中的任意数据点即可打开提示框。其中的“GitHub Actions 运行记录”链接会直接跳转到生成该数据点的工作流运行。您可以在那里查看完整的任务日志、框架和驱动版本、命令行参数，并下载原始产物，包括请求延迟、token 计数和芯片功耗遥测数据。',
   },
   {
     id: 'faq-rerun-benchmark',

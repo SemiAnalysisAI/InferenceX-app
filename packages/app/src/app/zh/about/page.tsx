@@ -43,11 +43,11 @@ export default function AboutPageZh() {
         <section>
           <Card>
             <h2 className="text-lg font-semibold mb-2">
-              开源持续智能体推理基准测试——受万亿美元级吉瓦规模 Token 工厂运营者的信赖
+              持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
             </h2>
             <p className="text-muted-foreground mb-2">
-              随着世界以指数级速度迈向
-              AGI，软件开发和模型发布日新月异。现有基准测试因其静态性质而迅速过时，参与者往往提交专为基准测试定制的软件镜像，无法反映真实的线上推理性能。
+              随着全球迈向 AGI
+              的进程呈指数级加速，软件开发和模型发布也日新月异。静态基准测试很快就会过时；参与者提交的镜像往往专为基准测试打造，无法反映真实环境中的性能。
             </p>
             <p className="text-muted-foreground mb-2">
               <strong>InferenceX&trade;</strong>（原名

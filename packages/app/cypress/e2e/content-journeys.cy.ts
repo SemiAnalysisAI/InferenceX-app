@@ -55,7 +55,6 @@ function exerciseEveryBlogJourney({
         // whichever (possibly stale) alternate is first in document order.
         cy.get(
           `link[rel="alternate"][hreflang="${alternateLocale}"][href="${CONTENT_SITE_URL}${alternatePath}"]`,
-          { timeout: 15000 },
         ).should('exist');
         cy.go('back');
         cy.location('pathname').should('eq', basePath);
@@ -92,7 +91,6 @@ function exerciseEveryGlossaryJourney({
         // for this term has replaced the listing page's alternate link.
         cy.get(
           `link[rel="alternate"][hreflang="${alternateLocale}"][href="${CONTENT_SITE_URL}${alternatePath}"]`,
-          { timeout: 15000 },
         ).should('exist');
         cy.go('back');
         cy.location('pathname').should('eq', basePath);
