@@ -171,8 +171,17 @@ describe('Chinese (/zh) pages', () => {
       cy.get('button[aria-label="展开配置详情"]').first().click();
       cy.get('[data-testid="submissions-display"]')
         .should('contain.text', '投机解码方法：')
-        .and('contain.text', '预填充')
-        .and('contain.text', '解码');
+        .and('contain.text', '分离式部署：')
+        .and('contain.text', '聚合推理芯片数：');
+      // Disaggregated deployments split the chip pool, so their expanded
+      // details localize the prefill/decode fields instead of the aggregate ones.
+      cy.contains('tr', 'Mooncake ATOMesh')
+        .first()
+        .find('button[aria-label="展开配置详情"]')
+        .click();
+      cy.get('[data-testid="submissions-display"]')
+        .should('contain.text', '预填充芯片数：')
+        .and('contain.text', '解码芯片数：');
     });
 
     it('separates localized empty chart and table states', () => {
@@ -186,22 +195,26 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('shows a safe error and retries through a real button click', () => {
-      let attempts = 0;
+      // Fail every request until the retry button is actually clicked — counting
+      // attempts is race-prone because query retries can consume the "healthy"
+      // response before the error UI is asserted.
+      let failRequests = true;
       cy.intercept('GET', '**/api/v1/submissions', (request) => {
-        attempts += 1;
         request.reply(
-          attempts <= 2
+          failRequests
             ? { statusCode: 500, body: { error: 'submissions-database-internal-detail' } }
             : { body: { summary: [], volume: [] } },
         );
       }).as('retrySubmissions');
       cy.reload();
       cy.wait('@retrySubmissions');
-      cy.wait('@retrySubmissions');
       cy.contains('加载提交数据失败。').should('be.visible');
       cy.contains('submissions-database-internal-detail').should('not.exist');
-      cy.contains('button', '重试').click();
-      cy.wait('@retrySubmissions');
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
       cy.contains('暂无提交记录。').should('be.visible');
     });
 

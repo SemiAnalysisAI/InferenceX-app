@@ -21,10 +21,23 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-gradient-nudge-shown',
     'inferencex-eval-samples-nudge-dismissed',
     'inferencex-filter-hint-nudge-dismissed',
-    'inferencex-feedback-modal-snoozed',
-    'inferencex-feedback-modal-submitted',
   ];
   for (const key of keys) {
+    win.localStorage.removeItem(key);
+    win.sessionStorage.removeItem(key);
+  }
+}
+
+// The support file seeds `inferencex-feedback-modal-snoozed` on every page
+// load so the modal's backdrop stays out of other specs' way. This spec's
+// accessibility test is the one place that wants the real modal, so it clears
+// the seed (spec `onBeforeLoad` runs after the support hook). Keep the
+// feedback keys OUT of `clearAllNudgeStorage`: the immediate feedback modal
+// claims the shared overlay slot and would suppress the delayed
+// reproducibility / filter-hint toasts every other test asserts on.
+function clearNudgeStorageAndUnsnoozeFeedbackModal(win: Cypress.AUTWindow) {
+  clearAllNudgeStorage(win);
+  for (const key of ['inferencex-feedback-modal-snoozed', 'inferencex-feedback-modal-submitted']) {
     win.localStorage.removeItem(key);
     win.sessionStorage.removeItem(key);
   }
@@ -33,7 +46,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
 describe('Dashboard feedback modal accessibility', () => {
   it('has a valid English accessible name and description', () => {
     cy.visit('/inference', {
-      onBeforeLoad: clearAllNudgeStorage,
+      onBeforeLoad: clearNudgeStorageAndUnsnoozeFeedbackModal,
     });
 
     cy.get('[data-testid="feedback-modal"]')

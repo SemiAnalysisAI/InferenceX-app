@@ -211,31 +211,9 @@ export default function HistoricalTrendsDisplay() {
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
 
-  if (loading || trendLoading) {
-    return (
-      <section data-testid="historical-trends-display">
-        <Card className="relative z-30">
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-            </div>
-            <ChartControls hideGpuComparison />
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-56" />
-              <Skeleton className="h-9 w-full" />
-            </div>
-          </div>
-        </Card>
-        <Card className="mt-4">
-          <Skeleton className="h-7 w-2/4 mb-1" />
-          <Skeleton className="h-5 w-3/4 mb-2" />
-          <Skeleton className="h-[600px] w-full" />
-        </Card>
-      </section>
-    );
-  }
-
+  // Check `error` before the loading skeleton: a failed benchmark query never
+  // produces rows, so `loading` (which includes "no rows yet") would otherwise
+  // pin the page on the skeleton forever instead of surfacing the error card.
   if (error) {
     return (
       <section data-testid="historical-trends-display">
@@ -256,6 +234,31 @@ export default function HistoricalTrendsDisplay() {
               {t.retry}
             </Button>
           </div>
+        </Card>
+      </section>
+    );
+  }
+
+  if (loading || trendLoading) {
+    return (
+      <section data-testid="historical-trends-display">
+        <Card className="relative z-30">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
+            </div>
+            <ChartControls hideGpuComparison />
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-56" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          </div>
+        </Card>
+        <Card className="mt-4">
+          <Skeleton className="h-7 w-2/4 mb-1" />
+          <Skeleton className="h-5 w-3/4 mb-2" />
+          <Skeleton className="h-[600px] w-full" />
         </Card>
       </section>
     );
