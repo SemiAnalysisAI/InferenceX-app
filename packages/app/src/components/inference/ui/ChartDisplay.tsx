@@ -1173,9 +1173,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {t.inferencePerformanceDesc}
                     </p>
                   </div>
-                  {/* The chart-row ShareButton lives in ChartButtons, which is desktop-only
-                      (`hidden md:flex`); keep a header Share on mobile so small screens
-                      don't lose the share entry point. */}
+                  {/* The chart-row ShareButton lives in ChartButtons (visible on mobile
+                      via `mobileVisible`, but rendered per chart row); keep a header Share
+                      on mobile so small screens have a share entry point next to the title. */}
                   <div className="md:hidden">
                     <ShareButton />
                   </div>

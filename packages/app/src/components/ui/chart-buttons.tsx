@@ -31,12 +31,17 @@ interface ChartButtonsProps {
   exportFileName?: string;
   /**
    * Optional controls rendered before export/reset buttons, such as a view toggle.
-   * These inherit this wrapper's desktop-only (`hidden md:flex`) and no-export behavior.
+   * These inherit this wrapper's visibility (`hidden md:flex` unless `mobileVisible`)
+   * and no-export behavior.
    */
   leadingControls?: ReactNode;
   /** Optional container class override for positioning/layout variants. */
   className?: string;
-  /** Keep actions reachable on narrow screens for routes that have verified mobile layouts. */
+  /**
+   * Keep actions reachable on narrow screens for routes that have verified mobile
+   * layouts. Below `md` the toolbar renders as a normal-flow right-aligned row above
+   * the chart card (instead of an absolute overlay) so it cannot cover the title.
+   */
   mobileVisible?: boolean;
 }
 
@@ -112,8 +117,8 @@ export function ChartButtons({
   return (
     <div
       className={cn(
-        'absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10',
-        mobileVisible ? 'flex' : 'hidden md:flex',
+        'no-export export-buttons gap-1 z-10 md:absolute md:top-8 md:right-8',
+        mobileVisible ? 'flex justify-end mb-2 md:mb-0' : 'hidden md:flex',
         className,
       )}
     >
