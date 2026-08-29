@@ -71,7 +71,7 @@ function EpChip({
       data-status={ep.status}
       title={noteText ?? undefined}
       aria-label={noteText ? `${label}: ${noteText}` : label}
-      className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 font-mono text-[11px] leading-none whitespace-nowrap ${EP_CHIP_CLASS[ep.status]}`}
+      className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 font-mono text-2xs leading-none whitespace-nowrap ${EP_CHIP_CLASS[ep.status]}`}
     >
       EP{degree} {glyph}
       {noteNumber === null ? null : <sup className="font-sans">{noteNumber}</sup>}
@@ -220,7 +220,7 @@ function LegendKey({ status, label }: { status: CollectiveXKnownEp['status']; la
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 font-mono text-[11px] leading-none ${EP_CHIP_CLASS[status]}`}
+        className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 font-mono text-2xs leading-none ${EP_CHIP_CLASS[status]}`}
       >
         {status === 'works' ? '✓' : status === 'broken' ? '✕' : '—'}
       </span>
