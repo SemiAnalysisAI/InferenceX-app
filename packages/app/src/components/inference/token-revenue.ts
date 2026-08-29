@@ -88,6 +88,24 @@ export function tokenRevenueFromRatesPerGpuHour(
   return (totalTokPerSecond * SECONDS_PER_HOUR * blendedPriceAtPoint) / TOKENS_PER_MILLION;
 }
 
+/** Raw total tokens represented by one dollar at the selected blended sale price. */
+export function tokensPerDollarFromRates(
+  totalTokPerSecond: number,
+  inputTokenShare: number | null,
+  cacheHitRate: number | null,
+  pricing: TokenRevenuePricing,
+): number | null {
+  if (!(totalTokPerSecond > 0)) return 0;
+  const revenue = tokenRevenueFromRatesPerGpuHour(
+    totalTokPerSecond,
+    inputTokenShare,
+    cacheHitRate,
+    pricing,
+  );
+  if (revenue === null || !(revenue > 0)) return null;
+  return (totalTokPerSecond * SECONDS_PER_HOUR) / revenue;
+}
+
 /** Cache-aware gross token revenue at one benchmark operating point, in $/GPU/hr. */
 export function tokenRevenuePerGpuHour(
   point: InferenceData,
@@ -99,8 +117,22 @@ export function tokenRevenuePerGpuHour(
   return tokenRevenueFromRatesPerGpuHour(total, inputShare, cacheHitRate, pricing);
 }
 
+/** Cache-aware API purchasing power at one benchmark operating point, in raw tok/$. */
+export function tokensPerDollar(point: InferenceData, pricing: TokenRevenuePricing): number | null {
+  const total = point.tput_per_gpu ?? 0;
+  const cacheHitRate = measuredCacheHitRate(point);
+  const inputShare = inputTokenShareForRevenue(point);
+  return tokensPerDollarFromRates(total, inputShare, cacheHitRate, pricing);
+}
+
+/** Whether a Y-axis option depends on the selected normalized or OpenRouter token prices. */
+export function usesTokenSalePricing(metricConfigKey: string): boolean {
+  return metricConfigKey === 'y_tokenRevenuePerGpuHour' || metricConfigKey === 'y_tokensPerDollar';
+}
+
 /**
- * Recompute the revenue field without mutating transformed benchmark points.
+ * Recompute sale-price revenue and purchasing-power fields without mutating
+ * transformed benchmark points.
  * A null price removes the normalized placeholder while OpenRouter is loading
  * or unavailable, so the chart never presents $1/M revenue as live pricing.
  */
@@ -111,11 +143,16 @@ export function applyTokenRevenuePricing(
   return points.map((point) => {
     const next = { ...point };
     delete next.tokenRevenuePerGpuHour;
+    delete next.tokensPerDollar;
     if (!pricing) return next;
 
     const revenue = tokenRevenuePerGpuHour(point, pricing);
     if (revenue !== null) {
       next.tokenRevenuePerGpuHour = { y: revenue, roof: false };
+    }
+    const purchasingPower = tokensPerDollar(point, pricing);
+    if (purchasingPower !== null) {
+      next.tokensPerDollar = { y: purchasingPower, roof: false };
     }
     return next;
   });

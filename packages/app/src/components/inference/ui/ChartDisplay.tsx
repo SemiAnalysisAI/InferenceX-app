@@ -14,6 +14,7 @@ import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
   formatTokenPrice,
+  usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import {
   useInferenceActions,
@@ -412,10 +413,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
       const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
-      const pricedData =
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
-          ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
-          : rawData.data;
+      const pricedData = usesTokenSalePricing(selectedYAxisMetric)
+        ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
+        : rawData.data;
       const capableData = pricedData.filter((point) =>
         supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
       );
@@ -984,24 +984,23 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               .join(', ')}{' '}
                             • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
                             {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-                            {selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
-                              tokenRevenuePricing && (
-                                <>
-                                  {' '}
-                                  •{' '}
-                                  <span data-testid="token-revenue-subtitle-prices">
-                                    {t.revenuePrices(
-                                      formatTokenPrice(tokenRevenuePricing.inputPerMillion),
-                                      graph.sequence === Sequence.AgenticTraces
-                                        ? formatTokenPrice(
-                                            cachedInputPricePerMillion(tokenRevenuePricing),
-                                          )
-                                        : null,
-                                      formatTokenPrice(tokenRevenuePricing.outputPerMillion),
-                                    )}
-                                  </span>
-                                </>
-                              )}
+                            {usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing && (
+                              <>
+                                {' '}
+                                •{' '}
+                                <span data-testid="token-revenue-subtitle-prices">
+                                  {t.revenuePrices(
+                                    formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                    graph.sequence === Sequence.AgenticTraces
+                                      ? formatTokenPrice(
+                                          cachedInputPricePerMillion(tokenRevenuePricing),
+                                        )
+                                      : null,
+                                    formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                                  )}
+                                </span>
+                              </>
+                            )}
                             {selectedRunDate && (
                               <>
                                 {' '}

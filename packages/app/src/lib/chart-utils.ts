@@ -334,6 +334,11 @@ export function buildDerivedChartFields(
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
+  if (wants('tokensPerDollar')) {
+    // Placeholder for normalized uncached pricing. The selected pricing source,
+    // measured cache hit, and token mix are applied without mutating this point.
+    fields.tokensPerDollar = chartMetric(tputPerGpu > 0 ? 1_000_000 : 0);
+  }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
@@ -347,59 +352,43 @@ export function buildDerivedChartFields(
   }
 
   if (wants('costh')) {
-    fields.costh = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costh / millionTokensPerHour : 0,
-    );
+    fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
   if (wants('costn')) {
-    fields.costn = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costn / millionTokensPerHour : 0,
-    );
+    fields.costn = chartMetric(millionTokensPerHour ? specs.costn / millionTokensPerHour : 0);
   }
   if (wants('costr')) {
-    fields.costr = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costr / millionTokensPerHour : 0,
-    );
+    fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
   if (wants('costhOutput')) {
     fields.costhOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costnOutput')) {
     fields.costnOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costrOutput')) {
     fields.costrOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costhi')) {
     fields.costhi = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
   if (wants('costni')) {
     fields.costni = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
     );
   }
   if (wants('costri')) {
     fields.costri = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
     );
-  }
-
-  if (wants('tokensPerDollarH')) {
-    fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
-  }
-  if (wants('tokensPerDollarN')) {
-    fields.tokensPerDollarN = chartMetric(specs.costn ? tokensPerHour / specs.costn : 0);
-  }
-  if (wants('tokensPerDollarR')) {
-    fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
   }
   if (wants('outputTokensPerDollarH')) {
     fields.outputTokensPerDollarH = chartMetric(

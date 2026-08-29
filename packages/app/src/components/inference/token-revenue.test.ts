@@ -7,8 +7,11 @@ import {
   formatTokenPrice,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
+  tokensPerDollar,
+  tokensPerDollarFromRates,
   tokenRevenuePerGpuHour,
   tokenRevenueFromRatesPerGpuHour,
+  usesTokenSalePricing,
 } from './token-revenue';
 
 function point(overrides: Partial<InferenceData> = {}): InferenceData {
@@ -43,6 +46,12 @@ const openRouterPricing: TokenRevenuePricing = {
 };
 
 describe('token revenue', () => {
+  it('scopes the shared price source to revenue and API purchasing power', () => {
+    expect(usesTokenSalePricing('y_tokenRevenuePerGpuHour')).toBe(true);
+    expect(usesTokenSalePricing('y_tokensPerDollar')).toBe(true);
+    expect(usesTokenSalePricing('y_outputTokensPerDollarH')).toBe(false);
+  });
+
   it('formats subtitle prices without unnecessary trailing zeroes', () => {
     expect(formatTokenPrice(1)).toBe('1');
     expect(formatTokenPrice(1.122)).toBe('1.122');
@@ -51,6 +60,7 @@ describe('token revenue', () => {
 
   it('keeps the normalized $1/M axis equal to million total tokens per GPU hour', () => {
     expect(tokenRevenuePerGpuHour(point(), NORMALIZED_TOKEN_REVENUE_PRICING)).toBe(7.2);
+    expect(tokensPerDollar(point(), NORMALIZED_TOKEN_REVENUE_PRICING)).toBe(1_000_000);
   });
 
   it('prices measured Agentic cache hits at the separate cached-input price', () => {
@@ -72,6 +82,7 @@ describe('token revenue', () => {
 
     // 80 fresh input tok/s at $2/M, 720 cached at $0.2/M, 200 output at $10/M.
     expect(tokenRevenuePerGpuHour(agentic, pricing)).toBeCloseTo(8.2944, 10);
+    expect(tokensPerDollar(agentic, pricing)).toBeCloseTo(3_600_000 / 8.2944, 9);
   });
 
   it('applies cache pricing to the normalized source too', () => {
@@ -84,6 +95,10 @@ describe('token revenue', () => {
 
     expect(tokenRevenuePerGpuHour(agentic, NORMALIZED_TOKEN_REVENUE_PRICING)).toBeCloseTo(
       1.2672,
+      10,
+    );
+    expect(tokensPerDollar(agentic, NORMALIZED_TOKEN_REVENUE_PRICING)).toBeCloseTo(
+      3_600_000 / 1.2672,
       10,
     );
   });
@@ -101,6 +116,14 @@ describe('token revenue', () => {
         outputPerMillion: 10,
       }),
     ).toBeCloseTo(8.2944, 10);
+    expect(
+      tokensPerDollarFromRates(1_000, 0.8, 0.9, {
+        source: 'openrouter',
+        inputPerMillion: 2,
+        cachedInputPerMillion: 0.2,
+        outputPerMillion: 10,
+      }),
+    ).toBeCloseTo(3_600_000 / 8.2944, 9);
   });
 
   it('prices compatible aggregate input and output rates separately', () => {
@@ -175,10 +198,15 @@ describe('token revenue', () => {
   });
 
   it('removes the normalized placeholder when OpenRouter pricing is unavailable', () => {
-    const original = point({ tokenRevenuePerGpuHour: { y: 7.2, roof: false } });
+    const original = point({
+      tokenRevenuePerGpuHour: { y: 7.2, roof: false },
+      tokensPerDollar: { y: 1_000_000, roof: false },
+    });
     const [cleared] = applyTokenRevenuePricing([original], null);
     expect(cleared).not.toHaveProperty('tokenRevenuePerGpuHour');
+    expect(cleared).not.toHaveProperty('tokensPerDollar');
     expect(original.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
+    expect(original.tokensPerDollar).toEqual({ y: 1_000_000, roof: false });
   });
 
   it('does not invent OpenRouter revenue when the token mix is unavailable', () => {
@@ -192,5 +220,17 @@ describe('token revenue', () => {
     });
 
     expect(tokenRevenuePerGpuHour(unknownMix, openRouterPricing)).toBeNull();
+    expect(tokensPerDollar(unknownMix, openRouterPricing)).toBeNull();
+  });
+
+  it('does not produce infinite purchasing power for free token pricing', () => {
+    expect(
+      tokensPerDollar(point(), {
+        source: 'openrouter',
+        inputPerMillion: 0,
+        cachedInputPerMillion: 0,
+        outputPerMillion: 0,
+      }),
+    ).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ import {
   applyTokenRevenuePricing,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
+  tokensPerDollarFromRates,
   tokenRevenueFromRatesPerGpuHour,
 } from '@/components/inference/token-revenue';
 import {
@@ -83,7 +84,8 @@ export function rowToLightweightPoint(
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
 
-  return requestedMetrics.includes('tokenRevenuePerGpuHour')
+  return requestedMetrics.includes('tokenRevenuePerGpuHour') ||
+    requestedMetrics.includes('tokensPerDollar')
     ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]!
     : point;
 }
@@ -124,9 +126,6 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokenRevenuePerGpuHour: 'tpPerGpu',
-  tokensPerDollarH: 'tpPerGpu',
-  tokensPerDollarN: 'tpPerGpu',
-  tokensPerDollarR: 'tpPerGpu',
   outputTokensPerDollarH: 'outputTputPerGpu',
   outputTokensPerDollarN: 'outputTputPerGpu',
   outputTokensPerDollarR: 'outputTputPerGpu',
@@ -240,7 +239,10 @@ export function interpolateMetricAtInteractivity(
   // operating point. Do the same for Historical Trends instead of splining
   // already-multiplied dollar values. A partly measured cache frontier opts out
   // of the discount as a whole rather than inventing a zero-hit knot.
-  if (metricKey === 'tokenRevenuePerGpuHour' && tokenRevenuePricing) {
+  if (
+    (metricKey === 'tokenRevenuePerGpuHour' || metricKey === 'tokensPerDollar') &&
+    tokenRevenuePricing
+  ) {
     const interpolateBounded = (ys: number[]) => {
       const slopes = monotoneSlopes(xs, ys);
       const raw = hermiteInterpolate(xs, ys, slopes, targetInteractivity);
@@ -256,12 +258,10 @@ export function interpolateMetricAtInteractivity(
       ? interpolateBounded(cacheHitRates)
       : null;
 
-    return tokenRevenueFromRatesPerGpuHour(
-      interpolateBounded(throughputYs),
-      inputShare,
-      cacheHitRate,
-      tokenRevenuePricing,
-    );
+    const throughput = interpolateBounded(throughputYs);
+    return metricKey === 'tokensPerDollar'
+      ? tokensPerDollarFromRates(throughput, inputShare, cacheHitRate, tokenRevenuePricing)
+      : tokenRevenueFromRatesPerGpuHour(throughput, inputShare, cacheHitRate, tokenRevenuePricing);
   }
 
   // When a business metric is a fixed multiple of throughput, spline the

@@ -52,6 +52,14 @@ export const METRIC_REGISTRY = {
     titleZh: '每 GPU 小时 token 收入',
     polarity: 'higher',
   },
+  tokensPerDollar: {
+    field: 'tokensPerDollar.y',
+    label: 'Total Tokens per $1 USD (tok/$)',
+    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 USD',
+    titleZh: '每 1 美元可购买的总 token 数',
+    polarity: 'higher',
+  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -147,30 +155,6 @@ export const METRIC_REGISTRY = {
     title: 'Cost per Million Input Tokens (3 Year Rental)',
     titleZh: '每百万输入 token 成本（3 年租赁）',
     polarity: 'lower',
-  },
-  tokensPerDollarH: {
-    field: 'tokensPerDollarH.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (Owning - Hyperscaler)',
-    titleZh: '每 1 美元可购买的总 token 数（自有 - 超大规模）',
-    polarity: 'higher',
-  },
-  tokensPerDollarN: {
-    field: 'tokensPerDollarN.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (Owning - Neocloud Giant)',
-    titleZh: '每 1 美元可购买的总 token 数（自有 - Neocloud Giant）',
-    polarity: 'higher',
-  },
-  tokensPerDollarR: {
-    field: 'tokensPerDollarR.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (3 Year Rental)',
-    titleZh: '每 1 美元可购买的总 token 数（3 年租赁）',
-    polarity: 'higher',
   },
   outputTokensPerDollarH: {
     field: 'outputTokensPerDollarH.y',
@@ -424,7 +408,13 @@ export type CustomMetricKey = {
 export type BenchmarkMetricKey = Exclude<MetricKey, CustomMetricKey>;
 export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 
-export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarN' satisfies MetricConfigKey;
+export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollar' satisfies MetricConfigKey;
+
+const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
+  y_tokensPerDollarH: 'y_tokensPerDollar',
+  y_tokensPerDollarN: 'y_tokensPerDollar',
+  y_tokensPerDollarR: 'y_tokensPerDollar',
+};
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
@@ -455,6 +445,8 @@ export function resolveMetricConfigKey(
   fallback?: string,
 ): MetricConfigKey {
   if (metricConfigKey === 'y') return 'y_tpPerGpu';
+  const aliasedMetric = metricConfigKey ? LEGACY_METRIC_ALIASES[metricConfigKey] : undefined;
+  if (aliasedMetric) return aliasedMetric;
   if (metricConfigKey?.startsWith('y_')) {
     const metricKey = metricConfigKey.slice(2);
     if (isMetricKey(metricKey)) return metricConfigKey as MetricConfigKey;
@@ -504,7 +496,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Total Tokens per $1 USD',
     labelZh: '每 1 美元可购买的总 token 数',
-    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
+    metrics: ['y_tokensPerDollar'],
   },
   {
     label: 'Total Tokens per ¥1 CNY',

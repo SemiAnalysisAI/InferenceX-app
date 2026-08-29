@@ -1,7 +1,7 @@
 /**
- * The dashboard now opens on tokens purchasable per $1 USD, and the same
- * quantities are also available priced in yuan. Fixed-sequence Quick Filters
- * remain available from the chart legend.
+ * The dashboard opens on API tokens purchasable per $1 USD. Infrastructure
+ * purchasing power remains available in yuan and by token type. Fixed-sequence
+ * Quick Filters remain available from the chart legend.
  */
 describe('Tokens per currency and agentic controls', () => {
   beforeEach(() => {
@@ -14,8 +14,9 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 USD (Owning - Neocloud Giant)',
+      'Total Tokens per $1 USD',
     );
+    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
     cy.get('[data-testid="scatter-graph"]')
       .first()
       .find('svg .dot-group')

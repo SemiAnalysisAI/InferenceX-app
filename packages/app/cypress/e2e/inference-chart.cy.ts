@@ -153,6 +153,44 @@ describe('Inference Chart', () => {
       });
   });
 
+  it('plots cache-aware total tokens per dollar for official and unofficial runs', () => {
+    interceptOverlayRun();
+    cy.visit(
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.wait('@unofficialRun');
+
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      'Total Tokens per $1 USD',
+    );
+    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', 'Total Tokens per $1 USD at Normalized Pricing');
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should('contain.text', 'not an infrastructure-cost metric')
+      .and('contain.text', 'calculates revenue')
+      .and('contain.text', 'cache-aware gross token revenue');
+  });
+
   it('ships OpenRouter-priced token revenue in Chinese', () => {
     cy.viewport(390, 844);
     cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
@@ -215,6 +253,36 @@ describe('Inference Chart', () => {
       .and(($body) => {
         expect($body.text()).not.to.include('—');
       });
+  });
+
+  it('ships cache-aware total tokens per dollar in Chinese', () => {
+    cy.viewport(390, 844);
+    interceptOverlayRun();
+    cy.visit(
+      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@unofficialRun');
+
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      '每 1 美元可购买的总 token 数',
+    );
+    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', '标准化');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', '按标准化价格计算的每 1 美元总 token 数');
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should('contain.text', '因此不是基础设施成本指标')
+      .and('contain.text', '先计算收入')
+      .and('contain.text', '每 GPU 小时缓存感知 token 毛收入');
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {

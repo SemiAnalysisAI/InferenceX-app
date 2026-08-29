@@ -65,7 +65,7 @@ import {
   Sequence,
   sequenceKind,
 } from '@/lib/data-mappings';
-import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
+import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -211,7 +211,7 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tokensPerDollarN`. URL param still wins so existing
+   * the dashboard's default `y_tokensPerDollar`. URL param still wins so existing
    * shared links are unaffected.
    */
   initialYAxisMetric?: string;
@@ -361,7 +361,7 @@ export function InferenceProvider({
   const openRouterModelId = getOpenRouterModelId(selectedModel);
   const openRouterPricingQuery = useOpenRouterPricing(
     openRouterModelId,
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && tokenRevenuePriceSource === 'openrouter',
+    usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePriceSource === 'openrouter',
   );
   const tokenRevenuePricing =
     tokenRevenuePriceSource === 'normalized'
@@ -909,7 +909,7 @@ export function InferenceProvider({
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
   const openRouterPricingLoading =
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+    usesTokenSalePricing(selectedYAxisMetric) &&
     tokenRevenuePriceSource === 'openrouter' &&
     openRouterPricingQuery.isLoading;
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
@@ -1447,8 +1447,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
-      i_revenue:
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
+      i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),

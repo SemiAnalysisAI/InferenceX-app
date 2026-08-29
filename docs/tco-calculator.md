@@ -167,14 +167,16 @@ at every interpolated point.
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page also exposes tokens-per-dollar and token revenue as
-separate Y-axis metrics; neither replaces the cost-per-million metrics.
-Historical tokens-per-dollar trends select Pareto knots from the matching
-throughput, spline that throughput, and apply the constant `3600 / $/GPU-hr`
-multiplier. Revenue selects the total-throughput Pareto knots, interpolates their
-throughput, token mix, and cache hit independently, and then applies the selected
-prices. Reusing the matching frontier remains essential: total-throughput knots
-are not necessarily the output- or input-throughput Pareto knots.
+The `/inference` page exposes total API tokens-per-dollar and token revenue as
+paired Y-axis metrics; neither replaces the infrastructure cost-per-million
+metrics. Both select the total-throughput Pareto knots, interpolate throughput,
+token mix, and cache hit independently, and then apply the selected prices.
+Revenue is the priced token streams per GPU hour. Total API tokens per dollar
+divides the interpolated raw token volume by that revenue. Output-only and
+input-only infrastructure tokens-per-dollar trends still spline their matching
+throughput and apply the constant `3600 / $/GPU-hr` multiplier. Reusing the
+matching frontier remains essential: total-throughput knots are not necessarily
+the output- or input-throughput Pareto knots.
 
 The revenue axis defaults to normalized cache-aware pricing: uncached input and
 output are `$1/M tok`, while cached input is `$0.10/M tok`, matching Fleet

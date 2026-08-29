@@ -206,17 +206,17 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('tokens-per-dollar URL metric is independent from cost per million', () => {
+    it('maps a legacy tokens-per-dollar URL to the API-pricing metric', () => {
       visitWithDismissedModal('/inference?i_metric=y_tokensPerDollarH');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 USD (Owning - Hyperscaler)',
+        'Total Tokens per $1 USD',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 USD (tok/$)');
+        .should('have.text', 'Total Tokens per $1 USD at Normalized Pricing (tok/$)');
     });
 
     it('keeps the legacy i_metric=y alias on raw throughput', () => {

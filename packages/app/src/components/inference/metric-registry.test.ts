@@ -20,6 +20,8 @@ describe('metric registry', () => {
     expect(e2e.y_tpPerGpu_roofline).toBe('upper_right');
     expect(interactivity.y_tokenRevenuePerGpuHour_roofline).toBe('upper_left');
     expect(e2e.y_tokenRevenuePerGpuHour_roofline).toBe('upper_right');
+    expect(interactivity.y_tokensPerDollar_roofline).toBe('upper_left');
+    expect(e2e.y_tokensPerDollar_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
@@ -49,13 +51,19 @@ describe('metric compatibility', () => {
 
   it('keeps the legacy fallback independent from the dashboard default', () => {
     expect(resolveMetricConfigKey(undefined, 'y')).toBe('y_tpPerGpu');
-    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokensPerDollarN');
+    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokensPerDollar');
   });
 
   it('falls back safely for unknown persisted metric values', () => {
     expect(resolveMetricConfigKey('y_removedMetric')).toBe(DEFAULT_METRIC_CONFIG_KEY);
     expect(resolveMetricConfigKey('arbitrary')).toBe(DEFAULT_METRIC_CONFIG_KEY);
     expect(isBenchmarkMetricKey('removedMetric')).toBe(false);
+  });
+
+  it('maps legacy infrastructure total-token purchasing-power links to API pricing', () => {
+    expect(resolveMetricConfigKey('y_tokensPerDollarH')).toBe('y_tokensPerDollar');
+    expect(resolveMetricConfigKey('y_tokensPerDollarN')).toBe('y_tokensPerDollar');
+    expect(resolveMetricConfigKey('y_tokensPerDollarR')).toBe('y_tokensPerDollar');
   });
 
   it('preserves valid benchmark, derived, and custom metric identities', () => {
@@ -66,6 +74,7 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
+    expect(isBenchmarkMetricKey('tokensPerDollar')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
   });
@@ -76,6 +85,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_tokensPerDollar')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
   });
 });

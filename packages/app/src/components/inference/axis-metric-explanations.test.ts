@@ -71,6 +71,18 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(explanation.description.zh).not.toContain('—');
     expect(explanation.formula.en).toContain('$/GPU/hr =');
   });
+
+  it('defines total tokens per dollar as the reciprocal of cache-aware revenue pricing', () => {
+    const explanation = METRIC_EXPLANATIONS.tokensPerDollar;
+    expect(explanation.description.en).toContain('not an infrastructure-cost metric');
+    expect(explanation.description.en).toContain('calculates revenue');
+    expect(explanation.description.en).toContain('partially measured cache frontier');
+    expect(explanation.description.zh).toContain('不是基础设施成本指标');
+    expect(explanation.description.zh).toContain('先计算收入');
+    expect(explanation.formula.en).toContain('cache-aware gross token revenue');
+    expect(explanation.description.en).not.toContain('—');
+    expect(explanation.description.zh).not.toContain('—');
+  });
 });
 
 describe('X_AXIS_EXPLANATIONS', () => {
@@ -154,5 +166,6 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
+    expect(metricRowLabel('tokensPerDollar', 'zh')).toBe('每 1 美元可购买的总 token 数');
   });
 });

@@ -278,6 +278,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   inputTputPerGpu?: { y: number; roof: boolean };
   /** Cache-aware gross token revenue using normalized or OpenRouter prices. */
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
+  /** Raw total tokens represented by one dollar at the selected token sale prices. */
+  tokensPerDollar?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
@@ -293,9 +295,6 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
   // Tokens purchasable per $1.
-  tokensPerDollarH?: { y: number; roof: boolean };
-  tokensPerDollarN?: { y: number; roof: boolean };
-  tokensPerDollarR?: { y: number; roof: boolean };
   outputTokensPerDollarH?: { y: number; roof: boolean };
   outputTokensPerDollarN?: { y: number; roof: boolean };
   outputTokensPerDollarR?: { y: number; roof: boolean };
