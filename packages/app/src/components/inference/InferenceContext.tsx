@@ -644,6 +644,7 @@ export function InferenceProvider({
     graphs,
     selectionPoints,
     loading: chartDataLoading,
+    refreshing: chartDataRefreshing,
     error: chartDataError,
     hardwareConfig,
     availableQuickFilters,
@@ -930,6 +931,7 @@ export function InferenceProvider({
     tokenRevenuePriceSource === 'openrouter' &&
     openRouterPricingQuery.isLoading;
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
+  const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1641,6 +1643,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1657,6 +1660,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,

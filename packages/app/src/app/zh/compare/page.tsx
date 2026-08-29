@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -8,6 +9,7 @@ import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { ModelLogo } from '@/components/ui/model-logo';
+import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
@@ -83,7 +85,20 @@ const jsonLd = {
   inLanguage: 'zh-CN',
 };
 
-export default async function CompareIndexPageZh() {
+export default function CompareIndexPageZh() {
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <AgentXCompareHero locale="zh" />
+      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
+      <Suspense fallback={<CompareRouteSkeleton />}>
+        <CompareCatalogZh />
+      </Suspense>
+    </>
+  );
+}
+
+async function CompareCatalogZh() {
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
   const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
@@ -92,9 +107,6 @@ export default async function CompareIndexPageZh() {
 
   return (
     <>
-      <JsonLd data={jsonLd} />
-      <AgentXCompareHero locale="zh" />
-
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">

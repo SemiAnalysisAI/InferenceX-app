@@ -39,6 +39,38 @@ describe('Chart Section Tabs — E2E', () => {
     cy.visit('/inference');
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
   });
+
+  it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
+    // Start locked: testIsolation is off, so an unlock persisted by an earlier
+    // test would make the konami sequence below a no-op (nothing would insert,
+    // nothing would shift, and the assertion would pass vacuously).
+    cy.visit('/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
+    // Unlock mid-session: inserting the Hidden trigger reflows the
+    // justify-evenly tabs WITHOUT resizing the nav box, so the nav's
+    // ResizeObserver never fires — only the gateUnlocked remeasure keeps
+    // the indicator under the active tab.
+    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
+      const active = $indicator
+        .closest('[data-testid="chart-section-tabs"]')
+        .find('[data-tab-active="true"]')[0];
+      expect(active, 'active tab link').to.not.equal(undefined);
+      const indicator = $indicator[0];
+      const match = /translateX\((?<left>-?[\d.]+)px\)/u.exec(indicator.style.transform);
+      expect(match, 'indicator transform').to.not.equal(null);
+      expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
+      expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
+    });
+    // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+  });
 });
 
 describe('First-load navigation', () => {
