@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const DATASET = {
   id: 'agentx-v1-full',
@@ -25,15 +25,6 @@ const ROUTE_VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 375, height: 812 },
 ] as const;
-
-function expectNoPageOverflow(): void {
-  cy.window().should((win) => {
-    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
-    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
-      win.innerWidth,
-    );
-  });
-}
 
 describe('AgentX dataset methodology', () => {
   beforeEach(() => {

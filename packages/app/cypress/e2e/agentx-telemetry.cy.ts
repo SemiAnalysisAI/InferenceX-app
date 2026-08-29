@@ -1,4 +1,4 @@
-import { keepTelemetryTutorial, unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, keepTelemetryTutorial, unlockAgenticGate } from '../support/e2e';
 
 // This spec owns the telemetry-tutorial card's storage, so it opts out of the
 // global suppression seeded in support/e2e.ts (which also re-seeds on reload).
@@ -25,15 +25,6 @@ const ROUTE_VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 375, height: 812 },
 ] as const;
-
-function expectNoPageOverflow(): void {
-  cy.window().should((win) => {
-    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
-    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
-      win.innerWidth,
-    );
-  });
-}
 
 describe('AgentX telemetry tutorial — English page', () => {
   beforeEach(() => {

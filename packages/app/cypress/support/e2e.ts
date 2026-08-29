@@ -132,3 +132,17 @@ export function interceptDerivedAgenticMetrics(): void {
     });
   }).as('derivedAgenticMetrics');
 }
+
+/**
+ * Assert the page has no horizontal overflow at the current viewport — wide
+ * content (tables, flamegraphs) must scroll inside its own container, never
+ * the page body. Call after the route under test has rendered.
+ */
+export function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
+}

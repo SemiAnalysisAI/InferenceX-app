@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',
@@ -123,13 +124,44 @@ export function chipLabel(s: BenchmarkSibling): string {
 
 type SortMode = 'default' | 'conc' | 'parallelism' | 'tput' | 'requests';
 
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: 'default', label: 'Default' },
-  { value: 'conc', label: 'Concurrency ↑' },
-  { value: 'parallelism', label: 'Parallelism' },
-  { value: 'tput', label: 'Throughput/Chip ↓' },
-  { value: 'requests', label: 'Total requests ↓' },
-];
+const SIBLING_STRINGS = {
+  en: {
+    sortOptions: {
+      default: 'Default',
+      conc: 'Concurrency ↑',
+      parallelism: 'Parallelism',
+      tput: 'Throughput/Chip ↓',
+      requests: 'Total requests ↓',
+    },
+    pointCount: (count: number) => `${count} point${count === 1 ? '' : 's'} in this run`,
+    sortBy: 'Sort by',
+    sortAria: 'Sort points',
+    previous: 'prev',
+    previousAria: 'Previous point',
+    next: 'next',
+    nextAria: 'Next point',
+    noTrace: 'No stored trace data',
+  },
+  zh: {
+    sortOptions: {
+      default: '默认顺序',
+      conc: '并发数 ↑',
+      parallelism: '并行配置',
+      tput: '单芯片吞吐量 ↓',
+      requests: '请求总数 ↓',
+    },
+    pointCount: (count: number) => `本次运行共 ${count} 个数据点`,
+    sortBy: '排序方式',
+    sortAria: '数据点排序',
+    previous: '上一个',
+    previousAria: '上一个数据点',
+    next: '下一个',
+    nextAria: '下一个数据点',
+    noTrace: '未存储 trace 数据',
+  },
+} as const;
+
+const SORT_VALUES: SortMode[] = ['default', 'conc', 'parallelism', 'tput', 'requests'];
 
 // Group key for the "parallelism" sort: ep first (so TP/EP1 sorts ahead of
 // EP/TEP/DEP groups), then tp, then dp-attention, then disagg — every config
@@ -177,11 +209,14 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
 }
 
 const isSortMode = (v: string | null): v is SortMode =>
-  v !== null && SORT_OPTIONS.some((o) => o.value === v);
+  v !== null && SORT_VALUES.includes(v as SortMode);
 
 export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: BenchmarkSibling[] }) {
   const router = useRouter();
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = SIBLING_STRINGS[locale];
+  const sortOptions = SORT_VALUES.map((value) => ({ value, label: t.sortOptions[value] }));
   const agenticBase = isZhPathname(pathname)
     ? `${ZH_PREFIX}/inference/agentic`
     : '/inference/agentic';
@@ -213,15 +248,20 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
 
   return (
     <div className="border-b border-border/40 pb-4 mb-4">
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h1 className="text-2xl font-semibold text-foreground">{skuLabel}</h1>
+      <div className="flex flex-col items-start gap-1 mb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+        <h1 className="min-w-0 break-words text-xl font-semibold text-foreground sm:text-2xl">
+          {skuLabel}
+        </h1>
         <span className="text-xs text-muted-foreground">
-          {siblings.length} point{siblings.length === 1 ? '' : 's'} in this run · {sku.date}
+          {t.pointCount(siblings.length)} ·{' '}
+          {locale === 'zh'
+            ? `${Number(sku.date.slice(0, 4))}年${Number(sku.date.slice(5, 7))}月${Number(sku.date.slice(8, 10))}日`
+            : sku.date}
         </span>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Sort by</span>
+          <span className="text-xs text-muted-foreground">{t.sortBy}</span>
           <Select
             value={sortMode}
             onValueChange={(v) => {
@@ -241,13 +281,13 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           >
             <SelectTrigger
               className="h-7 w-[10rem] text-xs"
-              aria-label="Sort points"
+              aria-label={t.sortAria}
               data-testid="sibling-sort-select"
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SORT_OPTIONS.map((o) => (
+              {sortOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value} className="text-xs">
                   {o.label}
                 </SelectItem>
@@ -265,9 +305,9 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             }
           }}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Previous point"
+          aria-label={t.previousAria}
         >
-          <ChevronLeft className="size-3.5" /> prev
+          <ChevronLeft className="size-3.5" /> {t.previous}
         </button>
         <div className="flex items-center gap-1 flex-wrap">
           {sorted.map((s) => {
@@ -287,7 +327,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                     ? 'border-primary bg-primary text-primary-foreground font-medium'
                     : 'border-border/40 text-foreground hover:bg-accent'
                 } ${s.has_trace ? '' : 'opacity-60'}`}
-                title={s.has_trace ? undefined : 'No stored trace data'}
+                title={s.has_trace ? undefined : t.noTrace}
               >
                 {chipLabel(s)}
               </button>
@@ -304,9 +344,9 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             }
           }}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Next point"
+          aria-label={t.nextAria}
         >
-          next <ChevronRight className="size-3.5" />
+          {t.next} <ChevronRight className="size-3.5" />
         </button>
       </div>
     </div>

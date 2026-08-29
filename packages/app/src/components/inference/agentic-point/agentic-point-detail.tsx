@@ -16,6 +16,7 @@ import {
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
@@ -53,6 +54,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     back: 'Back',
     inferenceChart: 'Inference chart',
     loadingSku: 'Loading SKU navigator…',
+    siblingError: 'Failed to load the SKU navigator.',
     loadingPoint: 'Loading point metadata…',
     configsInSku: 'configs in SKU',
     requests: 'requests',
@@ -70,11 +72,22 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     warmupNoServerData:
       ' Warmup server-side metrics aren’t available for this point, so the server charts below are empty — the request-level charts above still reflect warmup.',
     metricSourceError: 'The selected server-metrics source could not be loaded.',
+    traceFailure: 'Failed to load trace data for benchmark point #{id}.',
+    missingTrace:
+      'No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf time-series capture, or its source artifacts have expired on GitHub.',
+    loadingAggregates: 'loading…',
+    loadingTimeline: 'Loading request timeline…',
+    missingTimeline:
+      "No per-request timeline for benchmark point #{id} — the profile_export.jsonl artifact isn't stored for this row.",
+    aggregatesError: 'Failed to load aggregate data across configurations.',
+    timelineError: 'Failed to load the request timeline.',
+    requestChartsError: 'Failed to load request chart data.',
   },
   zh: {
     back: '返回',
     inferenceChart: '推理图表',
     loadingSku: '加载 SKU 导航器……',
+    siblingError: 'SKU 导航数据加载失败。',
     loadingPoint: '加载数据点元信息……',
     configsInSku: '个配置',
     requests: '个请求',
@@ -92,6 +105,16 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     warmupNoServerData:
       ' 该数据点没有 warmup 阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映 warmup 阶段数据。',
     metricSourceError: '无法加载所选服务器指标来源。',
+    traceFailure: '无法加载基准测试数据点 #{id} 的 trace 数据。',
+    missingTrace:
+      '基准测试数据点 #{id} 未存储 trace_replay 数据。该数据点生成于 aiperf 时间序列采集功能上线前，或 GitHub 上的源产物已过期。',
+    loadingAggregates: '加载中……',
+    loadingTimeline: '正在加载请求时间线……',
+    missingTimeline:
+      '基准测试数据点 #{id} 没有逐请求时间线；对应数据行未存储 profile_export.jsonl 产物。',
+    aggregatesError: '跨配置聚合数据加载失败。',
+    timelineError: '请求时间线加载失败。',
+    requestChartsError: '请求图表数据加载失败。',
   },
 } as const;
 
@@ -108,6 +131,7 @@ export function AgenticPointDetail({ id }: Props) {
   const pathname = usePathname();
   const locale = useLocale();
   const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
+  const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
   const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
   // Carry the chart state the reader arrived with back to the chart. The link
@@ -251,7 +275,14 @@ export function AgenticPointDetail({ id }: Props) {
         </Link>
       </div>
 
-      {siblingsData ? (
+      {siblingsQuery.isError ? (
+        <RetryableQueryError
+          message={t.siblingError}
+          analyticsEvent="inference_agentic_siblings_retry_clicked"
+          onRetry={siblingsQuery.refetch}
+          testId="agentic-siblings-query-error"
+        />
+      ) : siblingsData ? (
         <SiblingNav sku={siblingsData.sku} siblings={siblingsData.siblings} />
       ) : siblingsQuery.isLoading ? (
         <div className="text-sm text-muted-foreground">{t.loadingSku}</div>
@@ -264,16 +295,21 @@ export function AgenticPointDetail({ id }: Props) {
       ) : null}
 
       {view !== 'logs' && metricsQuery.isError && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-          Failed to load trace data for benchmark point #{id}.
-        </div>
+        <RetryableQueryError
+          message={withId(t.traceFailure)}
+          analyticsEvent="inference_agentic_trace_retry_clicked"
+          onRetry={metricsQuery.refetch}
+          testId="agentic-trace-query-error"
+        />
       )}
-      {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
-        <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-          No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf
-          time-series capture, or its source artifacts have expired on GitHub.
-        </div>
-      )}
+      {view !== 'logs' &&
+        metricsQuery.data === null &&
+        !metricsQuery.isLoading &&
+        !metricsQuery.isError && (
+          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+            {withId(t.missingTrace)}
+          </div>
+        )}
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
@@ -288,7 +324,7 @@ export function AgenticPointDetail({ id }: Props) {
         {view === 'aggregates' && (
           <span className="text-xs text-muted-foreground">
             {siblingIds.length} {t.configsInSku}
-            {aggregatesQuery.isLoading ? ' · loading…' : ''}
+            {aggregatesQuery.isLoading ? ` · ${t.loadingAggregates}` : ''}
           </span>
         )}
         {view === 'timeline' && timelineQuery.data && (
@@ -313,16 +349,32 @@ export function AgenticPointDetail({ id }: Props) {
       {view === 'logs' ? (
         <ServerLogViewer id={id} enabled />
       ) : view === 'aggregates' ? (
-        <AggregatesGrid
-          siblings={siblingsData?.siblings ?? []}
-          aggregates={aggregatesQuery.data}
-          isLoading={aggregatesQuery.isLoading}
-        />
+        aggregatesQuery.isError ? (
+          <RetryableQueryError
+            message={t.aggregatesError}
+            analyticsEvent="inference_agentic_aggregates_retry_clicked"
+            onRetry={aggregatesQuery.refetch}
+            testId="agentic-aggregates-query-error"
+          />
+        ) : (
+          <AggregatesGrid
+            siblings={siblingsData?.siblings ?? []}
+            aggregates={aggregatesQuery.data}
+            isLoading={aggregatesQuery.isLoading}
+          />
+        )
       ) : view === 'timeline' ? (
         timelineQuery.isLoading ? (
           <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            Loading request timeline…
+            {t.loadingTimeline}
           </div>
+        ) : timelineQuery.isError ? (
+          <RetryableQueryError
+            message={t.timelineError}
+            analyticsEvent="inference_agentic_timeline_retry_clicked"
+            onRetry={timelineQuery.refetch}
+            testId="agentic-timeline-query-error"
+          />
         ) : timelineQuery.data ? (
           <RequestTimelineView
             data={timelineQuery.data}
@@ -331,13 +383,20 @@ export function AgenticPointDetail({ id }: Props) {
           />
         ) : (
           <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            No per-request timeline for benchmark point #{id} — the profile_export.jsonl artifact
-            isn&apos;t stored for this row.
+            {withId(t.missingTimeline)}
           </div>
         )
       ) : (
         <>
-          {effectivePhase === 'warmup' && (
+          {requestChartQuery.isError && (
+            <RetryableQueryError
+              message={t.requestChartsError}
+              analyticsEvent="inference_agentic_request_charts_retry_clicked"
+              onRetry={requestChartQuery.refetch}
+              testId="agentic-request-charts-query-error"
+            />
+          )}
+          {!requestChartQuery.isError && effectivePhase === 'warmup' && (
             <p
               className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
               data-testid="warmup-phase-note"
@@ -349,36 +408,43 @@ export function AgenticPointDetail({ id }: Props) {
             </p>
           )}
           {metricSourceQuery.isError && (
-            <p className="rounded-md border-l-2 border-destructive/60 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {t.metricSourceError}
-            </p>
+            <RetryableQueryError
+              message={t.metricSourceError}
+              analyticsEvent="inference_agentic_metric_source_retry_clicked"
+              onRetry={metricSourceQuery.refetch}
+              testId="agentic-metric-source-query-error"
+            />
           )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SequenceMetricCard
-              metric="isl"
-              timeline={phaseRequestData}
-              timelineLoading={requestChartQuery.isLoading}
-            />
-            <SequenceMetricCard
-              metric="osl"
-              timeline={phaseRequestData}
-              timelineLoading={requestChartQuery.isLoading}
-            />
+            {!requestChartQuery.isError && (
+              <>
+                <SequenceMetricCard
+                  metric="isl"
+                  timeline={phaseRequestData}
+                  timelineLoading={requestChartQuery.isLoading}
+                />
+                <SequenceMetricCard
+                  metric="osl"
+                  timeline={phaseRequestData}
+                  timelineLoading={requestChartQuery.isLoading}
+                />
 
-            <RequestMetricOverTime
-              title={t.interactivityOverTime}
-              metric="interactivity"
-              timeline={phaseRequestData}
-              isLoading={requestChartQuery.isLoading}
-            />
+                <RequestMetricOverTime
+                  title={t.interactivityOverTime}
+                  metric="interactivity"
+                  timeline={phaseRequestData}
+                  isLoading={requestChartQuery.isLoading}
+                />
 
-            <RequestMetricOverTime
-              title={t.ttftOverTime}
-              metric="ttft"
-              timeline={phaseRequestData}
-              isLoading={requestChartQuery.isLoading}
-              latencySelector
-            />
+                <RequestMetricOverTime
+                  title={t.ttftOverTime}
+                  metric="ttft"
+                  timeline={phaseRequestData}
+                  isLoading={requestChartQuery.isLoading}
+                  latencySelector
+                />
+              </>
+            )}
 
             <KvCacheUtilizationCard sliced={sliced} />
 
@@ -386,6 +452,7 @@ export function AgenticPointDetail({ id }: Props) {
               sliced={sliced}
               phaseTimeline={phaseRequestData}
               timelineLoading={requestChartQuery.isLoading}
+              timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
               view={requestActivityView}
               onViewChange={setRequestActivityView}
             />
@@ -403,11 +470,13 @@ export function AgenticPointDetail({ id }: Props) {
 
             <CumulativeUniqueInputTokensCard sliced={sliced} />
 
-            <InflightUniqueTokensCard
-              phaseTimeline={phaseRequestData}
-              timelineLoading={requestChartQuery.isLoading}
-              kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
-            />
+            {!requestChartQuery.isError && (
+              <InflightUniqueTokensCard
+                phaseTimeline={phaseRequestData}
+                timelineLoading={requestChartQuery.isLoading}
+                kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+              />
+            )}
           </div>
         </>
       )}

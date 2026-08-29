@@ -5,6 +5,7 @@ import { Maximize2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 /**
  * Wraps a chart in a card with a header + expand button. Click the button to
@@ -23,6 +24,7 @@ export function ExpandableChart({
   testId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const locale = useLocale();
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/40 p-4" data-testid={testId}>
@@ -32,7 +34,7 @@ export function ExpandableChart({
           {controls}
           <button
             type="button"
-            aria-label="Expand chart"
+            aria-label={locale === 'zh' ? '展开图表' : 'Expand chart'}
             onClick={() => {
               track('agentic_chart_expanded', { title });
               setOpen(true);

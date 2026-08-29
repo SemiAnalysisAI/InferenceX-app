@@ -10,6 +10,7 @@ import {
   useInferenceActions,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import * as inferenceContextModule from '@/components/inference/InferenceContext';
 import { Sequence } from '@/lib/data-mappings';
 import type {
   InferenceActionsContextType,
@@ -19,6 +20,25 @@ import type {
 } from '@/components/inference/types';
 
 describe('inference requested and effective axis selectors', () => {
+  it('exposes byte-stable English and complete Chinese date-range reset copy', () => {
+    const copy = (
+      inferenceContextModule as typeof inferenceContextModule & {
+        INFERENCE_CONTEXT_STRINGS?: Record<'en' | 'zh', Record<string, unknown>>;
+      }
+    ).INFERENCE_CONTEXT_STRINGS;
+
+    expect(copy).toBeDefined();
+    expect(copy?.en).toMatchObject({
+      dateRangeResetTitle: 'Date Range Reset',
+      dateRangeResetDescription:
+        'The chip configs are not available in the selected date range. The date range will be reset.',
+      ok: 'OK',
+    });
+    expect(Object.keys(copy?.zh ?? {})).toEqual(Object.keys(copy?.en ?? {}));
+    expect(copy?.zh.dateRangeResetTitle).not.toBe(copy?.en.dateRangeResetTitle);
+    expect(copy?.zh.dateRangeResetDescription).not.toBe(copy?.en.dateRangeResetDescription);
+  });
+
   it('preserves URL mode while sequence availability is unresolved', () => {
     expect(
       resolveEffectiveXAxisMode('e2e-normalized-interactivity', Sequence.EightK_OneK, false),

@@ -44,7 +44,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ModelLogo } from '@/components/ui/model-logo';
-import { metricLabel, metricTitle } from '@/lib/chart-utils';
+import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -175,6 +175,7 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
+  xField: (percentile: string) => string;
   xLabel: (percentileLabel: string) => string;
   xLabelZh?: (percentileLabel: string) => string;
   heading: (percentileLabel: string) => string;
@@ -185,6 +186,7 @@ interface DerivedXModeSpec {
 
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
   'e2e-normalized-interactivity': {
+    xField: (percentile) => `${percentile}_e2e_norm_intvty`,
     xLabel: (pctl) => `${pctl} E2E Normalized Interactivity (tok/s/user)`,
     xLabelZh: (pctl) => `${pctl} 端到端归一化交互性 (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} E2E Normalized Interactivity`,
@@ -748,11 +750,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       if (!derivedSpec) return { ...graph, data, clippedData };
 
-      const xLabelFn =
-        locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
       const chartDefinition = {
         ...graph.chartDefinition,
-        x_label: xLabelFn(selectedPercentile.toUpperCase()),
+        x_scale_field: derivedSpec.xField(selectedPercentile),
+        x_label: derivedSpec.xLabel(selectedPercentile.toUpperCase()),
+        x_labelZh: (derivedSpec.xLabelZh ?? derivedSpec.xLabel)(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
         ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
@@ -766,7 +768,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     derivedMetrics,
     selectedYAxisMetric,
     selectedPercentile,
-    locale,
   ]);
 
   const displayGraphs =
@@ -792,6 +793,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             </Card>,
           ]
         : renderableGraphs.map((graph, graphIndex) => {
+            const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
@@ -857,6 +859,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <figure data-testid="chart-figure" className="relative rounded-lg">
                   <ChartButtons
                     chartId={`chart-${graphIndex}`}
+                    mobileVisible
                     analyticsPrefix={
                       isTimelineMode
                         ? 'gpu_timeseries'
@@ -909,7 +912,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           yPath: (graph.chartDefinition as ChartDefinition)[
                             selectedYAxisMetric
                           ] as string,
-                          xHeader: graph.chartDefinition.x_label,
+                          xHeader: resolvedXLabel,
                         },
                       );
                       // Match warnings against the same series the chart annotates,
@@ -1104,7 +1107,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
                           data={graph.data}
-                          xLabel={graph.chartDefinition.x_label}
+                          xLabel={resolvedXLabel}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
@@ -1117,7 +1120,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             modelLabel={graph.model}
                             data={graph.data}
                             clippedData={graph.clippedData}
-                            xLabel={graph.chartDefinition.x_label}
+                            xLabel={resolvedXLabel}
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
@@ -1147,7 +1150,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         parentChartId={`chart-${graphIndex}`}
                         chartDefinition={graph.chartDefinition}
                         yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
-                        xLabel={graph.chartDefinition.x_label}
+                        xLabel={resolvedXLabel}
                       />
                     )}
                   </Card>
@@ -1230,7 +1233,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         }}
       >
         <TabsList
-          aria-label="Chart x-axis metric"
+          aria-label={locale === 'zh' ? '图表横轴指标' : 'Chart x-axis metric'}
           data-testid="x-axis-mode-buttons"
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >

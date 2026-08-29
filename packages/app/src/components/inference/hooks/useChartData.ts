@@ -485,20 +485,28 @@ export function useChartData(
           : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
+        const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
         let xAxisLabel = chartDef.x_label;
+        let xAxisLabelZh = chartDef.x_labelZh;
         if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const labelZhKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
             xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
+            xAxisLabelZh = (chartDef[labelZhKey] as string) || chartDef.x_labelZh;
           } else {
             xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
+            xAxisLabelZh = isTtftOverride ? ttftLabelZh : chartDef.x_labelZh;
           }
         } else if (resolved.branch === 'config-input-override') {
           const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const xLabelZhOverrideKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
+          xAxisLabelZh = (chartDef[xLabelZhOverrideKey] as string) || chartDef.x_labelZh;
         } else if (resolved.branch === 'e2e-ttft-override') {
           xAxisLabel = ttftLabel;
+          xAxisLabelZh = ttftLabelZh;
         }
 
         // Agentic: relabel to the chosen percentile (the resolver already
@@ -512,6 +520,7 @@ export function useChartData(
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
@@ -570,7 +579,9 @@ export function useChartData(
             ...rooflineOverrides,
             ...revenueLabels,
             heading: chartHeading,
+            x_scale_field: xAxisField,
             x_label: xAxisLabel,
+            x_labelZh: xAxisLabelZh,
             y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
           },
           metricKey,
