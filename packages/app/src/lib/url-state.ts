@@ -98,17 +98,17 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
- * Dashboard default y-axis: total tokens represented by $1 USD at the selected
- * token sale prices, so the dashboard leads with API purchasing power rather
- * than raw throughput. `?i_metric=` still wins, so existing shared links are
- * unaffected.
+ * Dashboard default y-axis: gross token revenue per GPU hour at the selected
+ * token sale prices. It preserves an economics-first view while still varying
+ * with hardware throughput when the blended token price is constant.
+ * `?i_metric=` still wins, so existing shared links are unaffected.
  *
  * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
  * strips any value equal to the default from share links. If the two drifted,
  * a link captured on the *other* metric would be written without `i_metric`
  * and reopen on this one.
  */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollar';
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokenRevenuePerGpuHour';
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';

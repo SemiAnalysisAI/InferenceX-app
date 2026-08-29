@@ -408,7 +408,7 @@ export type CustomMetricKey = {
 export type BenchmarkMetricKey = Exclude<MetricKey, CustomMetricKey>;
 export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 
-export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollar' satisfies MetricConfigKey;
+export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokenRevenuePerGpuHour' satisfies MetricConfigKey;
 
 const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
   y_tokensPerDollarH: 'y_tokensPerDollar',

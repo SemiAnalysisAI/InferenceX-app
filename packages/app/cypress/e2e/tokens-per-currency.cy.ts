@@ -1,7 +1,8 @@
 /**
- * The dashboard opens on API tokens purchasable per $1 USD. Infrastructure
- * purchasing power remains available in yuan and by token type. Fixed-sequence
- * Quick Filters remain available from the chart legend.
+ * The dashboard opens on normalized token revenue per GPU hour so fixed-price
+ * scenarios still compare hardware throughput. API and infrastructure
+ * purchasing-power metrics remain available. Fixed-sequence Quick Filters
+ * remain available from the chart legend.
  */
 describe('Tokens per currency and agentic controls', () => {
   beforeEach(() => {
@@ -10,17 +11,17 @@ describe('Tokens per currency and agentic controls', () => {
     });
   });
 
-  it('defaults the y-axis to total tokens per $1 USD', () => {
+  it('defaults the y-axis to token revenue and preserves hardware comparison', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 USD',
+      'Token Revenue per GPU Hour',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
     cy.get('[data-testid="scatter-graph"]')
       .first()
       .find('svg .dot-group')
-      .should('have.length.greaterThan', 0);
+      .should('have.length.greaterThan', 1);
   });
 
   it('still honors an explicit ?i_metric=, so shared links are unaffected', () => {

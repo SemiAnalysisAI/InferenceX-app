@@ -51,7 +51,7 @@ describe('metric compatibility', () => {
 
   it('keeps the legacy fallback independent from the dashboard default', () => {
     expect(resolveMetricConfigKey(undefined, 'y')).toBe('y_tpPerGpu');
-    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokensPerDollar');
+    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokenRevenuePerGpuHour');
   });
 
   it('falls back safely for unknown persisted metric values', () => {

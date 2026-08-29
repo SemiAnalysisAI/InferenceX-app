@@ -211,8 +211,8 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tokensPerDollar`. URL param still wins so existing
-   * shared links are unaffected.
+   * the dashboard's default `y_tokenRevenuePerGpuHour`. URL param still wins so
+   * existing shared links are unaffected.
    */
   initialYAxisMetric?: string;
   /**
