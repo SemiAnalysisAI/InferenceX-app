@@ -56,6 +56,25 @@ describe('Header', () => {
     cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
   });
 
+  it('keeps the sticky header opaque enough that content cannot show through', () => {
+    // Regression: `bg-background/60 backdrop-blur-[2px]` let page text bleed
+    // through the sticky header while scrolling on mobile.
+    cy.get('[data-testid="header"]').should(($el) => {
+      const tokens = $el[0].className.split(/\s+/u);
+      expect(tokens).to.include('bg-background/95');
+      expect(tokens).to.include('supports-[backdrop-filter]:bg-background/80');
+      expect(tokens).to.include('backdrop-blur-md');
+      expect(tokens).to.not.include('bg-background/60');
+      expect(tokens).to.not.include('backdrop-blur-[2px]');
+    });
+    // With the stylesheet applied the header must actually blur what scrolls
+    // beneath it (backdrop-blur-md), not just carry the class names.
+    cy.get('[data-testid="header"]').should(($el) => {
+      const { backdropFilter } = getComputedStyle($el[0]);
+      expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
+    });
+  });
+
   it('shows Overview as a top-level nav link', () => {
     cy.get('[data-testid="nav-link-overview"]')
       .should('be.visible')
