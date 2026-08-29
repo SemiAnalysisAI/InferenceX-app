@@ -78,9 +78,13 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's CPU-proxy RDMA is functional on the Pollara fabric but ~13x under its upstream-documented bandwidth (~6 GB/s vs 82 GB/s), invariant to GPU-memory registration mode and traffic class — an ionic-driver-level suspect. Numbers at that deficit would misrepresent the SKU.",
     zh: 'UCCL 的 CPU 代理 RDMA 在 Pollara 网络上可运行，但带宽仅为上游文档值的约 1/13（约 6 GB/s 对 82 GB/s），与 GPU 内存注册方式和流量类别无关，疑似 ionic 驱动层问题。该水平的数据无法公正代表此 SKU。',
   },
-  'uccl-wallclock': {
-    en: 'Functional cross-node, but CPU-proxy EP16 ran over the per-case wall-clock budget when probed on this pool; the bare-metal B200 pool carries the EP16 row instead.',
-    zh: '跨节点功能正常，但在该集群上 CPU 代理 EP16 的探测超出单用例时间预算；EP16 行改由裸金属 B200 集群承载。',
+  'uccl-h100-init-crash': {
+    en: 'Crashes at NCCL communicator setup on this pool (unhandled CUDA error, 4/4 attempts on 2026-08-28) while deepep-v2 EP16 ran green concurrently — uccl-specific here, under investigation; the earlier wall-clock rationale is superseded.',
+    zh: '在该集群上于 NCCL 通信器建立阶段崩溃（unhandled CUDA error，2026-08-28 四次尝试全部失败），而同期 deepep-v2 EP16 正常通过——为该集群上 uccl 特有问题，调查中；早先的超时说法已被取代。',
+  },
+  'uccl-hseries-topend': {
+    en: 'Works and passes correctness at every rung (audited 2026-08-28); top-of-ladder periods run ~2–3.7x slower than bare-metal B200 — the CPU proxy on this virtualized IB — at parity through T=16.',
+    zh: '可用且所有梯级正确性通过（2026-08-28 审计）；梯级顶端周期比裸金属 B200 慢约 2–3.7 倍（虚拟化 IB 上的 CPU 代理），T≤16 时与其持平。',
   },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
@@ -91,8 +95,8 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: 'UCCL 低延迟 Kernel 在 AMD 的 CU 数量下触发断言（kNumMaxTopK+1 超出 warp 组预算），为上游 Kernel 限制而非集成问题。',
   },
   'nccl-gdaki-x86': {
-    en: "NCCL EP's GPU-initiated RDMA (GDAKI) does not work for EP16 scale-out on the x86 pools; EP16 works only over MNNVL on the GB SKUs.",
-    zh: 'NCCL EP 的 GPU 发起 RDMA（GDAKI）在 x86 集群上无法支撑 EP16 横向扩展；EP16 仅在 GB SKU 的 MNNVL 上可用。',
+    en: "NCCL EP's GPU-initiated RDMA (GDAKI) does not work for EP16 scale-out on the x86 pools — re-confirmed on bare metal 2026-08-28: every rank hits an illegal memory access in the EP kernel, so it is not a virtualization artifact. EP16 works only over MNNVL on the GB SKUs.",
+    zh: 'NCCL EP 的 GPU 发起 RDMA（GDAKI）在 x86 集群上无法支撑 EP16 横向扩展——2026-08-28 在裸金属上复验：所有 rank 在 EP Kernel 中触发非法内存访问，故并非虚拟化产物。EP16 仅在 GB SKU 的 MNNVL 上可用。',
   },
   'nccl-ll-clamped': {
     en: 'Works, BF16 only, with the ladder clamped to ≤128 tokens/rank pending an upstream low-latency fence-race fix (NVIDIA/nccl-extensions#8).',
@@ -107,8 +111,8 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: '通过固定的单节点 HCA 列表可用：低延迟缓冲即使单节点也会自启用 IBGDA，而只有存储 IB 通道接受 AH/DCT 创建（InferenceX#2525）；稳态流量仍走 NVLink。',
   },
   'b300-ll-create-ah': {
-    en: 'Cross-node IBGDA needs address-handle creation on the GPU-fabric RoCE rails, and ibv_create_ah fails there at every GID index (kernel GID→DMAC resolution) — a fabric-level fix, not a harness change.',
-    zh: '跨节点 IBGDA 需要在 GPU 网络的 RoCE 通道上创建地址句柄，而 ibv_create_ah 在所有 GID 索引下均失败（内核 GID→DMAC 解析问题）——需网络层面修复，非测试框架可解决。',
+    en: 'Cross-node IBGDA fails during NVSHMEM setup — re-confirmed on a fresh node pair 2026-08-28: ibv_reg_dmabuf_mr returns a null MR before the downstream ibv_create_ah failure, with nvidia_peermem loaded; the live suspect is the stale libmlx5 in the container image (an image bump, not a host fix).',
+    zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
   },
   'mori-ll-scale-up-only': {
     en: 'MoRI low-latency uses the IntraNodeLL kernel, which is scale-up-only by design; a cross-node low-latency mode does not exist.',
@@ -145,14 +149,14 @@ const NORMAL: KnownMatrix = {
   h100: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
-    'uccl-ep': cell(works, broken('uccl-wallclock')),
+    'uccl-ep': cell(works, broken('uccl-h100-init-crash')),
     'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
     'flashinfer-ep': off('gb-only'),
   },
   h200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
-    'uccl-ep': cell(works, broken('uccl-wallclock')),
+    'uccl-ep': cell(works, worksWith('uccl-hseries-topend')),
     'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
     'flashinfer-ep': off('gb-only'),
   },
