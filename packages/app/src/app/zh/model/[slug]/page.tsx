@@ -20,15 +20,15 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  return modelDetailMetadata(slug, 'en');
+  return modelDetailMetadata(slug, 'zh');
 }
 
-export default async function ModelPage({ params }: Props) {
+export default async function ZhModelPage({ params }: Props) {
   const { slug } = await params;
   const canonical = COMPARE_MODEL_ALIASES[slug];
-  if (canonical) redirect(modelAliasDestination(canonical, 'en'));
+  if (canonical) redirect(modelAliasDestination(canonical, 'zh'));
 
-  const page = getLocalizedModelPage(slug, 'en');
+  const page = getLocalizedModelPage(slug, 'zh');
   if (!page) notFound();
-  return <ModelDetailContent slug={slug} page={page} locale="en" />;
+  return <ModelDetailContent slug={slug} page={page} locale="zh" />;
 }

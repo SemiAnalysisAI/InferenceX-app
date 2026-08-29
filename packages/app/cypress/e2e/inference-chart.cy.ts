@@ -240,7 +240,7 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
       .and('match', /^了解 .*DeepSeek.*模型架构$/u);
     cy.get('[data-testid="model-architecture-link"]')
       .should('have.attr', 'href')
-      .and('match', /^\/model\//u);
+      .and('match', /^\/zh\/model\//u);
     cy.contains('button', '变更日志').should('be.visible').click();
     cy.contains('说明').should('be.visible');
   });

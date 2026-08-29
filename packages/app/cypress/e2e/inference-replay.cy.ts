@@ -106,19 +106,33 @@ describe('Inference Replay', () => {
         cy.log('Replay history fixture has < 2 dates; skipping animation check');
         return;
       }
-      // Earlier tests can leave the playhead at the end, where Play restarts
-      // from zero and "value > start" can never hold — reset to origin first.
+      // Rewind first: earlier tests in this file (and failed retry attempts —
+      // testIsolation is off) leave the playhead wherever they stopped, and a
+      // playhead at the end would turn Play into a restart-from-zero whose
+      // scrubber value can never exceed the recorded start.
       cy.get('[data-testid="replay-reset"]').click();
       cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
       cy.get('[data-testid="replay-date-overlay"]')
         .invoke('text')
         .then((startDate) => {
           cy.get('[data-testid="replay-play-pause"]').click();
-          cy.get('[data-testid="replay-scrubber"]').should(($scrubber) => {
-            expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(0);
-          });
+          // Poll both signals BEFORE pausing, each with headroom for the
+          // slowest path. Scrubber: reduced motion (the chromium e2e launch
+          // flag) steps discretely at 1.2s per date, so any fixed wait
+          // shorter than one step fails deterministically. Date overlay: the
+          // continuous path (Firefox has no reduced-motion flag) commits
+          // scrubber ticks every few ms but only flips the label when the
+          // eased playhead crosses a whole segment — pausing as soon as the
+          // scrubber moves would freeze the label on the first date forever.
+          // The timeout must ride on .invoke: a cy.get timeout does not
+          // extend the retries of chained queries.
+          cy.get('[data-testid="replay-scrubber"]')
+            .invoke({ timeout: 10_000 }, 'val')
+            .should((endVal) => {
+              expect(Number(endVal)).to.be.greaterThan(0);
+            });
           cy.get('[data-testid="replay-date-overlay"]')
-            .invoke('text')
+            .invoke({ timeout: 10_000 }, 'text')
             .should((endDate) => {
               expect(endDate).not.to.equal(startDate);
             });

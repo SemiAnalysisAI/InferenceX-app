@@ -8,6 +8,7 @@ import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/too
 import { getModelSlugEntryForDisplayName } from '@/lib/compare-slug';
 import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
 import { type Model, getModelLabel } from '@/lib/data-mappings';
+import { localePath } from '@/lib/i18n';
 
 /**
  * Compact replacement for the old full-width "Learn more about the … architecture"
@@ -34,7 +35,7 @@ export function ModelArchitectureInfoLink({
     <TooltipRoot>
       <TooltipTrigger asChild>
         <Link
-          href={`/model/${entry.slug}`}
+          href={localePath(`/model/${entry.slug}`, locale)}
           aria-label={text}
           data-testid="model-architecture-link"
           className="border-input flex size-9 shrink-0 items-center justify-center rounded-md border bg-transparent text-muted-foreground shadow-xs transition-colors hover:bg-muted/50 hover:text-foreground"

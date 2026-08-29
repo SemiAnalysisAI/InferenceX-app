@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -30,6 +31,7 @@ import {
   compareTableNarrativeZh,
 } from '@/lib/compare-ssr-zh';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
@@ -124,7 +126,7 @@ export default async function ComparePageZh({ params, searchParams }: Props) {
   return renderComparePageZh(slug, await searchParams, {});
 }
 
-export async function renderComparePageZh(
+export function renderComparePageZh(
   slug: string,
   sp: Record<string, string | string[] | undefined>,
   { scenarioSegment }: ScenarioOptions,
@@ -147,6 +149,33 @@ export async function renderComparePageZh(
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
+  // In-page Suspense, NOT loading.tsx: a route-level loading boundary would
+  // stream a 200 shell before the notFound()/permanentRedirect() above run,
+  // degrading real 404/308 responses to soft client-side handling. See the
+  // English page for the full rationale.
+  return (
+    <Suspense fallback={<CompareDetailRouteSkeleton />}>
+      <CompareDetailZh
+        parsed={parsed}
+        canonical={canonical}
+        sp={sp}
+        scenarioSegment={scenarioSegment}
+      />
+    </Suspense>
+  );
+}
+
+async function CompareDetailZh({
+  parsed,
+  canonical,
+  sp,
+  scenarioSegment,
+}: {
+  parsed: NonNullable<ReturnType<typeof parseCompareSlug>>;
+  canonical: string;
+  sp: Record<string, string | string[] | undefined>;
+  scenarioSegment?: ScenarioSegment;
+}) {
   const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
 
   const urlSeq = pickString(sp.i_seq);

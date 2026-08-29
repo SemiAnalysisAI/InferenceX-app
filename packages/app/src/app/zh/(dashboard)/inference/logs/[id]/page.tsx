@@ -19,11 +19,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function ZhBenchmarkLogPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ZhBenchmarkLogPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const numericId = Number(id);
   if (!isPersistedBenchmarkId(numericId)) notFound();

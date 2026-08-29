@@ -94,10 +94,13 @@ export function AgentXCompareHero({
                 analyticsEvent="compare_agentx_overview_clicked"
                 analyticsSurface={surface}
                 appNavigation
-                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
               >
                 {t.overview}
-                <ArrowRight aria-hidden="true" className="size-4" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                />
               </CompareIndexTrackedLink>
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-dashboard-link"
@@ -106,10 +109,13 @@ export function AgentXCompareHero({
                 analyticsTarget="kimi-k3"
                 analyticsSurface={surface}
                 appNavigation
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 {t.dashboard}
-                <ArrowRight aria-hidden="true" className="size-4" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                />
               </CompareIndexTrackedLink>
             </div>
           </div>
@@ -153,7 +159,10 @@ export function AgentXCompareHero({
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
                     {t.modelAction}
-                    <ArrowRight aria-hidden="true" className="size-3.5" />
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                    />
                   </span>
                 </CompareIndexTrackedLink>
               ))}

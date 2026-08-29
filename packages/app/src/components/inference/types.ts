@@ -573,6 +573,9 @@ export interface InferenceDataContextType {
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   loading: boolean;
+  /** True while `graphs` shows previous-key data (placeholder) or a background
+   *  refetch is in flight — i.e. content is visible but about to update. */
+  refreshing: boolean;
   error: string | null;
   availableQuickFilters: AvailableQuickFilters;
   availableGPUs: { value: string; label: string }[];

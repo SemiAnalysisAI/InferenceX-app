@@ -57,6 +57,7 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/blog' },
   { path: '/glossary' },
   { path: '/chips' },
+  { path: '/model' },
   { path: '/agentx' },
   { path: '/rankings' },
   { path: '/run' },

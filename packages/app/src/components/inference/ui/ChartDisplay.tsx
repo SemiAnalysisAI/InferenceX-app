@@ -114,6 +114,8 @@ const STRINGS = {
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
+    noChartData:
+      'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -133,6 +135,7 @@ const STRINGS = {
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
+    noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
@@ -229,7 +232,7 @@ export function formatTokenLength(value: number): string {
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
+  const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {
     selectedGPUs,
     selectedPrecisions,
@@ -621,9 +624,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     throw new Error('Something went wrong.');
   }
 
-  // Show skeletons only on first load (no data yet). During refetch, keepPreviousData
-  // keeps old graphs visible so we never flash skeletons when switching filters.
+  // Show skeletons only on first load (no data yet). Same-model query-key
+  // changes keep the previous rows rendered (placeholderData in
+  // benchmarkQueryOptions), so switching dates/runs/scopes never flashes
+  // skeletons — those windows surface as `refreshing` instead.
   const isFirstLoad = loading && graphs.length === 0;
+  // Stale-while-refetching: previous charts stay rendered but dim slightly
+  // (motion.css `.motion-stale`) so the update reads as "updating", not
+  // "frozen". aria-busy mirrors the cue for assistive tech.
+  const isRefetching = refreshing && graphs.length > 0;
 
   // When the selected model has no DB data but an unofficial run provides overlay
   // data for this (model, sequence), synthesize empty-data stub graphs from the
@@ -771,7 +780,18 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           </Card>,
         ]
       : renderableGraphs.length === 0
-        ? []
+        ? [
+            // Reserved-height empty state: without it the chart region
+            // collapses to zero height, which shifts the page and breaks
+            // scroll restoration when a selection has no data.
+            <Card
+              key="empty-0"
+              data-testid="chart-empty-state"
+              className="flex min-h-[320px] items-center justify-center"
+            >
+              <p className="max-w-md text-center text-sm text-muted-foreground">{t.noChartData}</p>
+            </Card>,
+          ]
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
             const isTimelineMode = Boolean(
@@ -1255,7 +1275,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           })}
         </TabsList>
       </Tabs>
-      <div className="flex flex-col gap-4">{displayGraphs}</div>
+      <div
+        className="motion-stale flex flex-col gap-4"
+        data-stale={isRefetching || undefined}
+        aria-busy={isRefetching || undefined}
+      >
+        {displayGraphs}
+      </div>
     </div>
   );
 }
