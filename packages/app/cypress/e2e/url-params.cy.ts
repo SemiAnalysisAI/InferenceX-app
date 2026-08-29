@@ -188,12 +188,12 @@ describe('URL Parameter Persistence', () => {
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
       visitWithDismissedModal('/inference');
 
-      // The dashboard opens on the tokens-per-dollar default; this asserts the
-      // starting label before switching, not that throughput is the default.
+      // The dashboard opens on normalized token revenue so fixed-price
+      // scenarios still compare hardware before switching metrics.
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('contain.text', 'Total Tokens per $1 USD');
+        .should('contain.text', 'Token Revenue per GPU Hour at Normalized Pricing');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
       cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
