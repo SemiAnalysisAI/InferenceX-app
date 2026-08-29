@@ -73,6 +73,11 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(true);
   });
 
+  it('matches the model index and model detail pages', () => {
+    expect(hasZhSibling('/model')).toBe(true);
+    expect(hasZhSibling('/model/deepseek-r1')).toBe(true);
+  });
+
   it('matches datasets, gated tabs, and agentic detail pages', () => {
     expect(hasZhSibling('/agentx')).toBe(true);
     expect(hasZhSibling('/agentx/some-set/conversations/abc123')).toBe(true);
@@ -126,6 +131,12 @@ describe('switchLocalePath', () => {
   it('switches datasets pages within the language trees', () => {
     expect(switchLocalePath('/agentx')).toBe('/zh/agentx');
     expect(switchLocalePath('/zh/agentx/some-set')).toBe('/agentx/some-set');
+  });
+
+  it('switches model pages within the language trees', () => {
+    expect(switchLocalePath('/model')).toBe('/zh/model');
+    expect(switchLocalePath('/model/deepseek-r1')).toBe('/zh/model/deepseek-r1');
+    expect(switchLocalePath('/zh/model/deepseek-r1')).toBe('/model/deepseek-r1');
   });
 
   it('falls back to the other homepage for unmirrored paths', () => {

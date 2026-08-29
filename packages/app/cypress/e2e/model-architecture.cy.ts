@@ -5,12 +5,27 @@
  * describe block.
  */
 
+const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
+
+function dismissStarModal(win: Window): void {
+  win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+}
+
+function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
+}
+
 /** Visit a model deep-dive page and wait for the inline diagram to render. */
 function visitModelPage(slug: string) {
   cy.viewport(1280, 800);
   cy.visit(`/model/${slug}`, {
     onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      dismissStarModal(win);
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
@@ -450,7 +465,7 @@ describe('Model Architecture Diagram', () => {
       cy.viewport(1280, 800);
       cy.visit('/model', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
     });
@@ -481,13 +496,111 @@ describe('Model Architecture Diagram', () => {
     });
   });
 
+  describe('Chinese model index and detail journey', () => {
+    const viewports = [
+      { label: 'desktop', width: 1440, height: 900 },
+      { label: '375px mobile', width: 375, height: 812 },
+      { label: '390px mobile', width: 390, height: 844 },
+    ] as const;
+
+    for (const viewport of viewports) {
+      it(`keeps Chinese chrome, metadata, and navigation at ${viewport.label}`, () => {
+        cy.viewport(viewport.width, viewport.height);
+        cy.visit('/zh/model', { onBeforeLoad: dismissStarModal });
+
+        cy.get('[data-testid="model-index-page"]').should('be.visible');
+        cy.get('h1').should('have.text', '模型架构');
+        cy.get('[data-testid="model-index-link-deepseek-r1"]')
+          .should('contain.text', 'DeepSeek R1 0528')
+          .and('contain.text', '总参数量 671B')
+          .and('contain.text', 'MLA')
+          .and('contain.text', '发布日期 2025 年 5 月 28 日')
+          .and('have.attr', 'href', '/zh/model/deepseek-r1');
+        cy.get('[data-testid="model-index-link-deepseek-r1"] img').should(
+          'have.attr',
+          'alt',
+          'DeepSeek 标志',
+        );
+        cy.get('[data-testid="footer-link-model-architectures"]')
+          .should('have.attr', 'href', '/zh/model')
+          .and('contain.text', '模型架构');
+        cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model');
+        cy.get('link[rel="canonical"]').should('have.attr', 'href', `${MODEL_SITE_URL}/zh/model`);
+        cy.get('link[rel="alternate"][hreflang="en"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/model`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model`,
+        );
+        expectNoPageOverflow();
+
+        cy.get('[data-testid="model-index-link-deepseek-r1"]').scrollIntoView().click();
+        cy.location('pathname').should('eq', '/zh/model/deepseek-r1');
+        cy.get('[data-testid="model-detail-page"]').should('be.visible');
+        cy.get('h1').should('have.text', 'DeepSeek R1 0528');
+        cy.get('[data-testid="model-detail-page"]').should(
+          'contain.text',
+          '发布日期 2025 年 5 月 28 日',
+        );
+        cy.get('[data-testid="model-english-article-notice"]')
+          .should('contain.text', '模型深度解析正文目前仅提供英文版')
+          .find('a')
+          .should('have.attr', 'href', '/model/deepseek-r1')
+          .and('have.text', '查看英文原文');
+        cy.get('[data-testid="model-page-article"]').should('have.attr', 'lang', 'en');
+        cy.get('[data-testid="model-page-dashboard"]')
+          .should('contain.text', 'DeepSeek R1 0528 推理性能')
+          .find('a[href^="/zh/inference?"]')
+          .should('contain.text', '在完整仪表板中查看');
+        cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
+
+        // The click assertions above cover the client transition. Canonical and
+        // hreflang are SSR contracts, so verify them from a fresh document rather
+        // than racing streamed App Router head updates after the soft navigation.
+        cy.reload();
+        cy.get('[data-testid="model-detail-page"]').should('be.visible');
+        cy.get('link[rel="canonical"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model/deepseek-r1`,
+        );
+        cy.get('link[rel="alternate"][hreflang="en"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/model/deepseek-r1`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model/deepseek-r1`,
+        );
+        expectNoPageOverflow();
+      });
+    }
+
+    it('keeps the dashboard architecture link inside the Chinese route tree', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+        onBeforeLoad: dismissStarModal,
+      });
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+      cy.get('[data-testid="model-architecture-link"]')
+        .should('have.attr', 'href', '/zh/model/deepseek-r1')
+        .and('have.attr', 'aria-label', '了解 DeepSeek R1 0528 671B 模型架构');
+    });
+  });
+
   describe('Embedded dashboard changelog starts collapsed', () => {
     before(() => {
       cy.viewport(1280, 800);
       // deepseek-r1 has fixture benchmark data, so the changelog renders.
       cy.visit('/model/deepseek-r1', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
     });
@@ -509,7 +622,7 @@ describe('Model Architecture Diagram', () => {
       cy.viewport(1280, 800);
       cy.visit('/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
