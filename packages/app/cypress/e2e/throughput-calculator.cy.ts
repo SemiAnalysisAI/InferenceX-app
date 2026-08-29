@@ -876,6 +876,15 @@ describe('TCO Calculator Chinese route', () => {
   });
 
   it('localizes chart internals, table headers, and preserved units', () => {
+    cy.contains('label', '计价方式').should('be.visible');
+    cy.contains('label', '目标交互性 (tok/s/user)')
+      .parent()
+      .find('svg.cursor-help')
+      .trigger('pointermove');
+    cy.get('[role="tooltip"]')
+      .should('contain.text', '用于插值计算的交互性目标值。')
+      .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
+    cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
     cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
       'contain.text',
       '每芯片吞吐量 (tok/s/chip)',
@@ -887,6 +896,8 @@ describe('TCO Calculator Chinese route', () => {
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '吞吐量：')
       .and('contain.text', '成本：');
+    cy.get('[data-testid="calculator-metric-power"]').click();
+    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗：');
     // At 390px the desktop toolbar is hidden; use the mobile view toggle.
     cy.contains('[role="tab"]:visible', '表格').click();
     cy.get('[data-testid="calculator-results-table"] thead')
@@ -900,7 +911,9 @@ describe('TCO Calculator Chinese route', () => {
     cy.reload();
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
-    cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
+    cy.get('[data-testid="calculator-comparison-banner"]')
+      .should('be.visible')
+      .and('contain.text', '已选中。点击其他柱形即可对比。');
     cy.get('[data-testid="calculator-table-view-btn"]').click();
     cy.get('[data-testid="calculator-results-table"]').should('be.visible');
     cy.document().then((doc) => {

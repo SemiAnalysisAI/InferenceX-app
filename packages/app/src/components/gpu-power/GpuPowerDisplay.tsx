@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { localePath } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 import { relockFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
@@ -117,6 +117,22 @@ const STRINGS = {
 } as const;
 
 type GpuMetricsView = 'chart' | 'correlation';
+
+const GPU_RUN_CONCLUSION_ZH: Readonly<Record<string, string>> = {
+  success: '成功',
+  failure: '失败',
+  cancelled: '已取消',
+  skipped: '已跳过',
+  timed_out: '超时',
+  startup_failure: '启动失败',
+  action_required: '需要处理',
+  neutral: '中立',
+  stale: '已过期',
+};
+
+export function getGpuRunConclusionLabel(conclusion: string, locale: Locale): string {
+  return locale === 'zh' ? (GPU_RUN_CONCLUSION_ZH[conclusion] ?? conclusion) : conclusion;
+}
 
 async function fetchGpuPowerRun(runId: string, signal: AbortSignal): Promise<GpuPowerApiResponse> {
   const response = await fetch(`/api/gpu-metrics?runId=${encodeURIComponent(runId)}`, {
@@ -449,7 +465,8 @@ export default function GpuMetricsDisplay() {
                   : new Date(runInfo.createdAt).toLocaleDateString()}
               </span>
               <span>
-                <span className="text-muted-foreground">{t.statusLabel}</span> {runInfo.conclusion}
+                <span className="text-muted-foreground">{t.statusLabel}</span>{' '}
+                {getGpuRunConclusionLabel(runInfo.conclusion, locale)}
               </span>
               <span>
                 <span className="text-muted-foreground">{t.dataPointsLabel}</span>{' '}

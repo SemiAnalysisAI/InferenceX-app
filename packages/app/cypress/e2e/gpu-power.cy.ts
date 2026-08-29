@@ -194,6 +194,10 @@ describe('PowerX Chinese route', () => {
       .and('contain.text', '单芯片统计信息')
       .and('contain.text', '样本数')
       .and('contain.text', '最小值');
+    cy.contains('span', '状态：')
+      .parent()
+      .should('contain.text', '成功')
+      .and('not.contain.text', 'success');
     cy.get('[data-testid="gpu-metrics-chart-svg"] svg')
       .should('contain.text', '秒')
       .and('contain.text', '功耗 (W)');
