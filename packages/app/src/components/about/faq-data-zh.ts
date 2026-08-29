@@ -83,13 +83,13 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-benchmark-differences',
     question: 'InferenceX 与其他 AI 基准测试有何不同？',
     answer:
-      'InferenceX 在真实硬件上运行固定序列工作负载与 AgentX 长上下文多轮编码场景。测试配方保存在代码仓库中，每项结果均链接至对应的 GitHub Actions 运行。',
+      'InferenceX 在真实硬件上运行固定序列工作负载和 AgentX 长上下文多轮编码场景。测试配置保存在代码仓库中，每项结果都链接到对应的 GitHub Actions 运行记录。',
   },
   {
     id: 'faq-reproducibility',
     question: '结果如何实现可复现？',
     answer:
-      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、芯片追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
+      '仪表板上的每个数据点都由公开的 GitHub Actions 工作流生成。测试配置（模型、框架、精度、并行度、序列长度和并发数）保存在代码仓库中，并在对应的目标硬件上运行。日志、指标和芯片追踪数据等产物会上传到运行记录页面。每个图表的提示框都提供链接，可直接打开生成该数据点的 GitHub Actions 运行记录。',
   },
   {
     id: 'faq-raw-logs',
@@ -101,7 +101,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-rerun-benchmark',
     question: '我可以自己重新运行基准测试吗？',
     answer:
-      '可以。基准测试配方位于代码仓库的 /benchmarks 目录中，以独立的 shell 脚本形式存在。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，或触发相同的 GitHub Actions 工作流来复现结果。',
+      '可以。基准测试脚本位于代码仓库的 /benchmarks 目录中，可以独立运行。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，也可以触发相同的 GitHub Actions 工作流来复现结果。',
   },
   {
     id: 'faq-old-runs',

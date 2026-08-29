@@ -82,9 +82,8 @@ export default function AboutPageZh() {
           <Card>
             <h2 className="text-lg font-semibold mb-2">可复现性</h2>
             <p className="text-muted-foreground mb-4">
-              仪表板上的每一个数据点均来自公开的 GitHub Actions
-              工作流运行。测试配方、日志、产物以及数据库记录端到端关联，任何人都可以审计、重新运行或
-              fork 基准测试。
+              仪表板上的每个数据点都由公开的 GitHub Actions
+              工作流生成。测试配置、日志、产物及其对应的数据库记录彼此关联，任何人都可以核查结果来源、重新运行测试，或基于现有配置创建新的基准测试。
             </p>
             <ol className="space-y-3 text-sm text-muted-foreground mb-4">
               <li className="flex gap-3">
@@ -92,9 +91,9 @@ export default function AboutPageZh() {
                   1
                 </span>
                 <div>
-                  <strong className="text-foreground">配方提交至仓库。</strong>{' '}
-                  每种硬件、框架、模型和精度的组合都是一个提交到公开仓库的 shell
-                  脚本。镜像、命令行和并行度均在源码中固定。
+                  <strong className="text-foreground">测试配置已提交到仓库。</strong>{' '}
+                  每组硬件、框架、模型和精度组合都对应一个提交到公开仓库的 shell
+                  脚本。脚本中固定了所用镜像、命令行参数和并行度。
                 </div>
               </li>
               <li className="flex gap-3">
@@ -123,10 +122,9 @@ export default function AboutPageZh() {
                   4
                 </span>
                 <div>
-                  <strong className="text-foreground">导入仪表板。</strong>{' '}
-                  成功的运行将被加载到数据库中并在此展示。每个图表 tooltip
-                  都附带一个直接链接，指向生成该数据点的 GitHub Actions
-                  运行。点击任意数据点即可审计其来源。
+                  <strong className="text-foreground">结果写入仪表板。</strong>{' '}
+                  运行成功后，结果将写入数据库并在仪表板中展示。每个图表的提示框都提供对应的 GitHub
+                  Actions 运行记录链接。点击任意数据点即可核查其来源。
                 </div>
               </li>
             </ol>
@@ -137,7 +135,7 @@ export default function AboutPageZh() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
-                浏览工作流运行
+                查看工作流运行记录
               </Link>
               <Link
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/main/benchmarks`}
@@ -145,7 +143,7 @@ export default function AboutPageZh() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
-                查看基准测试配方
+                查看测试配置
               </Link>
               <Link
                 href="https://github.com/SemiAnalysisAI/InferenceX-app/releases?q=db-dump"

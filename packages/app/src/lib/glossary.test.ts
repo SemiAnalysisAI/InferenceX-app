@@ -158,6 +158,22 @@ describe('Chinese glossary content', () => {
     expect(entry?.benchmarkContext).not.toContain('concurrency');
     expect(entry?.benchmarkContext).not.toContain('request batch');
   });
+
+  it('uses the established Chinese term for point tooltips in audited entries', () => {
+    const slugs = [
+      'speculative-decoding',
+      'context-parallelism',
+      'recipe',
+      'pipeline-parallelism',
+      'dp-attention',
+    ];
+
+    for (const slug of slugs) {
+      const benchmarkContext = getZhGlossaryEntry(slug)?.benchmarkContext;
+      expect(benchmarkContext, slug).toContain('提示框');
+      expect(benchmarkContext, slug).not.toContain('tooltip');
+    }
+  });
 });
 
 describe('glossary navigation', () => {

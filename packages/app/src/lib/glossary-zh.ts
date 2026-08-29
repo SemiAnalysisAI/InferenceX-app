@@ -393,7 +393,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '应在真实接受率下比较投机解码方案并验证模型质量。定长场景仍把投机解码作为曲线标识的一部分，因此开启和关闭 MTP 的方案会分开绘制；agentic 曲线则把它当作数据点级元数据并合并这些点，在 tooltip 中标明具体方式，因为 AgentX 按模型、芯片 SKU 和引擎给出可获得的最佳曲线。由于 AgentX 回放的内容是合成的，speculator 接受的 draft token 数会失真，因此运行时会套用一套按模型、speculator、draft 长度和思考模式在外部 agentic 编码数据集上采集的接受长度。',
+      '应在真实接受率下比较投机解码方案并验证模型质量。定长场景仍把投机解码作为曲线标识的一部分，因此开启和关闭 MTP 的方案会分开绘制；agentic 曲线则把它当作数据点级元数据并合并这些点，在提示框中标明具体方式，因为 AgentX 按模型、芯片 SKU 和引擎给出可获得的最佳曲线。由于 AgentX 回放的内容是合成的，speculator 接受的 draft token 数会失真，因此运行时会套用一套按模型、speculator、draft 长度和思考模式在外部 agentic 编码数据集上采集的接受长度。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
@@ -779,7 +779,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '张量并行会在每个 rank 上复制完整 KV cache，数据并行注意力则把会话绑定在持有其分片的 rank 上，两者在上下文达到几十万 token 时都难以扩展。上下文并行直接针对这一点，而且收益随输入长度增长，而不是随 batch 大小增长。',
     benchmarkContext:
-      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
+      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
   },
   'kv-cache-offload': {
     term: 'KV cache offload',
@@ -847,7 +847,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值规格无法描述服务性能，同一颗芯片在不同配置下可以相差数倍。把整套组合写清楚，结论才可核查：脱离配置的单个数字既无法复现，也无法与其他厂商公平比较。',
     benchmarkContext:
-      'InferenceX 的测试配置主要跟随 vLLM 与 SGLang 官方 cookbook，并使用上游镜像，因此结果反映用户实际能部署的性能，而不是为基准测试特调过的镜像。数据点 tooltip 会展示背后的配置，并给出运行溯源链接。',
+      'InferenceX 的测试配置主要跟随 vLLM 与 SGLang 官方 cookbook，并使用上游镜像，因此结果反映用户实际能部署的性能，而不是为基准测试特调过的镜像。数据点的提示框会展示背后的配置，并给出运行溯源链接。',
   },
   'tail-latency': {
     term: '尾部延迟',
@@ -991,7 +991,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '对最大的那批模型来说，这首先是容量手段，其次才是提速手段。有些前沿模型根本装不进单个节点，流水线并行才让它们可服务；当某项竞争性优化拒绝与任何方案组合时，它甚至是唯一选项。',
     benchmarkContext:
-      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示流水线并行度，且仅在大于 1 时显示。可组合性与并行度同样重要：一种会导致投机解码无法启用的阶段切分，代价可能超过它节省的显存。',
+      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示流水线并行度，且仅在大于 1 时显示。可组合性与并行度同样重要：一种会导致投机解码无法启用的阶段切分，代价可能超过它节省的显存。',
   },
   'dp-attention': {
     term: '数据并行注意力',
@@ -1005,7 +1005,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '由于每个 rank 只拥有缓存池的私有一份，请求落在哪里就成了影响性能的关键：长会话一旦被路由到不持有其前缀的 rank，就要全部重算。此时实测命中率会远低于理论上限，而原因与缓存大小毫无关系。',
     benchmarkContext:
-      'InferenceX 会在数据点 tooltip 的并行策略部分展示 DP attention。它是否有利取决于模型；当缓存局部性变成路由约束时，不启用它的配置有时反而占据前沿曲线。',
+      'InferenceX 会在数据点提示框的并行策略部分展示 DP attention。它是否有利取决于模型；当缓存局部性变成路由约束时，不启用它的配置有时反而占据前沿曲线。',
   },
   int4: {
     term: 'INT4',

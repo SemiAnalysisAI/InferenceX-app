@@ -9,6 +9,7 @@ const aboutPageSource = readFileSync(
   new URL('../../app/zh/about/page.tsx', import.meta.url),
   'utf8',
 );
+const normalizedAboutPageSource = aboutPageSource.replaceAll(/\s+/gu, ' ');
 
 describe('localized About FAQ', () => {
   it('keeps every English FAQ item and optional field represented in Chinese', () => {
@@ -52,5 +53,34 @@ describe('localized About FAQ', () => {
     expect(logs?.answer).toContain('“GitHub Actions 运行记录”');
     expect(logs?.answer).not.toContain('tooltip');
     expect(logs?.answer).not.toContain('"GitHub Actions Run"');
+  });
+
+  it('uses formal, natural Chinese for benchmark provenance', () => {
+    expect(normalizedAboutPageSource).toContain(
+      '测试配置、日志、产物及其对应的数据库记录彼此关联，任何人都可以核查结果来源、重新运行测试，或基于现有配置创建新的基准测试。',
+    );
+    expect(normalizedAboutPageSource).toContain('测试配置已提交到仓库。');
+    expect(normalizedAboutPageSource).toContain('运行成功后，结果将写入数据库并在仪表板中展示。');
+    expect(normalizedAboutPageSource).toContain('每个图表的提示框');
+    expect(normalizedAboutPageSource).toContain('查看工作流运行记录');
+    expect(normalizedAboutPageSource).toContain('查看测试配置');
+    expect(normalizedAboutPageSource).not.toContain('成功的运行将被加载到数据库中');
+    expect(normalizedAboutPageSource).not.toContain('图表 tooltip');
+  });
+
+  it('uses test configuration and run-record terminology in reproducibility answers', () => {
+    const differences = FAQ_ITEMS_ZH.find((item) => item.id === 'faq-benchmark-differences');
+    const reproducibility = FAQ_ITEMS_ZH.find((item) => item.id === 'faq-reproducibility');
+    const rerun = FAQ_ITEMS_ZH.find((item) => item.id === 'faq-rerun-benchmark');
+
+    expect(differences?.answer).toContain('测试配置保存在代码仓库中');
+    expect(differences?.answer).toContain('GitHub Actions 运行记录');
+    expect(reproducibility?.answer).toContain(
+      '测试配置（模型、框架、精度、并行度、序列长度和并发数）',
+    );
+    expect(reproducibility?.answer).toContain('每个图表的提示框都提供链接');
+    expect(reproducibility?.answer).not.toContain('tooltip');
+    expect(rerun?.answer).toContain('基准测试脚本位于代码仓库的 /benchmarks 目录中');
+    expect(rerun?.answer).not.toContain('基准测试配方');
   });
 });
