@@ -7,6 +7,7 @@ import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 import { ChartHover, type HoverItem } from './chart-hover';
 import { CHART_PAD, ChartEmpty, fmtCount, fmtSeconds } from './chart-shared';
 import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
+import { useLocale } from '@/lib/use-locale';
 
 // Historical entry point: the pure data-shaping helpers lived in this module
 // before being extracted; re-export them so both import paths stay valid.
@@ -50,6 +51,7 @@ export function TimeSeriesChart({
   height = 260,
   refLines = NO_REF_LINES,
 }: TimeSeriesChartProps) {
+  const locale = useLocale();
   const W = width;
   const H = height;
 
@@ -229,7 +231,7 @@ export function TimeSeriesChart({
         opacity={0.55}
         textAnchor="middle"
       >
-        time
+        {locale === 'zh' ? '时间' : 'time'}
       </text>
 
       {yAxisLabel && (
@@ -288,11 +290,19 @@ const KNOWN_SOURCE_COLORS: Record<string, string> = {
   'compute (miss)': '#f97316',
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  local_compute: 'Prefill',
-  local_cache_hit: 'HBM Cache Hit',
-  external_kv_transfer: 'Offload Cache Hit',
-  miss: 'Miss',
+const SOURCE_LABELS: Record<string, Record<string, string>> = {
+  en: {
+    local_compute: 'Prefill',
+    local_cache_hit: 'HBM Cache Hit',
+    external_kv_transfer: 'Offload Cache Hit',
+    miss: 'Miss',
+  },
+  zh: {
+    local_compute: '预填充计算',
+    local_cache_hit: 'HBM cache 命中',
+    external_kv_transfer: 'offload cache 命中',
+    miss: '未命中',
+  },
 };
 
 // Fallback palette for any source name not in KNOWN_SOURCE_COLORS so we never
@@ -320,6 +330,8 @@ export function StackedAreaChart({
   width?: number;
   height?: number;
 }) {
+  const locale = useLocale();
+  const sourceLabels = SOURCE_LABELS[locale];
   const W = width;
   const H = height;
 
@@ -421,7 +433,7 @@ export function StackedAreaChart({
     }
     const items: HoverItem[] = stackOrder.map((name) => ({
       color: colorFor(name),
-      label: SOURCE_LABELS[name] ?? name,
+      label: sourceLabels[name] ?? name,
       value: `${((shares[name]?.[idx] ?? 0) * 100).toFixed(1)}%`,
     }));
     return { items, title: fmtSeconds(t) };
@@ -493,7 +505,7 @@ export function StackedAreaChart({
         opacity={0.55}
         textAnchor="middle"
       >
-        time
+        {locale === 'zh' ? '时间' : 'time'}
       </text>
       <text
         x={10}
@@ -504,7 +516,7 @@ export function StackedAreaChart({
         textAnchor="middle"
         transform={`rotate(-90 10 ${H / 2})`}
       >
-        % of prefill tokens
+        {locale === 'zh' ? '预填充 token 占比' : '% of prefill tokens'}
       </text>
       {(() => {
         const chipY = H - 8;
@@ -515,7 +527,7 @@ export function StackedAreaChart({
             <g key={`leg${i}`}>
               <rect x={x + 2} y={chipY - 9} width={12} height={8} fill={l.color} opacity={0.75} />
               <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                {SOURCE_LABELS[l.name] ?? l.name}
+                {sourceLabels[l.name] ?? l.name}
               </text>
             </g>
           );

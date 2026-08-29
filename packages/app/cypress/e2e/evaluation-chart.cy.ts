@@ -1,5 +1,8 @@
+import { expectNoPageOverflow } from '../support/e2e';
+
 describe('Evaluation Chart', () => {
   before(() => {
+    cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
@@ -42,6 +45,7 @@ describe('Evaluation Chart', () => {
 
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
+    cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
@@ -240,5 +244,125 @@ describe('Evaluation sample sharing', () => {
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('[aria-expanded="true"]').should('exist');
     cy.get('[data-testid^="eval-sample-share-"]').scrollIntoView().should('be.visible');
+  });
+});
+
+describe('Evaluation Chart — Simplified Chinese mobile path', () => {
+  beforeEach(() => {
+    cy.viewport(390, 900);
+    cy.visit('/zh/evaluation', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        // The eval-samples toast fires 1.5s after load and covers the retry
+        // button at this viewport — keep it dismissed for the whole suite.
+        win.localStorage.setItem('inferencex-eval-samples-nudge-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+  });
+
+  it('keeps table/chart actions reachable and localizes table labels and dates', () => {
+    cy.contains('h2', '准确率评估').should('be.visible');
+    cy.get('[data-testid="share-button"]')
+      .should('be.visible')
+      .and('have.attr', 'title', '分享当前视图');
+    cy.get('[data-testid="evaluation-view-toggle"]').should('be.visible');
+    cy.get('[data-testid="evaluation-results-table"]')
+      .should('contain.text', '芯片')
+      .and('contain.text', '精度')
+      .and('contain.text', '日期')
+      .and('contain.text', '年');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+    cy.get('[data-testid="export-button"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', '下载图表');
+    expectNoPageOverflow();
+  });
+
+  it('distinguishes a fetch error from empty data and retries the failed query', () => {
+    cy.fixture('api/evaluations.json').then((evaluations) => {
+      // Flag-gated rather than attempt-counted: the page left over from the
+      // previous test can fire a stray request after this intercept registers
+      // (firefox does), which would silently consume the failure budget and
+      // let the fresh page succeed without ever showing the error card.
+      let attempts = 0;
+      let succeed = false;
+      cy.intercept('GET', '/api/v1/evaluations', (request) => {
+        attempts += 1;
+        request.reply(
+          succeed ? { statusCode: 200, body: evaluations } : { statusCode: 500, body: {} },
+        );
+      });
+      // Distinct URL: with testIsolation off, revisiting the beforeEach URL
+      // does not reliably reload, so the intercept would never be exercised.
+      cy.visit('/zh/evaluation?e2e=fetch-error');
+      // Long timeout: the error card only renders after two failed attempts
+      // separated by React Query's retry backoff, which can outlast the
+      // default budget on a slow (firefox CI) page load.
+      cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
+        .should('contain.text', '评估数据加载失败。')
+        .and('contain.text', '重试');
+      cy.then(() => {
+        succeed = true;
+      });
+      // Forced: the floating chart-actions row (absolute top-6 right-6 z-10)
+      // overlaps the banner's right edge in the error state — a pre-existing
+      // layout collision, not a localization regression. This test covers the
+      // retry semantics, not tap reachability.
+      cy.get('[data-testid="evaluation-query-error"]')
+        .contains('button', '重试')
+        .click({ force: true });
+      cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
+      cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+      cy.then(() => expect(attempts).to.be.at.least(3));
+    });
+  });
+
+  it('keeps evaluation results visible while retrying failed availability metadata', () => {
+    cy.fixture('api/availability.json').then((availability) => {
+      cy.fixture('api/evaluations.json').then((evaluations) => {
+        // Flag-gated for the same stray-request reason as the previous test.
+        let availabilityAttempts = 0;
+        let succeed = false;
+        cy.intercept('GET', '/api/v1/availability*', (request) => {
+          availabilityAttempts += 1;
+          request.reply(
+            succeed ? { statusCode: 200, body: availability } : { statusCode: 500, body: {} },
+          );
+        });
+        cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: evaluations });
+        cy.visit('/zh/evaluation?e2e=availability-retry');
+
+        // Long timeout: same two-failures-plus-backoff delay as above.
+        cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
+          .should('contain.text', '筛选项可用性数据加载失败。')
+          .and('contain.text', '重试');
+        cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+        cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+        cy.get('[data-testid="evaluation-query-error"]')
+          .should('contain.text', '筛选项可用性数据加载失败。')
+          .and('contain.text', '重试');
+        cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
+        cy.then(() => {
+          succeed = true;
+        });
+        // Forced for the same floating chart-actions overlap as above.
+        cy.get('[data-testid="evaluation-query-error"]')
+          .contains('button', '重试')
+          .click({ force: true });
+        cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
+        cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
+        cy.then(() => expect(availabilityAttempts).to.be.at.least(3));
+      });
+    });
+  });
+
+  it('renders a successful empty response without offering an error retry', () => {
+    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
+    cy.visit('/zh/evaluation?e2e=empty-success');
+    cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+    cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
+    cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
   });
 });

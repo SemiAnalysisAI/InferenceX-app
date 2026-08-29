@@ -191,7 +191,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   return (
     <header
       data-testid="header"
-      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
+      className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
@@ -292,7 +292,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               {mobileMenuOpen && (
                 <div
                   data-testid="mobile-menu"
-                  className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
+                  className="motion-pop-in absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
                 >
                   {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link

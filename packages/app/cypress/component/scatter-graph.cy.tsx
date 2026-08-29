@@ -19,6 +19,7 @@ import {
 } from '../support/mock-data';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
@@ -78,6 +79,34 @@ describe('ScatterGraph', () => {
     );
 
     cy.contains('No data available').should('be.visible');
+  });
+
+  it('localizes the complete Chinese empty state', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="并发数"
+            yLabel="单芯片吞吐量 (tok/s)"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+        },
+        unofficial: {},
+      },
+    );
+    cy.contains('暂无数据').should('be.visible');
+    cy.contains('请调整模型、序列长度、精度、日期范围或芯片选项。').should('be.visible');
+    cy.contains('No data available').should('not.exist');
   });
 
   it('renders scatter points as shapes in SVG with mock data', () => {

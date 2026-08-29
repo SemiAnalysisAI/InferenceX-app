@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -34,6 +35,7 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare-page-data.server';
+import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from './page-client';
 
@@ -127,7 +129,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
   return renderComparePage(slug, await searchParams, {});
 }
 
-export async function renderComparePage(
+export function renderComparePage(
   slug: string,
   sp: Record<string, string | string[] | undefined>,
   { scenarioSegment }: ScenarioOptions,
@@ -166,6 +168,35 @@ export async function renderComparePage(
     permanentRedirect(`${comparePath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
+  // The skeleton boundary lives here, in the page, NOT in a loading.tsx: a
+  // route-level loading boundary streams a 200 shell before this function
+  // runs, which degrades the notFound() above to a soft 404 and the
+  // permanentRedirect() to a client-side hop — both must stay real HTTP
+  // 404/308 responses. With the status decided, the heavy benchmark fetch
+  // suspends below and the skeleton streams in its place.
+  return (
+    <Suspense fallback={<CompareDetailRouteSkeleton />}>
+      <CompareDetail
+        parsed={parsed}
+        canonical={canonical}
+        sp={sp}
+        scenarioSegment={scenarioSegment}
+      />
+    </Suspense>
+  );
+}
+
+async function CompareDetail({
+  parsed,
+  canonical,
+  sp,
+  scenarioSegment,
+}: {
+  parsed: NonNullable<ReturnType<typeof parseCompareSlug>>;
+  canonical: string;
+  sp: Record<string, string | string[] | undefined>;
+  scenarioSegment?: ScenarioSegment;
+}) {
   const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
   // URL params win over slug-derived defaults; this baking-into-SSR avoids the
   // hydration flash where the client upgrades seeded defaults to URL values.

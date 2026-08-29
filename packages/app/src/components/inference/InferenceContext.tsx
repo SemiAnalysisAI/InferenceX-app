@@ -66,6 +66,7 @@ import {
   sequenceKind,
 } from '@/lib/data-mappings';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
+import { useLocale } from '@/lib/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -104,6 +105,20 @@ const InferenceDataContext = createContext<InferenceDataContextType | undefined>
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
 const InferenceDisplayContext = createContext<InferenceDisplayContextType | undefined>(undefined);
 const InferenceActionsContext = createContext<InferenceActionsContextType | undefined>(undefined);
+
+export const INFERENCE_CONTEXT_STRINGS = {
+  en: {
+    dateRangeResetTitle: 'Date Range Reset',
+    dateRangeResetDescription:
+      'The chip configs are not available in the selected date range. The date range will be reset.',
+    ok: 'OK',
+  },
+  zh: {
+    dateRangeResetTitle: '重置日期范围',
+    dateRangeResetDescription: '所选日期范围内没有这些芯片配置，将重置日期范围。',
+    ok: '确定',
+  },
+} as const;
 
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
@@ -225,6 +240,8 @@ export function InferenceProvider({
    */
   autoSelectAllGpus?: boolean;
 }) {
+  const locale = useLocale();
+  const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
@@ -627,6 +644,7 @@ export function InferenceProvider({
     graphs,
     selectionPoints,
     loading: chartDataLoading,
+    refreshing: chartDataRefreshing,
     error: chartDataError,
     hardwareConfig,
     availableQuickFilters,
@@ -913,6 +931,7 @@ export function InferenceProvider({
     tokenRevenuePriceSource === 'openrouter' &&
     openRouterPricingQuery.isLoading;
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
+  const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1624,6 +1643,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1640,6 +1660,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1801,14 +1822,11 @@ export function InferenceProvider({
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Date Range Reset</DialogTitle>
-            <DialogDescription>
-              The chip configs are not available in the selected date range. The date range will be
-              reset.
-            </DialogDescription>
+            <DialogTitle>{localeStrings.dateRangeResetTitle}</DialogTitle>
+            <DialogDescription>{localeStrings.dateRangeResetDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={handleDateRangeDialogOk}>OK</Button>
+            <Button onClick={handleDateRangeDialogOk}>{localeStrings.ok}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

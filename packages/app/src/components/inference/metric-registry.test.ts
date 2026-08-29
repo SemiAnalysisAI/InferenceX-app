@@ -29,9 +29,27 @@ describe('metric registry', () => {
   it('preserves metric-specific x overrides and bilingual labels', () => {
     const interactivity = chartDefinitions[0];
 
+    expect(interactivity.x_label).toBe('Interactivity (tok/s/user)');
+    expect(interactivity.x_labelZh).toBe('交互性 (tok/s/user)');
     expect(interactivity.y_inputTputPerGpu_x).toBe('p90_ttft');
     expect(interactivity.y_inputTputPerGpu_heading).toBe('vs. P90 Time To First Token');
+    expect(interactivity.y_inputTputPerGpu_x_label).toBe('P90 Time To First Token (s)');
+    expect(interactivity.y_inputTputPerGpu_x_labelZh).toBe('P90 首 token 延迟 (s)');
     expect(interactivity.y_inputTputPerGpu_labelZh).toBe(METRIC_REGISTRY.inputTputPerGpu.labelZh);
+  });
+
+  it('provides a Chinese sibling for every registered x-axis label', () => {
+    for (const chartDefinition of chartDefinitions) {
+      const definition = chartDefinition as Record<string, unknown>;
+      const xLabelKeys = Object.keys(definition).filter(
+        (key) => key === 'x_label' || key.endsWith('_x_label'),
+      );
+      for (const key of xLabelKeys) {
+        const zhKey = `${key}Zh`;
+        expect(definition[zhKey], `${chartDefinition.chartType}.${zhKey}`).toBeTypeOf('string');
+        expect(definition[zhKey], `${chartDefinition.chartType}.${zhKey}`).not.toBe('');
+      }
+    }
   });
 
   it('lists every canonical metric exactly once across controls', () => {

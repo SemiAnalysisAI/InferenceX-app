@@ -224,7 +224,7 @@ export function DatePicker({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-0.5">
+      <div className="flex max-w-full items-center gap-0.5">
         <Button
           variant="ghost"
           size="sm"
@@ -249,7 +249,7 @@ export function DatePicker({
           <DialogTrigger asChild>
             <Button
               variant="ghost"
-              className="!px-5 min-w-[200px] dark:bg-input/90 dark:hover:bg-input/50"
+              className="min-w-0 flex-1 !px-4 sm:min-w-[200px] sm:flex-none sm:!px-5 dark:bg-input/90 dark:hover:bg-input/50"
             >
               <Calendar className="mr-0 size-4" />
               <strong>{t.runDate}</strong>
