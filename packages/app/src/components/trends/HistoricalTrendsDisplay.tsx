@@ -69,7 +69,7 @@ const STRINGS = {
   zh: {
     heading: '历史趋势',
     description: '将交互性固定在指定水平后，展示各项性能指标随时间的变化；数据经插值计算。',
-    targetLabel: '目标交互性 (tok/s/user)',
+    targetLabel: '目标交互性（tok/s/user）',
     targetTooltip: '设置插值计算采用的交互性水平。移动滑块可比较不同交互性水平下的芯片性能。',
     captionTitle: (yTitle: string, target: number) =>
       `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
@@ -78,7 +78,7 @@ const STRINGS = {
     logScale: '对数缩放',
     highContrast: '高对比度',
     resetFilter: '重置筛选',
-    noData: '所选模型和序列无可用的交互性图表数据。',
+    noData: '所选模型和序列暂无交互性图表数据。',
     loadError: '历史基准测试数据加载失败。',
     retry: '重新加载页面',
     trendLoadError: '历史趋势数据加载失败。',

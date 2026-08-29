@@ -28,6 +28,7 @@ import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
+  collectiveXConclusionLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
@@ -151,7 +152,6 @@ const STRINGS = {
     deleteFailed: 'Deleting the run failed. Try again.',
     deleteShownFailed: (deleted: number, total: number) =>
       `Deleted ${deleted} of ${total} shown runs before the operation failed. Try again.`,
-    conclusion: { success: 'success', failure: 'failure', pending: 'pending' },
     atLatency: (percentile: string) => `at ${percentile} latency`,
   },
   zh: {
@@ -211,7 +211,7 @@ const STRINGS = {
     refresh: '刷新',
     seriesCount: '序列数',
     measuredCases: '实测用例',
-    terminalCases: '已终结用例',
+    terminalCases: '终态用例',
     retainedAttempts: '保留尝试',
     allocations: '独立分配',
     publishedUtc: '发布时间（UTC）',
@@ -281,7 +281,7 @@ const STRINGS = {
       dtypes: '数据类型',
       'resource profile': '资源配置',
       measurement: '测量协议',
-      'token ladder': 'token 梯度',
+      'token ladder': 'token 档位',
       'component availability': '测量分项可用性',
       correctness: '正确性',
     },
@@ -289,7 +289,7 @@ const STRINGS = {
     isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
-      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
+      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
     provenance: '发布数据溯源',
     runLabel: '运行',
     attemptLabel: '尝试',
@@ -306,7 +306,6 @@ const STRINGS = {
     deleteFailed: '删除运行失败，请重试。',
     deleteShownFailed: (deleted: number, total: number) =>
       `操作失败前已删除 ${total} 个已显示运行中的 ${deleted} 个，请重试。`,
-    conclusion: { success: '成功', failure: '失败', pending: '待处理' },
     atLatency: (percentile: string) => `${percentile} 延迟分位点`,
   },
 } as const;
@@ -767,7 +766,7 @@ export default function CollectiveXDisplay() {
                 }`}
               >
                 {singleDataset
-                  ? `#${singleDataset.run.run_id} · ${t.conclusion[singleDataset.run.conclusion === 'success' || singleDataset.run.conclusion === 'failure' ? singleDataset.run.conclusion : 'pending']}`
+                  ? `#${singleDataset.run.run_id} · ${collectiveXConclusionLabel(singleDataset.run.conclusion, locale)}`
                   : t.shownRunCount(datasets.length)}
               </span>
             </div>

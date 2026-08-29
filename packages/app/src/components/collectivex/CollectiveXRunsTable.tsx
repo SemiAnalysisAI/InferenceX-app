@@ -7,7 +7,7 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
-import { collectiveXRunDasharray, collectiveXSkuLabel } from './data';
+import { collectiveXConclusionLabel, collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import type { CollectiveXRunSummary } from './types';
 
 interface CollectiveXRunsTableProps {
@@ -32,13 +32,11 @@ const STRINGS = {
     skus: 'SKUs',
     published: 'Published (UTC)',
     actions: 'Actions',
-    pending: 'pending',
     showRun: (id: string) => `Show run #${id}`,
     lineStyle: (id: string) => `Line style for run #${id}`,
     openRun: (id: string) => `Open GitHub Actions run #${id}`,
     deleteRun: (id: string) => `Delete run #${id}`,
     empty: 'No runs match this benchmark version.',
-    conclusion: { success: 'success', failure: 'failure' },
     epSuite: (measured: number, requested: number) => `EP: ${measured}/${requested} measured`,
     kvSuite: (measured: number, requested: number) =>
       `KV transfer: ${measured}/${requested} measured`,
@@ -53,13 +51,11 @@ const STRINGS = {
     skus: 'SKUs',
     published: '发布时间（UTC）',
     actions: '操作',
-    pending: '待处理',
     showRun: (id: string) => `显示运行 #${id}`,
     lineStyle: (id: string) => `运行 #${id} 的线型`,
     openRun: (id: string) => `打开 GitHub Actions 运行 #${id}`,
     deleteRun: (id: string) => `删除运行 #${id}`,
     empty: '该基准测试版本下暂无运行记录。',
-    conclusion: { success: '成功', failure: '失败' },
     epSuite: (measured: number, requested: number) => `EP：已测量 ${measured}/${requested}`,
     kvSuite: (measured: number, requested: number) => `KV 传输：已测量 ${measured}/${requested}`,
   },
@@ -128,7 +124,7 @@ export function CollectiveXRunsTable({
             const visible = visibleRunIds.has(run.run_id);
             const loading = loadingRunIds.has(run.run_id);
             const deleting = deletingRunIds.has(run.run_id);
-            const conclusion = run.conclusion ?? t.pending;
+            const conclusion = run.conclusion;
             const selectedRunIndex = selectedRunIndexById.get(run.run_id);
             // Summaries stored before the kv suite carry no kv_cases: EP-only.
             const kvRequested = run.kv_cases?.requested ?? 0;
@@ -208,12 +204,10 @@ export function CollectiveXRunsTable({
                   <span
                     className={cn(
                       'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
-                      CONCLUSION_CLASSES[conclusion] ?? CONCLUSION_FALLBACK_CLASS,
+                      CONCLUSION_CLASSES[conclusion ?? ''] ?? CONCLUSION_FALLBACK_CLASS,
                     )}
                   >
-                    {conclusion === 'success' || conclusion === 'failure'
-                      ? t.conclusion[conclusion]
-                      : conclusion}
+                    {collectiveXConclusionLabel(conclusion, locale)}
                   </span>
                 </td>
                 <td className="px-3 py-1.5">

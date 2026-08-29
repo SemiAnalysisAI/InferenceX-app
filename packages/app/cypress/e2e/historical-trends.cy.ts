@@ -197,6 +197,7 @@ describe('Historical Trends — Chinese route', () => {
 
   it('localizes the metric title, chart instructions, and point tooltip', () => {
     cy.viewport(1440, 900);
+    cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
     cy.get('[data-testid="trend-chart-svg"] circle').first().click({ force: true });
@@ -210,19 +211,33 @@ describe('Historical Trends — Chinese route', () => {
     cy.intercept('GET', '**/api/v1/benchmarks?*', []).as('emptyBenchmarks');
     cy.reload();
     cy.wait('@emptyBenchmarks');
-    cy.contains('所选模型和序列无可用的交互性图表数据。').should('be.visible');
+    cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
     cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
   });
 
-  it('shows a safe Chinese error when benchmark loading fails', () => {
-    cy.intercept('GET', '**/api/v1/benchmarks?*', {
-      statusCode: 500,
-      body: { error: 'historical-database-internal-detail' },
-    }).as('failedBenchmarks');
-    cy.reload();
-    cy.wait('@failedBenchmarks');
-    cy.contains('历史基准测试数据加载失败。').should('be.visible');
-    cy.contains('historical-database-internal-detail').should('not.exist');
+  it('shows a safe Chinese primary error and recovers through the reload control', () => {
+    cy.fixture('api/benchmarks.json').then((benchmarkRows) => {
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/benchmarks?*', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'historical-database-internal-detail' } }
+            : { body: benchmarkRows },
+        );
+      }).as('failedBenchmarks');
+      cy.reload();
+      cy.wait('@failedBenchmarks');
+      cy.wait('@failedBenchmarks');
+      cy.contains('历史基准测试数据加载失败。').should('be.visible');
+      cy.contains('historical-database-internal-detail').should('not.exist');
+      cy.contains('button', '重新加载页面')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.wait('@failedBenchmarks');
+      cy.get('[data-testid="historical-trend-figure"]').should('be.visible');
+    });
   });
 
   it('shows a distinct secondary-history error and recovers through the tracked retry', () => {

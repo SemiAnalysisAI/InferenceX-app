@@ -219,8 +219,19 @@ describe('Chinese (/zh) pages', () => {
     });
 
     for (const width of [375, 390]) {
-      it(`keeps the table available through horizontal scrolling at ${width}px`, () => {
+      it(`keeps the chart labels readable and the table scrollable at ${width}px`, () => {
         cy.viewport(width, 844);
+        cy.get('[data-testid="submissions-chart-svg"] .x-axis .tick text').then(($ticks) => {
+          expect($ticks.length, 'mobile date tick count').to.be.at.most(3);
+          const boxes = [...$ticks]
+            .map((tick) => tick.getBoundingClientRect())
+            .sort((left, right) => left.left - right.left);
+          for (let index = 1; index < boxes.length; index += 1) {
+            expect(boxes[index - 1].right, 'adjacent mobile date ticks').to.be.at.most(
+              boxes[index].left,
+            );
+          }
+        });
         cy.get('[data-testid="submissions-display"] table').should('be.visible');
         cy.get('[data-testid="submissions-display"] .overflow-x-auto')
           .scrollTo('right')
@@ -252,14 +263,29 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
       cy.get('[data-testid="feedback-key-submit"]').click();
       cy.get('[role="alert"]').should('contain.text', '解密密钥必须是有效的 base64 编码');
+      cy.get('[data-testid="feedback-key-input"]')
+        .clear()
+        .type('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+      cy.get('[data-testid="feedback-key-submit"]').click();
+      cy.contains('button', '清除密钥').should('be.visible');
+    });
+
+    it('names the feedback loading state instead of showing an objectless spinner label', () => {
+      cy.intercept('GET', '**/api/v1/feedback/list', {
+        delay: 500,
+        body: { rows: [] },
+      }).as('slowFeedbackList');
+      cy.reload();
+      cy.contains('正在加载反馈记录……').should('be.visible');
+      cy.wait('@slowFeedbackList');
+      cy.contains('暂无反馈记录。').should('be.visible');
     });
 
     it('shows a safe fetch error and retries through a real button click', () => {
-      let attempts = 0;
+      let failRequests = true;
       cy.intercept('GET', '**/api/v1/feedback/list', (request) => {
-        attempts += 1;
         request.reply(
-          attempts <= 2
+          failRequests
             ? { statusCode: 500, body: { error: 'feedback-database-internal-detail' } }
             : { body: { rows: [] } },
         );
@@ -269,7 +295,11 @@ describe('Chinese (/zh) pages', () => {
       cy.wait('@retryFeedbackList');
       cy.contains('无法加载反馈数据。').should('be.visible');
       cy.contains('feedback-database-internal-detail').should('not.exist');
-      cy.contains('button', '重试').click();
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
       cy.wait('@retryFeedbackList');
       cy.contains('暂无反馈记录。').should('be.visible');
     });

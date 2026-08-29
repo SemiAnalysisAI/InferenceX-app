@@ -1,5 +1,7 @@
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import type { Locale } from '@/lib/i18n';
+
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
@@ -24,6 +26,42 @@ export interface CollectiveXSeriesSelection {
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+
+const COLLECTIVEX_CONCLUSION_LABELS = {
+  en: {
+    action_required: 'action_required',
+    cancelled: 'cancelled',
+    failure: 'failure',
+    neutral: 'neutral',
+    skipped: 'skipped',
+    stale: 'stale',
+    startup_failure: 'startup_failure',
+    success: 'success',
+    timed_out: 'timed_out',
+  },
+  zh: {
+    action_required: '需要处理',
+    cancelled: '已取消',
+    failure: '失败',
+    neutral: '中立',
+    skipped: '已跳过',
+    stale: '已过期',
+    startup_failure: '启动失败',
+    success: '成功',
+    timed_out: '超时',
+  },
+} as const;
+
+/** Format every conclusion emitted by the GitHub Actions workflow-run API. */
+export function collectiveXConclusionLabel(conclusion: string | null, locale: Locale): string {
+  if (conclusion === null) return locale === 'zh' ? '待处理' : 'pending';
+  const labels = COLLECTIVEX_CONCLUSION_LABELS[locale];
+  return conclusion in labels
+    ? labels[conclusion as keyof typeof labels]
+    : locale === 'zh'
+      ? '未知状态'
+      : conclusion;
+}
 
 /**
  * CollectiveX artifacts identify runner pools in the SKU (for example,

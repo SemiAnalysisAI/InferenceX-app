@@ -53,9 +53,9 @@ const STRINGS = {
     },
     yLabel: (selection: CollectiveXKvChartSelection) =>
       selection.y === 'bandwidth'
-        ? `p50 聚合 ${selection.op} 带宽（GB/s）`
+        ? `聚合 ${selection.op} 带宽（p50，GB/s）`
         : 'burst 完成延迟 p50（ms）',
-    noData: '所选分页大小和传输方向下暂无实测 KV 数据。',
+    noData: '所选页大小和传输方向下暂无实测 KV 数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
     point: (op: string, page: string, batch: number, isl: string) =>

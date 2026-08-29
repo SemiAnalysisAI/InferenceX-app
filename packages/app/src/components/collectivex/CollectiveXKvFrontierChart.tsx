@@ -47,7 +47,7 @@ const STRINGS = {
   zh: {
     noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    xAxis: (op: CollectiveXKvFrontierSelection['op']) => `p50 聚合 ${op} 带宽（GB/s，对数）`,
+    xAxis: (op: CollectiveXKvFrontierSelection['op']) => `聚合 ${op} 带宽（p50，GB/s，对数）`,
     yAxis: '每个在途请求的突发 p95 延迟（ms，对数）',
     dismiss: '点击其他位置关闭',
     skuFrontier: 'SKU 级帕累托前沿',

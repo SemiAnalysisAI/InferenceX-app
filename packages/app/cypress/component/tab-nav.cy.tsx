@@ -108,6 +108,15 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
   });
 
+  it('still names the current gated page in the locked mobile selector', () => {
+    cy.viewport(390, 844);
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    mountTabNav({ pathname: '/zh/ai-chart' });
+    cy.get('[data-testid="mobile-chart-select"]')
+      .should('be.visible')
+      .and('contain.text', 'AI 图表');
+  });
+
   it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
     mountTabNav({});

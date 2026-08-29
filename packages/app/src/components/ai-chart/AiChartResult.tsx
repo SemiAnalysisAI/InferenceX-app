@@ -58,7 +58,7 @@ const STRINGS = {
     interactivity: '交互性',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     summary: 'AI 总结',
-    noData: '没有数据符合这项图表配置。',
+    noData: '当前图表配置没有匹配的数据。',
     chartAria: {
       bar: 'AI 生成的条形图',
       scatter: 'AI 生成的散点图',
@@ -226,7 +226,7 @@ function ScatterChart({
   );
 
   return (
-    <div role="img" aria-label={t.chartAria.scatter}>
+    <div role="group" aria-label={t.chartAria.scatter}>
       <D3Chart
         chartId="ai-chart-scatter"
         data={data}
@@ -357,7 +357,7 @@ function LineChart({
   );
 
   return (
-    <div role="img" aria-label={t.chartAria.line}>
+    <div role="group" aria-label={t.chartAria.line}>
       <D3Chart
         chartId="ai-chart-line"
         data={flatPoints}

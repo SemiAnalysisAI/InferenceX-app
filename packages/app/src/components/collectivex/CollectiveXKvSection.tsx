@@ -73,12 +73,12 @@ const STRINGS = {
     heading: 'KV 缓存传输',
     description:
       '预填充到解码的 KV 缓存交接（2 节点 × 1 GPU，采用 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
-      '分页行按随机块表以逐层描述符列表搬运每个请求；bulk 为单描述符线速上限。' +
-      'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
+      'paged 测试基于随机 block table，按请求传输以层为主序的描述符列表；bulk 测试以单描述符测量链路线速上限。' +
+      'GB/s 表示最大 ISL 下各 burst 汇总的 pull 带宽；b1/bmax 表示每个 burst 提交的请求数。',
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线连接最大实测 ISL 下的批大小阶梯，越靠右下越优。' +
+      '每条线连接最大实测 ISL 下的各个批大小；越靠右下越优。' +
       '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
     frontierOption: '帕累托前沿',
     yControl: '指标',
@@ -107,7 +107,7 @@ const STRINGS = {
       diagnostic: '诊断',
       pending: '待处理',
     },
-    batch: '批量请求数',
+    batch: '批大小',
     caption: (op: string, page: string, suffix: string) => `${op} · 每页 ${page} token · ${suffix}`,
   },
 } as const;

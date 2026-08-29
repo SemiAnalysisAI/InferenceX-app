@@ -431,6 +431,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-runs"]')
       .should('contain.text', '运行记录')
       .and('contain.text', '终态数据点');
+    cy.get('[data-testid="collectivex-display"]').should('contain.text', '终态用例');
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', '往返（实测）')
       .and('contain.text', '解码')
@@ -441,6 +442,63 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', '点击其他区域关闭')
       .and('contain.text', '往返')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
+  });
+
+  it('localizes every real GitHub workflow conclusion and derives pending only from null', () => {
+    const cases = [
+      ['success', '成功'],
+      ['failure', '失败'],
+      ['cancelled', '已取消'],
+      ['neutral', '中立'],
+      ['skipped', '已跳过'],
+      ['stale', '已过期'],
+      ['timed_out', '超时'],
+      ['startup_failure', '启动失败'],
+      ['action_required', '需要处理'],
+      [null, '待处理'],
+    ] as const;
+    const runs = cases.map(([conclusion], index) =>
+      buildDataset({
+        shards: [makeRawShard()],
+        meta: {
+          run_id: String(170 + index),
+          generated_at: `2026-08-${String(20 - index).padStart(2, '0')}T12:20:00Z`,
+          conclusion,
+        },
+      }),
+    );
+
+    installRuns(runs);
+    cy.intercept('GET', '/api/v1/collectivex/runs/*', (request) => {
+      const runIdFromUrl = request.url.split('/').at(-1)?.split('?')[0];
+      request.reply({ body: runs.find((run) => run.run.run_id === runIdFromUrl) ?? runs[0] });
+    }).as('conclusionRun');
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@conclusionRun');
+
+    cases.forEach(([conclusion, expected], index) => {
+      cy.get(`[data-testid="collectivex-run-row-${170 + index}"]`)
+        .should('contain.text', expected)
+        .and('not.contain.text', conclusion ?? 'pending');
+    });
+  });
+
+  it('shows a cancelled selected run as cancelled instead of pending', () => {
+    const cancelled = buildDataset({
+      shards: [makeRawShard()],
+      meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },
+    });
+    installRuns([cancelled]);
+    installRun(cancelled, 'cancelledRun');
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@cancelledRun');
+
+    cy.get('[data-testid="collectivex-run-conclusion"]')
+      .should('contain.text', '已取消')
+      .and('not.contain.text', '待处理')
+      .and('not.contain.text', 'cancelled');
   });
 
   for (const width of [375, 390]) {
@@ -603,16 +661,36 @@ describe('CollectiveX availability states', () => {
   });
 
   it('shows a safe localized error on the Chinese route', () => {
-    cy.intercept('GET', '/api/v1/collectivex/runs?*', {
-      statusCode: 503,
-      body: { error: 'collectivex-internal-storage-detail' },
+    let failRequests = true;
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
+      request.reply(
+        failRequests
+          ? { statusCode: 503, body: { error: 'collectivex-internal-storage-detail' } }
+          : {
+              body: {
+                version: 1,
+                runs: [buildRunSummary(dataset)],
+                discovery_complete: true,
+              },
+            },
+      );
     }).as('zhDown');
+    installRun();
     cy.visit('/zh/collectivex');
+    cy.wait('@zhDown');
     cy.wait('@zhDown');
     cy.get('[data-testid="collectivex-error"]')
       .should('contain.text', 'CollectiveX 运行暂不可用')
       .and('contain.text', 'CollectiveX 数据集加载失败。')
       .and('not.contain.text', 'collectivex-internal-storage-detail');
+    cy.contains('button', '重试')
+      .then(() => {
+        failRequests = false;
+      })
+      .click();
+    cy.wait('@zhDown');
+    cy.wait('@run');
+    cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 
   it('renders the loading state while the run resolves', () => {
@@ -744,9 +822,14 @@ describe('CollectiveX kv-transfer card', () => {
 
     cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', '帕累托前沿').click();
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
-      .should('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
+      .should('contain.text', '聚合 pull 带宽（p50，GB/s，对数）')
       .and('contain.text', '每个在途请求的突发 p95 延迟（ms，对数）')
       .and('contain.text', '越靠右下越优');
+    cy.get('[data-testid="collectivex-kv-table"]')
+      .closest('[data-slot="card"]')
+      .should('contain.text', 'paged 测试基于随机 block table')
+      .and('contain.text', '页大小')
+      .and('contain.text', '批大小');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {

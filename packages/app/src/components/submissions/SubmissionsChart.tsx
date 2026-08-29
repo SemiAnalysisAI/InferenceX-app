@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -31,6 +31,27 @@ const TOTAL_COLOR = '#6b7280';
 const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date('2025-12-16').getTime();
+const NARROW_VIEWPORT_QUERY = '(max-width: 39.999rem)';
+const NOOP = () => {};
+
+function subscribeToNarrowViewport(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return NOOP;
+  const mediaQuery = window.matchMedia(NARROW_VIEWPORT_QUERY);
+  mediaQuery.addEventListener('change', onStoreChange);
+  return () => mediaQuery.removeEventListener('change', onStoreChange);
+}
+
+function getNarrowViewportSnapshot(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(NARROW_VIEWPORT_QUERY).matches
+  );
+}
+
+function useNarrowViewport(): boolean {
+  return useSyncExternalStore(subscribeToNarrowViewport, getNarrowViewportSnapshot, () => false);
+}
 
 interface ChartPoint {
   date: number;
@@ -111,6 +132,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
   const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
   const [onChangeOnly, setOnChangeOnly] = useState(true);
   const locale = useLocale();
+  const isNarrowViewport = useNarrowViewport();
   const legendT = SUBMISSIONS_STRINGS[locale];
   const dateFormatter = useMemo(
     () =>
@@ -298,7 +320,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         xAxis={
           locale === 'zh'
             ? {
-                tickCount: 6,
+                tickCount: isNarrowViewport ? 3 : 6,
                 tickFormat: (value) => dateFormatter.format(new Date(Number(value))),
               }
             : { tickCount: 6 }

@@ -4,6 +4,7 @@ import {
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
+  collectiveXConclusionLabel,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
@@ -27,6 +28,33 @@ const dataset = makeCollectiveXDataset();
 // series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
 // series[1]: MoRI EP16 scale-out (xGMI scale-up + RDMA scale-out, two nodes).
 const [scaleUp, scaleOut] = dataset.series;
+
+describe('collectiveXConclusionLabel', () => {
+  it.each([
+    ['success', '成功'],
+    ['failure', '失败'],
+    ['cancelled', '已取消'],
+    ['skipped', '已跳过'],
+    ['timed_out', '超时'],
+    ['startup_failure', '启动失败'],
+    ['action_required', '需要处理'],
+    ['neutral', '中立'],
+    ['stale', '已过期'],
+  ])('localizes the %s workflow conclusion in Chinese', (conclusion, expected) => {
+    expect(collectiveXConclusionLabel(conclusion, 'zh')).toBe(expected);
+  });
+
+  it('derives pending only from a null workflow conclusion', () => {
+    expect(collectiveXConclusionLabel(null, 'zh')).toBe('待处理');
+    expect(collectiveXConclusionLabel(null, 'en')).toBe('pending');
+  });
+
+  it('preserves known English values and hides unknown values on Chinese pages', () => {
+    expect(collectiveXConclusionLabel('startup_failure', 'en')).toBe('startup_failure');
+    expect(collectiveXConclusionLabel('future_status', 'en')).toBe('future_status');
+    expect(collectiveXConclusionLabel('future_status', 'zh')).toBe('未知状态');
+  });
+});
 
 describe('collectiveXTopologyLabel', () => {
   it('shows only the scale-up transport when there is no scale-out fabric', () => {

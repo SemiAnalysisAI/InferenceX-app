@@ -199,7 +199,7 @@ describe('AI chart Chinese workflow', () => {
 
       cy.visit('/zh/ai-chart');
       cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
-      cy.get('textarea[placeholder="描述您想查看的图表……"]').type(
+      cy.get('textarea[placeholder="描述想查看的图表……"]').type(
         '对比 B200 和 MI355X 的每芯片吞吐量',
       );
       cy.contains('button', '生成图表').click();
@@ -212,6 +212,48 @@ describe('AI chart Chinese workflow', () => {
       cy.get('[role="img"][aria-label="AI 生成的条形图"]').should('be.visible');
       cy.contains('[data-slot="card-title"]', 'AI 总结').should('be.visible');
       cy.contains('B200 在该配置下吞吐量更高。').should('be.visible');
+    });
+  });
+
+  it('keeps interactive scatter and line charts exposed as accessible groups', () => {
+    cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
+      const rows = [
+        fixtureRow(fixtureRows, 'b200', 20, 8_000),
+        fixtureRow(fixtureRows, 'b200', 40, 12_000),
+        fixtureRow(fixtureRows, 'mi355x', 20, 7_000),
+        fixtureRow(fixtureRows, 'mi355x', 40, 10_000),
+      ];
+      const specs = [
+        benchmarkSpec({ chartType: 'scatter', title: '交互式散点图' }),
+        benchmarkSpec({ chartType: 'line', title: '交互式折线图' }),
+      ];
+
+      cy.intercept('GET', '**/api/v1/benchmarks?*', rows).as('interactiveBenchmarks');
+      cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
+        const systemPrompt = request.body.messages?.[0]?.content ?? '';
+        request.reply({
+          choices: [
+            {
+              message: {
+                content: systemPrompt.includes('chart generation assistant')
+                  ? JSON.stringify(specs)
+                  : '已生成两张交互式图表。',
+              },
+            },
+          ],
+        });
+      });
+
+      cy.visit('/zh/ai-chart');
+      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
+      cy.get('textarea[placeholder="描述想查看的图表……"]').type('生成散点图和折线图');
+      cy.contains('button', '生成图表').click();
+      cy.wait('@interactiveBenchmarks');
+
+      cy.get('[role="group"][aria-label="AI 生成的散点图"]').should('be.visible');
+      cy.get('[role="group"][aria-label="AI 生成的折线图"]').should('be.visible');
+      cy.get('[role="img"][aria-label="AI 生成的散点图"]').should('not.exist');
+      cy.get('[role="img"][aria-label="AI 生成的折线图"]').should('not.exist');
     });
   });
 
@@ -257,7 +299,7 @@ describe('AI chart Chinese workflow', () => {
       cy.wait('@multiChartBenchmarks');
       cy.contains('H100 吞吐量')
         .closest('[data-slot="card"]')
-        .should('contain.text', '没有数据符合这项图表配置。');
+        .should('contain.text', '当前图表配置没有匹配的数据。');
     });
   });
 
@@ -275,6 +317,10 @@ describe('AI chart Chinese workflow', () => {
     cy.contains('图表请求失败。请检查 API 密钥和服务商设置后重试。').should('be.visible');
     cy.contains('provider-internal-error').should('not.exist');
     cy.get('[data-testid="ai-chart-error"]').should('not.contain.text', 'sk-sensitive-example-key');
+    cy.contains('button', '返回修改').click();
+    cy.get('[data-testid="ai-chart-error"]').should('not.exist');
+    cy.get('input[placeholder="OpenAI API Key"]').should('have.value', 'sk-sensitive-example-key');
+    cy.get('textarea').should('have.value', '对比吞吐量');
   });
 
   for (const width of [375, 390]) {
@@ -282,8 +328,11 @@ describe('AI chart Chinese workflow', () => {
       cy.viewport(width, 844);
       cy.visit('/zh/ai-chart');
       cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
-      cy.get('textarea[placeholder="描述您想查看的图表……"]').should('be.visible');
-      cy.contains('示例提示').should('be.visible');
+      cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
+      cy.contains('提示词示例').should('be.visible');
+      cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
+        'be.visible',
+      );
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
       });
