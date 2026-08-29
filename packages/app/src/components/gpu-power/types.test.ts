@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ALL_METRIC_OPTIONS,
   computeGpuStats,
   detectAnomalies,
   detectTdpFromArtifactName,
@@ -9,6 +10,16 @@ import {
   GPU_METRIC_OPTIONS,
   parseCsvData,
 } from './types';
+
+describe('GPU metric localization registry', () => {
+  it('provides Chinese option and axis labels for every metric', () => {
+    for (const metric of ALL_METRIC_OPTIONS) {
+      const localized = metric as typeof metric & { labelZh?: string; yAxisLabelZh?: string };
+      expect(localized.labelZh, metric.key).toBeTruthy();
+      expect(localized.yAxisLabelZh, metric.key).toContain(metric.unit);
+    }
+  });
+});
 
 const CSV_HEADER =
   'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';

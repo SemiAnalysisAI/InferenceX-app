@@ -83,4 +83,30 @@ describe('TraceFlamegraph', () => {
     );
     cy.get('[data-rowkey="g-2-c-1"]').should('be.visible').and('have.class', 'ring-primary');
   });
+
+  it('exposes bar values on keyboard focus without regressing pointer tooltips', () => {
+    cy.mount(<TraceFlamegraph structure={structure} />);
+
+    cy.get('[data-testid="flamegraph-bar-t-0"]')
+      .should('have.attr', 'tabindex', '0')
+      .and('have.attr', 'role', 'meter')
+      .and('have.attr', 'aria-label', 'Turn 1')
+      .and('have.attr', 'aria-valuemin', '0')
+      .and('have.attr', 'aria-valuemax', '2300')
+      .and('have.attr', 'aria-valuenow', '1200')
+      .and('have.attr', 'aria-valuetext')
+      .and('include', 'Cached prefix: 600');
+
+    cy.get('[data-testid="flamegraph-bar-t-0"]').focus();
+    cy.get('[role="tooltip"]')
+      .should('be.visible')
+      .and('contain.text', 'Turn 1')
+      .and('contain.text', 'Uncached input400')
+      .and('contain.text', 'Output200');
+
+    cy.get('[data-testid="flamegraph-bar-t-0"]')
+      .blur()
+      .trigger('mousemove', { clientX: 200, clientY: 200 });
+    cy.get('[role="tooltip"]').should('be.visible').and('contain.text', 'Cached prefix600');
+  });
 });

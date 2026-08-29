@@ -382,7 +382,10 @@ export interface ChartDefinition {
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
+  /** Resolved field represented by `InferenceData.x`; stable across locales. */
+  x_scale_field: string;
   x_label: string;
+  x_labelZh: string;
   y: keyof AggDataEntry;
   y_label?: string;
 
@@ -573,6 +576,9 @@ export interface InferenceDataContextType {
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   loading: boolean;
+  /** True while `graphs` shows previous-key data (placeholder) or a background
+   *  refetch is in flight — i.e. content is visible but about to update. */
+  refreshing: boolean;
   error: string | null;
   availableQuickFilters: AvailableQuickFilters;
   availableGPUs: { value: string; label: string }[];

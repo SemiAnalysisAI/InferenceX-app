@@ -3,7 +3,12 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import type { EvaluationChartData } from '../types';
-import { sizeScoreLabelBackgrounds } from './BarChartD3';
+import {
+  evaluationChartBlockingState,
+  evaluationChartIsInitializing,
+  sizeScoreLabelBackgrounds,
+} from './BarChartD3';
+import * as barChartModule from './BarChartD3';
 
 function makeDatum(configLabel: string, score: number): EvaluationChartData {
   return {
@@ -69,5 +74,86 @@ describe('sizeScoreLabelBackgrounds', () => {
 
     expect(events).toEqual(['read:0', 'read:1', 'write:0', 'write:1']);
     expect(labelGroups.select('.score-label-bg').attr('width')).toBe('20');
+  });
+});
+
+describe('evaluation chart locale presentation', () => {
+  it('preserves the raw English tooltip date while formatting the Chinese date', () => {
+    const module = barChartModule as typeof barChartModule & {
+      formatEvaluationDate?: (date: string, locale: 'en' | 'zh') => string;
+      formatEvaluationEmptyStateDate?: (date: string, locale: 'en' | 'zh') => string;
+      generateEvaluationTooltipContent?: (
+        data: EvaluationChartData,
+        isPinned: boolean,
+        unofficialBranch: string | undefined,
+        locale: 'en' | 'zh',
+      ) => string;
+    };
+
+    expect(module.formatEvaluationDate?.('2026-01-02', 'en')).toBe('2026-01-02');
+    expect(module.formatEvaluationDate?.('2026-01-02', 'zh')).toBe('2026年1月2日');
+    expect(module.formatEvaluationEmptyStateDate?.('2026-01-02', 'en')).toBe('Jan 2, 2026');
+    expect(module.formatEvaluationEmptyStateDate?.('2026-01-02', 'zh')).toBe('2026年1月2日');
+    const englishHtml = module.generateEvaluationTooltipContent?.(
+      makeDatum('B200 SGLang', 0.9),
+      false,
+      undefined,
+      'en',
+    );
+    expect(englishHtml).toContain('<strong>Date:</strong> 2026-01-01');
+    const html = module.generateEvaluationTooltipContent?.(
+      {
+        ...makeDatum('B200 SGLang', 0.9),
+        runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+      },
+      true,
+      'feature/zh',
+      'zh',
+    );
+    expect(html).toContain('点击其他区域关闭');
+    expect(html).toContain('非官方运行');
+    expect(html).toContain('<strong>平均得分：</strong>');
+    expect(html).toContain('<strong>并发数：</strong>');
+    expect(html).toContain('GitHub Actions 运行记录');
+    expect(html).not.toContain('Mean Score');
+    expect(html).not.toContain('Concurrency');
+  });
+});
+
+describe('evaluation chart blocking state', () => {
+  it('keeps valid official or unofficial chart data visible when either query failed', () => {
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: true,
+        isEvaluationDataError: false,
+      }),
+    ).toBeNull();
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: true,
+        isEvaluationDataError: true,
+      }),
+    ).toBeNull();
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: false,
+        isEvaluationDataError: true,
+      }),
+    ).toBe('data-error');
+  });
+});
+
+describe('evaluation chart initialization state', () => {
+  it('shows the loading skeleton until the evaluation query settles', () => {
+    expect(
+      evaluationChartIsInitializing({
+        isEvaluationDataSettled: false,
+      }),
+    ).toBe(true);
+    expect(
+      evaluationChartIsInitializing({
+        isEvaluationDataSettled: true,
+      }),
+    ).toBe(false);
   });
 });

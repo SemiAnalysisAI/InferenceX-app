@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -10,6 +11,7 @@ import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { ModelLogo } from '@/components/ui/model-logo';
+import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
@@ -82,7 +84,23 @@ const jsonLd = {
   url: `${SITE_URL}/compare`,
 };
 
-export default async function CompareIndexPage() {
+export default function CompareIndexPage() {
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <AgentXCompareHero locale="en" />
+      {/* In-page Suspense (not loading.tsx — a route-level boundary would
+          also wrap /compare/[slug] and degrade its 404/308 statuses): the
+          static hero paints immediately while the catalog's availability
+          query streams behind the skeleton. */}
+      <Suspense fallback={<CompareRouteSkeleton />}>
+        <CompareCatalog />
+      </Suspense>
+    </>
+  );
+}
+
+async function CompareCatalog() {
   // Server-side filter: only show (model, pair) combinations where both GPUs
   // have benchmark data for that model. Avoids cards that would link to an
   // empty-state page. The page-level handler at /compare/[slug] still renders
@@ -96,9 +114,6 @@ export default async function CompareIndexPage() {
 
   return (
     <>
-      <JsonLd data={jsonLd} />
-      <AgentXCompareHero locale="en" />
-
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">

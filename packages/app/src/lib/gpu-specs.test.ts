@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatNullable,
   formatTflops,
+  getScaleOutExpandAriaLabel,
   getScaleUpDomainMemory,
   getScaleUpDomainMemoryBw,
   getScaleUpDomainMemoryBwNumeric,
@@ -17,6 +18,13 @@ import {
 } from '@/lib/gpu-specs';
 
 const findGpu = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
+
+describe('getScaleOutExpandAriaLabel', () => {
+  it('preserves the English button label and localizes the Chinese label', () => {
+    expect(getScaleOutExpandAriaLabel('H200 SXM', 'en')).toBe('Expand H200 SXM topology diagram');
+    expect(getScaleOutExpandAriaLabel('H200 SXM', 'zh')).toBe('展开 H200 SXM 横向扩展拓扑图');
+  });
+});
 
 describe('GPU_SPECS', () => {
   it('contains all expected GPUs', () => {

@@ -208,6 +208,14 @@ describe('buildVisibleRows', () => {
     expect(rows[2]).toMatchObject({ label: '↳ subturn 1', indent: 1, overlaps: [overlap] });
     expect(rows[3]!.overlaps).toEqual([]);
   });
+
+  it('localizes generated turn, child-count, and subturn labels without changing source labels', () => {
+    const rows = buildVisibleRows(nodes, new Set([1]), new Map(), 'zh');
+
+    expect(rows[0]?.label).toBe('第 1 轮');
+    expect(rows[1]).toMatchObject({ label: 'Subagent: search', sublabel: '2 轮 · 12s' });
+    expect(rows[2]?.label).toBe('↳ 子轮次 1');
+  });
 });
 
 describe('buildRowOverlaps and computeBraceLayout', () => {

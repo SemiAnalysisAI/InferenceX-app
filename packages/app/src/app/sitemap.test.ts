@@ -5,6 +5,7 @@ import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { getAllChipRouteSlugs } from '@/lib/chip-pages';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { zhPath } from '@/lib/i18n';
+import { getModelPageSlugs } from '@/lib/model-pages';
 const mocks = vi.hoisted(() => ({
   fixturesMode: false,
   getDb: vi.fn(() => ({})),
@@ -65,6 +66,17 @@ describe('sitemap locale parity', () => {
     for (const entry of INFERENCE_MODEL_SLUGS) {
       expect(urls.has(`${SITE_URL}/inference/${entry.slug}`)).toBe(true);
       expect(urls.has(`${SITE_URL}${zhPath(`/inference/${entry.slug}`)}`)).toBe(true);
+    }
+  });
+
+  it('emits both locales for the model index and every model deep-dive page', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    expect(urls.has(`${SITE_URL}/model`)).toBe(true);
+    expect(urls.has(`${SITE_URL}/zh/model`)).toBe(true);
+    for (const slug of getModelPageSlugs()) {
+      expect(urls.has(`${SITE_URL}/model/${slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}/zh/model/${slug}`)).toBe(true);
     }
   });
 

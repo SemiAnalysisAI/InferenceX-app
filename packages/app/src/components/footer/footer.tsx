@@ -269,8 +269,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 </Link>
                 <Link
                   data-testid="footer-link-model-architectures"
-                  // English-only route (not zh-mirrored), so no locale prefix.
-                  href="/model"
+                  href={`${prefix}/model`}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {t.modelArchitectures}

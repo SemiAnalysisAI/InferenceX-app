@@ -289,6 +289,8 @@ export function useChartData(
   const {
     data: baseRows,
     isLoading: baseLoading,
+    isFetching: baseFetching,
+    isPlaceholderData: basePlaceholder,
     error: baseError,
   } = useBenchmarks(
     selectedModel,
@@ -299,6 +301,9 @@ export function useChartData(
     undefined,
     !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
     benchmarkQueryScope,
+    // Same-model key changes (date/run/scope) keep the previous rows rendered
+    // while the new result fetches; `refreshing` below surfaces that window.
+    true,
   );
   const {
     data: runRows,
@@ -347,6 +352,10 @@ export function useChartData(
 
   // Loading = query is fetching OR we haven't received any data yet (waiting for date/filters)
   const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  // Refreshing = data is on screen but a fresh result is on the way: either the
+  // base query is showing previous-key placeholder rows, or a same-key refetch
+  // is in flight. Distinct from `loading`, which means nothing renderable yet.
+  const refreshing = !loading && (basePlaceholder || baseFetching);
   const error = queryError ? queryError.message : null;
 
   // Stable identity for comparison query data — useQueries returns a new array ref every render,
@@ -479,20 +488,28 @@ export function useChartData(
           : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
+        const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
         let xAxisLabel = chartDef.x_label;
+        let xAxisLabelZh = chartDef.x_labelZh;
         if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const labelZhKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
             xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
+            xAxisLabelZh = (chartDef[labelZhKey] as string) || chartDef.x_labelZh;
           } else {
             xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
+            xAxisLabelZh = isTtftOverride ? ttftLabelZh : chartDef.x_labelZh;
           }
         } else if (resolved.branch === 'config-input-override') {
           const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const xLabelZhOverrideKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
+          xAxisLabelZh = (chartDef[xLabelZhOverrideKey] as string) || chartDef.x_labelZh;
         } else if (resolved.branch === 'e2e-ttft-override') {
           xAxisLabel = ttftLabel;
+          xAxisLabelZh = ttftLabelZh;
         }
 
         // Agentic: relabel to the chosen percentile (the resolver already
@@ -506,6 +523,7 @@ export function useChartData(
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
@@ -583,7 +601,9 @@ export function useChartData(
             ...rooflineOverrides,
             ...revenueLabels,
             heading: chartHeading,
+            x_scale_field: xAxisField,
             x_label: xAxisLabel,
+            x_labelZh: xAxisLabelZh,
             y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
           },
           metricKey,
@@ -701,6 +721,7 @@ export function useChartData(
     graphs,
     selectionPoints,
     loading,
+    refreshing,
     error,
     hardwareConfig,
     availableQuickFilters,

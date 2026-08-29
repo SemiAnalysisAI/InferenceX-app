@@ -58,6 +58,21 @@ export function resolveEvaluationDate(
   }, availableDates[0]);
 }
 
+export function retryFailedEvaluationQueries({
+  availabilityFailed,
+  evaluationsFailed,
+  refetchAvailability,
+  refetchEvaluations,
+}: {
+  availabilityFailed: boolean;
+  evaluationsFailed: boolean;
+  refetchAvailability: () => unknown;
+  refetchEvaluations: () => unknown;
+}): void {
+  if (availabilityFailed) void refetchAvailability();
+  if (evaluationsFailed) void refetchEvaluations();
+}
+
 export function EvaluationProvider({ children }: { children: ReactNode }) {
   const { selectedModel, effectivePrecisions } = useGlobalFilterSelection();
   const {
@@ -71,17 +86,32 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     availableDates: inferenceAvailableDates,
     availablePrecisions: globalAvailablePrecisions,
     availabilityError,
+    availabilityIsError,
+    retryAvailability,
   } = useGlobalFilterAvailability();
   const { getUrlParam } = useUrlState();
   const {
     data: rawRows,
     isLoading: loading,
-    isSuccess: evaluationsSettled,
+    isSuccess: evaluationsSucceeded,
+    isError: evaluationsError,
     error: queryError,
+    refetch: refetchEvaluations,
   } = useEvaluations();
+  const isEvaluationDataSettled = evaluationsSucceeded || evaluationsError;
   const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
   const error = availabilityError || (queryError ? queryError.message : null);
+  const retry = useCallback(
+    () =>
+      retryFailedEvaluationQueries({
+        availabilityFailed: availabilityIsError,
+        evaluationsFailed: evaluationsError,
+        refetchAvailability: retryAvailability,
+        refetchEvaluations,
+      }),
+    [availabilityIsError, evaluationsError, retryAvailability, refetchEvaluations],
+  );
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
@@ -246,15 +276,15 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       available: hwTypesWithData,
       pending: pendingActiveHardware,
       scopeChanged,
-      settled: evaluationsSettled,
+      settled: evaluationsSucceeded,
     });
-    if (!evaluationsSettled) return;
+    if (!evaluationsSucceeded) return;
     lastHardwareScopeRef.current = hardwareScopeKey;
     if (resolution.selection !== enabledHardware) setEnabledHardware(resolution.selection);
     if (resolution.consumedPending) setPendingActiveHardware(null);
   }, [
     enabledHardware,
-    evaluationsSettled,
+    evaluationsSucceeded,
     hardwareScopeKey,
     hwTypesWithData,
     pendingActiveHardware,
@@ -338,7 +368,12 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const value: EvaluationChartContextType = useMemo(
     () => ({
       loading,
+      isEvaluationDataSettled,
       error,
+      isError: availabilityIsError || evaluationsError,
+      isAvailabilityError: availabilityIsError,
+      isEvaluationDataError: evaluationsError,
+      retry,
       selectedBenchmark,
       setSelectedBenchmark: setRequestedBenchmark,
       selectedModel,
@@ -371,7 +406,11 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading,
+      isEvaluationDataSettled,
       error,
+      availabilityIsError,
+      evaluationsError,
+      retry,
       selectedBenchmark,
       selectedModel,
       handleSetSelectedModel,

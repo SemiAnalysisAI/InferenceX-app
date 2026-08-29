@@ -42,6 +42,34 @@ export function keepAgenticCoachMark(): void {
 }
 
 Cypress.on('window:before:load', (win) => {
+  // Skip cross-document view transitions (`@view-transition` in motion.css).
+  // Inside the Cypress AUT iframe Chrome starts the transition on every
+  // same-origin cy.visit but never finishes it, and while a transition is
+  // active the page's real DOM is excluded from hit-testing —
+  // `elementFromPoint` returns bare <html>, clicks stall, and the
+  // viewport-sized snapshot registers as horizontal overflow. Real top-level
+  // windows finish the transition in ~200ms; only the iframe hangs, so skip
+  // it here rather than gating the production feature.
+  win.addEventListener('pagereveal', (event) => {
+    const viewTransition = (
+      event as Event & {
+        viewTransition?: {
+          skipTransition: () => void;
+          ready?: Promise<void>;
+          finished?: Promise<void>;
+          updateCallbackDone?: Promise<void>;
+        };
+      }
+    ).viewTransition;
+    if (!viewTransition) return;
+    // Skipping rejects the transition's promises with
+    // "AbortError: Transition was skipped"; swallow those so Cypress
+    // doesn't fail the test on an unhandled rejection.
+    viewTransition.ready?.catch(() => {});
+    viewTransition.finished?.catch(() => {});
+    viewTransition.updateCallbackDone?.catch(() => {});
+    viewTransition.skipTransition();
+  });
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
     if (suppressTelemetryTutorial) {
@@ -103,4 +131,18 @@ export function interceptDerivedAgenticMetrics(): void {
       ),
     });
   }).as('derivedAgenticMetrics');
+}
+
+/**
+ * Assert the page has no horizontal overflow at the current viewport — wide
+ * content (tables, flamegraphs) must scroll inside its own container, never
+ * the page body. Call after the route under test has rendered.
+ */
+export function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
 }

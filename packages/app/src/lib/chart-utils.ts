@@ -777,3 +777,8 @@ export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale
   }
   return (chartDef[`${metricKey}_label`] as string) || '';
 }
+
+/** Resolve the rendered x-axis label without mutating the canonical English label. */
+export function xAxisLabel(chartDef: ChartDefinition, locale: Locale): string {
+  return locale === 'zh' && chartDef.x_labelZh ? chartDef.x_labelZh : chartDef.x_label;
+}

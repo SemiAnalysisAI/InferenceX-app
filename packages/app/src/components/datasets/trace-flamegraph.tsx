@@ -160,8 +160,8 @@ export function TraceFlamegraph({
   const overlapsByRow = useMemo(() => buildRowOverlaps(nodes), [nodes]);
 
   const rows = useMemo(
-    () => buildVisibleRows(nodes, expanded, overlapsByRow),
-    [nodes, expanded, overlapsByRow],
+    () => buildVisibleRows(nodes, expanded, overlapsByRow, locale),
+    [nodes, expanded, overlapsByRow, locale],
   );
 
   const maxTotal = useMemo(
@@ -178,6 +178,16 @@ export function TraceFlamegraph({
   const onMove = (e: React.MouseEvent, row: VisibleRow) => {
     setTooltip({ x: e.clientX, y: e.clientY, row });
   };
+
+  const onFocus = (e: React.FocusEvent<HTMLDivElement>, row: VisibleRow) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltip({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, row });
+  };
+
+  const ariaValueText = (row: VisibleRow) =>
+    locale === 'zh'
+      ? `${t.cachedPrefix}：${compact(row.cached)}；${t.uncachedInput}：${compact(row.uncached)}；${t.output}：${compact(row.output)}`
+      : `${t.cachedPrefix}: ${compact(row.cached)}; ${t.uncachedInput}: ${compact(row.uncached)}; ${t.output}: ${compact(row.output)}`;
 
   return (
     <div className="relative">
@@ -234,9 +244,10 @@ export function TraceFlamegraph({
 
       <div
         ref={scrollRef}
-        className="max-h-[520px] overflow-y-auto overflow-x-hidden rounded-md border border-border/40 bg-muted/10 p-2"
+        className="max-h-[520px] overflow-auto rounded-md border border-border/40 bg-muted/10 p-2"
+        data-testid="flamegraph-scroll"
       >
-        <div className="flex flex-col gap-0">
+        <div className="flex min-w-[36rem] flex-col gap-0">
           {rows.map((row, idx) => {
             const denom = row.isGroup ? maxGroupTotal : maxTotal;
             const widthPct = Math.min(100, Math.max(0.5, (row.total / denom) * 100));
@@ -344,9 +355,26 @@ export function TraceFlamegraph({
                   </div>
 
                   <div
+                    data-testid={`flamegraph-bar-${row.key}`}
                     className="relative flex h-5 flex-1 items-center"
+                    role="meter"
+                    tabIndex={0}
+                    aria-label={row.label}
+                    aria-valuemin={0}
+                    aria-valuemax={denom}
+                    aria-valuenow={row.total}
+                    aria-valuetext={ariaValueText(row)}
+                    aria-describedby={
+                      tooltip?.row.key === row.key ? 'flamegraph-tooltip' : undefined
+                    }
                     onMouseMove={(e) => onMove(e, row)}
-                    onMouseLeave={() => setTooltip(null)}
+                    onMouseLeave={(e) => {
+                      if (e.currentTarget.ownerDocument.activeElement !== e.currentTarget) {
+                        setTooltip(null);
+                      }
+                    }}
+                    onFocus={(e) => onFocus(e, row)}
+                    onBlur={() => setTooltip(null)}
                   >
                     <div
                       className={`flex overflow-hidden rounded-sm ${
@@ -374,6 +402,9 @@ export function TraceFlamegraph({
         mounted &&
         createPortal(
           <div
+            id="flamegraph-tooltip"
+            role="tooltip"
+            data-testid="flamegraph-tooltip"
             className="pointer-events-none fixed z-50 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs shadow-md"
             style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
           >
