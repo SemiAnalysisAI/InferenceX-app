@@ -26,6 +26,9 @@ describe('model page copy', () => {
 
   it('provides natural Chinese route-owned chrome', () => {
     expect(MODEL_PAGE_COPY.zh.indexTitle).toBe('模型架构');
+    expect(MODEL_PAGE_COPY.zh.indexDescription).toBe(
+      '逐一解析 InferenceX 已完成基准测试的模型：涵盖 MoE 与注意力架构、厂商公布的评估成绩，以及实时推理性能数据。',
+    );
     expect(MODEL_PAGE_COPY.zh.inferenceDashboard).toBe('推理仪表板');
     expect(MODEL_PAGE_COPY.zh.released).toBe('发布日期');
     expect(MODEL_PAGE_COPY.zh.englishArticleNotice).toContain('英文');

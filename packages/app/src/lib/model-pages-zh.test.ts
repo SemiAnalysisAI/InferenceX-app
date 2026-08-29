@@ -41,4 +41,9 @@ describe('Chinese model-page catalog', () => {
     expect(MODEL_PAGE_ZH['qwen-3-8-flash-next'].description).toContain('176B');
     expect(MODEL_PAGE_ZH['qwen-3-8-flash-next'].description).toContain('51B');
   });
+
+  it('preserves the scope of the GLM-5.3 agentic post-training claim', () => {
+    expect(MODEL_PAGE_ZH['glm-5-2'].description).toContain('重点面向智能体能力的后训练');
+    expect(MODEL_PAGE_ZH['glm-5-2'].description).not.toContain('大规模智能体后训练');
+  });
 });

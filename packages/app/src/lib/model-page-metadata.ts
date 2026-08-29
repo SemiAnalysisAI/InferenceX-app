@@ -11,10 +11,10 @@ export function modelIndexMetadata(locale: Locale): Metadata {
   const isZh = locale === 'zh';
   const enPath = '/model';
   const title = isZh
-    ? `${t.indexTitle}：各模型的 MoE、注意力与评估 | ${SITE_NAME}`
+    ? `${t.indexTitle}：各模型的 MoE 架构、注意力机制与评估结果 | ${SITE_NAME}`
     : `${t.indexTitle} — MoE, Attention & Evals per Model | ${SITE_NAME}`;
   const socialTitle = isZh
-    ? `${t.indexTitle}：各模型的 MoE、注意力与评估`
+    ? `${t.indexTitle}：各模型的 MoE 架构、注意力机制与评估结果`
     : `${t.indexTitle} — MoE, Attention & Evals per Model`;
   const url = `${SITE_URL}${isZh ? '/zh' : ''}${enPath}`;
   const image = `${SITE_URL}/model/opengraph-image`;

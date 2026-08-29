@@ -23,7 +23,7 @@ export const MODEL_PAGE_COPY = {
   zh: {
     indexTitle: '模型架构',
     indexDescription:
-      '逐一解析 InferenceX 收录的模型：包括 MoE 与注意力架构、厂商公布的评估成绩和实时推理性能数据。',
+      '逐一解析 InferenceX 已完成基准测试的模型：涵盖 MoE 与注意力架构、厂商公布的评估成绩，以及实时推理性能数据。',
     inferenceDashboard: '推理仪表板',
     modelBreadcrumb: '模型',
     released: '发布日期',

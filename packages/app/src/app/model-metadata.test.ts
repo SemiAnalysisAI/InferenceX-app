@@ -24,6 +24,12 @@ describe('model page metadata locale pairing', () => {
       locale: 'zh_CN',
       url: `${SITE_URL}/zh/model`,
     });
+    expect(zhIndexMetadata.title).toEqual({
+      absolute: '模型架构：各模型的 MoE 架构、注意力机制与评估结果 | InferenceX',
+    });
+    expect(zhIndexMetadata.openGraph).toMatchObject({
+      title: '模型架构：各模型的 MoE 架构、注意力机制与评估结果',
+    });
   });
 
   it('localizes detail metadata while preserving model facts', () => {

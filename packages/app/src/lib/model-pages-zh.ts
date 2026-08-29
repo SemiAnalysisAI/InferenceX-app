@@ -25,7 +25,7 @@ export const MODEL_PAGE_ZH = {
   },
   'glm-5-2': {
     description:
-      'Z.ai 的 744B 级 MoE 模型系列，借助 IndexShare 将稀疏注意力扩展至 1M token 上下文；GLM-5.3 还加入了一轮大规模智能体后训练。',
+      'Z.ai 的 744B 级 MoE 模型系列，借助 IndexShare 将稀疏注意力扩展至 1M token 上下文；GLM-5.3 还进行了一轮重点面向智能体能力的后训练。',
     releaseDate: '2026 年 6 月 16 日（GLM-5.2）；2026 年 8 月 14 日（GLM-5.3）',
   },
   'gptoss-120b': {
