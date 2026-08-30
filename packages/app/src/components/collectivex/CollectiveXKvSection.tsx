@@ -14,6 +14,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXKvChart } from './CollectiveXKvChart';
 import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';
+import { CollectiveXKvOverlapChart } from './CollectiveXKvOverlapChart';
 import {
   type CollectiveXKvChartSelection,
   type CollectiveXKvRunCase,
@@ -36,10 +37,15 @@ const STRINGS = {
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
-      'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
-      'A backend that serializes requests collapses to a single point; hover a point for its ' +
-      'Pareto status.',
-    frontierOption: 'Frontier',
+      'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
+      'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
+      'line well above its batch-1 points; hover a point for its batch, latency, and status.',
+    frontierOption: 'Envelope',
+    overlapOption: 'Overlap gain',
+    overlapCaption:
+      'aggregate bandwidth relative to batch 1 at the largest measured ISL; the dotted ideal ' +
+      'is y = batch. A perfect overlapper tracks the ideal until the wire saturates; a ' +
+      'serializing backend stays flat at 1.',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
@@ -58,9 +64,13 @@ const STRINGS = {
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线连接最大实测 ISL 下的批大小阶梯，越靠右下越优。' +
-      '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
-    frontierOption: '帕累托前沿',
+      '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、时延与状态。',
+    frontierOption: '带宽包络',
+    overlapOption: '重叠增益',
+    overlapCaption:
+      '相对批大小 1 的聚合带宽，取最大实测 ISL；虚线为理想值 y = 批大小。' +
+      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
@@ -106,7 +116,9 @@ export function CollectiveXKvSection({
   const locale = useLocale();
   const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const [yAxis, setYAxis] = useState<CollectiveXKvChartSelection['y']>('bandwidth');
-  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier'>('batch');
+  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
+    'batch',
+  );
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
   // Legend toggles are keyed to the current series set: when checked runs
@@ -266,7 +278,7 @@ export function CollectiveXKvSection({
   if (rows.length === 0) return null;
   const measured = rows.filter((row) => row.outcome === 'success').length;
   const selection: CollectiveXKvChartSelection = {
-    x: xAxis === 'frontier' ? 'batch' : xAxis,
+    x: xAxis === 'batch' || xAxis === 'isl' ? xAxis : 'batch',
     y: yAxis,
     op,
     pageTokens: Number(pageTokens),
@@ -280,7 +292,7 @@ export function CollectiveXKvSection({
       {measuredCases.length > 0 && (
         <>
           <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
-            {xAxis !== 'frontier' && (
+            {(xAxis === 'batch' || xAxis === 'isl') && (
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">{strings.yControl}</Label>
                 <SegmentedToggle
@@ -312,6 +324,7 @@ export function CollectiveXKvSection({
                   { value: 'batch', label: 'Batch' },
                   { value: 'isl', label: 'ISL' },
                   { value: 'frontier', label: strings.frontierOption },
+                  { value: 'overlap', label: strings.overlapOption },
                 ]}
               />
             </div>
@@ -353,6 +366,28 @@ export function CollectiveXKvSection({
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {op} · page {pageTokens} · {strings.frontierCaption}
+                  </p>
+                }
+                legendElement={
+                  <ChartLegend
+                    variant="sidebar"
+                    legendItems={legendItems}
+                    disableActiveSort
+                    isLegendExpanded={legendExpanded}
+                    onExpandedChange={setLegendExpanded}
+                  />
+                }
+              />
+            ) : xAxis === 'overlap' ? (
+              <CollectiveXKvOverlapChart
+                chartId="collectivex-kv-overlap"
+                testId="collectivex-kv-overlap-chart"
+                cases={activeCases}
+                colors={colors}
+                selection={{ op, pageTokens: Number(pageTokens) }}
+                caption={
+                  <p className="text-sm text-muted-foreground">
+                    {op} · page {pageTokens} · {strings.overlapCaption}
                   </p>
                 }
                 legendElement={
