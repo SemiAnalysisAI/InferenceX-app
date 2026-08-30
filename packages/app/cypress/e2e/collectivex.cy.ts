@@ -705,7 +705,7 @@ describe('CollectiveX kv-transfer card', () => {
     });
   });
 
-  it('plots the fixed frontier axes and keeps multi-run lines aligned with the legend', () => {
+  it('plots the envelope axes and keeps multi-run lines aligned with the legend', () => {
     installRuns([kvComparisonDataset, kvDataset]);
     installRun(kvComparisonDataset);
     installRun(kvDataset, 'comparisonKvRun');
@@ -713,12 +713,12 @@ describe('CollectiveX kv-transfer card', () => {
 
     cy.get(`[data-testid="collectivex-run-visible-${kvDataset.run.run_id}"]`).check();
     cy.wait('@comparisonKvRun');
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Frontier').click();
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Envelope').click();
 
     cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
-      .should('contain.text', 'Aggregate pull bandwidth at p50 (GB/s, log)')
-      .and('contain.text', 'Burst p95 latency per in-flight request (ms, log)');
+      .should('contain.text', 'Sequence length (ISL tokens, log)')
+      .and('contain.text', 'Aggregate pull bandwidth at p50 (GB/s, log)');
     cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path')
       .should('have.length', 2)
       .then(($lines) => {
@@ -729,18 +729,36 @@ describe('CollectiveX kv-transfer card', () => {
       });
   });
 
-  it('localizes the frontier control and chart copy on the Chinese page', () => {
+  it('plots the overlap-gain view with its dotted ideal line', () => {
+    installRuns([kvDataset]);
+    installRun(kvDataset);
+    openCollectiveX();
+
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]')
+      .contains('button', 'Overlap gain')
+      .click();
+    cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-kv-overlap-chart"]')
+      .should('contain.text', 'Requests per burst (log)')
+      .and('contain.text', 'Aggregate bandwidth relative to batch 1 (log)');
+    // The measured series plus the dotted y = batch ideal reference.
+    cy.get('[data-testid="collectivex-kv-overlap-chart"] .line-path').then(($lines) => {
+      expect([...$lines].map((line) => line.getAttribute('stroke-dasharray'))).to.include('2 4');
+    });
+  });
+
+  it('localizes the envelope control and chart copy on the Chinese page', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
     cy.wait('@run');
 
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', '帕累托前沿').click();
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', '带宽包络').click();
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
-      .should('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
-      .and('contain.text', '每个在途请求的突发 p95 延迟（ms，对数）')
-      .and('contain.text', '越靠右下越优');
+      .should('contain.text', '序列长度（ISL token，对数）')
+      .and('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
+      .and('contain.text', '越高越优');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {
