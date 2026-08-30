@@ -354,6 +354,133 @@ export function collectiveXKvFrontierPoints(
   return points;
 }
 
+export interface CollectiveXKvAlphaBetaFit {
+  /** Fixed per-request overhead (ms): the intercept of latency against bytes. */
+  alphaMs: number;
+  /** Wire bandwidth term (GB/s): the inverse slope of latency against bytes. */
+  betaGbps: number;
+  /** Transfer size (bytes) that reaches half of the peak bandwidth. */
+  nHalfBytes: number;
+  pointCount: number;
+}
+
+/**
+ * Latency-against-transfer-size points for the alpha+beta view: the batch-1
+ * paged rows of the selected direction and page size, with x the bytes moved
+ * per request and y the burst p50 latency. On log-log axes the flat left
+ * region is the fixed per-request overhead (alpha) and the slope-1 right
+ * region is the wire (1/beta); the knee between them is N-half.
+ */
+export function collectiveXKvSizePoints(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvFrontierSelection,
+): CollectiveXKvChartPoint[] {
+  return cases.flatMap((kase) => {
+    const seriesId = `${kase.run_id}:${kase.case_id}`;
+    return kase.rows
+      .filter(
+        (row) =>
+          row.kind === 'paged' &&
+          row.op === selection.op &&
+          row.page_tokens === selection.pageTokens &&
+          row.batch === 1,
+      )
+      .flatMap((row) => {
+        const x = row.req_bytes;
+        const y = row.latency_ms.p50;
+        if (!Number.isFinite(x) || x <= 0 || !Number.isFinite(y) || y <= 0) return [];
+        return [
+          {
+            seriesId,
+            seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+            colorKey: collectiveXKvColorKey(kase),
+            x,
+            y,
+            row,
+          },
+        ];
+      });
+  });
+}
+
+/**
+ * Per-series latency(bytes) ≈ alpha + bytes/beta fits over the size-view
+ * points, mirroring fitAlphaBeta on the EP side. A series needs three points
+ * and real byte spread; a non-positive slope leaves no bandwidth term and the
+ * series is skipped. Alpha can fit slightly negative on a clean wire, so it
+ * and N-half are clamped at zero for display.
+ */
+export function collectiveXKvAlphaBetaFits(
+  points: readonly CollectiveXKvChartPoint[],
+): Map<string, CollectiveXKvAlphaBetaFit> {
+  const bySeries = new Map<string, CollectiveXKvChartPoint[]>();
+  for (const point of points) {
+    const series = bySeries.get(point.seriesId);
+    if (series) series.push(point);
+    else bySeries.set(point.seriesId, [point]);
+  }
+  const fits = new Map<string, CollectiveXKvAlphaBetaFit>();
+  for (const [seriesId, seriesPoints] of bySeries) {
+    if (seriesPoints.length < 3) continue;
+    const xs = seriesPoints.map((point) => point.x);
+    const min = Math.min(...xs);
+    const max = Math.max(...xs);
+    if (max - min <= 1e-9 * max) continue;
+    const [alphaMs, slopeMsPerByte] = ols(
+      xs,
+      seriesPoints.map((point) => point.y),
+    );
+    if (slopeMsPerByte <= 0) continue;
+    fits.set(seriesId, {
+      alphaMs: Math.max(0, alphaMs),
+      // latency_ms = alpha + bytes/(beta GB/s): slope is 1/(beta*1e6) ms/byte.
+      betaGbps: 1e-6 / slopeMsPerByte,
+      nHalfBytes: Math.max(0, alphaMs / slopeMsPerByte),
+      pointCount: seriesPoints.length,
+    });
+  }
+  return fits;
+}
+
+/**
+ * Overlap-gain points: aggregate bandwidth relative to the batch-1 rung at
+ * the largest measured ISL of the selected direction and page size, so y is 1
+ * at batch 1 by construction. An ideal overlapper tracks y = batch until the
+ * wire saturates; a serializing backend stays flat at 1. A series without a
+ * batch-1 rung at that ISL has no baseline and is dropped.
+ */
+export function collectiveXKvOverlapPoints(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvFrontierSelection,
+): CollectiveXKvChartPoint[] {
+  return cases.flatMap((kase) => {
+    const matching = kase.rows.filter(
+      (row) =>
+        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
+    );
+    if (matching.length === 0) return [];
+    const isl = Math.max(...matching.map((row) => row.isl));
+    const atIsl = matching.filter((row) => row.isl === isl);
+    const baseline = atIsl.find((row) => row.batch === 1);
+    if (!baseline || !(baseline.gbps_p50 > 0)) return [];
+    const seriesId = `${kase.run_id}:${kase.case_id}`;
+    return atIsl.flatMap((row) => {
+      const y = row.gbps_p50 / baseline.gbps_p50;
+      if (!Number.isFinite(y) || y <= 0) return [];
+      return [
+        {
+          seriesId,
+          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          colorKey: collectiveXKvColorKey(kase),
+          x: row.batch,
+          y,
+          row,
+        },
+      ];
+    });
+  });
+}
+
 export function collectiveXKvChartPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvChartSelection,

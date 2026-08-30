@@ -15,8 +15,11 @@ import {
   normalizeCollectiveXSku,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
+  collectiveXKvAlphaBetaFits,
   collectiveXKvChartPoints,
   collectiveXKvFrontierPoints,
+  collectiveXKvOverlapPoints,
+  collectiveXKvSizePoints,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
 } from './data';
@@ -517,6 +520,106 @@ describe('collectiveXKvChartPoints', () => {
         selection,
       );
       expect(points.map((point) => point.onSkuFrontier)).toEqual([true, true]);
+    });
+  });
+
+  describe('collectiveXKvSizePoints', () => {
+    const selection = { op: 'pull', pageTokens: 64 } as const;
+
+    it('plots batch-1 p50 latency against bytes moved per request', () => {
+      const points = collectiveXKvSizePoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, req_bytes: 23e6, latency_p50: 4 },
+            { isl: 32768, batch: 1, req_bytes: 183e6, latency_p50: 25 },
+            // Other batches, pages, and directions stay out of this view.
+            { isl: 32768, batch: 16, req_bytes: 183e6, latency_p50: 190 },
+            { isl: 32768, batch: 1, page_tokens: 16, req_bytes: 183e6, latency_p50: 60 },
+            { isl: 32768, batch: 1, op: 'push', req_bytes: 183e6, latency_p50: 30 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [23e6, 4],
+        [183e6, 25],
+      ]);
+    });
+  });
+
+  describe('collectiveXKvAlphaBetaFits', () => {
+    it('recovers alpha and beta from an exact latency line', () => {
+      // latency_ms = 2 + bytes / (50 GB/s), so alpha 2 ms, beta 50 GB/s, and
+      // N-half (where wire time equals alpha) at 100 MB.
+      const bytes = [1e6, 1e7, 1e8, 1e9];
+      const points = collectiveXKvSizePoints(
+        [
+          kase(
+            bytes.map((req_bytes, index) => ({
+              isl: 4096 * 2 ** index,
+              batch: 1,
+              req_bytes,
+              latency_p50: 2 + req_bytes / 50e6,
+            })),
+          ),
+        ],
+        { op: 'pull', pageTokens: 64 },
+      );
+      const fit = collectiveXKvAlphaBetaFits(points).get(points[0].seriesId);
+      expect(fit?.pointCount).toBe(4);
+      expect(fit?.alphaMs).toBeCloseTo(2, 6);
+      expect(fit?.betaGbps).toBeCloseTo(50, 6);
+      expect((fit?.nHalfBytes ?? 0) / 1e6).toBeCloseTo(100, 3);
+    });
+
+    it('skips a series with fewer than three sizes', () => {
+      const points = collectiveXKvSizePoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, req_bytes: 23e6, latency_p50: 4 },
+            { isl: 32768, batch: 1, req_bytes: 183e6, latency_p50: 25 },
+          ]),
+        ],
+        { op: 'pull', pageTokens: 64 },
+      );
+      expect(collectiveXKvAlphaBetaFits(points).size).toBe(0);
+    });
+  });
+
+  describe('collectiveXKvOverlapPoints', () => {
+    const selection = { op: 'pull', pageTokens: 64 } as const;
+
+    it('normalizes the batch ladder at the largest ISL to its batch-1 rung', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            // The smaller-ISL ladder never enters the normalization.
+            { isl: 4096, batch: 1, gbps_p50: 99 },
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+            { isl: 32768, batch: 16, gbps_p50: 32 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [1, 1],
+        [4, 3],
+        [16, 4],
+      ]);
+    });
+
+    it('drops a series with no batch-1 baseline at the largest ISL', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+            { isl: 4096, batch: 1, gbps_p50: 6 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points).toEqual([]);
     });
   });
 });
