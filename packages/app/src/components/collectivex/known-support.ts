@@ -98,9 +98,9 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "NCCL EP's GPU-initiated RDMA (GDAKI) does not work for EP16 scale-out on the x86 pools — re-confirmed on bare metal 2026-08-28: every rank hits an illegal memory access in the EP kernel, so it is not a virtualization artifact. EP16 works only over MNNVL on the GB SKUs.",
     zh: 'NCCL EP 的 GPU 发起 RDMA（GDAKI）在 x86 集群上无法支撑 EP16 横向扩展——2026-08-28 在裸金属上复验：所有 rank 在 EP Kernel 中触发非法内存访问，故并非虚拟化产物。EP16 仅在 GB SKU 的 MNNVL 上可用。',
   },
-  'nccl-ll-clamped': {
-    en: 'Works, BF16 only, with the ladder clamped to ≤128 tokens/rank pending an upstream low-latency fence-race fix (NVIDIA/nccl-extensions#8).',
-    zh: '可用，但仅支持 BF16，且在上游修复低延迟栅栏竞争（NVIDIA/nccl-extensions#8）之前，梯度上限为每 rank 128 token。',
+  'nccl-ll-fence-race': {
+    en: "Held: nccl_ep's low-latency combine is a port of DeepEP's pre-fix pipeline, missing the DeepEP #642 fence, and the shared-memory race is present on every rung — the former T≤128 clamp only reduced exposure (observed 1-in-5 corruption at T=256, bimodal). Rows are withheld until a fenced wheel ships.",
+    zh: '暂缓发布：nccl_ep 的低延迟 combine 移植自 DeepEP 修复前的流水线，缺少 DeepEP #642 的栅栏，共享内存竞争存在于每一级梯度——此前的 T≤128 限制只是降低了暴露度（T=256 观察到约五分之一的双峰型损坏）。在修复后的 wheel 发布前不发布数据。',
   },
   'hseries-ll-gdr': {
     en: 'Functional and numerically correct, but the IBGDA send path runs 2.3–26x slower than bare-metal references in these virtualized pods (gdrcopy present but insufficient); held until the platform GDR question is resolved.',
@@ -115,8 +115,8 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
   },
   'mori-ll-scale-up-only': {
-    en: 'MoRI low-latency uses the IntraNodeLL kernel, which is scale-up-only by design; a cross-node low-latency mode does not exist.',
-    zh: 'MoRI 低延迟使用 IntraNodeLL Kernel，按设计仅限节点内扩展；不存在跨节点低延迟模式。',
+    en: 'MoRI low-latency measures AsyncLL split-phase (the kernel SGLang deploys for low-latency, validated 2026-08-30); the benchmark keeps it scale-up EP8 only.',
+    zh: 'MoRI 低延迟测量 AsyncLL 分阶段路径（即 SGLang 在低延迟模式下实际部署的 Kernel，2026-08-30 验证）；基准仅覆盖节点内 EP8。',
   },
   'no-ll-kernels': {
     en: 'The library has no low-latency kernels.',
@@ -216,42 +216,42 @@ const LOW_LATENCY: KnownMatrix = {
     'deepep-v2': cell(works, broken('hseries-ll-gdr')),
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   h200: {
     'deepep-v2': cell(works, broken('hseries-ll-gdr')),
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b300: {
     'deepep-v2': cell(worksWith('b300-ll-single-node-pin'), broken('b300-ll-create-ah')),
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   gb200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   gb300: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(worksWith('nccl-ll-clamped'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi300x: {
