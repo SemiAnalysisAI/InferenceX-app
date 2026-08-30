@@ -281,6 +281,9 @@ export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
 export interface CollectiveXKvFrontierSelection {
   op: 'pull' | 'push';
   pageTokens: number;
+  /** Overlap view only: pin the ladder to this ISL. Absent means each
+   * series reads at its own largest measured ISL. */
+  isl?: number;
 }
 
 export interface CollectiveXKvFrontierPoint {
@@ -356,9 +359,10 @@ export function collectiveXKvFrontierPoints(
 
 /**
  * Overlap-gain points: aggregate bandwidth relative to the batch-1 rung at
- * the largest measured ISL of the selected direction and page size, so y is 1
- * at batch 1 by construction. An ideal overlapper tracks y = batch until the
- * wire saturates; a serializing backend stays flat at 1. A series without a
+ * one ISL of the selected direction and page size, so y is 1 at batch 1 by
+ * construction. The ISL is `selection.isl` when set, else each series' own
+ * largest measured ISL. An ideal overlapper tracks y = batch until the wire
+ * saturates; a serializing backend stays flat at 1. A series without a
  * batch-1 rung at that ISL has no baseline and is dropped.
  */
 export function collectiveXKvOverlapPoints(
@@ -371,7 +375,7 @@ export function collectiveXKvOverlapPoints(
         row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
     );
     if (matching.length === 0) return [];
-    const isl = Math.max(...matching.map((row) => row.isl));
+    const isl = selection.isl ?? Math.max(...matching.map((row) => row.isl));
     const atIsl = matching.filter((row) => row.isl === isl);
     const baseline = atIsl.find((row) => row.batch === 1);
     if (!baseline || !(baseline.gbps_p50 > 0)) return [];
@@ -391,6 +395,72 @@ export function collectiveXKvOverlapPoints(
       ];
     });
   });
+}
+
+/**
+ * Distinct measured ISLs of the paged rows matching the selected direction
+ * and page size, ascending. Drives the overlap view's ISL selector; a series
+ * with no rows at a chosen ISL simply drops from the chart via the missing
+ * batch-1 baseline.
+ */
+export function collectiveXKvIslValues(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: Pick<CollectiveXKvFrontierSelection, 'op' | 'pageTokens'>,
+): number[] {
+  const values = new Set<number>();
+  for (const kase of cases) {
+    for (const row of kase.rows) {
+      if (
+        row.kind === 'paged' &&
+        row.op === selection.op &&
+        row.page_tokens === selection.pageTokens
+      ) {
+        values.add(row.isl);
+      }
+    }
+  }
+  return [...values].toSorted((a, b) => a - b);
+}
+
+export interface CollectiveXKvWireCeilingPoint {
+  x: number;
+  y: number;
+  row: CollectiveXKvRow;
+}
+
+/**
+ * Wire-ceiling lines for the envelope view: each series' bulk rows of the
+ * selected direction across the ISL ladder, keyed by series id. A bulk row
+ * moves the same bytes as the paged rungs at that ISL in one contiguous
+ * descriptor, so it is what the fabric itself achieves; the gap from a paged
+ * rung up to this line is per-descriptor software overhead, not the wire.
+ * Bulk rows have no page size, so the page toggle does not apply. When
+ * several bulk rows share an ISL (a batch ladder), the fastest one is the
+ * ceiling.
+ */
+export function collectiveXKvWireCeilings(
+  cases: readonly CollectiveXKvRunCase[],
+  op: 'pull' | 'push',
+): Map<string, CollectiveXKvWireCeilingPoint[]> {
+  const ceilings = new Map<string, CollectiveXKvWireCeilingPoint[]>();
+  for (const kase of cases) {
+    const byIsl = new Map<number, CollectiveXKvRow>();
+    for (const row of kase.rows) {
+      if (row.kind !== 'bulk' || row.op !== op) continue;
+      if (!Number.isFinite(row.isl) || row.isl <= 0) continue;
+      if (!Number.isFinite(row.gbps_p50) || row.gbps_p50 <= 0) continue;
+      const best = byIsl.get(row.isl);
+      if (!best || row.gbps_p50 > best.gbps_p50) byIsl.set(row.isl, row);
+    }
+    if (byIsl.size === 0) continue;
+    ceilings.set(
+      `${kase.run_id}:${kase.case_id}`,
+      [...byIsl.values()]
+        .toSorted((a, b) => a.isl - b.isl)
+        .map((row) => ({ x: row.isl, y: row.gbps_p50, row })),
+    );
+  }
+  return ceilings;
 }
 
 export function collectiveXKvChartPoints(

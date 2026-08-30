@@ -20,6 +20,7 @@ import {
   type CollectiveXKvRunCase,
   collectiveXKvCell,
   collectiveXKvColorKey,
+  collectiveXKvIslValues,
   collectiveXKvLegendLabel,
   collectiveXRunDasharray,
   collectiveXSkuLabel,
@@ -31,58 +32,82 @@ const STRINGS = {
     heading: 'KV-cache transfer',
     description:
       'Prefill-to-decode KV handoff (2 nodes x 1 GPU, DeepSeek-V4-Pro cache as vLLM allocates it). ' +
-      'Paged rows move per-request layer-major descriptor lists over randomized block tables; ' +
-      'bulk is the single-descriptor wire ceiling. GB/s is burst-aggregate pull at the largest ISL; ' +
-      'b1/bmax are requests posted per burst.',
+      'Paged rows move packed block-major descriptor lists over randomized block tables: one ' +
+      'contiguous descriptor per physical block per cache group, matching the production NIXL path. ' +
+      'Bulk is the single-descriptor contiguous baseline (host-observed goodput, not proven wire ' +
+      'utilization). GB/s is burst-aggregate pull at the largest ISL; b1/bmax are requests posted per burst.',
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
+      'every measured (ISL, batch) rung is a point; each solid or dashed line traces the ' +
+      'backend at its best batch for every ISL, so higher is better. The dotted line above ' +
+      'each backend is its contiguous baseline: the same bytes moved as one contiguous ' +
+      'descriptor through the same backend call, a host-observed goodput reference rather ' +
+      'than a proven physical link rate. The gap between a paged rung and its baseline is ' +
+      'the cost of the packed multi-descriptor path. Hover a point for its share of the baseline.',
+    frontierCaptionWithoutCeilings:
       'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
       'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
       'line well above its batch-1 points; hover a point for its batch, latency, and status.',
     frontierOption: 'Envelope',
     overlapOption: 'Overlap gain',
     overlapCaption:
-      'aggregate bandwidth relative to batch 1 at the largest measured ISL; the dotted ideal ' +
-      'is y = batch. A perfect overlapper tracks the ideal until the wire saturates; a ' +
-      'serializing backend stays flat at 1.',
+      'aggregate bandwidth relative to batch 1 at the selected ISL (Max reads each backend at ' +
+      'its largest measured ISL); the dotted ideal is y = batch. A perfect overlapper tracks ' +
+      'the ideal until the wire saturates; a serializing backend stays flat at 1. Backends ' +
+      'without a batch-1 rung at the selected ISL are hidden.',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
     opControl: 'Direction',
+    islControl: 'ISL',
+    islMaxOption: 'Max',
     metricAriaLabel: 'CollectiveX KV metric',
     xAriaLabel: 'CollectiveX KV X axis',
     pageAriaLabel: 'CollectiveX KV page size',
     opAriaLabel: 'CollectiveX KV direction',
+    islAriaLabel: 'CollectiveX KV overlap ISL',
     xLogScale: 'X-axis Log Scale',
     yLogScale: 'Y-axis Log Scale',
+    bulkBaseline: 'Bulk Contiguous Baseline',
   },
   zh: {
     heading: 'KV 缓存传输',
     description:
       '预填充到解码的 KV 交接（2 节点 x 1 GPU，按 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
-      '分页行按随机块表以逐层描述符列表搬运每个请求；bulk 为单描述符线速上限。' +
+      '分页行按随机块表以块主序打包描述符列表搬运每个请求：每个缓存组的每个物理块对应一个连续描述符，' +
+      '与生产 NIXL 路径一致。bulk 为单描述符连续传输基线（主机侧观测的有效吞吐，并非实测物理链路利用率）。' +
       'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
+      '每个实测 (ISL, 批大小) 组合都是一个点；实线或虚线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '每个后端上方的点状线是其连续传输基线：同样的字节量经同一后端调用以单个连续描述符搬运，' +
+      '是主机侧观测的有效吞吐参考，而非实测物理链路速率。' +
+      '分页组合与基线之间的差距即打包多描述符路径的开销。悬停数据点可查看其相对基线的比例。',
+    frontierCaptionWithoutCeilings:
       '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
-      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、时延与状态。',
+      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、延迟与状态。',
     frontierOption: '带宽包络',
     overlapOption: '重叠增益',
     overlapCaption:
-      '相对批大小 1 的聚合带宽，取最大实测 ISL；虚线为理想值 y = 批大小。' +
-      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。',
+      '相对批大小 1 的聚合带宽，取所选 ISL（“最大”表示各后端取其最大实测 ISL）；虚线为理想值 y = 批大小。' +
+      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。' +
+      '在所选 ISL 处没有批大小 1 数据的后端将被隐藏。',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
     opControl: '方向',
+    islControl: 'ISL',
+    islMaxOption: '最大',
     metricAriaLabel: 'CollectiveX KV 指标',
     xAriaLabel: 'CollectiveX KV X 轴',
     pageAriaLabel: 'CollectiveX KV 页大小',
     opAriaLabel: 'CollectiveX KV 传输方向',
+    islAriaLabel: 'CollectiveX KV 重叠增益 ISL',
     xLogScale: 'X 轴对数缩放',
     yLogScale: 'Y 轴对数缩放',
+    bulkBaseline: 'Bulk 连续传输基线',
   },
 } as const;
 
@@ -97,6 +122,10 @@ const OUTCOME_CLASS: Record<CollectiveXOutcome, string> = {
 
 function formatGbps(value: number | null | undefined): string {
   return value === null || value === undefined ? '-' : value.toFixed(value >= 100 ? 0 : 2);
+}
+
+function formatIsl(value: number): string {
+  return value >= 1024 && value % 1024 === 0 ? `${value / 1024}k` : String(value);
 }
 
 function cellsOf(row: CollectiveXKvRunCase) {
@@ -125,8 +154,12 @@ export function CollectiveXKvSection({
   );
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
+  // Overlap view only: 'max' normalizes each series at its own largest
+  // measured ISL; a numeric string pins every series to that ISL.
+  const [overlapIsl, setOverlapIsl] = useState<string>('max');
   const [xLogScale, setXLogScale] = useState(true);
   const [yLogScale, setYLogScale] = useState(true);
+  const [showWireCeilings, setShowWireCeilings] = useState(true);
   // Legend toggles are keyed to the current series set: when checked runs
   // change, the stored selection is stale and every series starts active
   // again (the EP explorer resets the same way).
@@ -169,6 +202,18 @@ export function CollectiveXKvSection({
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
     [activeIds, measuredCases],
   );
+  // ISL options come from all measured cases (not the legend-active subset)
+  // so the selector is stable while series are toggled. A stored value that
+  // no longer exists for the current direction and page size falls back to
+  // 'max' rather than an empty chart.
+  const overlapIslValues = useMemo(
+    () => collectiveXKvIslValues(measuredCases, { op, pageTokens: Number(pageTokens) }),
+    [measuredCases, op, pageTokens],
+  );
+  const effectiveOverlapIsl =
+    overlapIsl !== 'max' && overlapIslValues.includes(Number(overlapIsl))
+      ? Number(overlapIsl)
+      : undefined;
 
   const colorKeys = useMemo(
     () => [...new Set(measuredCases.map(collectiveXKvColorKey))],
@@ -311,6 +356,19 @@ export function CollectiveXKvSection({
       },
     },
   ];
+  const envelopeLegendSwitches = [
+    ...legendSwitches,
+    {
+      id: 'collectivex-kv-bulk-wire-ceiling',
+      label: strings.bulkBaseline,
+      advanced: true,
+      checked: showWireCeilings,
+      onCheckedChange: (checked: boolean) => {
+        setShowWireCeilings(checked);
+        track('collectivex_kv_bulk_wire_ceiling_toggled', { enabled: checked });
+      },
+    },
+  ];
   return (
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
@@ -382,6 +440,27 @@ export function CollectiveXKvSection({
                 ]}
               />
             </div>
+            {xAxis === 'overlap' && overlapIslValues.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.islControl}</Label>
+                <SegmentedToggle
+                  value={effectiveOverlapIsl === undefined ? 'max' : String(effectiveOverlapIsl)}
+                  onValueChange={(value) => {
+                    setOverlapIsl(value);
+                    track('collectivex_kv_overlap_isl_changed', { isl: value });
+                  }}
+                  ariaLabel={strings.islAriaLabel}
+                  testId="collectivex-kv-overlap-isl-toggle"
+                  options={[
+                    { value: 'max', label: strings.islMaxOption },
+                    ...overlapIslValues.map((value) => ({
+                      value: String(value),
+                      label: formatIsl(value),
+                    })),
+                  ]}
+                />
+              </div>
+            )}
           </div>
           <div className="relative mt-3">
             {xAxis === 'frontier' ? (
@@ -393,16 +472,20 @@ export function CollectiveXKvSection({
                 selection={{ op, pageTokens: Number(pageTokens) }}
                 xLogScale={xLogScale}
                 yLogScale={yLogScale}
+                showWireCeilings={showWireCeilings}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.frontierCaption}
+                    {op} · page {pageTokens} ·{' '}
+                    {showWireCeilings
+                      ? strings.frontierCaption
+                      : strings.frontierCaptionWithoutCeilings}
                   </p>
                 }
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
-                    switches={legendSwitches}
+                    switches={envelopeLegendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={setLegendExpanded}
@@ -415,10 +498,14 @@ export function CollectiveXKvSection({
                 testId="collectivex-kv-overlap-chart"
                 cases={activeCases}
                 colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens) }}
+                selection={{ op, pageTokens: Number(pageTokens), isl: effectiveOverlapIsl }}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.overlapCaption}
+                    {op} · page {pageTokens} · ISL{' '}
+                    {effectiveOverlapIsl === undefined
+                      ? strings.islMaxOption
+                      : formatIsl(effectiveOverlapIsl)}{' '}
+                    · {strings.overlapCaption}
                   </p>
                 }
                 legendElement={
