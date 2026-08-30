@@ -32,19 +32,19 @@ const STRINGS = {
     heading: 'KV-cache transfer',
     description:
       'Prefill-to-decode KV handoff (2 nodes x 1 GPU, DeepSeek-V4-Pro cache as vLLM allocates it). ' +
-      'Paged rows move per-request layer-major descriptor lists over randomized block tables; ' +
-      'bulk is the single-descriptor wire ceiling. GB/s is burst-aggregate pull at the largest ISL; ' +
-      'b1/bmax are requests posted per burst.',
+      'Paged rows move packed block-major descriptor lists over randomized block tables: one ' +
+      'contiguous descriptor per physical block per cache group, matching the production NIXL path. ' +
+      'Bulk is the single-descriptor contiguous baseline (host-observed goodput, not proven wire ' +
+      'utilization). GB/s is burst-aggregate pull at the largest ISL; b1/bmax are requests posted per burst.',
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
       'every measured (ISL, batch) rung is a point; each solid or dashed line traces the ' +
       'backend at its best batch for every ISL, so higher is better. The dotted line above ' +
-      'each backend is its bulk wire ceiling: the same bytes moved as one contiguous ' +
-      'descriptor, so it is what the fabric itself achieves. Paged rungs sit far below it ' +
-      'because the DeepSeek-V4-Pro layout fragments each request into thousands of tiny ' +
-      'per-layer page descriptors, making the transfer descriptor-rate bound (per-operation ' +
-      'software cost), not fabric-bandwidth bound. Hover a point for its share of the wire.',
+      'each backend is its contiguous baseline: the same bytes moved as one contiguous ' +
+      'descriptor through the same backend call, a host-observed goodput reference rather ' +
+      'than a proven physical link rate. The gap between a paged rung and its baseline is ' +
+      'the cost of the packed multi-descriptor path. Hover a point for its share of the baseline.',
     frontierCaptionWithoutCeilings:
       'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
       'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
@@ -69,21 +69,22 @@ const STRINGS = {
     islAriaLabel: 'CollectiveX KV overlap ISL',
     xLogScale: 'X-axis Log Scale',
     yLogScale: 'Y-axis Log Scale',
-    bulkWireCeiling: 'Bulk Wire Ceiling',
+    bulkBaseline: 'Bulk Contiguous Baseline',
   },
   zh: {
     heading: 'KV 缓存传输',
     description:
       '预填充到解码的 KV 交接（2 节点 x 1 GPU，按 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
-      '分页行按随机块表以逐层描述符列表搬运每个请求；bulk 为单描述符线速上限。' +
+      '分页行按随机块表以块主序打包描述符列表搬运每个请求：每个缓存组的每个物理块对应一个连续描述符，' +
+      '与生产 NIXL 路径一致。bulk 为单描述符连续传输基线（主机侧观测的有效吞吐，并非实测物理链路利用率）。' +
       'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
       '每个实测 (ISL, 批大小) 组合都是一个点；实线或虚线取该后端在各 ISL 下的最优批大小，越高越优。' +
-      '每个后端上方的点状线是其 bulk 线速上限：同样的字节量以单个连续描述符搬运，即链路本身的能力。' +
-      '分页组合远低于上限，是因为 DeepSeek-V4-Pro 布局把每个请求碎片化为数千个微小的逐层页描述符，' +
-      '瓶颈在描述符处理速率（每操作软件开销）而非链路带宽。悬停数据点可查看其达到线速的比例。',
+      '每个后端上方的点状线是其连续传输基线：同样的字节量经同一后端调用以单个连续描述符搬运，' +
+      '是主机侧观测的有效吞吐参考，而非实测物理链路速率。' +
+      '分页组合与基线之间的差距即打包多描述符路径的开销。悬停数据点可查看其相对基线的比例。',
     frontierCaptionWithoutCeilings:
       '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
       '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、延迟与状态。',
@@ -106,7 +107,7 @@ const STRINGS = {
     islAriaLabel: 'CollectiveX KV 重叠增益 ISL',
     xLogScale: 'X 轴对数缩放',
     yLogScale: 'Y 轴对数缩放',
-    bulkWireCeiling: 'Bulk 线速上限',
+    bulkBaseline: 'Bulk 连续传输基线',
   },
 } as const;
 
@@ -359,7 +360,7 @@ export function CollectiveXKvSection({
     ...legendSwitches,
     {
       id: 'collectivex-kv-bulk-wire-ceiling',
-      label: strings.bulkWireCeiling,
+      label: strings.bulkBaseline,
       advanced: true,
       checked: showWireCeilings,
       onCheckedChange: (checked: boolean) => {

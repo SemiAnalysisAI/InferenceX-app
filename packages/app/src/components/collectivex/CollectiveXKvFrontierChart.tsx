@@ -46,13 +46,18 @@ const STRINGS = {
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
       `${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
-      const perInflight = point.row.latency_ms.p95 / point.row.batch;
-      return `Aggregate ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s · p95 ÷ in-flight ${perInflight.toFixed(perInflight >= 100 ? 0 : 1)} ms`;
+      const aggregate = `Aggregate ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
+      const req = point.row.request_ms;
+      if (req) {
+        return `${aggregate} · per-request p95 ${req.p95.toFixed(req.p95 >= 100 ? 0 : 1)} ms`;
+      }
+      const amortized = point.row.latency_ms.p95 / point.row.batch;
+      return `${aggregate} · burst p95 ÷ batch ${amortized.toFixed(amortized >= 100 ? 0 : 1)} ms (amortized capacity, not per-request latency)`;
     },
     latency: (point: CollectiveXKvFrontierPoint) =>
       `Burst latency p50 / p95: ${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} descriptors/request`,
     ceiling: (gbps: number, share: string) =>
-      `Bulk wire ceiling ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s (dotted) · this rung reaches ${share} of it`,
+      `Contiguous baseline ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s (dotted) · this rung reaches ${share} of it`,
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
@@ -68,13 +73,18 @@ const STRINGS = {
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
       `${row.op} · 页大小 ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
-      const perInflight = point.row.latency_ms.p95 / point.row.batch;
-      return `聚合带宽 ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s · p95 ÷ 在途请求数 ${perInflight.toFixed(perInflight >= 100 ? 0 : 1)} ms`;
+      const aggregate = `聚合带宽 ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
+      const req = point.row.request_ms;
+      if (req) {
+        return `${aggregate} · 单请求 p95 ${req.p95.toFixed(req.p95 >= 100 ? 0 : 1)} ms`;
+      }
+      const amortized = point.row.latency_ms.p95 / point.row.batch;
+      return `${aggregate} · 突发 p95 ÷ 批大小 ${amortized.toFixed(amortized >= 100 ? 0 : 1)} ms（摊销容量指标，非单请求延迟）`;
     },
     latency: (point: CollectiveXKvFrontierPoint) =>
       `突发延迟 p50 / p95：${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} 个描述符/请求`,
     ceiling: (gbps: number, share: string) =>
-      `单描述符线速上限 ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s（点状线）· 此组合达到其 ${share}`,
+      `单描述符连续传输基线 ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s（点状线）· 此组合达到其 ${share}`,
     verify: (passed: boolean) => `校验：${passed ? '通过' : '失败'}`,
   },
 } as const;

@@ -73,7 +73,9 @@ interface RawKvRow {
   req_bytes: number;
   prep_ms?: number;
   latency_ms: CollectiveXKvLatency;
+  request_ms?: CollectiveXKvLatency;
   gbps_p50: number;
+  gbps_p50_incl_prep?: number;
   verify?: { passed: boolean; detail?: string };
 }
 
@@ -319,7 +321,12 @@ function mapKvRow(row: RawKvRow): CollectiveXKvRow {
     req_bytes: row.req_bytes,
     prep_ms: row.prep_ms ?? 0,
     latency_ms: row.latency_ms,
+    // Absent on rows measured before the harness recorded per-request marks.
+    ...(row.request_ms ? { request_ms: row.request_ms } : {}),
     gbps_p50: row.gbps_p50,
+    ...(typeof row.gbps_p50_incl_prep === 'number'
+      ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
+      : {}),
     verify_passed: row.verify?.passed ?? true,
   };
 }

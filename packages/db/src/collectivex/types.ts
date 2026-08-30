@@ -128,7 +128,15 @@ export interface CollectiveXKvRow {
   req_bytes: number;
   prep_ms: number;
   latency_ms: CollectiveXKvLatency;
+  /**
+   * Each request's host-observed completion offset within its burst — the
+   * per-request latency distribution. Absent on rows measured before the
+   * harness recorded it; `latency_ms` (whole-burst) is a capacity quantity.
+   */
+  request_ms?: CollectiveXKvLatency;
   gbps_p50: number;
+  /** Cold-path rate: descriptor/handle prep paid once per burst. */
+  gbps_p50_incl_prep?: number;
   verify_passed: boolean;
 }
 

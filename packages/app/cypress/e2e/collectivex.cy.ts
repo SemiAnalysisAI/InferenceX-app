@@ -852,7 +852,7 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-frontier-chart"] [data-testid="chart-legend"]')
       .should('contain.text', 'X 轴对数缩放')
       .and('contain.text', 'Y 轴对数缩放')
-      .and('contain.text', 'Bulk 线速上限');
+      .and('contain.text', 'Bulk 连续传输基线');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {

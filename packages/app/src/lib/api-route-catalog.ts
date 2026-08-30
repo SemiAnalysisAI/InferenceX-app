@@ -695,7 +695,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: '40079de1a9b1faef47cc72090331b9d2987f2895da34a77292f3bfcdf1dc5a64',
+    sourceSha256: 'd988f0c348d187667aedaba63848bf5c0afd038c7fee6bcaf830747ee6c0dc61',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
