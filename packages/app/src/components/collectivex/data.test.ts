@@ -18,6 +18,7 @@ import {
   collectiveXKvChartPoints,
   collectiveXKvFrontierPoints,
   collectiveXKvOverlapPoints,
+  collectiveXKvWireCeilings,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
 } from './data';
@@ -340,6 +341,9 @@ const kvRow = ({
   ...overrides,
 });
 
+const bulk = (overrides: Partial<CollectiveXKvRow>) =>
+  ({ kind: 'bulk', page_tokens: null, ...overrides }) as Partial<CollectiveXKvRow>;
+
 describe('collectiveXKvCell', () => {
   it('picks the largest-ISL pull row at the requested batch extreme', () => {
     const rows = [
@@ -555,6 +559,56 @@ describe('collectiveXKvChartPoints', () => {
         selection,
       );
       expect(points).toEqual([]);
+    });
+  });
+
+  describe('collectiveXKvWireCeilings', () => {
+    it('traces the bulk ladder of the selected direction, sorted by ISL', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            bulk({ isl: 32768, gbps_p50: 89.41 }),
+            bulk({ isl: 4096, gbps_p50: 52.3 }),
+            bulk({ isl: 32768, op: 'push', gbps_p50: 70 }),
+            // Paged rows never enter the ceiling.
+            { isl: 32768, batch: 1, gbps_p50: 7.39 },
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.get('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8')).toMatchObject([
+        { x: 4096, y: 52.3 },
+        { x: 32768, y: 89.41 },
+      ]);
+    });
+
+    it('keeps the fastest bulk row when several share an ISL', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            bulk({ isl: 32768, batch: 1, gbps_p50: 89.41 }),
+            bulk({ isl: 32768, batch: 4, gbps_p50: 96.2 }),
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.get('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8')).toMatchObject([
+        { x: 32768, y: 96.2 },
+      ]);
+    });
+
+    it('omits series without usable bulk rows', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            { isl: 32768, batch: 1, gbps_p50: 7.39 },
+            bulk({ isl: 32768, gbps_p50: 0 }),
+            bulk({ isl: 4096, gbps_p50: Number.NaN }),
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.size).toBe(0);
     });
   });
 });

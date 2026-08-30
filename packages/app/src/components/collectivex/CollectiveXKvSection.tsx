@@ -37,9 +37,13 @@ const STRINGS = {
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
-      'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
-      'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
-      'line well above its batch-1 points; hover a point for its batch, latency, and status.',
+      'every measured (ISL, batch) rung is a point; each solid or dashed line traces the ' +
+      'backend at its best batch for every ISL, so higher is better. The dotted line above ' +
+      'each backend is its bulk wire ceiling: the same bytes moved as one contiguous ' +
+      'descriptor, so it is what the fabric itself achieves. Paged rungs sit far below it ' +
+      'because the DeepSeek-V4-Pro layout fragments each request into thousands of tiny ' +
+      'per-layer page descriptors, making the transfer descriptor-rate bound (per-operation ' +
+      'software cost), not fabric-bandwidth bound. Hover a point for its share of the wire.',
     frontierOption: 'Envelope',
     overlapOption: 'Overlap gain',
     overlapCaption:
@@ -66,8 +70,10 @@ const STRINGS = {
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
-      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、时延与状态。',
+      '每个实测 (ISL, 批大小) 组合都是一个点；实线或虚线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '每个后端上方的点状线是其 bulk 线速上限：同样的字节量以单个连续描述符搬运，即链路本身的能力。' +
+      '分页组合远低于上限，是因为 DeepSeek-V4-Pro 布局把每个请求碎片化为数千个微小的逐层页描述符，' +
+      '瓶颈在描述符处理速率（每操作软件开销）而非链路带宽。悬停数据点可查看其达到线速的比例。',
     frontierOption: '带宽包络',
     overlapOption: '重叠增益',
     overlapCaption:

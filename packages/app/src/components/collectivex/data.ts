@@ -393,6 +393,47 @@ export function collectiveXKvOverlapPoints(
   });
 }
 
+export interface CollectiveXKvWireCeilingPoint {
+  x: number;
+  y: number;
+  row: CollectiveXKvRow;
+}
+
+/**
+ * Wire-ceiling lines for the envelope view: each series' bulk rows of the
+ * selected direction across the ISL ladder, keyed by series id. A bulk row
+ * moves the same bytes as the paged rungs at that ISL in one contiguous
+ * descriptor, so it is what the fabric itself achieves; the gap from a paged
+ * rung up to this line is per-descriptor software overhead, not the wire.
+ * Bulk rows have no page size, so the page toggle does not apply. When
+ * several bulk rows share an ISL (a batch ladder), the fastest one is the
+ * ceiling.
+ */
+export function collectiveXKvWireCeilings(
+  cases: readonly CollectiveXKvRunCase[],
+  op: 'pull' | 'push',
+): Map<string, CollectiveXKvWireCeilingPoint[]> {
+  const ceilings = new Map<string, CollectiveXKvWireCeilingPoint[]>();
+  for (const kase of cases) {
+    const byIsl = new Map<number, CollectiveXKvRow>();
+    for (const row of kase.rows) {
+      if (row.kind !== 'bulk' || row.op !== op) continue;
+      if (!Number.isFinite(row.isl) || row.isl <= 0) continue;
+      if (!Number.isFinite(row.gbps_p50) || row.gbps_p50 <= 0) continue;
+      const best = byIsl.get(row.isl);
+      if (!best || row.gbps_p50 > best.gbps_p50) byIsl.set(row.isl, row);
+    }
+    if (byIsl.size === 0) continue;
+    ceilings.set(
+      `${kase.run_id}:${kase.case_id}`,
+      [...byIsl.values()]
+        .toSorted((a, b) => a.isl - b.isl)
+        .map((row) => ({ x: row.isl, y: row.gbps_p50, row })),
+    );
+  }
+  return ceilings;
+}
+
 export function collectiveXKvChartPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvChartSelection,

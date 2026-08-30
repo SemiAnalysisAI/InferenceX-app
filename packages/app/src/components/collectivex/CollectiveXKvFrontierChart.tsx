@@ -11,8 +11,12 @@ import {
   type CollectiveXKvFrontierSelection,
   type CollectiveXKvRunCase,
   collectiveXKvFrontierPoints,
+  collectiveXKvWireCeilings,
   collectiveXRunDasharray,
 } from './data';
+
+/** Line-key suffix marking a series' bulk wire-ceiling line (not an envelope). */
+const CEILING_SUFFIX = '__collectivex-kv-wire-ceiling';
 
 interface CollectiveXKvFrontierChartProps {
   chartId: string;
@@ -46,6 +50,8 @@ const STRINGS = {
     },
     latency: (point: CollectiveXKvFrontierPoint) =>
       `Burst latency p50 / p95: ${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} descriptors/request`,
+    ceiling: (gbps: number, share: string) =>
+      `Bulk wire ceiling ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s (dotted) · this rung reaches ${share} of it`,
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
@@ -66,6 +72,8 @@ const STRINGS = {
     },
     latency: (point: CollectiveXKvFrontierPoint) =>
       `突发延迟 p50 / p95：${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} 个描述符/请求`,
+    ceiling: (gbps: number, share: string) =>
+      `单描述符线速上限 ${gbps.toFixed(gbps >= 100 ? 0 : 1)} GB/s（点状线）· 此组合达到其 ${share}`,
     verify: (passed: boolean) => `校验：${passed ? '通过' : '失败'}`,
   },
 } as const;
@@ -135,9 +143,32 @@ export function CollectiveXKvFrontierChart({
     () => new Map(points.map((point) => [point.seriesId, point.colorKey])),
     [points],
   );
+  // Each series' bulk single-descriptor rows, drawn as a dotted line above the
+  // envelope: what the fabric itself moves at that ISL. The gap from a paged
+  // rung up to this line is per-descriptor software overhead, not the wire.
+  const ceilings = useMemo(
+    () => collectiveXKvWireCeilings(cases, selection.op),
+    [cases, selection.op],
+  );
+  const allLines = useMemo(() => {
+    const merged: Record<string, { x: number; y: number }[]> = { ...lines };
+    for (const [seriesId, ceiling] of ceilings) {
+      // Only series that are actually plotted get a ceiling line.
+      if (!(seriesId in lines) || ceiling.length < 2) continue;
+      merged[`${seriesId}${CEILING_SUFFIX}`] = ceiling.map(({ x, y }) => ({ x, y }));
+    }
+    return merged;
+  }, [lines, ceilings]);
 
   const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
-  const yDomain = useMemo(() => paddedDomain(points.map((point) => point.y)), [points]);
+  const yDomain = useMemo(() => {
+    const values = points.map((point) => point.y);
+    for (const key of Object.keys(allLines)) {
+      if (!key.endsWith(CEILING_SUFFIX)) continue;
+      for (const { y } of allLines[key]) values.push(y);
+    }
+    return paddedDomain(values);
+  }, [points, allLines]);
 
   const noDataOverlay =
     points.length === 0 ? (
@@ -172,10 +203,20 @@ export function CollectiveXKvFrontierChart({
         {
           type: 'line',
           key: 'collectivex-kv-frontier-lines',
-          lines,
+          lines: allLines,
           config: {
-            getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
-            getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
+            getColor: (key) => {
+              const seriesId = key.endsWith(CEILING_SUFFIX)
+                ? key.slice(0, -CEILING_SUFFIX.length)
+                : key;
+              return colors[colorBySeries.get(seriesId) ?? ''] ?? '#888';
+            },
+            // Ceiling lines are dotted ('1 4' is used by no run dasharray) so
+            // they read as reference lines, not another measured envelope.
+            getStrokeDasharray: (key) =>
+              key.endsWith(CEILING_SUFFIX)
+                ? '1 4'
+                : collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
             strokeWidth: 2,
             curve: d3.curveMonotoneX,
           },
@@ -213,12 +254,22 @@ export function CollectiveXKvFrontierChart({
             : point.onSeriesFrontier
               ? strings.backendFrontier
               : strings.dominated;
+          const ceilingAtIsl = ceilings
+            .get(point.seriesId)
+            ?.find((ceiling) => ceiling.x === row.isl);
+          let ceilingLine = '';
+          if (ceilingAtIsl && ceilingAtIsl.y > 0) {
+            const fraction = point.y / ceilingAtIsl.y;
+            const share = fraction < 0.001 ? '<0.1%' : `${(fraction * 100).toFixed(1)}%`;
+            ceilingLine = `<div class="text-muted-foreground">${strings.ceiling(ceilingAtIsl.y, share)}</div>`;
+          }
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
             ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${strings.dismiss}</div>` : ''}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
             <div>${strings.pointContext(row, tier)}</div>
             <div>${strings.pointMetrics(point)}</div>
             <div class="text-muted-foreground">${strings.latency(point)}</div>
+            ${ceilingLine}
             <div class="text-muted-foreground">${strings.verify(row.verify_passed)}</div>
           </div>`;
         },
