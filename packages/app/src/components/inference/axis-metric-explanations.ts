@@ -108,16 +108,53 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
     description: {
       en:
         'Gross token revenue a GPU could earn per hour at this operating point. The normalized ' +
-        'source prices every input and output token at $1 per million; the OpenRouter source uses ' +
-        "the selected model's current public input and output prices. This turns the " +
+        'source prices uncached input and output at $1 per million and cached input at $0.10 per ' +
+        'million. The OpenRouter source uses the selected model’s current public prices, with a ' +
+        '10%-of-input fallback when no cache-read price is published. Revenue prices uncached ' +
+        'input, cached input, and output separately. Input share comes from compatible measured ' +
+        'input/output throughput. When disaggregated rates use different GPU denominators, fixed ' +
+        'sequences use ISL:OSL and Agentic traces use measured prompt/generation tokens. Agentic ' +
+        'cache hit combines GPU and external cache when external cache is reported, otherwise GPU ' +
+        'and CPU cache. Historical Trends interpolates total throughput, input share, and cache ' +
+        'hit separately before pricing. A partially measured cache frontier receives no cache ' +
+        'discount. This turns the ' +
         'throughput/interactivity tradeoff into a business-facing SLA curve.',
       zh:
-        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式将输入和输出 token 均按每百万 1 美元计价；' +
-        'OpenRouter 模式采用所选模型当前公开的输入和输出价格。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
+        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式下，未缓存输入和输出均按每百万 1 美元计价，' +
+        '缓存输入按每百万 0.10 美元计价。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。' +
+        '未缓存输入、缓存输入与输出分别计价。输入 token 占比优先采用口径一致的实测输入/输出吞吐量。解耦运行的两类速率使用不同 GPU 分母时，' +
+        '固定序列采用 ISL:OSL，Agentic trace 采用实测 prompt/generation token 构成。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
+        '否则由 GPU 与 CPU cache 相加。Historical Trends 会在计价前分别插值总吞吐量、输入 token 占比和缓存命中率。' +
+        '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
     },
     formula: {
-      en: '$/GPU/hr = total tok/s/GPU × (input share × input $/M + output share × output $/M) × 3,600 ÷ 1,000,000',
-      zh: '$/GPU/hr = 总 tok/s/GPU ×（输入占比 × 输入 $/百万 + 输出占比 × 输出 $/百万）× 3,600 ÷ 1,000,000',
+      en: '$/GPU/hr = (uncached input × input price + cached input × cache-read price + output × output price) per GPU-second, scaled to one hour',
+      zh: '$/GPU/hr = 每 GPU 秒的（未缓存输入 × 输入价格 + 缓存输入 × 缓存读取价格 + 输出 × 输出价格），再换算为一小时',
+    },
+  };
+}
+
+function apiTokensPerDollar(): MetricExplanation {
+  return {
+    description: {
+      en:
+        'How many raw total tokens are represented by one US dollar at the selected token sale ' +
+        'prices. It divides total token volume by the same cache-aware gross revenue used by the ' +
+        'revenue axis, so it is not an infrastructure-cost metric. Uncached input, cached input, ' +
+        'and output are priced separately. Agentic cache hit combines GPU and external cache when ' +
+        'external cache is reported, otherwise GPU and CPU cache. Historical Trends interpolates ' +
+        'total throughput, input share, and cache hit separately, calculates revenue, then divides ' +
+        'the interpolated total token volume by that revenue. A partially measured cache frontier ' +
+        'receives no cache discount.',
+      zh:
+        '表示按所选 token 售价计算时，1 美元对应多少原始总 token。该指标用总 token 量除以收入轴采用的同一套缓存感知毛收入，' +
+        '因此不是基础设施成本指标。未缓存输入、缓存输入与输出分别计价。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
+        '否则由 GPU 与 CPU cache 相加。Historical Trends 会分别插值总吞吐量、输入 token 占比和缓存命中率，先计算收入，' +
+        '再用插值后的总 token 量除以该收入。缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。',
+    },
+    formula: {
+      en: 'tok/$ = total tokens per GPU-hour ÷ cache-aware gross token revenue per GPU-hour ($)',
+      zh: 'tok/$ = 每 GPU 小时总 token 数 ÷ 每 GPU 小时缓存感知 token 毛收入（$）',
     },
   };
 }
@@ -259,6 +296,7 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
   tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
+  tokensPerDollar: apiTokensPerDollar(),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
@@ -271,9 +309,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   costhi: costPerMillion('h', 'input'),
   costni: costPerMillion('n', 'input'),
   costri: costPerMillion('r', 'input'),
-  tokensPerDollarH: tokensPerDollar('h', 'total'),
-  tokensPerDollarN: tokensPerDollar('n', 'total'),
-  tokensPerDollarR: tokensPerDollar('r', 'total'),
   outputTokensPerDollarH: tokensPerDollar('h', 'output'),
   outputTokensPerDollarN: tokensPerDollar('n', 'output'),
   outputTokensPerDollarR: tokensPerDollar('r', 'output'),

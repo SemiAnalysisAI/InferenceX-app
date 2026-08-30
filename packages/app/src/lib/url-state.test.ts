@@ -48,7 +48,7 @@ describe('PARAM_DEFAULTS', () => {
     const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
     expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
-    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarN');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokenRevenuePerGpuHour');
     expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
   });
 

@@ -85,6 +85,7 @@ describe('Inference Chart', () => {
             id: 'deepseek/deepseek-v4-pro-0813',
             pricing: {
               prompt: '0.000001122',
+              input_cache_read: '0.00000008',
               completion: '0.000003366',
             },
           },
@@ -113,12 +114,13 @@ describe('Inference Chart', () => {
       'OpenRouter current pricing',
     );
     cy.get('[data-testid="openrouter-price-summary"]')
-      .should('contain.text', 'Input $1.122/M tok')
+      .should('contain.text', 'Uncached input $1.122/M tok')
+      .and('contain.text', 'Cached input $0.08/M tok')
       .and('contain.text', 'Output $3.366/M tok');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should('have.text', 'Input $1.122/M tok · Output $3.366/M tok')
+      .should('have.text', 'Uncached $1.122/M tok · Cached $0.08/M tok · Output $3.366/M tok')
       .then(($prices) => {
         const subtitle = $prices.parent().text();
         expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('Updated:'));
@@ -144,7 +146,50 @@ describe('Inference Chart', () => {
     cy.get('[data-testid^="axis-metric-body-y-"]')
       .first()
       .should('contain.text', 'OpenRouter')
-      .and('contain.text', '$/GPU/hr =');
+      .and('contain.text', 'Agentic cache hit combines GPU and external cache')
+      .and('contain.text', 'A partially measured cache frontier receives no cache discount.')
+      .and('contain.text', '$/GPU/hr =')
+      .and(($body) => {
+        expect($body.text()).not.to.include('—');
+      });
+  });
+
+  it('plots cache-aware total tokens per dollar for official and unofficial runs', () => {
+    interceptOverlayRun();
+    cy.visit(
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.wait('@unofficialRun');
+
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      'Total Tokens per $1 USD',
+    );
+    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', 'Total Tokens per $1 USD at Normalized Pricing');
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should('contain.text', 'not an infrastructure-cost metric')
+      .and('contain.text', 'calculates revenue')
+      .and('contain.text', 'cache-aware gross token revenue');
   });
 
   it('ships OpenRouter-priced token revenue in Chinese', () => {
@@ -157,6 +202,7 @@ describe('Inference Chart', () => {
             id: 'deepseek/deepseek-v4-pro-0813',
             pricing: {
               prompt: '0.000001122',
+              input_cache_read: '0.00000008',
               completion: '0.000003366',
             },
           },
@@ -179,12 +225,16 @@ describe('Inference Chart', () => {
       'OpenRouter 当前价格',
     );
     cy.get('[data-testid="openrouter-price-summary"]')
-      .should('contain.text', '输入 $1.122/百万 token')
+      .should('contain.text', '未缓存输入 $1.122/百万 token')
+      .and('contain.text', '缓存输入 $0.08/百万 token')
       .and('contain.text', '输出 $3.366/百万 token');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should('have.text', '输入 $1.122/百万 token · 输出 $3.366/百万 token')
+      .should(
+        'have.text',
+        '未缓存 $1.122/百万 token · 缓存 $0.08/百万 token · 输出 $3.366/百万 token',
+      )
       .then(($prices) => {
         const subtitle = $prices.parent().text();
         expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('更新时间：'));
@@ -193,6 +243,47 @@ describe('Inference Chart', () => {
       .first()
       .find('h2')
       .should('contain.text', '按 OpenRouter 价格计算的每 GPU 小时 token 收入');
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should(
+        'contain.text',
+        '已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加',
+      )
+      .and('contain.text', '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。')
+      .and(($body) => {
+        expect($body.text()).not.to.include('—');
+      });
+  });
+
+  it('ships cache-aware total tokens per dollar in Chinese', () => {
+    cy.viewport(390, 844);
+    interceptOverlayRun();
+    cy.visit(
+      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@unofficialRun');
+
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      '每 1 美元可购买的总 token 数',
+    );
+    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', '标准化');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', '按标准化价格计算的每 1 美元总 token 数');
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should('contain.text', '因此不是基础设施成本指标')
+      .and('contain.text', '先计算收入')
+      .and('contain.text', '每 GPU 小时缓存感知 token 毛收入');
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {

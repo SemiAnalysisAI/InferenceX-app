@@ -1,4 +1,5 @@
 import type { InferenceData, TokenRevenuePricing } from './types';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO, measuredCacheHitRate } from '@/lib/cache-pricing';
 
 const SECONDS_PER_HOUR = 3_600;
 const TOKENS_PER_MILLION = 1_000_000;
@@ -7,12 +8,21 @@ const RATE_SUM_RELATIVE_TOLERANCE = 0.01;
 export const NORMALIZED_TOKEN_REVENUE_PRICING: TokenRevenuePricing = {
   source: 'normalized',
   inputPerMillion: 1,
+  cachedInputPerMillion: DEFAULT_CACHED_INPUT_PRICE_RATIO,
   outputPerMillion: 1,
 };
 
 /** Format a $/M tok sale price consistently across revenue UI surfaces. */
 export function formatTokenPrice(value: number): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
+/** Resolve an explicit cache-read price or use Fleet Lifecycle's 10% default. */
+export function cachedInputPricePerMillion(pricing: TokenRevenuePricing): number {
+  const explicit = pricing.cachedInputPerMillion;
+  return typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0
+    ? explicit
+    : pricing.inputPerMillion * DEFAULT_CACHED_INPUT_PRICE_RATIO;
 }
 
 /**
@@ -48,29 +58,81 @@ export function inputTokenShareForRevenue(point: InferenceData): number | null {
   return null;
 }
 
-/** Gross token revenue at one benchmark operating point, in $/GPU/hr. */
+/** Price interpolated or measured throughput components as gross $/GPU/hr. */
+export function tokenRevenueFromRatesPerGpuHour(
+  totalTokPerSecond: number,
+  inputTokenShare: number | null,
+  cacheHitRate: number | null,
+  pricing: TokenRevenuePricing,
+): number | null {
+  if (!(totalTokPerSecond > 0)) return 0;
+
+  const cachedInputPrice = cachedInputPricePerMillion(pricing);
+  const hit =
+    typeof cacheHitRate === 'number' && Number.isFinite(cacheHitRate)
+      ? Math.max(0, Math.min(1, cacheHitRate))
+      : 0;
+  const cacheChangesPrice = hit > 0 && cachedInputPrice !== pricing.inputPerMillion;
+
+  // Without a measured cache discount, equal input/output prices collapse
+  // exactly to total throughput and do not require token-mix telemetry.
+  if (pricing.inputPerMillion === pricing.outputPerMillion && !cacheChangesPrice) {
+    return (totalTokPerSecond * SECONDS_PER_HOUR * pricing.inputPerMillion) / TOKENS_PER_MILLION;
+  }
+
+  if (inputTokenShare === null || !Number.isFinite(inputTokenShare)) return null;
+  const inputShare = Math.max(0, Math.min(1, inputTokenShare));
+  const inputPriceAtPoint = (1 - hit) * pricing.inputPerMillion + hit * cachedInputPrice;
+  const blendedPriceAtPoint =
+    inputShare * inputPriceAtPoint + (1 - inputShare) * pricing.outputPerMillion;
+  return (totalTokPerSecond * SECONDS_PER_HOUR * blendedPriceAtPoint) / TOKENS_PER_MILLION;
+}
+
+/** Raw total tokens represented by one dollar at the selected blended sale price. */
+export function tokensPerDollarFromRates(
+  totalTokPerSecond: number,
+  inputTokenShare: number | null,
+  cacheHitRate: number | null,
+  pricing: TokenRevenuePricing,
+): number | null {
+  if (!(totalTokPerSecond > 0)) return 0;
+  const revenue = tokenRevenueFromRatesPerGpuHour(
+    totalTokPerSecond,
+    inputTokenShare,
+    cacheHitRate,
+    pricing,
+  );
+  if (revenue === null || !(revenue > 0)) return null;
+  return (totalTokPerSecond * SECONDS_PER_HOUR) / revenue;
+}
+
+/** Cache-aware gross token revenue at one benchmark operating point, in $/GPU/hr. */
 export function tokenRevenuePerGpuHour(
   point: InferenceData,
   pricing: TokenRevenuePricing,
 ): number | null {
   const total = point.tput_per_gpu ?? 0;
-  if (!(total > 0)) return 0;
-
-  // Equal input/output prices collapse exactly to total throughput and do not
-  // require token-mix telemetry. This is the normalized $1/M default.
-  if (pricing.inputPerMillion === pricing.outputPerMillion) {
-    return (total * SECONDS_PER_HOUR * pricing.inputPerMillion) / TOKENS_PER_MILLION;
-  }
-
+  const cacheHitRate = measuredCacheHitRate(point);
   const inputShare = inputTokenShareForRevenue(point);
-  if (inputShare === null) return null;
-  const blendedPriceAtPoint =
-    inputShare * pricing.inputPerMillion + (1 - inputShare) * pricing.outputPerMillion;
-  return (total * SECONDS_PER_HOUR * blendedPriceAtPoint) / TOKENS_PER_MILLION;
+  return tokenRevenueFromRatesPerGpuHour(total, inputShare, cacheHitRate, pricing);
+}
+
+/** Cache-aware API purchasing power at one benchmark operating point, in raw tok/$. */
+export function tokensPerDollar(point: InferenceData, pricing: TokenRevenuePricing): number | null {
+  const total = point.tput_per_gpu ?? 0;
+  const cacheHitRate = measuredCacheHitRate(point);
+  const inputShare = inputTokenShareForRevenue(point);
+  return tokensPerDollarFromRates(total, inputShare, cacheHitRate, pricing);
+}
+
+/** Whether a Y-axis option depends on the selected normalized or OpenRouter token prices. */
+export function usesTokenSalePricing(metricConfigKey: string): boolean {
+  return metricConfigKey === 'y_tokenRevenuePerGpuHour' || metricConfigKey === 'y_tokensPerDollar';
 }
 
 /**
- * Recompute the revenue field without mutating transformed benchmark points.
+ * Recompute sale-price revenue and purchasing-power fields without mutating
+ * transformed benchmark points.
  * A null price removes the normalized placeholder while OpenRouter is loading
  * or unavailable, so the chart never presents $1/M revenue as live pricing.
  */
@@ -81,11 +143,16 @@ export function applyTokenRevenuePricing(
   return points.map((point) => {
     const next = { ...point };
     delete next.tokenRevenuePerGpuHour;
+    delete next.tokensPerDollar;
     if (!pricing) return next;
 
     const revenue = tokenRevenuePerGpuHour(point, pricing);
     if (revenue !== null) {
       next.tokenRevenuePerGpuHour = { y: revenue, roof: false };
+    }
+    const purchasingPower = tokensPerDollar(point, pricing);
+    if (purchasingPower !== null) {
+      next.tokensPerDollar = { y: purchasingPower, roof: false };
     }
     return next;
   });

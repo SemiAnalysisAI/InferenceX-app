@@ -292,7 +292,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值 FLOPS 不能单独决定服务经济性；内存、网络、软件成熟度、数值精度和实际利用率都会影响最终比值。',
     benchmarkContext:
-      'InferenceX 在匹配交互性时比较 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。图表用每美元 token 数表达同一套经济性，它数值越大越好，也是默认的 Y 轴。',
+      'InferenceX 在匹配交互性时比较基础设施 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。每百万 token 成本以及输入和输出 token 购买力轴表达的是这套 TCO 经济性；默认的每美元总 token 数轴则采用所选 token 售价和实测缓存行为。',
   },
   'total-cost-of-ownership': {
     term: '总体拥有成本',
@@ -741,15 +741,15 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tokens-per-dollar': {
     term: '每美元 token 数',
     aliases: ['tokens per dollar', 'tok/$', '每 1 美元 token 数'],
-    plainEnglish: '每美元 token 数表示一美元基础设施支出能买到多少 token，数值越大说明系统越便宜。',
+    plainEnglish: '每美元 token 数表示在图表注明的计价口径下，1 美元对应多少 token。',
     definition:
-      '每美元 token 数是某个配置在一单位建模成本下产出的 token 数量，即每 token 成本的倒数。',
+      '默认的每美元总 token 数轴用原始总 token 量除以缓存感知 token 毛收入，也就是所选混合 token 售价的倒数。',
     explanation:
-      '它由每芯片吞吐量和建模的每芯片小时成本直接得出，因此与每百万 token 成本共用同一套假设，只是换成了人们规划容量时更习惯的方向。InferenceX 为总 token、输入 token 和输出 token 分别给出该指标，覆盖每种成本口径，并同时提供人民币与美元两种计价。',
+      '未缓存输入、缓存输入与输出分别采用标准化价格或 OpenRouter 价格。Agentic 缓存命中率沿用 Fleet Lifecycle 的实测缓存层级。Historical Trends 会先分别插值总吞吐量、输入 token 占比和缓存命中率，再计算收入并用 token 量除以该收入。输入、输出、自定义和人民币购买力轴仍采用各自明确标注的基础设施成本口径。',
     significance:
-      '每百万 token 成本与每美元 token 数对系统的排序完全一致，但后者随硬件变好而升高，与吞吐量方向相同，因此同一张图里的坐标轴不会中途反向。该数值完全依赖背后的成本模型，脱离所声明的口径就不成立。',
+      'API 计价指标体现缓存行为和 token 构成如何改变每 1 美元售价对应的原始 token 量。它不是基础设施每百万 token 成本的倒数，因此比较时必须使用相同的模型、工作负载和 token 计价来源。',
     benchmarkContext:
-      'InferenceX 推理图表默认的 Y 轴就是每 1 美元可购买的总 token 数。阅读时请对照图表上方的 TCO 行，并只在同一成本口径内比较：自有（超大规模费率）、自有（neocloud 费率）和 3 年租赁对同一颗芯片会给出不同结果。',
+      'InferenceX 推理图表默认的 Y 轴是每 1 美元可购买的总 token 数。图表会同时显示 token 计价来源以及未缓存输入、缓存输入和输出价格。原有超大规模、Neocloud 和租赁总 token 指标的旧链接会统一解析为这一 API 计价指标。',
     measurement: { label: '常用单位', value: '每 1 美元 token 数（tok/$）' },
   },
   'energy-per-token': {

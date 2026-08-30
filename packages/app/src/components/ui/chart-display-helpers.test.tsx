@@ -159,9 +159,9 @@ describe('MetricAssumptionNotes', () => {
     'y_costh',
     'y_costn',
     'y_costr',
-    'y_tokensPerDollarH',
-    'y_tokensPerDollarN',
-    'y_tokensPerDollarR',
+    'y_tokensPerRmbH',
+    'y_tokensPerRmbN',
+    'y_tokensPerRmbR',
   ])('hides the purchasing-power caveat for total-token metric %s', (metric) => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
@@ -174,10 +174,17 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
+  it('does not present API tokens per dollar as a TCO metric', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollar" />);
+
+    expect(getVisibleText()).not.toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).not.toContain(TCO_SOURCE_TITLE);
+  });
+
   it('narrows the TCO badges to the base GPUs of the active legend selection', () => {
     renderUi(
       <MetricAssumptionNotes
-        selectedYAxisMetric="y_tokensPerDollarH"
+        selectedYAxisMetric="y_tokensPerRmbH"
         activeHwKeys={['h200_dynamo-sglang', 'gb300_dynamo-sglang']}
       />,
     );
@@ -201,14 +208,14 @@ describe('MetricAssumptionNotes', () => {
   });
 
   it('falls back to every registry GPU when the selection is empty or unrecognized', () => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollarH" activeHwKeys={[]} />);
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerRmbH" activeHwKeys={[]} />);
 
     expect(getVisibleText()).toContain('H100:');
     expect(getVisibleText()).toContain('MI300X:');
 
     renderUi(
       <MetricAssumptionNotes
-        selectedYAxisMetric="y_tokensPerDollarH"
+        selectedYAxisMetric="y_tokensPerRmbH"
         activeHwKeys={['not-a-gpu_dynamo-sglang']}
       />,
     );

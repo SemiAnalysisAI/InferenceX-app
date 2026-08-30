@@ -24,13 +24,13 @@ a per-chip constant divided by a throughput, so they are NOT splined independent
 Two independent splines need not preserve `metric * throughput = constant` between
 measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
 throughput key) to spline that throughput and re-derive the metric. The live
-inference charts also expose tokens/$ and normalized token revenue as separate
-metrics; both are directly proportional to throughput. OpenRouter-priced revenue
-is proportional only when the input/output mix stays constant; otherwise spline
-the already-priced metric directly. Pass
-`proportional_to='throughput'` (or the matching output/input throughput key) so
-they use the same Pareto knots and spline as that throughput before applying the
-recovered multiplier. See docs/tco-calculator.md for a reproducible measurement.
+inference charts also expose tokens/$ and token revenue as separate metrics.
+Infrastructure-cost output/input tokens/$ remains directly proportional to
+throughput. For cache-aware token revenue or total API tokens/$, pass
+`revenue_pricing` with input/cached-input/output prices; the helper then splines
+throughput, measured cache hit, and input share independently before pricing the
+interpolated point, matching Fleet Lifecycle and Historical Trends.
+See docs/tco-calculator.md for a reproducible measurement.
 
 Usage as a module:
     from iso_interactivity import interpolate_metric, pareto_front_upper_left
@@ -208,6 +208,86 @@ def recover_proportional_multiplier(
     return multiplier
 
 
+def measured_cache_hit_rate(point: dict) -> Optional[float]:
+    """GPU plus external when external exists, otherwise GPU plus CPU."""
+    gpu = point.get('server_gpu_cache_hit_rate')
+    external = point.get('server_external_cache_hit_rate')
+    cpu = point.get('server_cpu_cache_hit_rate')
+    secondary = external if isinstance(external, (int, float)) else cpu
+    if not isinstance(gpu, (int, float)) and not isinstance(secondary, (int, float)):
+        return None
+    total = (float(gpu) if isinstance(gpu, (int, float)) else 0.0) + (
+        float(secondary) if isinstance(secondary, (int, float)) else 0.0
+    )
+    return max(0.0, min(1.0, total))
+
+
+def input_token_share_for_revenue(point: dict, tput_key: str) -> Optional[float]:
+    """Port of inputTokenShareForRevenue in token-revenue.ts."""
+    total = point.get('tput_per_gpu', point.get(tput_key, 0))
+    input_tput = point.get('input_tput_per_gpu', 0)
+    output_tput = point.get('output_tput_per_gpu', 0)
+    if all(isinstance(value, (int, float)) for value in (total, input_tput, output_tput)):
+        stream_sum = float(input_tput) + float(output_tput)
+        if float(total) > 0 and stream_sum > 0 and abs(stream_sum / float(total) - 1) <= 0.01:
+            return float(input_tput) / stream_sum
+
+    isl = point.get('isl')
+    osl = point.get('osl')
+    if isinstance(isl, (int, float)) and isinstance(osl, (int, float)) and isl + osl > 0:
+        return float(isl) / float(isl + osl)
+
+    prompt = point.get('total_prompt_tokens')
+    generation = point.get('total_generation_tokens')
+    if (
+        isinstance(prompt, (int, float))
+        and isinstance(generation, (int, float))
+        and prompt + generation > 0
+    ):
+        return float(prompt) / float(prompt + generation)
+    return None
+
+
+def token_revenue_from_rates_per_gpu_hour(
+    total_tput: float,
+    input_share: Optional[float],
+    cache_hit_rate: Optional[float],
+    pricing: dict,
+) -> Optional[float]:
+    """Port of tokenRevenueFromRatesPerGpuHour in token-revenue.ts."""
+    if not total_tput > 0:
+        return 0.0
+    input_price = float(pricing['input_per_million'])
+    output_price = float(pricing['output_per_million'])
+    cached_price = float(pricing.get('cached_input_per_million', input_price * 0.1))
+    hit = max(0.0, min(1.0, cache_hit_rate)) if cache_hit_rate is not None else 0.0
+    if input_price == output_price and not (hit > 0 and cached_price != input_price):
+        return total_tput * 3600 * input_price / 1_000_000
+    if input_share is None:
+        return None
+    share = max(0.0, min(1.0, input_share))
+    input_price_at_point = (1 - hit) * input_price + hit * cached_price
+    blended_price = share * input_price_at_point + (1 - share) * output_price
+    return total_tput * 3600 * blended_price / 1_000_000
+
+
+def tokens_per_dollar_from_rates(
+    total_tput: float,
+    input_share: Optional[float],
+    cache_hit_rate: Optional[float],
+    pricing: dict,
+) -> Optional[float]:
+    """Port of tokensPerDollarFromRates in token-revenue.ts."""
+    if not total_tput > 0:
+        return 0.0
+    revenue = token_revenue_from_rates_per_gpu_hour(
+        total_tput, input_share, cache_hit_rate, pricing
+    )
+    if revenue is None or not revenue > 0:
+        return None
+    return total_tput * 3600 / revenue
+
+
 def interpolate_metric(
     points: list[dict],
     target_iv: float,
@@ -216,6 +296,7 @@ def interpolate_metric(
     tput_key: str = 'throughput',
     reciprocal_of: Optional[str] = None,
     proportional_to: Optional[str] = None,
+    revenue_pricing: Optional[dict] = None,
 ) -> Optional[float]:
     """Interpolate `metric_key` at `target_iv` using the chart's algorithm.
 
@@ -223,8 +304,9 @@ def interpolate_metric(
     the chart code does not extrapolate. Blog tables should render this as
     `_unreachable_` in that row.
 
-    The Pareto frontier is built on (interactivity, throughput). For tokens/$ or
-    normalized token revenue (and revenue with a constant token mix),
+    The Pareto frontier is built on (interactivity, throughput). For
+    infrastructure-cost input/output tokens/$ or normalized token revenue (and
+    revenue with a constant token mix),
     `proportional_to` names the total/output/input
     throughput it scales; that throughput also supplies the frontier knots so
     both curves stay aligned.
@@ -236,10 +318,16 @@ def interpolate_metric(
     latency, and measured energy — whose numerator varies per point).
 
     `proportional_to` names the throughput key for metrics of the form
-    `throughput * constant` (tokens/$, normalized token revenue, and revenue
-    with a constant input/output mix). That
+    `throughput * constant` (infrastructure-cost input/output tokens/$,
+    normalized token revenue, and revenue with a constant input/output mix). That
     throughput is splined and the recovered multiplier applied, matching the
     dashboard.
+
+    `revenue_pricing` switches token revenue and total API tokens/$ to the
+    Fleet-compatible path: interpolate throughput, input share, and cache hit
+    independently, then price that operating point. Use metric_key
+    `tokens_per_dollar` for the purchasing-power result. A partly measured cache
+    frontier receives no discount.
     """
     if not points:
         return None
@@ -274,6 +362,37 @@ def interpolate_metric(
         if value is None:
             return None
         ys.append(value)
+
+    if revenue_pricing is not None:
+        def interpolate_bounded(values: list[float]) -> float:
+            slopes = monotone_slopes(xs, values)
+            raw = hermite_interpolate(xs, values, slopes, target_iv)
+            return max(min(values), min(max(values), raw))
+
+        revenue_tput_key = proportional_to or tput_key
+        tputs = [point.get(revenue_tput_key) for point in sorted_front]
+        if any(value is None for value in tputs):
+            return None
+        input_shares = [
+            input_token_share_for_revenue(point, revenue_tput_key) for point in sorted_front
+        ]
+        cache_hit_rates = [measured_cache_hit_rate(point) for point in sorted_front]
+        input_share = (
+            interpolate_bounded(input_shares) if all(v is not None for v in input_shares) else None
+        )
+        cache_hit_rate = (
+            interpolate_bounded(cache_hit_rates)
+            if all(v is not None for v in cache_hit_rates)
+            else None
+        )
+        throughput = interpolate_bounded(tputs)
+        if metric_key == 'tokens_per_dollar':
+            return tokens_per_dollar_from_rates(
+                throughput, input_share, cache_hit_rate, revenue_pricing
+            )
+        return token_revenue_from_rates_per_gpu_hour(
+            throughput, input_share, cache_hit_rate, revenue_pricing
+        )
 
     if proportional_to is not None:
         tputs: list[float] = []
@@ -324,7 +443,8 @@ def interpolate_metric(
 def _cli() -> None:
     """Stdin: {"points": [...], "target_iv": N, "metric_key": "...",
                "reciprocal_of": "throughput" for $/M tok and J/token,
-               "proportional_to": "throughput" for tokens/$ or revenue with a constant mix}
+               "proportional_to": "throughput" for infrastructure tokens/$,
+               "revenue_pricing": {...} for cache-aware revenue or API tokens/$}
     Stdout: {"value": N or null}"""
     req = json.loads(sys.stdin.read())
     value = interpolate_metric(
@@ -335,6 +455,7 @@ def _cli() -> None:
         tput_key=req.get('tput_key', 'throughput'),
         reciprocal_of=req.get('reciprocal_of'),
         proportional_to=req.get('proportional_to'),
+        revenue_pricing=req.get('revenue_pricing'),
     )
     json.dump({'value': value}, sys.stdout)
     sys.stdout.write('\n')

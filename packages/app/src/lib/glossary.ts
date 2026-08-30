@@ -456,7 +456,7 @@ const entries = [
     significance:
       'Peak chip FLOPS account for only part of serving economics. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
     benchmarkContext:
-      'InferenceX compares perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. The charts express the same economics as tokens per dollar, which reads in the higher-is-better direction and is the default y-axis.',
+      'InferenceX compares infrastructure perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. Cost per million tokens and the input/output infrastructure purchasing-power axes express those TCO economics. The default total tokens-per-dollar axis instead uses the selected token sale prices and measured cache behavior.',
     relatedTerms: [
       'cost-per-million-tokens',
       'tokens-per-dollar',
@@ -1176,15 +1176,15 @@ const entries = [
     aliases: ['tokens per $1 USD', 'tokens per RMB'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Tokens per dollar asks how many tokens one dollar of infrastructure spend buys, so a bigger number is a cheaper system.',
+      'Tokens per dollar asks how many tokens correspond to one dollar under the price basis named on the chart.',
     definition:
-      'Tokens per dollar is the count of tokens a configuration produces for one unit of modeled infrastructure cost, the reciprocal of cost per token.',
+      'The default total tokens-per-dollar axis divides raw total token volume by cache-aware gross token revenue, making it the reciprocal of the selected blended token sale price.',
     explanation:
-      'The figure follows directly from throughput per chip and the modeled cost per chip hour, so it carries the same assumptions as cost per million tokens while reading in the direction most people reason about capacity. InferenceX publishes it for total, input, and output tokens, against each cost basis it models, and in Chinese yuan alongside US dollars.',
+      'Uncached input, cached input, and output use separate normalized or OpenRouter prices. Agentic cache hit uses the same measured cache tiers as Fleet Lifecycle. Historical Trends interpolates total throughput, input share, and cache hit before calculating revenue and dividing token volume by it. Input-only, output-only, custom, and CNY purchasing-power axes retain their explicitly labeled infrastructure-cost bases.',
     significance:
-      'Cost per million tokens and tokens per dollar rank systems identically, but a metric that rises with better hardware sits the same way up as throughput, so a chart mixing the two no longer inverts halfway down the axis. The absolute value depends entirely on the cost model behind it, so it travels only with its stated basis.',
+      'The API-price metric shows how cache behavior and token mix change the raw token volume represented by a sales dollar. It is not the reciprocal of infrastructure cost per million tokens, so comparisons must use the same model, workload, and token price source.',
     benchmarkContext:
-      'Total tokens per $1 USD is the default y-axis on the InferenceX inference charts. Read it against the TCO row shown above the chart, and compare only within one cost basis: owning at hyperscaler rates, owning at neocloud rates, and three year rental produce different numbers for identical silicon.',
+      'Total tokens per $1 USD is the default y-axis on the InferenceX inference charts. Its token price source and uncached, cached, and output prices appear with the chart. Legacy links for the former hyperscaler, neocloud, and rental total-token variants resolve to this canonical API-price metric.',
     measurement: { label: 'Typical unit', value: 'tokens per $1 USD (tok/$)' },
     relatedTerms: [
       'cost-per-million-tokens',

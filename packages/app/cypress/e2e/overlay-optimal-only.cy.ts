@@ -27,12 +27,15 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
   before(() => {
     interceptOverlayRun({ overlayConfigs: OVERLAY_CONFIGS });
     interceptDerivedAgenticMetrics();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        unlockAgenticGate(win);
+    cy.visit(
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
       },
-    });
+    );
     cy.wait('@unofficialRun');
     // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
     // is the default — clicked anyway so the suite does not depend on that.
