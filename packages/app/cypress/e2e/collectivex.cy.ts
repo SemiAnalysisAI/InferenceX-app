@@ -398,13 +398,54 @@ describe('CollectiveX neutral run view', () => {
     cy.get(`[data-testid="collectivex-run-row-${dataset.run.run_id}"]`).should('not.exist');
   });
 
-  it('does not render the matrix case inventory', () => {
-    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
-    cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
-    cy.get('[data-testid="collectivex-display"]').should(
-      'not.contain.text',
-      'Matrix case inventory',
+  it('renders the curated known-support matrix at the bottom of the page', () => {
+    cy.get('[data-testid="collectivex-support-matrices"]')
+      .should('contain.text', 'Known kernel support')
+      .and('contain.text', 'Works')
+      .and('contain.text', 'Known not to work')
+      .and('contain.text', 'Not applicable')
+      .and('contain.text', 'MI355X')
+      .and('contain.text', 'GB300');
+    // Reference material renders last, below the explorer chart.
+    cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
+      cy.get('[data-testid="collectivex-support-matrices"]').then(($matrix) => {
+        expect($matrix[0].compareDocumentPosition($chart[0]) & 2, 'chart precedes matrix').to.eq(2);
+      });
+    });
+    cy.get('[data-testid="collectivex-support-matrix-normal"]').should(
+      'contain.text',
+      'Throughput kernels',
     );
+    cy.get('[data-testid="collectivex-support-matrix-low-latency"]').should(
+      'contain.text',
+      'Low-latency kernels',
+    );
+    // A working degree is a green chip with no excuse.
+    cy.get(
+      '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="b200"][data-library="deepep-v2"] [data-testid="collectivex-known-ep"][data-degree="16"]',
+    ).should('have.attr', 'data-status', 'works');
+    // A known wall is red and says why, in the tooltip and the notes list.
+    cy.get(
+      '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="mi355x"][data-library="mori"] [data-testid="collectivex-known-ep"][data-degree="16"]',
+    )
+      .should('have.attr', 'data-status', 'broken')
+      .and('have.attr', 'title')
+      .and('include', 'ROCm/mori#610');
+    cy.get('[data-testid="collectivex-known-notes-normal"]').should(
+      'contain.text',
+      'ROCm/mori#610',
+    );
+    // A vendor-mismatched pairing collapses to one muted dash.
+    cy.get(
+      '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"] [data-testid="collectivex-known-na"]',
+    ).should('exist');
+    cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
+  });
+
+  it('keeps the known-support matrix visible with no runs selected', () => {
+    cy.get(`[data-testid="collectivex-run-visible-${dataset.run.run_id}"]`).uncheck();
+    cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
+    cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
   });
 
   it('localizes the suite filter on the Chinese route', () => {
@@ -417,6 +458,13 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', '全部')
       .and('contain.text', 'EP')
       .and('contain.text', 'KV');
+    cy.get('[data-testid="collectivex-support-matrices"]')
+      .should('contain.text', '已知 Kernel 支持情况')
+      .and('contain.text', '吞吐量 Kernel')
+      .and('contain.text', '低延迟 Kernel')
+      .and('contain.text', '可用')
+      .and('contain.text', '已知不可用')
+      .and('contain.text', '不适用');
   });
 });
 
