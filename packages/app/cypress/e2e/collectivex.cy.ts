@@ -683,6 +683,30 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
     cy.get('[data-testid="collectivex-kv-chart"]').should(
       'contain.text',
+      'Aggregate pull bandwidth at p50 (GB/s, log)',
+    );
+    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should(
+      'have.attr',
+      'stroke-width',
+      '1.75',
+    );
+    // Axis-scale switches live in the same Advanced legend drawer as the
+    // /inference chart controls and start enabled for the existing log-log view.
+    cy.get('[data-testid="collectivex-kv-chart"] [data-testid="legend-advanced-toggle"]').click();
+    cy.get('[data-testid="collectivex-kv-x-log-scale"]')
+      .should('have.attr', 'aria-checked', 'true')
+      .click()
+      .should('have.attr', 'aria-checked', 'false');
+    cy.get('[data-testid="collectivex-kv-chart"] .x-axis-label').should(
+      'have.text',
+      'Requests per burst',
+    );
+    cy.get('[data-testid="collectivex-kv-y-log-scale"]')
+      .should('have.attr', 'aria-checked', 'true')
+      .click()
+      .should('have.attr', 'aria-checked', 'false');
+    cy.get('[data-testid="collectivex-kv-chart"] .y-axis-label').should(
+      'have.text',
       'Aggregate pull bandwidth at p50 (GB/s)',
     );
     // Metric toggle swaps the y axis to burst latency.
@@ -719,9 +743,26 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
       .should('contain.text', 'Sequence length (ISL tokens, log)')
       .and('contain.text', 'Aggregate pull bandwidth at p50 (GB/s, log)');
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
+    ).click();
+    cy.get('[data-testid="collectivex-kv-x-log-scale"]').click();
+    cy.get('[data-testid="collectivex-kv-y-log-scale"]').click();
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] .x-axis-label').should(
+      'have.text',
+      'Sequence length (ISL tokens)',
+    );
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] .y-axis-label').should(
+      'have.text',
+      'Aggregate pull bandwidth at p50 (GB/s)',
+    );
     cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path')
       .should('have.length', 2)
       .then(($lines) => {
+        expect([...$lines].map((line) => line.getAttribute('stroke-width'))).to.deep.equal([
+          '2',
+          '2',
+        ]);
         expect([...$lines].map((line) => line.getAttribute('stroke-dasharray'))).to.have.members([
           'none',
           '9 4',
@@ -759,6 +800,12 @@ describe('CollectiveX kv-transfer card', () => {
       .should('contain.text', '序列长度（ISL token，对数）')
       .and('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
       .and('contain.text', '越高越优');
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
+    ).click();
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] [data-testid="chart-legend"]')
+      .should('contain.text', 'X 轴对数缩放')
+      .and('contain.text', 'Y 轴对数缩放');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {
