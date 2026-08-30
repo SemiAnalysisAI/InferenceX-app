@@ -115,8 +115,12 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
   },
   'mori-ll-scale-up-only': {
-    en: 'MoRI low-latency measures AsyncLL split-phase (the kernel SGLang deploys for low-latency, validated 2026-08-30); the benchmark keeps it scale-up EP8 only.',
-    zh: 'MoRI 低延迟测量 AsyncLL 分阶段路径（即 SGLang 在低延迟模式下实际部署的 Kernel，2026-08-30 验证）；基准仅覆盖节点内 EP8。',
+    en: 'MoRI low-latency measures AsyncLL split-phase (the kernel SGLang deploys); the benchmark keeps it scale-up EP8 only.',
+    zh: 'MoRI 低延迟测量 AsyncLL 分阶段路径（即 SGLang 实际部署的 Kernel）；基准仅覆盖节点内 EP8。',
+  },
+  'mori-asyncll-topk6': {
+    en: "AsyncLL (the deployed low-latency kernel) hits a device-side assert whenever top-k does not divide the 64-lane warp — the DeepSeek-V4-Pro workload's top-k 6 crashes where top-k 8 passes (bisected on-metal, pure mori API). Fixed upstream in ROCm/mori#505 (2026-07-31); red until the mi35x images ship a mori containing it (newest tag is mori-0706).",
+    zh: 'AsyncLL（实际部署的低延迟 Kernel）在 top-k 无法整除 64 lane warp 时触发设备端断言——DeepSeek-V4-Pro 工作负载的 top-k 6 崩溃而 top-k 8 通过（裸金属上用纯 mori API 二分定位）。上游已在 ROCm/mori#505（2026-07-31）修复；在 mi35x 镜像包含该修复前（最新标签为 mori-0706）保持红色。',
   },
   'no-ll-kernels': {
     en: 'The library has no low-latency kernels.',
@@ -256,21 +260,21 @@ const LOW_LATENCY: KnownMatrix = {
   },
   mi300x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, na('mori-ll-scale-up-only')),
+    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
     'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi325x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, na('mori-ll-scale-up-only')),
+    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
     'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi355x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, na('mori-ll-scale-up-only')),
+    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
     'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
