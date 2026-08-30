@@ -740,7 +740,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'tokens-per-dollar': {
     term: '每美元 token 数',
-    aliases: ['tokens per dollar', 'tok/$', '每 1 美元 token 数'],
+    aliases: ['tokens per dollar', 'tok/$', '每 1 美元 TCO 对应的 token 数'],
     plainEnglish:
       '每美元 token 数表示按图表注明的成本口径，每投入 1 美元基础设施开支可以产出多少 token。',
     definition:
@@ -751,7 +751,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '该指标衡量硬件和软件的成本效率，因此比较时必须采用相同的模型、工作负载、交互性目标、token 类型和基础设施成本口径。',
     benchmarkContext:
       'InferenceX 分别提供按超大规模云厂商自有硬件、Neocloud Giant 自有硬件和 3 年期租赁成本计算的每美元总 token 数轴。默认 Y 轴仍为每 GPU 小时 token 收入；只有该独立指标采用标准化 token 售价或 OpenRouter 价格。',
-    measurement: { label: '常用单位', value: '每 1 美元 token 数（tok/$）' },
+    measurement: { label: '常用单位', value: '每 1 美元 TCO 对应的 token 数（tok/$）' },
   },
   'energy-per-token': {
     term: '每 token 能耗',

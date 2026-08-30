@@ -113,7 +113,7 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
     expect(getVisibleCaveatText()).toContain(
-      'calculate tokens per $1 USD per decode chip or per prefill chip',
+      'calculate tokens per $1 TCO per decode chip or per prefill chip',
     );
   });
 
@@ -140,7 +140,7 @@ describe('MetricAssumptionNotes', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
     expect(getVisibleCaveatText()).toContain(
-      'calculate tokens per $1 USD per decode chip or per prefill chip',
+      'calculate tokens per $1 TCO per decode chip or per prefill chip',
     );
   });
 

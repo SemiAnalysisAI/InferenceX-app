@@ -60,6 +60,50 @@ describe('metric registry', () => {
     expect(new Set(controlMetrics).size).toBe(controlMetrics.length);
     expect(controlMetrics.toSorted()).toEqual(METRIC_CONFIG_KEYS.toSorted());
   });
+
+  it('labels every infrastructure purchasing-power metric as TCO', () => {
+    const metricKeys = [
+      'tokensPerDollarH',
+      'tokensPerDollarN',
+      'tokensPerDollarR',
+      'outputTokensPerDollarH',
+      'outputTokensPerDollarN',
+      'outputTokensPerDollarR',
+      'inputTokensPerDollarH',
+      'inputTokensPerDollarN',
+      'inputTokensPerDollarR',
+      'tokensPerRmbH',
+      'tokensPerRmbN',
+      'tokensPerRmbR',
+      'outputTokensPerRmbH',
+      'outputTokensPerRmbN',
+      'outputTokensPerRmbR',
+      'inputTokensPerRmbH',
+      'inputTokensPerRmbN',
+      'inputTokensPerRmbR',
+      'tokensPerDollarUser',
+    ] as const;
+
+    for (const metricKey of metricKeys) {
+      expect(METRIC_REGISTRY[metricKey].label, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].labelZh, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].title, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].titleZh, metricKey).toContain(' TCO ');
+    }
+
+    const tcoGroups = METRIC_CONTROL_GROUPS.filter((group) =>
+      group.metrics.some(
+        (metric) =>
+          metric !== 'y_tokensPerDollarUser' &&
+          metricKeys.includes(metric.slice(2) as (typeof metricKeys)[number]),
+      ),
+    );
+    expect(tcoGroups).toHaveLength(6);
+    for (const group of tcoGroups) {
+      expect(group.label).toContain(' TCO');
+      expect(group.labelZh).toContain(' TCO ');
+    }
+  });
 });
 
 describe('metric compatibility', () => {

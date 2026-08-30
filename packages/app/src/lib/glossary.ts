@@ -1173,7 +1173,7 @@ const entries = [
     slug: 'tokens-per-dollar',
     term: 'Tokens per dollar',
     abbreviation: 'tok/$',
-    aliases: ['tokens per $1 USD', 'tokens per RMB'],
+    aliases: ['tokens per $1 TCO', 'tokens per ¥1 TCO'],
     category: 'Benchmark metrics',
     plainEnglish:
       'Tokens per dollar asks how many tokens one dollar of infrastructure spend can produce under the cost basis named on the chart.',
@@ -1185,7 +1185,7 @@ const entries = [
       'The metric measures hardware and software cost efficiency, so comparisons must use the same model, workload, interactivity target, token type, and infrastructure cost basis.',
     benchmarkContext:
       'InferenceX exposes separate total-token axes for Hyperscaler ownership, Neocloud ownership, and three-year rental costs. Token Revenue per GPU Hour remains the default y-axis and is the separate metric that uses normalized or OpenRouter token sale prices.',
-    measurement: { label: 'Typical unit', value: 'tokens per $1 USD (tok/$)' },
+    measurement: { label: 'Typical unit', value: 'tokens per $1 TCO (tok/$)' },
     relatedTerms: [
       'cost-per-million-tokens',
       'performance-per-dollar',

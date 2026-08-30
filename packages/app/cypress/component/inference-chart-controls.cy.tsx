@@ -97,19 +97,30 @@ describe('Inference ChartControls cost metrics', () => {
     cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
       'exist',
     );
-    cy.contains(
-      '[role="option"]',
-      'Total Tokens per $1 of Infrastructure Spend (Owning - Hyperscaler)',
-    ).should('exist');
+    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Output Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Input Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Total Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Output Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Input Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains(
-      '[role="option"]',
-      'Total Tokens per $1 of Infrastructure Spend (Owning - Neocloud Giant)',
-    ).click();
+    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarN');
   });
 });

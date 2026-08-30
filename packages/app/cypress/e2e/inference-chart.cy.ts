@@ -169,16 +169,13 @@ describe('Inference Chart', () => {
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 of Infrastructure Spend (Owning - Neocloud Giant)',
+      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should(
-        'contain.text',
-        'Total Tokens per $1 of Infrastructure Spend (Owning - Neocloud Giant)',
-      );
+      .should('contain.text', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)');
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -270,13 +267,13 @@ describe('Inference Chart', () => {
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      '每 1 美元基础设施开支可获得的总 token 数（自有 - Neocloud Giant）',
+      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', '每 1 美元基础设施开支可获得的总 token 数（自有 - Neocloud Giant）');
+      .should('contain.text', '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,

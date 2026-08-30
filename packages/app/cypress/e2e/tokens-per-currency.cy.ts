@@ -1,8 +1,8 @@
 /**
  * The dashboard opens on normalized token revenue per GPU hour so fixed-price
- * scenarios still compare hardware throughput. API and infrastructure
- * purchasing-power metrics remain available. Fixed-sequence Quick Filters
- * remain available from the chart legend.
+ * scenarios still compare hardware throughput. Infrastructure purchasing-power
+ * metrics remain available. Fixed-sequence Quick Filters remain available from
+ * the chart legend.
  */
 describe('Tokens per currency and agentic controls', () => {
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
-      .contains('Total Tokens per ¥1 RMB (Owning - Hyperscaler)')
+      .contains('Total Tokens per ¥1 TCO (Owning - Hyperscaler)')
       .click({ force: true });
     cy.get('[data-testid="scatter-graph"]')
       .first()

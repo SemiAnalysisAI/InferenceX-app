@@ -166,7 +166,7 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
     expect(metricRowLabel('tokensPerDollarN', 'zh')).toBe(
-      '每 1 美元基础设施开支可获得的总 token 数（自有 - Neocloud Giant）',
+      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
     );
   });
 });

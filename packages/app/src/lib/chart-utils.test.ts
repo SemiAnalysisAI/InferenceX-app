@@ -1665,7 +1665,7 @@ describe('metricTitle', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
-    y_tokensPerDollarH_title: 'Total Tokens per $1 of Infrastructure Spend',
+    y_tokensPerDollarH_title: 'Total Tokens per $1 TCO',
   } as ChartDefinition;
 
   it('returns English title for locale en', () => {
@@ -1677,9 +1677,7 @@ describe('metricTitle', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricTitle(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
-      'Total Tokens per $1 of Infrastructure Spend',
-    );
+    expect(metricTitle(chartDef, 'y_tokensPerDollarH', 'zh')).toBe('Total Tokens per $1 TCO');
   });
 
   it('returns empty string for unknown metric', () => {
@@ -1698,7 +1696,7 @@ describe('metricLabel', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
-    y_tokensPerDollarH_label: 'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+    y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
   } as ChartDefinition;
 
   it('returns English label for locale en', () => {
@@ -1711,7 +1709,7 @@ describe('metricLabel', () => {
 
   it('falls back to English when Zh field is missing', () => {
     expect(metricLabel(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
-      'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+      'Total Tokens per $1 TCO (tok/$)',
     );
   });
 

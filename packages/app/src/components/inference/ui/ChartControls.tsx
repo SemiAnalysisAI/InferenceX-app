@@ -81,7 +81,7 @@ const STRINGS = {
   zh: {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元可购买的 token 数以及自定义值。',
+      '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元 TCO 对应的 token 数以及自定义值。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',

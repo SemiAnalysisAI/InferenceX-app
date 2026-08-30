@@ -78,7 +78,7 @@ describe('AxisMetricFooter', () => {
     expect(yRow!.getAttribute('aria-expanded')).toBe('false');
     expect(xRow!.textContent).toContain('X-axis: Interactivity (tok/s/user)');
     expect(yRow!.textContent).toContain(
-      'Y-axis: Total Tokens per $1 of Infrastructure Spend (Owning - Neocloud Giant)',
+      'Y-axis: Total Tokens per $1 TCO (Owning - Neocloud Giant)',
     );
     // Bodies exist for aria-controls but stay hidden until toggled.
     const xBody = container.querySelector<HTMLElement>(
