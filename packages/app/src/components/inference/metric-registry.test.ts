@@ -20,8 +20,8 @@ describe('metric registry', () => {
     expect(e2e.y_tpPerGpu_roofline).toBe('upper_right');
     expect(interactivity.y_tokenRevenuePerGpuHour_roofline).toBe('upper_left');
     expect(e2e.y_tokenRevenuePerGpuHour_roofline).toBe('upper_right');
-    expect(interactivity.y_tokensPerDollar_roofline).toBe('upper_left');
-    expect(e2e.y_tokensPerDollar_roofline).toBe('upper_right');
+    expect(interactivity.y_tokensPerDollarN_roofline).toBe('upper_left');
+    expect(e2e.y_tokensPerDollarN_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
@@ -78,10 +78,8 @@ describe('metric compatibility', () => {
     expect(isBenchmarkMetricKey('removedMetric')).toBe(false);
   });
 
-  it('maps legacy infrastructure total-token purchasing-power links to API pricing', () => {
-    expect(resolveMetricConfigKey('y_tokensPerDollarH')).toBe('y_tokensPerDollar');
-    expect(resolveMetricConfigKey('y_tokensPerDollarN')).toBe('y_tokensPerDollar');
-    expect(resolveMetricConfigKey('y_tokensPerDollarR')).toBe('y_tokensPerDollar');
+  it('maps links for the removed API-price metric to Neocloud infrastructure cost', () => {
+    expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarN');
   });
 
   it('preserves valid benchmark, derived, and custom metric identities', () => {
@@ -92,7 +90,7 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
-    expect(isBenchmarkMetricKey('tokensPerDollar')).toBe(true);
+    expect(isBenchmarkMetricKey('tokensPerDollarN')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
   });
@@ -103,7 +101,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
-    expect(tokenMetricTypeForConfigKey('y_tokensPerDollar')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_tokensPerDollarN')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
   });
 });

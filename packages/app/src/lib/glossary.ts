@@ -456,7 +456,7 @@ const entries = [
     significance:
       'Peak chip FLOPS account for only part of serving economics. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
     benchmarkContext:
-      'InferenceX compares infrastructure perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. Cost per million tokens and the input/output infrastructure purchasing-power axes express those TCO economics. The default total tokens-per-dollar axis instead uses the selected token sale prices and measured cache behavior.',
+      'InferenceX compares infrastructure perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. Cost per million tokens and the total, input, and output infrastructure purchasing-power axes express those TCO economics.',
     relatedTerms: [
       'cost-per-million-tokens',
       'tokens-per-dollar',
@@ -1176,15 +1176,15 @@ const entries = [
     aliases: ['tokens per $1 USD', 'tokens per RMB'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Tokens per dollar asks how many tokens correspond to one dollar under the price basis named on the chart.',
+      'Tokens per dollar asks how many tokens one dollar of infrastructure spend can produce under the cost basis named on the chart.',
     definition:
-      'The default total tokens-per-dollar axis divides raw total token volume by cache-aware gross token revenue, making it the reciprocal of the selected blended token sale price.',
+      'Total tokens per dollar divides total tokens produced per chip-hour by the modeled all-in infrastructure cost per chip-hour.',
     explanation:
-      'Uncached input, cached input, and output use separate normalized or OpenRouter prices. Agentic cache hit uses the same measured cache tiers as Fleet Lifecycle. Historical Trends interpolates total throughput, input share, and cache hit before calculating revenue and dividing token volume by it. Input-only, output-only, custom, and CNY purchasing-power axes retain their explicitly labeled infrastructure-cost bases.',
+      'The Hyperscaler ownership, Neocloud ownership, and three-year rental variants use their corresponding TCO hourly rates. Historical Trends interpolates the matching total, input, or output throughput and then applies the hourly-cost multiplier.',
     significance:
-      'The API-price metric shows how cache behavior and token mix change the raw token volume represented by a sales dollar. It is not the reciprocal of infrastructure cost per million tokens, so comparisons must use the same model, workload, and token price source.',
+      'The metric measures hardware and software cost efficiency, so comparisons must use the same model, workload, interactivity target, token type, and infrastructure cost basis.',
     benchmarkContext:
-      'Total tokens per $1 USD is the default y-axis on the InferenceX inference charts. Its token price source and uncached, cached, and output prices appear with the chart. Legacy links for the former hyperscaler, neocloud, and rental total-token variants resolve to this canonical API-price metric.',
+      'InferenceX exposes separate total-token axes for Hyperscaler ownership, Neocloud ownership, and three-year rental costs. Token Revenue per GPU Hour remains the default y-axis and is the separate metric that uses normalized or OpenRouter token sale prices.',
     measurement: { label: 'Typical unit', value: 'tokens per $1 USD (tok/$)' },
     relatedTerms: [
       'cost-per-million-tokens',

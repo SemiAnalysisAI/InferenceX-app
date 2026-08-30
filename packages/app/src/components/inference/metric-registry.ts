@@ -54,12 +54,28 @@ export const METRIC_REGISTRY = {
     titleZh: '每 GPU 小时 token 收入',
     polarity: 'higher',
   },
-  tokensPerDollar: {
-    field: 'tokensPerDollar.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD',
-    titleZh: '每 1 美元可购买的总 token 数',
+  tokensPerDollarH: {
+    field: 'tokensPerDollarH.y',
+    label: 'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+    labelZh: '每 1 美元基础设施开支可获得的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 of Infrastructure Spend (Owning - Hyperscaler)',
+    titleZh: '每 1 美元基础设施开支可获得的总 token 数（自有 - 超大规模）',
+    polarity: 'higher',
+  },
+  tokensPerDollarN: {
+    field: 'tokensPerDollarN.y',
+    label: 'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+    labelZh: '每 1 美元基础设施开支可获得的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 of Infrastructure Spend (Owning - Neocloud Giant)',
+    titleZh: '每 1 美元基础设施开支可获得的总 token 数（自有 - Neocloud Giant）',
+    polarity: 'higher',
+  },
+  tokensPerDollarR: {
+    field: 'tokensPerDollarR.y',
+    label: 'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+    labelZh: '每 1 美元基础设施开支可获得的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 of Infrastructure Spend (3 Year Rental)',
+    titleZh: '每 1 美元基础设施开支可获得的总 token 数（3 年租赁）',
     polarity: 'higher',
   },
   tpPerMw: {
@@ -413,9 +429,7 @@ export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokenRevenuePerGpuHour' satisfies MetricConfigKey;
 
 const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
-  y_tokensPerDollarH: 'y_tokensPerDollar',
-  y_tokensPerDollarN: 'y_tokensPerDollar',
-  y_tokensPerDollarR: 'y_tokensPerDollar',
+  y_tokensPerDollar: 'y_tokensPerDollarN',
 };
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
@@ -496,9 +510,9 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     metrics: ['y_tokenRevenuePerGpuHour'],
   },
   {
-    label: 'Total Tokens per $1 USD',
-    labelZh: '每 1 美元可购买的总 token 数',
-    metrics: ['y_tokensPerDollar'],
+    label: 'Total Tokens per $1 of Infrastructure Spend',
+    labelZh: '每 1 美元基础设施开支可获得的总 token 数',
+    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
   },
   {
     label: 'Total Tokens per ¥1 CNY',

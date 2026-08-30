@@ -739,13 +739,15 @@ describe('createChartDataPoint', () => {
     expect(point.outputTputPerMw).toBeUndefined();
   });
 
-  it('keeps cost-per-million fields and adds the normalized API tokens-per-dollar placeholder', () => {
+  it('keeps cost-per-million fields and adds infrastructure total tokens-per-dollar fields', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
     expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
     expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
-    expect(point.tokensPerDollar!.y).toBe(1_000_000);
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
   });
 
   it('prices the same tokens in yuan at the pinned FX rate', () => {
@@ -756,7 +758,7 @@ describe('createChartDataPoint', () => {
     expect(point.tokensPerRmbH!.y).toBeCloseTo(3_600_000 / (2.8 * USD_TO_CNY), 5);
     expect(point.tokensPerRmbN!.y).toBeCloseTo(3_600_000 / (1.4 * USD_TO_CNY), 5);
     expect(point.tokensPerRmbR!.y).toBeCloseTo(3_600_000 / (0.7 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(point.tokensPerDollarH!.y, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {
@@ -877,13 +879,13 @@ describe('buildDerivedChartFields', () => {
     });
   });
 
-  it('selectively derives the normalized API tokens-per-dollar placeholder', () => {
+  it('selectively derives infrastructure total tokens per dollar', () => {
     const historicalFields = buildDerivedChartFields(entry({ tput_per_gpu: 1250 }), 'h100', [
-      'tokensPerDollar',
+      'tokensPerDollarN',
     ]);
 
     expect(historicalFields).toEqual({
-      tokensPerDollar: { y: 1_000_000, roof: false },
+      tokensPerDollarN: { y: 4_500_000 / 1.4, roof: false },
     });
   });
 
@@ -1253,7 +1255,7 @@ describe('createChartDataPoint output cost edge cases', () => {
     expect(point.costri.y).toBe(0);
   });
 
-  it('computes API total and infrastructure input/output tokens-per-dollar fields', () => {
+  it('computes infrastructure total, input, and output tokens-per-dollar fields', () => {
     const e = entry({
       tput_per_gpu: 1000,
       output_tput_per_gpu: 500,
@@ -1261,7 +1263,9 @@ describe('createChartDataPoint output cost edge cases', () => {
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
 
-    expect(point.tokensPerDollar!.y).toBe(1_000_000);
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
 
     // Output: outputTokensPerHour = 500 * 3600 = 1,800,000
     expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
@@ -1661,7 +1665,7 @@ describe('metricTitle', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
-    y_tokensPerDollar_title: 'Total Tokens per $1',
+    y_tokensPerDollarH_title: 'Total Tokens per $1 of Infrastructure Spend',
   } as ChartDefinition;
 
   it('returns English title for locale en', () => {
@@ -1673,7 +1677,9 @@ describe('metricTitle', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricTitle(chartDef, 'y_tokensPerDollar', 'zh')).toBe('Total Tokens per $1');
+    expect(metricTitle(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
+      'Total Tokens per $1 of Infrastructure Spend',
+    );
   });
 
   it('returns empty string for unknown metric', () => {
@@ -1692,7 +1698,7 @@ describe('metricLabel', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
-    y_tokensPerDollar_label: 'Total Tokens per $1 (tok/$)',
+    y_tokensPerDollarH_label: 'Total Tokens per $1 of Infrastructure Spend (tok/$)',
   } as ChartDefinition;
 
   it('returns English label for locale en', () => {
@@ -1704,7 +1710,9 @@ describe('metricLabel', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricLabel(chartDef, 'y_tokensPerDollar', 'zh')).toBe('Total Tokens per $1 (tok/$)');
+    expect(metricLabel(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
+      'Total Tokens per $1 of Infrastructure Spend (tok/$)',
+    );
   });
 
   it('returns empty string for unknown metric', () => {

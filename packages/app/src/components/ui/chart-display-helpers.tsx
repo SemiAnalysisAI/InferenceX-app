@@ -28,6 +28,9 @@ const TOTAL_COST_METRICS = new Set([
   'y_costh',
   'y_costn',
   'y_costr',
+  'y_tokensPerDollarH',
+  'y_tokensPerDollarN',
+  'y_tokensPerDollarR',
   'y_tokensPerRmbH',
   'y_tokensPerRmbN',
   'y_tokensPerRmbR',
@@ -163,6 +166,7 @@ function getCostValues(selectedYAxisMetric: string) {
       selectedYAxisMetric === 'y_costh' ||
       selectedYAxisMetric === 'y_costhOutput' ||
       selectedYAxisMetric === 'y_costhi' ||
+      selectedYAxisMetric === 'y_tokensPerDollarH' ||
       selectedYAxisMetric === 'y_tokensPerRmbH' ||
       selectedYAxisMetric === 'y_outputTokensPerRmbH' ||
       selectedYAxisMetric === 'y_inputTokensPerRmbH' ||
@@ -172,6 +176,7 @@ function getCostValues(selectedYAxisMetric: string) {
         : selectedYAxisMetric === 'y_costn' ||
             selectedYAxisMetric === 'y_costnOutput' ||
             selectedYAxisMetric === 'y_costni' ||
+            selectedYAxisMetric === 'y_tokensPerDollarN' ||
             selectedYAxisMetric === 'y_tokensPerRmbN' ||
             selectedYAxisMetric === 'y_outputTokensPerRmbN' ||
             selectedYAxisMetric === 'y_inputTokensPerRmbN' ||

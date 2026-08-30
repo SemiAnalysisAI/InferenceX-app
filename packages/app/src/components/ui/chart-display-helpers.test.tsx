@@ -159,6 +159,9 @@ describe('MetricAssumptionNotes', () => {
     'y_costh',
     'y_costn',
     'y_costr',
+    'y_tokensPerDollarH',
+    'y_tokensPerDollarN',
+    'y_tokensPerDollarR',
     'y_tokensPerRmbH',
     'y_tokensPerRmbN',
     'y_tokensPerRmbR',
@@ -172,13 +175,6 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).not.toContain(
       'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
-  });
-
-  it('does not present API tokens per dollar as a TCO metric', () => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollar" />);
-
-    expect(getVisibleText()).not.toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).not.toContain(TCO_SOURCE_TITLE);
   });
 
   it('narrows the TCO badges to the base GPUs of the active legend selection', () => {
