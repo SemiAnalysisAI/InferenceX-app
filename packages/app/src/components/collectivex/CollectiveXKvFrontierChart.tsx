@@ -25,6 +25,7 @@ interface CollectiveXKvFrontierChartProps {
   selection: CollectiveXKvFrontierSelection;
   xLogScale: boolean;
   yLogScale: boolean;
+  showWireCeilings: boolean;
   caption?: React.ReactNode;
   legendElement?: React.ReactNode;
   testId?: string;
@@ -108,6 +109,7 @@ export function CollectiveXKvFrontierChart({
   selection,
   xLogScale,
   yLogScale,
+  showWireCeilings,
   caption,
   legendElement,
   testId,
@@ -152,13 +154,14 @@ export function CollectiveXKvFrontierChart({
   );
   const allLines = useMemo(() => {
     const merged: Record<string, { x: number; y: number }[]> = { ...lines };
+    if (!showWireCeilings) return merged;
     for (const [seriesId, ceiling] of ceilings) {
       // Only series that are actually plotted get a ceiling line.
       if (!(seriesId in lines) || ceiling.length < 2) continue;
       merged[`${seriesId}${CEILING_SUFFIX}`] = ceiling.map(({ x, y }) => ({ x, y }));
     }
     return merged;
-  }, [lines, ceilings]);
+  }, [lines, ceilings, showWireCeilings]);
 
   const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
   const yDomain = useMemo(() => {
@@ -254,9 +257,9 @@ export function CollectiveXKvFrontierChart({
             : point.onSeriesFrontier
               ? strings.backendFrontier
               : strings.dominated;
-          const ceilingAtIsl = ceilings
-            .get(point.seriesId)
-            ?.find((ceiling) => ceiling.x === row.isl);
+          const ceilingAtIsl = showWireCeilings
+            ? ceilings.get(point.seriesId)?.find((ceiling) => ceiling.x === row.isl)
+            : undefined;
           let ceilingLine = '';
           if (ceilingAtIsl && ceilingAtIsl.y > 0) {
             const fraction = point.y / ceilingAtIsl.y;

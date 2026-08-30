@@ -44,6 +44,10 @@ const STRINGS = {
       'because the DeepSeek-V4-Pro layout fragments each request into thousands of tiny ' +
       'per-layer page descriptors, making the transfer descriptor-rate bound (per-operation ' +
       'software cost), not fabric-bandwidth bound. Hover a point for its share of the wire.',
+    frontierCaptionWithoutCeilings:
+      'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
+      'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
+      'line well above its batch-1 points; hover a point for its batch, latency, and status.',
     frontierOption: 'Envelope',
     overlapOption: 'Overlap gain',
     overlapCaption:
@@ -60,6 +64,7 @@ const STRINGS = {
     opAriaLabel: 'CollectiveX KV direction',
     xLogScale: 'X-axis Log Scale',
     yLogScale: 'Y-axis Log Scale',
+    bulkWireCeiling: 'Bulk Wire Ceiling',
   },
   zh: {
     heading: 'KV 缓存传输',
@@ -74,6 +79,9 @@ const STRINGS = {
       '每个后端上方的点状线是其 bulk 线速上限：同样的字节量以单个连续描述符搬运，即链路本身的能力。' +
       '分页组合远低于上限，是因为 DeepSeek-V4-Pro 布局把每个请求碎片化为数千个微小的逐层页描述符，' +
       '瓶颈在描述符处理速率（每操作软件开销）而非链路带宽。悬停数据点可查看其达到线速的比例。',
+    frontierCaptionWithoutCeilings:
+      '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、延迟与状态。',
     frontierOption: '带宽包络',
     overlapOption: '重叠增益',
     overlapCaption:
@@ -89,6 +97,7 @@ const STRINGS = {
     opAriaLabel: 'CollectiveX KV 传输方向',
     xLogScale: 'X 轴对数缩放',
     yLogScale: 'Y 轴对数缩放',
+    bulkWireCeiling: 'Bulk 线速上限',
   },
 } as const;
 
@@ -133,6 +142,7 @@ export function CollectiveXKvSection({
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
   const [xLogScale, setXLogScale] = useState(true);
   const [yLogScale, setYLogScale] = useState(true);
+  const [showWireCeilings, setShowWireCeilings] = useState(true);
   // Legend toggles are keyed to the current series set: when checked runs
   // change, the stored selection is stale and every series starts active
   // again (the EP explorer resets the same way).
@@ -317,6 +327,19 @@ export function CollectiveXKvSection({
       },
     },
   ];
+  const envelopeLegendSwitches = [
+    ...legendSwitches,
+    {
+      id: 'collectivex-kv-bulk-wire-ceiling',
+      label: strings.bulkWireCeiling,
+      advanced: true,
+      checked: showWireCeilings,
+      onCheckedChange: (checked: boolean) => {
+        setShowWireCeilings(checked);
+        track('collectivex_kv_bulk_wire_ceiling_toggled', { enabled: checked });
+      },
+    },
+  ];
   return (
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
@@ -399,16 +422,20 @@ export function CollectiveXKvSection({
                 selection={{ op, pageTokens: Number(pageTokens) }}
                 xLogScale={xLogScale}
                 yLogScale={yLogScale}
+                showWireCeilings={showWireCeilings}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.frontierCaption}
+                    {op} · page {pageTokens} ·{' '}
+                    {showWireCeilings
+                      ? strings.frontierCaption
+                      : strings.frontierCaptionWithoutCeilings}
                   </p>
                 }
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
-                    switches={legendSwitches}
+                    switches={envelopeLegendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={setLegendExpanded}

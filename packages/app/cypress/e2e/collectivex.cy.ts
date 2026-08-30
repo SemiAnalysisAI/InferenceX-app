@@ -48,6 +48,20 @@ const kvComparisonDataset = buildDataset({
   kv: [{}],
   meta: { run_id: '164', generated_at: '2026-08-09T12:20:00Z', source_sha: 'a'.repeat(40) },
 });
+const kvWireCeilingDataset = buildDataset({
+  shards: [makeRawShard()],
+  kv: [
+    {
+      rows: [
+        { kind: 'paged', page_tokens: 64, batch: 1, isl: 4096, gbps_p50: 5.1 },
+        { kind: 'paged', page_tokens: 64, batch: 1, isl: 32768, gbps_p50: 7.39 },
+        { kind: 'bulk', page_tokens: null, batch: 1, isl: 4096, gbps_p50: 52.3 },
+        { kind: 'bulk', page_tokens: null, batch: 1, isl: 32768, gbps_p50: 89.41 },
+      ],
+    },
+  ],
+  meta: { run_id: '165', generated_at: '2026-08-10T12:20:00Z', source_sha: 'b'.repeat(40) },
+});
 const kvOnlyDataset = buildDataset({
   shards: [],
   kv: [{}],
@@ -770,6 +784,38 @@ describe('CollectiveX kv-transfer card', () => {
       });
   });
 
+  it('toggles the Envelope bulk wire-ceiling lines from Advanced controls', () => {
+    installRuns([kvWireCeilingDataset]);
+    installRun(kvWireCeilingDataset);
+    openCollectiveX();
+
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Envelope').click();
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path').should('have.length', 2);
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
+    ).should('have.length', 1);
+
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
+    ).click();
+    cy.get('[data-testid="collectivex-kv-bulk-wire-ceiling"]')
+      .should('have.attr', 'aria-checked', 'true')
+      .click()
+      .should('have.attr', 'aria-checked', 'false');
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path').should('have.length', 1);
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
+    ).should('not.exist');
+    cy.get('[data-testid="collectivex-kv-frontier-chart"]')
+      .should('contain.text', 'hover a point for its batch, latency, and status')
+      .and('not.contain.text', 'dotted line above each backend');
+
+    cy.get('[data-testid="collectivex-kv-bulk-wire-ceiling"]').click();
+    cy.get(
+      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
+    ).should('have.length', 1);
+  });
+
   it('plots the overlap-gain view with its dotted ideal line', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
@@ -805,7 +851,8 @@ describe('CollectiveX kv-transfer card', () => {
     ).click();
     cy.get('[data-testid="collectivex-kv-frontier-chart"] [data-testid="chart-legend"]')
       .should('contain.text', 'X 轴对数缩放')
-      .and('contain.text', 'Y 轴对数缩放');
+      .and('contain.text', 'Y 轴对数缩放')
+      .and('contain.text', 'Bulk 线速上限');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {
