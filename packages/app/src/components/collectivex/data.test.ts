@@ -17,6 +17,7 @@ import {
   type CollectiveXSeriesSelection,
   collectiveXKvChartPoints,
   collectiveXKvFrontierPoints,
+  collectiveXKvIslValues,
   collectiveXKvOverlapPoints,
   collectiveXKvWireCeilings,
   type CollectiveXKvRunCase,
@@ -559,6 +560,57 @@ describe('collectiveXKvChartPoints', () => {
         selection,
       );
       expect(points).toEqual([]);
+    });
+
+    it('pins the normalization to the requested ISL when one is selected', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 6 },
+            { isl: 4096, batch: 4, gbps_p50: 18 },
+            // The larger-ISL ladder is ignored once 4096 is pinned.
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+          ]),
+        ],
+        { ...selection, isl: 4096 },
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [1, 1],
+        [4, 3],
+      ]);
+    });
+
+    it('drops a series with no rows at the requested ISL', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+          ]),
+        ],
+        { ...selection, isl: 4096 },
+      );
+      expect(points).toEqual([]);
+    });
+  });
+
+  describe('collectiveXKvIslValues', () => {
+    it('lists distinct paged ISLs of the selected direction and page size, ascending', () => {
+      const values = collectiveXKvIslValues(
+        [
+          kase([
+            { isl: 32768, batch: 1 },
+            { isl: 32768, batch: 4 },
+            { isl: 4096, batch: 1 },
+            { isl: 8192, batch: 1, op: 'push' },
+            { isl: 16384, batch: 1, page_tokens: 16 },
+            bulk({ isl: 65536 }),
+          ]),
+        ],
+        { op: 'pull', pageTokens: 64 },
+      );
+      expect(values).toEqual([4096, 32768]);
     });
   });
 

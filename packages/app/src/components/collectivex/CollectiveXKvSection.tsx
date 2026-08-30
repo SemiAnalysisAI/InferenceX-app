@@ -20,6 +20,7 @@ import {
   type CollectiveXKvRunCase,
   collectiveXKvCell,
   collectiveXKvColorKey,
+  collectiveXKvIslValues,
   collectiveXKvLegendLabel,
   collectiveXRunDasharray,
   collectiveXSkuLabel,
@@ -51,17 +52,21 @@ const STRINGS = {
     frontierOption: 'Envelope',
     overlapOption: 'Overlap gain',
     overlapCaption:
-      'aggregate bandwidth relative to batch 1 at the largest measured ISL; the dotted ideal ' +
-      'is y = batch. A perfect overlapper tracks the ideal until the wire saturates; a ' +
-      'serializing backend stays flat at 1.',
+      'aggregate bandwidth relative to batch 1 at the selected ISL (Max reads each backend at ' +
+      'its largest measured ISL); the dotted ideal is y = batch. A perfect overlapper tracks ' +
+      'the ideal until the wire saturates; a serializing backend stays flat at 1. Backends ' +
+      'without a batch-1 rung at the selected ISL are hidden.',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
     opControl: 'Direction',
+    islControl: 'ISL',
+    islMaxOption: 'Max',
     metricAriaLabel: 'CollectiveX KV metric',
     xAriaLabel: 'CollectiveX KV X axis',
     pageAriaLabel: 'CollectiveX KV page size',
     opAriaLabel: 'CollectiveX KV direction',
+    islAriaLabel: 'CollectiveX KV overlap ISL',
     xLogScale: 'X-axis Log Scale',
     yLogScale: 'Y-axis Log Scale',
     bulkWireCeiling: 'Bulk Wire Ceiling',
@@ -85,16 +90,20 @@ const STRINGS = {
     frontierOption: '带宽包络',
     overlapOption: '重叠增益',
     overlapCaption:
-      '相对批大小 1 的聚合带宽，取最大实测 ISL；虚线为理想值 y = 批大小。' +
-      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。',
+      '相对批大小 1 的聚合带宽，取所选 ISL（“最大”表示各后端取其最大实测 ISL）；虚线为理想值 y = 批大小。' +
+      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。' +
+      '在所选 ISL 处没有批大小 1 数据的后端将被隐藏。',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
     opControl: '方向',
+    islControl: 'ISL',
+    islMaxOption: '最大',
     metricAriaLabel: 'CollectiveX KV 指标',
     xAriaLabel: 'CollectiveX KV X 轴',
     pageAriaLabel: 'CollectiveX KV 页大小',
     opAriaLabel: 'CollectiveX KV 传输方向',
+    islAriaLabel: 'CollectiveX KV 重叠增益 ISL',
     xLogScale: 'X 轴对数缩放',
     yLogScale: 'Y 轴对数缩放',
     bulkWireCeiling: 'Bulk 线速上限',
@@ -112,6 +121,10 @@ const OUTCOME_CLASS: Record<CollectiveXOutcome, string> = {
 
 function formatGbps(value: number | null | undefined): string {
   return value === null || value === undefined ? '-' : value.toFixed(value >= 100 ? 0 : 2);
+}
+
+function formatIsl(value: number): string {
+  return value >= 1024 && value % 1024 === 0 ? `${value / 1024}k` : String(value);
 }
 
 function cellsOf(row: CollectiveXKvRunCase) {
@@ -140,6 +153,9 @@ export function CollectiveXKvSection({
   );
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
+  // Overlap view only: 'max' normalizes each series at its own largest
+  // measured ISL; a numeric string pins every series to that ISL.
+  const [overlapIsl, setOverlapIsl] = useState<string>('max');
   const [xLogScale, setXLogScale] = useState(true);
   const [yLogScale, setYLogScale] = useState(true);
   const [showWireCeilings, setShowWireCeilings] = useState(true);
@@ -185,6 +201,18 @@ export function CollectiveXKvSection({
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
     [activeIds, measuredCases],
   );
+  // ISL options come from all measured cases (not the legend-active subset)
+  // so the selector is stable while series are toggled. A stored value that
+  // no longer exists for the current direction and page size falls back to
+  // 'max' rather than an empty chart.
+  const overlapIslValues = useMemo(
+    () => collectiveXKvIslValues(measuredCases, { op, pageTokens: Number(pageTokens) }),
+    [measuredCases, op, pageTokens],
+  );
+  const effectiveOverlapIsl =
+    overlapIsl !== 'max' && overlapIslValues.includes(Number(overlapIsl))
+      ? Number(overlapIsl)
+      : undefined;
 
   const colorKeys = useMemo(
     () => [...new Set(measuredCases.map(collectiveXKvColorKey))],
@@ -411,6 +439,27 @@ export function CollectiveXKvSection({
                 ]}
               />
             </div>
+            {xAxis === 'overlap' && overlapIslValues.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.islControl}</Label>
+                <SegmentedToggle
+                  value={effectiveOverlapIsl === undefined ? 'max' : String(effectiveOverlapIsl)}
+                  onValueChange={(value) => {
+                    setOverlapIsl(value);
+                    track('collectivex_kv_overlap_isl_changed', { isl: value });
+                  }}
+                  ariaLabel={strings.islAriaLabel}
+                  testId="collectivex-kv-overlap-isl-toggle"
+                  options={[
+                    { value: 'max', label: strings.islMaxOption },
+                    ...overlapIslValues.map((value) => ({
+                      value: String(value),
+                      label: formatIsl(value),
+                    })),
+                  ]}
+                />
+              </div>
+            )}
           </div>
           <div className="relative mt-3">
             {xAxis === 'frontier' ? (
@@ -448,10 +497,14 @@ export function CollectiveXKvSection({
                 testId="collectivex-kv-overlap-chart"
                 cases={activeCases}
                 colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens) }}
+                selection={{ op, pageTokens: Number(pageTokens), isl: effectiveOverlapIsl }}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.overlapCaption}
+                    {op} · page {pageTokens} · ISL{' '}
+                    {effectiveOverlapIsl === undefined
+                      ? strings.islMaxOption
+                      : formatIsl(effectiveOverlapIsl)}{' '}
+                    · {strings.overlapCaption}
                   </p>
                 }
                 legendElement={
