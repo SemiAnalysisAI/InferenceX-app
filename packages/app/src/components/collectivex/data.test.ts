@@ -445,53 +445,64 @@ describe('collectiveXKvChartPoints', () => {
   describe('collectiveXKvFrontierPoints', () => {
     const selection = { op: 'pull', pageTokens: 64 } as const;
 
-    it('plots aggregate GB/s against p95 per in-flight request at the largest ISL', () => {
+    it('plots aggregate GB/s against ISL across the full (ISL, batch) grid', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            { isl: 4096, batch: 1, gbps_p50: 5, latency_ms: p95(2) },
-            { isl: 32768, batch: 1, gbps_p50: 7.5, latency_ms: p95(24) },
-            { isl: 32768, batch: 16, gbps_p50: 30, latency_ms: p95(96) },
-            { isl: 32768, batch: 16, op: 'push', gbps_p50: 99, latency_ms: p95(1) },
+            { isl: 4096, batch: 1, gbps_p50: 5 },
+            { isl: 32768, batch: 1, gbps_p50: 7.5 },
+            { isl: 32768, batch: 16, gbps_p50: 30 },
+            { isl: 32768, batch: 16, op: 'push', gbps_p50: 99 },
           ]),
         ],
         selection,
       );
       expect(points.map((point) => [point.x, point.y])).toEqual([
-        [7.5, 24],
-        [30, 6],
+        [4096, 5],
+        [32768, 7.5],
+        [32768, 30],
       ]);
       expect(points[0].sku).toBe('gb200');
     });
 
-    it('fades within-series dominated points and keeps the ladder frontier', () => {
+    it('marks the best batch at each ISL as the series envelope', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            // batch 4 beats batch 1 on both axes; batch 16 trades latency for rate.
-            { batch: 1, gbps_p50: 7.5, latency_ms: p95(26) },
-            { batch: 4, gbps_p50: 20, latency_ms: p95(40) },
-            { batch: 16, gbps_p50: 30, latency_ms: p95(320) },
+            // batch 1 is alone at 4096; batch 16 wins the 32768 rung.
+            { isl: 4096, batch: 1, gbps_p50: 5 },
+            { isl: 32768, batch: 1, gbps_p50: 7.5 },
+            { isl: 32768, batch: 4, gbps_p50: 20 },
+            { isl: 32768, batch: 16, gbps_p50: 30 },
           ]),
         ],
         selection,
       );
-      expect(points.map((point) => point.onSeriesFrontier)).toEqual([false, true, true]);
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, false, false, true]);
     });
 
-    it('rings only the SKU-wide frontier across backends of the same SKU', () => {
+    it('rings only the best backend of a SKU at each ISL', () => {
       const points = collectiveXKvFrontierPoints(
         [
-          kase([{ batch: 1, gbps_p50: 20, latency_ms: p95(10) }]),
-          kase([{ batch: 1, gbps_p50: 8, latency_ms: p95(30) }], {
-            case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
-            backend: 'mooncake',
-          }),
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 3 },
+            { isl: 32768, batch: 1, gbps_p50: 20 },
+          ]),
+          kase(
+            [
+              { isl: 4096, batch: 1, gbps_p50: 9 },
+              { isl: 32768, batch: 1, gbps_p50: 8 },
+            ],
+            {
+              case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+              backend: 'mooncake',
+            },
+          ),
         ],
         selection,
       );
-      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, true]);
-      expect(points.map((point) => point.onSkuFrontier)).toEqual([true, false]);
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, true, true, true]);
+      expect(points.map((point) => point.onSkuFrontier)).toEqual([false, true, true, false]);
     });
 
     it('never lets one SKU dominate another', () => {

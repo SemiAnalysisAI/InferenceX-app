@@ -36,9 +36,9 @@ const STRINGS = {
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
-      'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
-      'A backend that serializes requests collapses to a single point; hover a point for its ' +
-      'Pareto status.',
+      'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
+      'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
+      'line well above its batch-1 points; hover a point for its batch, latency, and status.',
     frontierOption: 'Frontier',
     yControl: 'Metric',
     xControl: 'X axis',
@@ -58,8 +58,8 @@ const STRINGS = {
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线连接最大实测 ISL 下的批大小阶梯，越靠右下越优。' +
-      '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
+      '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、时延与状态。',
     frontierOption: '帕累托前沿',
     yControl: '指标',
     xControl: 'X 轴',
