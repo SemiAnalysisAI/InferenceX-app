@@ -334,11 +334,6 @@ export function buildDerivedChartFields(
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
-  if (wants('tokensPerDollar')) {
-    // Placeholder for normalized uncached pricing. The selected pricing source,
-    // measured cache hit, and token mix are applied without mutating this point.
-    fields.tokensPerDollar = chartMetric(tputPerGpu > 0 ? 1_000_000 : 0);
-  }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
@@ -389,6 +384,15 @@ export function buildDerivedChartFields(
     fields.costri = chartMetric(
       millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
     );
+  }
+  if (wants('tokensPerDollarH')) {
+    fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
+  }
+  if (wants('tokensPerDollarN')) {
+    fields.tokensPerDollarN = chartMetric(specs.costn ? tokensPerHour / specs.costn : 0);
+  }
+  if (wants('tokensPerDollarR')) {
+    fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
   }
   if (wants('outputTokensPerDollarH')) {
     fields.outputTokensPerDollarH = chartMetric(

@@ -574,24 +574,7 @@ export function useChartData(
                     'Token Revenue per GPU Hour at Normalized Pricing',
                   y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
-            : selectedYAxisMetric === 'y_tokensPerDollar'
-              ? usesOpenRouterPricing
-                ? {
-                    y_tokensPerDollar_label:
-                      'Total Tokens per $1 USD at OpenRouter Pricing (tok/$)',
-                    y_tokensPerDollar_labelZh:
-                      '按 OpenRouter 价格计算的每 1 美元总 token 数（tok/$）',
-                    y_tokensPerDollar_title: 'Total Tokens per $1 USD at OpenRouter Pricing',
-                    y_tokensPerDollar_titleZh: '按 OpenRouter 价格计算的每 1 美元总 token 数',
-                  }
-                : {
-                    y_tokensPerDollar_label:
-                      'Total Tokens per $1 USD at Normalized Pricing (tok/$)',
-                    y_tokensPerDollar_labelZh: '按标准化价格计算的每 1 美元总 token 数（tok/$）',
-                    y_tokensPerDollar_title: 'Total Tokens per $1 USD at Normalized Pricing',
-                    y_tokensPerDollar_titleZh: '按标准化价格计算的每 1 美元总 token 数',
-                  }
-              : {};
+            : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
         const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
 

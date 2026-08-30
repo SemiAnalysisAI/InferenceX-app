@@ -97,27 +97,44 @@ describe('Inference ChartControls cost metrics', () => {
     cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
       'exist',
     );
-    cy.contains('[role="option"]', 'Total Tokens per $1 USD').should('exist');
+    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Output Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Input Tokens per $1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Total Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Output Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Input Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
+      'exist',
+    );
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Total Tokens per $1 USD').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollar');
+    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarN');
   });
 });
 
-describe('Inference ChartControls API tokens per dollar', () => {
+describe('Inference ChartControls infrastructure tokens per dollar', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls />, {
-      inference: { selectedYAxisMetric: 'y_tokensPerDollar' },
+      inference: { selectedYAxisMetric: 'y_tokensPerDollarN' },
     });
   });
 
-  it('shows the shared token price source control', () => {
-    cy.contains('Token Price Source').should('be.visible');
-    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
+  it('does not show the token sale-price source control', () => {
+    cy.contains('Token Price Source').should('not.exist');
+    cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
   });
 });
 

@@ -206,17 +206,17 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('maps a legacy tokens-per-dollar URL to the API-pricing metric', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollarH');
+    it('maps the removed API-pricing URL to Neocloud TCO', () => {
+      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 USD',
+        'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 USD at Normalized Pricing (tok/$)');
+        .should('have.text', 'Total Tokens per $1 TCO (tok/$)');
     });
 
     it('keeps the legacy i_metric=y alias on raw throughput', () => {

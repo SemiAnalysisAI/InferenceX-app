@@ -134,31 +134,6 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
   };
 }
 
-function apiTokensPerDollar(): MetricExplanation {
-  return {
-    description: {
-      en:
-        'How many raw total tokens are represented by one US dollar at the selected token sale ' +
-        'prices. It divides total token volume by the same cache-aware gross revenue used by the ' +
-        'revenue axis, so it is not an infrastructure-cost metric. Uncached input, cached input, ' +
-        'and output are priced separately. Agentic cache hit combines GPU and external cache when ' +
-        'external cache is reported, otherwise GPU and CPU cache. Historical Trends interpolates ' +
-        'total throughput, input share, and cache hit separately, calculates revenue, then divides ' +
-        'the interpolated total token volume by that revenue. A partially measured cache frontier ' +
-        'receives no cache discount.',
-      zh:
-        '表示按所选 token 售价计算时，1 美元对应多少原始总 token。该指标用总 token 量除以收入轴采用的同一套缓存感知毛收入，' +
-        '因此不是基础设施成本指标。未缓存输入、缓存输入与输出分别计价。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
-        '否则由 GPU 与 CPU cache 相加。Historical Trends 会分别插值总吞吐量、输入 token 占比和缓存命中率，先计算收入，' +
-        '再用插值后的总 token 量除以该收入。缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。',
-    },
-    formula: {
-      en: 'tok/$ = total tokens per GPU-hour ÷ cache-aware gross token revenue per GPU-hour ($)',
-      zh: 'tok/$ = 每 GPU 小时总 token 数 ÷ 每 GPU 小时缓存感知 token 毛收入（$）',
-    },
-  };
-}
-
 function costPerMillion(basis: CostBasis, tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -296,7 +271,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
   tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
-  tokensPerDollar: apiTokensPerDollar(),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
@@ -309,6 +283,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   costhi: costPerMillion('h', 'input'),
   costni: costPerMillion('n', 'input'),
   costri: costPerMillion('r', 'input'),
+  tokensPerDollarH: tokensPerDollar('h', 'total'),
+  tokensPerDollarN: tokensPerDollar('n', 'total'),
+  tokensPerDollarR: tokensPerDollar('r', 'total'),
   outputTokensPerDollarH: tokensPerDollar('h', 'output'),
   outputTokensPerDollarN: tokensPerDollar('n', 'output'),
   outputTokensPerDollarR: tokensPerDollar('r', 'output'),

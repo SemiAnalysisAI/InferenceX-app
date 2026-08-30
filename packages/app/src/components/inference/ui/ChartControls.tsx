@@ -67,7 +67,7 @@ const STRINGS = {
     dateRangePlaceholder: 'Select date range',
     revenuePriceSource: 'Token Price Source',
     revenuePriceSourceTooltip:
-      'Choose the token sale prices used for revenue and total tokens per dollar. For Agentic traces, measured cache hits use a separate cached-input price. Normalized pricing uses $1/M uncached input and output plus $0.10/M cached input. OpenRouter uses the selected model’s current public prices, falling back to 10% of its input price when no cache-read price is published.',
+      'Choose the token sale prices used for revenue. For Agentic traces, measured cache hits use a separate cached-input price. Normalized pricing uses $1/M uncached input and output plus $0.10/M cached input. OpenRouter uses the selected model’s current public prices, falling back to 10% of its input price when no cache-read price is published.',
     normalizedPrice: 'Normalized ($1/M uncached + output, $0.10/M cached)',
     openRouterPrice: 'OpenRouter current pricing',
     openRouterLoading: 'Loading OpenRouter pricing…',
@@ -81,7 +81,7 @@ const STRINGS = {
   zh: {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元可购买的 token 数以及自定义值。',
+      '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元 TCO 对应的 token 数以及自定义值。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -100,7 +100,7 @@ const STRINGS = {
     dateRangePlaceholder: '选择日期范围',
     revenuePriceSource: 'token 计价来源',
     revenuePriceSourceTooltip:
-      '选择计算 token 收入和每 1 美元总 token 数所用的售价。Agentic trace 按实测缓存命中率采用单独的缓存输入价格。标准化模式下，未缓存输入和输出均为 $1/百万，缓存输入为 $0.10/百万。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。',
+      '选择计算 token 收入所用的售价。Agentic trace 按实测缓存命中率采用单独的缓存输入价格。标准化模式下，未缓存输入和输出均为 $1/百万，缓存输入为 $0.10/百万。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。',
     normalizedPrice: '标准化（未缓存输入和输出 $1/百万，缓存输入 $0.10/百万）',
     openRouterPrice: 'OpenRouter 当前价格',
     openRouterLoading: '正在加载 OpenRouter 价格…',

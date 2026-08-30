@@ -22,9 +22,9 @@ const CHART_DEF = {
   y_costh: 'costh.y',
   y_costh_label: 'Cost per Million Total Tokens ($)',
   y_costh_roofline: 'lower_right',
-  y_tokensPerDollar: 'tokensPerDollar.y',
-  y_tokensPerDollar_label: 'Total Tokens per $1 (tok/$)',
-  y_tokensPerDollar_roofline: 'upper_left',
+  y_tokensPerDollarH: 'tokensPerDollarH.y',
+  y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
+  y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
 function makePoint(overrides: Partial<InferenceData>): InferenceData {
@@ -44,7 +44,7 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
     costhi: { y: 0.2, roof: false },
     costni: { y: 0.15, roof: false },
     costri: { y: 0.1, roof: false },
-    tokensPerDollar: { y: 2_000_000, roof: false },
+    tokensPerDollarH: { y: 2_000_000, roof: false },
     ...overrides,
   } as InferenceData;
 }
@@ -95,12 +95,12 @@ describe('InferenceTable sorting logic', () => {
 
   it('sorts tokens-per-dollar purchasing power descending', () => {
     const points = [
-      makePoint({ tokensPerDollar: { y: 800_000, roof: false } }),
-      makePoint({ tokensPerDollar: { y: 200_000, roof: false } }),
-      makePoint({ tokensPerDollar: { y: 1_500_000, roof: true } }),
+      makePoint({ tokensPerDollarH: { y: 800_000, roof: false } }),
+      makePoint({ tokensPerDollarH: { y: 200_000, roof: false } }),
+      makePoint({ tokensPerDollarH: { y: 1_500_000, roof: true } }),
     ];
 
-    const yPath = CHART_DEF.y_tokensPerDollar as string;
+    const yPath = CHART_DEF.y_tokensPerDollarH as string;
     const sorted = [...points].toSorted(
       (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
     );
@@ -123,8 +123,8 @@ describe('getNestedYValue', () => {
   });
 
   it('resolves the separate tokens-per-dollar path', () => {
-    const point = makePoint({ tokensPerDollar: { y: 1_500_000, roof: false } });
-    expect(getNestedYValue(point, 'tokensPerDollar.y')).toBe(1_500_000);
+    const point = makePoint({ tokensPerDollarH: { y: 1_500_000, roof: false } });
+    expect(getNestedYValue(point, 'tokensPerDollarH.y')).toBe(1_500_000);
   });
 
   it('returns 0 for missing paths', () => {

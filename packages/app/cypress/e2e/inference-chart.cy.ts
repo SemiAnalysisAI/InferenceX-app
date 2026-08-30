@@ -154,10 +154,10 @@ describe('Inference Chart', () => {
       });
   });
 
-  it('plots cache-aware total tokens per dollar for official and unofficial runs', () => {
+  it('plots infrastructure total tokens per dollar for official and unofficial runs', () => {
     interceptOverlayRun();
     cy.visit(
-      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarN`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -169,13 +169,13 @@ describe('Inference Chart', () => {
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 USD',
+      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
     );
-    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
+    cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', 'Total Tokens per $1 USD at Normalized Pricing');
+      .should('contain.text', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)');
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -187,9 +187,9 @@ describe('Inference Chart', () => {
     cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
     cy.get('[data-testid^="axis-metric-body-y-"]')
       .first()
-      .should('contain.text', 'not an infrastructure-cost metric')
-      .and('contain.text', 'calculates revenue')
-      .and('contain.text', 'cache-aware gross token revenue');
+      .should('contain.text', 'infrastructure spend')
+      .and('contain.text', 'Neocloud Giant')
+      .and('contain.text', 'all-in cost per chip-hour');
   });
 
   it('ships OpenRouter-priced token revenue in Chinese', () => {
@@ -256,24 +256,24 @@ describe('Inference Chart', () => {
       });
   });
 
-  it('ships cache-aware total tokens per dollar in Chinese', () => {
+  it('ships infrastructure total tokens per dollar in Chinese', () => {
     cy.viewport(390, 844);
     interceptOverlayRun();
     cy.visit(
-      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollar`,
+      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarN`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@unofficialRun');
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      '每 1 美元可购买的总 token 数',
+      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
     );
-    cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', '标准化');
+    cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', '按标准化价格计算的每 1 美元总 token 数');
+      .should('contain.text', '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,
@@ -281,9 +281,9 @@ describe('Inference Chart', () => {
     cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
     cy.get('[data-testid^="axis-metric-body-y-"]')
       .first()
-      .should('contain.text', '因此不是基础设施成本指标')
-      .and('contain.text', '先计算收入')
-      .and('contain.text', '每 GPU 小时缓存感知 token 毛收入');
+      .should('contain.text', '基础设施开支')
+      .and('contain.text', 'Neocloud Giant')
+      .and('contain.text', '每芯片小时全包成本');
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {
