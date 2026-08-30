@@ -19,6 +19,8 @@ interface CollectiveXKvFrontierChartProps {
   cases: CollectiveXKvRunCase[];
   colors: Record<string, string>;
   selection: CollectiveXKvFrontierSelection;
+  xLogScale: boolean;
+  yLogScale: boolean;
   caption?: React.ReactNode;
   legendElement?: React.ReactNode;
   testId?: string;
@@ -29,9 +31,9 @@ const STRINGS = {
     noData: 'No measured KV rows match the selected page size and direction.',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    xAxis: 'Sequence length (ISL tokens, log)',
-    yAxis: (op: CollectiveXKvFrontierSelection['op']) =>
-      `Aggregate ${op} bandwidth at p50 (GB/s, log)`,
+    xAxis: (logScale: boolean) => `Sequence length (ISL tokens${logScale ? ', log' : ''})`,
+    yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
+      `Aggregate ${op} bandwidth at p50 (GB/s${logScale ? ', log' : ''})`,
     dismiss: 'Click elsewhere to dismiss',
     skuFrontier: 'SKU-wide best at this ISL',
     backendFrontier: 'backend best at this ISL',
@@ -49,8 +51,9 @@ const STRINGS = {
   zh: {
     noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    xAxis: '序列长度（ISL token，对数）',
-    yAxis: (op: CollectiveXKvFrontierSelection['op']) => `p50 聚合 ${op} 带宽（GB/s，对数）`,
+    xAxis: (logScale: boolean) => `序列长度（ISL token${logScale ? '，对数' : ''}）`,
+    yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
+      `p50 聚合 ${op} 带宽（GB/s${logScale ? '，对数' : ''}）`,
     dismiss: '点击其他位置关闭',
     skuFrontier: '该 ISL 下 SKU 级最优',
     backendFrontier: '该 ISL 下后端最优',
@@ -95,6 +98,8 @@ export function CollectiveXKvFrontierChart({
   cases,
   colors,
   selection,
+  xLogScale,
+  yLogScale,
   caption,
   legendElement,
   testId,
@@ -151,15 +156,15 @@ export function CollectiveXKvFrontierChart({
       testId={testId}
       grabCursor
       instructions={strings.instructions}
-      xScale={{ type: 'log', domain: xDomain, nice: false }}
-      yScale={{ type: 'log', domain: yDomain, nice: false }}
+      xScale={{ type: xLogScale ? 'log' : 'linear', domain: xDomain, nice: false }}
+      yScale={{ type: yLogScale ? 'log' : 'linear', domain: yDomain, nice: false }}
       xAxis={{
-        label: strings.xAxis,
+        label: strings.xAxis(xLogScale),
         tickCount: 6,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
       yAxis={{
-        label: strings.yAxis(selection.op),
+        label: strings.yAxis(selection.op, yLogScale),
         tickCount: 5,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
@@ -171,7 +176,7 @@ export function CollectiveXKvFrontierChart({
           config: {
             getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
             getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
-            strokeWidth: 2.5,
+            strokeWidth: 2,
             curve: d3.curveMonotoneX,
           },
         },

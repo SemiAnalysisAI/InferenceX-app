@@ -54,6 +54,8 @@ const STRINGS = {
     xAriaLabel: 'CollectiveX KV X axis',
     pageAriaLabel: 'CollectiveX KV page size',
     opAriaLabel: 'CollectiveX KV direction',
+    xLogScale: 'X-axis Log Scale',
+    yLogScale: 'Y-axis Log Scale',
   },
   zh: {
     heading: 'KV 缓存传输',
@@ -79,6 +81,8 @@ const STRINGS = {
     xAriaLabel: 'CollectiveX KV X 轴',
     pageAriaLabel: 'CollectiveX KV 页大小',
     opAriaLabel: 'CollectiveX KV 传输方向',
+    xLogScale: 'X 轴对数缩放',
+    yLogScale: 'Y 轴对数缩放',
   },
 } as const;
 
@@ -121,6 +125,8 @@ export function CollectiveXKvSection({
   );
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
+  const [xLogScale, setXLogScale] = useState(true);
+  const [yLogScale, setYLogScale] = useState(true);
   // Legend toggles are keyed to the current series set: when checked runs
   // change, the stored selection is stale and every series starts active
   // again (the EP explorer resets the same way).
@@ -283,6 +289,28 @@ export function CollectiveXKvSection({
     op,
     pageTokens: Number(pageTokens),
   };
+  const legendSwitches = [
+    {
+      id: 'collectivex-kv-x-log-scale',
+      label: strings.xLogScale,
+      advanced: true,
+      checked: xLogScale,
+      onCheckedChange: (checked: boolean) => {
+        setXLogScale(checked);
+        track('collectivex_kv_x_log_scale_toggled', { enabled: checked });
+      },
+    },
+    {
+      id: 'collectivex-kv-y-log-scale',
+      label: strings.yLogScale,
+      advanced: true,
+      checked: yLogScale,
+      onCheckedChange: (checked: boolean) => {
+        setYLogScale(checked);
+        track('collectivex_kv_y_log_scale_toggled', { enabled: checked });
+      },
+    },
+  ];
   return (
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
@@ -363,6 +391,8 @@ export function CollectiveXKvSection({
                 cases={activeCases}
                 colors={colors}
                 selection={{ op, pageTokens: Number(pageTokens) }}
+                xLogScale={xLogScale}
+                yLogScale={yLogScale}
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {op} · page {pageTokens} · {strings.frontierCaption}
@@ -372,6 +402,7 @@ export function CollectiveXKvSection({
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
+                    switches={legendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={setLegendExpanded}
@@ -407,6 +438,8 @@ export function CollectiveXKvSection({
                 cases={activeCases}
                 colors={colors}
                 selection={selection}
+                xLogScale={xLogScale}
+                yLogScale={yLogScale}
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {op} · page {pageTokens} ·{' '}
@@ -417,6 +450,7 @@ export function CollectiveXKvSection({
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
+                    switches={legendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={setLegendExpanded}
