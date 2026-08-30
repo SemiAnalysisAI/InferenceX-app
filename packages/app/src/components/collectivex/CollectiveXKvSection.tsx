@@ -12,7 +12,6 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
-import { CollectiveXKvAlphaBetaChart } from './CollectiveXKvAlphaBetaChart';
 import { CollectiveXKvChart } from './CollectiveXKvChart';
 import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';
 import { CollectiveXKvOverlapChart } from './CollectiveXKvOverlapChart';
@@ -41,13 +40,8 @@ const STRINGS = {
       'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
       'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
       'line well above its batch-1 points; hover a point for its batch, latency, and status.',
-    frontierOption: 'Frontier',
-    latSizeOption: 'Lat vs size',
+    frontierOption: 'Envelope',
     overlapOption: 'Overlap gain',
-    latSizeCaption:
-      'batch 1; x is bytes moved per request, so the flat left region is fixed per-request ' +
-      'overhead (α) and the slope-1 right region is the wire (1/β); the knee is N½, the size ' +
-      'that reaches half of peak. Hover a point for its series α+β fit.',
     overlapCaption:
       'aggregate bandwidth relative to batch 1 at the largest measured ISL; the dotted ideal ' +
       'is y = batch. A perfect overlapper tracks the ideal until the wire saturates; a ' +
@@ -72,12 +66,8 @@ const STRINGS = {
     frontierCaption:
       '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
       '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、时延与状态。',
-    frontierOption: '帕累托前沿',
-    latSizeOption: '时延-字节',
+    frontierOption: '带宽包络',
     overlapOption: '重叠增益',
-    latSizeCaption:
-      '批大小 1；x 为每请求传输字节数，左侧平坦段为固定的每请求开销（α），右侧斜率 1 段为线速（1/β）；' +
-      '拐点即 N½，达到峰值一半带宽的传输尺寸。悬停可查看该序列的 α+β 拟合。',
     overlapCaption:
       '相对批大小 1 的聚合带宽，取最大实测 ISL；虚线为理想值 y = 批大小。' +
       '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。',
@@ -126,9 +116,9 @@ export function CollectiveXKvSection({
   const locale = useLocale();
   const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const [yAxis, setYAxis] = useState<CollectiveXKvChartSelection['y']>('bandwidth');
-  const [xAxis, setXAxis] = useState<
-    CollectiveXKvChartSelection['x'] | 'frontier' | 'latsize' | 'overlap'
-  >('batch');
+  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
+    'batch',
+  );
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
   // Legend toggles are keyed to the current series set: when checked runs
@@ -334,7 +324,6 @@ export function CollectiveXKvSection({
                   { value: 'batch', label: 'Batch' },
                   { value: 'isl', label: 'ISL' },
                   { value: 'frontier', label: strings.frontierOption },
-                  { value: 'latsize', label: strings.latSizeOption },
                   { value: 'overlap', label: strings.overlapOption },
                 ]}
               />
@@ -377,28 +366,6 @@ export function CollectiveXKvSection({
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {op} · page {pageTokens} · {strings.frontierCaption}
-                  </p>
-                }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    legendItems={legendItems}
-                    disableActiveSort
-                    isLegendExpanded={legendExpanded}
-                    onExpandedChange={setLegendExpanded}
-                  />
-                }
-              />
-            ) : xAxis === 'latsize' ? (
-              <CollectiveXKvAlphaBetaChart
-                chartId="collectivex-kv-alphabeta"
-                testId="collectivex-kv-alphabeta-chart"
-                cases={activeCases}
-                colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens) }}
-                caption={
-                  <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.latSizeCaption}
                   </p>
                 }
                 legendElement={
