@@ -61,8 +61,8 @@ function windowFromUnixPair(start: unknown, end: unknown): PowerWindow | null {
 
 /**
  * Map an `agg_<X>.json` row (the exact bytes the ETL ingests) to power fields.
- * Legacy rows yield published values and a verdict only; rows carrying the
- * versioned `power_audit` object also yield window bounds, counts, and provenance.
+ * Legacy rows yield published values and a verdict only; rows carrying an
+ * embedded `power_audit` object also yield window bounds, counts, and provenance.
  */
 export function powerFromAggRow(
   agg: Record<string, unknown>,
