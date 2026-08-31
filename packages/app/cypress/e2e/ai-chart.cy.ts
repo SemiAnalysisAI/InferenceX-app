@@ -188,10 +188,12 @@ describe('AI chart Chinese workflow', () => {
       cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
         const systemPrompt = request.body.messages?.[0]?.content ?? '';
         if (systemPrompt.includes('chart generation assistant')) {
+          expect(systemPrompt).to.contain('natural Simplified Chinese');
           request.reply({ choices: [{ message: { content: JSON.stringify(spec) } }] });
           return;
         }
 
+        expect(systemPrompt).to.contain('用自然、准确的简体中文回答');
         request.reply({ choices: [{ message: { content: 'B200 在该配置下吞吐量更高。' } }] });
       }).as('zhOpenAi');
 

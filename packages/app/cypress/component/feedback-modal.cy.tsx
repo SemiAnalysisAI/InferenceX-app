@@ -28,7 +28,19 @@ describe('FeedbackForm', () => {
   it('POSTs to /api/v1/feedback, dispatches FEEDBACK_SUBMITTED_EVENT, then dismisses', () => {
     cy.intercept('POST', '/api/v1/feedback', { statusCode: 204 }).as('post');
     const onDismiss = cy.stub().as('onDismiss');
-    cy.mount(<FeedbackForm onDismiss={onDismiss} />);
+    cy.mount(
+      <FeedbackForm
+        onDismiss={onDismiss}
+        titleId="feedback-modal-title"
+        descriptionId="feedback-modal-description"
+      />,
+    );
+
+    cy.get('#feedback-modal-title').should('have.text', 'Help us improve InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      "We'd love to hear what's working and what isn't.",
+    );
 
     let submittedFired = false;
     cy.window().then((win) => {
@@ -40,32 +52,11 @@ describe('FeedbackForm', () => {
     cy.get('[data-testid="feedback-doing-well"]').type('useful chart!');
     cy.get('[data-testid="feedback-modal-submit"]').click();
     cy.wait('@post');
-    cy.contains('Thanks for your feedback!').should('be.visible');
+    cy.get('#feedback-modal-title').should('have.text', 'Thanks for your feedback!');
+    cy.get('#feedback-modal-description').should('have.text', 'We read every response.');
     cy.then(() => expect(submittedFired).to.be.true);
     // Success-hold is 2s; onDismiss fires after.
     cy.get('@onDismiss').should('have.been.calledOnce');
-  });
-
-  it('keeps engine-provided English accessible labels valid after success', () => {
-    cy.intercept('POST', '/api/v1/feedback', { statusCode: 204 }).as('postAccessibleEn');
-    cy.mount(
-      <FeedbackForm
-        onDismiss={cy.stub()}
-        titleId="feedback-modal-title"
-        descriptionId="feedback-modal-description"
-      />,
-    );
-
-    cy.get('#feedback-modal-title').should('have.text', 'Help us improve InferenceX');
-    cy.get('#feedback-modal-description').should(
-      'have.text',
-      "We'd love to hear what's working and what isn't.",
-    );
-    cy.get('[data-testid="feedback-doing-well"]').type('Clear charts');
-    cy.get('[data-testid="feedback-modal-submit"]').click();
-    cy.wait('@postAccessibleEn');
-    cy.get('#feedback-modal-title').should('have.text', 'Thanks for your feedback!');
-    cy.get('#feedback-modal-description').should('have.text', 'We read every response.');
   });
 
   it('surfaces a 429 as a user-readable error', () => {
@@ -93,14 +84,20 @@ describe('FeedbackForm', () => {
     cy.contains('感谢您的反馈！').should('be.visible');
   });
 
-  it('localizes rate-limit and server errors on Chinese routes', () => {
-    cy.intercept('POST', '/api/v1/feedback', { statusCode: 429 }).as('rateLimited');
-    cy.mount(<FeedbackForm locale="zh" onDismiss={cy.stub()} />);
-    cy.get('[data-testid="feedback-doing-well"]').type('反馈');
-    cy.get('[data-testid="feedback-modal-submit"]').click();
-    cy.wait('@rateLimited');
-    cy.contains('[role="alert"]', '提交次数过多，请稍后再试。').should('be.visible');
-  });
+  for (const [statusCode, expected] of [
+    [400, '提交未通过校验，请检查填写内容后重试。'],
+    [429, '提交次数过多，请稍后再试。'],
+    [500, '反馈保存失败，请重试。'],
+  ] as const) {
+    it(`localizes a ${statusCode} response on Chinese routes`, () => {
+      cy.intercept('POST', '/api/v1/feedback', { statusCode }).as('failedSubmission');
+      cy.mount(<FeedbackForm locale="zh" onDismiss={cy.stub()} />);
+      cy.get('[data-testid="feedback-doing-well"]').type('反馈');
+      cy.get('[data-testid="feedback-modal-submit"]').click();
+      cy.wait('@failedSubmission');
+      cy.contains('[role="alert"]', expected).should('be.visible');
+    });
+  }
 
   it('does not expose a raw network error on Chinese routes', () => {
     cy.intercept('POST', '/api/v1/feedback', { forceNetworkError: true }).as('networkFailure');

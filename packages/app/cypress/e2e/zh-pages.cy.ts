@@ -166,6 +166,16 @@ describe('Chinese (/zh) pages', () => {
         .should('have.attr', 'aria-label', '图表模式')
         .and('contain.text', '按周')
         .and('contain.text', '累计');
+      cy.get('[role="group"][aria-label="基准测试提交活动图表"]')
+        .should('contain.text', 'Shift+滚轮横向缩放')
+        .find('[data-testid="submissions-chart-svg"]')
+        .should('contain.text', '数据点数量');
+      cy.get('[data-testid="submissions-chart-svg"] .proximity-overlay').click('center', {
+        force: true,
+      });
+      cy.get('[data-chart-tooltip]:visible')
+        .should('contain.text', '点击其他区域关闭')
+        .and('contain.text', '合计');
       cy.contains('th button', '投机解码').should('be.visible');
       cy.contains('th button', '数据点').click().parent('th').should('have.attr', 'aria-sort');
       cy.get('button[aria-label="展开配置详情"]').first().click();

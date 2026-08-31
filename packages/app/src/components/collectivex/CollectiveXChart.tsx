@@ -147,8 +147,8 @@ export function CollectiveXChart({
   const locale = useLocale();
   const t = STRINGS[locale];
   const points = useMemo(
-    () => chartPoints(series, operation, percentile, yAxis),
-    [series, operation, percentile, yAxis],
+    () => chartPoints(series, operation, percentile, yAxis, locale),
+    [series, operation, percentile, yAxis, locale],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
   // Per-series α/β fit for the current operation (p50). β is the per-GPU

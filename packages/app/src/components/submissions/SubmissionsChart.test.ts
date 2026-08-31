@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { formatSubmissionTooltipDate } from './SubmissionsChart';
+import { formatSubmissionDate } from './SubmissionsChart';
 
 const originalTimeZone = process.env.TZ;
 
@@ -9,7 +9,7 @@ afterEach(() => {
   else process.env.TZ = originalTimeZone;
 });
 
-describe('formatSubmissionTooltipDate', () => {
+describe('formatSubmissionDate', () => {
   it.each([
     ['en' as const, 'Jan 1, 2025'],
     ['zh' as const, '2025年1月1日'],
@@ -18,6 +18,6 @@ describe('formatSubmissionTooltipDate', () => {
     const midnightUtc = Date.parse('2025-01-01T00:00:00Z');
 
     expect(new Date(midnightUtc).getDate()).toBe(31);
-    expect(formatSubmissionTooltipDate(midnightUtc, locale)).toBe(expected);
+    expect(formatSubmissionDate(midnightUtc, locale)).toBe(expected);
   });
 });

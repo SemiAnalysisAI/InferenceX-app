@@ -86,6 +86,14 @@ const STRINGS = {
   },
 };
 
+function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
+  if (locale !== 'zh') return date;
+  const [year, month, day] = date.split('-').map(Number);
+  return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day)
+    ? `${year}年${month}月${day}日`
+    : date;
+}
+
 export default function HistoricalTrendsDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -398,11 +406,11 @@ export default function HistoricalTrendsDisplay() {
                       {selectedPrecisions
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}{' '}
-                      • {getSequenceLabel(selectedSequence as Sequence)} • {t.source}
+                      • {getSequenceLabel(selectedSequence as Sequence, locale)} • {t.source}
                       {selectedRunDate && (
                         <>
                           {' '}
-                          • {t.updated} {selectedRunDate}
+                          • {t.updated} {historicalRunDate(selectedRunDate, locale)}
                         </>
                       )}
                     </p>

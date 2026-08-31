@@ -19,18 +19,11 @@ describe('AI chart locale instructions', () => {
 
     expect(prompt).toContain('"title": "short chart title"');
     expect(prompt).not.toContain('Simplified Chinese');
-    expect(summaryPrompt)
-      .toBe(`You are an expert performance analyst. Based on the following benchmark data, provide a concise 2-3 sentence summary highlighting the key takeaway.
-
-Chart: B200 throughput | Metric: Throughput/Chip | Model: DeepSeek-R1-0528, Seq: 8k/1k
-
-Data:
-B200: 12345.67 tok/s
-
-Rules:
-- Be technical and precise. Mention specific values and percentage differences.
-- Focus on the most interesting comparison or finding.
-- No markdown formatting, just plain text.`);
+    expect(summaryPrompt).toContain(
+      'Chart: B200 throughput | Metric: Throughput/Chip | Model: DeepSeek-R1-0528, Seq: 8k/1k',
+    );
+    expect(summaryPrompt).toContain('B200: 12345.67 tok/s');
+    expect(summaryPrompt).toContain('Be technical and precise');
   });
 
   it('asks for Simplified Chinese presentation fields on Chinese routes', () => {

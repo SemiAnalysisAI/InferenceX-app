@@ -69,19 +69,29 @@ function lineColor(key: string): string {
 const LINE_KEYS = ['nvidia', 'amd', 'total'] as const;
 type LineKey = (typeof LINE_KEYS)[number];
 
-export function formatSubmissionTooltipDate(date: number, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+const SUBMISSION_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(date));
+  }),
+  zh: new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }),
+};
+
+export function formatSubmissionDate(date: number | Date, locale: Locale): string {
+  return SUBMISSION_DATE_FORMATTERS[locale].format(new Date(date));
 }
 
 function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale): string {
   const t = SUBMISSIONS_STRINGS[locale];
   const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
-  const dateStr = formatSubmissionTooltipDate(d.date, locale);
+  const dateStr = formatSubmissionDate(d.date, locale);
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
@@ -134,16 +144,6 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
   const locale = useLocale();
   const isNarrowViewport = useNarrowViewport();
   const legendT = SUBMISSIONS_STRINGS[locale];
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      }),
-    [locale],
-  );
 
   const toggleLine = useCallback((name: string) => {
     setEnabledLines((prev) => {
@@ -260,7 +260,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
             .attr('font-size', '9px')
             .attr('font-weight', '400')
             .attr('fill', 'var(--muted-foreground)')
-            .text(dateFormatter.format(new Date(NIGHTLY_END_DATE)));
+            .text(formatSubmissionDate(NIGHTLY_END_DATE, locale));
           const bbox = (text.node() as SVGTextElement).getBBox();
           label
             .insert('rect', 'text')
@@ -293,7 +293,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         },
       },
     ],
-    [dateFormatter, legendT.markerLine1, legendT.markerLine2, lineData],
+    [legendT.markerLine1, legendT.markerLine2, lineData, locale],
   );
 
   if (chartPoints.length === 0) {
@@ -317,14 +317,10 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         instructions={legendT.instructions}
         xScale={{ type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])], nice: false }}
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
-        xAxis={
-          locale === 'zh'
-            ? {
-                tickCount: isNarrowViewport ? 3 : 6,
-                tickFormat: (value) => dateFormatter.format(new Date(Number(value))),
-              }
-            : { tickCount: 6 }
-        }
+        xAxis={{
+          tickCount: isNarrowViewport ? 3 : 6,
+          tickFormat: (value) => formatSubmissionDate(Number(value), locale),
+        }}
         yAxis={{
           label: locale === 'zh' ? legendT.yAxis : undefined,
           tickCount: 5,

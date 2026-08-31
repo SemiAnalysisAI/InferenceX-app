@@ -474,11 +474,18 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', 'KV');
     cy.get('[data-testid="collectivex-support-matrices"]')
       .should('contain.text', '已知 Kernel 支持情况')
+      .and('contain.text', '下表展示完整的 SKU × 集合通信库支持情况')
       .and('contain.text', '吞吐量 Kernel')
       .and('contain.text', '低延迟 Kernel')
       .and('contain.text', '可用')
       .and('contain.text', '已知不可用')
       .and('contain.text', '不适用');
+    cy.get(
+      '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="mi355x"][data-library="mori"] [data-testid="collectivex-known-ep"][data-degree="16"]',
+    )
+      .invoke('attr', 'aria-label')
+      .should('match', /（注 \d+）/u)
+      .and('not.include', '(note ');
   });
 
   it('localizes the complete chart and run-table click path on the Chinese route', () => {
@@ -496,6 +503,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-display"]').should('contain.text', '终态用例');
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', '往返（实测）')
+      .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟（µs）');
 
@@ -503,50 +511,12 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '点击其他区域关闭')
       .and('contain.text', '往返')
+      .and('contain.text', '常规')
+      .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
   });
 
-  it('localizes every real GitHub workflow conclusion and derives pending only from null', () => {
-    const cases = [
-      ['success', '成功'],
-      ['failure', '失败'],
-      ['cancelled', '已取消'],
-      ['neutral', '中立'],
-      ['skipped', '已跳过'],
-      ['stale', '已过期'],
-      ['timed_out', '超时'],
-      ['startup_failure', '启动失败'],
-      ['action_required', '需要处理'],
-      [null, '待处理'],
-    ] as const;
-    const runs = cases.map(([conclusion], index) =>
-      buildDataset({
-        shards: [makeRawShard()],
-        meta: {
-          run_id: String(170 + index),
-          generated_at: `2026-08-${String(20 - index).padStart(2, '0')}T12:20:00Z`,
-          conclusion,
-        },
-      }),
-    );
-
-    installRuns(runs);
-    cy.intercept('GET', '/api/v1/collectivex/runs/*', (request) => {
-      const runIdFromUrl = request.url.split('/').at(-1)?.split('?')[0];
-      request.reply({ body: runs.find((run) => run.run.run_id === runIdFromUrl) ?? runs[0] });
-    }).as('conclusionRun');
-    cy.visit('/zh/collectivex');
-    cy.wait('@runs');
-    cy.wait('@conclusionRun');
-
-    cases.forEach(([conclusion, expected], index) => {
-      cy.get(`[data-testid="collectivex-run-row-${170 + index}"]`)
-        .should('contain.text', expected)
-        .and('not.contain.text', conclusion ?? 'pending');
-    });
-  });
-
-  it('shows a cancelled selected run as cancelled instead of pending', () => {
+  it('keeps a selected cancelled run localized instead of showing it as pending', () => {
     const cancelled = buildDataset({
       shards: [makeRawShard()],
       meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },

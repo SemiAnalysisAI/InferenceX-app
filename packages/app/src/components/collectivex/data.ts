@@ -52,6 +52,16 @@ const COLLECTIVEX_CONCLUSION_LABELS = {
   },
 } as const;
 
+const COLLECTIVEX_MODE_LABELS_ZH: Record<CollectiveXMode, string> = {
+  normal: '常规',
+  'low-latency': '低延迟',
+};
+
+const COLLECTIVEX_PHASE_LABELS_ZH: Record<CollectiveXPhase, string> = {
+  decode: '解码',
+  prefill: '预填充',
+};
+
 /** Format every conclusion emitted by the GitHub Actions workflow-run API. */
 export function collectiveXConclusionLabel(conclusion: string | null, locale: Locale): string {
   if (conclusion === null) return locale === 'zh' ? '待处理' : 'pending';
@@ -108,20 +118,28 @@ export function collectiveXTopologyLabel(
     | 'scale_out_transport'
     | 'topology_class'
   >,
+  locale: Locale = 'en',
 ): string {
   const transports = system.scale_out_transport
     ? `${system.scale_up_transport}+${system.scale_out_transport}`
     : system.scale_up_transport;
-  return `${system.nodes}x${system.gpus_per_node} · domain ${system.scale_up_domain} · ${transports} · ${system.topology_class}`;
+  const domain =
+    locale === 'zh' ? `域内芯片数 ${system.scale_up_domain}` : `domain ${system.scale_up_domain}`;
+  return `${system.nodes}x${system.gpus_per_node} · ${domain} · ${transports} · ${system.topology_class}`;
 }
 
-export function collectiveXLegendLabel(series: CollectiveXSeries): string {
-  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+export function collectiveXLegendLabel(series: CollectiveXSeries, locale: Locale = 'en'): string {
+  const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
+  const phase = locale === 'zh' ? COLLECTIVEX_PHASE_LABELS_ZH[series.phase] : series.phase;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
 }
 
-export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
+export function collectiveXSeriesLabel(
+  series: CollectiveXSeries | CollectiveXRunSeries,
+  locale: Locale = 'en',
+): string {
   const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
-  return `${runPrefix}${collectiveXLegendLabel(series)}`;
+  return `${runPrefix}${collectiveXLegendLabel(series, locale)}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -240,6 +258,7 @@ export function chartPoints(
   operation: CollectiveXOperation,
   percentile: CollectiveXPercentile,
   yAxis: CollectiveXYAxis,
+  locale: Locale = 'en',
 ): CollectiveXChartPoint[] {
   return series.flatMap((item) =>
     item.points.flatMap((point) => {
@@ -249,7 +268,7 @@ export function chartPoints(
       return [
         {
           seriesId: item.series_id,
-          seriesLabel: collectiveXSeriesLabel(item),
+          seriesLabel: collectiveXSeriesLabel(item, locale),
           colorKey: collectiveXColorKey(item),
           x,
           y,

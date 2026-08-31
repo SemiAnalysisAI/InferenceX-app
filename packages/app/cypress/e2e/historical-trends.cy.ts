@@ -11,6 +11,9 @@ const visitHistoricalWithSetup = () => {
   cy.get('[data-testid="historical-trends-display"]').should('be.visible');
 };
 
+const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
+  rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
+
 describe('Historical Trends Tab', () => {
   beforeEach(() => {
     visitHistoricalWithSetup();
@@ -205,6 +208,31 @@ describe('Historical Trends — Chinese route', () => {
       .should('contain.text', '点击其他区域关闭')
       .invoke('text')
       .should('match', /\d{4}年/u);
+  });
+
+  it('localizes the Agentic sequence and run date in the chart caption', () => {
+    const runDate = '2025-03-01';
+    cy.fixture('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability', {
+        body: asAgenticRowsOn(rows, runDate),
+      }).as('agenticAvailability');
+    });
+    cy.fixture('api/benchmarks.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/benchmarks?*', {
+        body: asAgenticRowsOn(rows, runDate),
+      }).as('agenticBenchmarks');
+    });
+
+    cy.visit(
+      `/zh/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
+    );
+    cy.wait('@agenticAvailability');
+    cy.wait('@agenticBenchmarks');
+    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+      .first()
+      .should('contain.text', '智能体')
+      .and('contain.text', '2025年3月1日')
+      .and('not.contain.text', runDate);
   });
 
   it('shows a settled Chinese empty state instead of leaving the skeleton mounted', () => {

@@ -28,40 +28,6 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   }
 }
 
-// The support file seeds `inferencex-feedback-modal-snoozed` on every page
-// load so the modal's backdrop stays out of other specs' way. This spec's
-// accessibility test is the one place that wants the real modal, so it clears
-// the seed (spec `onBeforeLoad` runs after the support hook). Keep the
-// feedback keys OUT of `clearAllNudgeStorage`: the immediate feedback modal
-// claims the shared overlay slot and would suppress the delayed
-// reproducibility / filter-hint toasts every other test asserts on.
-function clearNudgeStorageAndUnsnoozeFeedbackModal(win: Cypress.AUTWindow) {
-  clearAllNudgeStorage(win);
-  for (const key of ['inferencex-feedback-modal-snoozed', 'inferencex-feedback-modal-submitted']) {
-    win.localStorage.removeItem(key);
-    win.sessionStorage.removeItem(key);
-  }
-}
-
-describe('Dashboard feedback modal accessibility', () => {
-  it('has a valid English accessible name and description', () => {
-    cy.visit('/inference', {
-      onBeforeLoad: clearNudgeStorageAndUnsnoozeFeedbackModal,
-    });
-
-    cy.get('[data-testid="feedback-modal"]')
-      .should('be.visible')
-      .and('have.attr', 'role', 'dialog')
-      .and('have.attr', 'aria-labelledby', 'feedback-modal-title')
-      .and('have.attr', 'aria-describedby', 'feedback-modal-description');
-    cy.get('#feedback-modal-title').should('have.text', 'Help us improve InferenceX');
-    cy.get('#feedback-modal-description').should(
-      'have.text',
-      "We'd love to hear what's working and what isn't.",
-    );
-  });
-});
-
 // `cypress.config.ts` runs with `testIsolation: false` — the browser context
 // (incl. localStorage / sessionStorage) survives across tests in this spec.
 // Defensively clear before each test so a missed `onBeforeLoad` in any test

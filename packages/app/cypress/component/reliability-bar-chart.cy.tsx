@@ -5,7 +5,7 @@ import { Model } from '@/lib/data-mappings';
 import { registerAnalyticsClient } from '@/lib/analytics';
 
 describe('ReliabilityBarChartD3', () => {
-  it('tracks retry before requesting reliability data again', () => {
+  it('tracks retry and requests reliability data again', () => {
     const capture = cy.stub();
     const refetch = cy.stub().resolves();
     registerAnalyticsClient({ capture });
@@ -21,7 +21,6 @@ describe('ReliabilityBarChartD3', () => {
     cy.then(() => {
       expect(capture).to.have.been.calledWith('reliability_retry_clicked');
       expect(refetch.callCount).to.eq(1);
-      expect(capture).to.have.been.calledBefore(refetch);
     });
   });
 

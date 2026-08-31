@@ -65,6 +65,9 @@ describe('collectiveXTopologyLabel', () => {
     expect(collectiveXTopologyLabel(scaleUp.system)).toBe(
       '1x8 · domain 8 · nvlink · h200-nvlink-island',
     );
+    expect(collectiveXTopologyLabel(scaleUp.system, 'zh')).toBe(
+      '1x8 · 域内芯片数 8 · nvlink · h200-nvlink-island',
+    );
   });
 
   it('joins scale-up and scale-out transports when a scale-out fabric is present', () => {
@@ -109,6 +112,15 @@ describe('collectiveXSeriesLabel', () => {
     expect(collectiveXLegendLabel(runSeries)).toBe(
       'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
+    expect(collectiveXLegendLabel(runSeries, 'zh')).toBe(
+      'H200 · deepep-v2 · EP8 · 常规 · 解码 · bf16',
+    );
+    expect(
+      collectiveXLegendLabel(
+        makeCollectiveXSeries({ mode: 'low-latency', phase: 'prefill' }),
+        'zh',
+      ),
+    ).toBe('H200 · deepep-v2 · EP8 · 低延迟 · 预填充 · bf16');
   });
 });
 
@@ -327,6 +339,9 @@ describe('chartPoints', () => {
       expect(point.x).toBeGreaterThan(0);
       expect(point.y).toBeGreaterThan(0);
     }
+    expect(chartPoints([scaleUp], 'dispatch', 'p50', 'latency', 'zh')[0].seriesLabel).toBe(
+      'H200 · deepep-v2 · EP8 · 常规 · 解码 · bf16',
+    );
   });
 
   it('drops points whose metric is unavailable', () => {

@@ -28,11 +28,12 @@ const STRINGS = {
     broken: 'Known not to work',
     na: 'Not applicable',
     notes: 'Notes',
+    note: (number: number) => ` (note ${number})`,
   },
   zh: {
     title: '已知 Kernel 支持情况',
     description:
-      '与上方勾选的运行无关的完整 SKU × 集合通信库支持图景：绿色组合在集群上可用，红色组合已知不可用（编号注释说明原因），灰色组合对该配对不存在。',
+      '下表展示完整的 SKU × 集合通信库支持情况，不受上方已选运行影响：绿色表示该组合可在集群上运行，红色表示已知不可用（原因见编号注释），灰色表示该配对不存在。',
     modes: {
       normal: '吞吐量 Kernel',
       'low-latency': '低延迟 Kernel',
@@ -42,6 +43,7 @@ const STRINGS = {
     broken: '已知不可用',
     na: '不适用',
     notes: '注释',
+    note: (number: number) => `（注 ${number}）`,
   },
 } as const;
 
@@ -56,14 +58,16 @@ function EpChip({
   degree,
   noteNumber,
   noteText,
+  formatNote,
 }: {
   ep: CollectiveXKnownEp;
   degree: 8 | 16;
   noteNumber: number | null;
   noteText: string | null;
+  formatNote: (number: number) => string;
 }) {
   const glyph = ep.status === 'works' ? '✓' : ep.status === 'broken' ? '✕' : '—';
-  const label = `EP${degree} ${glyph}${noteNumber === null ? '' : ` (note ${noteNumber})`}`;
+  const label = `EP${degree} ${glyph}${noteNumber === null ? '' : formatNote(noteNumber)}`;
   return (
     <span
       data-testid="collectivex-known-ep"
@@ -180,12 +184,14 @@ export function CollectiveXSupportMatrices() {
                                     degree={8}
                                     noteNumber={noteNumberOf(kase.ep8.note)}
                                     noteText={noteTextOf(kase.ep8.note)}
+                                    formatNote={t.note}
                                   />
                                   <EpChip
                                     ep={kase.ep16}
                                     degree={16}
                                     noteNumber={noteNumberOf(kase.ep16.note)}
                                     noteText={noteTextOf(kase.ep16.note)}
+                                    formatNote={t.note}
                                   />
                                 </span>
                               )}

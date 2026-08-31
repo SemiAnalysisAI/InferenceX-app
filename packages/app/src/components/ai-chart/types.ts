@@ -1,6 +1,7 @@
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
 import { Y_AXIS_METRICS } from '@/lib/chart-utils';
 import type { Locale } from '@/lib/i18n';
+import { isMetricKey, METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import { HW_REGISTRY, FRAMEWORK_KEYS } from '@semianalysisai/inferencex-constants';
 
 export type AiProvider = 'openai' | 'anthropic' | 'xai' | 'google';
@@ -80,6 +81,21 @@ const VALID_FRAMEWORKS = new Set<string>(FRAMEWORK_KEYS);
 const VALID_Y_METRICS = new Set<string>([...Y_AXIS_METRICS, 'eval_score', 'reliability_rate']);
 const VALID_SORT_ORDERS = new Set<string>(['desc', 'asc', 'registry']);
 
+const AI_Y_AXIS_LABELS_ZH = {
+  eval_score: '评估得分',
+  reliability_rate: '运行成功率',
+} as const;
+
+function fallbackYAxisLabel(metric: string, locale: Locale): string {
+  if (locale !== 'zh') return metric;
+  if (metric in AI_Y_AXIS_LABELS_ZH) {
+    return AI_Y_AXIS_LABELS_ZH[metric as keyof typeof AI_Y_AXIS_LABELS_ZH];
+  }
+
+  const metricKey = metric === 'y' ? 'tpPerGpu' : metric.startsWith('y_') ? metric.slice(2) : '';
+  return isMetricKey(metricKey) ? METRIC_REGISTRY[metricKey].labelZh : metric;
+}
+
 /** Validate and clamp an LLM-generated spec to known values. Throws on unrecoverable input. */
 export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'): AiChartSpec {
   const chartType = VALID_CHART_TYPES.has(raw.chartType as string)
@@ -141,7 +157,10 @@ export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'
     frameworks,
     disagg,
     yAxisMetric,
-    yAxisLabel: typeof raw.yAxisLabel === 'string' ? raw.yAxisLabel.slice(0, 100) : yAxisMetric,
+    yAxisLabel:
+      typeof raw.yAxisLabel === 'string'
+        ? raw.yAxisLabel.slice(0, 100)
+        : fallbackYAxisLabel(yAxisMetric, locale),
     targetInteractivity,
     sortOrder,
     radarMetrics: radarMetrics.length > 0 ? radarMetrics : undefined,

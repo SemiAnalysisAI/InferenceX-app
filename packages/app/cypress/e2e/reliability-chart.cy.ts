@@ -166,6 +166,12 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.get('#reliability-chart svg').should('contain.text', '成功率（%）');
     cy.get('#reliability-chart svg .overlay-label').first().should('contain.text', '次运行');
     cy.get('#reliability-chart').closest('figure').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('#reliability-chart svg rect.bar').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '点击其他区域关闭')
+      .and('contain.text', '成功率：')
+      .and('contain.text', '成功次数：')
+      .and('contain.text', '总运行次数：');
   });
 
   it('shows a Chinese empty state only after an empty response settles', () => {
@@ -177,12 +183,14 @@ describe('Reliability Chart — Chinese route and settled states', () => {
   });
 
   it('shows a safe Chinese error and recovers through the tracked retry control', () => {
-    let attempts = 0;
+    // Keep every automatic query attempt failing until the retry button is
+    // clicked. Counting attempts is race-prone because a remount can consume
+    // the first healthy response before the error UI is asserted.
+    let failRequests = true;
     cy.fixture('api/reliability.json').then((fixture) => {
       cy.intercept('GET', '**/api/v1/reliability', (req) => {
-        attempts += 1;
         req.reply(
-          attempts <= 2
+          failRequests
             ? { statusCode: 500, body: { error: 'database-internal-detail' } }
             : { statusCode: 200, body: fixture },
         );
@@ -195,7 +203,11 @@ describe('Reliability Chart — Chinese route and settled states', () => {
       .should('be.visible')
       .and('contain.text', '可靠性数据加载失败。');
     cy.contains('database-internal-detail').should('not.exist');
-    cy.contains('[data-testid="reliability-error"] button', '重试').click();
+    cy.contains('[data-testid="reliability-error"] button', '重试')
+      .then(() => {
+        failRequests = false;
+      })
+      .click();
     cy.wait('@retryReliability');
     cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
   });

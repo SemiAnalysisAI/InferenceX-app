@@ -226,7 +226,7 @@ const STRINGS = {
     allSuites: '全部',
     noSuiteRuns: '没有包含所选测试套件的运行。',
     selectRuns: '请从表格中选择至少一个运行以显示数据。',
-    selectedRunsFailed: '部分所选运行记录加载失败。',
+    selectedRunsFailed: '至少一个所选运行加载失败。',
     runControl: '运行',
     loadRuns: '加载运行',
     loadingRuns: '正在加载运行……',
@@ -597,11 +597,11 @@ export default function CollectiveXDisplay() {
     () =>
       phaseSeries.map((item) => ({
         name: item.series_id,
-        label: collectiveXLegendLabel(item),
+        label: collectiveXLegendLabel(item, locale),
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
+        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -612,7 +612,7 @@ export default function CollectiveXDisplay() {
           track('collectivex_series_toggled', { series: item.series_id });
         },
       })),
-    [activeSeriesIds, colors, phaseSeries],
+    [activeSeriesIds, colors, locale, phaseSeries],
   );
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
