@@ -312,10 +312,10 @@ describe('processOverlayChartData', () => {
 
   it('keeps all unofficial-run tokens-per-dollar points without the former cost clamp', () => {
     const data = [
-      pt({ tokensPerDollarH: { y: 500_000, roof: false }, median_intvty: 10 } as any),
-      pt({ tokensPerDollarH: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
+      pt({ tokensPerDollarN: { y: 500_000, roof: false }, median_intvty: 10 } as any),
+      pt({ tokensPerDollarN: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarH', null);
+    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarN', null);
     expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
@@ -330,12 +330,12 @@ describe('processOverlayChartData', () => {
 
   it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
-      tokensPerDollarH: { y: 500_000, roof: false },
+      tokensPerDollarN: { y: 500_000, roof: false },
       median_intvty: 10,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
     const highValue = pt({
-      tokensPerDollarH: { y: 2_000_000, roof: false },
+      tokensPerDollarN: { y: 2_000_000, roof: false },
       median_intvty: 20,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
@@ -343,7 +343,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartDataWithClipping(
       [visible, highValue],
       'interactivity',
-      'y_tokensPerDollarH',
+      'y_tokensPerDollarN',
       null,
     );
 

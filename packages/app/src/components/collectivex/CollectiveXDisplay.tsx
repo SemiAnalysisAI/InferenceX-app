@@ -27,6 +27,7 @@ import { useLocale } from '@/lib/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
+import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXConclusionLabel,
   collectiveXColorKey,
@@ -1129,6 +1130,10 @@ export default function CollectiveXDisplay() {
           </Card>
         </>
       )}
+      {/* The curated support picture is run-independent, so it renders even
+          with nothing checked, and last: it is reference material, not data
+          from the selection above. */}
+      <CollectiveXSupportMatrices />
     </section>
   );
 }

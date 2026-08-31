@@ -70,7 +70,6 @@ import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   parallelismLabelBoxes,
   placeLineLabels,
-  placeEndpointLineLabels,
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
@@ -582,12 +581,13 @@ const GPUGraph = React.memo(
       ) => {
         if (!showLineLabels) return [];
         const series = buildSeries();
-        return chartDefinition.chartType === 'interactivity'
-          ? placeLineLabels(series, xScale, yScale, {
-              collisionWidth: 160,
-              obstacles: parallelismLabelBoxes(zoomGroup.node()),
-            })
-          : placeEndpointLineLabels(series, xScale, yScale);
+        // Both chart types spread labels along their lines with collision
+        // avoidance — endpoint-only placement stacked every label at the
+        // right edge of the e2e latency chart.
+        return placeLineLabels(series, xScale, yScale, {
+          collisionWidth: 160,
+          obstacles: parallelismLabelBoxes(zoomGroup.node()),
+        });
       };
 
       return {

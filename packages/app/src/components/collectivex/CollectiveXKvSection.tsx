@@ -14,12 +14,15 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXKvChart } from './CollectiveXKvChart';
 import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';
+import { CollectiveXKvOverlapChart } from './CollectiveXKvOverlapChart';
 import {
   type CollectiveXKvChartSelection,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
   collectiveXKvColorKey,
+  collectiveXKvIslValues,
   collectiveXKvLegendLabel,
+  collectiveXKvPageValues,
   collectiveXRunDasharray,
   collectiveXSkuLabel,
 } from './data';
@@ -30,24 +33,44 @@ const STRINGS = {
     heading: 'KV-cache transfer',
     description:
       'Prefill-to-decode KV handoff (2 nodes x 1 GPU, DeepSeek-V4-Pro cache as vLLM allocates it). ' +
-      'Paged rows move per-request layer-major descriptor lists over randomized block tables; ' +
-      'bulk is the single-descriptor wire ceiling. GB/s is burst-aggregate pull at the largest ISL; ' +
-      'b1/bmax are requests posted per burst.',
+      'Paged rows move packed block-major descriptor lists over randomized block tables: one ' +
+      'contiguous descriptor per physical block per cache group, matching the production NIXL path. ' +
+      'Bulk is the single-descriptor contiguous baseline (host-observed goodput, not proven wire ' +
+      'utilization). GB/s is burst-aggregate pull at the largest ISL; b1/bmax are requests posted per burst.',
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
-      'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
-      'A backend that serializes requests collapses to a single point; hover a point for its ' +
-      'Pareto status.',
-    frontierOption: 'Frontier',
+      'every measured (ISL, batch) rung is a point; each solid or dashed line traces the ' +
+      'backend at its best batch for every ISL, so higher is better. The dotted line above ' +
+      'each backend is its contiguous baseline: the same bytes moved as one contiguous ' +
+      'descriptor through the same backend call, a host-observed goodput reference rather ' +
+      'than a proven physical link rate. The gap between a paged rung and its baseline is ' +
+      'the cost of the packed multi-descriptor path. Hover a point for its share of the baseline.',
+    frontierCaptionWithoutCeilings:
+      'every measured (ISL, batch) rung is a point; each line traces the backend at its best ' +
+      'batch for every ISL, so higher is better. A backend that overlaps requests lifts its ' +
+      'line well above its batch-1 points; hover a point for its batch, latency, and status.',
+    frontierOption: 'Envelope',
+    overlapOption: 'Overlap gain',
+    overlapCaption:
+      'aggregate bandwidth relative to batch 1 at the selected ISL (Max reads each backend at ' +
+      'its largest measured ISL); the dotted ideal is y = batch. A perfect overlapper tracks ' +
+      'the ideal until the wire saturates; a serializing backend stays flat at 1. Backends ' +
+      'without a batch-1 rung at the selected ISL are hidden.',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
     opControl: 'Direction',
+    islControl: 'ISL',
+    islMaxOption: 'Max',
     metricAriaLabel: 'CollectiveX KV metric',
     xAriaLabel: 'CollectiveX KV X axis',
     pageAriaLabel: 'CollectiveX KV page size',
     opAriaLabel: 'CollectiveX KV direction',
+    islAriaLabel: 'CollectiveX KV overlap ISL',
+    xLogScale: 'X-axis Log Scale',
+    yLogScale: 'Y-axis Log Scale',
+    bulkBaseline: 'Bulk Contiguous Baseline',
     summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
     headers: {
       run: 'Run',
@@ -72,23 +95,40 @@ const STRINGS = {
   zh: {
     heading: 'KV 缓存传输',
     description:
-      '预填充到解码的 KV 缓存交接（2 节点 × 1 GPU，采用 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
-      'paged 测试基于随机 block table，按请求传输以层为主序的描述符列表；bulk 测试以单描述符测量链路线速上限。' +
-      'GB/s 表示最大 ISL 下各 burst 汇总的 pull 带宽；b1/bmax 表示每个 burst 提交的请求数。',
+      '预填充到解码的 KV 交接（2 节点 x 1 GPU，按 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
+      '分页行按随机块表以块主序打包描述符列表搬运每个请求：每个缓存组的每个物理块对应一个连续描述符，' +
+      '与生产 NIXL 路径一致。bulk 为单描述符连续传输基线（主机侧观测的有效吞吐，并非实测物理链路利用率）。' +
+      'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线连接最大实测 ISL 下的各个批大小；越靠右下越优。' +
-      '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
-    frontierOption: '帕累托前沿',
+      '每个实测 (ISL, 批大小) 组合都是一个点；实线或虚线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '每个后端上方的点状线是其连续传输基线：同样的字节量经同一后端调用以单个连续描述符搬运，' +
+      '是主机侧观测的有效吞吐参考，而非实测物理链路速率。' +
+      '分页组合与基线之间的差距即打包多描述符路径的开销。悬停数据点可查看其相对基线的比例。',
+    frontierCaptionWithoutCeilings:
+      '每个实测 (ISL, 批大小) 组合都是一个点；每条线取该后端在各 ISL 下的最优批大小，越高越优。' +
+      '能重叠请求的后端其线会明显高于批大小 1 的点；悬停可查看批大小、延迟与状态。',
+    frontierOption: '带宽包络',
+    overlapOption: '重叠增益',
+    overlapCaption:
+      '相对批大小 1 的聚合带宽，取所选 ISL（“最大”表示各后端取其最大实测 ISL）；虚线为理想值 y = 批大小。' +
+      '完全重叠请求的后端会贴着理想线直到线速饱和；串行处理的后端保持在 1。' +
+      '在所选 ISL 处没有批大小 1 数据的后端将被隐藏。',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
     opControl: '方向',
+    islControl: 'ISL',
+    islMaxOption: '最大',
     metricAriaLabel: 'CollectiveX KV 指标',
     xAriaLabel: 'CollectiveX KV X 轴',
     pageAriaLabel: 'CollectiveX KV 页大小',
     opAriaLabel: 'CollectiveX KV 传输方向',
+    islAriaLabel: 'CollectiveX KV 重叠增益 ISL',
+    xLogScale: 'X 轴对数缩放',
+    yLogScale: 'Y 轴对数缩放',
+    bulkBaseline: 'Bulk 连续传输基线',
     summary: (cases: number, measured: number) => `${cases} 个用例 · 已测 ${measured} 个 · `,
     headers: {
       run: '运行',
@@ -125,11 +165,18 @@ function formatGbps(value: number | null | undefined): string {
   return value === null || value === undefined ? '-' : value.toFixed(value >= 100 ? 0 : 2);
 }
 
-function cellsOf(row: CollectiveXKvRunCase) {
+function formatIsl(value: number): string {
+  return value >= 1024 && value % 1024 === 0 ? `${value / 1024}k` : String(value);
+}
+
+function cellsOf(row: CollectiveXKvRunCase, primaryPage: number, secondaryPage?: number) {
   return {
-    p64b1: collectiveXKvCell(row.rows, 'paged', 64, 'min'),
-    p64bmax: collectiveXKvCell(row.rows, 'paged', 64, 'max'),
-    p16b1: collectiveXKvCell(row.rows, 'paged', 16, 'min'),
+    pb1: collectiveXKvCell(row.rows, 'paged', primaryPage, 'min'),
+    pbmax: collectiveXKvCell(row.rows, 'paged', primaryPage, 'max'),
+    sb1:
+      secondaryPage === undefined
+        ? null
+        : collectiveXKvCell(row.rows, 'paged', secondaryPage, 'min'),
     bulk: collectiveXKvCell(row.rows, 'bulk', null, 'min'),
   };
 }
@@ -146,9 +193,20 @@ export function CollectiveXKvSection({
   const locale = useLocale();
   const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const [yAxis, setYAxis] = useState<CollectiveXKvChartSelection['y']>('bandwidth');
-  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier'>('batch');
-  const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
+  const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
+    'batch',
+  );
+  // The page ladder lives in the data (the sweep moved from 64/16 to the
+  // production block 256); a stored choice the current rows no longer carry
+  // falls back to the largest measured page rather than an empty chart.
+  const [pageChoice, setPageChoice] = useState<string | null>(null);
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
+  // Overlap view only: 'max' normalizes each series at its own largest
+  // measured ISL; a numeric string pins every series to that ISL.
+  const [overlapIsl, setOverlapIsl] = useState<string>('max');
+  const [xLogScale, setXLogScale] = useState(true);
+  const [yLogScale, setYLogScale] = useState(true);
+  const [showWireCeilings, setShowWireCeilings] = useState(true);
   // Legend toggles are keyed to the current series set: when checked runs
   // change, the stored selection is stale and every series starts active
   // again (the EP explorer resets the same way).
@@ -172,6 +230,15 @@ export function CollectiveXKvSection({
     [datasets, runIndexById],
   );
   const measuredCases = useMemo(() => rows.filter((row) => row.rows.length > 0), [rows]);
+  const pageValues = useMemo(() => collectiveXKvPageValues(measuredCases), [measuredCases]);
+  const pageTokens =
+    pageChoice !== null && pageValues.includes(Number(pageChoice))
+      ? Number(pageChoice)
+      : (pageValues[0] ?? 64);
+  // Table cells always read the ladder's top page (and the runner-up when one
+  // exists) so the columns stay stable while the chart toggle moves.
+  const primaryPage = pageValues[0] ?? 64;
+  const secondaryPage = pageValues[1];
   const seriesSignature = useMemo(
     () =>
       measuredCases
@@ -191,6 +258,18 @@ export function CollectiveXKvSection({
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
     [activeIds, measuredCases],
   );
+  // ISL options come from all measured cases (not the legend-active subset)
+  // so the selector is stable while series are toggled. A stored value that
+  // no longer exists for the current direction and page size falls back to
+  // 'max' rather than an empty chart.
+  const overlapIslValues = useMemo(
+    () => collectiveXKvIslValues(measuredCases, { op, pageTokens }),
+    [measuredCases, op, pageTokens],
+  );
+  const effectiveOverlapIsl =
+    overlapIsl !== 'max' && overlapIslValues.includes(Number(overlapIsl))
+      ? Number(overlapIsl)
+      : undefined;
 
   const colorKeys = useMemo(
     () => [...new Set(measuredCases.map(collectiveXKvColorKey))],
@@ -272,53 +351,92 @@ export function CollectiveXKvSection({
       },
       {
         header: 'Bulk GB/s',
-        cell: (row) => formatGbps(cellsOf(row).bulk?.gbps_p50),
-        sortValue: (row) => cellsOf(row).bulk?.gbps_p50 ?? -1,
+        cell: (row) => formatGbps(cellsOf(row, primaryPage).bulk?.gbps_p50),
+        sortValue: (row) => cellsOf(row, primaryPage).bulk?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums',
       },
       {
-        header: 'p64 GB/s b1',
-        cell: (row) => formatGbps(cellsOf(row).p64b1?.gbps_p50),
-        sortValue: (row) => cellsOf(row).p64b1?.gbps_p50 ?? -1,
+        header: `p${primaryPage} GB/s b1`,
+        cell: (row) => formatGbps(cellsOf(row, primaryPage).pb1?.gbps_p50),
+        sortValue: (row) => cellsOf(row, primaryPage).pb1?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums',
       },
       {
-        header: 'p64 GB/s bmax',
+        header: `p${primaryPage} GB/s bmax`,
         cell: (row) => {
-          const cell = cellsOf(row).p64bmax;
+          const cell = cellsOf(row, primaryPage).pbmax;
           if (!cell) return '-';
           return `${formatGbps(cell.gbps_p50)} (b${cell.batch})`;
         },
-        sortValue: (row) => cellsOf(row).p64bmax?.gbps_p50 ?? -1,
+        sortValue: (row) => cellsOf(row, primaryPage).pbmax?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums whitespace-nowrap',
       },
-      {
-        header: 'p16 GB/s b1',
-        cell: (row) => formatGbps(cellsOf(row).p16b1?.gbps_p50),
-        sortValue: (row) => cellsOf(row).p16b1?.gbps_p50 ?? -1,
-        className: 'text-right tabular-nums',
-      },
+      ...(secondaryPage === undefined
+        ? []
+        : [
+            {
+              header: `p${secondaryPage} GB/s b1`,
+              cell: (row) => formatGbps(cellsOf(row, primaryPage, secondaryPage).sb1?.gbps_p50),
+              sortValue: (row) => cellsOf(row, primaryPage, secondaryPage).sb1?.gbps_p50 ?? -1,
+              className: 'text-right tabular-nums',
+            } satisfies DataTableColumn<CollectiveXKvRunCase>,
+          ]),
       {
         header: strings.headers.handoff,
         cell: (row) => {
-          const cell = cellsOf(row).p64b1;
+          const cell = cellsOf(row, primaryPage).pb1;
           return cell ? cell.latency_ms.p50.toFixed(1) : '-';
         },
-        sortValue: (row) => cellsOf(row).p64b1?.latency_ms.p50 ?? -1,
+        sortValue: (row) => cellsOf(row, primaryPage).pb1?.latency_ms.p50 ?? -1,
         className: 'text-right tabular-nums',
       },
     ],
-    [strings],
+    [strings, primaryPage, secondaryPage],
   );
 
   if (rows.length === 0) return null;
   const measured = rows.filter((row) => row.outcome === 'success').length;
   const selection: CollectiveXKvChartSelection = {
-    x: xAxis === 'frontier' ? 'batch' : xAxis,
+    x: xAxis === 'batch' || xAxis === 'isl' ? xAxis : 'batch',
     y: yAxis,
     op,
-    pageTokens: Number(pageTokens),
+    pageTokens,
   };
+  const legendSwitches = [
+    {
+      id: 'collectivex-kv-x-log-scale',
+      label: strings.xLogScale,
+      advanced: true,
+      checked: xLogScale,
+      onCheckedChange: (checked: boolean) => {
+        setXLogScale(checked);
+        track('collectivex_kv_x_log_scale_toggled', { enabled: checked });
+      },
+    },
+    {
+      id: 'collectivex-kv-y-log-scale',
+      label: strings.yLogScale,
+      advanced: true,
+      checked: yLogScale,
+      onCheckedChange: (checked: boolean) => {
+        setYLogScale(checked);
+        track('collectivex_kv_y_log_scale_toggled', { enabled: checked });
+      },
+    },
+  ];
+  const envelopeLegendSwitches = [
+    ...legendSwitches,
+    {
+      id: 'collectivex-kv-bulk-wire-ceiling',
+      label: strings.bulkBaseline,
+      advanced: true,
+      checked: showWireCeilings,
+      onCheckedChange: (checked: boolean) => {
+        setShowWireCeilings(checked);
+        track('collectivex_kv_bulk_wire_ceiling_toggled', { enabled: checked });
+      },
+    },
+  ];
   return (
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
@@ -329,7 +447,7 @@ export function CollectiveXKvSection({
       {measuredCases.length > 0 && (
         <>
           <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
-            {xAxis !== 'frontier' && (
+            {(xAxis === 'batch' || xAxis === 'isl') && (
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">{strings.yControl}</Label>
                 <SegmentedToggle
@@ -361,25 +479,25 @@ export function CollectiveXKvSection({
                   { value: 'batch', label: strings.batch },
                   { value: 'isl', label: 'ISL' },
                   { value: 'frontier', label: strings.frontierOption },
+                  { value: 'overlap', label: strings.overlapOption },
                 ]}
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
-              <SegmentedToggle
-                value={pageTokens}
-                onValueChange={(value) => {
-                  setPageTokens(value);
-                  track('collectivex_kv_page_size_changed', { page_tokens: value });
-                }}
-                ariaLabel={strings.pageAriaLabel}
-                testId="collectivex-kv-page-toggle"
-                options={[
-                  { value: '64', label: '64' },
-                  { value: '16', label: '16' },
-                ]}
-              />
-            </div>
+            {pageValues.length > 1 && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
+                <SegmentedToggle
+                  value={String(pageTokens)}
+                  onValueChange={setPageChoice}
+                  ariaLabel={strings.pageAriaLabel}
+                  testId="collectivex-kv-page-toggle"
+                  options={pageValues.map((value) => ({
+                    value: String(value),
+                    label: String(value),
+                  }))}
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">{strings.opControl}</Label>
               <SegmentedToggle
@@ -393,6 +511,27 @@ export function CollectiveXKvSection({
                 ]}
               />
             </div>
+            {xAxis === 'overlap' && overlapIslValues.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.islControl}</Label>
+                <SegmentedToggle
+                  value={effectiveOverlapIsl === undefined ? 'max' : String(effectiveOverlapIsl)}
+                  onValueChange={(value) => {
+                    setOverlapIsl(value);
+                    track('collectivex_kv_overlap_isl_changed', { isl: value });
+                  }}
+                  ariaLabel={strings.islAriaLabel}
+                  testId="collectivex-kv-overlap-isl-toggle"
+                  options={[
+                    { value: 'max', label: strings.islMaxOption },
+                    ...overlapIslValues.map((value) => ({
+                      value: String(value),
+                      label: formatIsl(value),
+                    })),
+                  ]}
+                />
+              </div>
+            )}
           </div>
           <div className="relative mt-3">
             {xAxis === 'frontier' ? (
@@ -401,10 +540,50 @@ export function CollectiveXKvSection({
                 testId="collectivex-kv-frontier-chart"
                 cases={activeCases}
                 colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens) }}
+                selection={{ op, pageTokens }}
+                xLogScale={xLogScale}
+                yLogScale={yLogScale}
+                showWireCeilings={showWireCeilings}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {strings.caption(op, pageTokens, strings.frontierCaption)}
+                    {strings.caption(
+                      op,
+                      String(pageTokens),
+                      showWireCeilings
+                        ? strings.frontierCaption
+                        : strings.frontierCaptionWithoutCeilings,
+                    )}
+                  </p>
+                }
+                legendElement={
+                  <ChartLegend
+                    variant="sidebar"
+                    legendItems={legendItems}
+                    switches={envelopeLegendSwitches}
+                    disableActiveSort
+                    isLegendExpanded={legendExpanded}
+                    onExpandedChange={setLegendExpanded}
+                  />
+                }
+              />
+            ) : xAxis === 'overlap' ? (
+              <CollectiveXKvOverlapChart
+                chartId="collectivex-kv-overlap"
+                testId="collectivex-kv-overlap-chart"
+                cases={activeCases}
+                colors={colors}
+                selection={{ op, pageTokens, isl: effectiveOverlapIsl }}
+                caption={
+                  <p className="text-sm text-muted-foreground">
+                    {strings.caption(
+                      op,
+                      String(pageTokens),
+                      `ISL ${
+                        effectiveOverlapIsl === undefined
+                          ? strings.islMaxOption
+                          : formatIsl(effectiveOverlapIsl)
+                      } · ${strings.overlapCaption}`,
+                    )}
                   </p>
                 }
                 legendElement={
@@ -427,11 +606,13 @@ export function CollectiveXKvSection({
                 cases={activeCases}
                 colors={colors}
                 selection={selection}
+                xLogScale={xLogScale}
+                yLogScale={yLogScale}
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {strings.caption(
                       op,
-                      pageTokens,
+                      String(pageTokens),
                       xAxis === 'batch' ? strings.batchCaption : strings.islCaption,
                     )}
                   </p>
@@ -440,6 +621,7 @@ export function CollectiveXKvSection({
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
+                    switches={legendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {

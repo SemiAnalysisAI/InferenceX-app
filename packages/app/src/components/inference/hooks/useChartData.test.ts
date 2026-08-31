@@ -516,7 +516,7 @@ describe('derived higher-is-better x-axis rooflines', () => {
     const defs = chartDefinitions as Record<string, unknown>[];
     const e2e = defs.find((d) => d.chartType === 'e2e')!;
     expect(derivedModeRoofline(e2e.y_tpPerGpu_roofline as 'upper_right', true)).toBe('upper_left');
-    expect(derivedModeRoofline(e2e.y_tokensPerDollarH_roofline as 'upper_right', true)).toBe(
+    expect(derivedModeRoofline(e2e.y_tokensPerDollarN_roofline as 'upper_right', true)).toBe(
       'upper_left',
     );
     expect(derivedModeRoofline(e2e.y_costh_roofline as 'lower_left', true)).toBe('lower_right');

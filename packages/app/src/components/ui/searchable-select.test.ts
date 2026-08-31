@@ -87,6 +87,17 @@ describe('SearchableSelect', () => {
     expect(items).toHaveLength(3);
   });
 
+  it('keeps option geometry unchanged by hover styles', () => {
+    render();
+    openMenu();
+    const item = document.body.querySelector('[data-slot="select-item"]') as HTMLElement;
+    const hoverClasses = item.className
+      .split(' ')
+      .filter((className) => className.startsWith('hover:'));
+
+    expect(hoverClasses).toEqual(['hover:bg-primary/20', 'hover:shadow-sm']);
+  });
+
   it('filters options across groups by the search query (option label match)', () => {
     render();
     openMenu();

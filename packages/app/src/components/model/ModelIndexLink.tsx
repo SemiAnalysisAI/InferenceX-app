@@ -15,9 +15,9 @@ interface ModelIndexLinkProps extends Omit<ComponentProps<typeof Link>, 'href'> 
 }
 
 /**
- * Model detail routes are generated from MDX. On a cold App Router transition,
- * the first push can fetch the route without committing the URL, so use the
- * shared retry-aware navigation path already used by dashboard entry links.
+ * Model detail routes are generated from MDX. Use the shared same-document
+ * navigation path already used by dashboard entry links, so background audio
+ * and layout state survive the transition.
  */
 export function ModelIndexLink({ href, slug, locale, onClick, ...props }: ModelIndexLinkProps) {
   const router = useRouter();

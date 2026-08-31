@@ -18,8 +18,12 @@ import {
   type CollectiveXSeriesSelection,
   collectiveXKvChartPoints,
   collectiveXKvFrontierPoints,
+  collectiveXKvIslValues,
+  collectiveXKvOverlapPoints,
+  collectiveXKvWireCeilings,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
+  collectiveXKvPageValues,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
@@ -367,6 +371,9 @@ const kvRow = ({
   ...overrides,
 });
 
+const bulk = (overrides: Partial<CollectiveXKvRow>) =>
+  ({ kind: 'bulk', page_tokens: null, ...overrides }) as Partial<CollectiveXKvRow>;
+
 describe('collectiveXKvCell', () => {
   it('picks the largest-ISL pull row at the requested batch extreme', () => {
     const rows = [
@@ -387,6 +394,24 @@ describe('collectiveXKvCell', () => {
   it('selects bulk rows by their null page size', () => {
     const rows = [kvRow({}), kvRow({ kind: 'bulk', page_tokens: null, gbps_p50: 89.41 })];
     expect(collectiveXKvCell(rows, 'bulk', null, 'min')?.gbps_p50).toBe(89.41);
+  });
+});
+
+describe('collectiveXKvPageValues', () => {
+  const kaseWithRows = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
+    ({ rows: rows.map(kvRow) }) as CollectiveXKvRunCase;
+
+  it('collects the distinct measured page sizes descending, ignoring bulk rows', () => {
+    const cases = [
+      kaseWithRows([{}, { page_tokens: 16 }, bulk({ gbps_p50: 89.41 })]),
+      kaseWithRows([{ page_tokens: 256 }, { page_tokens: 64 }]),
+    ];
+    expect(collectiveXKvPageValues(cases)).toEqual([256, 64, 16]);
+  });
+
+  it('is empty when no paged rows exist', () => {
+    expect(collectiveXKvPageValues([])).toEqual([]);
+    expect(collectiveXKvPageValues([kaseWithRows([bulk({})])])).toEqual([]);
   });
 });
 
@@ -473,53 +498,64 @@ describe('collectiveXKvChartPoints', () => {
   describe('collectiveXKvFrontierPoints', () => {
     const selection = { op: 'pull', pageTokens: 64 } as const;
 
-    it('plots aggregate GB/s against p95 per in-flight request at the largest ISL', () => {
+    it('plots aggregate GB/s against ISL across the full (ISL, batch) grid', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            { isl: 4096, batch: 1, gbps_p50: 5, latency_ms: p95(2) },
-            { isl: 32768, batch: 1, gbps_p50: 7.5, latency_ms: p95(24) },
-            { isl: 32768, batch: 16, gbps_p50: 30, latency_ms: p95(96) },
-            { isl: 32768, batch: 16, op: 'push', gbps_p50: 99, latency_ms: p95(1) },
+            { isl: 4096, batch: 1, gbps_p50: 5 },
+            { isl: 32768, batch: 1, gbps_p50: 7.5 },
+            { isl: 32768, batch: 16, gbps_p50: 30 },
+            { isl: 32768, batch: 16, op: 'push', gbps_p50: 99 },
           ]),
         ],
         selection,
       );
       expect(points.map((point) => [point.x, point.y])).toEqual([
-        [7.5, 24],
-        [30, 6],
+        [4096, 5],
+        [32768, 7.5],
+        [32768, 30],
       ]);
       expect(points[0].sku).toBe('gb200');
     });
 
-    it('fades within-series dominated points and keeps the ladder frontier', () => {
+    it('marks the best batch at each ISL as the series envelope', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            // batch 4 beats batch 1 on both axes; batch 16 trades latency for rate.
-            { batch: 1, gbps_p50: 7.5, latency_ms: p95(26) },
-            { batch: 4, gbps_p50: 20, latency_ms: p95(40) },
-            { batch: 16, gbps_p50: 30, latency_ms: p95(320) },
+            // batch 1 is alone at 4096; batch 16 wins the 32768 rung.
+            { isl: 4096, batch: 1, gbps_p50: 5 },
+            { isl: 32768, batch: 1, gbps_p50: 7.5 },
+            { isl: 32768, batch: 4, gbps_p50: 20 },
+            { isl: 32768, batch: 16, gbps_p50: 30 },
           ]),
         ],
         selection,
       );
-      expect(points.map((point) => point.onSeriesFrontier)).toEqual([false, true, true]);
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, false, false, true]);
     });
 
-    it('rings only the SKU-wide frontier across backends of the same SKU', () => {
+    it('rings only the best backend of a SKU at each ISL', () => {
       const points = collectiveXKvFrontierPoints(
         [
-          kase([{ batch: 1, gbps_p50: 20, latency_ms: p95(10) }]),
-          kase([{ batch: 1, gbps_p50: 8, latency_ms: p95(30) }], {
-            case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
-            backend: 'mooncake',
-          }),
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 3 },
+            { isl: 32768, batch: 1, gbps_p50: 20 },
+          ]),
+          kase(
+            [
+              { isl: 4096, batch: 1, gbps_p50: 9 },
+              { isl: 32768, batch: 1, gbps_p50: 8 },
+            ],
+            {
+              case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+              backend: 'mooncake',
+            },
+          ),
         ],
         selection,
       );
-      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, true]);
-      expect(points.map((point) => point.onSkuFrontier)).toEqual([true, false]);
+      expect(points.map((point) => point.onSeriesFrontier)).toEqual([true, true, true, true]);
+      expect(points.map((point) => point.onSkuFrontier)).toEqual([false, true, true, false]);
     });
 
     it('never lets one SKU dominate another', () => {
@@ -534,6 +570,144 @@ describe('collectiveXKvChartPoints', () => {
         selection,
       );
       expect(points.map((point) => point.onSkuFrontier)).toEqual([true, true]);
+    });
+  });
+
+  describe('collectiveXKvOverlapPoints', () => {
+    const selection = { op: 'pull', pageTokens: 64 } as const;
+
+    it('normalizes the batch ladder at the largest ISL to its batch-1 rung', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            // The smaller-ISL ladder never enters the normalization.
+            { isl: 4096, batch: 1, gbps_p50: 99 },
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+            { isl: 32768, batch: 16, gbps_p50: 32 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [1, 1],
+        [4, 3],
+        [16, 4],
+      ]);
+    });
+
+    it('drops a series with no batch-1 baseline at the largest ISL', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+            { isl: 4096, batch: 1, gbps_p50: 6 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points).toEqual([]);
+    });
+
+    it('pins the normalization to the requested ISL when one is selected', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 6 },
+            { isl: 4096, batch: 4, gbps_p50: 18 },
+            // The larger-ISL ladder is ignored once 4096 is pinned.
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+          ]),
+        ],
+        { ...selection, isl: 4096 },
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [1, 1],
+        [4, 3],
+      ]);
+    });
+
+    it('drops a series with no rows at the requested ISL', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 32768, batch: 1, gbps_p50: 8 },
+            { isl: 32768, batch: 4, gbps_p50: 24 },
+          ]),
+        ],
+        { ...selection, isl: 4096 },
+      );
+      expect(points).toEqual([]);
+    });
+  });
+
+  describe('collectiveXKvIslValues', () => {
+    it('lists distinct paged ISLs of the selected direction and page size, ascending', () => {
+      const values = collectiveXKvIslValues(
+        [
+          kase([
+            { isl: 32768, batch: 1 },
+            { isl: 32768, batch: 4 },
+            { isl: 4096, batch: 1 },
+            { isl: 8192, batch: 1, op: 'push' },
+            { isl: 16384, batch: 1, page_tokens: 16 },
+            bulk({ isl: 65536 }),
+          ]),
+        ],
+        { op: 'pull', pageTokens: 64 },
+      );
+      expect(values).toEqual([4096, 32768]);
+    });
+  });
+
+  describe('collectiveXKvWireCeilings', () => {
+    it('traces the bulk ladder of the selected direction, sorted by ISL', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            bulk({ isl: 32768, gbps_p50: 89.41 }),
+            bulk({ isl: 4096, gbps_p50: 52.3 }),
+            bulk({ isl: 32768, op: 'push', gbps_p50: 70 }),
+            // Paged rows never enter the ceiling.
+            { isl: 32768, batch: 1, gbps_p50: 7.39 },
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.get('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8')).toMatchObject([
+        { x: 4096, y: 52.3 },
+        { x: 32768, y: 89.41 },
+      ]);
+    });
+
+    it('keeps the fastest bulk row when several share an ISL', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            bulk({ isl: 32768, batch: 1, gbps_p50: 89.41 }),
+            bulk({ isl: 32768, batch: 4, gbps_p50: 96.2 }),
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.get('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8')).toMatchObject([
+        { x: 32768, y: 96.2 },
+      ]);
+    });
+
+    it('omits series without usable bulk rows', () => {
+      const ceilings = collectiveXKvWireCeilings(
+        [
+          kase([
+            { isl: 32768, batch: 1, gbps_p50: 7.39 },
+            bulk({ isl: 32768, gbps_p50: 0 }),
+            bulk({ isl: 4096, gbps_p50: Number.NaN }),
+          ]),
+        ],
+        'pull',
+      );
+      expect(ceilings.size).toBe(0);
     });
   });
 });

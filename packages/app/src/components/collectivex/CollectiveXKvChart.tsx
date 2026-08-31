@@ -19,6 +19,8 @@ interface CollectiveXKvChartProps {
   cases: CollectiveXKvRunCase[];
   colors: Record<string, string>;
   selection: CollectiveXKvChartSelection;
+  xLogScale: boolean;
+  yLogScale: boolean;
   caption?: React.ReactNode;
   legendElement?: React.ReactNode;
   testId?: string;
@@ -26,14 +28,12 @@ interface CollectiveXKvChartProps {
 
 const STRINGS = {
   en: {
-    xLabels: {
-      batch: 'Requests per burst (log)',
-      isl: 'Input sequence length, tokens (log)',
-    },
-    yLabel: (selection: CollectiveXKvChartSelection) =>
+    xAxis: (axis: CollectiveXKvChartSelection['x'], logScale: boolean) =>
+      `${axis === 'batch' ? 'Requests per burst' : 'Input sequence length, tokens'}${logScale ? ' (log)' : ''}`,
+    yAxis: (selection: CollectiveXKvChartSelection, logScale: boolean) =>
       selection.y === 'bandwidth'
-        ? `Aggregate ${selection.op} bandwidth at p50 (GB/s)`
-        : 'Burst completion latency p50 (ms)',
+        ? `Aggregate ${selection.op} bandwidth at p50 (GB/s${logScale ? ', log' : ''})`
+        : `Burst completion latency p50 (ms${logScale ? ', log' : ''})`,
     noData: 'No measured kv rows match the selected page size and direction.',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
@@ -47,14 +47,12 @@ const STRINGS = {
     aria: 'CollectiveX KV-cache transfer chart',
   },
   zh: {
-    xLabels: {
-      batch: '每次 burst 的请求数（对数）',
-      isl: '输入序列长度（token，对数）',
-    },
-    yLabel: (selection: CollectiveXKvChartSelection) =>
+    xAxis: (axis: CollectiveXKvChartSelection['x'], logScale: boolean) =>
+      `${axis === 'batch' ? '每次突发的请求数' : '输入序列长度（token）'}${logScale ? '（对数）' : ''}`,
+    yAxis: (selection: CollectiveXKvChartSelection, logScale: boolean) =>
       selection.y === 'bandwidth'
-        ? `聚合 ${selection.op} 带宽（p50，GB/s）`
-        : 'burst 完成延迟 p50（ms）',
+        ? `p50 聚合 ${selection.op} 带宽（GB/s${logScale ? '，对数' : ''}）`
+        : `突发完成延迟 p50（ms${logScale ? '，对数' : ''}）`,
     noData: '所选页大小和传输方向下暂无实测 KV 数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
@@ -96,6 +94,8 @@ export function CollectiveXKvChart({
   cases,
   colors,
   selection,
+  xLogScale,
+  yLogScale,
   caption,
   legendElement,
   testId,
@@ -148,16 +148,16 @@ export function CollectiveXKvChart({
         testId={testId}
         grabCursor
         instructions={t.instructions}
-        xScale={{ type: 'log', domain: xDomain, nice: false }}
-        yScale={{ type: 'log', domain: yDomain, nice: false }}
+        xScale={{ type: xLogScale ? 'log' : 'linear', domain: xDomain, nice: false }}
+        yScale={{ type: yLogScale ? 'log' : 'linear', domain: yDomain, nice: false }}
         xAxis={{
-          label: t.xLabels[selection.x],
+          label: t.xAxis(selection.x, xLogScale),
           tickCount: 6,
           tickValues: xTickValues,
           tickFormat: (value) => formatCompact(Number(value)),
         }}
         yAxis={{
-          label: t.yLabel(selection),
+          label: t.yAxis(selection, yLogScale),
           tickCount: 5,
           tickFormat: (value) => formatCompact(Number(value)),
         }}
@@ -169,7 +169,7 @@ export function CollectiveXKvChart({
             config: {
               getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
               getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
-              strokeWidth: 2.25,
+              strokeWidth: 1.75,
               curve: d3.curveLinear,
             },
           },
