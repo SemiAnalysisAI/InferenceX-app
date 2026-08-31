@@ -22,6 +22,7 @@ import {
   collectiveXKvColorKey,
   collectiveXKvIslValues,
   collectiveXKvLegendLabel,
+  collectiveXKvPageValues,
   collectiveXRunDasharray,
   collectiveXSkuLabel,
 } from './data';
@@ -128,11 +129,14 @@ function formatIsl(value: number): string {
   return value >= 1024 && value % 1024 === 0 ? `${value / 1024}k` : String(value);
 }
 
-function cellsOf(row: CollectiveXKvRunCase) {
+function cellsOf(row: CollectiveXKvRunCase, primaryPage: number, secondaryPage?: number) {
   return {
-    p64b1: collectiveXKvCell(row.rows, 'paged', 64, 'min'),
-    p64bmax: collectiveXKvCell(row.rows, 'paged', 64, 'max'),
-    p16b1: collectiveXKvCell(row.rows, 'paged', 16, 'min'),
+    pb1: collectiveXKvCell(row.rows, 'paged', primaryPage, 'min'),
+    pbmax: collectiveXKvCell(row.rows, 'paged', primaryPage, 'max'),
+    sb1:
+      secondaryPage === undefined
+        ? null
+        : collectiveXKvCell(row.rows, 'paged', secondaryPage, 'min'),
     bulk: collectiveXKvCell(row.rows, 'bulk', null, 'min'),
   };
 }
@@ -152,7 +156,10 @@ export function CollectiveXKvSection({
   const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
     'batch',
   );
-  const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
+  // The page ladder lives in the data (the sweep moved from 64/16 to the
+  // production block 256); a stored choice the current rows no longer carry
+  // falls back to the largest measured page rather than an empty chart.
+  const [pageChoice, setPageChoice] = useState<string | null>(null);
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
   // Overlap view only: 'max' normalizes each series at its own largest
   // measured ISL; a numeric string pins every series to that ISL.
@@ -183,6 +190,15 @@ export function CollectiveXKvSection({
     [datasets, runIndexById],
   );
   const measuredCases = useMemo(() => rows.filter((row) => row.rows.length > 0), [rows]);
+  const pageValues = useMemo(() => collectiveXKvPageValues(measuredCases), [measuredCases]);
+  const pageTokens =
+    pageChoice !== null && pageValues.includes(Number(pageChoice))
+      ? Number(pageChoice)
+      : (pageValues[0] ?? 64);
+  // Table cells always read the ladder's top page (and the runner-up when one
+  // exists) so the columns stay stable while the chart toggle moves.
+  const primaryPage = pageValues[0] ?? 64;
+  const secondaryPage = pageValues[1];
   const seriesSignature = useMemo(
     () =>
       measuredCases
@@ -207,7 +223,7 @@ export function CollectiveXKvSection({
   // no longer exists for the current direction and page size falls back to
   // 'max' rather than an empty chart.
   const overlapIslValues = useMemo(
-    () => collectiveXKvIslValues(measuredCases, { op, pageTokens: Number(pageTokens) }),
+    () => collectiveXKvIslValues(measuredCases, { op, pageTokens }),
     [measuredCases, op, pageTokens],
   );
   const effectiveOverlapIsl =
@@ -287,43 +303,47 @@ export function CollectiveXKvSection({
       },
       {
         header: 'Bulk GB/s',
-        cell: (row) => formatGbps(cellsOf(row).bulk?.gbps_p50),
-        sortValue: (row) => cellsOf(row).bulk?.gbps_p50 ?? -1,
+        cell: (row) => formatGbps(cellsOf(row, primaryPage).bulk?.gbps_p50),
+        sortValue: (row) => cellsOf(row, primaryPage).bulk?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums',
       },
       {
-        header: 'p64 GB/s b1',
-        cell: (row) => formatGbps(cellsOf(row).p64b1?.gbps_p50),
-        sortValue: (row) => cellsOf(row).p64b1?.gbps_p50 ?? -1,
+        header: `p${primaryPage} GB/s b1`,
+        cell: (row) => formatGbps(cellsOf(row, primaryPage).pb1?.gbps_p50),
+        sortValue: (row) => cellsOf(row, primaryPage).pb1?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums',
       },
       {
-        header: 'p64 GB/s bmax',
+        header: `p${primaryPage} GB/s bmax`,
         cell: (row) => {
-          const cell = cellsOf(row).p64bmax;
+          const cell = cellsOf(row, primaryPage).pbmax;
           if (!cell) return '-';
           return `${formatGbps(cell.gbps_p50)} (b${cell.batch})`;
         },
-        sortValue: (row) => cellsOf(row).p64bmax?.gbps_p50 ?? -1,
+        sortValue: (row) => cellsOf(row, primaryPage).pbmax?.gbps_p50 ?? -1,
         className: 'text-right tabular-nums whitespace-nowrap',
       },
-      {
-        header: 'p16 GB/s b1',
-        cell: (row) => formatGbps(cellsOf(row).p16b1?.gbps_p50),
-        sortValue: (row) => cellsOf(row).p16b1?.gbps_p50 ?? -1,
-        className: 'text-right tabular-nums',
-      },
+      ...(secondaryPage === undefined
+        ? []
+        : [
+            {
+              header: `p${secondaryPage} GB/s b1`,
+              cell: (row) => formatGbps(cellsOf(row, primaryPage, secondaryPage).sb1?.gbps_p50),
+              sortValue: (row) => cellsOf(row, primaryPage, secondaryPage).sb1?.gbps_p50 ?? -1,
+              className: 'text-right tabular-nums',
+            } satisfies DataTableColumn<CollectiveXKvRunCase>,
+          ]),
       {
         header: 'Handoff ms',
         cell: (row) => {
-          const cell = cellsOf(row).p64b1;
+          const cell = cellsOf(row, primaryPage).pb1;
           return cell ? cell.latency_ms.p50.toFixed(1) : '-';
         },
-        sortValue: (row) => cellsOf(row).p64b1?.latency_ms.p50 ?? -1,
+        sortValue: (row) => cellsOf(row, primaryPage).pb1?.latency_ms.p50 ?? -1,
         className: 'text-right tabular-nums',
       },
     ],
-    [],
+    [primaryPage, secondaryPage],
   );
 
   if (rows.length === 0) return null;
@@ -332,7 +352,7 @@ export function CollectiveXKvSection({
     x: xAxis === 'batch' || xAxis === 'isl' ? xAxis : 'batch',
     y: yAxis,
     op,
-    pageTokens: Number(pageTokens),
+    pageTokens,
   };
   const legendSwitches = [
     {
@@ -414,19 +434,21 @@ export function CollectiveXKvSection({
                 ]}
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
-              <SegmentedToggle
-                value={pageTokens}
-                onValueChange={setPageTokens}
-                ariaLabel={strings.pageAriaLabel}
-                testId="collectivex-kv-page-toggle"
-                options={[
-                  { value: '64', label: '64' },
-                  { value: '16', label: '16' },
-                ]}
-              />
-            </div>
+            {pageValues.length > 1 && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
+                <SegmentedToggle
+                  value={String(pageTokens)}
+                  onValueChange={setPageChoice}
+                  ariaLabel={strings.pageAriaLabel}
+                  testId="collectivex-kv-page-toggle"
+                  options={pageValues.map((value) => ({
+                    value: String(value),
+                    label: String(value),
+                  }))}
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">{strings.opControl}</Label>
               <SegmentedToggle
@@ -469,7 +491,7 @@ export function CollectiveXKvSection({
                 testId="collectivex-kv-frontier-chart"
                 cases={activeCases}
                 colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens) }}
+                selection={{ op, pageTokens }}
                 xLogScale={xLogScale}
                 yLogScale={yLogScale}
                 showWireCeilings={showWireCeilings}
@@ -498,7 +520,7 @@ export function CollectiveXKvSection({
                 testId="collectivex-kv-overlap-chart"
                 cases={activeCases}
                 colors={colors}
-                selection={{ op, pageTokens: Number(pageTokens), isl: effectiveOverlapIsl }}
+                selection={{ op, pageTokens, isl: effectiveOverlapIsl }}
                 caption={
                   <p className="text-sm text-muted-foreground">
                     {op} · page {pageTokens} · ISL{' '}

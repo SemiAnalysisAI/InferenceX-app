@@ -422,6 +422,22 @@ export function collectiveXKvIslValues(
   return [...values].toSorted((a, b) => a - b);
 }
 
+/**
+ * Distinct page sizes across the measured paged rows, descending. Drives the
+ * page toggle and the table's paged columns: the sweep's page ladder has
+ * already changed once (64/16 to the production block 256), and hardcoding it
+ * left every view empty against the new rows.
+ */
+export function collectiveXKvPageValues(cases: readonly CollectiveXKvRunCase[]): number[] {
+  const values = new Set<number>();
+  for (const kase of cases) {
+    for (const row of kase.rows) {
+      if (row.kind === 'paged' && row.page_tokens !== null) values.add(row.page_tokens);
+    }
+  }
+  return [...values].toSorted((a, b) => b - a);
+}
+
 export interface CollectiveXKvWireCeilingPoint {
   x: number;
   y: number;
