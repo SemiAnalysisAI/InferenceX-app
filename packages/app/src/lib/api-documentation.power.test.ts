@@ -12,7 +12,6 @@ describe('measured-power API documentation', () => {
   it('types every power metric key in the benchmarks metrics schema', () => {
     const metricsSchema = benchmarkRowSchema?.properties?.metrics;
     expect(metricsSchema).toBeDefined();
-    // Non-power keys stay admitted alongside the typed power properties.
     expect(metricsSchema?.additionalProperties).toEqual({ type: 'number' });
     for (const key of POWER_METRIC_KEYS) {
       const property = metricsSchema?.properties?.[key];
@@ -42,7 +41,7 @@ describe('measured-power API documentation', () => {
         'exporter_image_sha256',
       ].toSorted(),
     );
-    // PLAN-07's mapper stores partial audits, so no audit field may be required.
+    // Producers may emit partial audits, so individual audit fields remain optional.
     expect(audit?.required).toBeUndefined();
 
     expect(benchmarkRowSchema?.required).not.toContain('power_invalid_reasons');
@@ -64,7 +63,6 @@ describe('measured-power API documentation', () => {
       enum: ['1', '0', 'any', 'strictV2'],
       default: 'any',
     });
-    // The documented enum comes from the filter module, so route and docs cannot drift.
     expect([...POWER_VALIDITY_FILTERS]).toEqual(['1', '0', 'any', 'strictV2']);
   });
 

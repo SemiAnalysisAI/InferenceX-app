@@ -20,7 +20,7 @@ describe('parsePowerValidityFilter', () => {
   it('rejects unknown values', () => {
     expect(parsePowerValidityFilter('garbage')).toBeUndefined();
     expect(parsePowerValidityFilter('')).toBeUndefined();
-    // The pre-rename spelling must not silently alias to strictV2.
+    // `certified` is a UI display tier, not an API filter value.
     expect(parsePowerValidityFilter('certified')).toBeUndefined();
   });
 
