@@ -22,6 +22,7 @@ import {
   collectiveXKvWireCeilings,
   type CollectiveXKvRunCase,
   collectiveXKvCell,
+  collectiveXKvPageValues,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
@@ -365,6 +366,24 @@ describe('collectiveXKvCell', () => {
   it('selects bulk rows by their null page size', () => {
     const rows = [kvRow({}), kvRow({ kind: 'bulk', page_tokens: null, gbps_p50: 89.41 })];
     expect(collectiveXKvCell(rows, 'bulk', null, 'min')?.gbps_p50).toBe(89.41);
+  });
+});
+
+describe('collectiveXKvPageValues', () => {
+  const kaseWithRows = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
+    ({ rows: rows.map(kvRow) }) as CollectiveXKvRunCase;
+
+  it('collects the distinct measured page sizes descending, ignoring bulk rows', () => {
+    const cases = [
+      kaseWithRows([{}, { page_tokens: 16 }, bulk({ gbps_p50: 89.41 })]),
+      kaseWithRows([{ page_tokens: 256 }, { page_tokens: 64 }]),
+    ];
+    expect(collectiveXKvPageValues(cases)).toEqual([256, 64, 16]);
+  });
+
+  it('is empty when no paged rows exist', () => {
+    expect(collectiveXKvPageValues([])).toEqual([]);
+    expect(collectiveXKvPageValues([kaseWithRows([bulk({})])])).toEqual([]);
   });
 });
 
