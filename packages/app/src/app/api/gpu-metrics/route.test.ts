@@ -434,7 +434,7 @@ describe('GET /api/gpu-metrics', () => {
       });
     });
 
-    it('takes the window from a versioned bmk agg row without downloading power_audit', async () => {
+    it('uses an embedded audit window without downloading the power_audit artifact', async () => {
       zipRegistry.set('zip:bmk', [
         {
           entryName: 'agg_dsr1_h200.json',

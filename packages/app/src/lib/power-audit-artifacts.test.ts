@@ -64,7 +64,7 @@ describe('powerFromAggRow', () => {
     expect(powerFromAggRow({ power_valid: 1 }).reasons).toBeUndefined();
   });
 
-  it('maps a versioned power_audit object through to window and provenance', () => {
+  it('maps an embedded power_audit object through to window and provenance', () => {
     const result = powerFromAggRow(
       {
         power_valid: 1,
