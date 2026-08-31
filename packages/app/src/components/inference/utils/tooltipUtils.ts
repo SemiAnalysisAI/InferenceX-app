@@ -201,14 +201,11 @@ const WORKER_POWER_STRINGS = {
   },
 } as const;
 
-/** Pinned tooltips list at most this many workers before the "+N more" line. */
 const WORKER_ROWS_LIMIT = 8;
 
 /**
- * Per-worker measured power drilldown. Rendered only while the tooltip is
- * pinned (same rule as the point-detail actions) so hover tooltips stay lean;
- * nothing renders when `workers` is absent or empty — production AgentX rows
- * currently ship without it.
+ * Render worker telemetry only in pinned tooltips so hover tooltips stay lean.
+ * Missing or empty worker payloads produce no section.
  */
 const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
   if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';

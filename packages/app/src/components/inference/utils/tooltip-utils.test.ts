@@ -798,9 +798,6 @@ describe('generateGPUGraphTooltipContent', () => {
   });
 });
 
-// ===========================================================================
-// per-worker measured power drilldown (all three generators, pinned-only)
-// ===========================================================================
 describe('worker power drilldown', () => {
   const workers = [
     { role: 'frontend', worker_idx: 0, hosts: ['fe0'], num_gpus: 0, avg_power_w: 120 },
@@ -847,11 +844,9 @@ describe('worker power drilldown', () => {
 
   it('includes optional telemetry cells only when the worker carries them', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ workers }), isPinned: true }));
-    // Prefill worker: avg/peak temp, util %, mem in GiB (71234.5 MB ≈ 69.565 GiB).
     expect(html).toContain('68.4/79.2°C');
     expect(html).toContain('88.5%');
     expect(html).toContain('69.565 GiB');
-    // Decode worker row (no telemetry) keeps only role/chips/watts/hosts.
     const decodeRow = html.split('<strong>decode[0]</strong>')[1].split('</div>')[0];
     expect(decodeRow).not.toContain('°C');
     expect(decodeRow).not.toContain('%');
