@@ -102,7 +102,6 @@ describe('PowerX', () => {
       cy.get('[data-testid="gpu-metrics-chart-svg"] .measurement-window rect').should('exist');
       cy.get('[data-testid="gpu-metrics-reconciliation"]').should('be.visible');
       cy.get('[data-testid="gpu-metrics-power-verdict"]').should('contain.text', 'Power valid');
-      // Published 402 W vs viewer-recomputed 400 W (constant trace) → Δ −0.5%
       cy.get('[data-testid="gpu-metrics-reconciliation"]').should('contain.text', '402');
       cy.get('[data-testid="gpu-metrics-reconciliation"]').should('contain.text', '400');
       cy.get('[data-testid="gpu-metrics-reconciliation-delta"]').should('contain.text', '0.5');

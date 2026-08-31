@@ -434,7 +434,7 @@ describe('GET /api/gpu-metrics', () => {
       });
     });
 
-    it('takes the window from a PLAN-06 bmk agg row without downloading power_audit', async () => {
+    it('takes the window from a versioned bmk agg row without downloading power_audit', async () => {
       zipRegistry.set('zip:bmk', [
         {
           entryName: 'agg_dsr1_h200.json',
@@ -481,7 +481,6 @@ describe('GET /api/gpu-metrics', () => {
       });
       const fetchedUrls = fetchMock.mock.calls.map((call) => String(call[0]));
       expect(fetchedUrls).not.toContain('https://example.com/dl/3');
-      // run info + artifact list + gpu_metrics zip + bmk zip only
       expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
@@ -495,7 +494,7 @@ describe('GET /api/gpu-metrics', () => {
       expect(Object.keys(body.artifacts[0]).toSorted()).toEqual(['data', 'name']);
     });
 
-    it('skips an oversized power_audit bundle and keeps Tier 1 content', async () => {
+    it('skips an oversized power_audit bundle and keeps bmk content', async () => {
       zipRegistry.set('zip:bmk-legacy', [{ entryName: 'agg_dsr1_h200.json', contents: AGG_JSON }]);
       installFetch([
         { id: 1, name: 'gpu_metrics_dsr1_h200' },
@@ -511,7 +510,6 @@ describe('GET /api/gpu-metrics', () => {
       const res = await GET(req('/api/gpu-metrics?runId=12345'));
       expect(res.status).toBe(200);
       const body = await res.json();
-      // Tier 2 was skipped (over cap) so no window; Tier 1 published survives.
       expect(body.artifacts[0].power).toEqual({
         power_valid: 1,
         reasons: [],
@@ -532,7 +530,6 @@ describe('GET /api/gpu-metrics', () => {
 
     it('keeps a no-op bmk artifact out of sources and falls through to the bundle', async () => {
       zipRegistry.set('zip:bmk-noop', [
-        // Agg row with no power fields at all (e.g. an eval-style row).
         { entryName: 'agg_dsr1_h200.json', contents: JSON.stringify({ output_toks_per_sec: 1 }) },
       ]);
       zipRegistry.set('zip:audit-sidecar-only', [
@@ -547,7 +544,6 @@ describe('GET /api/gpu-metrics', () => {
       const res = await GET(req('/api/gpu-metrics?runId=12345'));
       expect(res.status).toBe(200);
       const body = await res.json();
-      // The bmk artifact contributed nothing, so only the bundle is credited.
       expect(body.artifacts[0].power.sources).toEqual(['power_audit_dsr1_h200']);
       expect(body.artifacts[0].power.published).toEqual({
         avg_power_w: 401.5,

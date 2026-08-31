@@ -14,7 +14,6 @@ export interface SiblingArtifactNames {
   powerAudit: string;
 }
 
-/** Derive same-suffix sibling artifact names for a `gpu_metrics_<X>` artifact. */
 export function siblingArtifactNames(gpuMetricsArtifactName: string): SiblingArtifactNames | null {
   if (!gpuMetricsArtifactName.startsWith(GPU_METRICS_PREFIX)) return null;
   const suffix = gpuMetricsArtifactName.slice(GPU_METRICS_PREFIX.length);
@@ -62,8 +61,8 @@ function windowFromUnixPair(start: unknown, end: unknown): PowerWindow | null {
 
 /**
  * Map an `agg_<X>.json` row (the exact bytes the ETL ingests) to power fields.
- * Legacy rows yield published values + verdict only; rows carrying the PLAN-06
- * `power_audit` object additionally yield window bounds, counts, and provenance.
+ * Legacy rows yield published values and a verdict only; rows carrying the
+ * versioned `power_audit` object also yield window bounds, counts, and provenance.
  */
 export function powerFromAggRow(
   agg: Record<string, unknown>,
@@ -167,13 +166,11 @@ export function powerFromValidationSidecar(
   return result;
 }
 
-/** Basename of a ZIP entry path (agentic bundles nest under `results/`). */
 function entryBasename(entryName: string): string {
   const idx = entryName.lastIndexOf('/');
   return idx === -1 ? entryName : entryName.slice(idx + 1);
 }
 
-/** Filename stem: basename without its final extension. */
 function pathStem(path: string): string {
   const base = entryBasename(path.replaceAll('\\', '/'));
   const dot = base.lastIndexOf('.');
@@ -204,7 +201,6 @@ export function selectValidationEntry(
   return null;
 }
 
-/** True when a mapped partial carries at least one power field. */
 export function hasPowerContent(
   partial: Partial<GpuArtifactPower> | null,
 ): partial is Partial<GpuArtifactPower> {

@@ -71,8 +71,8 @@ function findNamedAggEntry(
 
 /**
  * Assemble the normalized power block for one gpu_metrics artifact from its
- * same-suffix siblings, cheapest first: the tiny `bmk_*` agg row (Tier 1), and
- * only when that yields no window bounds, the `power_audit_*` bundle (Tier 2).
+ * same-suffix siblings, cheapest first: the tiny `bmk_*` agg row, then the
+ * `power_audit_*` bundle only when the agg row has no window bounds.
  * Every step tolerates absence — legacy runs simply get no `power` block.
  */
 async function resolveArtifactPower(
@@ -85,7 +85,7 @@ async function resolveArtifactPower(
   const suffix = gpuMetricsArtifactName.slice('gpu_metrics_'.length);
   const sources: string[] = [];
 
-  // Tier 1: bmk_<suffix> (fallback bmk_agentic_<suffix>) — one agg_*.json.
+  // Prefer bmk_<suffix> (fallback bmk_agentic_<suffix>) — one agg_*.json.
   let fromAgg: ReturnType<typeof powerFromAggRow> | null = null;
   const bmkArtifact = artifactsByName.get(siblings.bmk) ?? artifactsByName.get(siblings.bmkAgentic);
   if (bmkArtifact) {
@@ -97,7 +97,7 @@ async function resolveArtifactPower(
       if (aggRow) {
         const parsed = powerFromAggRow(aggRow, 'bmk_artifact');
         // A row with no power fields contributes nothing: keep it out of the
-        // sources footer and let Tier 2's agg fallback take over.
+        // sources footer and let the power_audit bundle fallback take over.
         if (hasPowerContent(parsed)) {
           fromAgg = parsed;
           sources.push(bmkArtifact.name);
@@ -106,7 +106,7 @@ async function resolveArtifactPower(
     }
   }
 
-  // Tier 2: power_audit_<suffix> bundle — skipped when Tier 1 gave the window.
+  // Fall back to power_audit_<suffix> only when the bmk row has no window.
   let fromSidecar: ReturnType<typeof powerFromValidationSidecar> | null = null;
   const auditArtifact = artifactsByName.get(siblings.powerAudit);
   if (auditArtifact && !fromAgg?.window) {

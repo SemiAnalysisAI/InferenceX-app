@@ -93,7 +93,6 @@ const DEFAULT_WINDOW_LABELS: MeasurementWindowLabels = {
   warmup: 'Warmup / ramp',
   after: 'Post-benchmark',
 };
-/** Minimum region width (px) before its label is worth drawing. */
 const WINDOW_LABEL_MIN_PX = 60;
 
 /**

@@ -25,7 +25,6 @@ function row(overrides: Partial<GpuMetricRow> & { timestamp: string }): GpuMetri
   };
 }
 
-/** Rows for one GPU at 1 Hz epoch-second timestamps with a power function. */
 function gpuRows(
   gpuIndex: number,
   startOffsetS: number,
@@ -39,10 +38,6 @@ function gpuRows(
   }
   return rows;
 }
-
-// ---------------------------------------------------------------------------
-// parseTimestampUtcMs
-// ---------------------------------------------------------------------------
 
 describe('parseTimestampUtcMs', () => {
   it('parses nvidia-smi naive timestamps as UTC regardless of viewer timezone', () => {
@@ -78,10 +73,6 @@ describe('parseTimestampUtcMs', () => {
     expect(parseTimestampUtcMs('Wed Mar 01 2026')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// alignWindowToTrace
-// ---------------------------------------------------------------------------
 
 describe('alignWindowToTrace', () => {
   const trace = gpuRows(0, 0, 100, () => 400);
@@ -131,10 +122,6 @@ describe('alignWindowToTrace', () => {
     ).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// integrateWindowPower
-// ---------------------------------------------------------------------------
 
 describe('integrateWindowPower', () => {
   it('recovers a constant power exactly', () => {
@@ -217,10 +204,6 @@ describe('integrateWindowPower', () => {
     ).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// classifyDelta
-// ---------------------------------------------------------------------------
 
 describe('classifyDelta', () => {
   it('classifies at the 2% and 5% boundaries (inclusive)', () => {

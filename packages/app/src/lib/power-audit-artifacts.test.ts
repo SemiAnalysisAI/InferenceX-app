@@ -9,10 +9,6 @@ import {
   siblingArtifactNames,
 } from './power-audit-artifacts';
 
-// ---------------------------------------------------------------------------
-// siblingArtifactNames
-// ---------------------------------------------------------------------------
-
 describe('siblingArtifactNames', () => {
   it('derives bmk, bmk_agentic, and power_audit siblings from the suffix', () => {
     expect(siblingArtifactNames('gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_h200-nb_0')).toEqual({
@@ -32,10 +28,6 @@ describe('siblingArtifactNames', () => {
     expect(siblingArtifactNames('gpu_metrics_')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// powerFromAggRow
-// ---------------------------------------------------------------------------
 
 describe('powerFromAggRow', () => {
   it('maps a legacy agg row to published values + verdict only', () => {
@@ -72,7 +64,7 @@ describe('powerFromAggRow', () => {
     expect(powerFromAggRow({ power_valid: 1 }).reasons).toBeUndefined();
   });
 
-  it('maps a post-PLAN-06 power_audit object through to window and provenance', () => {
+  it('maps a versioned power_audit object through to window and provenance', () => {
     const result = powerFromAggRow(
       {
         power_valid: 1,
@@ -129,10 +121,6 @@ describe('powerFromAggRow', () => {
     ).toBeUndefined();
   });
 });
-
-// ---------------------------------------------------------------------------
-// powerFromValidationSidecar
-// ---------------------------------------------------------------------------
 
 describe('powerFromValidationSidecar', () => {
   const singleNodeSidecar = {
@@ -218,10 +206,6 @@ describe('powerFromValidationSidecar', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// selectValidationEntry
-// ---------------------------------------------------------------------------
-
 describe('selectValidationEntry', () => {
   const suffix = 'dsr1_1k8k_fp8_sglang_tp8_h200-nb_0';
 
@@ -282,10 +266,6 @@ describe('selectValidationEntry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// hasPowerContent
-// ---------------------------------------------------------------------------
-
 describe('hasPowerContent', () => {
   it('distinguishes empty partials from ones carrying a power field', () => {
     expect(hasPowerContent(null)).toBe(false);
@@ -294,10 +274,6 @@ describe('hasPowerContent', () => {
     expect(hasPowerContent(powerFromAggRow({ output_toks_per_sec: 1000 }))).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// mergeArtifactPower
-// ---------------------------------------------------------------------------
 
 describe('mergeArtifactPower', () => {
   it('returns null when both inputs are null or empty', () => {

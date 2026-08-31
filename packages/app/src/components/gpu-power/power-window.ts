@@ -111,7 +111,6 @@ export function alignWindowToTrace(
   };
 }
 
-/** Linear interpolation at a timestamp bracketed by sorted samples. */
 function interpolatePower(samples: [number, number][], timeS: number): number {
   let rightIndex = samples.findIndex(([t]) => t >= timeS);
   if (rightIndex === -1) rightIndex = samples.length;
@@ -125,7 +124,6 @@ function interpolatePower(samples: [number, number][], timeS: number): number {
   return leftPower + fraction * (rightPower - leftPower);
 }
 
-/** Trapezoid energy of one device over [startS, endS], boundary-interpolated. */
 function integrateDevice(samples: [number, number][], startS: number, endS: number): number {
   const clipped: [number, number][] = [[startS, interpolatePower(samples, startS)]];
   for (const [t, p] of samples) {
@@ -222,7 +220,6 @@ export function integrateWindowPower(
   };
 }
 
-/** Classify recomputed-vs-published delta with the producer-derived thresholds. */
 export function classifyDelta(
   recomputedW: number,
   publishedW: number,
