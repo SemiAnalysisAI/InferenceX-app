@@ -11,6 +11,15 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
+  // The whole-workspace typecheck already runs as its own gating CI job
+  // (`bun run typecheck` in tests-unit.yml), and the E2E matrix builds the
+  // app in eight parallel E2E shard jobs that each repeated the same ~30s TypeScript
+  // pass inside `next build`. Skip the duplicate pass in GitHub Actions only;
+  // Vercel and local builds still typecheck. Gated on GITHUB_ACTIONS (not CI,
+  // which Vercel also sets) to match turbopackFileSystemCacheForBuild below.
+  typescript: {
+    ignoreBuildErrors: process.env.GITHUB_ACTIONS === 'true',
+  },
   serverExternalPackages: ['shiki'],
   redirects() {
     return Promise.resolve([
