@@ -342,7 +342,7 @@ jobs:
           DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.PAT }}
           trigger_phrase: '@claude'
           track_progress: true
           allowed_bots: ''
