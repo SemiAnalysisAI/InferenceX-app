@@ -9,10 +9,6 @@
       "duration": 7274
     },
     {
-      "spec": "cypress/e2e/agentic-measured-power.cy.ts",
-      "duration": 1500
-    },
-    {
       "spec": "cypress/e2e/agentic-point-coach-mark.cy.ts",
       "duration": 12729
     },
