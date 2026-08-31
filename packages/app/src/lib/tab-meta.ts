@@ -20,6 +20,26 @@ export const LANDING_META = {
     "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
 };
 
+/**
+ * Short English tab labels, shared by the dashboard tab nav and the command
+ * palette. Chinese siblings live in `TAB_LABELS_ZH` (tab-meta-zh.ts).
+ */
+export const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
+  inference: 'Inference Performance',
+  evaluation: 'Accuracy Evals',
+  historical: 'Historical Trends',
+  calculator: 'TCO Calculator',
+  fleet: 'Fleet Lifecycle',
+  reliability: 'Reliability',
+  'gpu-specs': 'Chip Specs',
+  submissions: 'Submissions',
+  collectivex: 'CollectiveX',
+  'ai-chart': 'AI Chart',
+  'gpu-metrics': 'PowerX',
+  'current-inferencex-image': 'Images',
+  feedback: 'Feedback',
+};
+
 export const TAB_META: Record<DashboardRouteKey, { title: string; description: string }> = {
   inference: {
     title: 'Agentic Inference Benchmarks',

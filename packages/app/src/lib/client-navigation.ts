@@ -98,6 +98,16 @@ export function navigateInApp(
   }
 
   event.preventDefault();
+  pushInApp(router, href);
+}
+
+/**
+ * `router.push` with the same commit-retry as `navigateInApp`, for callers
+ * that navigate without an anchor click (the command palette). See
+ * `navigateInApp` for why the first dashboard transition can request the
+ * route payload without committing the URL change.
+ */
+export function pushInApp(router: RouterLike, href: string): void {
   const from = window.location.pathname;
   const target = new URL(href, window.location.origin).pathname;
   router.push(href);

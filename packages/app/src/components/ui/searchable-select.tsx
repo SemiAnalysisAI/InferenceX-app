@@ -5,6 +5,7 @@ import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { track } from '@/lib/analytics';
+import { matchesSearch } from '@/lib/search-match';
 import { cn } from '@/lib/utils';
 
 export interface SearchableSelectOption {
@@ -81,13 +82,12 @@ export function SearchableSelect({
 
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
-    const lower = search.toLowerCase();
     return groups
       .map((g) => ({
         label: g.label,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
+        // Punctuation-insensitive token matching against the option label and
+        // its group label, so "B300 vllm" finds "B300 (vLLM)" (#406).
+        options: g.options.filter((opt) => matchesSearch(search, opt.label, g.label)),
       }))
       .filter((g) => g.options.length > 0);
   }, [groups, search]);

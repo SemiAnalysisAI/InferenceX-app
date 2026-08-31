@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { track } from '@/lib/analytics';
+import { matchesSearch } from '@/lib/search-match';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/lib/use-locale';
 
@@ -190,9 +191,9 @@ function MultiSelect({
 
   const filteredSections = React.useMemo(() => {
     if (!sections?.length) return null;
-    const lower = search.toLowerCase();
+    // Punctuation-insensitive token matching so "B300 vllm" finds "B300 (vLLM)" (#406).
     const filterOpts = (opts: MultiSelectOption[]) =>
-      search ? opts.filter((opt) => opt.label.toLowerCase().includes(lower)) : opts;
+      search ? opts.filter((opt) => matchesSearch(search, opt.label)) : opts;
 
     return sections.map((section) => ({
       ...section,
@@ -206,8 +207,7 @@ function MultiSelect({
     }
     const opts = flatOptions;
     if (!search) return opts;
-    const lower = search.toLowerCase();
-    return opts.filter((opt) => opt.label.toLowerCase().includes(lower));
+    return opts.filter((opt) => matchesSearch(search, opt.label));
   }, [filteredSections, flatOptions, search]);
 
   const handleToggle = (optionValue: string) => {
