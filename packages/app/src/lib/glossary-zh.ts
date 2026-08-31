@@ -750,7 +750,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '该指标衡量硬件和软件的成本效率，因此比较时必须采用相同的模型、工作负载、交互性目标、token 类型和基础设施成本口径。',
     benchmarkContext:
-      'InferenceX 分别提供按超大规模云厂商自有硬件、Neocloud Giant 自有硬件和 3 年期租赁成本计算的每美元总 token 数轴。默认 Y 轴仍为每 GPU 小时 token 收入；只有该独立指标采用标准化 token 售价或 OpenRouter 价格。',
+      'InferenceX 分别提供按超大规模云厂商自有硬件、Neocloud Giant 自有硬件和 3 年期租赁成本计算的每美元总 token 数轴，其中 Neocloud Giant 自有硬件轴是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
     measurement: { label: '常用单位', value: '每 1 美元 TCO 对应的 token 数（tok/$）' },
   },
   'energy-per-token': {
