@@ -4,8 +4,6 @@ import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
 import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
-import { isMonochromeLogo } from '@/lib/model-logos';
-import { cn } from '@/lib/utils';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
@@ -27,22 +25,52 @@ const MODEL_LOGOS: Record<string, string> = {
 };
 
 /**
- * Full-color marks for the hardware platforms named in the description,
- * sharing the brand assets under `public/logos/` used across the app.
- * NVIDIA renders its official brand-green mark as-is; the OpenAI and AMD
- * marks are black by brand design (neither has a color variant), so they
- * take the shared dark-mode invert like every other monochrome logo.
+ * Full-color marks for the hardware platforms named in the description.
+ * The path data is copied from the shared brand assets under
+ * `public/logos/` but inlined as SVG elements: the strip must add zero
+ * `/logos/` image requests, because the mobile landing performance spec
+ * budgets those fetches to the ledger's lazy `*-color.svg` model marks.
+ * viewBoxes are cropped to the path content, so rendered sizes need no
+ * canvas-padding compensation and the marks read optically equal.
  *
- * Rendered heights compensate for internal canvas padding — the AMD and
- * NVIDIA assets fill only ~2/3 of their viewBox height while the OpenAI
- * blossom fills all of it — so the marks read optically equal in the row.
- * `width`/`height` attributes match each asset's aspect ratio to reserve
- * layout space before the SVGs load.
+ * NVIDIA uses its official brand green (#76B900) as-is in both themes;
+ * the OpenAI and AMD marks are black by brand design (neither has a
+ * color variant), so they render in `currentColor` via `text-foreground`,
+ * which reproduces the official reversed-white treatment in dark mode.
  */
-const VENDOR_MARKS = [
-  { name: 'OpenAI', file: 'openai.svg', width: 22, height: 22 },
-  { name: 'AMD', file: 'amd.svg', width: 93, height: 25 },
-  { name: 'NVIDIA', file: 'nvidia-color.svg', width: 33, height: 33 },
+const VENDOR_MARKS: readonly {
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  /** Brand color, or `currentColor` for marks that are monochrome by design. */
+  fill: string;
+  d: string;
+}[] = [
+  {
+    name: 'OpenAI',
+    viewBox: '0 0 256 260',
+    width: 22,
+    height: 22,
+    fill: 'currentColor',
+    d: 'M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z',
+  },
+  {
+    name: 'AMD',
+    viewBox: '-0.04 9.1 24.08 5.8',
+    width: 71,
+    height: 17,
+    fill: 'currentColor',
+    d: 'M18.324 9.137l1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273l.791 1.932H2.008zm17.137.307l-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z',
+  },
+  {
+    name: 'NVIDIA',
+    viewBox: '-0.02 4.03 24.04 15.94',
+    width: 33,
+    height: 22,
+    fill: '#76B900',
+    d: 'M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z',
+  },
 ] as const;
 
 const STRINGS = {
@@ -113,22 +141,20 @@ export function AgentXCompareHero({
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
-              className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2"
+              className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
             >
               {VENDOR_MARKS.map((mark) => (
-                <img
+                <svg
                   key={mark.name}
-                  src={`/logos/${mark.file}`}
-                  alt=""
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox={mark.viewBox}
                   width={mark.width}
                   height={mark.height}
-                  loading="lazy"
-                  className={cn(
-                    'w-auto shrink-0 object-contain',
-                    isMonochromeLogo(mark.file) && 'dark:invert',
-                  )}
-                  style={{ height: mark.height }}
-                />
+                  fill={mark.fill}
+                  className="shrink-0"
+                >
+                  <path d={mark.d} />
+                </svg>
               ))}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
