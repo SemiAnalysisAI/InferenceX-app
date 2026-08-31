@@ -76,9 +76,19 @@ export function replaceRouterPathname(target: string, dropParams: readonly strin
 }
 
 /**
- * The first dashboard transition can request the route without committing the
- * URL change. Repeating the same app-router push after the route payload has
- * been requested preserves same-document navigation and avoids a music restart.
+ * Same-document navigation for in-app links: preventDefault + `router.push`
+ * keeps the transition soft (the Minecraft music keeps playing) while
+ * preserving modified-click, middle-click and `target` behaviors.
+ *
+ * History note: this used to re-push after 250ms because the first
+ * landing → dashboard click could "request the route without committing the
+ * URL change". The real culprit was `url-state.ts` initializing
+ * mid-transition and dispatching a stale router restore through the
+ * Next-patched `history.replaceState`, which reverted the just-committed
+ * URL; the timed retry then read the reverted address bar, pushed again,
+ * stacked a duplicate history entry (breaking a single Back) and visibly
+ * restarted the transition. That module no longer talks to the router, so a
+ * single push is both sufficient and required.
  */
 export function navigateInApp(
   event: MouseEvent<HTMLAnchorElement>,
@@ -98,14 +108,5 @@ export function navigateInApp(
   }
 
   event.preventDefault();
-  const from = window.location.pathname;
-  const target = new URL(href, window.location.origin).pathname;
   router.push(href);
-  // Retry only while nothing has moved. Once the pathname has changed — to this
-  // target, or to a later navigation the user started — a second push only
-  // re-renders the destination, cancels its in-flight work and stacks a
-  // duplicate history entry.
-  window.setTimeout(() => {
-    if (window.location.pathname === from && from !== target) router.push(href);
-  }, 250);
 }

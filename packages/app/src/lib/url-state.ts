@@ -206,19 +206,41 @@ if (typeof window !== 'undefined') {
       currentState[key] = value;
     }
   }
-  // Defer cleanup so the Next.js router doesn't overwrite it during hydration
-  setTimeout(() => {
-    const sp = new URLSearchParams(window.location.search);
-    for (const key of URL_STATE_KEYS) {
-      sp.delete(key);
-    }
-    const s = sp.toString();
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
-    );
-  }, 0);
+  // Strip share-link params from the address bar. Deferred so the Next.js
+  // router doesn't overwrite it during hydration, and skipped entirely when
+  // the URL carries none: this module is pulled in by dashboard chunks, so on
+  // a landing → dashboard client navigation it initializes *mid-transition*.
+  // Going through the Next-patched `window.history.replaceState` here would
+  // dispatch a router restore built from the pre-commit URL, reverting the
+  // just-committed navigation (the "first dashboard click replays the landing
+  // page" regression). The pristine prototype method rewrites the address bar
+  // without involving the App Router — same trick as `replaceClientSearch` in
+  // client-navigation.ts. Router state is carried over so Back/Forward keep
+  // working.
+  if (Object.keys(_initialParams).length > 0) {
+    setTimeout(() => {
+      const sp = new URLSearchParams(window.location.search);
+      let dirty = false;
+      for (const key of URL_STATE_KEYS) {
+        if (sp.has(key)) {
+          sp.delete(key);
+          dirty = true;
+        }
+      }
+      if (!dirty) return;
+      const s = sp.toString();
+      const replace =
+        typeof History === 'undefined'
+          ? window.history.replaceState
+          : History.prototype.replaceState;
+      replace.call(
+        window.history,
+        window.history.state,
+        '',
+        `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
+      );
+    }, 0);
+  }
 }
 
 /** Returns the current share-link state, flushing pending writes for provider remounts. */
