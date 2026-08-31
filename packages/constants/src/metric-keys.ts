@@ -1,12 +1,8 @@
 /**
- * Measured power / energy / GPU-telemetry metrics that MUST be withheld
- * whenever a row carries an invalid power verdict (power_valid = 0).
- * Excludes the contract discriminators (power_valid,
- * power_metric_schema_version) and the invalid-verdict companion fields
- * (power_invalid_reasons, power_audit), which are always kept. Add any new
- * measured power/telemetry key here — it feeds METRIC_KEYS automatically.
- * Mirrored by the display-layer withholding in
- * packages/app/src/lib/benchmark-transform.ts (rowToAggDataEntry).
+ * Power, energy, and GPU telemetry withheld at ingest and display when the
+ * normalized `power_valid` verdict is 0. Contract and diagnostic fields are
+ * excluded so the invalid verdict remains auditable. Add new measured fields
+ * here; `METRIC_KEYS` derives from this list.
  */
 export const MEASURED_POWER_METRIC_KEY_LIST = [
   // measured power / energy (emitted by runner's aggregate_power.py)
@@ -198,7 +194,6 @@ export const METRIC_KEYS = new Set([
   // profiling window (agentic aiperf; flat in v2 artifacts, mapped from
   // server_metrics.kv_cache.gpu_usage_pct in v3)
   'gpu_kv_cache_usage_pct',
-  // measured power / energy contract: discriminators + measured values
   ...POWER_METRIC_KEYS,
   // extended parallelism dimensions (2026-07+ artifacts): pipeline parallelism
   // and decode/prefill context parallelism per role. These are config

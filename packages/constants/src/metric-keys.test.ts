@@ -36,7 +36,6 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
-    // Verdict and audit metadata must survive measured-value scrubbing.
     for (const key of [
       'power_valid',
       'power_metric_schema_version',

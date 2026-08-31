@@ -347,9 +347,8 @@ export function mapBenchmarkRow(
       ? rawRecipeFingerprint.trim()
       : null;
 
-  // Scrub AFTER the last mutation of `metrics` (the agentic
-  // preferFullResponseMetrics reassignment and the extractRuntimeMetadata
-  // merge above) so no later step can resurrect a withheld key.
+  // Keep this after agentic reassignment and runtime metadata merging so no
+  // later mutation can reintroduce a withheld key.
   const powerWithheld = scrubWithheldPowerMetrics(metrics);
   // Per-worker measured-power breakdown. The runner emits this as an array
   // of objects sibling to the scalar metrics; we surface it on a dedicated
@@ -499,21 +498,12 @@ export function normalizePowerContractMetrics(
 }
 
 /**
- * Defense-in-depth for the power publication contract: when the
- * normalized verdict is an explicit invalid (power_valid === 0), delete
- * every measured power/energy/telemetry metric so withheld measurements
- * can never be persisted or served, even if a producer regression ships
- * them. Keeps power_valid and power_metric_schema_version (and any
- * future companion fields such as power_invalid_reasons / power_audit).
- * Legacy rows without a verdict are untouched. Returns true when the
- * row's power is withheld so the caller also drops the workers payload.
- * This is the single enforcement policy at ingest: every mapBenchmarkRow
- * path runs it here, and ingest-supplemental.ts — the one persistence
- * path that bypasses mapBenchmarkRow — applies the same normalize+scrub
- * pair to its verbatim metrics. The query layer intentionally serves
- * metrics unfiltered (see queries/benchmarks.ts rawMetrics), and the
- * frontend independently withholds at display
- * (benchmark-transform.ts rowToAggDataEntry).
+ * Enforces fail-closed power publication at ingest. An explicit normalized
+ * invalid verdict removes every measured field while preserving the contract
+ * and diagnostic fields; legacy rows without a verdict remain unchanged.
+ * Returns true so callers also drop worker telemetry. Paths that bypass
+ * `mapBenchmarkRow` must normalize the verdict before calling this function.
+ * Queries intentionally remain raw; the frontend withholds independently.
  */
 export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
   if (metrics.power_valid !== 0) return false;
