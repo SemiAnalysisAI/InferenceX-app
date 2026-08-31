@@ -7,6 +7,9 @@ type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 // Named separately so the sampling density is obvious in test failures and can
 // be changed without leaving a magic number in the scoring loop.
 const SAMPLE_COUNT = 9;
+// A singleton can be a useful preview, but it should not displace a measured
+// curve merely because its lone point scores well.
+const MIN_CURVE_FRONTIER_POINTS = 2;
 
 /** The physical SKU portion shared by framework/speculative-decoding variants. */
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
@@ -71,8 +74,25 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
       continue;
     }
 
-    const commonMin = Math.max(...usable.map((candidate) => candidate.minX));
-    const commonMax = Math.min(...usable.map((candidate) => candidate.maxX));
+    const comparable = usable.filter(
+      (candidate) => candidate.points.length >= MIN_CURVE_FRONTIER_POINTS,
+    );
+    // When every candidate is a singleton, retain all candidates for the
+    // existing score + deterministic key tie-break.
+    const scoringPool =
+      comparable.length > 0
+        ? comparable
+        : usable.filter(
+            (candidate) =>
+              candidate.points.length === Math.max(...usable.map((item) => item.points.length)),
+          );
+    if (scoringPool.length === 1) {
+      selected.add(scoringPool[0].key);
+      continue;
+    }
+
+    const commonMin = Math.max(...scoringPool.map((candidate) => candidate.minX));
+    const commonMax = Math.min(...scoringPool.map((candidate) => candidate.maxX));
     const hasCommonDomain = commonMin <= commonMax;
 
     const score = (candidate: ScoredSeries): number => {
@@ -94,7 +114,7 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
       return higherYIsBetter ? mean : -mean;
     };
 
-    const winner = usable
+    const winner = scoringPool
       .map((candidate) => ({ candidate, score: score(candidate) }))
       .toSorted((a, b) => b.score - a.score || a.candidate.key.localeCompare(b.candidate.key))[0];
     selected.add(winner.candidate.key);

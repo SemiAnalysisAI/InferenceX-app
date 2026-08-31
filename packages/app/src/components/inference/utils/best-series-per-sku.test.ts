@@ -49,6 +49,34 @@ describe('bestSeriesPerSku', () => {
     expect(selected).toEqual(new Set(['b200_narrow']));
   });
 
+  it('does not let a singleton preview displace a complete curve', () => {
+    const selected = bestSeriesPerSku(
+      [
+        point('B200-8', 'b200_complete', 10, 100),
+        point('B200-8', 'b200_complete', 20, 80),
+        point('B200-8', 'b200_complete', 30, 60),
+        point('B200-8', 'b200_complete', 40, 40),
+        point('B200-8', 'b200_singleton', 200, 1_000),
+      ],
+      'upper_left',
+    );
+
+    expect(selected).toEqual(new Set(['b200_complete']));
+  });
+
+  it('keeps a two-point preview from being hidden by a singleton', () => {
+    const selected = bestSeriesPerSku(
+      [
+        point('B200-8', 'b200_two_points', 10, 100),
+        point('B200-8', 'b200_two_points', 20, 80),
+        point('B200-8', 'b200_singleton', 200, 1_000),
+      ],
+      'upper_left',
+    );
+
+    expect(selected).toEqual(new Set(['b200_two_points']));
+  });
+
   it('inverts the score for lower-is-better metrics', () => {
     const selected = bestSeriesPerSku(
       [

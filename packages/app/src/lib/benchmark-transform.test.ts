@@ -454,6 +454,95 @@ describe('rowToAggDataEntry', () => {
     expect(point.measuredPowerPercentTdp?.y).toBe(80);
   });
 
+  it('certifies a validated non-disagg row (no schema version required)', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          power_valid: 1,
+          avg_power_w: 685.5,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('certified');
+  });
+
+  it('certifies a validated disagg row stamped with schema v2', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          power_valid: 1,
+          power_metric_schema_version: 2,
+          avg_power_w: 650,
+          joules_per_output_token: 9.7,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('certified');
+  });
+
+  it('classifies a no-verdict row with telemetry as legacy', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          avg_power_w: 560,
+          joules_per_successful_query: 1800,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('legacy');
+    // The tier is informational only — telemetry still renders (G2 is
+    // distinguish, not exclude).
+    expect(entry.avg_power_w).toBe(560);
+  });
+
+  it('classifies a validated disagg row without schema v2 as legacy', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          power_valid: 1,
+          avg_power_w: 650,
+          prefill_avg_power_w: 612.3,
+          joules_per_output_token: 9.7,
+        },
+      }),
+    );
+    // Role watts render, but their provenance predates the versioned
+    // whole-deployment energy contract.
+    expect(entry.power_tier).toBe('legacy');
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.joules_per_output_token).toBeUndefined();
+  });
+
+  it('leaves power_tier absent for explicit power_valid=0 and telemetry-free rows', () => {
+    const invalid = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          power_valid: 0,
+          avg_power_w: 685.5,
+          joules_per_output_token: 8.4,
+        },
+      }),
+    );
+    expect(invalid.power_tier).toBeUndefined();
+
+    const noTelemetry = rowToAggDataEntry(makeRow({ metrics: {} }));
+    expect(noTelemetry.power_tier).toBeUndefined();
+  });
+
+  it('carries power_tier onto transformed chart points', () => {
+    const legacyRow = makeRow({ id: 1, metrics: { avg_power_w: 560 } });
+    const certifiedRow = makeRow({
+      id: 2,
+      conc: 128,
+      metrics: { power_valid: 1, avg_power_w: 685.5 },
+    });
+    const { chartData } = transformBenchmarkRows([legacyRow, certifiedRow]);
+    const points = chartData.find((data) => data.length > 0)!;
+    expect(points.map((p) => p.power_tier)).toEqual(['legacy', 'certified']);
+  });
+
   it('passes through per-worker measured power array intact', () => {
     const workers = [
       {

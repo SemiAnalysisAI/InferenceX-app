@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
+  isMeasuredEnergyConfigKey,
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -88,6 +89,7 @@ import { useLocale } from '@/lib/use-locale';
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
+import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 
 import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
@@ -849,15 +851,21 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
             const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
+            // Legacy-power rings render only on Measured Energy axes, so the
+            // key follows the same gate to never advertise an absent ring.
+            const hasLegacyPowerPoints =
+              isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
+              footerPoints.some((point) => point.power_tier === 'legacy');
             const hasAtomSeries = footerPoints.some(
               (point) =>
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
                 <>
                   {hasOffloadHalo && <OffloadHaloLegendKey />}
+                  {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                   {isAgenticSequence && <AgenticOptimizationNote />}
                   {hasAtomSeries && <AtomEngineFootnote />}
                 </>
