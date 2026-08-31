@@ -161,6 +161,10 @@
       "duration": 6076
     },
     {
+      "spec": "cypress/e2e/landing-dashboard-navigation.cy.ts",
+      "duration": 5500
+    },
+    {
       "spec": "cypress/e2e/landing-performance.cy.ts",
       "duration": 7454
     },
