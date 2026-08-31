@@ -270,7 +270,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-latest-images',
-    sourceSha256: 'ae0d5535af9f5bf8d287c04f915067c0e470ec907efb2a848cb6c35660770d2d',
+    sourceSha256: 'a72e44393ff478d18973a050b009bdbaa9e5e5929837dac3781970d162b4de77',
   },
   {
     source: 'src/app/api/v1/log-availability/route.ts',
@@ -660,7 +660,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '54e398a2041040ed7b66bd5c813041db26287111774dafd13a70d5e545fb24f3',
+    sourceSha256: 'd80b18da9bae84079764238fb586090b26aff5eeddfea1a152ef735889bd3357',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -759,7 +759,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '80c69b9e9ed34e4279c6b95d8418c9535fcee1919ccb4883066d27954588c977',
+    sourceSha256: '98659d61fdfb73d955fd84ead82deaa51076b792ad73b0c111af4d7e512749f5',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',
