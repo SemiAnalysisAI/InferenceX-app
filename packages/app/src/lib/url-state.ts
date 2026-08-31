@@ -98,7 +98,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
- * Dashboard default y-axis: total tokens purchased per $1 of Neocloud Giant
+ * Dashboard default y-axis: total tokens purchased per $1 of Hyperscaler
  * ownership TCO. It leads with infrastructure purchasing power, which depends
  * only on measured throughput and hardware cost, so the opening view does not
  * assume a token sale price. Token Revenue per GPU Hour remains one selector
@@ -110,7 +110,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
  * a link captured on the *other* metric would be written without `i_metric`
  * and reopen on this one.
  */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarN';
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';

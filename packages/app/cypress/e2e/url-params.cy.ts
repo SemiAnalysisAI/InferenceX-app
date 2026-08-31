@@ -188,8 +188,8 @@ describe('URL Parameter Persistence', () => {
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
       visitWithDismissedModal('/inference');
 
-      // The dashboard opens on Neocloud ownership Total Tokens per $1 TCO, so
-      // the first axis is infrastructure purchasing power before switching.
+      // The dashboard opens on Hyperscaler ownership Total Tokens per $1 TCO,
+      // so the first axis is infrastructure purchasing power before switching.
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
