@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -28,6 +29,10 @@ const STRINGS = {
     loadingChart: 'Loading chart data...',
     loadingTable: 'Loading submissions...',
     errorText: 'Failed to load submission data.',
+    retry: 'Retry',
+    noChartData: 'No submission activity data is available.',
+    noTableData: 'No submission records are available.',
+    chartModeAria: 'Chart mode',
     chartCaption: 'Submission Activity',
     chartSource: 'Source: SemiAnalysis InferenceX™',
     statDatapoints: 'Datapoints Generated',
@@ -44,9 +49,13 @@ const STRINGS = {
     description: '所有提交至 InferenceX 的基准测试配置。查看提交历史、活动趋势和数据点数量。',
     modeWeekly: '按周',
     modeCumulative: '累计',
-    loadingChart: '正在加载图表数据...',
-    loadingTable: '正在加载提交记录...',
+    loadingChart: '正在加载图表数据……',
+    loadingTable: '正在加载提交记录……',
     errorText: '加载提交数据失败。',
+    retry: '重试',
+    noChartData: '暂无提交活动数据。',
+    noTableData: '暂无提交记录。',
+    chartModeAria: '图表模式',
     chartCaption: '提交活动',
     chartSource: '数据来源：SemiAnalysis InferenceX™',
     statDatapoints: '已生成数据点',
@@ -54,15 +63,17 @@ const STRINGS = {
     statModels: '模型数',
     statHardware: '硬件类型',
     subtitleResults: '条结果',
-    subtitleTested: '已测试',
+    subtitleTested: '个配置',
     subtitleLLMs: '个 LLM',
     subtitleSKUs: '种 SKU',
   },
 } as const;
 
 export default function SubmissionsDisplay() {
-  const { data, isLoading, error } = useSubmissions();
-  const t = STRINGS[useLocale()];
+  const { data, isLoading, error, refetch } = useSubmissions();
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const [chartMode, setChartMode] = useState<ChartMode>('weekly');
 
   const chartModeOptions = useMemo<SegmentedToggleOption<ChartMode>[]>(
@@ -96,7 +107,20 @@ export default function SubmissionsDisplay() {
   if (error) {
     return (
       <Card>
-        <p className="text-destructive text-sm">{t.errorText}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-destructive text-sm">{t.errorText}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              track('submissions_retry_clicked');
+              void refetch();
+            }}
+          >
+            {t.retry}
+          </Button>
+        </div>
       </Card>
     );
   }
@@ -137,7 +161,7 @@ export default function SubmissionsDisplay() {
                 <StatCard
                   key={s.label}
                   label={s.label}
-                  value={s.value.toLocaleString()}
+                  value={s.value.toLocaleString(numberLocale)}
                   subtitle={s.subtitle}
                 />
               ))}
@@ -159,7 +183,7 @@ export default function SubmissionsDisplay() {
                 value={chartMode}
                 options={chartModeOptions}
                 onValueChange={handleModeChange}
-                ariaLabel="Chart mode"
+                ariaLabel={t.chartModeAria}
                 testId="submissions-mode-toggle"
                 className="shrink-0"
               />
@@ -170,7 +194,7 @@ export default function SubmissionsDisplay() {
               <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
                 {t.loadingChart}
               </div>
-            ) : data?.volume ? (
+            ) : data?.volume && data.volume.length > 0 ? (
               <SubmissionsChart
                 volume={data.volume}
                 mode={chartMode}
@@ -181,7 +205,11 @@ export default function SubmissionsDisplay() {
                   </>
                 }
               />
-            ) : null}
+            ) : (
+              <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
+                {t.noChartData}
+              </div>
+            )}
           </Card>
         </figure>
       </section>
@@ -193,9 +221,13 @@ export default function SubmissionsDisplay() {
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
               {t.loadingTable}
             </div>
-          ) : data?.summary ? (
+          ) : data?.summary && data.summary.length > 0 ? (
             <SubmissionsTable data={data.summary} />
-          ) : null}
+          ) : (
+            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+              {t.noTableData}
+            </div>
+          )}
         </Card>
       </section>
     </div>

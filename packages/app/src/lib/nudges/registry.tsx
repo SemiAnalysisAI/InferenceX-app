@@ -344,7 +344,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       descriptionZh: '我们非常希望了解哪些方面做得好，哪些方面需要改进。',
       testId: 'feedback-modal',
       centered: true,
-      renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
+      renderContent: ({ dismiss, titleId, descriptionId }) => (
+        <FeedbackForm onDismiss={dismiss} titleId={titleId} descriptionId={descriptionId} />
+      ),
     },
     analytics: {
       shown: 'feedback_modal_shown',

@@ -71,6 +71,26 @@ const STRINGS = {
     xLogScale: 'X-axis Log Scale',
     yLogScale: 'Y-axis Log Scale',
     bulkBaseline: 'Bulk Contiguous Baseline',
+    summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
+    headers: {
+      run: 'Run',
+      backend: 'Backend',
+      fabric: 'Fabric',
+      workload: 'Workload',
+      precision: 'Precision',
+      outcome: 'Outcome',
+      handoff: 'Handoff ms',
+    },
+    outcomes: {
+      success: 'success',
+      unsupported: 'unsupported',
+      failed: 'failed',
+      invalid: 'invalid',
+      diagnostic: 'diagnostic',
+      pending: 'pending',
+    },
+    batch: 'Batch',
+    caption: (op: string, page: string, suffix: string) => `${op} · page ${page} · ${suffix}`,
   },
   zh: {
     heading: 'KV 缓存传输',
@@ -109,6 +129,26 @@ const STRINGS = {
     xLogScale: 'X 轴对数缩放',
     yLogScale: 'Y 轴对数缩放',
     bulkBaseline: 'Bulk 连续传输基线',
+    summary: (cases: number, measured: number) => `${cases} 个用例 · 已测 ${measured} 个 · `,
+    headers: {
+      run: '运行',
+      backend: '后端',
+      fabric: '互联方式',
+      workload: '工作负载',
+      precision: '精度',
+      outcome: '结果',
+      handoff: '交接延迟（ms）',
+    },
+    outcomes: {
+      success: '成功',
+      unsupported: '不支持',
+      failed: '失败',
+      invalid: '无效',
+      diagnostic: '诊断',
+      pending: '待处理',
+    },
+    batch: '批大小',
+    caption: (op: string, page: string, suffix: string) => `${op} · 每页 ${page} token · ${suffix}`,
   },
 } as const;
 
@@ -272,27 +312,35 @@ export function CollectiveXKvSection({
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
       {
-        header: 'Run',
+        header: strings.headers.run,
         cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
         sortValue: (row) => Number(row.run_id),
         className: 'whitespace-nowrap',
       },
       { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
-        header: 'Backend',
+        header: strings.headers.backend,
         cell: (row) => row.backend,
         sortValue: (row) => row.backend,
         className: 'whitespace-nowrap',
       },
-      { header: 'Fabric', cell: (row) => row.fabric, sortValue: (row) => row.fabric },
-      { header: 'Workload', cell: (row) => row.workload, sortValue: (row) => row.workload },
-      { header: 'Precision', cell: (row) => row.precision, sortValue: (row) => row.precision },
+      { header: strings.headers.fabric, cell: (row) => row.fabric, sortValue: (row) => row.fabric },
       {
-        header: 'Outcome',
+        header: strings.headers.workload,
+        cell: (row) => row.workload,
+        sortValue: (row) => row.workload,
+      },
+      {
+        header: strings.headers.precision,
+        cell: (row) => row.precision,
+        sortValue: (row) => row.precision,
+      },
+      {
+        header: strings.headers.outcome,
         cell: (row) => (
           <div className="min-w-28">
             <Badge variant="outline" className={OUTCOME_CLASS[row.outcome]}>
-              {row.outcome}
+              {strings.outcomes[row.outcome]}
             </Badge>
             {(row.detail || row.reason) && (
               <p className="mt-1 text-xs text-muted-foreground">{row.detail ?? row.reason}</p>
@@ -334,7 +382,7 @@ export function CollectiveXKvSection({
             } satisfies DataTableColumn<CollectiveXKvRunCase>,
           ]),
       {
-        header: 'Handoff ms',
+        header: strings.headers.handoff,
         cell: (row) => {
           const cell = cellsOf(row, primaryPage).pb1;
           return cell ? cell.latency_ms.p50.toFixed(1) : '-';
@@ -343,7 +391,7 @@ export function CollectiveXKvSection({
         className: 'text-right tabular-nums',
       },
     ],
-    [primaryPage, secondaryPage],
+    [strings, primaryPage, secondaryPage],
   );
 
   if (rows.length === 0) return null;
@@ -393,7 +441,8 @@ export function CollectiveXKvSection({
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {rows.length} cases · {measured} measured · {strings.description}
+        {strings.summary(rows.length, measured)}
+        {strings.description}
       </p>
       {measuredCases.length > 0 && (
         <>
@@ -427,7 +476,7 @@ export function CollectiveXKvSection({
                 ariaLabel={strings.xAriaLabel}
                 testId="collectivex-kv-xaxis-toggle"
                 options={[
-                  { value: 'batch', label: 'Batch' },
+                  { value: 'batch', label: strings.batch },
                   { value: 'isl', label: 'ISL' },
                   { value: 'frontier', label: strings.frontierOption },
                   { value: 'overlap', label: strings.overlapOption },
@@ -497,10 +546,13 @@ export function CollectiveXKvSection({
                 showWireCeilings={showWireCeilings}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} ·{' '}
-                    {showWireCeilings
-                      ? strings.frontierCaption
-                      : strings.frontierCaptionWithoutCeilings}
+                    {strings.caption(
+                      op,
+                      String(pageTokens),
+                      showWireCeilings
+                        ? strings.frontierCaption
+                        : strings.frontierCaptionWithoutCeilings,
+                    )}
                   </p>
                 }
                 legendElement={
@@ -523,11 +575,15 @@ export function CollectiveXKvSection({
                 selection={{ op, pageTokens, isl: effectiveOverlapIsl }}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · ISL{' '}
-                    {effectiveOverlapIsl === undefined
-                      ? strings.islMaxOption
-                      : formatIsl(effectiveOverlapIsl)}{' '}
-                    · {strings.overlapCaption}
+                    {strings.caption(
+                      op,
+                      String(pageTokens),
+                      `ISL ${
+                        effectiveOverlapIsl === undefined
+                          ? strings.islMaxOption
+                          : formatIsl(effectiveOverlapIsl)
+                      } · ${strings.overlapCaption}`,
+                    )}
                   </p>
                 }
                 legendElement={
@@ -536,7 +592,10 @@ export function CollectiveXKvSection({
                     legendItems={legendItems}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
-                    onExpandedChange={setLegendExpanded}
+                    onExpandedChange={(expanded) => {
+                      setLegendExpanded(expanded);
+                      track('collectivex_kv_legend_expanded', { expanded });
+                    }}
                   />
                 }
               />
@@ -551,8 +610,11 @@ export function CollectiveXKvSection({
                 yLogScale={yLogScale}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} ·{' '}
-                    {xAxis === 'batch' ? strings.batchCaption : strings.islCaption}
+                    {strings.caption(
+                      op,
+                      String(pageTokens),
+                      xAxis === 'batch' ? strings.batchCaption : strings.islCaption,
+                    )}
                   </p>
                 }
                 legendElement={
@@ -562,7 +624,10 @@ export function CollectiveXKvSection({
                     switches={legendSwitches}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
-                    onExpandedChange={setLegendExpanded}
+                    onExpandedChange={(expanded) => {
+                      setLegendExpanded(expanded);
+                      track('collectivex_kv_legend_expanded', { expanded });
+                    }}
                   />
                 }
               />

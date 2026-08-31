@@ -11,6 +11,9 @@ const visitHistoricalWithSetup = () => {
   cy.get('[data-testid="historical-trends-display"]').should('be.visible');
 };
 
+const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
+  rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
+
 describe('Historical Trends Tab', () => {
   beforeEach(() => {
     visitHistoricalWithSetup();
@@ -76,8 +79,6 @@ describe('Historical Trends — Content & Interactions', () => {
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="model-selector"]').should('be.visible');
-    // Radix Select may need a brief settle after scroll lock removal
-    cy.wait(100);
     cy.get('[data-testid="model-selector"]').click();
     cy.get('[role="option"]').should('have.length.greaterThan', 0);
     cy.get('body').type('{esc}');
@@ -157,7 +158,6 @@ describe('Historical Trends — Content & Interactions', () => {
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"]').should('exist');
-    cy.wait(100);
 
     cy.get('[data-testid="historical-trend-figure"] figcaption p')
       .first()
@@ -185,5 +185,121 @@ describe('Historical Trends — Content & Interactions', () => {
       .each(($span) => {
         expect($span.text()).to.match(/\d+/u);
       });
+  });
+});
+
+describe('Historical Trends — Chinese route', () => {
+  beforeEach(() => {
+    cy.visit('/zh/historical', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+  });
+
+  it('localizes the metric title, chart instructions, and point tooltip', () => {
+    cy.viewport(1440, 900);
+    cy.contains('目标交互性（tok/s/user）').should('be.visible');
+    cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
+    cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('[data-testid="trend-chart-svg"] circle').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '点击其他区域关闭')
+      .invoke('text')
+      .should('match', /\d{4}年/u);
+  });
+
+  it('localizes the Agentic sequence and run date in the chart caption', () => {
+    const runDate = '2025-03-01';
+    cy.fixture('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability', {
+        body: asAgenticRowsOn(rows, runDate),
+      }).as('agenticAvailability');
+    });
+    cy.fixture('api/benchmarks.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/benchmarks?*', {
+        body: asAgenticRowsOn(rows, runDate),
+      }).as('agenticBenchmarks');
+    });
+
+    cy.visit(
+      `/zh/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
+    );
+    cy.wait('@agenticAvailability');
+    cy.wait('@agenticBenchmarks');
+    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+      .first()
+      .should('contain.text', '智能体')
+      .and('contain.text', '2025年3月1日')
+      .and('not.contain.text', runDate);
+  });
+
+  it('shows a settled Chinese empty state instead of leaving the skeleton mounted', () => {
+    cy.intercept('GET', '**/api/v1/benchmarks?*', []).as('emptyBenchmarks');
+    cy.reload();
+    cy.wait('@emptyBenchmarks');
+    cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
+    cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
+  });
+
+  it('shows a safe Chinese primary error and recovers through the reload control', () => {
+    cy.fixture('api/benchmarks.json').then((benchmarkRows) => {
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/benchmarks?*', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'historical-database-internal-detail' } }
+            : { body: benchmarkRows },
+        );
+      }).as('failedBenchmarks');
+      cy.reload();
+      cy.wait('@failedBenchmarks');
+      cy.wait('@failedBenchmarks');
+      cy.contains('历史基准测试数据加载失败。').should('be.visible');
+      cy.contains('historical-database-internal-detail').should('not.exist');
+      cy.contains('button', '重新加载页面')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.wait('@failedBenchmarks');
+      cy.get('[data-testid="historical-trend-figure"]').should('be.visible');
+    });
+  });
+
+  it('shows a distinct secondary-history error and recovers through the tracked retry', () => {
+    cy.fixture('api/benchmarks-history.json').then((historyRows) => {
+      let attempts = 0;
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', (request) => {
+        attempts += 1;
+        request.reply(
+          attempts <= 2
+            ? { statusCode: 500, body: { error: 'secondary-history-internal-detail' } }
+            : { body: historyRows },
+        );
+      }).as('secondaryHistory');
+
+      cy.reload();
+      cy.wait('@secondaryHistory');
+      cy.wait('@secondaryHistory');
+      cy.get('[data-testid="historical-trend-error"]')
+        .should('contain.text', '历史趋势数据加载失败。')
+        .and('not.contain.text', '历史基准测试数据加载失败。')
+        .and('not.contain.text', 'secondary-history-internal-detail');
+      cy.contains('button', '重试加载趋势数据').click();
+      cy.wait('@secondaryHistory');
+      cy.get('[data-testid="historical-trend-figure"]').should('be.visible');
+    });
+  });
+
+  it('keeps the target controls and chart reachable at 375px', () => {
+    cy.viewport(375, 844);
+    cy.get('[data-testid="historical-trends-display"] input[type="range"]').should('be.visible');
+    cy.get('[data-testid="historical-trends-display"] input[type="number"]').should('be.visible');
+    cy.get('[data-testid="historical-trend-figure"] svg').should('exist');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+    });
   });
 });

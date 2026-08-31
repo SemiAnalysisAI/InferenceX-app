@@ -413,6 +413,7 @@ export function createMockReliabilityContext(
   return {
     loading: false,
     error: null,
+    refetch: namedStub('refetchReliability').resolves(),
     dateRangeSuccessRateData: {
       'last-7-days': {
         [Model.DeepSeek_R1]: {
