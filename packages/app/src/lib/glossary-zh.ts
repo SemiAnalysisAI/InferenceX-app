@@ -71,7 +71,12 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'agentic-coding-workload': {
     term: '智能体编码工作负载',
-    aliases: ['agentic coding workload', '编码智能体工作负载', '软件工程智能体工作负载'],
+    aliases: [
+      'agentic coding',
+      'agentic coding workload',
+      '编码智能体工作负载',
+      '软件工程智能体工作负载',
+    ],
     plainEnglish:
       '编码智能体读取代码仓库、修改代码并运行工具，随后继续请求模型，直到完成任务；这一连串请求就是智能体编码工作负载。',
     definition:
@@ -345,7 +350,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'kv-cache': {
     term: 'KV 缓存',
-    aliases: ['KV cache', '键值缓存', '注意力缓存'],
+    aliases: ['KV cache', 'KVCache', 'KV caching', '键值缓存', '注意力缓存'],
     plainEnglish: 'KV 缓存是模型对当前对话的工作记忆，让它生成新 token 时不必每次从头重读。',
     definition:
       'KV 缓存保存已经处理过的 token 的注意力 key/value 状态，避免每个解码步重新计算它们。',
@@ -783,18 +788,46 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
   },
   'kv-cache-offload': {
-    term: 'KV cache offload',
-    aliases: ['KV cache offload', 'CPU offload', 'KV 卸载'],
+    term: 'KV cache offloading',
+    aliases: ['KV cache offload', 'KV offloading', 'KV 卸载', 'KV cache 分层'],
     plainEnglish:
       '把芯片放不下的注意力状态暂存到主机内存，长会话下一轮就能直接恢复，而不必整段重算。',
     definition:
-      'KV cache offload 把 KV block 从加速器显存移到更慢的存储层（通常是主机 DRAM），并在后续请求复用该前缀时再读回来。',
+      'KV cache offloading 把 KV block 从加速器显存移到更慢的存储层，先是主机 DRAM，其下还有 NVMe，并在后续请求复用该前缀时再读回来。',
     explanation:
       'offload 通常实现为写穿缓存：写入 HBM 缓存的前缀会同时写入较慢的一层，因此当 offload 池容量大致是 HBM 的 1.5 到 3 倍时效果最好。在 agentic 的上下文长度下，重新载入长前缀远比重算划算；但对短提示词结论相反，传输开销会超过它省下的 prefill。',
     significance:
       '长 agentic 会话超出 HBM 中 KV 容量的时间，远早于超出合理的 DRAM 预算，因此 offload 决定了有多少并发对话仍可恢复。它也会转移瓶颈：前缀能够留存之后，store 与 load 路径、传输批量化和索引记账才是值得优化的开销。',
     benchmarkContext:
       'InferenceX 会给每个使用了 offload 的数据点加上虚线光环，无论它是否位于 Pareto 前沿；点详情视图还会给出 offload 类型、引擎，以及芯片与 CPU 两侧的缓存命中率。offload 属于允许但可选的优化，因此同一条曲线上可以同时存在启用和未启用的数据点。',
+  },
+  'cpu-offloading': {
+    term: 'CPU offloading',
+    aliases: ['CPU offload', 'DRAM offloading', '主机内存卸载'],
+    plainEnglish:
+      'CPU offloading 把加速器装不下的 KV cache 溢出到主机 DRAM，让长对话可以从内存中恢复，而不必从头重算。',
+    definition:
+      'CPU offloading 把可复用的 KV cache block 保存在主机 CPU DRAM 而非加速器 HBM 中，当后续请求复用该前缀时再经主机链路读回。',
+    explanation:
+      '在推理服务语境下，这个词几乎总是指把 KV cache offload 到 DRAM，与训练侧把权重或优化器状态放到 CPU 的做法不同。引擎通过 connector 访问 DRAM，例如 vLLM 的 CPU offloading connector、LMCache、SGLang HiCache、Mooncake Store 和 Dynamo KVBM。该池通常是写穿实现，因此当用于 offload 的主机 DRAM 约为 HBM KV 容量的 1.5 到 3 倍时收益最大；其余取决于传输效率：在 hipMemcpyBatchAsync 于 ROCm 7.14 落地之前，AMD vLLM 无法批量执行 GPU 到 CPU 的拷贝，其 CPU offload 路径远不如 NVIDIA 上的同类功能好用。',
+    significance:
+      '当并发会话的 KV 工作集总量超过 HBM 时，DRAM offloading 决定了有多少智能体会话仍可恢复。它并非免费容量：在高并发下过度依赖 DRAM 层会增加重载流量，可能把交互性拖到可接受水平之下，所以真正值得回答的问题是这一层什么时候有用，而不是它是否存在。',
+    benchmarkContext:
+      'AgentX 把 CPU KV offloading 视为允许但可选的优化。用于 offload 的 DRAM 必须随所用 GPU 的比例同步扩缩，非标准化 DRAM 配置的系统另有 3 TB 上限。使用了 offload 的数据点会被虚线光环标记，点详情视图会给出 offload 后端以及 HBM 与 CPU 两侧的缓存命中率。',
+  },
+  'nvme-offloading': {
+    term: 'NVMe offloading',
+    aliases: ['NVMe offload', 'SSD offloading', '闪存 KV cache 卸载'],
+    plainEnglish:
+      'NVMe offloading 把 KV cache 再向下延伸一层到本地 SSD，让 GPU 和 CPU 内存都装不下的前缀日后仍能重新载入。',
+    definition:
+      'NVMe offloading 把可复用的 KV cache block 保存在 HBM 与主机 DRAM 之下的 NVMe SSD 层，用更慢的重载速度换取大得多的可取回 KV 工作集。',
+    explanation:
+      '存储层级每往下一层，容量成倍增长而带宽成倍下降，因此只有当重新载入长前缀仍然比重算划算时，SSD 层才有收益。LMCache、Mooncake Store 等 KV cache 管理器已经在 DRAM 和远端存储之外支持本地 NVMe 后端。这一层在两种情况下帮助最大：复用工作集超出任何合理的 DRAM 预算，或会话空闲太久、DRAM 淘汰已经把它丢弃之后才回来。',
+    significance:
+      'NVMe offloading 实际上延长了长生命周期智能体会话的缓存存活时间，当 agent 需要等待工具、人类或 CI 数分钟时这一点尤为重要。它高度依赖工作负载：如果高并发部署下 DRAM offloading 已经在拖累延迟，更慢的一层也救不回来，因为瓶颈在重载带宽而不是容量。',
+    benchmarkContext:
+      'AgentX v1 测量 HBM 和 DRAM 两层，暂缓 NVMe offloading；SSD/NVMe KV offloading 已列为快速跟进项，用来把工作集扩展到 DRAM 之外。届时回放流当前 5 分钟的空闲上限也可能随之提高，使更长的缓存存活时间变得可测量。',
   },
   'kv-cache-manager': {
     term: 'KV cache 管理器',
@@ -1281,9 +1314,23 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     benchmarkContext:
       'InferenceX 吞吐量对交互性曲线的最右端，即批次最大、单用户速度最低处，近似离线运行。在一条曲线的两端各读一次，就能看到该配置从在线到离线的完整成本区间。',
   },
+  'long-context': {
+    term: '长上下文',
+    aliases: ['long context', '长上下文推理', '长上下文服务'],
+    plainEnglish:
+      '长上下文指模型一次要处理非常大量的对话、代码或文档，此时压力主要落在内存上，而不是原始算力上。',
+    definition:
+      '长上下文指提示词和累积的对话历史达到数万甚至数十万 token 的推理场景，此时 KV cache 容量、内存带宽和缓存复用主导服务行为。',
+    explanation:
+      'KV cache 随上下文中的每个 token 增长，prefill 开销增长得更快，因此长上下文流量会在算力耗尽之前先耗尽 HBM。编码智能体是最典型的来源：每一轮都把文件、工具输出和历史回答追加到可能持续数小时的会话中。模型架构用滑动窗口、潜在注意力、线性注意力和稀疏注意力应对，服务栈则用前缀缓存、向 DRAM 和 NVMe 的 KV cache offloading 以及上下文并行应对。',
+    significance:
+      '在短固定序列上测出的硬件与引擎排名无法直接迁移到长上下文流量，因为约束条件从算术吞吐量转移到了 KV 容量和数据搬运。并发上限表现为容量悬崖，而应对这些悬崖的系统能力，决定了智能体、检索流水线和文档分析是否具备可服务的经济性。',
+    benchmarkContext:
+      'InferenceX 从两个方向覆盖长上下文：固定序列场景钉住输入输出长度，例如 8K 输入 1K 输出；AgentX 则回放上下文逐轮增长、逼近真实 agent 工作集的多轮编码会话，并让并发扫描跨越 HBM 容量悬崖。',
+  },
   'context-window': {
     term: '上下文窗口',
-    aliases: ['context window', '上下文长度', '长上下文'],
+    aliases: ['context window', '上下文长度', '最大序列长度'],
     plainEnglish: '上下文窗口是模型一次能处理的最大 token 数，涵盖输入和到目前为止生成的全部内容。',
     definition:
       '上下文窗口是模型支持的最大序列长度，约束提示词、对话历史、检索材料与生成输出的 token 总数。',
