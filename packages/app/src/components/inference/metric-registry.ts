@@ -559,9 +559,19 @@ const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
 );
 
+const ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set([
+  'y_measuredPrefillJPerInputToken',
+  'y_measuredDecodeJPerOutputToken',
+]);
+
 /** Whether a y-axis config key plots one of the Measured Energy metrics. */
 export function isMeasuredEnergyConfigKey(configKey: string): boolean {
   return MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
+/** Whether a y-axis requires the explicit prefill/decode energy breakdown. */
+export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
+  return ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [

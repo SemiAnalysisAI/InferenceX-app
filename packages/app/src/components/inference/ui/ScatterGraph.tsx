@@ -126,7 +126,10 @@ import {
   countPowerTiers,
   MeasuredPowerSummary,
 } from '@/components/inference/ui/MeasuredPowerSummary';
-import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
+} from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
@@ -381,6 +384,8 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    noRoleEnergyDataHint:
+      'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
     unofficialRun: 'UNOFFICIAL RUN',
     branch: 'Branch',
@@ -407,6 +412,8 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    noRoleEnergyDataHint:
+      '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
     unofficialTitle: (branch: string) => `非官方：${branch}`,
     unofficialRun: '非官方运行',
     branch: '分支',
@@ -3390,6 +3397,11 @@ const ScatterGraph = React.memo(
     const emptyState = (
       <ScatterEmptyState
         reason={emptyReason}
+        description={
+          emptyReason === 'selection' && isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+            ? legendT.noRoleEnergyDataHint
+            : undefined
+        }
         onShowChips={() => {
           resetUnifiedSelection();
           track('inference_empty_recovered', { action: 'show_matching_chips' });

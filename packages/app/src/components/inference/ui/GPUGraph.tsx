@@ -68,7 +68,10 @@ import {
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
-import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
+} from '@/components/inference/metric-registry';
 import {
   clampIsoX,
   clearPerfRulers,
@@ -156,6 +159,8 @@ const GPU_STRINGS = {
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    noRoleEnergyDataHint:
+      'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
   },
   zh: {
     logScale: '对数缩放',
@@ -173,6 +178,8 @@ const GPU_STRINGS = {
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    noRoleEnergyDataHint:
+      '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
   },
 } as const;
 
@@ -230,6 +237,9 @@ const GPUGraph = React.memo(
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
     const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
+    const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+      ? legendT.noRoleEnergyDataHint
+      : legendT.noDataHint;
     const ephemeralUrlState = useEphemeralUrlState();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
@@ -1160,7 +1170,7 @@ const GPUGraph = React.memo(
                 />
               </svg>
               <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
-              <p className="text-xs">{legendT.noDataHint}</p>
+              <p className="text-xs">{noDataHint}</p>
               <Button
                 type="button"
                 size="sm"

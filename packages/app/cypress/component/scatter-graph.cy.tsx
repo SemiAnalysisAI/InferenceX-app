@@ -191,6 +191,37 @@ describe('ScatterGraph', () => {
     cy.contains('No data available').should('be.visible');
   });
 
+  it('explains when the selected dataset lacks role-local energy', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-role-energy-empty"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="Measured Prefill J per Input Token"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+      'be.visible',
+    );
+    cy.contains(
+      'No measurements to plot for this selection. Review the benchmark controls above or adjust quick filters.',
+    ).should('not.exist');
+  });
+
   it('localizes the complete Chinese empty state', () => {
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">
@@ -219,39 +250,79 @@ describe('ScatterGraph', () => {
     cy.contains('No data available').should('not.exist');
   });
 
-  it('offers targeted quick-filter recovery without changing model, precision or date', () => {
+  it('localizes the missing role-energy explanation', () => {
     mountWithProviders(
-      <div style={{ width: 800 }}>
-        <ScatterGraph
-          chartId="empty-filtered"
-          modelLabel="DeepSeek R1"
-          data={[]}
-          xLabel="Concurrency"
-          yLabel="Throughput"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-role-energy-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每输入 token 实测 Prefill 能耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
       {
         inference: {
-          quickFilters: {
-            vendors: ['AMD'],
-            frameworks: ['vllm'],
-            deployment: [],
-            spec: [],
-            power: [],
-          },
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
         },
         unofficial: {},
       },
     );
-    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
-    cy.get('[data-testid="scatter-empty-clear-filters"]').click();
-    cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
-    cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
-    cy.get('@setSelectedModel').should('not.have.been.called');
-    cy.get('@setSelectedPrecisions').should('not.have.been.called');
-    cy.get('@setSelectedDateRange').should('not.have.been.called');
+
+    cy.contains('当前数据集未提供 Prefill/Decode 各角色的能耗数据。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。请检查上方的基准测试设置，或调整快捷筛选。').should(
+      'not.exist',
+    );
   });
+
+  for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
+    it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
+      mountWithProviders(
+        <div style={{ width: 800 }}>
+          <ScatterGraph
+            chartId="empty-filtered"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="Concurrency"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric,
+            quickFilters: {
+              vendors: ['AMD'],
+              frameworks: ['vllm'],
+              deployment: [],
+              spec: [],
+              power: [],
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
+      cy.contains('No points match this selection. Try removing a quick filter;').should(
+        'be.visible',
+      );
+      cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+        'not.exist',
+      );
+      cy.get('[data-testid="scatter-empty-clear-filters"]').click();
+      cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
+      cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
+      cy.get('@setSelectedModel').should('not.have.been.called');
+      cy.get('@setSelectedPrecisions').should('not.have.been.called');
+      cy.get('@setSelectedDateRange').should('not.have.been.called');
+    });
+  }
 
   it('restores hidden matching official and unofficial chip series together', () => {
     const restore = cy.stub().as('restoreUnified');

@@ -76,6 +76,36 @@ describe('GPUGraph', () => {
     cy.contains('No data available').should('be.visible');
   });
 
+  it('explains missing role-local energy in GPU comparison mode', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <GPUGraph
+          chartId="test-gpu-role-energy-empty"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="Measured Decode J per Output Token"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['mi355x'],
+          selectedDates: ['2026-07-25'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2026-07-25_mi355x']),
+          selectedPrecisions: [Precision.FP8],
+          selectedYAxisMetric: 'y_measuredDecodeJPerOutputToken',
+        },
+      },
+    );
+
+    cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+      'be.visible',
+    );
+  });
+
   it('localizes the Chinese comparison empty state', () => {
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">

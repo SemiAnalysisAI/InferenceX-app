@@ -6,6 +6,7 @@ import {
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
   METRIC_CONTROL_GROUPS,
@@ -65,6 +66,13 @@ describe('metric registry', () => {
 
     expect(new Set(controlMetrics).size).toBe(controlMetrics.length);
     expect(controlMetrics.toSorted()).toEqual(METRIC_CONFIG_KEYS.toSorted());
+  });
+
+  it('identifies only the role-local prefill and decode energy axes', () => {
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredPrefillJPerInputToken')).toBe(true);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredDecodeJPerOutputToken')).toBe(true);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredJPerOutputToken')).toBe(false);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredPrefillAvgPower')).toBe(false);
   });
 
   it('labels every infrastructure purchasing-power metric as TCO', () => {
