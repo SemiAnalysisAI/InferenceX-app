@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
 import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
+import { isMonochromeLogo } from '@/lib/model-logos';
+import { cn } from '@/lib/utils';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
@@ -23,6 +25,25 @@ const MODEL_LOGOS: Record<string, string> = {
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
+
+/**
+ * Full-color marks for the hardware platforms named in the description,
+ * sharing the brand assets under `public/logos/` used across the app.
+ * NVIDIA renders its official brand-green mark as-is; the OpenAI and AMD
+ * marks are black by brand design (neither has a color variant), so they
+ * take the shared dark-mode invert like every other monochrome logo.
+ *
+ * Rendered heights compensate for internal canvas padding — the AMD and
+ * NVIDIA assets fill only ~2/3 of their viewBox height while the OpenAI
+ * blossom fills all of it — so the marks read optically equal in the row.
+ * `width`/`height` attributes match each asset's aspect ratio to reserve
+ * layout space before the SVGs load.
+ */
+const VENDOR_MARKS = [
+  { name: 'OpenAI', file: 'openai.svg', width: 22, height: 22 },
+  { name: 'AMD', file: 'amd.svg', width: 93, height: 25 },
+  { name: 'NVIDIA', file: 'nvidia-color.svg', width: 33, height: 33 },
+] as const;
 
 const STRINGS = {
   en: {
@@ -87,6 +108,29 @@ export function AgentXCompareHero({
             <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>
+            {/* Decorative: the description right above already names every
+                vendor, so the strip is hidden from assistive technology. */}
+            <div
+              aria-hidden="true"
+              data-testid="compare-agentx-vendor-marks"
+              className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2"
+            >
+              {VENDOR_MARKS.map((mark) => (
+                <img
+                  key={mark.name}
+                  src={`/logos/${mark.file}`}
+                  alt=""
+                  width={mark.width}
+                  height={mark.height}
+                  loading="lazy"
+                  className={cn(
+                    'w-auto shrink-0 object-contain',
+                    isMonochromeLogo(mark.file) && 'dark:invert',
+                  )}
+                  style={{ height: mark.height }}
+                />
+              ))}
+            </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-overview-link"
