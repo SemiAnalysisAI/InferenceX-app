@@ -14,6 +14,8 @@ export interface RowOverrides {
   globalTokens?: number;
   stageUnavailable?: boolean;
   stageZeroBytes?: boolean;
+  /** Adds wire_byte_provenance at this multiple of byte_provenance (a token-expert LL row). */
+  wireBytesFactor?: number;
 }
 
 export interface ShardOverrides {
@@ -78,13 +80,29 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
   if (!row.stageUnavailable) {
     byteProvenance.stage = bytes(row.stageZeroBytes ? 0 : 192381952);
   }
-  return {
+  const raw: Json = {
     tokens_per_rank: tokensPerRank,
     global_tokens: row.globalTokens ?? tokensPerRank * worldSize,
     token_rate_at_latency_percentile: percentiles(8_338_218),
     components,
     byte_provenance: byteProvenance,
   };
+  if (row.wireBytesFactor !== undefined) {
+    const scaled = (entry: Json): Json => ({
+      activation_data_bytes:
+        (entry as { activation_data_bytes: number }).activation_data_bytes * row.wireBytesFactor!,
+      total_logical_bytes:
+        ((entry as { total_logical_bytes?: number }).total_logical_bytes ?? 0) *
+        row.wireBytesFactor!,
+    });
+    raw.wire_byte_provenance = Object.fromEntries(
+      Object.entries(byteProvenance as Record<string, Json>).map(([name, entry]) => [
+        name,
+        scaled(entry),
+      ]),
+    );
+  }
+  return raw;
 }
 
 function makeRawCase(options: ShardOverrides, caseId: string): Json {
