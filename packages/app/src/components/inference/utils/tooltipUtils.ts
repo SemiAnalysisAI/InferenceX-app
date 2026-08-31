@@ -143,9 +143,9 @@ const TOOLTIP_STRINGS = {
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
-    powerData: 'Power Data',
-    powerCertified: 'Certified (validated measurement)',
-    powerLegacy: 'Legacy (no validation verdict)',
+    powerData: 'Power Measurement',
+    powerCertified: 'Validated (current PowerX method)',
+    powerLegacy: 'Historical (not validated under the current method)',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -160,9 +160,9 @@ const TOOLTIP_STRINGS = {
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
-    powerData: '功耗数据',
-    powerCertified: '已认证（通过验证的测量）',
-    powerLegacy: '旧版（无验证结论）',
+    powerData: '功耗测量',
+    powerCertified: '已验证（采用当前 PowerX 方法）',
+    powerLegacy: '历史测量（尚未按当前方法验证）',
   },
 } as const;
 

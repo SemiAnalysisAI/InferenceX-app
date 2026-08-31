@@ -1,9 +1,9 @@
-// Certified-vs-legacy measured power (PLAN-02 / gap G2): on the Measured
+// Validated-vs-historical measured power (PLAN-02 / gap G2): on the Measured
 // Energy y-axes, points without a producer validation verdict carry a dotted
 // ring and a footer legend key, and Quick Filters gains a "Measured Power"
-// category (Certified/Legacy pills, `i_power` share-link param). Fixture rows
-// are intercepted so one config is certified (power_valid=1) and one is
-// legacy (no verdict), keeping every assertion deterministic regardless of
+// category (Validated/Historical labels, stable `i_power` share-link values).
+// Fixture rows are intercepted so one config is validated (power_valid=1) and
+// one is historical (no verdict), keeping every assertion deterministic regardless of
 // what the production dataset contains.
 
 const POWER_MODEL = 'dsv4';
@@ -98,7 +98,7 @@ function visitCertifiedPowerChart(extraParams = '') {
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
-describe('Certified vs legacy measured power', () => {
+describe('Validated vs historical measured power', () => {
   it('rings legacy points on a measured axis and filters them via Quick Filters', () => {
     visitCertifiedPowerChart();
 
@@ -116,6 +116,12 @@ describe('Certified vs legacy measured power', () => {
       .click();
     cy.get('[data-slot="select-content"]').should('not.exist');
 
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 2 of 6 measured points')
+      .and('contain.text', '1/3 validated')
+      .and('contain.text', '1/3 historical')
+      .and('contain.text', 'Best per SKU and Optimal Only are enabled');
+
     // The no-verdict config is ringed; the certified one is not. The footer
     // legend key appears with the ringed points.
     cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
@@ -128,6 +134,11 @@ describe('Certified vs legacy measured power', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
+    cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
+    cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
+    cy.get('[data-testid="measured-power-help"]').click();
+    cy.contains('Both are shown by default.').should('be.visible');
+    cy.get('body').type('{esc}');
 
     // Certified-only: legacy points (and with them every ring and the legend
     // key) leave the chart while the certified series stays.

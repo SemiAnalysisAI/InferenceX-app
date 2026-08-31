@@ -67,6 +67,12 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  countPowerTiers,
+  MeasuredPowerSummary,
+} from '@/components/inference/ui/MeasuredPowerSummary';
 import {
   parallelismLabelBoxes,
   placeLineLabels,
@@ -177,6 +183,7 @@ const GPUGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
+    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
     const ephemeralUrlState = useEphemeralUrlState();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
@@ -369,6 +376,16 @@ const GPUGraph = React.memo(
         );
       return pts;
     }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+
+    const powerTierCounts = useMemo(
+      () => ({
+        total: countPowerTiers(
+          data.filter((point) => selectedPrecisions.includes(point.precision)),
+        ),
+        visible: countPowerTiers(filteredData),
+      }),
+      [data, filteredData, selectedPrecisions],
+    );
 
     // GPU comparison currently renders official DB-backed points only. Unofficial
     // overlays have no benchmark_results id or persisted trace, so they cannot
@@ -737,7 +754,21 @@ const GPUGraph = React.memo(
         watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
-        caption={caption}
+        caption={
+          isMeasuredEnergyAxis ? (
+            <>
+              {caption}
+              <MeasuredPowerSummary
+                total={powerTierCounts.total}
+                visible={powerTierCounts.visible}
+                bestPerSku={false}
+                optimalOnly={hideNonOptimal}
+              />
+            </>
+          ) : (
+            caption
+          )
+        }
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
@@ -908,12 +939,18 @@ const GPUGraph = React.memo(
             .selectAll('.dot-group, .roofline-path')
             .style('transition', 'opacity 150ms ease');
 
-          // The halo stays inside the point group, so normal zoom transforms
-          // carry it without a separate update pass.
+          // Decorations stay inside the point group, so normal zoom transforms
+          // carry them without a separate update pass.
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {
               renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
+              renderLegacyPowerRing(
+                d3.select(this),
+                point,
+                isMeasuredEnergyAxis,
+                'var(--foreground)',
+              );
             });
         }}
         legendElement={

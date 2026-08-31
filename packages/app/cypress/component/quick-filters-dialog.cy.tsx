@@ -22,6 +22,21 @@ describe('QuickFiltersDialog', () => {
     cy.get('[data-testid="quick-filter-framework-vllm"]').should('exist');
     cy.get('[data-testid="quick-filter-deployment-disagg"]').should('exist');
     cy.get('[data-testid="quick-filter-spec-mtp"]').should('exist');
+    cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
+    cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
+  });
+
+  it('explains validated and historical power measurements in plain language', () => {
+    mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub()} />, {
+      inference: { availableQuickFilters },
+    });
+
+    cy.get('[data-testid="measured-power-help"]').click();
+    cy.contains('Validated measurement').should('be.visible');
+    cy.contains('passed checks for benchmark-window coverage').should('be.visible');
+    cy.contains('Historical measurement').should('be.visible');
+    cy.contains('This does not mean the measurement is wrong.').should('be.visible');
+    cy.contains('Both are shown by default.').should('be.visible');
   });
 
   it('removes speculative decoding from agentic charts and toggles supported filters', () => {

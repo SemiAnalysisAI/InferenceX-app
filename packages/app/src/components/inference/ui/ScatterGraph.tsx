@@ -122,6 +122,10 @@ import {
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import {
+  countPowerTiers,
+  MeasuredPowerSummary,
+} from '@/components/inference/ui/MeasuredPowerSummary';
 import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
@@ -1342,6 +1346,30 @@ const ScatterGraph = React.memo(
         (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
       [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
     );
+
+    const powerTierCounts = useMemo(() => {
+      const officialTotal = pointsData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const overlayTotal = processedOverlayData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const officialVisible = officialTotal.filter(isPointVisible);
+      const overlayVisible = overlayTotal.filter(
+        (point) => activeOverlayHwTypes.has(String(point.hwKey)) && isOverlayPointVisible(point),
+      );
+      return {
+        total: countPowerTiers([...officialTotal, ...overlayTotal]),
+        visible: countPowerTiers([...officialVisible, ...overlayVisible]),
+      };
+    }, [
+      pointsData,
+      processedOverlayData,
+      selectedPrecisions,
+      isPointVisible,
+      activeOverlayHwTypes,
+      isOverlayPointVisible,
+    ]);
 
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
@@ -3712,6 +3740,14 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        {isMeasuredEnergyAxis && (
+          <MeasuredPowerSummary
+            total={powerTierCounts.total}
+            visible={powerTierCounts.visible}
+            bestPerSku={bestPerSku}
+            optimalOnly={hideNonOptimal}
+          />
+        )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}

@@ -8,8 +8,8 @@ export const LEGACY_POWER_RING_STROKE_WIDTH = 1.5;
 export const LEGACY_POWER_RING_DASHARRAY = '1 3';
 
 const STRINGS = {
-  en: 'Legacy power data (no validation verdict)',
-  zh: '旧版功耗数据（无验证结论）',
+  en: 'Historical measurement (not validated under the current method)',
+  zh: '历史测量（尚未按当前方法验证）',
 } as const;
 
 /**

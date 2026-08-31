@@ -792,7 +792,9 @@ describe('power tier tooltip line', () => {
         data: pt({ power_tier: 'legacy' }),
       }),
     );
-    expect(html).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
+    expect(html).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
   });
 
   it('states the certified tier on a measured axis', () => {
@@ -802,7 +804,7 @@ describe('power tier tooltip line', () => {
         data: pt({ power_tier: 'certified' }),
       }),
     );
-    expect(html).toContain('<strong>Power Data:</strong> Certified (validated measurement)');
+    expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
   });
 
   it('omits the tier line on non-measured axes', () => {
@@ -812,14 +814,14 @@ describe('power tier tooltip line', () => {
         data: pt({ power_tier: 'legacy' }),
       }),
     );
-    expect(html).not.toContain('Power Data');
+    expect(html).not.toContain('Power Measurement');
   });
 
   it('omits the tier line when the point carries no tier', () => {
     const html = generateTooltipContent(
       tooltipConfig({ selectedYAxisMetric: 'y_measuredAvgPower', data: pt() }),
     );
-    expect(html).not.toContain('Power Data');
+    expect(html).not.toContain('Power Measurement');
   });
 
   it('renders the ZH strings under the zh locale', () => {
@@ -837,8 +839,8 @@ describe('power tier tooltip line', () => {
         locale: 'zh',
       }),
     );
-    expect(legacy).toContain('<strong>功耗数据：</strong> 旧版（无验证结论）');
-    expect(certified).toContain('<strong>功耗数据：</strong> 已认证（通过验证的测量）');
+    expect(legacy).toContain('<strong>功耗测量：</strong> 历史测量（尚未按当前方法验证）');
+    expect(certified).toContain('<strong>功耗测量：</strong> 已验证（采用当前 PowerX 方法）');
   });
 
   it('reaches overlay and GPU-graph tooltips through the same gate', () => {
@@ -867,8 +869,12 @@ describe('power tier tooltip line', () => {
       }),
     );
 
-    expect(overlay).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
-    expect(gpuGraph).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
-    expect(gpuGraphOffAxis).not.toContain('Power Data');
+    expect(overlay).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
+    expect(gpuGraph).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
+    expect(gpuGraphOffAxis).not.toContain('Power Measurement');
   });
 });

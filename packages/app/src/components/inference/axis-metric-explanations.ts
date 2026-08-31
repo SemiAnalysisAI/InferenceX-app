@@ -209,17 +209,14 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
   };
 }
 
-/**
- * Certification-tier note appended to every Measured Energy explanation:
- * pairs the dotted legacy-power point ring and the Quick Filters → Measured
- * Power pills with the footer text that explains them.
- */
+/** Validation-status note appended to every Measured Energy explanation. */
 const MEASURED_TIER_NOTE_EN =
-  ' Points without a producer validation verdict are legacy measurements — marked with a ' +
-  'dotted ring on the chart and filterable via Quick Filters → Measured Power.';
+  ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
+  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
+  'marks them. Filter either status under Quick Filters → Measured Power.';
 const MEASURED_TIER_NOTE_ZH =
-  '没有生产端验证结论的数据点属于旧版测量——在图表上以虚线圆环标记，' +
-  '并可通过快捷筛选中的“实测功耗”进行筛选。';
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
+  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
 
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
