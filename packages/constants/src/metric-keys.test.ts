@@ -14,9 +14,6 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
   });
 
   it('contains exactly the 13 measured power / energy / telemetry keys', () => {
-    // Guards accidental additions/removals: the ingest scrub and the display
-    // withholding both key off this set, so membership changes are policy
-    // changes and must be deliberate.
     expect(new Set(MEASURED_POWER_METRIC_KEY_LIST)).toEqual(
       new Set([
         'avg_power_w',
@@ -38,11 +35,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
-    // power_valid / power_metric_schema_version are the verdict itself and
-    // must survive a scrub; power_invalid_reasons / power_audit are the
-    // producer's explanation of an invalid verdict (persisted app-side by
-    // PLAN-07) and are only meaningful on scrubbed rows. None of them may
-    // ever be added to the withheld set.
+    // These fields describe or explain withholding; they are not measurements.
     for (const key of [
       'power_valid',
       'power_metric_schema_version',

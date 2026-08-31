@@ -426,12 +426,6 @@ describe('rowToAggDataEntry', () => {
   });
 
   it('withholds every MEASURED_POWER_METRIC_KEYS field when power_valid=0 (ETL parity)', () => {
-    // Parity with the ingest scrub (benchmark-mapper.ts
-    // scrubWithheldPowerMetrics): the shared constant is the single source of
-    // truth for the withheld set, so a key added there without a matching
-    // display-layer withholding fails here. The reverse direction — the
-    // display layer withholding a key missing from the constant — stays
-    // hand-audited.
     const metrics: BenchmarkRow['metrics'] = { power_valid: 0 };
     for (const key of MEASURED_POWER_METRIC_KEYS) metrics[key] = 123.45;
     const entry = rowToAggDataEntry(

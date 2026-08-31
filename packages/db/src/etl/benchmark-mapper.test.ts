@@ -67,11 +67,6 @@ function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/**
- * All 13 measured power/energy/telemetry keys with distinct sentinel values,
- * plus a valid 2-entry per-worker payload — the shape a producer regression
- * would ship if it stopped stripping measurements on power_valid=0 rows.
- */
 function dirtyPowerPayload(): Record<string, any> {
   return {
     avg_power_w: 685.5,
@@ -334,8 +329,6 @@ describe('mapBenchmarkRow', () => {
         expect(result!.metrics).not.toHaveProperty(key);
       }
       expect(result!.workers).toBeUndefined();
-      // Non-power metrics survive untouched — a power_valid=0 row is still a
-      // perfectly valid performance result.
       expect(result!.metrics.tput_per_gpu).toBe(567.8);
       expect(result!.metrics.median_ttft).toBe(50.2);
     });
@@ -385,9 +378,8 @@ describe('mapBenchmarkRow', () => {
     );
 
     it('converges a dirty pv=0 artifact to exactly what a clean producer would ship', () => {
-      // Re-ingest replaces metrics and workers wholesale (ON CONFLICT DO
-      // UPDATE in benchmark-ingest.ts), so a scrubbed dirty row must be a
-      // fixed point identical to the producer-clean mapping.
+      // Upserts replace metrics and workers wholesale, so re-ingest must
+      // converge to the same row as a producer-clean artifact.
       const tracker = createSkipTracker();
       const dirtyResult = mapBenchmarkRow(
         makeV2Row({ power_valid: 0, power_metric_schema_version: 2, ...dirtyPowerPayload() }),
@@ -415,7 +407,6 @@ describe('mapBenchmarkRow', () => {
       );
 
       expect(result!.metrics.power_valid).toBe(0);
-      // The reassignment ran: full-response ITL became canonical.
       expect(result!.metrics.mean_itl).toBe(0.02);
       for (const key of MEASURED_POWER_METRIC_KEYS) {
         expect(result!.metrics).not.toHaveProperty(key);
@@ -423,12 +414,7 @@ describe('mapBenchmarkRow', () => {
       expect(result!.workers).toBeUndefined();
     });
 
-    it('tolerates the invalid-verdict companion fields without scrubbing them', () => {
-      // PLAN-06 producers ship power_invalid_reasons / power_audit alongside
-      // power_valid=0. The scrub must never touch them; persisting them
-      // app-side is PLAN-07 — today's pinned behavior is that non-numeric
-      // fields simply never land in the numeric metrics record (parseNum
-      // drops arrays/objects).
+    it('keeps structured invalid-verdict companions outside the numeric metrics record', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(
         makeV2Row({
@@ -867,9 +853,6 @@ describe('mapBenchmarkRow', () => {
 });
 
 describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
-  // ingest-supplemental.ts persists metrics without mapBenchmarkRow, calling
-  // normalizePowerContractMetrics + scrubWithheldPowerMetrics on the raw
-  // record directly. Pin that usage pattern here.
   function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
     const { workers: _workers, ...measured } = dirtyPowerPayload();
     return { tput_per_gpu: 567.8, ...measured, ...overrides };
@@ -897,8 +880,6 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
 
   it('fails closed on a malformed verdict when composed with normalization', () => {
     const metrics = supplementalMetrics({ power_valid: 2 });
-    // The exact ingest-supplemental.ts call sequence: same object as row
-    // and metrics.
     normalizePowerContractMetrics(metrics, metrics);
     expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
 
