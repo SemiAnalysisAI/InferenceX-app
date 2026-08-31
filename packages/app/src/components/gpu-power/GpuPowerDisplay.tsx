@@ -587,55 +587,52 @@ export default function GpuMetricsDisplay() {
                       {!windowAlignment && (
                         <p className="text-sm text-muted-foreground mb-2">{t.alignmentFailed}</p>
                       )}
-                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                        <span>
-                          <span className="text-muted-foreground">{t.publishedLabel}</span>{' '}
-                          {publishedAvgPowerW === null ? (
-                            <span className="text-muted-foreground italic">
-                              {t.publishedUnavailable}
-                            </span>
-                          ) : (
-                            <>
-                              {publishedAvgPowerW.toFixed(1)} W{' '}
-                              {currentPower.published && (
-                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                                  {currentPower.published.source}
-                                </code>
-                              )}
-                            </>
-                          )}
-                        </span>
-                        <span>
-                          <span className="text-muted-foreground">{t.recomputedLabel}</span>{' '}
-                          {windowRecompute ? (
-                            <>
-                              {windowRecompute.avgPowerPerGpuW.toFixed(1)} W{' '}
-                              <span className="text-muted-foreground text-xs">
-                                ({t.recomputedMethodNote}
-                                {windowRecompute.partialCoverage
-                                  ? `, ${t.partialCoverageNote}`
-                                  : ''}
-                                )
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground italic">
-                              {t.recomputeUnavailable}
-                            </span>
-                          )}
-                        </span>
-                        {reconciliationDelta && (
-                          <span
-                            data-testid="gpu-metrics-reconciliation-delta"
-                            className={`font-medium ${DELTA_LEVEL_CLASSES[reconciliationDelta.level]}`}
-                          >
-                            {t.deltaLabel} {reconciliationDelta.deltaPct >= 0 ? '+' : ''}
-                            {reconciliationDelta.deltaPct.toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
                     </>
                   )}
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                    <span>
+                      <span className="text-muted-foreground">{t.publishedLabel}</span>{' '}
+                      {publishedAvgPowerW === null ? (
+                        <span className="text-muted-foreground italic">
+                          {t.publishedUnavailable}
+                        </span>
+                      ) : (
+                        <>
+                          {publishedAvgPowerW.toFixed(1)} W{' '}
+                          {currentPower.published && (
+                            <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                              {currentPower.published.source}
+                            </code>
+                          )}
+                        </>
+                      )}
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground">{t.recomputedLabel}</span>{' '}
+                      {windowRecompute ? (
+                        <>
+                          {windowRecompute.avgPowerPerGpuW.toFixed(1)} W{' '}
+                          <span className="text-muted-foreground text-xs">
+                            ({t.recomputedMethodNote}
+                            {windowRecompute.partialCoverage ? `, ${t.partialCoverageNote}` : ''})
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground italic">
+                          {t.recomputeUnavailable}
+                        </span>
+                      )}
+                    </span>
+                    {reconciliationDelta && (
+                      <span
+                        data-testid="gpu-metrics-reconciliation-delta"
+                        className={`font-medium ${DELTA_LEVEL_CLASSES[reconciliationDelta.level]}`}
+                      >
+                        {t.deltaLabel} {reconciliationDelta.deltaPct >= 0 ? '+' : ''}
+                        {reconciliationDelta.deltaPct.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
                   {(currentPower.producer_sha ||
                     currentPower.exporter_image_sha256 ||
                     currentPower.sources.length > 0) && (

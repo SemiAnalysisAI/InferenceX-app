@@ -107,6 +107,41 @@ describe('PowerX', () => {
       cy.get('[data-testid="gpu-metrics-reconciliation-delta"]').should('contain.text', '0.5');
     });
 
+    it('shows published power when measurement-window bounds are unavailable', () => {
+      cy.fixture('api/gpu-metrics-run.json').then(
+        (fixture: {
+          artifacts: (Record<string, unknown> & { power: Record<string, unknown> })[];
+        }) => {
+          const artifact = fixture.artifacts[0];
+          cy.intercept('GET', '/api/gpu-metrics*', {
+            body: {
+              ...fixture,
+              artifacts: [
+                {
+                  ...artifact,
+                  power: {
+                    ...artifact.power,
+                    window: null,
+                    expected_gpu_count: null,
+                    observed_gpu_count: null,
+                  },
+                },
+              ],
+            },
+          }).as('gpuMetricsWithoutWindow');
+        },
+      );
+      openPowerX();
+      cy.get('[data-testid="gpu-metrics-load-button"]').click();
+      cy.wait('@gpuMetricsWithoutWindow');
+
+      cy.get('[data-testid="gpu-metrics-reconciliation"]')
+        .should('contain.text', 'Published avg power:')
+        .and('contain.text', '402.0 W')
+        .and('contain.text', 'not enough samples to recompute');
+      cy.get('[data-testid="gpu-metrics-chart-svg"] .measurement-window').should('not.exist');
+    });
+
     it('renders the legacy view unchanged when the response has no power block', () => {
       cy.fixture('api/gpu-metrics-run.json').then(
         (fixture: { artifacts: Record<string, unknown>[] }) => {
