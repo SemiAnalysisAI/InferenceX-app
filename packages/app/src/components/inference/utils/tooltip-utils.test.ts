@@ -924,9 +924,6 @@ describe('worker power drilldown', () => {
   });
 });
 
-// ===========================================================================
-// measured-power certification tier line (all three generators)
-// ===========================================================================
 describe('power tier tooltip line', () => {
   it('states the tier for a legacy point on a measured axis', () => {
     const html = generateTooltipContent(

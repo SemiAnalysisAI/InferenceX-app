@@ -119,9 +119,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   // failure that made versioning necessary in the first place.
   const hasWholeDeploymentEnergySemantics =
     !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
-  // Gated measured power values, hoisted so the tier below can see exactly
-  // what the chart will render (behavior identical to the previous inline
-  // conditionals in the returned object).
+  // Tier derivation must see exactly the measured values the chart can render.
   const avgPowerW = measuredPowerValid ? m.avg_power_w : undefined;
   const prefillAvgPowerW = measuredPowerValid ? m.prefill_avg_power_w : undefined;
   const decodeAvgPowerW = measuredPowerValid ? m.decode_avg_power_w : undefined;
