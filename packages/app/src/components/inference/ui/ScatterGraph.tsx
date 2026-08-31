@@ -23,7 +23,6 @@ import {
   avoidPointLabelCollisions,
   parallelismLabelBoxes,
   placeLineLabels,
-  placeEndpointLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
@@ -2245,17 +2244,15 @@ const ScatterGraph = React.memo(
             });
             const labelSeries = [...officialSeries, ...overlaySeries];
 
-            lineLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, xScale, yScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, xScale, yScale, {
-                    nudge: !pinLineLabels,
-                  });
+            // Both chart types spread labels along their lines with collision
+            // avoidance — endpoint-only placement stacked every label at the
+            // right edge of the e2e latency chart.
+            lineLabels = placeLineLabels(labelSeries, xScale, yScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
+            });
 
             // Keep hidden data-join entries for precision/date curves that lost
             // deduplication, preserving the chart's one-label-per-series identity.
@@ -2485,17 +2482,12 @@ const ScatterGraph = React.memo(
                 : [],
             );
             const labelSeries = [...officialSeries, ...overlaySeries];
-            const zoomLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, newXScale, newYScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, newXScale, newYScale, {
-                    nudge: !pinLineLabels,
-                  });
+            const zoomLabels = placeLineLabels(labelSeries, newXScale, newYScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(zoomGroup.node()),
+            });
             updateRenderedLineLabels(zoomGroup, zoomLabels);
           }
         },
