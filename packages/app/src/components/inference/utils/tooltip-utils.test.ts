@@ -864,6 +864,14 @@ describe('measured-power withheld tooltip line', () => {
     expect(html).toContain('Measured power withheld');
     expect(html).toContain('sampling gap exceeded');
   });
+
+  it('gives GPU comparison tooltips the same line', () => {
+    const html = generateGPUGraphTooltipContent(
+      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
+    );
+    expect(html).toContain('Measured power withheld');
+    expect(html).toContain('sampling gap exceeded');
+  });
 });
 
 describe('worker power drilldown', () => {

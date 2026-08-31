@@ -691,6 +691,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
+      ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
       ${runLinkHTML(runUrl, locale)}
