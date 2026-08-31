@@ -1,5 +1,5 @@
-// Validated-vs-historical measured power (PLAN-02 / gap G2): on the Measured
-// Energy y-axes, points without a producer validation verdict carry a dotted
+// Validated-vs-historical measured power: on the Measured Energy y-axes,
+// points without a producer validation verdict carry a dotted
 // ring and a footer legend key, and Quick Filters gains a "Measured Power"
 // category (Validated/Historical labels, stable `i_power` share-link values).
 // Fixture rows are intercepted so one config is validated (power_valid=1) and

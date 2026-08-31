@@ -491,8 +491,8 @@ describe('rowToAggDataEntry', () => {
       }),
     );
     expect(entry.power_tier).toBe('legacy');
-    // The tier is informational only — telemetry still renders (G2 is
-    // distinguish, not exclude).
+    // The tier is informational only: historical telemetry remains visible
+    // so users can distinguish measurement status without losing older data.
     expect(entry.avg_power_w).toBe(560);
   });
 
