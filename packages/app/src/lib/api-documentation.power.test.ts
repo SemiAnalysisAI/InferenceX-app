@@ -27,7 +27,6 @@ describe('measured-power API documentation', () => {
     const reasons = benchmarkRowSchema?.properties?.power_invalid_reasons;
     expect(reasons?.type).toBe('array');
     expect(reasons?.items).toEqual({ type: 'string' });
-    // PLAN-07 turned the fields live; the reserved wording must not linger.
     expect(reasons?.description).not.toMatch(/reserved|forthcoming/iu);
 
     const audit = benchmarkRowSchema?.properties?.power_audit;
@@ -44,7 +43,6 @@ describe('measured-power API documentation', () => {
         'exporter_image_sha256',
       ].toSorted(),
     );
-    // Producers may emit partial audits, so individual audit fields remain optional.
     expect(audit?.required).toBeUndefined();
 
     expect(benchmarkRowSchema?.required).not.toContain('power_invalid_reasons');

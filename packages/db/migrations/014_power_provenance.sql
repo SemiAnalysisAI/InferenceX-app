@@ -1,24 +1,5 @@
--- ============================================================
--- BENCHMARK_RESULTS — power audit provenance columns
--- ============================================================
---
--- Producers (aggregate_power.py) annotate every aggregate result row with two
--- optional provenance fields alongside the power_valid verdict:
---
---   power_invalid_reasons — array of snake_case reason-code strings explaining
---     a withheld verdict (present when power_valid == 0);
---   power_audit — compact measurement-window audit object
---     {window_start_unix, window_end_unix, expected_gpu_count,
---      observed_gpu_count, sample_count, max_sample_gap_s, producer_sha,
---      exporter_image_sha256}, present on valid and invalid rows alike.
---
--- These live in dedicated JSONB columns rather than in `metrics` (mirror of
--- the migration-006 `workers` rationale): metrics is a flat
--- Record<string, number> — every consumer assumes scalar values, so an array
--- or object under one key would break parseNum and surface as "missing"
--- everywhere. Dedicated columns also let SELECTs skip the fields when a
--- query doesn't need them. NULL on legacy rows and rows whose producers
--- predate the provenance contract.
+-- Power audit provenance lives in dedicated JSONB columns so `metrics` stays
+-- a flat Record<string, number>. NULL identifies rows from older producers.
 
 alter table benchmark_results
   add column power_invalid_reasons jsonb;
@@ -26,12 +7,9 @@ alter table benchmark_results
 alter table benchmark_results
   add column power_audit jsonb;
 
--- Re-create the latest_benchmarks materialized view so the new columns ride
--- on the view as well (`br.*` in a matview freezes the column list at
--- creation time). The definition below is copied VERBATIM from migration
--- 012_benchmark_recipe_fingerprint.sql — the current canonical definition —
--- solely so `br.*` picks up the new columns. Do not edit the body here;
--- line-selection changes belong in a migration of their own.
+-- Re-create latest_benchmarks because `br.*` freezes the column list when the
+-- materialized view is created. The body remains identical to the canonical
+-- definition in migration 012; line-selection changes require a new migration.
 
 drop materialized view if exists latest_benchmarks;
 

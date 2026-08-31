@@ -108,7 +108,6 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
 
     const { text } = calls[0];
     expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
-    // metrics + workers + power_invalid_reasons + power_audit
     expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
     expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
     expect(text).toContain('power_audit = excluded.power_audit');
@@ -118,8 +117,6 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
     const { sql, calls } = captureInsertSql();
     await bulkIngestBenchmarkRows(sql, [provenancedRow, legacyRow], 42, '2026-08-27');
 
-    // Template value order mirrors the INSERT column list; the provenance
-    // lanes ride directly after metrics and workers.
     const { values } = calls[0];
     expect(values[10]).toEqual([
       JSON.stringify(provenancedRow.metrics),

@@ -521,15 +521,9 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     ${tooltipLine(t.dpAttention, d.dp_attention ? t.yes : t.no)}`;
 };
 
-/** Producer reason codes are snake_case; anything else never reaches the DOM. */
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 
-/**
- * One muted line explaining a withheld measured-power verdict. Empty unless
- * the point carries producer reason codes. Codes are re-validated against the
- * snake_case shape before interpolation (defense in depth — tooltip content
- * is raw HTML) and humanized by replacing underscores with spaces.
- */
+/** Revalidate producer codes before interpolating them into raw tooltip HTML. */
 const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
   const codes = d.power_invalid_reasons

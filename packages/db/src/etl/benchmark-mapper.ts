@@ -86,10 +86,8 @@ const NON_METRIC_KEYS = new Set([
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
-  // Power audit provenance (array / object, never scalars). Extracted into
-  // dedicated BenchmarkParams fields by mapBenchmarkRow. Listed here because
-  // Number(['5']) === 5: without the guard a malformed single-element reasons
-  // array would be auto-captured as a bogus numeric metric.
+  // Keep structured provenance outside flat numeric metrics. Explicitly
+  // excluding the keys also blocks Number(['5']) coercion.
   'power_invalid_reasons',
   'power_audit',
 ]);
@@ -133,12 +131,8 @@ export interface WorkerPower {
 }
 
 /**
- * Compact measurement-window audit emitted by aggregate_power.py alongside
- * the power_valid verdict (present on valid and invalid rows alike). All
- * fields optional: {@link extractPowerAudit} omits malformed numerics rather
- * than dropping the whole object, and single-node telemetry has no srt-slurm
- * producer so both shas are null there. Stored on benchmark_results in the
- * dedicated `power_audit` JSONB column (migration 014).
+ * Narrowed measurement-window audit. Fields are optional because malformed
+ * numerics are omitted; producer identity is null when unavailable.
  */
 export interface PowerAudit {
   window_start_unix?: number;
@@ -173,18 +167,7 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
-  /**
-   * Producer reason codes explaining a withheld power verdict
-   * (aggregate_power.py emits them when power_valid == 0). Stored in the
-   * dedicated `power_invalid_reasons` JSONB column (migration 014).
-   * Undefined for legacy artifacts and rows with a valid verdict.
-   */
   powerInvalidReasons?: string[];
-  /**
-   * Compact power measurement-window audit from the same producer contract.
-   * Stored in the dedicated `power_audit` JSONB column (migration 014).
-   * Undefined for legacy artifacts predating the provenance contract.
-   */
   powerAudit?: PowerAudit;
 }
 
@@ -395,10 +378,7 @@ export function mapBenchmarkRow(
   // narrowing — anything other than a non-empty array of objects is dropped,
   // and a withheld power verdict drops the payload entirely.
   const workers = powerWithheld ? undefined : extractWorkers(row.workers);
-  // Audit provenance is extracted unconditionally on power_valid: the
-  // contract says reasons appear when power_valid == 0, but the app stores
-  // whatever validly arrives — tolerance in both directions, and no data
-  // loss if a future producer annotates valid rows too.
+  // Audit metadata is independent of the verdict so valid-row provenance is retained.
   const powerInvalidReasons = extractPowerInvalidReasons(row.power_invalid_reasons);
   const powerAudit = extractPowerAudit(row.power_audit);
 
@@ -601,19 +581,14 @@ export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-/** Producer reason codes are lowercase snake_case identifiers. */
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 const MAX_POWER_REASON_CODES = 32;
 const MAX_POWER_REASON_LENGTH = 64;
 const MAX_POWER_AUDIT_SHA_LENGTH = 128;
 
 /**
- * Narrow a raw `power_invalid_reasons` value from the artifact JSON to
- * `string[]` or undefined. Entries must be snake_case strings (length ≤ 64
- * after trim) to be kept; anything else is dropped silently (same policy as
- * `extractWorkers`). Deduplicates preserving first-seen order and caps the
- * result at 32 codes. Returns undefined for any non-array input or an empty
- * result so the eventual JSONB column stores null rather than `[]`.
+ * Keep at most 32 unique snake_case reason codes, each at most 64 characters.
+ * Empty results become undefined so persistence stores SQL NULL, not `[]`.
  */
 export function extractPowerInvalidReasons(raw: unknown): string[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -637,13 +612,11 @@ function auditFiniteNum(v: unknown): number | undefined {
   return n !== undefined && Number.isFinite(n) ? n : undefined;
 }
 
-/** GPU/sample counts must be non-negative safe integers. */
 function auditCount(v: unknown): number | undefined {
   const n = parseInt2(v);
   return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
 }
 
-/** Trimmed non-empty string of bounded length, anything else → null. */
 function auditSha(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   const s = v.trim();
@@ -651,16 +624,10 @@ function auditSha(v: unknown): string | null {
 }
 
 /**
- * Narrow a raw `power_audit` value from the artifact JSON to a fixed 8-key
- * {@link PowerAudit} or undefined. Field-by-field: window/gap fields must be
- * finite numbers, counts must be non-negative safe integers; malformed
- * numerics are omitted, since a partial audit beats none. The shas keep a
- * trimmed non-empty string of length ≤ 128 and collapse anything else
- * (including explicit null) to null, matching the contract's string|null.
- * Unknown keys are dropped so the stored object stays bounded. Returns
- * undefined for non-object input and for an empty husk (no numeric field
- * survived and both shas are null) so the eventual JSONB column stores null
- * rather than `{}`.
+ * Narrow to the fixed {@link PowerAudit} shape: finite window/gap values,
+ * non-negative safe-integer counts, and bounded producer identifiers. Unknown
+ * keys are dropped; an empty result becomes undefined so persistence stores
+ * SQL NULL rather than `{}`.
  */
 export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;

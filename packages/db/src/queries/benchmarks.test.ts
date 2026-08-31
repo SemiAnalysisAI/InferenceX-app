@@ -150,8 +150,6 @@ describe('power audit provenance reads (tolerant to a not-yet-applied migration 
     const { text } = captured.query();
     expect(text).toContain("to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons");
     expect(text).toContain("to_jsonb(lb) -> 'power_audit' AS power_audit");
-    // The #407 lesson, pinned: a bare column reference would fail to PLAN
-    // until the next ingest run applies migration 014.
     expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
   });
 });

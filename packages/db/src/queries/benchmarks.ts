@@ -47,17 +47,9 @@ export interface BenchmarkRow {
    * aggregate_power.py's multinode patch — surfaced as undefined here.
    */
   workers?: BenchmarkWorkerRow[];
-  /**
-   * Producer reason codes explaining a withheld power verdict. Stored in the
-   * dedicated `power_invalid_reasons` JSONB column (migration 014).
-   * Null/undefined on legacy rows and rows from valid runs.
-   */
+  /** Producer reason codes for withheld power; null/undefined on other rows. */
   power_invalid_reasons?: string[] | null;
-  /**
-   * Compact power measurement-window audit from the producer contract.
-   * Stored in the dedicated `power_audit` JSONB column (migration 014).
-   * Null/undefined on legacy rows predating the provenance contract.
-   */
+  /** Narrowed measurement-window audit; null/undefined on legacy rows. */
   power_audit?: PowerAudit | null;
   date: string;
   /** Producer identity and timestamp; preserved for per-point provenance. */
@@ -268,10 +260,9 @@ function executeRecursiveBenchmarkQuery(
       br.recipe_fingerprint,
       ${plan.metricsExpression},
       br.workers,
-      -- Deploy-order tolerance (the #405/#407 lesson): a bare br.power_* column
-      -- reference fails at query PLAN time until the next ingest run applies
-      -- migration 014. The jsonb key lookup degrades to NULL while the column
-      -- is missing and is byte-identical once it exists.
+      -- A bare br.power_* reference fails during query planning until the next
+      -- ingest applies migration 014. The jsonb lookup returns NULL before the
+      -- migration and the stored value afterward, making deploy order safe.
       to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons,
       to_jsonb(br) -> 'power_audit' AS power_audit,
       br.date::text,
@@ -469,8 +460,8 @@ export async function getLatestBenchmarks(
       lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
-      -- Same deploy-order tolerance as the recursive branch: NULL until
-      -- migration 014 recreates latest_benchmarks, identical afterwards.
+      -- latest_benchmarks lacks these fields until migration 014 recreates it;
+      -- the jsonb lookup keeps reads safe during that deploy window.
       to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons,
       to_jsonb(lb) -> 'power_audit' AS power_audit,
       lb.date::text,

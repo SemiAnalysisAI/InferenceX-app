@@ -185,8 +185,6 @@ interface SupplementalBmk {
   is_multinode?: boolean;
   prefill_num_workers?: number;
   decode_num_workers?: number;
-  /** Producer power-audit provenance (PLAN-06 contract), sibling to `metrics`
-   * like on artifact rows; narrowed by the shared extractors. */
   power_invalid_reasons?: unknown;
   power_audit?: unknown;
 }
@@ -280,11 +278,8 @@ async function ingestSupplementalBmk(
       // then strip withheld measurements when power_valid=0.
       normalizePowerContractMetrics(entry.metrics, entry.metrics);
       scrubWithheldPowerMetrics(entry.metrics);
-      // The provenance companions ride the entry itself (sibling to the flat
-      // numeric `metrics` record), but accept a nesting under `metrics` too —
-      // power_valid lives there in this format. Delete the keys from `metrics`
-      // either way so the structured companions never enter the persisted
-      // metrics jsonb (the NON_METRIC_KEYS guarantee on the mapper path).
+      // Accept the supplemental format's metrics nesting, then remove the
+      // structured fields so persisted metrics remain numeric-only.
       const powerInvalidReasons = extractPowerInvalidReasons(
         entry.power_invalid_reasons ?? entry.metrics.power_invalid_reasons,
       );

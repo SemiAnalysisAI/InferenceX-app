@@ -84,15 +84,11 @@ export async function bulkIngestBenchmarkRows(
   const images = deduped.map((r) => r.image);
   const recipeFingerprints = deduped.map((r) => r.recipeFingerprint);
   const metricsJsons = deduped.map((r) => JSON.stringify(r.metrics));
-  // workers is optional — encode missing values as JSON null so the JSONB
-  // unnest input has a homogeneous type (jsonb[]) and stores SQL NULL in the
-  // column for rows that didn't emit a per-worker breakdown.
+  // Optional JSONB lanes use JSON null so each jsonb[] input remains
+  // homogeneous and missing payloads persist as SQL NULL.
   const workersJsons = deduped.map((r) =>
     r.workers === undefined ? null : JSON.stringify(r.workers),
   );
-  // Same encoding for the power audit provenance columns: JSON null lanes
-  // keep the jsonb[] unnest inputs homogeneous and store SQL NULL for rows
-  // whose artifacts predate the provenance contract.
   const powerInvalidReasonsJsons = deduped.map((r) =>
     r.powerInvalidReasons === undefined ? null : JSON.stringify(r.powerInvalidReasons),
   );

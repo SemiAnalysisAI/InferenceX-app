@@ -217,7 +217,6 @@ describe('normalizeArtifactRows', () => {
 
     expect(row.power_invalid_reasons).toEqual(['sampling_gap_exceeded']);
     expect(row.power_audit).toEqual(audit);
-    // The provenance explains the withheld verdict; it never lands in metrics.
     expect(row.metrics).not.toHaveProperty('power_invalid_reasons');
     expect(row.metrics).not.toHaveProperty('power_audit');
   });

@@ -76,7 +76,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
       zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
     },
-    sourceSha256: '252c57b34dfbf94335d085e34aee62e5b88467b27edcf98fdbe53166adec8cfe',
+    sourceSha256: '6973369b5ee4ded847754b7d38ec7b9db7c30f895c9b0e54c7aaf9b2bf7eb45d',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -731,7 +731,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '6f38e94cbeafed5383e4519bcf691e67cab0ea1fbf75e71d2dfb2de5bd3698dd',
+    sourceSha256: '0793d7901630d74301493a34436c8ad868cc4c938d46ba40256b19fc76b17332',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
