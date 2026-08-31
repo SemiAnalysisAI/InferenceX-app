@@ -49,6 +49,10 @@
       "duration": 9822
     },
     {
+      "spec": "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
       "duration": 1955
     },

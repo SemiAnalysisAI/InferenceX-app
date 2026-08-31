@@ -944,7 +944,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {(() => {
                       const chartCaption = (
                         <>
-                          <h2 className="text-lg font-semibold">
+                          {/* md:mr-80 keeps the heading clear of the absolute
+                              toolbar overlay (~287px wide at md:right-8), so a
+                              long title wraps instead of running under it. */}
+                          <h2 className="text-lg font-semibold md:mr-80">
                             {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
                               // For Input metrics with dynamic x-axis, use dynamic heading.
