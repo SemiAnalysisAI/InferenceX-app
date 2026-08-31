@@ -270,6 +270,199 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('zh submissions workflow', () => {
+    beforeEach(() => {
+      cy.visit('/zh/submissions');
+      cy.get('[data-testid="submissions-display"]').should('be.visible');
+    });
+
+    it('localizes chart controls, table headers, sorting, and expanded details', () => {
+      cy.viewport(1440, 900);
+      cy.contains('h2', '基准测试提交').should('be.visible');
+      cy.get('[data-testid="submissions-mode-toggle"]')
+        .should('have.attr', 'aria-label', '图表模式')
+        .and('contain.text', '按周')
+        .and('contain.text', '累计');
+      cy.get('[role="group"][aria-label="基准测试提交活动图表"]')
+        .should('contain.text', 'Shift+滚轮横向缩放')
+        .find('[data-testid="submissions-chart-svg"]')
+        .should('contain.text', '数据点数量');
+      cy.get('[data-testid="submissions-chart-svg"] .proximity-overlay').click('center', {
+        force: true,
+      });
+      cy.get('[data-chart-tooltip]:visible')
+        .should('contain.text', '点击其他区域关闭')
+        .and('contain.text', '合计');
+      cy.contains('th button', '投机解码').should('be.visible');
+      cy.contains('th button', '数据点').click().parent('th').should('have.attr', 'aria-sort');
+      cy.get('button[aria-label="展开配置详情"]').first().click();
+      cy.get('[data-testid="submissions-display"]')
+        .should('contain.text', '投机解码方法：')
+        .and('contain.text', '分离式部署：')
+        .and('contain.text', '聚合推理芯片数：');
+      // Disaggregated deployments split the chip pool, so their expanded
+      // details localize the prefill/decode fields instead of the aggregate ones.
+      cy.contains('tr', 'Mooncake ATOMesh')
+        .first()
+        .find('button[aria-label="展开配置详情"]')
+        .click();
+      cy.get('[data-testid="submissions-display"]')
+        .should('contain.text', '预填充芯片数：')
+        .and('contain.text', '解码芯片数：');
+    });
+
+    it('separates localized empty chart and table states', () => {
+      cy.intercept('GET', '**/api/v1/submissions', { body: { summary: [], volume: [] } }).as(
+        'emptySubmissions',
+      );
+      cy.reload();
+      cy.wait('@emptySubmissions');
+      cy.contains('暂无提交活动数据。').should('be.visible');
+      cy.contains('暂无提交记录。').should('be.visible');
+    });
+
+    it('shows a safe error and retries through a real button click', () => {
+      // Fail every request until the retry button is actually clicked — counting
+      // attempts is race-prone because query retries can consume the "healthy"
+      // response before the error UI is asserted.
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/submissions', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'submissions-database-internal-detail' } }
+            : { body: { summary: [], volume: [] } },
+        );
+      }).as('retrySubmissions');
+      cy.reload();
+      cy.wait('@retrySubmissions');
+      cy.contains('加载提交数据失败。').should('be.visible');
+      cy.contains('submissions-database-internal-detail').should('not.exist');
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.contains('暂无提交记录。').should('be.visible');
+    });
+
+    it('keeps the chart labels readable and the table scrollable at 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="submissions-chart-svg"] .x-axis .tick text').then(($ticks) => {
+        expect($ticks.length, 'mobile date tick count').to.be.at.most(3);
+        const boxes = [...$ticks]
+          .map((tick) => tick.getBoundingClientRect())
+          .sort((left, right) => left.left - right.left);
+        for (let index = 1; index < boxes.length; index += 1) {
+          expect(boxes[index - 1].right, 'adjacent mobile date ticks').to.be.at.most(
+            boxes[index].left,
+          );
+        }
+      });
+      cy.get('[data-testid="submissions-display"] table').should('be.visible');
+      cy.get('[data-testid="submissions-display"] .overflow-x-auto')
+        .scrollTo('right')
+        .should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
+  describe('zh feedback viewer workflow', () => {
+    beforeEach(() => {
+      cy.intercept('GET', '**/api/v1/feedback/list', { body: { rows: [] } }).as('feedbackList');
+      cy.visit('/zh/feedback', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-feature-gate', '1');
+        },
+      });
+      cy.wait('@feedbackList');
+    });
+
+    it('localizes the empty state, key validation, and accessibility label', () => {
+      cy.viewport(1440, 900);
+      cy.get('[data-testid="feedback-viewer"]')
+        .should('contain.text', '用户反馈')
+        .and('contain.text', '暂无反馈记录。');
+      cy.get('button[aria-label="显示密钥"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
+      cy.get('[data-testid="feedback-key-submit"]').click();
+      cy.get('[role="alert"]').should('contain.text', '解密密钥必须是有效的 base64 编码');
+      cy.get('[data-testid="feedback-key-input"]')
+        .clear()
+        .type('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+      cy.get('[data-testid="feedback-key-submit"]').click();
+      cy.contains('button', '清除密钥').should('be.visible');
+    });
+
+    it('names the feedback loading state instead of showing an objectless spinner label', () => {
+      cy.intercept('GET', '**/api/v1/feedback/list', {
+        delay: 500,
+        body: { rows: [] },
+      }).as('slowFeedbackList');
+      cy.reload();
+      cy.contains('正在加载反馈记录……').should('be.visible');
+      cy.wait('@slowFeedbackList');
+      cy.contains('暂无反馈记录。').should('be.visible');
+    });
+
+    it('shows a safe fetch error and retries through a real button click', () => {
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/feedback/list', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'feedback-database-internal-detail' } }
+            : { body: { rows: [] } },
+        );
+      }).as('retryFeedbackList');
+      cy.reload();
+      cy.wait('@retryFeedbackList');
+      cy.wait('@retryFeedbackList');
+      cy.contains('无法加载反馈数据。').should('be.visible');
+      cy.contains('feedback-database-internal-detail').should('not.exist');
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.wait('@retryFeedbackList');
+      cy.contains('暂无反馈记录。').should('be.visible');
+    });
+
+    it('keeps the key controls and content within 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="feedback-key-input"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-submit"]').should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
+  it('uses the route locale in the global feedback modal and dismisses it through the UI', () => {
+    cy.viewport(1440, 900);
+    cy.visit('/zh/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem('inferencex-feedback-modal-snoozed');
+      },
+    });
+
+    cy.get('[data-testid="feedback-modal"]')
+      .should('be.visible')
+      .and('have.attr', 'role', 'dialog')
+      .and('have.attr', 'aria-labelledby', 'feedback-modal-title')
+      .and('have.attr', 'aria-describedby', 'feedback-modal-description')
+      .and('contain.text', '帮助我们改进 InferenceX')
+      .and('contain.text', '您的反馈会加密保存');
+    cy.get('#feedback-modal-title').should('have.text', '帮助我们改进 InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
+    );
+    cy.get('[data-testid="feedback-modal-dismiss"]').click();
+    cy.get('[data-testid="feedback-modal"]').should('not.exist');
+  });
+
   describe('English pages expose the Chinese sibling', () => {
     before(() => {
       cy.visit('/blog');

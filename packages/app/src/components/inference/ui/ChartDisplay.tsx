@@ -10,7 +10,12 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import { applyTokenRevenuePricing, formatTokenPrice } from '@/components/inference/token-revenue';
+import {
+  applyTokenRevenuePricing,
+  cachedInputPricePerMillion,
+  formatTokenPrice,
+  usesTokenSalePricing,
+} from '@/components/inference/token-revenue';
 import {
   useInferenceActions,
   useInferenceData,
@@ -106,8 +111,10 @@ const STRINGS = {
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `Input $${input}/M tok · Output $${output}/M tok`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `Input $${input}/M tok · Output $${output}/M tok`
+        : `Uncached $${input}/M tok · Cached $${cached}/M tok · Output $${output}/M tok`,
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
@@ -128,8 +135,10 @@ const STRINGS = {
     table: '表格',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `输入 $${input}/百万 token · 输出 $${output}/百万 token`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
+        : `未缓存 $${input}/百万 token · 缓存 $${cached}/百万 token · 输出 $${output}/百万 token`,
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
@@ -409,10 +418,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
       const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
-      const pricedData =
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
-          ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
-          : rawData.data;
+      const pricedData = usesTokenSalePricing(selectedYAxisMetric)
+        ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
+        : rawData.data;
       const capableData = pricedData.filter((point) =>
         supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
       );
@@ -859,6 +867,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <figure data-testid="chart-figure" className="relative rounded-lg">
                   <ChartButtons
                     chartId={`chart-${graphIndex}`}
+                    className="md:top-4"
                     mobileVisible
                     analyticsPrefix={
                       isTimelineMode
@@ -935,7 +944,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {(() => {
                       const chartCaption = (
                         <>
-                          <h2 className="text-lg font-semibold">
+                          {/* md:mr-80 keeps the heading clear of the absolute
+                              toolbar overlay (~287px wide at md:right-8), so a
+                              long title wraps instead of running under it. */}
+                          <h2 className="text-lg font-semibold md:mr-80">
                             {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
                               // For Input metrics with dynamic x-axis, use dynamic heading.
@@ -998,19 +1010,23 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               .join(', ')}{' '}
                             • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
                             {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-                            {selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
-                              tokenRevenuePricing && (
-                                <>
-                                  {' '}
-                                  •{' '}
-                                  <span data-testid="token-revenue-subtitle-prices">
-                                    {t.revenuePrices(
-                                      formatTokenPrice(tokenRevenuePricing.inputPerMillion),
-                                      formatTokenPrice(tokenRevenuePricing.outputPerMillion),
-                                    )}
-                                  </span>
-                                </>
-                              )}
+                            {usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing && (
+                              <>
+                                {' '}
+                                •{' '}
+                                <span data-testid="token-revenue-subtitle-prices">
+                                  {t.revenuePrices(
+                                    formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                    graph.sequence === Sequence.AgenticTraces
+                                      ? formatTokenPrice(
+                                          cachedInputPricePerMillion(tokenRevenuePricing),
+                                        )
+                                      : null,
+                                    formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                                  )}
+                                </span>
+                              </>
+                            )}
                             {selectedRunDate && (
                               <>
                                 {' '}
@@ -1173,9 +1189,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {t.inferencePerformanceDesc}
                     </p>
                   </div>
-                  {/* The chart-row ShareButton lives in ChartButtons, which is desktop-only
-                      (`hidden md:flex`); keep a header Share on mobile so small screens
-                      don't lose the share entry point. */}
+                  {/* The chart-row ShareButton lives in ChartButtons (visible on mobile
+                      via `mobileVisible`, but rendered per chart row); keep a header Share
+                      on mobile so small screens have a share entry point next to the title. */}
                   <div className="md:hidden">
                     <ShareButton />
                   </div>

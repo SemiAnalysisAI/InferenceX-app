@@ -20,6 +20,8 @@ describe('metric registry', () => {
     expect(e2e.y_tpPerGpu_roofline).toBe('upper_right');
     expect(interactivity.y_tokenRevenuePerGpuHour_roofline).toBe('upper_left');
     expect(e2e.y_tokenRevenuePerGpuHour_roofline).toBe('upper_right');
+    expect(interactivity.y_tokensPerDollarN_roofline).toBe('upper_left');
+    expect(e2e.y_tokensPerDollarN_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
@@ -58,6 +60,50 @@ describe('metric registry', () => {
     expect(new Set(controlMetrics).size).toBe(controlMetrics.length);
     expect(controlMetrics.toSorted()).toEqual(METRIC_CONFIG_KEYS.toSorted());
   });
+
+  it('labels every infrastructure purchasing-power metric as TCO', () => {
+    const metricKeys = [
+      'tokensPerDollarH',
+      'tokensPerDollarN',
+      'tokensPerDollarR',
+      'outputTokensPerDollarH',
+      'outputTokensPerDollarN',
+      'outputTokensPerDollarR',
+      'inputTokensPerDollarH',
+      'inputTokensPerDollarN',
+      'inputTokensPerDollarR',
+      'tokensPerRmbH',
+      'tokensPerRmbN',
+      'tokensPerRmbR',
+      'outputTokensPerRmbH',
+      'outputTokensPerRmbN',
+      'outputTokensPerRmbR',
+      'inputTokensPerRmbH',
+      'inputTokensPerRmbN',
+      'inputTokensPerRmbR',
+      'tokensPerDollarUser',
+    ] as const;
+
+    for (const metricKey of metricKeys) {
+      expect(METRIC_REGISTRY[metricKey].label, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].labelZh, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].title, metricKey).toContain(' TCO ');
+      expect(METRIC_REGISTRY[metricKey].titleZh, metricKey).toContain(' TCO ');
+    }
+
+    const tcoGroups = METRIC_CONTROL_GROUPS.filter((group) =>
+      group.metrics.some(
+        (metric) =>
+          metric !== 'y_tokensPerDollarUser' &&
+          metricKeys.includes(metric.slice(2) as (typeof metricKeys)[number]),
+      ),
+    );
+    expect(tcoGroups).toHaveLength(6);
+    for (const group of tcoGroups) {
+      expect(group.label).toContain(' TCO');
+      expect(group.labelZh).toContain(' TCO ');
+    }
+  });
 });
 
 describe('metric compatibility', () => {
@@ -67,13 +113,17 @@ describe('metric compatibility', () => {
 
   it('keeps the legacy fallback independent from the dashboard default', () => {
     expect(resolveMetricConfigKey(undefined, 'y')).toBe('y_tpPerGpu');
-    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokensPerDollarN');
+    expect(DEFAULT_METRIC_CONFIG_KEY).toBe('y_tokensPerDollarH');
   });
 
   it('falls back safely for unknown persisted metric values', () => {
     expect(resolveMetricConfigKey('y_removedMetric')).toBe(DEFAULT_METRIC_CONFIG_KEY);
     expect(resolveMetricConfigKey('arbitrary')).toBe(DEFAULT_METRIC_CONFIG_KEY);
     expect(isBenchmarkMetricKey('removedMetric')).toBe(false);
+  });
+
+  it('maps links for the removed API-price metric to Neocloud infrastructure cost', () => {
+    expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarN');
   });
 
   it('preserves valid benchmark, derived, and custom metric identities', () => {
@@ -84,6 +134,7 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
+    expect(isBenchmarkMetricKey('tokensPerDollarN')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
   });
@@ -94,6 +145,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_tokensPerDollarN')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
   });
 });

@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useId, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -18,9 +20,58 @@ type Status = 'idle' | 'submitting' | 'success' | 'error';
 export interface FeedbackFormProps {
   /** Engine-supplied close + persist-dismissal hook. */
   onDismiss: () => void;
+  /** Test/embedded-surface override. Production defaults to the current route locale. */
+  locale?: Locale;
+  /** Engine-owned IDs referenced by the containing dialog. */
+  titleId?: string;
+  descriptionId?: string;
 }
 
-export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
+const STRINGS = {
+  en: {
+    validation: 'Please fill in at least one field.',
+    rateLimit: 'Too many submissions — please try again later.',
+    rejected: 'Submission rejected. Please check the fields and try again.',
+    saveFailed: 'Could not save your feedback. Please try again.',
+    unknownError: 'Something went wrong.',
+    successTitle: 'Thanks for your feedback!',
+    successBody: 'We read every response.',
+    title: 'Help us improve InferenceX',
+    description: "We'd love to hear what's working and what isn't.",
+    worksWell: 'What works well?',
+    improve: 'What could be better?',
+    want: 'What would you like to see?',
+    privacy: 'Your response is encrypted and only visible to the InferenceX team.',
+    dismiss: 'Maybe later',
+    sending: 'Sending…',
+    submit: 'Send feedback',
+  },
+  zh: {
+    validation: '请至少填写一项。',
+    rateLimit: '提交次数过多，请稍后再试。',
+    rejected: '提交未通过校验，请检查填写内容后重试。',
+    saveFailed: '反馈保存失败，请重试。',
+    unknownError: '出现意外错误，请重试。',
+    successTitle: '感谢您的反馈！',
+    successBody: '我们会认真阅读每一条反馈。',
+    title: '帮助我们改进 InferenceX',
+    description: '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
+    worksWell: '哪些地方做得好？',
+    improve: '哪些地方可以改进？',
+    want: '还希望看到哪些功能？',
+    privacy: '您的反馈会加密保存，只有 InferenceX 团队可以查看。',
+    dismiss: '稍后再说',
+    sending: '正在发送……',
+    submit: '发送反馈',
+  },
+} as const;
+
+export function FeedbackForm({
+  onDismiss,
+  locale: localeOverride,
+  titleId: titleIdOverride,
+  descriptionId: descriptionIdOverride,
+}: FeedbackFormProps) {
   const [doingWell, setDoingWell] = useState('');
   const [doingPoorly, setDoingPoorly] = useState('');
   const [wantToSee, setWantToSee] = useState('');
@@ -28,8 +79,13 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const pathname = usePathname();
-  const titleId = useId();
-  const descId = useId();
+  const routeLocale = useLocale();
+  const locale = localeOverride ?? routeLocale;
+  const t = STRINGS[locale];
+  const generatedTitleId = useId();
+  const generatedDescriptionId = useId();
+  const titleId = titleIdOverride ?? generatedTitleId;
+  const descriptionId = descriptionIdOverride ?? generatedDescriptionId;
 
   const handleSubmit = useCallback(async () => {
     if (status === 'submitting') return;
@@ -38,9 +94,10 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
       doingPoorly.trim() && 'doing_poorly',
       wantToSee.trim() && 'want_to_see',
     ].filter(Boolean) as string[];
+    track('feedback_modal_submit_clicked', { filled_fields: filledFields.join(',') });
 
     if (filledFields.length === 0) {
-      setErrorMsg('Please fill in at least one field.');
+      setErrorMsg(t.validation);
       setStatus('error');
       return;
     }
@@ -63,12 +120,12 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
 
       if (!res.ok) {
         if (res.status === 429) {
-          throw new Error('Too many submissions — please try again later.');
+          throw new Error(t.rateLimit);
         }
         if (res.status === 400) {
-          throw new Error('Submission rejected. Please check the fields and try again.');
+          throw new Error(t.rejected);
         }
-        throw new Error('Could not save your feedback. Please try again.');
+        throw new Error(t.saveFailed);
       }
 
       window.dispatchEvent(new Event(FEEDBACK_SUBMITTED_EVENT));
@@ -76,10 +133,22 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
       setStatus('success');
       window.setTimeout(onDismiss, SUCCESS_HOLD_MS);
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Something went wrong.');
+      const knownMessage =
+        error instanceof Error &&
+        (error.message === t.rateLimit ||
+          error.message === t.rejected ||
+          error.message === t.saveFailed)
+          ? error.message
+          : t.unknownError;
+      setErrorMsg(knownMessage);
       setStatus('error');
     }
-  }, [doingWell, doingPoorly, wantToSee, honeypot, pathname, status, onDismiss]);
+  }, [doingWell, doingPoorly, wantToSee, honeypot, pathname, status, onDismiss, t]);
+
+  const handleDismiss = useCallback(() => {
+    track('feedback_modal_later_clicked');
+    onDismiss();
+  }, [onDismiss]);
 
   const submitting = status === 'submitting';
 
@@ -88,10 +157,10 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
       <div className="flex flex-col items-center gap-2 py-4 text-center">
         <CheckCircle2 className="size-8 text-brand" />
         <h2 id={titleId} className="text-lg font-semibold">
-          Thanks for your feedback!
+          {t.successTitle}
         </h2>
-        <p id={descId} className="text-sm text-muted-foreground">
-          We read every response.
+        <p id={descriptionId} className="text-sm text-muted-foreground">
+          {t.successBody}
         </p>
       </div>
     );
@@ -102,29 +171,29 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
       <div className="space-y-1.5 pr-6">
         <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold">
           <MessageSquareText className="size-5 text-brand" />
-          Help us improve InferenceX
+          {t.title}
         </h2>
-        <p id={descId} className="text-sm text-muted-foreground">
-          We'd love to hear what's working and what isn't.
+        <p id={descriptionId} className="text-sm text-muted-foreground">
+          {t.description}
         </p>
       </div>
 
       <FieldBlock
-        label="What works well?"
+        label={t.worksWell}
         value={doingWell}
         onChange={setDoingWell}
         disabled={submitting}
         testId="feedback-doing-well"
       />
       <FieldBlock
-        label="What could be better?"
+        label={t.improve}
         value={doingPoorly}
         onChange={setDoingPoorly}
         disabled={submitting}
         testId="feedback-doing-poorly"
       />
       <FieldBlock
-        label="What would you like to see?"
+        label={t.want}
         value={wantToSee}
         onChange={setWantToSee}
         disabled={submitting}
@@ -145,9 +214,7 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
         </label>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Your response is encrypted and only visible to the InferenceX team.
-      </p>
+      <p className="text-xs text-muted-foreground">{t.privacy}</p>
 
       {errorMsg && (
         <p className="text-xs text-destructive" role="alert">
@@ -155,17 +222,17 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
         </p>
       )}
 
-      <div className="flex flex-row justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button
           variant="outline"
-          onClick={onDismiss}
+          onClick={handleDismiss}
           disabled={submitting}
           data-testid="feedback-modal-dismiss"
         >
-          Maybe later
+          {t.dismiss}
         </Button>
         <Button onClick={handleSubmit} disabled={submitting} data-testid="feedback-modal-submit">
-          {submitting ? 'Sending…' : 'Send feedback'}
+          {submitting ? t.sending : t.submit}
         </Button>
       </div>
     </div>

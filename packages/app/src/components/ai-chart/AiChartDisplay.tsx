@@ -43,14 +43,14 @@ const STRINGS = {
   zh: {
     title: 'AI 图表生成',
     description:
-      '用自然语言描述您想要的图表。您的 API 密钥仅存储在浏览器中，只发送给您选择的服务商，我们绝不会读取。',
-    placeholder: '描述您想查看的图表……',
-    enterToGenerate: '+Enter 生成',
+      '用自然语言描述所需图表。API 密钥只保存在浏览器中，仅发送给所选服务商；InferenceX 不会读取该密钥。',
+    placeholder: '描述想查看的图表……',
+    enterToGenerate: '+Enter 生成图表',
     generating: '生成中……',
     generateChart: '生成图表',
     error: '错误',
-    tryAgain: '重试',
-    examplePrompts: '示例提示',
+    tryAgain: '返回修改',
+    examplePrompts: '提示词示例',
     hideKey: '隐藏 API 密钥',
     showKey: '显示 API 密钥',
   },
@@ -67,9 +67,10 @@ export default function AiChartDisplay() {
   const [prompt, setPrompt] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isMac, setIsMac] = useState(false);
-  const { result, isLoading, error, generate, reset } = useAiChart();
   const locale = useLocale();
+  const { result, isLoading, error, generate, reset } = useAiChart(locale);
   const t = STRINGS[locale];
+  const examples = EXAMPLE_PROMPTS[locale];
 
   useEffect(() => {
     setIsMac(navigator.userAgent.includes('Mac'));
@@ -144,7 +145,10 @@ export default function AiChartDisplay() {
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
-                onClick={() => setShowKey((s) => !s)}
+                onClick={() => {
+                  setShowKey((visible) => !visible);
+                  track('ai_chart_api_key_visibility_toggled', { visible: !showKey });
+                }}
                 aria-label={showKey ? t.hideKey : t.showKey}
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -192,10 +196,18 @@ export default function AiChartDisplay() {
         <Card className="border-destructive">
           <CardContent className="flex items-start gap-3 pt-6">
             <AlertCircle className="text-destructive mt-0.5 size-5 shrink-0" />
-            <div>
+            <div data-testid="ai-chart-error">
               <p className="text-destructive text-sm font-medium">{t.error}</p>
               <p className="text-muted-foreground text-sm">{error}</p>
-              <Button variant="outline" size="sm" className="mt-2" onClick={reset}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => {
+                  track('ai_chart_retry_clicked');
+                  reset();
+                }}
+              >
                 {t.tryAgain}
               </Button>
             </div>
@@ -216,7 +228,7 @@ export default function AiChartDisplay() {
         <div className="space-y-3">
           <h3 className="text-muted-foreground text-sm font-medium">{t.examplePrompts}</h3>
           <div className="grid gap-2 sm:grid-cols-2">
-            {EXAMPLE_PROMPTS.map((example, i) => (
+            {examples.map((example, i) => (
               <button
                 key={i}
                 type="button"

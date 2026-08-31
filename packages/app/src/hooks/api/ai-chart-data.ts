@@ -1,3 +1,7 @@
+import { metricLabel } from '@/lib/chart-utils';
+import type { Locale } from '@/lib/i18n';
+import type { ChartDefinition } from '@/components/inference/types';
+
 export type AiMetricDirection = 'higher' | 'lower';
 
 export interface AiMetricPoint {
@@ -11,6 +15,43 @@ export interface RankAiHardwareOptions {
   chartDefinition: Record<string, unknown>;
   topN: number;
   distinctGpus: boolean;
+}
+
+const AI_RADAR_METRIC_LABELS = {
+  en: {
+    y_tpPerGpu: 'Throughput/Chip',
+    y_outputTputPerGpu: 'Output Tput/Chip',
+    y_inputTputPerGpu: 'Input Tput/Chip',
+    y_tpPerMw: 'Tput/MW',
+    y_costh: 'Cost (Hyper)',
+    y_costn: 'Cost (Neo)',
+    y_costr: 'Cost (Rental)',
+    y_jTotal: 'J/Token',
+    y_jOutput: 'J/Output',
+    y_jInput: 'J/Input',
+  },
+  zh: {
+    y_tpPerGpu: '每芯片吞吐量',
+    y_outputTputPerGpu: '每芯片输出吞吐量',
+    y_inputTputPerGpu: '每芯片输入吞吐量',
+    y_tpPerMw: '每 MW 吞吐量',
+    y_costh: '成本（Hyperscaler）',
+    y_costn: '成本（NeoCloud）',
+    y_costr: '成本（租赁）',
+    y_jTotal: '每 token 能耗',
+    y_jOutput: '每输出 token 能耗',
+    y_jInput: '每输入 token 能耗',
+  },
+} as const;
+
+export function getAiRadarMetricLabel(
+  metric: string,
+  chartDefinition: ChartDefinition,
+  locale: Locale,
+): string {
+  const conciseLabel = (AI_RADAR_METRIC_LABELS[locale] as Record<string, string>)[metric];
+  if (conciseLabel) return conciseLabel;
+  return metricLabel(chartDefinition, metric, locale) || metric;
 }
 
 function isMeasuredTelemetryMetric(metric: string): boolean {
