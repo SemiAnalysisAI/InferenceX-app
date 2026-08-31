@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import * as d3 from 'd3';
 
 import {
   firstNonCollidingRect,
-  placeEndpointLineLabels,
   placeLineLabels,
   rectsOverlap,
   type LineLabelSeries,
@@ -102,16 +100,36 @@ describe('line-label placement', () => {
     expect(zoomed[0]).toMatchObject({ x: 60, y: 120, visible: true });
   });
 
-  it('nudges endpoint labels into the scale range without changing identities', () => {
-    const yScale = d3.scaleLinear().domain([0, 100]).range([100, 0]);
-    const labels = placeEndpointLineLabels(
-      [series('a', [{ x: 1, y: 50 }]), series('b', [{ x: 2, y: 51 }])],
+  it('staggers anchor slots so converging curves spread along the line instead of stacking at the endpoint', () => {
+    // Frontier-shaped curves that all converge on the same right-edge region,
+    // like the e2e latency chart: endpoint placement used to pile every label
+    // on top of the shared endpoint.
+    const converging = (key: string, startY: number): LineLabelSeries<Point> =>
+      series(
+        key,
+        [0, 25, 50, 75, 100].map((x) => ({ x, y: startY + ((50 - startY) * x) / 100 })),
+      );
+    const labels = placeLineLabels(
+      [converging('a', 0), converging('b', 100), converging('c', 200), converging('d', 300)],
       identity,
-      yScale,
+      identity,
+      { collisionWidth: 30 },
     );
 
-    expect(labels.map((label) => label.key).toSorted()).toEqual(['a', 'b']);
-    expect(Math.abs(labels[0].y - labels[1].y)).toBeGreaterThanOrEqual(17.9);
-    expect(labels.every((label) => label.y >= 18 && label.y <= 82)).toBe(true);
+    expect(labels).toHaveLength(4);
+    expect(labels.every((label) => label.visible)).toBe(true);
+    // Labels occupy distinct anchor slots along the x-range rather than all
+    // sitting at the shared endpoint (x = 100).
+    const distinctX = new Set(labels.map((label) => label.x));
+    expect(distinctX.size).toBeGreaterThanOrEqual(3);
+    expect(labels.filter((label) => label.x === 100).length).toBeLessThanOrEqual(1);
+  });
+
+  it('places a single-point series at its only point', () => {
+    const labels = placeLineLabels([series('solo', [{ x: 5, y: 7 }])], identity, identity, {
+      collisionWidth: 30,
+    });
+
+    expect(labels[0]).toMatchObject({ x: 5, y: 7, visible: true });
   });
 });
