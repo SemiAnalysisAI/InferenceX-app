@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { useLocale } from '@/lib/use-locale';
 
 import {
   type CollectiveXKvChartPoint,
@@ -18,21 +19,31 @@ interface CollectiveXKvChartProps {
   cases: CollectiveXKvRunCase[];
   colors: Record<string, string>;
   selection: CollectiveXKvChartSelection;
+  xLogScale: boolean;
+  yLogScale: boolean;
   caption?: React.ReactNode;
   legendElement?: React.ReactNode;
   testId?: string;
 }
 
-const X_LABELS: Record<CollectiveXKvChartSelection['x'], string> = {
-  batch: 'Requests per burst (log)',
-  isl: 'Input sequence length, tokens (log)',
-};
-
-function yLabel(selection: CollectiveXKvChartSelection): string {
-  return selection.y === 'bandwidth'
-    ? `Aggregate ${selection.op} bandwidth at p50 (GB/s)`
-    : 'Burst completion latency p50 (ms)';
-}
+const STRINGS = {
+  en: {
+    xAxis: (axis: CollectiveXKvChartSelection['x'], logScale: boolean) =>
+      `${axis === 'batch' ? 'Requests per burst' : 'Input sequence length, tokens'}${logScale ? ' (log)' : ''}`,
+    yAxis: (selection: CollectiveXKvChartSelection, logScale: boolean) =>
+      selection.y === 'bandwidth'
+        ? `Aggregate ${selection.op} bandwidth at p50 (GB/s${logScale ? ', log' : ''})`
+        : `Burst completion latency p50 (ms${logScale ? ', log' : ''})`,
+  },
+  zh: {
+    xAxis: (axis: CollectiveXKvChartSelection['x'], logScale: boolean) =>
+      `${axis === 'batch' ? '每次突发的请求数' : '输入序列长度（token）'}${logScale ? '（对数）' : ''}`,
+    yAxis: (selection: CollectiveXKvChartSelection, logScale: boolean) =>
+      selection.y === 'bandwidth'
+        ? `p50 聚合 ${selection.op} 带宽（GB/s${logScale ? '，对数' : ''}）`
+        : `突发完成延迟 p50（ms${logScale ? '，对数' : ''}）`,
+  },
+} as const;
 
 function paddedDomain(values: number[]): [number, number] {
   if (values.length === 0) return [1, 10];
@@ -62,10 +73,14 @@ export function CollectiveXKvChart({
   cases,
   colors,
   selection,
+  xLogScale,
+  yLogScale,
   caption,
   legendElement,
   testId,
 }: CollectiveXKvChartProps) {
+  const locale = useLocale();
+  const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const points = useMemo(() => collectiveXKvChartPoints(cases, selection), [cases, selection]);
   const runIndexBySeries = useMemo(
     () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
@@ -112,16 +127,16 @@ export function CollectiveXKvChart({
       testId={testId}
       grabCursor
       instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
-      xScale={{ type: 'log', domain: xDomain, nice: false }}
-      yScale={{ type: 'log', domain: yDomain, nice: false }}
+      xScale={{ type: xLogScale ? 'log' : 'linear', domain: xDomain, nice: false }}
+      yScale={{ type: yLogScale ? 'log' : 'linear', domain: yDomain, nice: false }}
       xAxis={{
-        label: X_LABELS[selection.x],
+        label: strings.xAxis(selection.x, xLogScale),
         tickCount: 6,
         tickValues: xTickValues,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
       yAxis={{
-        label: yLabel(selection),
+        label: strings.yAxis(selection, yLogScale),
         tickCount: 5,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
@@ -133,7 +148,7 @@ export function CollectiveXKvChart({
           config: {
             getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
             getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
-            strokeWidth: 2.25,
+            strokeWidth: 1.75,
             curve: d3.curveLinear,
           },
         },

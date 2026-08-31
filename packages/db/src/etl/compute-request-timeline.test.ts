@@ -127,7 +127,8 @@ describe('computeRequestTimeline', () => {
         },
       ]),
     );
-    const r = tl?.requests[0]!;
+    const r = tl?.requests[0];
+    if (!r) throw new Error('Expected a request');
     expect(r.cid).toBe('conv-A');
     expect(r.ti).toBe(5);
     expect(r.wid).toBe('worker_abcd1234');
@@ -312,7 +313,8 @@ describe('computeRequestTimeline', () => {
         },
       ]),
     );
-    const r = tl?.requests[0]!;
+    const r = tl?.requests[0];
+    if (!r) throw new Error('Expected a request');
     expect(r.cancelled).toBe(true);
     expect(r.ttftMs).toBeCloseTo(25.5, 6);
     expect(r.tpotMs).toBeCloseTo(12.5, 6);

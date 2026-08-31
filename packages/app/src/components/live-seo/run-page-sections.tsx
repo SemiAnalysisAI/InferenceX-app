@@ -69,14 +69,14 @@ export function RunDetailContent({
               {t.backLabel}
             </Link>
             <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-brand uppercase">
+              <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
                 {entry.model.label}
               </span>
-              <span className="font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
+              <span className="font-mono text-xs tracking-eyebrow text-muted-foreground uppercase">
                 {getChipHw(entry.chip).vendor} {getChipHw(entry.chip).arch}
               </span>
             </div>
-            <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {t.heading}
             </h1>
           </header>
@@ -89,7 +89,7 @@ export function RunDetailContent({
               >
                 <p
                   id="run-quick-answer"
-                  className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase"
+                  className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase"
                 >
                   {t.quickAnswerLabel}
                 </p>
@@ -103,19 +103,19 @@ export function RunDetailContent({
                 className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
               >
                 <div className="rounded-xl border border-border/50 p-4">
-                  <p className="text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                  <p className="text-xs tracking-widest text-muted-foreground uppercase">
                     {t.statConfigs}
                   </p>
                   <p className="mt-1 font-mono text-2xl font-semibold">{data.configCount}</p>
                 </div>
                 <div className="rounded-xl border border-border/50 p-4">
-                  <p className="text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                  <p className="text-xs tracking-widest text-muted-foreground uppercase">
                     {t.statEngines}
                   </p>
                   <p className="mt-1 text-sm leading-6 font-medium">{data.frameworks.join(', ')}</p>
                 </div>
                 <div className="rounded-xl border border-border/50 p-4">
-                  <p className="text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                  <p className="text-xs tracking-widest text-muted-foreground uppercase">
                     {t.statPrecisions}
                   </p>
                   <p className="mt-1 text-sm leading-6 font-medium uppercase">
@@ -123,7 +123,7 @@ export function RunDetailContent({
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/50 p-4">
-                  <p className="text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                  <p className="text-xs tracking-widest text-muted-foreground uppercase">
                     {t.statFreshness}
                   </p>
                   <p className="mt-1 font-mono text-sm leading-6 font-medium">
@@ -143,7 +143,7 @@ export function RunDetailContent({
                 <div className="mt-4 overflow-x-auto rounded-xl border border-border/50">
                   <table className="w-full min-w-[36rem] text-sm">
                     <thead>
-                      <tr className="border-b border-border/50 text-left text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                      <tr className="border-b border-border/50 text-left text-xs tracking-widest text-muted-foreground uppercase">
                         <th scope="col" className="px-4 py-3">
                           {t.colTier}
                         </th>
@@ -194,7 +194,7 @@ export function RunDetailContent({
                   <div className="mt-4 overflow-x-auto rounded-xl border border-border/50">
                     <table className="w-full min-w-[28rem] text-sm">
                       <thead>
-                        <tr className="border-b border-border/50 text-left text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                        <tr className="border-b border-border/50 text-left text-xs tracking-widest text-muted-foreground uppercase">
                           <th scope="col" className="px-4 py-3">
                             {t.colPriceTier}
                           </th>

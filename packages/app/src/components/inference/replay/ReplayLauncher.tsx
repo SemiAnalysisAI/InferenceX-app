@@ -6,6 +6,7 @@ import { forwardRef, useImperativeHandle, useState } from 'react';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLocale } from '@/lib/use-locale';
 
 // Keep this in sync with REPLAY_HEIGHT + padding/header/controls in ReplayPanel
 // so the dialog doesn't resize as the panel transitions through its loading states.
@@ -35,6 +36,7 @@ export interface ReplayLauncherHandle {
 const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
   ({ parentChartId, chartDefinition, yLabel, xLabel }, ref) => {
     const [open, setOpen] = useState(false);
+    const locale = useLocale();
     useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
     return (
       <Dialog open={open} onOpenChange={setOpen}>
@@ -42,7 +44,9 @@ const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
           className="max-w-[min(1280px,95vw)] w-[min(1280px,95vw)] max-h-[92vh] overflow-y-auto p-0 sm:rounded-lg"
           data-testid={`replay-dialog-${parentChartId}`}
         >
-          <DialogTitle className="sr-only">Replay over time</DialogTitle>
+          <DialogTitle className="sr-only">
+            {locale === 'zh' ? '按时间回放' : 'Replay over time'}
+          </DialogTitle>
           {open && (
             <ReplayPanel
               parentChartId={parentChartId}

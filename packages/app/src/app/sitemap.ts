@@ -216,19 +216,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
     // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
-    // English-only: no /zh sibling, so no localizedPair.
-    {
-      url: `${BASE_URL}/model`,
+    ...localizedPair('/model', {
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
-    },
-    ...getModelPageSlugs().map((slug) => ({
-      url: `${BASE_URL}/model/${slug}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    })),
+    }),
+    ...getModelPageSlugs().flatMap((slug) =>
+      localizedPair(`/model/${slug}`, {
+        lastModified: now,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }),
+    ),
     ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
       localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
         lastModified: now,

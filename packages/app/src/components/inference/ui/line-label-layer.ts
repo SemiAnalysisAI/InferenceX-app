@@ -114,13 +114,29 @@ function pillObstacles(
   return boxes;
 }
 
-function lineCandidates<TPoint extends CartesianPoint>(points: readonly TPoint[]): TPoint[] {
-  return [
-    points[Math.min(1, points.length - 1)],
-    points[Math.floor(points.length / 2)],
-    points[Math.max(0, Math.floor((points.length * 2) / 3))],
-    points.at(-1)!,
-  ];
+/**
+ * Preferred anchor fractions along a line, from left to right. Each series
+ * starts at a different slot (rotated by its index) so labels spread across
+ * the plot instead of all racing for the same spot, then falls back to the
+ * remaining slots on collision.
+ */
+const ANCHOR_SLOTS = [0.25, 0.5, 0.75, 1] as const;
+
+function lineCandidates<TPoint extends CartesianPoint>(
+  points: readonly TPoint[],
+  seriesIndex: number,
+): TPoint[] {
+  const last = points.length - 1;
+  if (last <= 0) return [points[0]];
+  // Clamp to index >= 1 so a label never sits on the line's first point,
+  // which typically hugs the axis.
+  const at = (fraction: number) => points[Math.max(1, Math.min(last, Math.round(fraction * last)))];
+  const candidates: TPoint[] = [];
+  for (let slot = 0; slot < ANCHOR_SLOTS.length; slot++) {
+    const point = at(ANCHOR_SLOTS[(slot + seriesIndex) % ANCHOR_SLOTS.length]);
+    if (!candidates.includes(point)) candidates.push(point);
+  }
+  return candidates;
 }
 
 export function placeLineLabels<TPoint extends CartesianPoint>(
@@ -151,9 +167,9 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
         Math.abs(other.x - x) < other.halfW + labelHalfWidth,
     );
 
-  for (const entry of sorted) {
+  for (const [seriesIndex, entry] of sorted.entries()) {
     if (entry.points.length === 0) continue;
-    const candidates = lineCandidates(entry.points);
+    const candidates = lineCandidates(entry.points, seriesIndex);
 
     if (options.pinAnchors && options.anchors) {
       let anchorX = options.anchors.get(entry.key);
@@ -214,56 +230,19 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
   return result;
 }
 
-export function placeEndpointLineLabels<TPoint extends CartesianPoint>(
-  series: readonly LineLabelSeries<TPoint>[],
-  xScale: (value: number) => number,
-  yScale: (value: number) => number,
-  options: { collisionHeight?: number; nudge?: boolean } = {},
-): LineLabelPlacement[] {
-  const collisionHeight = options.collisionHeight ?? 18;
-  const labels = series.flatMap((entry) => {
-    const point = entry.points.at(-1);
-    return point
-      ? [
-          {
-            key: entry.key,
-            seriesId: entry.seriesId,
-            label: entry.label,
-            color: entry.color,
-            x: xScale(point.x),
-            y: yScale(point.y),
-            visible: true,
-          },
-        ]
-      : [];
-  });
-
-  if (labels.length < 2 || options.nudge === false) return labels;
-
-  const range = yScaleRange(yScale);
-  if (!range) return labels;
-  const top = Math.min(range[0], range[1]) + collisionHeight;
-  const bottom = Math.max(range[0], range[1]) - collisionHeight;
-  labels.sort((a, b) => a.y - b.y);
-  for (let pass = 0; pass < 5; pass++) {
-    for (let i = 1; i < labels.length; i++) {
-      const overlap = labels[i - 1].y + collisionHeight - labels[i].y;
-      if (overlap <= 0) continue;
-      const half = overlap / 2;
-      labels[i - 1].y -= half;
-      labels[i].y += half;
-    }
-    for (const label of labels) label.y = Math.max(top, Math.min(bottom, label.y));
-  }
-  return labels;
+/** Full-color icon rendered on a white chip at the left edge of a pill. */
+export interface LineLabelIconSpec {
+  href: string;
+  width: number;
+  height: number;
 }
 
-function yScaleRange(scale: (value: number) => number): [number, number] | null {
-  const withRange = scale as ((value: number) => number) & { range?: () => unknown[] };
-  const range = withRange.range?.();
-  return range && range.length >= 2 && typeof range[0] === 'number' && typeof range[1] === 'number'
-    ? [range[0], range[1]]
-    : null;
+/** Gap between the icon and the label text. */
+const ICON_TEXT_GAP = 4;
+
+/** Horizontal space an icon occupies to the left of the label text. */
+function iconSpace(icon: LineLabelIconSpec | undefined): number {
+  return icon ? icon.width + ICON_TEXT_GAP : 0;
 }
 
 export function renderLineLabels(
@@ -274,6 +253,8 @@ export function renderLineLabels(
     opacity?: number;
     offsetX?: number;
     offsetY?: number;
+    /** Optional full-color icon (e.g. vendor mark) per label. */
+    iconFor?: (label: LineLabelPlacement) => LineLabelIconSpec | undefined;
     configureText?: (
       text: d3.Selection<SVGTextElement, LineLabelPlacement, null, undefined>,
       label: LineLabelPlacement,
@@ -320,6 +301,11 @@ export function renderLineLabels(
     const labelGroup = d3.select<SVGGElement, LineLabelPlacement>(this);
     options.configureGroup?.(labelGroup, label);
     const text = labelGroup.select<SVGTextElement>('.ll-text');
+    // Shift the text right to leave room for the icon chip; the background
+    // sizing pass below expands the pill back over that space.
+    const space = iconSpace(options.iconFor?.(label));
+    if (space > 0) text.attr('x', space);
+    else text.attr('x', null);
     if (options.configureText) options.configureText(text, label);
     else text.text(label.label);
   });
@@ -330,13 +316,30 @@ export function renderLineLabels(
     if (text) measured.push({ node: this, label, bbox: text.getBBox() });
   });
   for (const { node, label, bbox } of measured) {
-    d3.select(node)
+    const labelGroup = d3.select(node);
+    const icon = options.iconFor?.(label);
+    const space = iconSpace(icon);
+    labelGroup
       .select('.ll-bg')
-      .attr('x', bbox.x - 5)
+      .attr('x', bbox.x - space - 5)
       .attr('y', bbox.y - 3)
-      .attr('width', bbox.width + 10)
+      .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
       .attr('fill', label.color);
+
+    // Full-color mark drawn directly on the pill — transparent background, so
+    // the icon shares the label's own fill shade (including gradient fills).
+    labelGroup
+      .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')
+      .data(icon ? [icon] : [])
+      .join('image')
+      .attr('class', 'll-logo')
+      .attr('href', (d) => d.href)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .attr('x', bbox.x - space)
+      .attr('y', (d) => bbox.y + bbox.height / 2 - d.height / 2)
+      .attr('width', (d) => d.width)
+      .attr('height', (d) => d.height);
   }
 }
 

@@ -10,7 +10,12 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import { applyTokenRevenuePricing, formatTokenPrice } from '@/components/inference/token-revenue';
+import {
+  applyTokenRevenuePricing,
+  cachedInputPricePerMillion,
+  formatTokenPrice,
+  usesTokenSalePricing,
+} from '@/components/inference/token-revenue';
 import {
   useInferenceActions,
   useInferenceData,
@@ -38,12 +43,13 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { ShareButton } from '@/components/ui/share-button';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ModelLogo } from '@/components/ui/model-logo';
-import { metricLabel, metricTitle } from '@/lib/chart-utils';
+import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -91,71 +97,10 @@ import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
-import Link from 'next/link';
-
-import { Badge } from '@/components/ui/badge';
-import { getModelSlugEntryForDisplayName } from '@/lib/compare-slug';
-import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 type InferenceViewMode = 'chart' | 'table';
-
-/**
- * Replaces the old in-card Model Architecture drawer: a row that links to the
- * model's `/model/[slug]` page, which hosts the full architecture diagram,
- * vendor eval scores, and a model-focused view of this dashboard. Renders
- * nothing for models without a public slug (hidden models).
- */
-function ModelArchitectureLink({ model, locale }: { model: Model; locale: 'en' | 'zh' }) {
-  const entry = getModelSlugEntryForDisplayName(model);
-  if (!entry) return null;
-  const arch = getModelArchitecture(model);
-  const label = getModelLabel(model);
-  return (
-    <Link
-      href={`/model/${entry.slug}`}
-      data-testid="model-architecture-link"
-      className="group rounded-lg border border-border/50 bg-muted/30 px-4 py-2 flex items-center justify-between gap-3 hover:bg-muted/50 transition-colors"
-      onClick={() => track('model_architecture_link_clicked', { model, slug: entry.slug })}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <svg
-          className="size-4 shrink-0 text-muted-foreground"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <line x1="3" y1="9" x2="21" y2="9" />
-          <line x1="9" y1="9" x2="9" y2="21" />
-        </svg>
-        <span className="text-sm font-medium truncate">
-          {locale === 'zh'
-            ? `了解 ${label} 模型架构`
-            : `Learn more about the ${label} architecture`}
-        </span>
-        {arch && (
-          <span className="hidden sm:flex items-center gap-1.5">
-            <Badge variant="outline" className="text-xs py-0">
-              {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
-            </Badge>
-            <Badge variant="outline" className="text-xs py-0">
-              {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
-            </Badge>
-            <Badge variant="outline" className="text-xs py-0">
-              {formatParamCount(arch.totalParams)}
-            </Badge>
-          </span>
-        )}
-      </div>
-      <span className="text-sm shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
-        →
-      </span>
-    </Link>
-  );
-}
 
 const STRINGS = {
   en: {
@@ -166,14 +111,18 @@ const STRINGS = {
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `Input $${input}/M tok · Output $${output}/M tok`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `Input $${input}/M tok · Output $${output}/M tok`
+        : `Uncached $${input}/M tok · Cached $${cached}/M tok · Output $${output}/M tok`,
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
+    noChartData:
+      'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -186,13 +135,16 @@ const STRINGS = {
     table: '表格',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
-    revenuePrices: (input: string, output: string) =>
-      `输入 $${input}/百万 token · 输出 $${output}/百万 token`,
+    revenuePrices: (input: string, cached: string | null, output: string) =>
+      cached === null
+        ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
+        : `未缓存 $${input}/百万 token · 缓存 $${cached}/百万 token · 输出 $${output}/百万 token`,
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
+    noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
@@ -232,6 +184,7 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
+  xField: (percentile: string) => string;
   xLabel: (percentileLabel: string) => string;
   xLabelZh?: (percentileLabel: string) => string;
   heading: (percentileLabel: string) => string;
@@ -242,6 +195,7 @@ interface DerivedXModeSpec {
 
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
   'e2e-normalized-interactivity': {
+    xField: (percentile) => `${percentile}_e2e_norm_intvty`,
     xLabel: (pctl) => `${pctl} E2E Normalized Interactivity (tok/s/user)`,
     xLabelZh: (pctl) => `${pctl} 端到端归一化交互性 (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} E2E Normalized Interactivity`,
@@ -287,7 +241,7 @@ export function formatTokenLength(value: number): string {
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
+  const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {
     selectedGPUs,
     selectedPrecisions,
@@ -464,10 +418,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
       const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
-      const pricedData =
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
-          ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
-          : rawData.data;
+      const pricedData = usesTokenSalePricing(selectedYAxisMetric)
+        ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
+        : rawData.data;
       const capableData = pricedData.filter((point) =>
         supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
       );
@@ -679,9 +632,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     throw new Error('Something went wrong.');
   }
 
-  // Show skeletons only on first load (no data yet). During refetch, keepPreviousData
-  // keeps old graphs visible so we never flash skeletons when switching filters.
+  // Show skeletons only on first load (no data yet). Same-model query-key
+  // changes keep the previous rows rendered (placeholderData in
+  // benchmarkQueryOptions), so switching dates/runs/scopes never flashes
+  // skeletons — those windows surface as `refreshing` instead.
   const isFirstLoad = loading && graphs.length === 0;
+  // Stale-while-refetching: previous charts stay rendered but dim slightly
+  // (motion.css `.motion-stale`) so the update reads as "updating", not
+  // "frozen". aria-busy mirrors the cue for assistive tech.
+  const isRefetching = refreshing && graphs.length > 0;
 
   // When the selected model has no DB data but an unofficial run provides overlay
   // data for this (model, sequence), synthesize empty-data stub graphs from the
@@ -799,11 +758,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       if (!derivedSpec) return { ...graph, data, clippedData };
 
-      const xLabelFn =
-        locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
       const chartDefinition = {
         ...graph.chartDefinition,
-        x_label: xLabelFn(selectedPercentile.toUpperCase()),
+        x_scale_field: derivedSpec.xField(selectedPercentile),
+        x_label: derivedSpec.xLabel(selectedPercentile.toUpperCase()),
+        x_labelZh: (derivedSpec.xLabelZh ?? derivedSpec.xLabel)(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
         ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
@@ -817,7 +776,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     derivedMetrics,
     selectedYAxisMetric,
     selectedPercentile,
-    locale,
   ]);
 
   const displayGraphs =
@@ -830,8 +788,20 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           </Card>,
         ]
       : renderableGraphs.length === 0
-        ? []
+        ? [
+            // Reserved-height empty state: without it the chart region
+            // collapses to zero height, which shifts the page and breaks
+            // scroll restoration when a selection has no data.
+            <Card
+              key="empty-0"
+              data-testid="chart-empty-state"
+              className="flex min-h-[320px] items-center justify-center"
+            >
+              <p className="max-w-md text-center text-sm text-muted-foreground">{t.noChartData}</p>
+            </Card>,
+          ]
         : renderableGraphs.map((graph, graphIndex) => {
+            const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
@@ -897,6 +867,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <figure data-testid="chart-figure" className="relative rounded-lg">
                   <ChartButtons
                     chartId={`chart-${graphIndex}`}
+                    className="md:top-4"
+                    mobileVisible
                     analyticsPrefix={
                       isTimelineMode
                         ? 'gpu_timeseries'
@@ -905,13 +877,16 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : 'interactivity'
                     }
                     leadingControls={
-                      <SegmentedToggle
-                        value={getViewMode(graphIndex)}
-                        options={viewModeOptions}
-                        onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                        ariaLabel={t.viewMode}
-                        testId={`inference-view-toggle-${graphIndex}`}
-                      />
+                      <>
+                        <SegmentedToggle
+                          value={getViewMode(graphIndex)}
+                          options={viewModeOptions}
+                          onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                          ariaLabel={t.viewMode}
+                          testId={`inference-view-toggle-${graphIndex}`}
+                        />
+                        {!embedded && <ShareButton className="h-7" />}
+                      </>
                     }
                     hideImageExport={getViewMode(graphIndex) === 'table'}
                     setIsLegendExpanded={setIsLegendExpanded}
@@ -946,7 +921,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           yPath: (graph.chartDefinition as ChartDefinition)[
                             selectedYAxisMetric
                           ] as string,
-                          xHeader: graph.chartDefinition.x_label,
+                          xHeader: resolvedXLabel,
                         },
                       );
                       // Match warnings against the same series the chart annotates,
@@ -1032,19 +1007,23 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               .join(', ')}{' '}
                             • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
                             {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-                            {selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
-                              tokenRevenuePricing && (
-                                <>
-                                  {' '}
-                                  •{' '}
-                                  <span data-testid="token-revenue-subtitle-prices">
-                                    {t.revenuePrices(
-                                      formatTokenPrice(tokenRevenuePricing.inputPerMillion),
-                                      formatTokenPrice(tokenRevenuePricing.outputPerMillion),
-                                    )}
-                                  </span>
-                                </>
-                              )}
+                            {usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing && (
+                              <>
+                                {' '}
+                                •{' '}
+                                <span data-testid="token-revenue-subtitle-prices">
+                                  {t.revenuePrices(
+                                    formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                    graph.sequence === Sequence.AgenticTraces
+                                      ? formatTokenPrice(
+                                          cachedInputPricePerMillion(tokenRevenuePricing),
+                                        )
+                                      : null,
+                                    formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                                  )}
+                                </span>
+                              </>
+                            )}
                             {selectedRunDate && (
                               <>
                                 {' '}
@@ -1141,7 +1120,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
                           data={graph.data}
-                          xLabel={graph.chartDefinition.x_label}
+                          xLabel={resolvedXLabel}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
@@ -1154,7 +1133,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             modelLabel={graph.model}
                             data={graph.data}
                             clippedData={graph.clippedData}
-                            xLabel={graph.chartDefinition.x_label}
+                            xLabel={resolvedXLabel}
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
@@ -1184,7 +1163,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         parentChartId={`chart-${graphIndex}`}
                         chartDefinition={graph.chartDefinition}
                         yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
-                        xLabel={graph.chartDefinition.x_label}
+                        xLabel={resolvedXLabel}
                       />
                     )}
                   </Card>
@@ -1207,10 +1186,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {t.inferencePerformanceDesc}
                     </p>
                   </div>
-                  <ChartShareActions />
+                  {/* The chart-row ShareButton lives in ChartButtons (visible on mobile
+                      via `mobileVisible`, but rendered per chart row); keep a header Share
+                      on mobile so small screens have a share entry point next to the title. */}
+                  <div className="md:hidden">
+                    <ShareButton />
+                  </div>
                 </div>
                 <ChartControls />
-                <ModelArchitectureLink model={selectedModel} locale={locale} />
               </>
             )}
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
@@ -1263,7 +1246,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         }}
       >
         <TabsList
-          aria-label="Chart x-axis metric"
+          aria-label={locale === 'zh' ? '图表横轴指标' : 'Chart x-axis metric'}
           data-testid="x-axis-mode-buttons"
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >
@@ -1305,7 +1288,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           })}
         </TabsList>
       </Tabs>
-      <div className="flex flex-col gap-4">{displayGraphs}</div>
+      <div
+        className="motion-stale flex flex-col gap-4"
+        data-stale={isRefetching || undefined}
+        aria-busy={isRefetching || undefined}
+      >
+        {displayGraphs}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
 
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 
@@ -9,6 +10,7 @@ interface OpenRouterModel {
   pricing?: {
     prompt?: unknown;
     completion?: unknown;
+    input_cache_read?: unknown;
   };
 }
 
@@ -31,10 +33,13 @@ export function openRouterPricingForModel(
   const inputPerMillion = dollarsPerMillion(model?.pricing?.prompt);
   const outputPerMillion = dollarsPerMillion(model?.pricing?.completion);
   if (inputPerMillion === null || outputPerMillion === null) return null;
+  const publishedCachedInput = dollarsPerMillion(model?.pricing?.input_cache_read);
 
   return {
     source: 'openrouter',
     inputPerMillion,
+    cachedInputPerMillion:
+      publishedCachedInput ?? inputPerMillion * DEFAULT_CACHED_INPUT_PRICE_RATIO,
     outputPerMillion,
     openRouterModelId: modelId,
   };

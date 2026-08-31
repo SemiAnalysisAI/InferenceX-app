@@ -41,7 +41,7 @@ function render(props?: Partial<React.ComponentProps<typeof AxisMetricFooter>>) 
     root.render(
       <AxisMetricFooter
         chartId="chart-0"
-        metricKey="tokensPerDollarH"
+        metricKey="tokensPerDollarN"
         xAxisKind="interactivity"
         xAxisLabel="Interactivity (tok/s/user)"
         {...props}
@@ -77,7 +77,9 @@ describe('AxisMetricFooter', () => {
     expect(xRow!.getAttribute('aria-expanded')).toBe('false');
     expect(yRow!.getAttribute('aria-expanded')).toBe('false');
     expect(xRow!.textContent).toContain('X-axis: Interactivity (tok/s/user)');
-    expect(yRow!.textContent).toContain('Y-axis: Total Tokens per $1 USD (Owning - Hyperscaler)');
+    expect(yRow!.textContent).toContain(
+      'Y-axis: Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+    );
     // Bodies exist for aria-controls but stay hidden until toggled.
     const xBody = container.querySelector<HTMLElement>(
       '[data-testid="axis-metric-body-x-chart-0"]',
@@ -128,14 +130,14 @@ describe('AxisMetricFooter', () => {
     expect(mocks.track).toHaveBeenCalledWith('axis_metric_footer_toggled', {
       chart: 'chart-0',
       axis: 'y',
-      metric: 'tokensPerDollarH',
+      metric: 'tokensPerDollarN',
       expanded: true,
     });
     click(yRow);
     expect(mocks.track).toHaveBeenLastCalledWith('axis_metric_footer_toggled', {
       chart: 'chart-0',
       axis: 'y',
-      metric: 'tokensPerDollarH',
+      metric: 'tokensPerDollarN',
       expanded: false,
     });
   });

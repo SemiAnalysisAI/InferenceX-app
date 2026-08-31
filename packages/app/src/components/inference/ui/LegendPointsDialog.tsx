@@ -10,8 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 import {
   type LegendPointsSortKey,
@@ -64,21 +67,48 @@ export default function LegendPointsDialog({
   isOverlay,
   onRowClick,
 }: LegendPointsDialogProps) {
+  const locale = useLocale();
+  const t =
+    locale === 'zh'
+      ? {
+          concurrency: '并发数',
+          parallelism: '并行配置',
+          offload: 'offload',
+          throughput: '单芯片吞吐量',
+          empty: '当前筛选条件下，该系列没有可见数据点。',
+          overlayFootnote: '非官方叠加数据点没有存储的基准测试记录，仅提供指标，不提供详情链接。',
+          officialFootnote:
+            '点击数据行可查看数据点详情：Agentic 数据点会打开 trace 详情页，固定序列数据点会打开 GitHub Actions 运行记录。',
+          units: '交互性单位为 tok/s/user · TTFT 单位为 s · 吞吐量单位为 tok/s/chip。',
+        }
+      : {
+          concurrency: 'Conc',
+          parallelism: 'Parallelism',
+          offload: 'Offload',
+          throughput: 'Tput/Chip',
+          empty: 'No visible points for this series under the current filters.',
+          overlayFootnote:
+            'Unofficial overlay points have no stored benchmark records — metrics only, no detail links.',
+          officialFootnote:
+            'Click a row for the point detail — agentic points open the trace detail page, fixed-seq points open the GitHub Actions run.',
+          units: 'Interactivity in tok/s/user · TTFT in s · throughput in tok/s/chip.',
+        };
   const [sort, setSort] = useState<{ key: LegendPointsSortKey; dir: 'asc' | 'desc' } | null>(null);
+  const ephemeralUrlState = useEphemeralUrlState();
 
   const hasOffload = rows.some((r) => r.offload !== null);
   const columns = useMemo(
     (): Column[] => [
-      { key: 'conc', label: 'Conc', numeric: true },
-      { key: 'parallelism', label: 'Parallelism', numeric: false },
-      ...(hasOffload ? [{ key: 'offload', label: 'Offload', numeric: false } as Column] : []),
-      { key: 'tputPerGpu', label: 'Tput/Chip', numeric: true },
+      { key: 'conc', label: t.concurrency, numeric: true },
+      { key: 'parallelism', label: t.parallelism, numeric: false },
+      ...(hasOffload ? [{ key: 'offload', label: t.offload, numeric: false } as Column] : []),
+      { key: 'tputPerGpu', label: t.throughput, numeric: true },
       { key: 'p50Intvty', label: 'p50 Int', numeric: true },
       { key: 'p90Intvty', label: 'p90 Int', numeric: true },
       { key: 'p50Ttft', label: 'p50 TTFT', numeric: true },
       { key: 'p90Ttft', label: 'p90 TTFT', numeric: true },
     ],
-    [hasOffload],
+    [hasOffload, t],
   );
 
   const sortedRows = useMemo(
@@ -87,6 +117,7 @@ export default function LegendPointsDialog({
   );
 
   const toggleSort = (key: LegendPointsSortKey) => {
+    track('inference_legend_points_table_sorted', { key });
     setSort((prev) =>
       prev?.key === key ? (prev.dir === 'asc' ? { key, dir: 'desc' } : null) : { key, dir: 'asc' },
     );
@@ -136,9 +167,7 @@ export default function LegendPointsDialog({
         </DialogHeader>
 
         {sortedRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">
-            No visible points for this series under the current filters.
-          </p>
+          <p className="text-sm text-muted-foreground py-4">{t.empty}</p>
         ) : (
           // One grid owns the column tracks; every row is a subgrid so cells
           // align across ALL rows (per-row grids would auto-size independently
@@ -185,8 +214,10 @@ export default function LegendPointsDialog({
                   onClick={() => {
                     // In-app detail links are full-document navigations, so the
                     // chart state has to be written into this history entry
-                    // before we leave or Back lands on a default chart.
-                    if (!row.isExternal) rememberChartStateInUrl();
+                    // before we leave or Back lands on a default chart. Skipped
+                    // in ephemeral scopes (/model embeds): the store holds the
+                    // primary dashboard's state there, not this chart's.
+                    if (!row.isExternal && !ephemeralUrlState) rememberChartStateInUrl();
                     onRowClick?.(row);
                   }}
                   className="col-span-full grid grid-cols-subgrid items-center rounded-sm hover:bg-accent whitespace-nowrap"
@@ -207,11 +238,8 @@ export default function LegendPointsDialog({
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground/70 leading-tight">
-          {isOverlay
-            ? 'Unofficial overlay points have no stored benchmark records — metrics only, no detail links.'
-            : 'Click a row for the point detail — agentic points open the trace detail page, fixed-seq points open the GitHub Actions run.'}{' '}
-          Interactivity in tok/s/user · TTFT in s · throughput in tok/s/chip.
+        <p className="text-3xs text-muted-foreground/70 leading-tight">
+          {isOverlay ? t.overlayFootnote : t.officialFootnote} {t.units}
         </p>
       </DialogContent>
     </Dialog>

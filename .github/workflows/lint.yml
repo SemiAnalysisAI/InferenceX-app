@@ -47,3 +47,5 @@ jobs:
         run: bun run lint
       - name: Format check
         run: bun run fmt
+      - name: Typography gate
+        run: bun run check:typography

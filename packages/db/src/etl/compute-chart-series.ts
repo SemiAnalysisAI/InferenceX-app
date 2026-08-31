@@ -1252,7 +1252,8 @@ function buildSeriesFromMetrics(
           group = { source, metrics: {} };
           grouped.set(source.id, group);
         }
-        const groupedMetric = (group.metrics[metricName] ??= { series: [] });
+        group.metrics[metricName] ??= { series: [] };
+        const groupedMetric = group.metrics[metricName];
         groupedMetric.series!.push(series);
       }
     }

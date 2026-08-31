@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -9,10 +10,13 @@ import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { type Model } from '@/lib/data-mappings';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +84,23 @@ const jsonLd = {
   url: `${SITE_URL}/compare`,
 };
 
-export default async function CompareIndexPage() {
+export default function CompareIndexPage() {
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <AgentXCompareHero locale="en" />
+      {/* In-page Suspense (not loading.tsx — a route-level boundary would
+          also wrap /compare/[slug] and degrade its 404/308 statuses): the
+          static hero paints immediately while the catalog's availability
+          query streams behind the skeleton. */}
+      <Suspense fallback={<CompareRouteSkeleton />}>
+        <CompareCatalog />
+      </Suspense>
+    </>
+  );
+}
+
+async function CompareCatalog() {
   // Server-side filter: only show (model, pair) combinations where both GPUs
   // have benchmark data for that model. Avoids cards that would link to an
   // empty-state page. The page-level handler at /compare/[slug] still renders
@@ -94,12 +114,9 @@ export default async function CompareIndexPage() {
 
   return (
     <>
-      <JsonLd data={jsonLd} />
-      <AgentXCompareHero locale="en" />
-
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
-          <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
             Comparison catalog
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
@@ -154,7 +171,15 @@ export default async function CompareIndexPage() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
+                {/* `displayName` is the Model enum value by contract (see
+                    CompareModelSlug in compare-slug.ts), so the shared
+                    ModelLogo resolves each section's brand mark (DeepSeek,
+                    MiniMax, Kimi, ...) from MODEL_CONFIG and renders nothing
+                    for models without one. */}
+                <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
+                  <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
+                  {model.label}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   {pairs.length} chip pair{pairs.length === 1 ? '' : 's'} with benchmark data on{' '}
                   {model.label}.

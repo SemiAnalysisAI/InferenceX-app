@@ -192,7 +192,7 @@ function FieldBlock({
         <label htmlFor={id} className="text-xs font-medium">
           {label}
         </label>
-        <span className="text-[10px] tabular-nums text-muted-foreground">
+        <span className="text-3xs tabular-nums text-muted-foreground">
           {value.length}/{MAX_LEN}
         </span>
       </div>

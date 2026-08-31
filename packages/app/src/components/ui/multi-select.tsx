@@ -37,6 +37,8 @@ interface MultiSelectOption {
   label: string;
   /** Optional leading visual (e.g. a brand logo) rendered before the label. */
   icon?: React.ReactNode;
+  /** Optional trailing visual (e.g. a NEW pill) rendered after the label. */
+  badge?: React.ReactNode;
 }
 
 export interface MultiSelectSection {
@@ -460,9 +462,10 @@ function MultiSelect({
                             <span className="absolute right-2 flex size-3.5 items-center justify-center">
                               {isSelected && <CheckIcon className="size-4 text-primary" />}
                             </span>
-                            <span className="flex items-center gap-2">
+                            <span className="flex min-w-0 items-center gap-2">
                               {option.icon}
                               {option.label}
+                              {option.badge}
                             </span>
                           </div>
                         );
@@ -492,9 +495,10 @@ function MultiSelect({
                       <span className="absolute right-2 flex size-3.5 items-center justify-center">
                         {isSelected && <CheckIcon className="size-4 text-primary" />}
                       </span>
-                      <span className="flex items-center gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
                         {option.icon}
                         {option.label}
+                        {option.badge}
                       </span>
                     </div>
                   );

@@ -250,8 +250,8 @@ export function SearchableSelect({
                       onClick={() => handleSelect(option.value)}
                       onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(
-                        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
-                        'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
+                        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-[background-color,color,box-shadow] duration-150 ease-in-out",
+                        'hover:bg-primary/20 hover:shadow-sm',
                         isSelected && 'bg-primary/10 font-medium',
                       )}
                     >

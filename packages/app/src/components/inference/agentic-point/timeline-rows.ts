@@ -5,7 +5,7 @@
  */
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 
 export type RowMode = 'conversation' | 'worker';
 
@@ -41,7 +41,11 @@ export function subagentIdOf(cid: string): string | null {
  * real `href` on the request bar so the browser's native "open in new tab"
  * (right-click, ⌘/Ctrl-click, middle-click) works.
  */
-export function conversationHref(datasetSlug: string, req: RequestRecord): string {
+export function conversationHref(
+  datasetSlug: string,
+  req: RequestRecord,
+  locale: Locale = 'en',
+): string {
   const convId = req.srcTrace ?? datasetConvId(req.cid);
   const params = new URLSearchParams({ turn: String(req.ti) });
   if (typeof req.srcOuter === 'number' && Number.isInteger(req.srcOuter) && req.srcOuter >= 0) {
@@ -52,16 +56,22 @@ export function conversationHref(datasetSlug: string, req: RequestRecord): strin
   }
   const sa = subagentIdOf(req.cid);
   if (sa && !params.has('inner')) params.set('sa', sa);
-  return `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`;
+  return localePath(
+    `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`,
+    locale,
+  );
 }
 
 /** Human label for where a request came from (raw trace index or replay turn). */
-export function requestSourceLabel(req: RequestRecord): string {
+export function requestSourceLabel(req: RequestRecord, locale: Locale = 'en'): string {
   if (typeof req.srcOuter === 'number') {
-    if (typeof req.srcInner === 'number') return `raw ${req.srcOuter} / child ${req.srcInner}`;
-    return `raw ${req.srcOuter}`;
+    if (typeof req.srcInner === 'number')
+      return locale === 'zh'
+        ? `原始记录 ${req.srcOuter} / 子项 ${req.srcInner}`
+        : `raw ${req.srcOuter} / child ${req.srcInner}`;
+    return locale === 'zh' ? `原始记录 ${req.srcOuter}` : `raw ${req.srcOuter}`;
   }
-  return `replay turn ${req.ti + 1}`;
+  return locale === 'zh' ? `回放轮次 ${req.ti + 1}` : `replay turn ${req.ti + 1}`;
 }
 
 export interface RequestIdleStats {
@@ -395,7 +405,7 @@ export function buildRequestTimelineRows(
       reqs.sort((a, b) => a.start - b.start);
       rows.push({
         key: `${tree.groupKey}::aux:${auxId}`,
-        label: `aux ${auxId} · parallel`,
+        label: `aux ${auxId} · ${locale === 'zh' ? '并行' : 'parallel'}`,
         color,
         requests: reqs,
         depth: 1,
@@ -430,7 +440,7 @@ export function buildRequestTimelineRows(
       const streamCount = lanes.streams.size;
       rows.push({
         key: subagentKey,
-        label: `↳ ${formatSubagentLabel(saBase)}`,
+        label: `↳ ${formatSubagentLabel(saBase, locale)}`,
         color,
         requests: allReqs,
         depth: 1,
@@ -452,7 +462,7 @@ export function buildRequestTimelineRows(
           reqs.sort((a, b) => a.start - b.start);
           rows.push({
             key: `${subagentKey}:s${streamIdx ?? '∅'}`,
-            label: `stream ${streamIdx ?? '∅'}`,
+            label: `${locale === 'zh' ? '流' : 'stream'} ${streamIdx ?? '∅'}`,
             color,
             requests: reqs,
             depth: 2,
@@ -474,7 +484,7 @@ export function buildRequestTimelineRows(
         reqs.sort((a, b) => a.start - b.start);
         rows.push({
           key: `${subagentKey}:aux:${auxId}`,
-          label: `aux ${auxId} · parallel`,
+          label: `aux ${auxId} · ${locale === 'zh' ? '并行' : 'parallel'}`,
           color,
           requests: reqs,
           depth: 2,
@@ -488,7 +498,7 @@ export function buildRequestTimelineRows(
 }
 
 /** `subagent_001_bf1c5c16` → `subagent 001 · bf1c` (compact, readable). */
-function formatSubagentLabel(raw: string): string {
+export function formatSubagentLabel(raw: string, _locale: Locale): string {
   const m = /^subagent_(?<index>\d+)_(?<hash>[0-9a-f]+)$/iu.exec(raw);
   if (!m) return raw;
   return `subagent ${m[1]} · ${m[2]!.slice(0, 4)}`;

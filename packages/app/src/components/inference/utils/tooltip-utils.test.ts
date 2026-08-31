@@ -241,6 +241,60 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
   });
 
+  it('localizes agentic request counters and workflow link chrome for Chinese tooltips', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          num_requests_successful: 9,
+          num_requests_total: 10,
+          total_prompt_tokens: 12_345,
+          total_generation_tokens: 678,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>请求：</strong> 9 / 10 (90%)');
+    expect(html).toContain('<strong>提示 token：</strong>');
+    expect(html).toContain('<strong>生成 token：</strong>');
+    expect(html).toContain('GitHub Actions 运行记录');
+    expect(html).not.toContain('<strong>Requests:</strong>');
+    expect(html).not.toContain('GitHub Actions Run');
+  });
+
+  it('localizes dates, DPA flags, and worker labels for Chinese disaggregated tooltips', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({
+          date: '2026-01-02',
+          actualDate: '2026-01-02',
+          ep: 2,
+          disagg: true,
+          is_multinode: true,
+          prefill_tp: 2,
+          prefill_ep: 2,
+          prefill_dp_attention: true,
+          prefill_num_workers: 2,
+          decode_tp: 4,
+          decode_ep: 4,
+          decode_dp_attention: false,
+          decode_num_workers: 1,
+          num_prefill_gpu: 4,
+          num_decode_gpu: 4,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>日期：</strong> 2026年1月2日');
+    expect(html).toContain('DPA: 是, worker 数: 2');
+    expect(html).toContain('DPA: 否, worker 数: 1');
+    expect(html).not.toContain('DPA: True');
+    expect(html).not.toContain('Workers:');
+  });
+
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
     // link to /inference/agentic/0, a doomed lookup.

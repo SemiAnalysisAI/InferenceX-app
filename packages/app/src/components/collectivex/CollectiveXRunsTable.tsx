@@ -201,7 +201,7 @@ export function CollectiveXRunsTable({
                 <td className="px-3 py-1.5">
                   <span
                     className={cn(
-                      'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                      'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                       CONCLUSION_CLASSES[conclusion] ?? CONCLUSION_FALLBACK_CLASS,
                     )}
                   >
@@ -215,7 +215,7 @@ export function CollectiveXRunsTable({
                         title={`EP: ${epMeasured}/${epRequested} measured`}
                         data-testid={`collectivex-run-suite-ep-${run.run_id}`}
                         className={cn(
-                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                           SUITE_BADGE_CLASSES.ep,
                         )}
                       >
@@ -227,7 +227,7 @@ export function CollectiveXRunsTable({
                         title={`KV transfer: ${kvMeasured}/${kvRequested} measured`}
                         data-testid={`collectivex-run-suite-kv-${run.run_id}`}
                         className={cn(
-                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
                           SUITE_BADGE_CLASSES.kv,
                         )}
                       >

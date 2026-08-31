@@ -5,22 +5,25 @@ import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceT
 
 // Test the pure logic used by InferenceTable — sorting and value resolution
 import { getNestedYValue } from '@/lib/chart-utils';
+import * as inferenceTableModule from './InferenceTable';
 
 const CHART_DEF = {
   chartType: 'interactivity',
   heading: 'vs. Interactivity',
   x: 'median_intvty',
   x_label: 'Interactivity (tok/s/user)',
+  x_labelZh: '交互性 (tok/s/user)',
   y: 'tput_per_gpu',
   y_tpPerGpu: 'tpPerGpu.y',
   y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
+  y_tpPerGpu_labelZh: '单 GPU token 吞吐量 (tok/s/gpu)',
   y_tpPerGpu_title: 'Token Throughput per GPU',
   y_tpPerGpu_roofline: 'upper_left',
   y_costh: 'costh.y',
   y_costh_label: 'Cost per Million Total Tokens ($)',
   y_costh_roofline: 'lower_right',
   y_tokensPerDollarH: 'tokensPerDollarH.y',
-  y_tokensPerDollarH_label: 'Total Tokens per $1 (tok/$)',
+  y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
   y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
@@ -47,6 +50,32 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
+  it('provides locale-aware table headers without changing the English source', () => {
+    const headerLabels = (
+      inferenceTableModule as typeof inferenceTableModule & {
+        inferenceTableHeaderLabels?: (
+          chartDefinition: ChartDefinition,
+          selectedYAxisMetric: string,
+          locale: 'en' | 'zh',
+        ) => Record<string, string>;
+      }
+    ).inferenceTableHeaderLabels;
+
+    expect(headerLabels).toBeTypeOf('function');
+    const en = headerLabels?.(CHART_DEF, 'y_tpPerGpu', 'en');
+    const zh = headerLabels?.(CHART_DEF, 'y_tpPerGpu', 'zh');
+    expect(en).toMatchObject({
+      chip: 'Chip',
+      precision: 'Precision',
+      concurrency: 'Conc',
+      throughput: 'Throughput/Chip (tok/s)',
+    });
+    expect(Object.keys(zh ?? {})).toEqual(Object.keys(en ?? {}));
+    expect(zh).toMatchObject({ chip: '芯片', precision: '精度', concurrency: '并发数' });
+    expect(zh?.yMetric).not.toBe(en?.yMetric);
+    expect(zh?.xMetric).not.toBe(en?.xMetric);
+  });
+
   it('sorts by Y value descending for upper_left roofline (throughput)', () => {
     const points = [
       makePoint({ tpPerGpu: { y: 100, roof: false } }),

@@ -1,11 +1,13 @@
 'use client';
 
 import { Info } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { NewBadge } from '@/components/ui/new-badge';
 import {
   Select,
   SelectContent,
@@ -37,6 +39,7 @@ const STRINGS = {
   en: {
     model: 'Model',
     modelTooltip: 'The language model being benchmarked.',
+    newModel: 'NEW',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
@@ -63,6 +66,7 @@ const STRINGS = {
   zh: {
     model: '模型',
     modelTooltip: '正在进行基准测试的语言模型。',
+    newModel: '新',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       '输入序列长度 / 输出序列长度（Input Sequence Length / Output Sequence Length）。定义基准测试的输入和输出 token 数量（如 1K/8K 表示 1,024 个输入 token 和 8,192 个输出 token）。',
@@ -157,10 +161,11 @@ function AgenticScenarioInfo({
 // Full-color creator logo beside each model name, in the dropdown rows and
 // the closed trigger alike. `ModelLogo` renders nothing for models without
 // a configured logo, so rows degrade to plain text instead of breaking.
-const toOption = (model: string) => ({
+const toOption = (model: string, badge?: ReactNode) => ({
   value: model,
   label: getModelLabel(model as Model),
   icon: <ModelLogo model={model as Model} />,
+  badge,
 });
 
 interface ModelSelectorProps {
@@ -171,6 +176,18 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
+  /**
+   * Optional affordance rendered beside the closed trigger (outside the
+   * dropdown, mirroring the scenario selector's info icon) — e.g. the
+   * model-architecture deep-dive link on the inference dashboard.
+   */
+  trailing?: ReactNode;
+  /**
+   * Models whose dropdown rows carry a NEW pill (localized). The inference
+   * dashboard passes the featured AgentX set; surfaces that don't highlight
+   * new models simply omit the prop.
+   */
+  newModels?: ReadonlySet<string>;
 }
 
 export function ModelSelector({
@@ -181,20 +198,29 @@ export function ModelSelector({
   onOpenChange,
   availableModels,
   'data-testid': testId,
+  trailing,
+  newModels,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
+  const optionFor = (model: string) =>
+    toOption(
+      model,
+      newModels?.has(model) ? (
+        <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>
+      ) : undefined,
+    );
   const sections = [
     {
       id: 'default',
-      options: groups.default.map(toOption),
+      options: groups.default.map(optionFor),
     },
     ...(groups.experimental.length > 0
       ? [
           {
             id: 'experimental',
             header: t.experimentalSupport,
-            options: groups.experimental.map(toOption),
+            options: groups.experimental.map(optionFor),
           },
         ]
       : []),
@@ -209,7 +235,7 @@ export function ModelSelector({
                 reason={t.maintenanceReason}
               />
             ),
-            options: groups.maintenance.map(toOption),
+            options: groups.maintenance.map(optionFor),
           },
         ]
       : []),
@@ -224,7 +250,7 @@ export function ModelSelector({
                 reason={t.deprecatedModelReason}
               />
             ),
-            options: groups.deprecated.map(toOption),
+            options: groups.deprecated.map(optionFor),
           },
         ]
       : []),
@@ -233,28 +259,31 @@ export function ModelSelector({
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
       <LabelWithTooltip htmlFor={id} label={t.model} tooltip={t.modelTooltip} />
-      <div>
-        <MultiSelect
-          sections={sections}
-          value={[value]}
-          onChange={(values) => {
-            const next = values[0];
-            if (!next) return;
-            track('selector_model_changed', { model: next });
-            onChange(next as Model);
-          }}
-          open={open}
-          onOpenChange={onOpenChange}
-          triggerId={id}
-          triggerTestId={testId}
-          placeholder={t.model}
-          minSelections={1}
-          maxSelections={1}
-          showClearAll={false}
-          searchable={false}
-          plainSelectedText
-          showSelectionSummary={false}
-        />
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <MultiSelect
+            sections={sections}
+            value={[value]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              track('selector_model_changed', { model: next });
+              onChange(next as Model);
+            }}
+            open={open}
+            onOpenChange={onOpenChange}
+            triggerId={id}
+            triggerTestId={testId}
+            placeholder={t.model}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+        {trailing}
       </div>
     </div>
   );

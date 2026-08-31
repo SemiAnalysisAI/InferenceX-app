@@ -11,6 +11,7 @@ import * as d3 from 'd3';
 import type { KnownConfigIssue } from '@/lib/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
   /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
@@ -109,8 +110,8 @@ const BOX_GAP = 8;
 const BOX_RIGHT_GAP = 10;
 const PAD_X = 10;
 const PAD_Y = 7;
-const LINE1_SIZE = 11;
-const LINE2_SIZE = 10;
+const LINE1_SIZE = CHART_TYPE.annotation;
+const LINE2_SIZE = CHART_TYPE.annotationSub;
 const LINE1_H = 14;
 const LINE2_H = 13;
 const SWATCH_R = 4;

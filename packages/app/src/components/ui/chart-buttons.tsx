@@ -8,6 +8,7 @@ import { useChartExport } from '@/hooks/useChartExport';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
 
 interface ChartButtonsProps {
   /** Unique chart ID for export targeting */
@@ -30,11 +31,18 @@ interface ChartButtonsProps {
   exportFileName?: string;
   /**
    * Optional controls rendered before export/reset buttons, such as a view toggle.
-   * These inherit this wrapper's desktop-only (`hidden md:flex`) and no-export behavior.
+   * These inherit this wrapper's visibility (`hidden md:flex` unless `mobileVisible`)
+   * and no-export behavior.
    */
   leadingControls?: ReactNode;
   /** Optional container class override for positioning/layout variants. */
   className?: string;
+  /**
+   * Keep actions reachable on narrow screens for routes that have verified mobile
+   * layouts. Below `md` the toolbar renders as a normal-flow right-aligned row above
+   * the chart card (instead of an absolute overlay) so it cannot cover the title.
+   */
+  mobileVisible?: boolean;
 }
 
 /**
@@ -57,7 +65,27 @@ export function ChartButtons({
   exportFileName,
   leadingControls,
   className,
+  mobileVisible = false,
 }: ChartButtonsProps) {
+  const locale = useLocale();
+  const t =
+    locale === 'zh'
+      ? {
+          exporting: '正在导出……',
+          exportMenu: '下载图表',
+          png: '下载 PNG',
+          csv: '下载 CSV',
+          mp4: '下载 MP4',
+          reset: '重置缩放',
+        }
+      : {
+          exporting: 'Exporting...',
+          exportMenu: 'Download chart',
+          png: 'Download PNG',
+          csv: 'Download CSV',
+          mp4: 'Download MP4',
+          reset: 'Reset zoom',
+        };
   const { isExporting, exportToImage } = useChartExport({
     chartId,
     setIsLegendExpanded,
@@ -89,7 +117,8 @@ export function ChartButtons({
   return (
     <div
       className={cn(
-        'hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10',
+        'no-export export-buttons gap-1 z-10 md:absolute md:top-8 md:right-8',
+        mobileVisible ? 'flex justify-end mb-2 md:mb-0' : 'hidden md:flex',
         className,
       )}
     >
@@ -103,9 +132,10 @@ export function ChartButtons({
               size={isExporting ? 'default' : 'icon'}
               className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
               disabled={isExporting}
+              aria-label={t.exportMenu}
             >
               <Download className={isExporting ? 'mr-2' : ''} size={16} />
-              {isExporting && 'Exporting...'}
+              {isExporting && t.exporting}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-44 p-1">
@@ -119,7 +149,7 @@ export function ChartButtons({
               aria-disabled={hideImageExport}
             >
               <Image size={14} />
-              Download PNG
+              {t.png}
             </button>
             {onExportCsv && (
               <button
@@ -131,7 +161,7 @@ export function ChartButtons({
                 onClick={handleExportCsv}
               >
                 <FileSpreadsheet size={14} />
-                Download CSV
+                {t.csv}
               </button>
             )}
             {onExportMp4 && (
@@ -144,7 +174,7 @@ export function ChartButtons({
                 onClick={handleExportMp4}
               >
                 <Video size={14} />
-                Download MP4
+                {t.mp4}
               </button>
             )}
           </PopoverContent>
@@ -157,9 +187,10 @@ export function ChartButtons({
           className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
           onClick={handleExportPng}
           disabled={isExporting}
+          aria-label={t.exportMenu}
         >
           <Download className={isExporting ? 'mr-2' : ''} size={16} />
-          {isExporting && 'Exporting...'}
+          {isExporting && t.exporting}
         </Button>
       )}
       {!hideZoomReset && (
@@ -169,6 +200,7 @@ export function ChartButtons({
           size="icon"
           className="size-7"
           disabled={hideImageExport}
+          aria-label={t.reset}
           onClick={() => {
             track(`${analyticsPrefix}_zoom_reset_button`);
             window.dispatchEvent(new CustomEvent(resetEventName));

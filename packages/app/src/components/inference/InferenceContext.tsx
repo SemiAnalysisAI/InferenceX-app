@@ -65,7 +65,8 @@ import {
   Sequence,
   sequenceKind,
 } from '@/lib/data-mappings';
-import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
+import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
+import { useLocale } from '@/lib/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -104,6 +105,20 @@ const InferenceDataContext = createContext<InferenceDataContextType | undefined>
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
 const InferenceDisplayContext = createContext<InferenceDisplayContextType | undefined>(undefined);
 const InferenceActionsContext = createContext<InferenceActionsContextType | undefined>(undefined);
+
+export const INFERENCE_CONTEXT_STRINGS = {
+  en: {
+    dateRangeResetTitle: 'Date Range Reset',
+    dateRangeResetDescription:
+      'The chip configs are not available in the selected date range. The date range will be reset.',
+    ok: 'OK',
+  },
+  zh: {
+    dateRangeResetTitle: '重置日期范围',
+    dateRangeResetDescription: '所选日期范围内没有这些芯片配置，将重置日期范围。',
+    ok: '确定',
+  },
+} as const;
 
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
@@ -211,8 +226,8 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tokensPerDollarN`. URL param still wins so existing
-   * shared links are unaffected.
+   * the dashboard's default `y_tokensPerDollarH`. URL param still wins so
+   * existing shared links are unaffected.
    */
   initialYAxisMetric?: string;
   /**
@@ -225,6 +240,8 @@ export function InferenceProvider({
    */
   autoSelectAllGpus?: boolean;
 }) {
+  const locale = useLocale();
+  const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
@@ -361,7 +378,7 @@ export function InferenceProvider({
   const openRouterModelId = getOpenRouterModelId(selectedModel);
   const openRouterPricingQuery = useOpenRouterPricing(
     openRouterModelId,
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && tokenRevenuePriceSource === 'openrouter',
+    usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePriceSource === 'openrouter',
   );
   const tokenRevenuePricing =
     tokenRevenuePriceSource === 'normalized'
@@ -627,6 +644,7 @@ export function InferenceProvider({
     graphs,
     selectionPoints,
     loading: chartDataLoading,
+    refreshing: chartDataRefreshing,
     error: chartDataError,
     hardwareConfig,
     availableQuickFilters,
@@ -909,10 +927,11 @@ export function InferenceProvider({
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
   const openRouterPricingLoading =
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+    usesTokenSalePricing(selectedYAxisMetric) &&
     tokenRevenuePriceSource === 'openrouter' &&
     openRouterPricingQuery.isLoading;
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
+  const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1447,8 +1466,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
-      i_revenue:
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
+      i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1624,6 +1642,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1640,6 +1659,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1801,14 +1821,11 @@ export function InferenceProvider({
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Date Range Reset</DialogTitle>
-            <DialogDescription>
-              The chip configs are not available in the selected date range. The date range will be
-              reset.
-            </DialogDescription>
+            <DialogTitle>{localeStrings.dateRangeResetTitle}</DialogTitle>
+            <DialogDescription>{localeStrings.dateRangeResetDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={handleDateRangeDialogOk}>OK</Button>
+            <Button onClick={handleDateRangeDialogOk}>{localeStrings.ok}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

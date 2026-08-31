@@ -207,6 +207,8 @@ export interface AggDataEntry {
   router_version?: string;
   /** Actual server-observed GPU prefix-cache hit rate (0..1). */
   server_gpu_cache_hit_rate?: number;
+  /** Actual server-observed external/router prefix-cache hit rate (0..1). */
+  server_external_cache_hit_rate?: number;
   /** Actual server-observed CPU prefix-cache hit rate (0..1). */
   server_cpu_cache_hit_rate?: number;
   /** Infinite-cache theoretical hit rate (0..1) computed from trace. */
@@ -274,8 +276,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerGpu: { y: number; roof: boolean };
   outputTputPerGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
-  /** Gross token revenue using the selected normalized or OpenRouter prices. */
+  /** Cache-aware gross token revenue using normalized or OpenRouter prices. */
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
+  /** Total tokens produced per dollar of modeled infrastructure spend. */
+  tokensPerDollarH?: { y: number; roof: boolean };
+  tokensPerDollarN?: { y: number; roof: boolean };
+  tokensPerDollarR?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
@@ -291,9 +297,6 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
   // Tokens purchasable per $1.
-  tokensPerDollarH?: { y: number; roof: boolean };
-  tokensPerDollarN?: { y: number; roof: boolean };
-  tokensPerDollarR?: { y: number; roof: boolean };
   outputTokensPerDollarH?: { y: number; roof: boolean };
   outputTokensPerDollarN?: { y: number; roof: boolean };
   outputTokensPerDollarR?: { y: number; roof: boolean };
@@ -353,8 +356,10 @@ export type TokenRevenuePriceSource = 'normalized' | 'openrouter';
 
 export interface TokenRevenuePricing {
   source: TokenRevenuePriceSource;
-  /** Published or assumed input-token sale price, $/M tok. */
+  /** Published or assumed fresh input-token sale price, $/M tok. */
   inputPerMillion: number;
+  /** Published or assumed cached input-token sale price, $/M tok. */
+  cachedInputPerMillion?: number;
   /** Published or assumed output-token sale price, $/M tok. */
   outputPerMillion: number;
   /** Exact OpenRouter catalog id when `source` is `openrouter`. */
@@ -379,7 +384,10 @@ export interface ChartDefinition {
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
+  /** Resolved field represented by `InferenceData.x`; stable across locales. */
+  x_scale_field: string;
   x_label: string;
+  x_labelZh: string;
   y: keyof AggDataEntry;
   y_label?: string;
 
@@ -570,6 +578,9 @@ export interface InferenceDataContextType {
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   loading: boolean;
+  /** True while `graphs` shows previous-key data (placeholder) or a background
+   *  refetch is in flight — i.e. content is visible but about to update. */
+  refreshing: boolean;
   error: string | null;
   availableQuickFilters: AvailableQuickFilters;
   availableGPUs: { value: string; label: string }[];

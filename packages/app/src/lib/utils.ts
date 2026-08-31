@@ -1,10 +1,23 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
 import { FRAMEWORK_LABELS, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 
 import { getGpuSpecs } from './constants';
+
+// Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
+// built-in tracking scale (tighter…widest), so without this, e.g.
+// cn('tracking-eyebrow', 'tracking-tight') would keep both classes.
+// (text-2xs/text-3xs need no config: t-shirt sizes are recognized as font sizes.)
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      tracking: ['eyebrow', 'eyebrow-wide', 'heading'],
+    },
+  },
+});
+
 /**
  * Combines Tailwind CSS classes and other class values into a single string.
  * This utility helps in conditionally applying classes and merging them efficiently,
