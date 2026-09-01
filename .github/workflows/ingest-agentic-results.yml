@@ -41,6 +41,16 @@ on:
         required: false
         default: production
         type: string
+      neon-branch:
+        description: Named Neon branch when database-target is neon-branch
+        required: false
+        default: ''
+        type: string
+      preview-url:
+        description: Preview deployment URL to invalidate for a named Neon branch
+        required: false
+        default: ''
+        type: string
     secrets:
       DATABASE_WRITE_URL:
         description: Production database write connection for direct ingests
@@ -60,6 +70,12 @@ on:
       INFX_MAIN_PAT:
         description: Token used to download InferenceX artifacts
         required: true
+      NEON_API_KEY:
+        description: Neon API key used to resolve named child branches
+        required: false
+      NEON_PROJECT_ID:
+        description: Neon project containing named child branches
+        required: false
       SLACK_WEBHOOK_URL:
         description: Optional failure and unmapped-entity notifications
         required: false
@@ -83,6 +99,17 @@ on:
           - production
           - dev
           - staging
+          - neon-branch
+      neon-branch:
+        description: Named Neon branch when database-target is neon-branch
+        required: false
+        default: ''
+        type: string
+      preview-url:
+        description: Preview deployment URL to invalidate for a named Neon branch
+        required: false
+        default: ''
+        type: string
 
 permissions: {}
 
@@ -148,6 +175,10 @@ jobs:
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
           STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
             'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
+          PREVIEW_SITE_URL: ${{ inputs.preview-url }}
         run: |
           case "$REQUESTED_DATABASE_TARGET" in
             production)
@@ -165,6 +196,29 @@ jobs:
               cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
+            neon-branch)
+              if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ] || [ -z "$NEON_BRANCH_NAME" ] || [ -z "$PREVIEW_SITE_URL" ]; then
+                echo "::error::NEON_API_KEY, NEON_PROJECT_ID, neon-branch, and preview-url are required"
+                exit 1
+              fi
+              branches=$(curl --retry 3 --retry-all-errors -sSf \
+                -H "Authorization: Bearer $NEON_API_KEY" \
+                "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches?limit=100")
+              branch_id=$(jq -r --arg name "$NEON_BRANCH_NAME" \
+                '.branches[] | select(.name == $name) | .id' <<<"$branches" | head -n 1)
+              if [ -z "$branch_id" ] || [ "$branch_id" = "null" ]; then
+                echo "::error::Neon branch not found: $NEON_BRANCH_NAME"
+                exit 1
+              fi
+              database_write_url=$(npx --yes neonctl connection-string \
+                --api-key "$NEON_API_KEY" \
+                --project-id "$NEON_PROJECT_ID" \
+                --branch-id "$branch_id" \
+                --database-name neondb \
+                --role-name neondb_owner)
+              cache_invalidate_url="${PREVIEW_SITE_URL%/}/api/v1/invalidate"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
+              ;;
             *)
               echo "::error::Unsupported database-target: $REQUESTED_DATABASE_TARGET"
               exit 1
@@ -175,12 +229,12 @@ jobs:
             echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
-          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ -z "$cache_invalidate_secret" ]; then
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ "$REQUESTED_DATABASE_TARGET" != "neon-branch" ] && [ -z "$cache_invalidate_secret" ]; then
             echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
-          if [ "$REQUESTED_DATABASE_TARGET" = "staging" ] && [ -z "$protection_bypass_secret" ]; then
-            echo "::error::Vercel protection bypass secret is empty for staging"
+          if { [ "$REQUESTED_DATABASE_TARGET" = "staging" ] || [ "$REQUESTED_DATABASE_TARGET" = "neon-branch" ]; } && [ -z "$protection_bypass_secret" ]; then
+            echo "::error::Vercel protection bypass secret is empty for preview target"
             exit 1
           fi
 
@@ -234,7 +288,7 @@ jobs:
 
       - name: Invalidate Vercel cache
         run: |
-          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
+          if [ "$INGEST_DATABASE_TARGET" = "staging" ] || [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
             curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
               -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
           else
