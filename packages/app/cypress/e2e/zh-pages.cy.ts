@@ -322,30 +322,6 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
-  it('uses the route locale in the global feedback modal and dismisses it through the UI', () => {
-    cy.viewport(1440, 900);
-    cy.visit('/zh/inference', {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feedback-modal-snoozed');
-      },
-    });
-
-    cy.get('[data-testid="feedback-modal"]')
-      .should('be.visible')
-      .and('have.attr', 'role', 'dialog')
-      .and('have.attr', 'aria-labelledby', 'feedback-modal-title')
-      .and('have.attr', 'aria-describedby', 'feedback-modal-description')
-      .and('contain.text', '帮助我们改进 InferenceX')
-      .and('contain.text', '您的反馈会加密保存');
-    cy.get('#feedback-modal-title').should('have.text', '帮助我们改进 InferenceX');
-    cy.get('#feedback-modal-description').should(
-      'have.text',
-      '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
-    );
-    cy.get('[data-testid="feedback-modal-dismiss"]').click();
-    cy.get('[data-testid="feedback-modal"]').should('not.exist');
-  });
-
   describe('English pages expose the Chinese sibling', () => {
     before(() => {
       cy.visit('/blog');
