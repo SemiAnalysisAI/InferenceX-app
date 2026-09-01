@@ -74,7 +74,6 @@ describe('NUDGE_REGISTRY integrity', () => {
       'agentx-telemetry-tutorial',
       'eval-samples',
       'export',
-      'feedback-modal',
       'filter-hint',
       'gradient-label',
       'openai-rubin-comparison-banner',
