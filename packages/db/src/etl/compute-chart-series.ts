@@ -127,8 +127,10 @@ import {
  * cached-token counter rate plus the prefill-batch-token histogram sum per
  * timeslice. TRT-LLM does not currently expose the prompt-token counter that
  * v16 expected.
+ *
+ * v18: retain Dynamo's per-DP-rank KV gauges within each TRT-LLM worker.
  */
-export const CHART_SERIES_VERSION = 17;
+export const CHART_SERIES_VERSION = 18;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -255,6 +257,7 @@ export const CHART_METRIC_KEYS = new Set([
   'sglang:hicache_host_used_tokens',
   'sglang:hicache_host_total_tokens',
   // TensorRT-LLM
+  'dynamo_component_gpu_cache_usage_percent',
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_host_utilization',
   'trtllm_kv_cache_hit_rate',
@@ -1004,12 +1007,24 @@ function buildSeriesFromMetrics(
 
   // KV cache usage (gauge, 0..1) — average across engines so the value
   // stays a fraction (each engine has its own KV pool).
-  const kvSeries = pickSeries(
-    'vllm:kv_cache_usage_perc',
-    'vllm:gpu_cache_usage_perc',
-    'sglang:token_usage',
-    'trtllm_kv_cache_utilization',
-  );
+  const nativeTrtKv = metrics['trtllm_kv_cache_utilization']?.series ?? [];
+  const dynamoTrtKv =
+    selectServerMetricsAdapter(context).id === 'trtllm'
+      ? (metrics['dynamo_component_gpu_cache_usage_percent']?.series ?? [])
+      : [];
+  const rankedEndpoints = new Set(dynamoTrtKv.map((s) => s.endpoint_url));
+  // Dynamo gauges omit worker_id. Preserve endpoint identity so two workers
+  // with similar utilization and the same DP rank cannot be mistaken for mirrors.
+  const trtKv = [
+    ...dynamoTrtKv.map((s) => ({
+      ...s,
+      labels: { ...s.labels, metric_endpoint: s.endpoint_url ?? '' },
+    })),
+    ...nativeTrtKv.filter((s) => !rankedEndpoints.has(s.endpoint_url)),
+  ];
+  const kvSeries =
+    pickSeries('vllm:kv_cache_usage_perc', 'vllm:gpu_cache_usage_perc', 'sglang:token_usage') ??
+    trtKv;
   // One entry per logical engine (v13) — mirrored API-server frontends and the
   // warmup/profiling phase split are collapsed here rather than showing up as
   // extra "engines".

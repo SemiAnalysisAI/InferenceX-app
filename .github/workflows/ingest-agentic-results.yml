@@ -205,18 +205,29 @@ jobs:
                 -H "Authorization: Bearer $NEON_API_KEY" \
                 "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches?limit=100")
               branch_id=$(jq -r --arg name "$NEON_BRANCH_NAME" \
-                '.branches[] | select(.name == $name) | .id' <<<"$branches" | head -n 1)
+                '.branches[] | select(.name == $name and .parent_id != null and .default != true) | .id' <<<"$branches" | head -n 1)
               if [ -z "$branch_id" ] || [ "$branch_id" = "null" ]; then
                 echo "::error::Neon branch not found: $NEON_BRANCH_NAME"
                 exit 1
               fi
-              database_write_url=$(npx --yes neonctl connection-string \
+              database_write_url=$(npx --yes neonctl connection-string "$branch_id" \
                 --api-key "$NEON_API_KEY" \
                 --project-id "$NEON_PROJECT_ID" \
-                --branch-id "$branch_id" \
                 --database-name neondb \
                 --role-name neondb_owner)
+              endpoints=$(curl --retry 3 --retry-all-errors -sSf \
+                -H "Authorization: Bearer $NEON_API_KEY" \
+                "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/endpoints")
+              database_host=$(DATABASE_URL_TO_CHECK="$database_write_url" node -e \
+                'console.log(new URL(process.env.DATABASE_URL_TO_CHECK).hostname)')
+              if ! jq -e --arg branch "$branch_id" --arg host "$database_host" \
+                '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null; then
+                echo "::error::Resolved database host does not belong to the requested child branch"
+                exit 1
+              fi
+              echo "Verified child database: $NEON_BRANCH_NAME ($branch_id), host $database_host"
               cache_invalidate_url="${PREVIEW_SITE_URL%/}/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
             *)
@@ -293,7 +304,8 @@ jobs:
               -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
           elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
             curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" || \
+              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" \
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" || \
               echo "::warning::Preview cache invalidation failed; the database ingest is complete"
           else
             curl -sSf -X POST "$CACHE_INVALIDATE_URL" \

@@ -786,6 +786,61 @@ describe('computeChartSeries', () => {
     expect(result?.metricSources[0]?.promptTps).toEqual([{ t: 0, value: 100 }]);
     expect(result?.metricSources[1]?.generationTps).toEqual([{ t: 0, value: 50 }]);
   });
+
+  it('keeps Dynamo TRT ranks within each worker and falls back to native-only endpoints', async () => {
+    const prefillUrls = ['http://prefill-a:7500/metrics', 'http://prefill-b:7500/metrics'];
+    const decodeUrl = 'http://decode:7500/metrics';
+    const result = await computeChartSeries(
+      gzipSync(
+        Buffer.from(
+          JSON.stringify({
+            metrics: {
+              trtllm_kv_cache_utilization: {
+                series: [
+                  ...prefillUrls.map((url) => buildTrtllmSeries(url, 'prefill', 0.9, 'avg')),
+                  buildTrtllmSeries(decodeUrl, 'backend', 0.8, 'avg'),
+                ],
+              },
+              dynamo_component_gpu_cache_usage_percent: {
+                series: prefillUrls.flatMap((endpoint_url) =>
+                  [0, 1].map((rank) => ({
+                    endpoint_url,
+                    labels: {
+                      dynamo_component: 'prefill',
+                      model: 'GLM-5.2-NVFP4',
+                      dp_rank: String(rank),
+                    },
+                    timeslices: [{ start_ns: 0, end_ns: 1e9, avg: rank === 0 ? 0.2 : 0.6 }],
+                  })),
+                ),
+              },
+              trtllm_num_requests_running: {
+                series: prefillUrls.map((url) => buildTrtllmSeries(url, 'prefill', 2, 'avg')),
+              },
+            },
+          }),
+        ),
+      ),
+      { framework: 'dynamo-trt', disagg: true },
+    );
+
+    expect(result?.metricSources).toHaveLength(3);
+    expect(result?.kvCacheUsageByEngine).toHaveLength(5);
+    expect(result?.kvCacheUsage[0]?.value).toBeCloseTo(0.48);
+    for (const url of prefillUrls) {
+      const source = result?.metricSources.find((s) => s.source.endpointUrl === url);
+      expect(source?.source.dpRank).toBeNull();
+      expect(source?.kvCacheUsage).toEqual([{ t: 0, value: 0.4 }]);
+      expect(source?.kvCacheUsageByEngine).toEqual([
+        { engineLabel: '0', points: [{ t: 0, value: 0.2 }] },
+        { engineLabel: '1', points: [{ t: 0, value: 0.6 }] },
+      ]);
+      expect(source?.queueDepth).toEqual([{ t: 0, running: 2, waiting: 0, total: 2 }]);
+    }
+    expect(result?.metricSources.find((s) => s.source.role === 'decode')?.kvCacheUsage).toEqual([
+      { t: 0, value: 0.8 },
+    ]);
+  });
 });
 
 // ── Summed series on the canonical grid (v14) ───────────────────────────

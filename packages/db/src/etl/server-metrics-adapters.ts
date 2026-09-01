@@ -94,17 +94,16 @@ const trtllmAdapter: ServerMetricsAdapter = {
             : 'unknown';
     const endpointUrl = series.endpoint_url ?? null;
     const workerId = labels['worker_id'] ?? null;
-    const dpRank = labels['dp_rank'] ?? null;
-    const engine = labels['engine'] ?? labels['engine_idx'] ?? null;
     return {
-      id: stableId('trtllm', [role, endpointUrl, workerId, dpRank, engine]),
+      // Native TRT metrics and Dynamo's rank-labelled gauges share one endpoint.
+      id: stableId('trtllm', [role, endpointUrl ?? workerId]),
       adapter: 'trtllm',
       role,
       endpointUrl,
       nativeRole,
       workerId,
-      dpRank,
-      engine,
+      dpRank: null,
+      engine: null,
     };
   },
 };
