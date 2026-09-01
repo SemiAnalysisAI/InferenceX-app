@@ -322,6 +322,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             open={openDropdown === 'sequence'}
             onOpenChange={handleDropdownOpenChange('sequence')}
             availableSequences={availableSequences}
+            model={selectedModel}
             data-testid="scenario-selector"
           />
           {/* AgentX publishes on P90, so the percentile control is an insider

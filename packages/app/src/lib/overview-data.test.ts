@@ -179,7 +179,7 @@ describe('overview engine scope and scenario selection', () => {
     expect(overviewScenarioForModel(Model.GLM_5_2)).toBe('agentx');
     expect(overviewScenarioForModel(Model.DeepSeek_V4_Pro)).toBe('single_turn_8k1k');
     expect(overviewScenarioForModel(Model.Kimi_K2_5)).toBe('single_turn_8k1k');
-    expect(overviewScenarioForModel(Model.MiniMax_M3)).toBe('single_turn_8k1k');
+    expect(overviewScenarioForModel(Model.MiniMax_M3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.Qwen3_5)).toBe('single_turn_8k1k');
   });
 
@@ -1336,13 +1336,16 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    // Curated scenarios: DeepSeek, MiniMax and Qwen3.5 each get both rows, Kimi
-    // K3 and GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are
-    // not default models, and the matrix is built from DEFAULT_MODELS.
+    // Curated scenarios: DeepSeek and Qwen3.5 each get both rows, Kimi K3 and
+    // GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are not
+    // default models, and the matrix is built from DEFAULT_MODELS.
     // Qwen3.8-Flash-Next is curated AgentX-only, like Kimi K3 and GLM: the
     // model is benchmarked on agentic traces, so it must not claim a
-    // fixed-sequence row it will never fill. AgentX rows group above the 8K/1K
-    // rows, each group in MODEL_CONFIG declaration order.
+    // fixed-sequence row it will never fill. MiniMax M3 is AgentX-only too,
+    // but by retirement: its single-turn 8k1k sweep stopped on 2026-08-04
+    // (InferenceX#2493), so the matrix must not keep a row that never
+    // refreshes. AgentX rows group above the 8K/1K rows, each group in
+    // MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.Kimi_K3}/agentx`,
@@ -1351,7 +1354,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.Qwen3_5}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
       `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
-      `${Model.MiniMax_M3}/single_turn_8k1k`,
       `${Model.Qwen3_5}/single_turn_8k1k`,
     ]);
     expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
@@ -1419,10 +1421,10 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
         .map((p) => p.missingReason),
     ).toEqual(['no_scenario_data', 'no_scenario_data', 'no_scenario_data']);
 
-    // MiniMax: the platform result remains visible when B200 has no 8K/1K data
-    // — priced, but with no percentage baseline (the UI's ∞ badge state).
+    // MiniMax: the platform result remains visible when B200 has no AgentX
+    // data — priced, but with no percentage baseline (the UI's ∞ badge state).
     const minimax = page.models.find(
-      (m) => m.model === Model.MiniMax_M3 && m.scenario === 'single_turn_8k1k',
+      (m) => m.model === Model.MiniMax_M3 && m.scenario === 'agentx',
     )!;
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
     expect(mmGb300.baseline.missingReason).toBe('no_scenario_data');

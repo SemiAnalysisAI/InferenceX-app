@@ -384,6 +384,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
+                  model={selectedModel}
                 />
                 {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
