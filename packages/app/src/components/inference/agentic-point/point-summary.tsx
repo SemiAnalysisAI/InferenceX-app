@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
+import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { useLocale } from '@/lib/use-locale';
@@ -24,6 +25,7 @@ export const POINT_SUMMARY_STRINGS = {
     concurrency: 'Concurrency',
     gpuCacheHit: 'Chip cache hit',
     cpuCacheHit: 'CPU cache hit',
+    combinedCacheHit: 'Combined chip + CPU cache hit',
     enabledLegacy: 'Enabled (legacy data)',
     disabledLegacy: 'Disabled (legacy data)',
     none: 'None',
@@ -40,6 +42,7 @@ export const POINT_SUMMARY_STRINGS = {
     concurrency: '并发数',
     gpuCacheHit: '芯片 cache 命中率',
     cpuCacheHit: 'CPU cache 命中率',
+    combinedCacheHit: '芯片 + CPU 综合 cache 命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',
     none: '无',
@@ -71,6 +74,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
   const t = POINT_SUMMARY_STRINGS[locale];
   const showCpuCacheHit = isKvOffloadEnabled(meta);
+  const showCombinedCacheHit = showCpuCacheHit && frameworkFamily(meta.framework) === 'trt';
   const offloadBackend = versionedComponentLabel(
     meta.kv_offload_backend,
     meta.kv_offload_backend_version,
@@ -104,8 +108,11 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
         {transferEngine && <MetaLine label={t.transferEngine} value={transferEngine} />}
         {router && <MetaLine label={t.router} value={router} />}
         <MetaLine label={t.concurrency} value={meta.conc} />
-        <MetaLine label={t.gpuCacheHit} value={fmtPct(meta.server_gpu_cache_hit_rate)} />
-        {showCpuCacheHit && (
+        <MetaLine
+          label={showCombinedCacheHit ? t.combinedCacheHit : t.gpuCacheHit}
+          value={fmtPct(meta.server_gpu_cache_hit_rate)}
+        />
+        {showCpuCacheHit && !showCombinedCacheHit && (
           <MetaLine label={t.cpuCacheHit} value={fmtPct(meta.server_cpu_cache_hit_rate)} />
         )}
         {meta.isl !== null && <MetaLine label="ISL" value={meta.isl} />}

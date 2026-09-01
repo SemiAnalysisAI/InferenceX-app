@@ -68,6 +68,23 @@ describe('PointSummary', () => {
     expect(html).toContain('42.00%');
   });
 
+  it('labels TRTLLM offload cache hits as combined instead of showing an empty CPU rate', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, {
+        meta: meta({
+          framework: 'dynamo-trt',
+          kv_offloading: 'dram',
+          server_gpu_cache_hit_rate: 0.978,
+          server_cpu_cache_hit_rate: null,
+        }),
+      }),
+    );
+
+    expect(html).toContain('Combined chip + CPU cache hit');
+    expect(html).toContain('97.80%');
+    expect(html).not.toContain('>CPU cache hit<');
+  });
+
   it('shows runtime component names and independently reported versions', () => {
     const html = renderToStaticMarkup(
       createElement(PointSummary, {

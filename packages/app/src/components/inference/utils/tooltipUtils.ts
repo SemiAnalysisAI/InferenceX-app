@@ -2,6 +2,7 @@ import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
 import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
@@ -167,6 +168,7 @@ const CACHE_STRINGS = {
     router: 'Router',
     gpuHitRate: 'Chip Cache Hit Rate',
     cpuHitRate: 'CPU Cache Hit Rate',
+    combinedHitRate: 'Combined Chip + CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
@@ -178,6 +180,7 @@ const CACHE_STRINGS = {
     router: '路由器',
     gpuHitRate: '芯片 Cache 命中率',
     cpuHitRate: 'CPU Cache 命中率',
+    combinedHitRate: '芯片 + CPU 综合 Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
@@ -216,8 +219,10 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
   const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
   const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
-  if (gpuHit) parts.push(tooltipLine(t.gpuHitRate, gpuHit));
-  if (cpuHit && isKvOffloadEnabled(d)) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
+  const offloadEnabled = isKvOffloadEnabled(d);
+  const combinedHit = offloadEnabled && frameworkFamily(d.framework) === 'trt';
+  if (gpuHit) parts.push(tooltipLine(combinedHit ? t.combinedHitRate : t.gpuHitRate, gpuHit));
+  if (cpuHit && offloadEnabled && !combinedHit) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
   if (theoreticalHit) parts.push(tooltipLine(t.theoreticalHitRate, theoreticalHit));
   return parts.join('');
 };
