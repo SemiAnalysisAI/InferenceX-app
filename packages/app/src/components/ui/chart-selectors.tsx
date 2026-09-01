@@ -28,7 +28,7 @@ import {
   getModelLabel,
   getPercentileLabel,
   getPrecisionLabel,
-  getSequenceCategory,
+  getSequenceCategoryForModel,
   getSequenceLabel,
   groupByCategory,
   sequenceKind,
@@ -296,6 +296,8 @@ interface SequenceSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
+  /** Selected model, so per-model scenario retirements group as Deprecated. */
+  model?: Model | null;
   'data-testid'?: string;
 }
 
@@ -306,11 +308,14 @@ export function SequenceSelector({
   open,
   onOpenChange,
   availableSequences,
+  model,
   'data-testid': testId,
 }: SequenceSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
+  const groups = groupByCategory(availableSequences, (s) =>
+    getSequenceCategoryForModel(s as Sequence, model),
+  );
   const sections = [
     {
       id: 'default',
@@ -376,6 +381,8 @@ interface ScenarioSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
+  /** Selected model, so per-model scenario retirements group as Deprecated. */
+  model?: Model | null;
   'data-testid'?: string;
 }
 
@@ -396,13 +403,16 @@ export function ScenarioSelector({
   open,
   onOpenChange,
   availableSequences,
+  model,
   'data-testid': testId,
 }: ScenarioSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
-  const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
+  const fixedGroups = groupByCategory(fixedSeq, (s) =>
+    getSequenceCategoryForModel(s as Sequence, model),
+  );
   const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
 
   if (availableSequences.length < 2) return null;

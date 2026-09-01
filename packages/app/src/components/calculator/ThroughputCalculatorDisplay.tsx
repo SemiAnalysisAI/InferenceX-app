@@ -947,6 +947,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
+                  model={selectedModel}
                 />
                 {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
