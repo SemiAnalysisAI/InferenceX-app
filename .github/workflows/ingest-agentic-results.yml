@@ -288,9 +288,13 @@ jobs:
 
       - name: Invalidate Vercel cache
         run: |
-          if [ "$INGEST_DATABASE_TARGET" = "staging" ] || [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
+          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
             curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
               -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
+          elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" || \
+              echo "::warning::Preview cache invalidation failed; the database ingest is complete"
           else
             curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
               -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" || true
