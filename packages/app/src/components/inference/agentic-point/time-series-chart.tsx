@@ -5,7 +5,16 @@ import { useMemo } from 'react';
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
 import { ChartHover, type HoverItem } from './chart-hover';
-import { CHART_PAD, ChartEmpty, fmtCount, fmtSeconds } from './chart-shared';
+import {
+  CHART_PAD,
+  ChartEmpty,
+  ChartLegend,
+  LEGEND_BASELINE_OFFSET,
+  fmtCount,
+  fmtSeconds,
+  type ChartLegendEntry,
+} from './chart-shared';
+import { layoutChartLegend } from './chart-legend';
 import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
 import { useLocale } from '@/lib/use-locale';
 
@@ -53,11 +62,35 @@ export function TimeSeriesChart({
 }: TimeSeriesChartProps) {
   const locale = useLocale();
   const W = width;
-  const H = height;
+
+  // Legend entries, skipping series flagged hideFromHover so per-engine
+  // underlays don't take a legend slot with no visible line.
+  const legendEntries = useMemo<ChartLegendEntry[]>(
+    () =>
+      series
+        .filter((s) => !s.hideFromHover)
+        .map((s) => ({ label: s.name, color: s.color, strokeWidth: s.strokeWidth ?? 2 })),
+    [series],
+  );
+
+  // Wrap the legend to as many rows as the labels need, then grow the viewBox
+  // and the bottom padding by the same amount. The plot area keeps its exact
+  // geometry and the extra rows extend the SVG downward.
+  const legend = useMemo(
+    () =>
+      layoutChartLegend(
+        legendEntries.map((e) => e.label),
+        W - PAD.left - PAD.right,
+      ),
+    [legendEntries, W],
+  );
+  const H = height + legend.extraHeight;
+  const padBottom = PAD.bottom + legend.extraHeight;
+  const pad = useMemo(() => ({ ...PAD, bottom: padBottom }), [padBottom]);
 
   const layout = useMemo(() => {
     const innerW = W - PAD.left - PAD.right;
-    const innerH = H - PAD.top - PAD.bottom;
+    const innerH = H - PAD.top - padBottom;
     const xMax = Math.max(durationS, 1);
     // Fold reference-line values into the auto max so a ceiling above the data
     // (e.g. KV-cache pool >> working set) still renders inside the plot.
@@ -67,7 +100,7 @@ export function TimeSeriesChart({
     const xScale = (t: number) => PAD.left + (t / xMax) * innerW;
     const yScale = (v: number) => PAD.top + (1 - v / yMax) * innerH;
     return { innerW, innerH, xMax, yMax, xScale, yScale };
-  }, [series, durationS, yMaxOpt, refLines, W, H]);
+  }, [series, durationS, yMaxOpt, refLines, W, H, padBottom]);
 
   const { innerW, innerH, xMax, yMax, xScale, yScale } = layout;
 
@@ -99,7 +132,7 @@ export function TimeSeriesChart({
   }
 
   return (
-    <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
+    <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
       {/* y-axis gridlines + labels */}
       {yTickVals.map((v, i) => {
         const y = yScale(v);
@@ -225,7 +258,7 @@ export function TimeSeriesChart({
       })}
       <text
         x={W / 2}
-        y={H - 22}
+        y={H - legend.extraHeight - 22}
         fontSize={11}
         fill="currentColor"
         opacity={0.55}
@@ -237,42 +270,23 @@ export function TimeSeriesChart({
       {yAxisLabel && (
         <text
           x={10}
-          y={H / 2}
+          y={(H - legend.extraHeight) / 2}
           fontSize={11}
           fill="currentColor"
           opacity={0.55}
           textAnchor="middle"
-          transform={`rotate(-90 10 ${H / 2})`}
+          transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
         >
           {yAxisLabel}
         </text>
       )}
 
-      {/* Legend — skip series flagged hideFromHover so per-engine
-          underlays don't clutter the chip row. */}
-      {(() => {
-        const visible = series.filter((s) => !s.hideFromHover);
-        const chipY = H - 8;
-        const chipW = innerW / Math.max(1, visible.length);
-        return visible.map((s, i) => {
-          const x = PAD.left + i * chipW;
-          return (
-            <g key={`leg${i}`}>
-              <line
-                x1={x + 2}
-                x2={x + 14}
-                y1={chipY - 4}
-                y2={chipY - 4}
-                stroke={s.color}
-                strokeWidth={s.strokeWidth ?? 2}
-              />
-              <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                {s.name}
-              </text>
-            </g>
-          );
-        });
-      })()}
+      <ChartLegend
+        entries={legendEntries}
+        layout={legend}
+        left={PAD.left}
+        baselineY={H - LEGEND_BASELINE_OFFSET}
+      />
     </ChartHover>
   );
 }
@@ -333,7 +347,6 @@ export function StackedAreaChart({
   const locale = useLocale();
   const sourceLabels = SOURCE_LABELS[locale];
   const W = width;
-  const H = height;
 
   const computed = useMemo(() => {
     const entries = Object.entries(sourceSeries).filter(([, v]) => v.length > 0);
@@ -397,8 +410,24 @@ export function StackedAreaChart({
   }
   const colorFor = (name: string): string => colorByName.get(name) ?? FALLBACK_PALETTE[0]!;
 
+  // Wrap the legend, then grow the viewBox and bottom padding by the same
+  // amount so the plot area is untouched (see TimeSeriesChart).
+  const legendEntries: ChartLegendEntry[] = stackOrder.map((name) => ({
+    label: sourceLabels[name] ?? name,
+    color: colorFor(name),
+    swatch: 'area',
+    opacity: 0.75,
+  }));
+  const legend = layoutChartLegend(
+    legendEntries.map((e) => e.label),
+    W - PAD.left - PAD.right,
+  );
+  const H = height + legend.extraHeight;
+  const padBottom = PAD.bottom + legend.extraHeight;
+  const pad = { ...PAD, bottom: padBottom };
+
   const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
+  const innerH = H - PAD.top - padBottom;
   const xMax = Math.max(durationS, 1);
   const xScale = (t: number) => PAD.left + (t / xMax) * innerW;
   const yScale = (v: number) => PAD.top + (1 - v) * innerH;
@@ -443,7 +472,7 @@ export function StackedAreaChart({
   const yTickVals = [0, 0.25, 0.5, 0.75, 1];
 
   return (
-    <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
+    <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
       {yTickVals.map((v, i) => {
         const y = yScale(v);
         return (
@@ -499,7 +528,7 @@ export function StackedAreaChart({
       })}
       <text
         x={W / 2}
-        y={H - 22}
+        y={H - legend.extraHeight - 22}
         fontSize={11}
         fill="currentColor"
         opacity={0.55}
@@ -509,30 +538,21 @@ export function StackedAreaChart({
       </text>
       <text
         x={10}
-        y={H / 2}
+        y={(H - legend.extraHeight) / 2}
         fontSize={11}
         fill="currentColor"
         opacity={0.55}
         textAnchor="middle"
-        transform={`rotate(-90 10 ${H / 2})`}
+        transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
       >
         {locale === 'zh' ? '预填充 token 占比' : '% of prefill tokens'}
       </text>
-      {(() => {
-        const chipY = H - 8;
-        const chipW = innerW / Math.max(1, layers.length);
-        return layers.map((l, i) => {
-          const x = PAD.left + i * chipW;
-          return (
-            <g key={`leg${i}`}>
-              <rect x={x + 2} y={chipY - 9} width={12} height={8} fill={l.color} opacity={0.75} />
-              <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                {sourceLabels[l.name] ?? l.name}
-              </text>
-            </g>
-          );
-        });
-      })()}
+      <ChartLegend
+        entries={legendEntries}
+        layout={legend}
+        left={PAD.left}
+        baselineY={H - LEGEND_BASELINE_OFFSET}
+      />
     </ChartHover>
   );
 }

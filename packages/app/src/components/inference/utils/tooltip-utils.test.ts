@@ -500,6 +500,23 @@ describe('generateTooltipContent', () => {
     expect(enabled).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 
+  it('labels TRTLLM offload cache hits as a combined chip and CPU rate', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          framework: 'dynamo-trt',
+          kv_offloading: 'dram',
+          server_gpu_cache_hit_rate: 0.978,
+          server_cpu_cache_hit_rate: undefined,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Combined Chip + CPU Cache Hit Rate:</strong> 97.8%');
+    expect(html).not.toContain('<strong>CPU Cache Hit Rate:</strong>');
+    expect(html).not.toContain('<strong>Chip Cache Hit Rate:</strong>');
+  });
+
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
     const html = generateTooltipContent(
       tooltipConfig({

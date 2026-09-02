@@ -2,6 +2,16 @@
 
 import { useLocale } from '@/lib/use-locale';
 
+import {
+  LEGEND_BASELINE_OFFSET,
+  LEGEND_FONT_SIZE,
+  LEGEND_ROW_HEIGHT,
+  LEGEND_SWATCH_INSET,
+  LEGEND_SWATCH_WIDTH,
+  LEGEND_TEXT_OFFSET,
+  type LegendLayout,
+} from './chart-legend';
+
 /**
  * Shared presentational constants and helpers for the agentic point-detail
  * charts (time-series, stacked-area, distribution, aggregate). These charts
@@ -58,3 +68,88 @@ export function ChartEmpty({ height = 260, message }: { height?: number; message
 export function ChartSkeleton() {
   return <div className="h-[260px] rounded-md bg-muted/30 animate-pulse" />;
 }
+
+/** How a legend entry's color is shown: a stroked line or a filled block. */
+export type LegendSwatch = 'line' | 'dashed-line' | 'area';
+
+export interface ChartLegendEntry {
+  label: string;
+  color: string;
+  /** Defaults to `'line'`. */
+  swatch?: LegendSwatch;
+  /** Stroke width for the line swatches. Defaults to 2. */
+  strokeWidth?: number;
+  /** Swatch opacity, to match a translucent area fill. Defaults to 1. */
+  opacity?: number;
+}
+
+/**
+ * Wrapped legend for the hand-rolled point-detail charts.
+ *
+ * `layout` comes from `layoutChartLegend()` and must have been computed from
+ * the same entry order. `baselineY` is the baseline of the *last* row (charts
+ * pass `height - LEGEND_BASELINE_OFFSET`), so a single-row legend lands exactly
+ * where it did before wrapping existed and extra rows grow downward into the
+ * space the chart added to its bottom padding.
+ */
+export function ChartLegend({
+  entries,
+  layout,
+  left,
+  baselineY,
+}: {
+  entries: readonly ChartLegendEntry[];
+  layout: LegendLayout;
+  /** x of the plot area's left edge; item x offsets are relative to it. */
+  left: number;
+  baselineY: number;
+}) {
+  const topRowBaseline = baselineY - (layout.rows - 1) * LEGEND_ROW_HEIGHT;
+  return (
+    <>
+      {entries.map((entry, i) => {
+        const placed = layout.items[i];
+        if (!placed) return null;
+        const x = left + placed.x;
+        const y = topRowBaseline + placed.row * LEGEND_ROW_HEIGHT;
+        const swatch = entry.swatch ?? 'line';
+        return (
+          <g key={`legend-${i}`}>
+            {swatch === 'area' ? (
+              <rect
+                x={x + LEGEND_SWATCH_INSET}
+                y={y - 9}
+                width={LEGEND_SWATCH_WIDTH}
+                height={8}
+                fill={entry.color}
+                opacity={entry.opacity ?? 1}
+              />
+            ) : (
+              <line
+                x1={x + LEGEND_SWATCH_INSET}
+                x2={x + LEGEND_SWATCH_INSET + LEGEND_SWATCH_WIDTH}
+                y1={y - 4}
+                y2={y - 4}
+                stroke={entry.color}
+                strokeWidth={entry.strokeWidth ?? 2}
+                strokeDasharray={swatch === 'dashed-line' ? '5 3' : undefined}
+                opacity={entry.opacity ?? 1}
+              />
+            )}
+            <text
+              x={x + LEGEND_TEXT_OFFSET}
+              y={y}
+              fontSize={LEGEND_FONT_SIZE}
+              fill="currentColor"
+              opacity={0.9}
+            >
+              {entry.label}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+export { LEGEND_BASELINE_OFFSET };
