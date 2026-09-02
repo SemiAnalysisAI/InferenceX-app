@@ -157,6 +157,7 @@ export function extractServerMetricSamples(json: string): {
     'vllm:kv_cache_usage_perc',
     'vllm:gpu_cache_usage_perc',
     'sglang:token_usage',
+    'atom:kv_cache_usage_ratio',
     'trtllm_kv_cache_utilization',
   );
   const kvCacheUtil = [...aggregateSeriesByStart(kvSeriesAll, 'avg', 'avg').values()];
@@ -168,6 +169,7 @@ export function extractServerMetricSamples(json: string): {
     'vllm:prefix_cache_hits',
     'vllm:gpu_prefix_cache_hits',
     'sglang:cached_tokens',
+    'atom:prefix_cache_cached_tokens',
     'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
@@ -177,6 +179,7 @@ export function extractServerMetricSamples(json: string): {
     'vllm:gpu_prefix_cache_queries',
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'atom:prefix_cache_full_tokens',
     'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
@@ -189,7 +192,7 @@ export function extractServerMetricSamples(json: string): {
   }
   if (prefixCacheHitRate.length === 0) {
     const directRate = aggregateSeriesByStart(
-      metrics['trtllm_kv_cache_hit_rate']?.series ?? [],
+      pickFirstNonEmpty(metrics, 'trtllm_kv_cache_hit_rate', 'atom:prefix_cache_hit_ratio'),
       'avg',
       'avg',
     );
@@ -213,6 +216,11 @@ const TARGET_METRIC_KEYS = new Set([
   'sglang:token_usage',
   'sglang:cached_tokens',
   'sglang:prompt_tokens',
+  // ATOM
+  'atom:kv_cache_usage_ratio',
+  'atom:prefix_cache_cached_tokens',
+  'atom:prefix_cache_full_tokens',
+  'atom:prefix_cache_hit_ratio',
   // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
