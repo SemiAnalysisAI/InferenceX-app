@@ -429,7 +429,9 @@ function MultiSelect({
             plainSelectedText ? (
               <span className="text-foreground flex min-w-0 items-center gap-1.5">
                 {selectedOptions.length === 1 && selectedOptions[0].icon}
-                <span className="block min-w-0 truncate">{selectedLabels.join(', ')}</span>
+                <span className="block min-w-0 truncate" title={selectedLabels.join(', ')}>
+                  {selectedLabels.join(', ')}
+                </span>
               </span>
             ) : (
               selectedLabels.map((label, index) => (

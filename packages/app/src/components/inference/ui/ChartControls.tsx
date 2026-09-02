@@ -321,13 +321,19 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const showPercentile =
+    mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <ControlPanel legend={t.benchmarkControls}>
-          <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-            <div className="min-w-0 sm:col-span-2">
+      <div
+        className={`grid min-w-0 items-start gap-3 ${hideGpuComparison ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}
+      >
+        <ControlPanel legend={t.benchmarkControls} className="lg:col-span-2">
+          <div
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
+          >
+            <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
                 onChange={handleModelChange}
@@ -348,16 +354,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               model={selectedModel}
               data-testid="scenario-selector"
             />
-            {/* AgentX publishes on P90, so the percentile control is an insider
-              affordance rather than a normal chart filter: it stays behind the
-              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
-            {mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked && (
-              <PercentileSelector
-                value={selectedPercentile}
-                onChange={(p: Percentile) => setSelectedPercentile(p)}
-                data-testid="percentile-selector"
-              />
-            )}
             <PrecisionSelector
               value={selectedPrecisions}
               onChange={handlePrecisionChange}
@@ -366,6 +362,16 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               availablePrecisions={availablePrecisions}
               data-testid="precision-multiselect"
             />
+            {/* AgentX publishes on P90, so the percentile control is an insider
+              affordance rather than a normal chart filter: it stays behind the
+              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
+            {showPercentile && (
+              <PercentileSelector
+                value={selectedPercentile}
+                onChange={(p: Percentile) => setSelectedPercentile(p)}
+                data-testid="percentile-selector"
+              />
+            )}
           </div>
         </ControlPanel>
 
@@ -520,8 +526,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           </ControlPanel>
 
           {!hideGpuComparison && (
-            <ControlPanel legend={t.compareHistory} className="lg:col-span-2">
-              <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            <ControlPanel legend={t.compareHistory}>
+              <div className="grid min-w-0 gap-3">
                 <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="gpu-config-select"

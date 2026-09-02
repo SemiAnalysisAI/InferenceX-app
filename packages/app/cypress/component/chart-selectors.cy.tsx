@@ -72,7 +72,83 @@ function PrecisionSelectorHarness() {
   );
 }
 
+function SelectableContextHarness() {
+  const [multipleOptions, setMultipleOptions] = useState(false);
+  const [scenario, setScenario] = useState(Sequence.EightK_OneK);
+  const [precisions, setPrecisions] = useState(['fp4']);
+  return (
+    <TooltipProvider>
+      <button
+        data-testid="toggle-options"
+        onClick={() => {
+          setMultipleOptions(!multipleOptions);
+          setScenario(Sequence.EightK_OneK);
+          setPrecisions(['fp4']);
+        }}
+      >
+        Change available configurations
+      </button>
+      <div className="grid grid-cols-2 gap-3 p-4">
+        <ScenarioSelector
+          value={scenario}
+          onChange={setScenario}
+          availableSequences={
+            multipleOptions
+              ? [Sequence.EightK_OneK, Sequence.AgenticTraces]
+              : [Sequence.EightK_OneK]
+          }
+          data-testid="scenario-selector"
+        />
+        <PrecisionSelector
+          value={precisions}
+          onChange={setPrecisions}
+          availablePrecisions={multipleOptions ? ['fp4', 'fp8', 'bf16'] : ['fp4']}
+          data-testid="precision-multiselect"
+        />
+      </div>
+    </TooltipProvider>
+  );
+}
+
 describe('Chart Selectors', () => {
+  for (const width of [390, 768, 1280]) {
+    it(`keeps fixed and selectable values the same height at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<SelectableContextHarness />);
+      const height = width < 768 ? '44px' : '36px';
+      const assertHeights = () => {
+        cy.get('[data-testid="scenario-selector"]').should('have.css', 'height', height);
+        cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
+      };
+      cy.get('output').should('have.length', 2);
+      assertHeights();
+      cy.get('[data-testid="toggle-options"]').click();
+      cy.get('[role="combobox"]').should('have.length', 2);
+      assertHeights();
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[role="option"]', 'Agentic').click();
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      for (const precision of ['FP8', 'BF16']) {
+        cy.get('[data-testid="precision-multiselect"]').click();
+        cy.contains('[role="option"]', precision).click();
+        cy.get('[data-slot="select-content"]').should('not.exist');
+        assertHeights();
+      }
+      cy.get('[data-testid="precision-multiselect"] [title]').should(
+        'have.attr',
+        'title',
+        'FP4, FP8, BF16',
+      );
+      cy.get('[data-testid="precision-multiselect"]').click();
+      cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="toggle-options"]').click();
+      cy.get('output#scenario-select').should('have.text', '8K / 1K');
+      cy.get('output#precision-select').should('have.text', 'FP4');
+      assertHeights();
+    });
+  }
+
   it('keeps single-value benchmark context readable on Chinese phones', () => {
     cy.viewport(390, 720);
     cy.mount(

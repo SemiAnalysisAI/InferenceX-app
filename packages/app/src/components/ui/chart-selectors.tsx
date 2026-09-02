@@ -7,7 +7,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { CONTROL_MIN_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
 import {
   Select,
@@ -389,7 +389,7 @@ function SelectedBenchmarkValue({
     <output
       id={id}
       data-testid={testId}
-      className={`${SELECT_TRIGGER_STYLE} ${CONTROL_MIN_HEIGHT.default} w-full py-2 text-foreground`}
+      className={`${SELECT_TRIGGER_STYLE} ${CONTROL_HEIGHT.default} w-full py-1 text-foreground`}
     >
       {children}
     </output>
@@ -617,6 +617,7 @@ export function PrecisionSelector({
             minSelections={1}
             showClearAll={false}
             searchable={false}
+            plainSelectedText
           />
         )}
       </div>

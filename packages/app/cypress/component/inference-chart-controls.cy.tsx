@@ -85,13 +85,29 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="gpu-multiselect"]').should('be.visible');
   });
 
-  it('keeps benchmark and chart controls side by side above comparison history on desktop', () => {
+  it('uses a full-width benchmark row above chart and history controls on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
       const rects = [...$groups].map((group) => group.getBoundingClientRect());
-      expect(Math.abs(rects[0].top - rects[1].top)).to.be.lessThan(2);
-      expect(rects[2].top).to.be.greaterThan(Math.max(rects[0].bottom, rects[1].bottom));
+      expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+      expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
+      expect(rects[0].left).to.equal(rects[1].left);
+      expect(rects[0].right).to.equal(rects[2].right);
+      expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+    });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+      });
+    });
+    cy.get('[data-testid="gpu-multiselect"]').then(($gpu) => {
+      const group = $gpu[0].closest('fieldset')!.getBoundingClientRect();
+      expect(
+        group.right - $gpu[0].getBoundingClientRect().right,
+        'chip selector fills its panel',
+      ).to.be.lessThan(20);
     });
   });
 
@@ -106,6 +122,37 @@ describe('Inference ChartControls', () => {
         expect(rects[2].top).to.be.greaterThan(rects[1].bottom);
         expect(rects[0].width).to.be.closeTo(rects[1].width, 2);
       });
+    cy.get('#scenario-select').then(($scenario) => {
+      const scenario = $scenario[0].getBoundingClientRect();
+      cy.get('#precision-select').should(($precision) => {
+        const precision = $precision[0].getBoundingClientRect();
+        expect(precision.top).to.be.closeTo(scenario.top, 1);
+        expect(precision.left).to.be.greaterThan(scenario.right);
+      });
+    });
+  });
+
+  it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
+    cy.viewport(1280, 900);
+    mountWithProviders(<InferenceChartControls hideGpuComparison />, { inference: {} });
+    cy.get('fieldset')
+      .should('have.length', 2)
+      .then(($groups) => {
+        const benchmark = $groups[0].getBoundingClientRect();
+        const chart = $groups[1].getBoundingClientRect();
+        expect(benchmark.top).to.equal(chart.top);
+        expect(benchmark.width).to.be.greaterThan(chart.width);
+        expect(benchmark.right).to.be.lessThan(chart.left);
+        expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+      });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('#scenario-select, #precision-select, [data-testid="yaxis-metric-selector"]').each(
+        ($control) => {
+          expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+        },
+      );
+    });
   });
 
   it('keeps primary controls visible while secondary controls collapse on mobile', () => {
