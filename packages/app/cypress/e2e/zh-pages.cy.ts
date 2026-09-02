@@ -122,6 +122,78 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('About pages', () => {
+    it('keeps both Chinese article links inside /zh and follows one to its translation', () => {
+      cy.viewport(390, 844);
+      cy.visit('/zh/about');
+
+      cy.contains('a', 'InferenceX v1')
+        .should('have.attr', 'href', '/zh/blog/inferencemax-open-source-inference-benchmarking')
+        .and('not.have.attr', 'hreflang', 'en');
+      cy.contains('a', 'InferenceX v2')
+        .should('have.attr', 'href', '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper')
+        .and('not.have.attr', 'hreflang', 'en')
+        .click();
+      cy.location('pathname').should(
+        'eq',
+        '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper',
+      );
+    });
+  });
+
+  describe('Glossary pages', () => {
+    it('supports a mobile Chinese search, filter, and term navigation journey without overflow', () => {
+      cy.viewport(375, 844);
+      cy.visit('/zh/glossary');
+
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+      cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').as('search').type('MTP');
+      cy.get('a[href="/zh/glossary/multi-token-prediction"]').should('be.visible');
+      cy.get('@search').clear().type('不存在的术语-xyz');
+      cy.contains('h2', '未找到相关术语').should('be.visible');
+      cy.contains('button', '显示全部术语').click();
+      cy.get('@search').should('have.value', '');
+
+      cy.contains('button', '智能体推理').click().should('have.attr', 'aria-pressed', 'true');
+      cy.get('a[href="/zh/glossary/agentx"]').click();
+      cy.location('pathname').should('eq', '/zh/glossary/agentx');
+      cy.contains('a', 'AI 推理术语表').click();
+      cy.location('pathname').should('eq', '/zh/glossary');
+    });
+  });
+
+  describe('Land acknowledgement pages', () => {
+    it('keeps every region and nation visible on mobile', () => {
+      cy.viewport(375, 812);
+      cy.visit('/zh/land-acknowledgement');
+
+      cy.get('[data-testid="land-acknowledgement-page"]').should(
+        'contain.text',
+        '原住民传统领地声明',
+      );
+      cy.title().should('contain', '原住民传统领地声明');
+      for (const [testId, region, nation] of [
+        ['land-acknowledgement-san-jose', 'San Jose', 'Muwekma Ohlone'],
+        ['land-acknowledgement-los-angeles', 'Los Angeles', 'Tongva'],
+        ['land-acknowledgement-chicago', 'Chicago', 'Potawatomi'],
+      ] as const) {
+        cy.get(`[data-testid="${testId}"]`)
+          .should('contain.text', region)
+          .and('contain.text', nation);
+      }
+      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+    });
+  });
+
   describe('zh blog post page', () => {
     before(() => {
       cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
@@ -129,12 +201,27 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders translated content with Chinese chrome', () => {
       cy.get('article.prose').should('exist');
-      cy.contains('分钟阅读').should('exist');
+      cy.contains('预计阅读').should('exist');
       cy.get('a[href="/zh/blog"]').should('exist');
     });
 
     it('links to the English original', () => {
       cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
+    });
+
+    it('localizes the table of contents and heading-link controls at mobile widths', () => {
+      cy.viewport(390, 844);
+      cy.get('details[aria-label="本页目录"]')
+        .should('be.visible')
+        .find('summary')
+        .should('contain.text', '点击展开');
+      cy.get('article.prose a[aria-label="复制本节链接"]')
+        .first()
+        .should('have.attr', 'href')
+        .and('match', /^#/u);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
     });
   });
 

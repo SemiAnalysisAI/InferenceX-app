@@ -19,14 +19,14 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     id: 'faq-chips',
     question: 'InferenceX 测试了哪些芯片？',
-    answer: '我们会在新加速器可用时持续添加。',
+    answer: '新加速器可用后，我们会持续将其纳入基准测试。',
     list: GENERATED_FAQ_DATA.gpuGroups,
   },
   {
     id: 'faq-models',
     question: '测试了哪些 AI 模型？',
     answer:
-      '各模型会在其已有数据所覆盖的固定序列配置（1k/1k、1k/8k、8k/1k tokens）与多个并发级别下进行测试。具备对应数据的模型还包含 AgentX 长上下文多轮智能体编码运行。',
+      '各模型会在其支持的固定序列配置（1k/1k、1k/8k 和 8k/1k token）和多个并发级别下进行测试。对于支持 AgentX 且有相应数据的模型，现有结果还涵盖 AgentX 长上下文、多轮智能体编程测试。',
     list: GENERATED_FAQ_DATA.modelNames,
   },
   {
@@ -34,10 +34,10 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     question: '测试了哪些推理框架和配置？',
     answer: '',
     list: [
-      `框架：${GENERATED_FAQ_DATA.frameworkNames.join(', ')}`,
-      `精度：${GENERATED_FAQ_DATA.precisionNames.join(', ')}`,
+      `框架：${GENERATED_FAQ_DATA.frameworkNames.join('、')}`,
+      `精度：${GENERATED_FAQ_DATA.precisionNames.join('、')}`,
       '运行时：CUDA、ROCm',
-      '分离式推理（Disaggregated serving，独立的 prefill/decode 芯片池）',
+      '分离式推理（独立的 prefill/decode 芯片池）',
       '多 token 预测（MTP）',
       '面向 MoE 模型的宽专家并行（Wide Expert Parallelism）',
     ],
@@ -52,8 +52,8 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
       '每芯片输入和输出吞吐量',
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
-      'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与 subagent 执行情况',
-      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCoud 和裸机租赁定价',
+      'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与子智能体执行情况',
+      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCloud 和租赁定价',
       '每 token 能耗（焦耳，总计、输入、输出）',
       '用户自定义成本和功耗计算',
     ],
@@ -83,25 +83,25 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-benchmark-differences',
     question: 'InferenceX 与其他 AI 基准测试有何不同？',
     answer:
-      'InferenceX 在真实硬件上运行固定序列工作负载与 AgentX 长上下文多轮编码场景。测试配方保存在代码仓库中，每项结果均链接至对应的 GitHub Actions 运行。',
+      'InferenceX 在真实硬件上运行固定序列工作负载和 AgentX 长上下文多轮编码场景。测试配置保存在代码仓库中，每项结果都链接到对应的 GitHub Actions 运行记录。',
   },
   {
     id: 'faq-reproducibility',
-    question: '结果如何实现可复现？',
+    question: '如何保证结果可复现？',
     answer:
-      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、芯片追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
+      '仪表板上的每个数据点都由公开的 GitHub Actions 工作流生成。测试配置（模型、框架、精度、并行度、序列长度和并发数）保存在代码仓库中，并在对应的目标硬件上运行。日志、指标和芯片追踪数据等产物会上传到运行记录页面。每个图表的提示框都提供链接，可直接打开生成该数据点的 GitHub Actions 运行记录。',
   },
   {
     id: 'faq-raw-logs',
     question: '在哪里可以查看原始基准测试日志？',
     answer:
-      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和芯片功耗遥测数据）。',
+      '点击图表中的任意数据点即可打开提示框。其中的“GitHub Actions 运行记录”链接会直接跳转到生成该数据点的工作流运行。您可以在那里查看完整的任务日志、框架和驱动版本、命令行参数，并下载原始产物，包括请求延迟、token 计数和芯片功耗遥测数据。',
   },
   {
     id: 'faq-rerun-benchmark',
     question: '我可以自己重新运行基准测试吗？',
     answer:
-      '可以。基准测试配方位于代码仓库的 /benchmarks 目录中，以独立的 shell 脚本形式存在。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，或触发相同的 GitHub Actions 工作流来复现结果。',
+      '可以。基准测试配置以可独立运行的 shell 脚本形式保存在代码仓库的 /benchmarks 目录中。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，也可以触发相同的 GitHub Actions 工作流来复现结果。',
   },
   {
     id: 'faq-old-runs',
@@ -111,7 +111,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   },
   {
     id: 'faq-data-use',
-    question: '我可以使用 InferenceX 的数据进行自己的分析吗？',
+    question: '我可以使用 InferenceX 数据自行分析吗？',
     answer:
       '可以。所有数据均可自由获取。仪表板支持按芯片、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
   },

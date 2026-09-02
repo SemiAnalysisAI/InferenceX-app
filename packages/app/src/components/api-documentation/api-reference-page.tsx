@@ -59,7 +59,7 @@ const UI_COPY = {
     },
     openApiKicker: '机器可读契约',
     openApiTitle: 'OpenAPI 3.1 JSON',
-    openApiDescription: '查看标准数据结构，或将其直接传入开发工具。',
+    openApiDescription: '查看标准 schema，或直接将其传入工具链。',
     openApiAction: '打开 OpenAPI JSON',
     quickstart: '快速入门',
     quickstartDescription: '只需几步，即可从查看契约到获得真实响应。',
@@ -68,7 +68,7 @@ const UI_COPY = {
     schemas: 'BenchmarkRow 与指标',
     schemasDescription: '理解主要基准测试响应数据及其中的实测字段。',
     endpoints: '端点参考',
-    endpointsDescription: '展开操作，查看参数、状态码与完整示例。',
+    endpointsDescription: '展开任一操作，即可查看参数、状态码和完整示例。',
     operation: '项操作',
     operations: '项操作',
     parameters: '参数',
@@ -305,7 +305,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               {documentation.schemaNotes.map((schema) => (
                 <div
                   key={schema.id}
-                  className="border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
+                  className="min-w-0 border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
                 >
                   <dt className="font-mono text-sm font-semibold">{schema.title}</dt>
                   <dd className="mt-2">
