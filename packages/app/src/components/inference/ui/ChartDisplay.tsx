@@ -692,7 +692,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     return [...ids];
   }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
   // Unofficial-run artifacts are transformed in memory and do not have
-  // persisted aggregate_stats sketches. Suppress the subtitle in overlay mode
+  // persisted aggregate_stats sketches. Suppress the footer summary in overlay mode
   // rather than presenting official-only values as if they covered the overlay.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
@@ -864,6 +864,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
+            // The resident ISL/OSL percentile summary (agentic only) renders
+            // here as the footer's last block rather than in the chart subtitle,
+            // keeping the result-context header compact.
             const footerNotices =
               hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
                 <>
@@ -871,6 +874,28 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                   {isAgenticSequence && <AgenticOptimizationNote />}
                   {hasAtomSeries && <AtomEngineFootnote />}
+                  {residentSequenceLengths && (
+                    <p
+                      className="text-3xs leading-tight text-muted-foreground/70"
+                      data-testid="resident-sequence-lengths"
+                    >
+                      {t.completedSequenceLengths(
+                        residentSequenceLengths.isl.n.toLocaleString(
+                          locale === 'zh' ? 'zh-CN' : 'en-US',
+                        ),
+                      )}{' '}
+                      · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
+                      {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
+                      {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
+                      {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
+                      {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
+                      {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
+                      {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
+                      {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
+                      {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
+                      {formatTokenLength(residentSequenceLengths.osl.p99)}
+                    </p>
+                  )}
                 </>
               ) : undefined;
             return (
@@ -1052,28 +1077,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 : undefined
                             }
                           />
-                          {residentSequenceLengths && (
-                            <p
-                              className="mb-2 text-xs text-muted-foreground"
-                              data-testid="resident-sequence-lengths"
-                            >
-                              {t.completedSequenceLengths(
-                                residentSequenceLengths.isl.n.toLocaleString(
-                                  locale === 'zh' ? 'zh-CN' : 'en-US',
-                                ),
-                              )}{' '}
-                              · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
-                              {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
-                              {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
-                              {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
-                              {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
-                              {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
-                              {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
-                              {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
-                              {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
-                              {formatTokenLength(residentSequenceLengths.osl.p99)}
-                            </p>
-                          )}
                           <MetricAssumptionNotes
                             selectedYAxisMetric={selectedYAxisMetric}
                             activeHwKeys={captionHwKeys}
