@@ -33,6 +33,22 @@ function focusAppearance(element: Element) {
   };
 }
 
+function SegmentedGeometryHarness({ size }: { size: 'sm' | 'default' }) {
+  const [value, setValue] = useState('chart');
+  return (
+    <SegmentedToggle
+      size={size}
+      value={value}
+      onValueChange={setValue}
+      ariaLabel={`${size} view`}
+      options={[
+        { value: 'chart', label: 'Chart' },
+        { value: 'table', label: 'Table' },
+      ]}
+    />
+  );
+}
+
 function SearchForm({ onSubmit }: { onSubmit: React.FormEventHandler<HTMLFormElement> }) {
   const [value, setValue] = useState('first');
   return (
@@ -239,6 +255,53 @@ describe('component CSS harness', () => {
       '32px',
     );
   });
+
+  for (const width of [390, 1280]) {
+    for (const theme of ['light', 'dark', 'minecraft']) {
+      it(`keeps selected segments concentric with their outlines at ${width}px in ${theme} mode`, () => {
+        cy.viewport(width, 720);
+        cy.mount(
+          <div className={`${theme} flex flex-col items-start gap-4 p-4`}>
+            <SegmentedGeometryHarness size="sm" />
+            <SegmentedGeometryHarness size="default" />
+          </div>,
+        );
+        for (const size of ['sm', 'default']) {
+          const selector = `[role="tablist"][aria-label="${size} view"]`;
+          const assertCorners = (side: 'left' | 'right') => {
+            cy.get(selector).should(($group) => {
+              const group = $group[0];
+              const selected = group.querySelector('[aria-selected="true"]')!;
+              const outer = group.getBoundingClientRect();
+              const inner = selected.getBoundingClientRect();
+              const inset = side === 'left' ? inner.left - outer.left : outer.right - inner.right;
+              expect(inner.top - outer.top, 'equal top and side inset').to.be.closeTo(inset, 0.25);
+              expect(outer.bottom - inner.bottom, 'equal bottom and side inset').to.be.closeTo(
+                inset,
+                0.25,
+              );
+              const outerStyle = getComputedStyle(group);
+              const innerStyle = getComputedStyle(selected);
+              const corner = side === 'left' ? 'borderTopLeftRadius' : 'borderTopRightRadius';
+              expect(parseFloat(innerStyle[corner]), 'concentric selected corner').to.be.closeTo(
+                Math.max(0, parseFloat(outerStyle[corner]) - inset),
+                0.25,
+              );
+              expect(inner.height, 'retains usable touch targets').to.be.at.least(
+                width < 768 ? 44 : 24,
+              );
+            });
+          };
+          assertCorners('left');
+          cy.get(selector).contains('[role="tab"]', 'Table').click();
+          cy.get(selector)
+            .contains('[role="tab"]', 'Table')
+            .should('have.attr', 'aria-selected', 'true');
+          assertCorners('right');
+        }
+      });
+    }
+  }
 
   it('exposes value filters as pressed buttons and does not submit the surrounding form', () => {
     cy.viewport(390, 720);

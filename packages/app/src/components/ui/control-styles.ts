@@ -27,4 +27,4 @@ export const CONTROL_SEARCH_CLEAR_STYLE =
 export const CONTROL_OPTION_STYLE = 'min-h-11 md:min-h-8';
 
 export const SEGMENTED_CONTAINER_STYLE =
-  'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center rounded-lg border border-border gap-0.5 md:p-0.5 md:min-h-8';
+  'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-stretch rounded-lg border border-border gap-0.5 [--segmented-inset:1px] md:[--segmented-inset:3px] md:p-0.5 md:min-h-8';

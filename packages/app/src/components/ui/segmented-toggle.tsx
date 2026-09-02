@@ -76,7 +76,8 @@ export function SegmentedToggle<TValue extends string>({
           aria-label={option.ariaLabel}
           title={option.title}
           className={cn(
-            'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
+            // Match the outer curve after its border/padding inset, including square themes.
+            'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-[max(0px,calc(var(--radius)-var(--segmented-inset)))] px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
             size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,
             value === option.value ? activeButtonClassName : inactiveButtonClassName,
