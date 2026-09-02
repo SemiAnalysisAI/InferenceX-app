@@ -283,9 +283,9 @@ describe('Current InferenceX Image localized routes', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', {});
     visitCurrentImage();
-    cy.get('[data-testid="current-image-filters"] fieldset')
+    cy.get('[data-testid="current-image-filters"] fieldset legend')
       .first()
-      .should('contain.text', '基准测试配置');
+      .should('have.text', '配置');
     cy.get('[data-testid="current-image-filters"] button[role="combobox"]').each(($button) => {
       expect($button[0].getBoundingClientRect().height).to.be.at.least(44);
     });
