@@ -87,9 +87,12 @@ describe('TCO Calculator', () => {
           expect(first.top, 'joined fill reaches the upper border').to.equal(bounds.top + 1);
           expect(first.bottom, 'joined fill reaches the lower border').to.equal(bounds.bottom - 1);
           for (let i = 1; i < buttons.length; i++) {
-            expect(buttons[i].getBoundingClientRect().left, 'segments have no inset gaps').to.equal(
-              buttons[i - 1].getBoundingClientRect().right,
-            );
+            // Firefox can round adjacent fractional coordinates differently;
+            // a subpixel tolerance still rejects any visible inset or gap.
+            expect(
+              buttons[i].getBoundingClientRect().left,
+              'segments have no inset gaps',
+            ).to.be.closeTo(buttons[i - 1].getBoundingClientRect().right, 0.1);
           }
         });
       cy.get('input[type="range"]').should('be.visible');

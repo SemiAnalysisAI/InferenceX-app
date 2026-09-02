@@ -14,6 +14,7 @@ import {
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { CONTROL_SEARCH_CLEAR_STYLE, CONTROL_SEARCH_STYLE } from '@/components/ui/control-styles';
 import {
   Select,
   SelectContent,
@@ -223,14 +224,14 @@ export function DataTable<T>({
               setPage(0);
             }}
             placeholder={t.search}
-            className="h-11 w-full rounded-md border border-border bg-transparent pl-8 pr-9 text-xs focus:outline-none md:h-8"
+            className={`${CONTROL_SEARCH_STYLE} rounded-md border border-border pl-8 pr-11 md:pr-8`}
             aria-label={t.searchAria}
           />
           {search && (
             <button
               type="button"
               onClick={clearSearch}
-              className="absolute right-0 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground md:size-8"
+              className={`${CONTROL_SEARCH_CLEAR_STYLE} absolute right-0 top-1/2 -translate-y-1/2`}
               aria-label={t.clearSearch}
             >
               <X className="size-3" />

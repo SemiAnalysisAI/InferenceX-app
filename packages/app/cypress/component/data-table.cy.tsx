@@ -28,6 +28,34 @@ const columns = [
 ];
 
 describe('DataTable presets', () => {
+  it('keeps search readable and its clear action touchable on phones', () => {
+    cy.viewport(390, 720);
+    cy.mount(<DataTable data={rows} columns={columns} testId="search-table" />);
+
+    cy.get('input[aria-label="Search table"]')
+      .should('have.css', 'font-size', '16px')
+      .and('have.css', 'height', '44px')
+      .type('B200');
+    cy.get('[data-testid="search-table"] tbody tr')
+      .should('have.length', 1)
+      .and('contain.text', 'B200');
+    cy.get('button[aria-label="Clear search"]')
+      .should('have.css', 'width', '44px')
+      .and('have.css', 'height', '44px')
+      .click();
+    cy.get('input[aria-label="Search table"]').should('have.value', '').and('be.focused');
+    cy.get('[data-testid="search-table"] tbody tr').should('have.length', 2);
+
+    cy.viewport(1280, 900);
+    cy.get('input[aria-label="Search table"]')
+      .should('have.css', 'font-size', '14px')
+      .and('have.css', 'height', '32px')
+      .type('H100');
+    cy.get('button[aria-label="Clear search"]')
+      .should('have.css', 'width', '32px')
+      .and('have.css', 'height', '32px');
+  });
+
   it('switches to all data, searches hidden columns, clears search, and keeps sort state', () => {
     cy.mount(<DataTable data={rows} columns={columns} testId="preset-table" />);
 

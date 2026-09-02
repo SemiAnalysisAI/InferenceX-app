@@ -1,5 +1,5 @@
 /**
- * Regression: the chart action toolbar (view toggle, share, download, reset
+ * Regression: the chart action toolbar (view toggle, download, reset
  * zoom) renders as an absolute overlay in the chart figure's top-right corner
  * from `md` up. The chart heading spanned the full card width, so at reduced
  * tab widths (browser side panel, split screen) a long title — e.g. the
@@ -55,12 +55,17 @@ function assertHeaderClearsToolbar(width: number) {
 }
 
 function assertToolbarActionsPresent() {
+  // Sharing applies to the whole comparison and lives in the page controls,
+  // while download, view mode, and zoom remain scoped to each chart figure.
+  cy.get('[data-testid="inference-chart-display"] > section')
+    .first()
+    .find('[data-testid="share-button"]')
+    .should('be.visible');
   cy.get('[data-testid="chart-figure"]')
     .first()
     .within(() => {
       cy.get('[data-testid="inference-chart-view-btn"]').should('be.visible');
       cy.get('[data-testid="inference-table-view-btn"]').should('be.visible');
-      cy.get('[data-testid="share-button"]').should('be.visible');
       cy.get('[data-testid="export-button"]').should('be.visible');
       cy.get('[data-testid="zoom-reset-button"]').should('be.visible');
     });

@@ -109,7 +109,8 @@ describe('API documentation', () => {
 
     cy.get('section[aria-labelledby="api-schemas-heading"] > dl > div')
       .should('be.visible')
-      .find('.overflow-x-auto')
+      .find('[data-testid="copyable-code-block"] pre[role="region"]')
+      .should('have.css', 'overflow-x', 'auto')
       .then(($scrollers) => {
         expect(
           [...$scrollers].some((scroller) => scroller.scrollWidth > scroller.clientWidth),
