@@ -119,11 +119,10 @@ function CategorySectionTitle({
 }
 
 /**
- * Info affordance shown next to the scenario selector while an agentic scenario
- * is selected. The agentic workload isn't self-describing from its name alone,
- * and it's now the opening scenario for the AgentX models — so the explainer
- * sits beside the closed trigger rather than inside the dropdown, where the
- * "learn more" link would be swallowed by the select's outside-click handling.
+ * Info affordance shown beside the selected Agentic label inside its control.
+ * It stays outside the option menu so the explainer link remains independent
+ * of the select's outside-click handling. Stop portal events from reaching the
+ * surrounding select trigger when someone follows the link.
  */
 function AgenticScenarioInfo({
   tooltip,
@@ -137,12 +136,22 @@ function AgenticScenarioInfo({
   return (
     <TooltipRoot>
       <TooltipTrigger asChild>
-        <Info
-          className="size-3.5 shrink-0 text-muted-foreground cursor-help"
+        <span
+          className="inline-flex shrink-0 cursor-help text-muted-foreground"
           data-testid="scenario-agentic-info"
-        />
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Info className="size-3.5" />
+        </span>
       </TooltipTrigger>
-      <TooltipContent side="top" collisionPadding={10} className="z-[130]">
+      <TooltipContent
+        side="top"
+        collisionPadding={10}
+        className="z-[130]"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
         <span>
           {tooltip}{' '}
           <a
@@ -179,7 +188,7 @@ interface ModelSelectorProps {
   'data-testid'?: string;
   /**
    * Optional affordance rendered beside the closed trigger (outside the
-   * dropdown, mirroring the scenario selector's info icon) — e.g. the
+   * dropdown) — e.g. the
    * model-architecture deep-dive link on the inference dashboard.
    */
   trailing?: ReactNode;
@@ -437,14 +446,24 @@ export function ScenarioSelector({
 
   if (availableSequences.length === 0) return null;
   const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  const agenticInfo = isAgenticSelected ? (
+    <AgenticScenarioInfo
+      tooltip={t.agenticScenarioTooltip}
+      learnMore={t.agenticScenarioLearnMore}
+      href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+    />
+  ) : null;
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <div className="flex items-center gap-1.5">
+      <div>
         {isOnlySelectedScenario ? (
           <SelectedBenchmarkValue id={id} testId={testId}>
-            {getSequenceLabel(value as Sequence, locale)}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span>{getSequenceLabel(value as Sequence, locale)}</span>
+              {agenticInfo}
+            </span>
           </SelectedBenchmarkValue>
         ) : (
           <Select
@@ -457,7 +476,10 @@ export function ScenarioSelector({
             onOpenChange={onOpenChange}
           >
             <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
-              <SelectValue />
+              <span className="flex min-w-0 items-center gap-1.5">
+                <SelectValue className="truncate" />
+                {agenticInfo}
+              </span>
             </SelectTrigger>
             <SelectContent>
               {/* Agentic entries listed first when available (display order only
@@ -503,13 +525,6 @@ export function ScenarioSelector({
               )}
             </SelectContent>
           </Select>
-        )}
-        {isAgenticSelected && (
-          <AgenticScenarioInfo
-            tooltip={t.agenticScenarioTooltip}
-            learnMore={t.agenticScenarioLearnMore}
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
-          />
         )}
       </div>
     </div>

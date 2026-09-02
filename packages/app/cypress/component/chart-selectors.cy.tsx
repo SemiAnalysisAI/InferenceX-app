@@ -110,6 +110,23 @@ function SelectableContextHarness() {
   );
 }
 
+function assertAgenticInfoInside(height: number) {
+  cy.get('[data-testid="scenario-selector"]').should(($control) => {
+    const control = $control[0];
+    const bounds = control.getBoundingClientRect();
+    const info = control.querySelector('[data-testid="scenario-agentic-info"]');
+    expect(info, 'explainer is inside the scenario control').not.to.equal(null);
+    const icon = info!.getBoundingClientRect();
+    const label = control.firstElementChild!.firstElementChild!.getBoundingClientRect();
+    expect(icon.left - label.right, 'explainer is directly beside Agentic').to.be.closeTo(6, 1);
+    expect(icon.left).to.be.greaterThan(bounds.left);
+    expect(icon.right).to.be.lessThan(bounds.right);
+    expect(icon.top).to.be.greaterThan(bounds.top);
+    expect(icon.bottom).to.be.lessThan(bounds.bottom);
+    expect(bounds.height, 'control keeps its shared height').to.equal(height);
+  });
+}
+
 describe('Chart Selectors', () => {
   for (const width of [390, 768, 1280]) {
     it(`keeps fixed and selectable values the same height at ${width}px`, () => {
@@ -128,6 +145,7 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-selector"]').click();
       cy.contains('[role="option"]', 'Agentic').click();
       cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-slot="select-content"]').should('not.exist');
       for (const precision of ['FP8', 'BF16']) {
         cy.get('[data-testid="precision-multiselect"]').click();
         cy.contains('[role="option"]', precision).click();
@@ -262,6 +280,7 @@ describe('Chart Selectors', () => {
 
     it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
+      assertAgenticInfoInside(36);
       cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
         pointerType: 'mouse',
       });
@@ -271,7 +290,22 @@ describe('Chart Selectors', () => {
       );
       cy.get('[data-testid="scenario-agentic-info-link"]')
         .should('be.visible')
-        .and('have.attr', 'href', '/agentx');
+        .and('have.attr', 'href', '/agentx')
+        .then(($link) => {
+          const followLink = cy.spy().as('followAgenticLink');
+          $link[0].addEventListener('click', (event) => {
+            followLink(event.defaultPrevented);
+            // Keep the component runner mounted while checking native link activation.
+            event.preventDefault();
+          });
+        })
+        .click();
+      cy.get('@followAgenticLink').should('have.been.calledOnceWith', false);
+      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="scenario-agentic-info"]').click();
+      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[role="option"]', '8K / 1K').should('be.visible');
     });
 
     it('keeps the fixed-sequence scenario visible without a one-option menu', () => {
@@ -314,6 +348,7 @@ describe('Chart Selectors', () => {
         .and('have.text', 'Agentic');
       cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
       cy.get('[role="combobox"]').should('not.exist');
+      assertAgenticInfoInside(36);
       cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
         pointerType: 'mouse',
       });
@@ -321,6 +356,40 @@ describe('Chart Selectors', () => {
         .should('be.visible')
         .and('have.attr', 'href', '/agentx');
     });
+
+    for (const fixed of [true, false]) {
+      it(`keeps the ${fixed ? 'fixed' : 'selectable'} Agentic explainer inside on Chinese phones`, () => {
+        cy.viewport(390, 720);
+        cy.mount(
+          <PathnameContext.Provider value="/zh/inference">
+            <TooltipProvider delayDuration={0}>
+              <div className="w-40 p-3">
+                <ScenarioSelector
+                  value={Sequence.AgenticTraces}
+                  onChange={() => {}}
+                  availableSequences={
+                    fixed
+                      ? [Sequence.AgenticTraces]
+                      : [Sequence.AgenticTraces, Sequence.EightK_OneK]
+                  }
+                  data-testid="scenario-selector"
+                />
+              </div>
+            </TooltipProvider>
+          </PathnameContext.Provider>,
+        );
+        assertAgenticInfoInside(44);
+        cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+          pointerType: 'mouse',
+        });
+        cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
+          'be.visible',
+        );
+        cy.get('[data-testid="scenario-agentic-info-link"]')
+          .should('be.visible')
+          .and('have.attr', 'href', '/zh/agentx');
+      });
+    }
 
     it('groups a per-model retired scenario under Deprecated (MiniMax M3 8K/1K)', () => {
       // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
