@@ -42,6 +42,7 @@ import {
 } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
+import { XAxisModeSelector } from './XAxisModeSelector';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
@@ -139,9 +140,14 @@ const METRIC_TITLE_ZH_MAP = new Map(
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
+  /** Inference-only: historical trends use dates on the horizontal axis. */
+  showXAxisMode?: boolean;
 }
 
-export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+export default function ChartControls({
+  hideGpuComparison = false,
+  showXAxisMode = false,
+}: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   // The percentile selector is rendered conditionally on `selectedSequence`,
@@ -173,6 +179,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     openRouterPricingError,
     selectedPercentile,
     selectedXAxisMetric,
+    selectedXAxisMode,
     scaleType,
   } = useInferenceDisplay();
   const {
@@ -317,6 +324,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
   const secondaryCount =
     (selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
+    (showXAxisMode && selectedXAxisMode !== 'interactivity' ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
@@ -326,10 +334,11 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div
-        className={`grid min-w-0 items-start gap-3 ${hideGpuComparison ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}
-      >
-        <ControlPanel legend={t.benchmarkControls} className="lg:col-span-2">
+      <div className="grid min-w-0 items-start gap-3 lg:grid-cols-3">
+        <ControlPanel
+          legend={t.benchmarkControls}
+          className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
+        >
           <div
             className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
           >
@@ -381,9 +390,15 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           countLabel={t.changed}
           testId="inference-secondary-controls"
         >
-          <ControlPanel legend={t.chartControls}>
+          <ControlPanel
+            legend={t.chartControls}
+            className={showXAxisMode ? 'lg:col-span-2' : undefined}
+          >
             <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
+              {showXAxisMode && <XAxisModeSelector />}
+              <div
+                className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
+              >
                 <LabelWithTooltip
                   htmlFor="y-axis-select"
                   label={t.yAxisMetric}
@@ -471,7 +486,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                 </div>
               )}
 
-              {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
+              {!showXAxisMode &&
+                graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
                 isInputMetric &&
                 selectedSequence !== Sequence.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">

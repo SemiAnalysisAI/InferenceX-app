@@ -1,10 +1,11 @@
+import { Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
 
 describe('Inference ChartControls', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
   });
 
   it('renders the model selector with the current model', () => {
@@ -94,6 +95,9 @@ describe('Inference ChartControls', () => {
       expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
       expect(rects[0].left).to.equal(rects[1].left);
       expect(rects[0].right).to.equal(rects[2].right);
+      expect(rects[1].width, 'axes get more space than the history picker').to.be.greaterThan(
+        rects[2].width,
+      );
       expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
@@ -111,6 +115,27 @@ describe('Inference ChartControls', () => {
     });
   });
 
+  it('aligns the X and Y fields with equal desktop heights', () => {
+    cy.viewport(1280, 900);
+    cy.get('[data-testid="x-axis-mode-selector"]').then(($x) => {
+      const x = $x[0].getBoundingClientRect();
+      cy.get('[data-testid="yaxis-metric-selector"]').should(($y) => {
+        const y = $y[0].getBoundingClientRect();
+        expect(x.top).to.be.closeTo(y.top, 1);
+        expect(x.right).to.be.lessThan(y.left);
+        expect(x.height).to.equal(36);
+        expect(y.height).to.equal(x.height);
+      });
+    });
+  });
+
+  it('selects an axis through the existing action and closes the menu', () => {
+    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-ttft"]').click();
+    cy.get('@setSelectedXAxisMode').should('have.been.calledOnceWith', 'ttft');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'aria-expanded', 'false');
+  });
+
   it('wraps the semantic groups into a single column on narrow screens', () => {
     cy.viewport(390, 844);
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
@@ -122,6 +147,16 @@ describe('Inference ChartControls', () => {
         expect(rects[2].top).to.be.greaterThan(rects[1].bottom);
         expect(rects[0].width).to.be.closeTo(rects[1].width, 2);
       });
+    cy.get('[data-testid="x-axis-mode-selector"]').then(($x) => {
+      const x = $x[0].getBoundingClientRect();
+      cy.get('[data-testid="yaxis-metric-selector"]').should(($y) => {
+        const y = $y[0].getBoundingClientRect();
+        expect(y.top).to.be.greaterThan(x.bottom);
+        expect(x.height).to.equal(44);
+        expect(y.height).to.equal(x.height);
+        expect(x.width).to.be.closeTo(y.width, 1);
+      });
+    });
     cy.get('#scenario-select').then(($scenario) => {
       const scenario = $scenario[0].getBoundingClientRect();
       cy.get('#precision-select').should(($precision) => {
@@ -135,6 +170,7 @@ describe('Inference ChartControls', () => {
   it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<InferenceChartControls hideGpuComparison />, { inference: {} });
+    cy.get('[data-testid="x-axis-mode-selector"]').should('not.exist');
     cy.get('fieldset')
       .should('have.length', 2)
       .then(($groups) => {
@@ -157,7 +193,7 @@ describe('Inference ChartControls', () => {
 
   it('keeps primary controls visible while secondary controls collapse on mobile', () => {
     cy.viewport(390, 844);
-    mountWithProviders(<InferenceChartControls />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
 
     cy.get('#model-select').should('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -175,7 +211,7 @@ describe('Inference ChartControls', () => {
 
   it('shows secondary controls by default on desktop', () => {
     cy.viewport(1280, 900);
-    mountWithProviders(<InferenceChartControls />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
 
     cy.get('[data-testid="inference-secondary-controls"] > button').should('not.be.visible');
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
@@ -185,7 +221,7 @@ describe('Inference ChartControls', () => {
     cy.viewport(390, 844);
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">
-        <InferenceChartControls />
+        <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       { inference: {} },
     );
@@ -198,7 +234,7 @@ describe('Inference ChartControls', () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls />, {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: { selectedYAxisMetric: 'y_costh' },
     });
   });
@@ -238,7 +274,7 @@ describe('Inference ChartControls cost metrics', () => {
 
 describe('Inference ChartControls infrastructure tokens per dollar', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls />, {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: { selectedYAxisMetric: 'y_tokensPerDollarN' },
     });
   });
@@ -251,7 +287,7 @@ describe('Inference ChartControls infrastructure tokens per dollar', () => {
 
 describe('Inference ChartControls with GPUs selected', () => {
   it('shows the date range picker when GPUs are selected', () => {
-    mountWithProviders(<InferenceChartControls />, {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: {
         selectedGPUs: ['h100'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -262,7 +298,7 @@ describe('Inference ChartControls with GPUs selected', () => {
   });
 
   it('leaves the optional date range unflagged for a selected current config', () => {
-    mountWithProviders(<InferenceChartControls />, {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: {
         selectedGPUs: ['h100'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -276,7 +312,7 @@ describe('Inference ChartControls with GPUs selected', () => {
   });
 
   it('leaves the date range unflagged when exact comparison entries are pinned', () => {
-    mountWithProviders(<InferenceChartControls />, {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: {
         selectedGPUs: ['b200_sglang', 'b200_vllm'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -296,5 +332,29 @@ describe('Inference ChartControls with hideGpuComparison', () => {
 
     cy.contains('Chip Config').should('not.exist');
     cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
+  });
+});
+
+describe('Inference axis selector — Chinese Agentic controls', () => {
+  it('keeps every full option name and a localized FAQ link on phones', () => {
+    cy.viewport(390, 844);
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <InferenceChartControls showXAxisMode />
+      </PathnameContext.Provider>,
+      {
+        inference: { selectedSequence: Sequence.AgenticTraces, selectedXAxisMode: 'interactivity' },
+      },
+    );
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', '交互性').click();
+    cy.get('[role="listbox"] [role="option"]').should('have.length', 4);
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
+      .should('have.text', '端到端归一化交互性')
+      .type('{esc}');
+    cy.get('[aria-label="X 轴指标说明"]').click();
+    cy.get('[role="dialog"] [data-testid="normalized-interactivity-faq-link"]')
+      .should('have.text', '什么是端到端归一化交互性？')
+      .and('have.attr', 'href', '/zh/about#faq-normalized-interactivity');
   });
 });

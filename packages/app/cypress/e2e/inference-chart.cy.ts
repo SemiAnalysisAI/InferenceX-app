@@ -321,7 +321,14 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
 
   it('keeps chart controls reachable and localizes the complete table click path', () => {
     cy.contains('h2', '推理性能').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-buttons"]').should('have.attr', 'aria-label', '图表横轴指标');
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('label[for="x-axis-mode-select"]').should('have.text', 'X 轴指标');
+    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('have.text', '端到端延迟').click();
+    cy.get('[data-testid="x-axis-mode-selector"]')
+      .should('contain.text', '端到端延迟')
+      .and('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', '端到端延迟');
     cy.get('[data-testid="share-button"]')
       .should('be.visible')
       .and('have.attr', 'title', '分享当前视图');

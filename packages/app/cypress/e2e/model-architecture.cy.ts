@@ -615,6 +615,18 @@ describe('Model Architecture Diagram', () => {
       cy.contains('button', 'Config Changelog').click();
       cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
     });
+
+    it('retains the axis selector even though the full filter panel is hidden', () => {
+      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-ttft"]').click();
+      cy.get('[data-testid="x-axis-mode-selector"]')
+        .should('contain.text', 'TTFT')
+        .and('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="chart-figure"] h2')
+        .first()
+        .should('contain.text', 'Time To First Token');
+      cy.get('[data-testid="model-selector"]').should('not.exist');
+    });
   });
 
   describe('Dashboard architecture icon link (replaces the banner row)', () => {

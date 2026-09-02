@@ -48,7 +48,6 @@ import { ShareButton } from '@/components/ui/share-button';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
@@ -96,6 +95,7 @@ import { ResultContext } from '@/components/ui/result-context';
 
 import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
+import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
@@ -103,7 +103,6 @@ import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
-import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 type InferenceViewMode = 'chart' | 'table';
 
@@ -175,17 +174,6 @@ function zhHeading(configured: string): string {
   const pctl = match.groups?.pctl;
   return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
 }
-
-const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
-  {
-    value: 'e2e-normalized-interactivity',
-    label: 'E2E Normalized Interactivity',
-    labelZh: '端到端归一化交互性',
-  },
-  { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
-  { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
-  { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
-];
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
@@ -269,12 +257,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMode,
     tokenRevenuePricing,
   } = useInferenceDisplay();
-  const {
-    setSelectedDates,
-    setSelectedDatesFromRunExpansion,
-    setIsLegendExpanded,
-    setSelectedXAxisMode,
-  } = useInferenceActions();
+  const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
+    useInferenceActions();
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -290,9 +274,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     dateRangeAvailableDates,
     workflowInfoBenchmarkType,
   );
-
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   const modelDbKeys = useMemo(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -1200,8 +1181,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   description={t.inferencePerformanceDesc}
                   actions={<ShareButton />}
                 />
-                <ChartControls />
+                <ChartControls showXAxisMode />
               </>
+            )}
+            {embedded && (
+              <div className="w-full max-w-sm">
+                <XAxisModeSelector />
+              </div>
             )}
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
             {selectedGPUs.length > 0 && (
@@ -1245,56 +1231,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           <CustomPowers loading={loading} />
         </section>
       )}
-      <Tabs
-        value={selectedXAxisMode}
-        onValueChange={(value) => {
-          setSelectedXAxisMode(value as XAxisMode);
-          track('latency_x_axis_mode_selected', { mode: value });
-        }}
-      >
-        <TabsList
-          aria-label={locale === 'zh' ? '图表横轴指标' : 'Chart x-axis metric'}
-          data-testid="x-axis-mode-buttons"
-          className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
-        >
-          {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
-            // Before mount, render all buttons so SSR and first client render match.
-            if (!mounted) return true;
-            return !isAgenticOnlyXAxisMode(value) || isAgenticSequence;
-          }).map(({ value, label, labelZh }) => {
-            const modeLabel = locale === 'zh' ? labelZh : label;
-            if (value !== 'e2e-normalized-interactivity') {
-              return (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  data-testid={`x-axis-mode-${value}`}
-                  className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
-                >
-                  {modeLabel}
-                </TabsTrigger>
-              );
-            }
-
-            return (
-              <span
-                key={value}
-                role="presentation"
-                className="relative flex flex-1 sm:flex-initial"
-              >
-                <TabsTrigger
-                  value={value}
-                  data-testid={`x-axis-mode-${value}`}
-                  className="min-w-[130px] flex-1 justify-center pr-9 sm:min-w-[140px] sm:flex-initial"
-                >
-                  {modeLabel}
-                </TabsTrigger>
-                <NormalizedInteractivityHelpLink locale={locale} />
-              </span>
-            );
-          })}
-        </TabsList>
-      </Tabs>
       <ActiveQuickFilters />
       <div
         className="motion-stale flex flex-col gap-4"

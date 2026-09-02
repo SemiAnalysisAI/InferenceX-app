@@ -1,3 +1,4 @@
+import { selectXAxisMode } from '../support/e2e';
 /**
  * Tests that URL parameters correctly drive UI state and that user interactions
  * update the visible output (selector text, SVG axis labels).
@@ -91,8 +92,7 @@ describe('URL Parameter Persistence', () => {
           });
           cy.get(selector).should('not.be.checked');
 
-          cy.get('[data-testid="x-axis-mode-ttft"]').click();
-          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          selectXAxisMode('ttft');
           cy.get(selector).should('not.be.checked');
         });
     });
@@ -127,8 +127,7 @@ describe('URL Parameter Persistence', () => {
           );
           cy.contains('button', 'Done').click();
           cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-          cy.get('[data-testid="x-axis-mode-ttft"]').click();
-          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          selectXAxisMode('ttft');
           cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').then(
             ($inputs) => {
               const after = [...$inputs].map((input) => input.id).toSorted();

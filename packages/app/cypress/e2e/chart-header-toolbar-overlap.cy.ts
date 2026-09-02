@@ -1,3 +1,4 @@
+import { selectXAxisMode } from '../support/e2e';
 /**
  * Regression: the chart action toolbar (view toggle, download, reset
  * zoom) renders as an absolute overlay in the chart figure's top-right corner
@@ -78,7 +79,7 @@ describe('chart header toolbar overlap', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/inference');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    selectXAxisMode('interactivity');
     cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
   });
 

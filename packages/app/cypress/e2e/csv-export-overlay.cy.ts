@@ -1,4 +1,4 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
@@ -48,11 +48,8 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
       },
     });
     cy.wait('@unofficialRun');
-    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
-    // is the default — clicked anyway so the suite does not depend on that.
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
-      .click()
-      .should('have.attr', 'data-state', 'active');
+    // Explicitly select Interactivity so this suite does not depend on the default.
+    selectXAxisMode('interactivity');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('exist');
   });
 
