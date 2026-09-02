@@ -31,17 +31,13 @@ import { createAdminSql } from './etl/db-utils.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
+  parseRunIdFlag,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
-const runIdIndex = process.argv.indexOf('--run-id');
-const runIdRaw = runIdIndex === -1 ? undefined : process.argv[runIdIndex + 1];
-if (runIdIndex !== -1 && (!runIdRaw || !/^\d+$/u.test(runIdRaw))) {
-  throw new Error('--run-id must be followed by a numeric GitHub workflow run ID');
-}
-const githubRunId = runIdRaw ? Number(runIdRaw) : undefined;
+const githubRunId = parseRunIdFlag();
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),

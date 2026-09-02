@@ -254,7 +254,7 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: ./.github/workflows/ingest-agentic-results.yml
+    uses: $/.github/workflows/ingest-agentic-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}

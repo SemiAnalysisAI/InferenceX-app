@@ -177,6 +177,11 @@ retains `dp_rank`, over the rankless native `trtllm_kv_cache_utilization` gauge.
 Ranks remain inside each worker's source; native-only endpoints retain their fallback.
 The all-endpoints view summarizes workers, while selecting a worker exposes its ranks.
 
+For runs ingested before a server-metric adapter was available, dispatch
+`Recompute Agentic Metrics` on `master` with the benchmark run ID. It force-rebuilds
+chart series and aggregate statistics from stored blobs for that run in production,
+then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
+
 ### Logical Engines vs Raw Series
 
 A raw series in the blob is one `(scrape endpoint × phase block × label set)` tuple, which is **not** the same as one engine. The KV-cache chart needs one entry per _logical engine_ — one KV pool — so `compute-chart-series.ts` groups series by their Prometheus label set (`seriesIdentityKey`) rather than emitting one entry per raw series. Three kinds of duplication collapse there:
