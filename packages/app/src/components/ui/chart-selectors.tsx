@@ -7,6 +7,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { CONTROL_MIN_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
 import {
   Select,
@@ -374,6 +375,27 @@ export function SequenceSelector({
   );
 }
 
+/** Keep benchmark context readable when there is no alternative to select. */
+function SelectedBenchmarkValue({
+  id,
+  testId,
+  children,
+}: {
+  id: string;
+  testId?: string;
+  children: ReactNode;
+}) {
+  return (
+    <output
+      id={id}
+      data-testid={testId}
+      className={`${SELECT_TRIGGER_STYLE} ${CONTROL_MIN_HEIGHT.default} w-full py-2 text-foreground`}
+    >
+      {children}
+    </output>
+  );
+}
+
 interface ScenarioSelectorProps {
   id?: string;
   value: string;
@@ -391,10 +413,8 @@ interface ScenarioSelectorProps {
  * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
- * Renders nothing when fewer than two scenarios are available: a dropdown
- * with a single choice is dead UI (e.g. agentic-only models like Kimi K3),
- * and a static "Scenario: Agentic" readout is just as redundant when there is
- * nothing to choose — so the whole control disappears.
+ * A single available scenario remains visible as a labeled value: it explains
+ * the results even when the user cannot choose a different workload.
  */
 export function ScenarioSelector({
   id = 'scenario-select',
@@ -415,68 +435,75 @@ export function ScenarioSelector({
   );
   const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
 
-  if (availableSequences.length < 2) return null;
+  if (availableSequences.length === 0) return null;
+  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
       <div className="flex items-center gap-1.5">
-        <Select
-          value={value}
-          onValueChange={(v) => {
-            track('selector_scenario_changed', { scenario: v });
-            onChange(v as Sequence);
-          }}
-          open={open}
-          onOpenChange={onOpenChange}
-        >
-          <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {/* Agentic entries listed first when available (display order only
+        {isOnlySelectedScenario ? (
+          <SelectedBenchmarkValue id={id} testId={testId}>
+            {getSequenceLabel(value as Sequence, locale)}
+          </SelectedBenchmarkValue>
+        ) : (
+          <Select
+            value={value}
+            onValueChange={(v) => {
+              track('selector_scenario_changed', { scenario: v });
+              onChange(v as Sequence);
+            }}
+            open={open}
+            onOpenChange={onOpenChange}
+          >
+            <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {/* Agentic entries listed first when available (display order only
                 — availability decides which scenario opens by default). They
                 carry no group header: they are named "Agentic" themselves, so a
                 heading above them would just repeat the word. They stay in their
                 own SelectGroup so the "Fixed Sequence Length" heading below
                 still reads as a separate section. */}
-            {agentic.length > 0 && (
-              <SelectGroup>
-                {agentic.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-            {fixedSeq.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
-                {fixedGroups.default.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-                {fixedGroups.deprecated.length > 0 && (
-                  <>
-                    <SelectLabel>
-                      <CategorySectionTitle
-                        id="deprecated"
-                        label={t.deprecated}
-                        reason={t.deprecatedSequenceReason}
-                      />
-                    </SelectLabel>
-                    {fixedGroups.deprecated.map((seq) => (
-                      <SelectItem key={seq} value={seq}>
-                        {getSequenceLabel(seq as Sequence, locale)}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectGroup>
-            )}
-          </SelectContent>
-        </Select>
+              {agentic.length > 0 && (
+                <SelectGroup>
+                  {agentic.map((seq) => (
+                    <SelectItem key={seq} value={seq}>
+                      {getSequenceLabel(seq as Sequence, locale)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {fixedSeq.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
+                  {fixedGroups.default.map((seq) => (
+                    <SelectItem key={seq} value={seq}>
+                      {getSequenceLabel(seq as Sequence, locale)}
+                    </SelectItem>
+                  ))}
+                  {fixedGroups.deprecated.length > 0 && (
+                    <>
+                      <SelectLabel>
+                        <CategorySectionTitle
+                          id="deprecated"
+                          label={t.deprecated}
+                          reason={t.deprecatedSequenceReason}
+                        />
+                      </SelectLabel>
+                      {fixedGroups.deprecated.map((seq) => (
+                        <SelectItem key={seq} value={seq}>
+                          {getSequenceLabel(seq as Sequence, locale)}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
+        )}
         {isAgenticSelected && (
           <AgenticScenarioInfo
             tooltip={t.agenticScenarioTooltip}
@@ -548,9 +575,8 @@ interface PrecisionSelectorProps {
 }
 
 /**
- * Precision multi-select. Renders nothing when fewer than two precisions are
- * available — a single-precision model (e.g. Kimi K3) has nothing to toggle,
- * so the control disappears instead of offering a no-op menu.
+ * Precision multi-select. A fixed precision remains visible as a labeled value
+ * because it is part of the benchmark configuration, not just a filter.
  */
 export function PrecisionSelector({
   id = 'precision-select',
@@ -563,28 +589,36 @@ export function PrecisionSelector({
 }: PrecisionSelectorProps) {
   const t = STRINGS[useLocale()];
 
-  if (availablePrecisions.length < 2) return null;
+  if (availablePrecisions.length === 0) return null;
+  const isOnlySelectedPrecision =
+    availablePrecisions.length === 1 && value.length === 1 && availablePrecisions[0] === value[0];
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.precision} tooltip={t.precisionTooltip} />
       <div>
-        <MultiSelect
-          options={availablePrecisions.map((p) => ({
-            value: p,
-            label: getPrecisionLabel(p as Precision),
-          }))}
-          value={value}
-          onChange={onChange}
-          open={open}
-          onOpenChange={onOpenChange}
-          triggerId={id}
-          triggerTestId={testId}
-          placeholder=""
-          minSelections={1}
-          showClearAll={false}
-          searchable={false}
-        />
+        {isOnlySelectedPrecision ? (
+          <SelectedBenchmarkValue id={id} testId={testId}>
+            {getPrecisionLabel(value[0] as Precision)}
+          </SelectedBenchmarkValue>
+        ) : (
+          <MultiSelect
+            options={availablePrecisions.map((p) => ({
+              value: p,
+              label: getPrecisionLabel(p as Precision),
+            }))}
+            value={value}
+            onChange={onChange}
+            open={open}
+            onOpenChange={onOpenChange}
+            triggerId={id}
+            triggerTestId={testId}
+            placeholder=""
+            minSelections={1}
+            showClearAll={false}
+            searchable={false}
+          />
+        )}
       </div>
     </div>
   );

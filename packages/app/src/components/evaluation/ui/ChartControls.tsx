@@ -73,7 +73,7 @@ export default function EvaluationChartControls() {
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <ControlPanel legend={t.benchmarkGroup}>
           <div
-            className={`grid min-w-0 gap-3 ${availablePrecisions.length > 1 ? 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]' : 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'}`}
+            className={`grid min-w-0 gap-3 ${availablePrecisions.length > 0 ? 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]' : 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'}`}
           >
             <div className="min-w-0">
               <ModelSelector

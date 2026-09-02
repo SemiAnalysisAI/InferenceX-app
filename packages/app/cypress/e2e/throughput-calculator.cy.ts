@@ -110,12 +110,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('hides the Precision selector for a single-precision model', () => {
-      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
-      // is nothing to choose, so the control is hidden entirely.
+    it('shows the precision for a single-precision model', () => {
+      // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('not.exist');
+        cy.contains('Precision').should('be.visible');
+        cy.get('output#calc-precision').should('have.text', 'FP4');
       });
     });
 
@@ -691,10 +691,10 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      // The agentic fixture exposes a single scenario, so the scenario
-      // control disappears entirely — no dropdown, no static readout.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      cy.get('output[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic');
+      cy.get('output[data-testid="calc-precision-selector"]').should('have.text', 'FP4');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -751,10 +751,11 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      // Single-scenario fixture → the scenario control disappears entirely;
-      // the gate is locked, so no percentile selector either.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      // Scenario and precision stay readable; only percentile is feature-gated.
+      cy.get('output[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic');
+      cy.get('output[data-testid="calc-precision-selector"]').should('have.text', 'FP4');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()

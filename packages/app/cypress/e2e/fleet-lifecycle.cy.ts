@@ -903,9 +903,10 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    // The agentic fixture exposes a single scenario, so the scenario
-    // control disappears entirely — no dropdown, no static readout.
-    cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+    cy.get('output[data-testid="fleet-sequence-selector"]')
+      .should('be.visible')
+      .and('have.text', 'Agentic');
+    cy.get('output[data-testid="fleet-precision-selector"]').should('have.text', 'FP4');
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.wait('@agenticHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');

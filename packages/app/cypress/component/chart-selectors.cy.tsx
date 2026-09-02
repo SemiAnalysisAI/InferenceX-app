@@ -73,6 +73,33 @@ function PrecisionSelectorHarness() {
 }
 
 describe('Chart Selectors', () => {
+  it('keeps single-value benchmark context readable on Chinese phones', () => {
+    cy.viewport(390, 720);
+    cy.mount(
+      <PathnameContext.Provider value="/zh/inference">
+        <TooltipProvider delayDuration={0}>
+          <div className="grid gap-3 p-4">
+            <ScenarioSelector
+              value={Sequence.EightK_OneK}
+              onChange={() => {}}
+              availableSequences={[Sequence.EightK_OneK]}
+            />
+            <PrecisionSelector value={['fp4']} onChange={() => {}} availablePrecisions={['fp4']} />
+          </div>
+        </TooltipProvider>
+      </PathnameContext.Provider>,
+    );
+    cy.get('label[for="scenario-select"]').should('have.text', '场景');
+    cy.get('output#scenario-select').should('be.visible').and('have.text', '8K / 1K');
+    cy.get('label[for="precision-select"]').should('have.text', '精度');
+    cy.get('output#precision-select').should('be.visible').and('have.text', 'FP4');
+    cy.get('output').each(($value) => {
+      const bounds = $value[0].getBoundingClientRect();
+      expect(bounds.height).to.be.at.least(44);
+      expect(bounds.right).to.be.at.most(390);
+    });
+  });
+
   describe('ModelSelector', () => {
     beforeEach(() => {
       cy.mount(<ModelSelectorHarness />);
@@ -171,7 +198,7 @@ describe('Chart Selectors', () => {
         .and('have.attr', 'href', '/agentx');
     });
 
-    it('renders nothing when the only scenario is fixed-sequence', () => {
+    it('keeps the fixed-sequence scenario visible without a one-option menu', () => {
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <div data-testid="selector-host">
@@ -185,13 +212,14 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('[data-testid="scenario-selector"]').should('not.exist');
-      cy.contains('Scenario').should('not.exist');
+      cy.get('output[data-testid="scenario-selector"]')
+        .should('be.visible')
+        .and('have.text', '8K / 1K');
+      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
+      cy.get('[role="combobox"]').should('not.exist');
     });
 
-    it('renders nothing when agentic is the only scenario', () => {
-      // A static "Scenario: Agentic" readout is as redundant as a one-option
-      // dropdown — the whole control disappears for single-scenario models.
+    it('keeps the agentic scenario and its explanation visible with one option', () => {
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <div data-testid="selector-host">
@@ -205,10 +233,17 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('[data-testid="scenario-selector"]').should('not.exist');
-      cy.contains('Scenario').should('not.exist');
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+      cy.get('output[data-testid="scenario-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic');
+      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
+      cy.get('[role="combobox"]').should('not.exist');
+      cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+        pointerType: 'mouse',
+      });
+      cy.get('[data-testid="scenario-agentic-info-link"]')
+        .should('be.visible')
+        .and('have.attr', 'href', '/agentx');
     });
 
     it('groups a per-model retired scenario under Deprecated (MiniMax M3 8K/1K)', () => {
@@ -272,7 +307,7 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="precision-multiselect"]').should('contain', 'FP8');
     });
 
-    it('renders nothing when only one precision is available', () => {
+    it('keeps the fixed precision visible without a one-option menu', () => {
       cy.mount(
         <TooltipProvider>
           <div data-testid="selector-host">
@@ -286,8 +321,11 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('[data-testid="precision-multiselect"]').should('not.exist');
-      cy.contains('Precision').should('not.exist');
+      cy.get('output[data-testid="precision-multiselect"]')
+        .should('be.visible')
+        .and('have.text', 'FP8');
+      cy.get('label[for="precision-select"]').should('have.text', 'Precision');
+      cy.get('[role="combobox"]').should('not.exist');
     });
   });
 });

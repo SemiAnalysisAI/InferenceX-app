@@ -172,18 +172,18 @@ describe('Evaluation ChartControls', () => {
       expect($popover.text()).to.include('a'.repeat(500));
     });
   });
-  it('uses the available width when precision is fixed by the selected benchmark', () => {
+  it('keeps fixed precision visible beside the selected benchmark', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<EvaluationChartControls />, {
-      evaluation: { availablePrecisions: ['fp4'] },
+      evaluation: { availablePrecisions: ['fp4'], selectedPrecisions: ['fp4'] },
     });
-    cy.get('#eval-precision-select').should('not.exist');
+    cy.get('output#eval-precision-select').should('be.visible').and('have.text', 'FP4');
     cy.get('fieldset')
       .first()
       .then(($group) => {
-        cy.get('#eval-benchmark-select').should(($benchmark) => {
+        cy.get('#eval-precision-select').should(($precision) => {
           expect(
-            $group[0].getBoundingClientRect().right - $benchmark[0].getBoundingClientRect().right,
+            $group[0].getBoundingClientRect().right - $precision[0].getBoundingClientRect().right,
           ).to.be.lessThan(20);
         });
       });

@@ -97,13 +97,13 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('precision multi-select is present only for multi-precision models', () => {
-    // The default model is FP4-only in the fixtures, so the control is hidden;
-    // a multi-precision model brings it back.
-    cy.get('[data-testid="precision-multiselect"]').should('not.exist');
+  it('keeps fixed precision visible and allows selection for multi-precision models', () => {
+    cy.get('output[data-testid="precision-multiselect"]')
+      .should('be.visible')
+      .and('have.text', 'FP4');
     cy.visit('/historical?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
-    cy.get('[data-testid="precision-multiselect"]').should('be.visible');
+    cy.get('[data-testid="precision-multiselect"][role="combobox"]').should('be.visible');
   });
 
   it('legend sidebar renders with hardware items matching visible trend lines', () => {
