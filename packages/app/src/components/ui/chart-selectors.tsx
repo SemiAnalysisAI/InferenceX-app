@@ -55,6 +55,7 @@ const STRINGS = {
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
     fixedSequenceLength: 'Fixed Sequence Length',
+    fixedSequenceLengthDeprecated: 'Fixed Sequence Length (Deprecated)',
     experimentalSupport: 'Experimental Support (WIP)',
     maintenanceMode: 'Maintenance Mode',
     maintenanceReason: 'Updated at a lower priority because these models are irrelevant.',
@@ -81,6 +82,7 @@ const STRINGS = {
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
     fixedSequenceLength: '固定序列长度',
+    fixedSequenceLengthDeprecated: '固定序列长度（已弃用）',
     experimentalSupport: '实验性支持（开发中）',
     maintenanceMode: '维护模式',
     maintenanceReason: '这些模型的相关性较低，因此以较低优先级更新。',
@@ -449,7 +451,9 @@ export function ScenarioSelector({
         >
           <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
             <span className="flex min-w-0 items-center gap-1.5">
-              <SelectValue className="truncate" />
+              <SelectValue className="truncate">
+                {getSequenceLabel(value as Sequence, locale)}
+              </SelectValue>
               {agenticInfo}
             </span>
           </SelectTrigger>
@@ -469,7 +473,7 @@ export function ScenarioSelector({
                 ))}
               </SelectGroup>
             )}
-            {fixedSeq.length > 0 && (
+            {fixedGroups.default.length > 0 && (
               <SelectGroup>
                 <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
                 {fixedGroups.default.map((seq) => (
@@ -477,22 +481,22 @@ export function ScenarioSelector({
                     {getSequenceLabel(seq as Sequence, locale)}
                   </SelectItem>
                 ))}
-                {fixedGroups.deprecated.length > 0 && (
-                  <>
-                    <SelectLabel>
-                      <CategorySectionTitle
-                        id="deprecated"
-                        label={t.deprecated}
-                        reason={t.deprecatedSequenceReason}
-                      />
-                    </SelectLabel>
-                    {fixedGroups.deprecated.map((seq) => (
-                      <SelectItem key={seq} value={seq}>
-                        {getSequenceLabel(seq as Sequence, locale)}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
+              </SelectGroup>
+            )}
+            {fixedGroups.deprecated.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>
+                  <CategorySectionTitle
+                    id="deprecated"
+                    label={t.fixedSequenceLengthDeprecated}
+                    reason={t.deprecatedSequenceReason}
+                  />
+                </SelectLabel>
+                {fixedGroups.deprecated.map((seq) => (
+                  <SelectItem key={seq} value={seq}>
+                    {getSequenceLabel(seq as Sequence, locale)}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             )}
           </SelectContent>

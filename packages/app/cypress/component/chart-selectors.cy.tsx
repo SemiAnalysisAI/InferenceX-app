@@ -412,7 +412,7 @@ describe('Chart Selectors', () => {
       });
     }
 
-    it('groups a per-model retired scenario under Deprecated (MiniMax M3 8K/1K)', () => {
+    it('combines the fixed-length and deprecated headings for a retired scenario', () => {
       // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
       // (InferenceX#2493): with the model passed in, 8K / 1K moves out of the
       // default fixed-seq group into the Deprecated group.
@@ -428,12 +428,66 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-slot="select-label"]', 'Deprecated').should('be.visible');
-      cy.contains('[data-slot="select-label"]', 'Deprecated')
+      cy.get('[data-slot="select-label"]')
+        .should('have.length', 1)
+        .and('have.text', 'Fixed Sequence Length (Deprecated)');
+      cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length (Deprecated)')
         .nextAll('[role="option"]')
         .first()
         .should('contain.text', '8K / 1K');
     });
+
+    for (const locale of ['en', 'zh']) {
+      it(`keeps active and deprecated fixed-length choices in separate groups (${locale})`, () => {
+        cy.viewport(390, 720);
+        cy.mount(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <TooltipProvider delayDuration={0}>
+              <div className="w-44 p-3">
+                <ScenarioSelector
+                  value={Sequence.AgenticTraces}
+                  onChange={cy.stub().as('changeScenario')}
+                  availableSequences={[
+                    Sequence.AgenticTraces,
+                    Sequence.EightK_OneK,
+                    Sequence.OneK_OneK,
+                  ]}
+                  model={Model.DeepSeek_V4_Pro}
+                  data-testid="scenario-selector"
+                />
+              </div>
+            </TooltipProvider>
+          </PathnameContext.Provider>,
+        );
+        cy.get('[data-testid="scenario-selector"]').click('right');
+        const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
+        const deprecated =
+          locale === 'zh' ? '固定序列长度（已弃用）' : 'Fixed Sequence Length (Deprecated)';
+        cy.get('[data-slot="select-label"]').should('have.length', 2);
+        cy.contains('[data-slot="select-label"]', new RegExp(`^${active}$`, 'u'))
+          .parent()
+          .find('[role="option"]')
+          .should('have.length', 1)
+          .and('have.text', '8K / 1K');
+        cy.contains('[data-slot="select-label"]', deprecated)
+          .should('be.visible')
+          .parent()
+          .find('[role="option"]')
+          .should('have.length', 1)
+          .and('have.text', '1K / 1K');
+        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointermove', {
+          pointerType: 'mouse',
+        });
+        cy.get('[role="tooltip"]').should(
+          'contain.text',
+          locale === 'zh'
+            ? 'CI 容量已重新分配给智能体编程和多轮对话场景。'
+            : 'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
+        );
+        cy.contains('[role="option"]', '1K / 1K').click();
+        cy.get('@changeScenario').should('have.been.calledOnceWith', Sequence.OneK_OneK);
+      });
+    }
 
     it('keeps 8K/1K in the default group for models still sweeping it', () => {
       cy.mount(
@@ -472,6 +526,48 @@ describe('Chart Selectors', () => {
     it('shows current selection', () => {
       cy.get('[data-testid="precision-multiselect"]').should('contain', 'FP8');
     });
+
+    for (const locale of ['en', 'zh']) {
+      it(`separates the compact selection count from the minimum and keeps it accurate (${locale})`, () => {
+        cy.viewport(locale === 'zh' ? 390 : 1280, 720);
+        cy.mount(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <div className="w-44">
+              <PrecisionSelectorHarness />
+            </div>
+          </PathnameContext.Provider>,
+        );
+        const assertSummary = (count: number) => {
+          cy.get('[data-slot="select-summary"]').should(($summary) => {
+            const [selected, minimum] = [...$summary[0].children] as HTMLElement[];
+            const win = selected.ownerDocument.defaultView!;
+            expect(selected.textContent).to.equal(
+              locale === 'zh' ? `${count} 项已选择` : `${count} selected`,
+            );
+            expect(minimum.textContent).to.equal(locale === 'zh' ? '最少：1' : 'Minimum: 1');
+            expect(win.getComputedStyle(selected).fontSize).to.equal('12px');
+            expect(win.getComputedStyle(minimum).fontSize).to.equal('12px');
+            const countBounds = selected.getBoundingClientRect();
+            const minimumBounds = minimum.getBoundingClientRect();
+            expect(minimumBounds.top).to.equal(countBounds.top);
+            expect(minimumBounds.left - countBounds.right).to.be.at.least(12);
+            expect(minimumBounds.right).to.be.at.most($summary[0].getBoundingClientRect().right);
+          });
+        };
+        cy.get('[data-testid="precision-multiselect"]').click();
+        assertSummary(1);
+        cy.contains('[role="option"]', 'FP8').should('be.disabled');
+        cy.contains('[role="option"]', 'FP4').click();
+        cy.get('[data-slot="select-content"]').should('not.exist');
+        cy.get('[data-testid="precision-multiselect"]').click();
+        assertSummary(2);
+        cy.contains('[role="option"]', 'FP8').click();
+        cy.get('[data-slot="select-content"]').should('not.exist');
+        cy.get('[data-testid="precision-multiselect"]').click();
+        assertSummary(1);
+        cy.contains('[role="option"]', 'FP4').should('be.disabled');
+      });
+    }
 
     it('keeps the fixed precision visible without a one-option menu', () => {
       cy.mount(

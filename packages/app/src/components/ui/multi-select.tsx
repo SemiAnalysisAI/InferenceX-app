@@ -547,12 +547,17 @@ function MultiSelect({
             )}
             {showSelectionSummary &&
               (maxSelections !== undefined || minSelections !== undefined) && (
-                <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
-                  {value.length}
-                  {maxSelections !== undefined && ` / ${maxSelections}`}
-                  {resolvedSelectedSuffix}
+                <div
+                  data-slot="select-summary"
+                  className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 py-1.5 text-xs border-b mb-1"
+                >
+                  <span>
+                    {value.length}
+                    {maxSelections !== undefined && ` / ${maxSelections}`}
+                    {resolvedSelectedSuffix}
+                  </span>
                   {minSelections !== undefined && minSelections > 0 && (
-                    <span className="block text-xs mt-0.5">
+                    <span>
                       {resolvedMinimumPrefix}
                       {minSelections}
                     </span>
