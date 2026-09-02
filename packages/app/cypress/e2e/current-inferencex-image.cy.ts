@@ -109,14 +109,13 @@ describe('Current InferenceX Image localized routes', () => {
   });
 
   it('keeps rows available when release lookup fails and retries independently', () => {
-    let releaseAttempts = 0;
+    let releasesSucceed = false;
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', (req) => {
-      releaseAttempts += 1;
       req.reply(
-        releaseAttempts <= 2
-          ? { statusCode: 500, body: { error: 'release failure' } }
-          : { statusCode: 200, body: { sglang: 'v0.5.2', vllm: 'v0.10.1' } },
+        releasesSucceed
+          ? { statusCode: 200, body: { sglang: 'v0.5.2', vllm: 'v0.10.1' } }
+          : { statusCode: 500, body: { error: 'release failure' } },
       );
     }).as('frameworkReleases');
     visitCurrentImage();
@@ -125,6 +124,12 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('[data-testid="current-image-releases-error"]')
       .should('contain.text', '无法加载框架最新版本标签')
       .contains('button', '重试')
+      // Keep failures active until the user retries. A request from the previous
+      // page must not consume a count-based failure fixture (testIsolation=false).
+      .then(($button) => {
+        releasesSucceed = true;
+        return cy.wrap($button);
+      })
       .click();
     cy.get('table').should('contain.text', 'lmsysorg/sglang:v0.5.2');
     cy.wait('@frameworkReleases');
@@ -143,13 +148,12 @@ describe('Current InferenceX Image localized routes', () => {
   });
 
   it('hides primary API details, retries, and keeps the table internally scrollable', () => {
-    let attempts = 0;
+    let imagesSucceed = false;
     cy.intercept('GET', '**/api/v1/latest-images', (req) => {
-      attempts += 1;
       req.reply(
-        attempts <= 2
-          ? { statusCode: 500, body: { error: 'sensitive database detail' } }
-          : { statusCode: 200, body: imageRows },
+        imagesSucceed
+          ? { statusCode: 200, body: imageRows }
+          : { statusCode: 500, body: { error: 'sensitive database detail' } },
       );
     }).as('latestImagesRetry');
     cy.intercept('GET', '**/api/v1/framework-releases', {});
@@ -160,6 +164,10 @@ describe('Current InferenceX Image localized routes', () => {
       .should('contain.text', '无法加载镜像数据。')
       .and('not.contain.text', 'sensitive database detail')
       .contains('button', '重试')
+      .then(($button) => {
+        imagesSucceed = true;
+        return cy.wrap($button);
+      })
       .click();
     cy.wait('@latestImagesRetry');
     cy.get('table')
@@ -231,5 +239,73 @@ describe('Current InferenceX Image localized routes', () => {
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
+  });
+  it('keeps full configuration and long image tags readable while filtering the catalog', () => {
+    cy.viewport(1440, 900);
+    const longImage =
+      'registry.example.com/inferencex/sglang:rocm7.1.1-ubuntu24.04-pytorch2.9-deepseek-r1-fp8-h200-single-node-release-candidate';
+    cy.intercept('GET', '**/api/v1/latest-images', [
+      { ...imageRows[0], image: longImage, date: '2026-08-20' },
+      imageRows[1],
+    ]);
+    cy.intercept('GET', '**/api/v1/framework-releases', { sglang: 'v0.5.2', vllm: 'v0.10.1' });
+    cy.visit('/current-inferencex-image');
+    cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
+    cy.get('tbody tr')
+      .first()
+      .within(() => {
+        cy.get('th[scope="row"]')
+          .should('contain.text', 'DeepSeek-R1')
+          .and('contain.text', 'H200')
+          .and('contain.text', 'fp8')
+          .and('contain.text', 'Spec Decode: Off')
+          .and('contain.text', 'Single Node');
+        cy.get('code')
+          .first()
+          .should('have.text', longImage)
+          .and(($code) => {
+            const el = $code[0];
+            expect(el.scrollWidth).to.be.at.most(el.clientWidth);
+            expect(el.clientHeight).to.be.greaterThan(40);
+          });
+        cy.contains('Review image').should('have.attr', 'title').and('include', 'unstable tag');
+        cy.get('time').should('have.attr', 'datetime', '2026-08-20').and('have.text', '2026-08-20');
+        cy.get('td[title^="Last submission:"]').should('contain.text', '3d');
+      });
+    cy.get('#image-model-select').click();
+    cy.get('[data-slot="select-item"]').contains('DeepSeek-R1').click();
+    cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
+    cy.get('tbody tr').should('have.length', 1).and('contain.text', longImage);
+  });
+
+  it('pairs compact mobile filters and labels the keyboard-accessible version table in Chinese', () => {
+    cy.viewport(390, 844);
+    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
+    cy.intercept('GET', '**/api/v1/framework-releases', {});
+    visitCurrentImage();
+    cy.get('[data-testid="current-image-filters"] fieldset')
+      .first()
+      .should('contain.text', '基准测试配置');
+    cy.get('[data-testid="current-image-filters"] button[role="combobox"]').each(($button) => {
+      expect($button[0].getBoundingClientRect().height).to.be.at.least(44);
+    });
+    cy.get('#image-precision-select').then(($precision) => {
+      cy.get('#image-sequence-select').should(($sequence) => {
+        expect($sequence[0].getBoundingClientRect().top).to.be.closeTo(
+          $precision[0].getBoundingClientRect().top,
+          1,
+        );
+      });
+    });
+    cy.get('#current-image-scroll-hint').should('contain.text', '横向滚动');
+    cy.get('[role="region"][aria-label="镜像与版本"]')
+      .focus()
+      .should('be.focused')
+      .scrollTo('right');
+    cy.get('table').should('contain.text', '暂无信息');
+    cy.get('time').first().should('be.visible').and('have.text', today);
+    cy.get('#image-sequence-select').click();
+    cy.get('[data-slot="select-item"]').contains('智能体').click();
+    cy.get('table').should('contain.text', 'AgentX 提交已超过 14 天').and('contain.text', '22 天');
   });
 });

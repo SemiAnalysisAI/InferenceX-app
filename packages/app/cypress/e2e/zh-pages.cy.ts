@@ -108,6 +108,19 @@ describe('Chinese (/zh) pages', () => {
             .should('be.visible');
         });
       cy.location('hash').should('eq', '#faq-normalized-interactivity');
+      cy.get('#faq-normalized-interactivity').should(($row) => {
+        const question = $row.find('dt')[0].getBoundingClientRect();
+        const answer = $row.find('dd')[0].getBoundingClientRect();
+        expect(answer.left, 'desktop answer column').to.be.greaterThan(question.right);
+      });
+      cy.viewport(390, 720);
+      cy.get('#faq-normalized-interactivity').should(($row) => {
+        const question = $row.find('dt')[0].getBoundingClientRect();
+        const answer = $row.find('dd')[0].getBoundingClientRect();
+        expect(answer.top, 'mobile answer follows its question').to.be.greaterThan(question.bottom);
+        expect(answer.right).to.be.at.most(390);
+      });
+      cy.viewport(1280, 720);
     });
   });
 
@@ -354,6 +367,7 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="feedback-viewer"]')
         .should('contain.text', '用户反馈')
         .and('contain.text', '暂无反馈记录。');
+      cy.contains('仅在浏览器中处理密钥').and('contain.text', '不会持久化').should('be.visible');
       cy.get('button[aria-label="显示密钥"]').should('be.visible');
       cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
       cy.get('[data-testid="feedback-key-submit"]').click();
@@ -403,6 +417,7 @@ describe('Chinese (/zh) pages', () => {
       cy.viewport(375, 844);
       cy.get('[data-testid="feedback-key-input"]').should('be.visible');
       cy.get('[data-testid="feedback-key-submit"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-input"]').invoke('outerHeight').should('be.gte', 44);
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
       });

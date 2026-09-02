@@ -24,13 +24,15 @@ describe('Historical Trends Tab', () => {
   });
 
   it('renders a slider for target interactivity', () => {
-    cy.get('[data-testid="historical-trends-display"]').find('input[type="range"]').should('exist');
+    cy.get('[data-testid="historical-target-slider"]')
+      .should('exist')
+      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
   });
 
   it('renders a number input for precise interactivity value', () => {
-    cy.get('[data-testid="historical-trends-display"]')
-      .find('input[type="number"]')
-      .should('exist');
+    cy.get('[data-testid="historical-target-input"]')
+      .should('exist')
+      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
   });
 
   it('renders a trend chart SVG after data loads', () => {
@@ -159,7 +161,7 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="historical-trend-figure"]').should('exist');
 
-    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
       .invoke('text')
       .then((initialSubtitle) => {
@@ -168,7 +170,7 @@ describe('Historical Trends — Content & Interactions', () => {
           if ($options.length <= 1) return;
           cy.wrap($options).last().click();
 
-          cy.get('[data-testid="historical-trend-figure"] figcaption p')
+          cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
             .first()
             .invoke('text')
             .should('not.eq', initialSubtitle);
@@ -228,7 +230,7 @@ describe('Historical Trends — Chinese route', () => {
     );
     cy.wait('@agenticAvailability');
     cy.wait('@agenticBenchmarks');
-    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
       .should('contain.text', '智能体')
       .and('contain.text', '2025年3月1日')

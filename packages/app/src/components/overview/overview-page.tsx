@@ -166,7 +166,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                     href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
                   >
                     {strings.sourceLinkText}
                     <ExternalLinkIcon />

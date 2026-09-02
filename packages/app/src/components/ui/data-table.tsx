@@ -13,6 +13,7 @@ import {
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import {
   Select,
   SelectContent,
@@ -33,6 +34,10 @@ export interface DataTableColumn<T> {
   sortValue?: (row: T) => number | string;
   /** Additional className for header and body cells. */
   className?: string;
+  /** Opt-in visibility preset membership; columns without this remain in All data only. */
+  importance?: 'key' | 'secondary';
+  /** Pin this explicit configuration identifier while the table scrolls horizontally. */
+  pinned?: boolean;
 }
 
 type SortDir = 'asc' | 'desc' | null;
@@ -60,6 +65,8 @@ interface DataTableProps<T> {
    */
   searchable?: boolean;
 }
+
+type TablePreset = 'key' | 'all';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500] as const;
 
@@ -89,6 +96,9 @@ const STRINGS = {
     perPage: 'per page',
     previousPage: 'Previous page',
     nextPage: 'Next page',
+    preset: 'Columns',
+    keyPreset: 'Key metrics',
+    allPreset: 'All data',
   },
   zh: {
     noData: '当前筛选条件下没有可用数据。',
@@ -103,6 +113,9 @@ const STRINGS = {
     perPage: '每页',
     previousPage: '上一页',
     nextPage: '下一页',
+    preset: '列显示',
+    keyPreset: '关键指标',
+    allPreset: '全部数据',
   },
 } as const;
 
@@ -121,7 +134,22 @@ export function DataTable<T>({
   const [pageSize, setPageSize] = useState<number>(10);
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
   const [search, setSearch] = useState('');
+  const hasPresets =
+    columns.some((column) => column.importance === 'secondary') &&
+    columns.some((column) => column.importance === 'key');
+  const [preset, setPreset] = useState<TablePreset>('key');
   const searchRef = useRef<HTMLInputElement>(null);
+  const visibleColumns =
+    hasPresets && preset === 'key'
+      ? columns.filter((column) => column.importance === 'key')
+      : columns;
+
+  const clearSearch = () => {
+    setSearch('');
+    setPage(0);
+    track(`${analyticsPrefix}_search_cleared`);
+    searchRef.current?.focus();
+  };
 
   const handleSort = (colIndex: number) => {
     const col = columns[colIndex];
@@ -181,10 +209,10 @@ export function DataTable<T>({
   }
 
   return (
-    <div data-testid={testId} className="mt-3 min-w-0 w-full max-w-full">
+    <div data-testid={testId} className="mt-3 w-full min-w-0 max-w-full">
       {/* Search */}
       {searchable && (
-        <div className="mb-3 max-w-xs relative">
+        <div className="relative mb-3 w-full max-w-sm sm:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <input
             ref={searchRef}
@@ -195,23 +223,41 @@ export function DataTable<T>({
               setPage(0);
             }}
             placeholder={t.search}
-            className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+            className="h-11 w-full rounded-md border border-border bg-transparent pl-8 pr-9 text-xs focus:outline-none md:h-8"
             aria-label={t.searchAria}
           />
           {search && (
             <button
               type="button"
-              onClick={() => {
-                setSearch('');
-                setPage(0);
-                searchRef.current?.focus();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={clearSearch}
+              className="absolute right-0 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground md:size-8"
               aria-label={t.clearSearch}
             >
               <X className="size-3" />
             </button>
           )}
+        </div>
+      )}
+
+      {hasPresets && (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t.preset}</span>
+          <SegmentedToggle<TablePreset>
+            value={preset}
+            options={
+              [
+                { value: 'key', label: t.keyPreset, testId: 'data-table-preset-key' },
+                { value: 'all', label: t.allPreset, testId: 'data-table-preset-all' },
+              ] satisfies SegmentedToggleOption<TablePreset>[]
+            }
+            onValueChange={(value) => {
+              setPreset(value);
+              track(`${analyticsPrefix}_preset_changed`, { preset: value });
+            }}
+            ariaLabel={t.preset}
+            testId="data-table-preset"
+            role="group"
+          />
         </div>
       )}
 
@@ -227,7 +273,8 @@ export function DataTable<T>({
         <table className="w-full text-sm relative">
           <thead className="sticky top-0 bg-background z-1">
             <tr className="border-b-2 border-border">
-              {columns.map((col, i) => {
+              {visibleColumns.map((col) => {
+                const i = columns.indexOf(col);
                 const sortable = Boolean(col.sortValue);
                 const sortIcon =
                   sort.columnIndex === i && sort.dir
@@ -238,7 +285,7 @@ export function DataTable<T>({
                 return (
                   <th
                     key={i}
-                    className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
+                    className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-2 border-r border-border bg-background' : ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
                     onKeyDown={
@@ -270,21 +317,40 @@ export function DataTable<T>({
             {pageData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={visibleColumns.length}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
-                  {t.noResults} &quot;{search}&quot;
+                  <div className="flex flex-col items-center gap-2">
+                    <span>
+                      {t.noResults} &quot;{search}&quot;
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+                      aria-label={t.clearSearch}
+                      data-testid="data-table-empty-clear-search"
+                    >
+                      {t.clearSearch}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ) : (
               pageData.map((row, rowIndex) => (
                 <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                  {columns.map((col, colIndex) => (
+                  {visibleColumns.map((col) => (
                     <td
-                      key={colIndex}
-                      className={`py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''}`}
+                      key={columns.indexOf(col)}
+                      className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/60 bg-background' : ''}`}
                     >
-                      {col.cell(row, safePage * pageSize + rowIndex)}
+                      {col.pinned ? (
+                        <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">
+                          {col.cell(row, safePage * pageSize + rowIndex)}
+                        </div>
+                      ) : (
+                        col.cell(row, safePage * pageSize + rowIndex)
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -295,8 +361,8 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-xs text-muted-foreground">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span data-testid="data-table-pagination-summary">
             {locale === 'zh' ? (
               <>
@@ -329,7 +395,11 @@ export function DataTable<T>({
                 track(`${analyticsPrefix}_page_size_changed`, { size });
               }}
             >
-              <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs" aria-label={t.rowsPerPage}>
+              <SelectTrigger
+                size="sm"
+                className="min-w-14 w-auto gap-1 px-2 text-xs data-[size=sm]:h-11 md:data-[size=sm]:h-8"
+                aria-label={t.rowsPerPage}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -343,7 +413,7 @@ export function DataTable<T>({
             <span>{locale === 'zh' ? t.rowUnit : t.perPage}</span>
           </div>
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
           <button
             type="button"
             onClick={() => {
@@ -351,7 +421,7 @@ export function DataTable<T>({
               track(`${analyticsPrefix}_page_changed`, { direction: 'prev' });
             }}
             disabled={safePage === 0}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30 transition-colors md:size-8"
             aria-label={t.previousPage}
           >
             <ChevronLeft className="size-4" />
@@ -366,7 +436,7 @@ export function DataTable<T>({
               track(`${analyticsPrefix}_page_changed`, { direction: 'next' });
             }}
             disabled={safePage >= totalPages - 1}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30 transition-colors md:size-8"
             aria-label={t.nextPage}
           >
             <ChevronRight className="size-4" />

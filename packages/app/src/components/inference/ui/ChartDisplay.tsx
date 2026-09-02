@@ -45,11 +45,12 @@ import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { ModelLogo } from '@/components/ui/model-logo';
 import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
@@ -90,6 +91,8 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
+import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
+import { ResultContext } from '@/components/ui/result-context';
 
 import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
@@ -871,11 +874,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 </>
               ) : undefined;
             return (
-              <section key={graphIndex} className="pt-8 md:pt-0">
-                <figure data-testid="chart-figure" className="relative rounded-lg">
+              <section key={graphIndex}>
+                <figure data-testid="chart-figure" className="relative min-w-0 rounded-xl">
                   <ChartButtons
                     chartId={`chart-${graphIndex}`}
-                    className="md:top-4"
                     mobileVisible
                     analyticsPrefix={
                       isTimelineMode
@@ -893,7 +895,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           ariaLabel={t.viewMode}
                           testId={`inference-view-toggle-${graphIndex}`}
                         />
-                        {!embedded && <ShareButton className="h-7" />}
                       </>
                     }
                     hideImageExport={getViewMode(graphIndex) === 'table'}
@@ -952,10 +953,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {(() => {
                       const chartCaption = (
                         <>
-                          {/* md:mr-80 keeps the heading clear of the absolute
-                              toolbar overlay (~287px wide at md:right-8), so a
-                              long title wraps instead of running under it. */}
-                          <h2 className="text-lg font-semibold md:mr-80">
+                          <Heading as="h2" level="card">
                             {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
                               // For Input metrics with dynamic x-axis, use dynamic heading.
@@ -1009,21 +1007,35 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 ] || graph.chartDefinition.heading;
                               return locale === 'zh' ? zhHeading(String(configured)) : configured;
                             })()}
-                          </h2>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            <ModelLogo model={graph.model as Model} className="mr-1.5" />
-                            {getModelLabel(graph.model as Model)} •{' '}
-                            {selectedPrecisions
+                          </Heading>
+                          <ResultContext
+                            locale={locale}
+                            model={getModelLabel(graph.model as Model)}
+                            workload={getSequenceLabel(graph.sequence as Sequence, locale)}
+                            precision={selectedPrecisions
                               .map((prec) => getPrecisionLabel(prec as Precision))
-                              .join(', ')}{' '}
-                            • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
-                            {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-                            {usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing && (
-                              <>
-                                {' '}
-                                •{' '}
-                                <span data-testid="token-revenue-subtitle-prices">
-                                  {t.revenuePrices(
+                              .join(', ')}
+                            metric={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            date={selectedRunDate}
+                            dates={selectedDates}
+                            dateRange={
+                              selectedDateRange.startDate && selectedDateRange.endDate
+                                ? {
+                                    start: selectedDateRange.startDate,
+                                    end: selectedDateRange.endDate,
+                                  }
+                                : undefined
+                            }
+                            source={
+                              isUnofficialRun
+                                ? locale === 'zh'
+                                  ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
+                                  : 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays'
+                                : 'SemiAnalysis InferenceX™'
+                            }
+                            costBasis={
+                              usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
+                                ? t.revenuePrices(
                                     formatTokenPrice(tokenRevenuePricing.inputPerMillion),
                                     graph.sequence === Sequence.AgenticTraces
                                       ? formatTokenPrice(
@@ -1031,26 +1043,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                         )
                                       : null,
                                     formatTokenPrice(tokenRevenuePricing.outputPerMillion),
-                                  )}
-                                </span>
-                              </>
-                            )}
-                            {selectedRunDate && (
-                              <>
-                                {' '}
-                                • {t.updated}{' '}
-                                {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString(
-                                  locale === 'zh' ? 'zh-CN' : 'en-US',
-                                  {
-                                    year: 'numeric',
-                                    month: '2-digit',
-                                    day: '2-digit',
-                                    timeZone: 'UTC',
-                                  },
-                                )}
-                              </>
-                            )}
-                          </p>
+                                  )
+                                : undefined
+                            }
+                            costBasisTestId={
+                              usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
+                                ? 'token-revenue-subtitle-prices'
+                                : undefined
+                            }
+                          />
                           {residentSequenceLengths && (
                             <p
                               className="mb-2 text-xs text-muted-foreground"
@@ -1144,6 +1145,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             modelLabel={graph.model}
                             data={graph.data}
                             clippedData={graph.clippedData}
+                            onShowTable={() => handleViewModeChange(graphIndex, 'table')}
                             xLabel={resolvedXLabel}
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
@@ -1190,20 +1192,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           <div className="flex flex-col gap-4">
             {!embedded && (
               <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {t.inferencePerformanceDesc}
-                    </p>
-                  </div>
-                  {/* The chart-row ShareButton lives in ChartButtons (visible on mobile
-                      via `mobileVisible`, but rendered per chart row); keep a header Share
-                      on mobile so small screens have a share entry point next to the title. */}
-                  <div className="md:hidden">
-                    <ShareButton />
-                  </div>
-                </div>
+                <DashboardSectionHeader
+                  title={t.inferencePerformance}
+                  description={t.inferencePerformanceDesc}
+                  actions={<ShareButton />}
+                />
                 <ChartControls />
               </>
             )}
@@ -1299,6 +1292,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           })}
         </TabsList>
       </Tabs>
+      <ActiveQuickFilters />
       <div
         className="motion-stale flex flex-col gap-4"
         data-stale={isRefetching || undefined}

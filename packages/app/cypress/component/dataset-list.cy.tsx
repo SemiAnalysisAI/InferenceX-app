@@ -64,7 +64,26 @@ describe('DatasetList', () => {
     cy.contains('cc-traces-weka (256k)').should('be.visible');
     cy.contains('1,234').should('be.visible'); // conversation_count, localized
     cy.contains('82%').should('be.visible'); // cachedPct
+    cy.contains('Request shape').should('be.visible');
+    cy.contains('Token volume').should('be.visible');
+    cy.get('a[href="/agentx/cc-traces-weka-full"]')
+      .find('section[aria-labelledby="cc-traces-weka-full-request-shape"]')
+      .should('exist');
     cy.get('a[href="/agentx/cc-traces-weka-full"]').should('exist');
+  });
+
+  it('keeps grouped metrics readable when cards stack on mobile', () => {
+    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: datasets }).as('list');
+    cy.viewport(390, 844);
+    mountList();
+    cy.wait('@list');
+    cy.get('a[href="/agentx/cc-traces-weka-full"]')
+      .find('section')
+      .should('have.length', 2)
+      .each(($section) => {
+        cy.wrap($section).find('dt').should('have.length.greaterThan', 0);
+      });
+    cy.contains('View dataset →').should('be.visible');
   });
 
   it('shows the empty state when no datasets are ingested', () => {

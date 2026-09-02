@@ -38,7 +38,7 @@ export function AgenticOptimizationNote() {
             <button
               type="button"
               aria-label={t.aria}
-              className="inline-flex cursor-help rounded-sm p-0.5 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 dark:hover:text-blue-200"
+              className="inline-flex cursor-help rounded-sm p-0.5 hover:text-blue-800 focus-visible:outline-none dark:hover:text-blue-200"
             >
               <Info size={13} />
             </button>

@@ -454,7 +454,7 @@ function MethodFigure({
       aria-label={`${copy.alt} ${
         locale === 'zh' ? '打开原始分辨率图片。' : 'Open the full-resolution image.'
       }`}
-      className="group my-7 block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
         className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"

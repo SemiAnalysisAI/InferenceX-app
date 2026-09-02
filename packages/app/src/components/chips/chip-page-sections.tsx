@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { getPostBySlug } from '@/lib/blog';
 import {
@@ -98,6 +99,7 @@ const STRINGS = {
     vsRatioNote: 'Ratios are spec-sheet values; see the live compare pages for measured deltas.',
     vsRatioNa: 'n/a',
     vsSpecTableCaption: 'Spec-sheet comparison',
+    specScrollHint: 'Swipe horizontally to view all specification values.',
     overviewHeading: 'Overview',
     benchmarkHeading: 'How InferenceX benchmarks it',
     vsIntroPrefix: 'Spec-sheet and pricing comparison of',
@@ -159,6 +161,7 @@ const STRINGS = {
     vsRatioNote: '倍数为纸面规格对比；实测差距请见实时对比页面。',
     vsRatioNa: '不适用',
     vsSpecTableCaption: '纸面规格对比',
+    specScrollHint: '左右滑动可查看全部规格参数。',
     overviewHeading: '概览',
     benchmarkHeading: 'InferenceX 如何测试这款芯片',
     vsIntroPrefix: '本页对比',
@@ -299,7 +302,7 @@ const ModelsSection = ({ locale }: { locale: Locale }) => {
   );
 };
 
-const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
+export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
   const t = STRINGS[locale];
   const spec = getChipSpec(entry);
   const hw = getChipHw(entry);
@@ -324,19 +327,25 @@ const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) 
     [t.specLabels.costRetail, `$${hw.costr.toFixed(2)}`],
   ];
   return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="w-full text-sm">
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label} className="border-b border-border/40">
-              <th scope="row" className="py-2 pr-4 text-left font-medium text-muted-foreground">
-                {label}
-              </th>
-              <td className="py-2 font-mono">{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="relative mt-4">
+      <div className="overflow-x-auto rounded-lg border border-border/40">
+        <table className="w-full min-w-[36rem] text-sm">
+          <tbody className="divide-y divide-border/40">
+            {rows.map(([label, value], index) => (
+              <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
+                <th
+                  scope="row"
+                  className="w-[52%] py-2.5 pr-4 text-left font-medium text-muted-foreground"
+                >
+                  {label}
+                </th>
+                <td className="whitespace-nowrap py-2.5 text-right font-mono">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground md:hidden">{t.specScrollHint}</p>
       <p className="mt-3 text-sm text-muted-foreground">
         {t.pricingSource}{' '}
         <a
@@ -632,14 +641,15 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
                 const translation = locale === 'zh' ? getZhChipTranslation(chip.slug) : undefined;
                 const summary = translation?.summary ?? chip.summary;
                 return (
-                  <Link key={chip.slug} href={localePath(`/chips/${chip.slug}`, locale)}>
-                    <Card className="h-full p-5 transition-colors hover:border-brand/50">
-                      <h3 className="font-semibold">{chip.title}</h3>
-                      <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">
-                        {summary}
-                      </p>
-                    </Card>
-                  </Link>
+                  <CatalogLinkCard
+                    key={chip.slug}
+                    href={localePath(`/chips/${chip.slug}`, locale)}
+                    title={chip.title}
+                    description={summary}
+                    slug={chip.slug}
+                    locale={locale}
+                    event="chip_index_entry_clicked"
+                  />
                 );
               })}
             </div>
@@ -651,12 +661,13 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
             <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {vsPages.map((page) => (
                 <li key={page.slug}>
-                  <Link
+                  <CatalogLinkCard
                     href={localePath(`/chips/${page.slug}`, locale)}
-                    className="text-sm font-medium text-brand hover:underline"
-                  >
-                    {page.a.label} vs {page.b.label} →
-                  </Link>
+                    title={`${page.a.label} vs ${page.b.label}`}
+                    slug={page.slug}
+                    locale={locale}
+                    event="chip_index_entry_clicked"
+                  />
                 </li>
               ))}
             </ul>

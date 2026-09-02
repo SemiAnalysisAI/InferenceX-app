@@ -145,6 +145,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           ) : null;
         },
         className: 'whitespace-nowrap',
+        importance: 'key',
       },
       {
         header: t.chip,
@@ -175,12 +176,15 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         },
         sortValue: (row) => row.configLabel,
         className: 'font-medium whitespace-nowrap',
+        importance: 'key',
+        pinned: true,
       },
       {
         header: t.precision,
         cell: (row) => row.precision.toUpperCase(),
         sortValue: (row) => row.precision,
         className: 'whitespace-nowrap',
+        importance: 'key',
       },
       {
         header: t.score,
@@ -188,6 +192,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => row.score.toFixed(2),
         sortValue: (row) => row.score,
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: t.min,
@@ -195,6 +200,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => row.minScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.minScore ?? 0,
         className: 'tabular-nums',
+        importance: 'secondary',
       },
       {
         header: t.max,
@@ -202,6 +208,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => row.maxScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.maxScore ?? 0,
         className: 'tabular-nums',
+        importance: 'secondary',
       },
       {
         header: 'TP',
@@ -209,6 +216,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => row.tp,
         sortValue: (row) => row.tp,
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: t.conc,
@@ -216,18 +224,21 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: t.benchmark,
         cell: (row) => row.benchmark,
         sortValue: (row) => row.benchmark,
         className: 'whitespace-nowrap',
+        importance: 'secondary',
       },
       {
         header: t.date,
         cell: (row) => formatEvaluationDate(row.date, locale),
         sortValue: (row) => row.date,
         className: 'whitespace-nowrap',
+        importance: 'secondary',
       },
     ],
     [locale, runIndexByUrl],

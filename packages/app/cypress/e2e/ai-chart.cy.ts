@@ -1,5 +1,68 @@
 type FixtureRow = Record<string, any> & { metrics: Record<string, number> };
 
+describe('AI chart workspace', () => {
+  it('explains setup, prefills an editable example, and retains each provider key separately', () => {
+    cy.viewport(1280, 720);
+    cy.visit('/ai-chart');
+    cy.get('#ai-chart-prompt').should('have.attr', 'aria-describedby', 'ai-chart-prompt-hint');
+    cy.contains('button', 'Generate Chart').should('be.disabled');
+    cy.get('#ai-chart-requirements').should('contain.text', 'Add a description');
+    cy.get('[data-testid="ai-chart-examples"] button')
+      .first()
+      .then(($example) => {
+        const prompt = $example.text().trim();
+        cy.wrap($example).click();
+        cy.get('#ai-chart-prompt').should('have.value', prompt).type(' at high interactivity');
+      });
+    cy.get('#ai-chart-requirements').should('contain.text', 'Add your provider');
+    cy.get('#ai-chart-key')
+      .type('test-openai-key', { log: false })
+      .should('have.attr', 'type', 'password');
+    cy.contains('button', 'Generate Chart').should('be.enabled');
+    cy.get('#ai-chart-provider').click();
+    cy.contains('[role="option"]', 'Anthropic').click();
+    cy.get('#ai-chart-key').should('have.value', '').type('test-anthropic-key', { log: false });
+    cy.get('#ai-chart-provider').click();
+    cy.contains('[role="option"]', 'OpenAI').click();
+    cy.get('#ai-chart-key').should('have.value', 'test-openai-key');
+    cy.get('button[aria-label="Show API key"]').click();
+    cy.get('#ai-chart-key').should('have.attr', 'type', 'text');
+    cy.reload();
+    cy.get('#ai-chart-key').should('have.value', '').and('have.attr', 'type', 'password');
+  });
+
+  for (const locale of ['en', 'zh']) {
+    it(`keeps the ${locale} workspace labeled and contained on mobile`, () => {
+      cy.viewport(390, 844);
+      cy.visit(locale === 'zh' ? '/zh/ai-chart' : '/ai-chart');
+      cy.get('label[for="ai-chart-prompt"]').should(
+        'contain.text',
+        locale === 'zh' ? '想比较什么' : 'What would',
+      );
+      cy.get('label[for="ai-chart-provider"]').should(
+        'contain.text',
+        locale === 'zh' ? 'AI 服务商' : 'AI provider',
+      );
+      cy.get('#ai-chart-key-hint').should(
+        'contain.text',
+        locale === 'zh' ? '当前页面的内存' : 'page’s memory',
+      );
+      cy.get(
+        '#ai-chart-provider, #ai-chart-key, button[aria-label="Show API key"], button[aria-label="显示 API 密钥"]',
+      ).each(($control) => {
+        const box = $control[0].getBoundingClientRect();
+        expect(box.height).to.be.at.least(44);
+        expect(box.left).to.be.at.least(0);
+        expect(box.right).to.be.at.most(390);
+      });
+      cy.get('[data-testid="ai-chart-examples"] button').should('have.length', 6);
+      cy.window().should((win) =>
+        expect(win.document.documentElement.scrollWidth).to.be.at.most(390),
+      );
+    });
+  }
+});
+
 function fixtureRow(
   rows: FixtureRow[],
   hardware: 'b200' | 'mi355x',

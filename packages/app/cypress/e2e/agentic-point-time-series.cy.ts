@@ -972,26 +972,35 @@ describe('Agentic point orchestrator metric sources', () => {
   });
 
   it('toggles input and decode independently while keeping one visible', () => {
+    cy.get('[data-testid="throughput-series-select"]').click();
     cy.get('[data-testid="throughput-series-input"]')
-      .should('have.attr', 'aria-pressed', 'true')
-      .and('not.be.disabled');
+      .should('have.attr', 'aria-selected', 'true')
+      .and('not.have.attr', 'aria-disabled', 'true');
     cy.get('[data-testid="throughput-series-decode"]')
-      .should('have.attr', 'aria-pressed', 'true')
-      .and('not.be.disabled');
+      .should('have.attr', 'aria-selected', 'true')
+      .and('not.have.attr', 'aria-disabled', 'true');
     cy.contains('svg', 'Input (avg n=50)').should('be.visible');
     cy.contains('svg', 'Decode (avg n=50)').should('be.visible');
     cy.contains('svg', 'Total running avg (60s burn-in)').should('be.visible');
 
     cy.get('[data-testid="throughput-series-input"]').click();
-    cy.get('[data-testid="throughput-series-input"]').should('have.attr', 'aria-pressed', 'false');
-    cy.get('[data-testid="throughput-series-decode"]').should('be.disabled');
+    cy.get('[data-testid="throughput-series-select"]').click();
+    cy.get('[data-testid="throughput-series-input"]').should('have.attr', 'aria-selected', 'false');
+    cy.get('[data-testid="throughput-series-decode"]').should('have.attr', 'aria-disabled', 'true');
     cy.contains('svg', 'Input (avg n=50)').should('not.exist');
     cy.contains('svg', 'Total running avg (60s burn-in)').should('not.exist');
 
     cy.get('[data-testid="throughput-series-input"]').click();
+    cy.get('[data-testid="throughput-series-select"]').click();
     cy.get('[data-testid="throughput-series-decode"]').click();
-    cy.get('[data-testid="throughput-series-input"]').should('be.disabled');
-    cy.get('[data-testid="throughput-series-decode"]').should('have.attr', 'aria-pressed', 'false');
+    cy.get('[data-testid="throughput-series-select"]').click();
+    cy.get('[data-testid="throughput-series-input"]').should('have.attr', 'aria-disabled', 'true');
+    cy.get('[data-testid="throughput-series-decode"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
+    );
+    cy.get('body').type('{esc}');
   });
 
   it('retries only the selected server-metrics source query', () => {

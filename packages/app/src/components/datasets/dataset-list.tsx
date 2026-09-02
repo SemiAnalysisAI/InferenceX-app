@@ -21,6 +21,8 @@ const STRINGS = {
     cachedInput: 'Cached input',
     totalInput: 'Total input',
     totalOutput: 'Total output',
+    requestShape: 'Request shape',
+    tokenVolume: 'Token volume',
     viewDataset: 'View dataset →',
   },
   zh: {
@@ -35,6 +37,8 @@ const STRINGS = {
     cachedInput: 'cached input 占比',
     totalInput: 'input token 总数',
     totalOutput: 'output token 总数',
+    requestShape: '请求结构',
+    tokenVolume: 'Token 规模',
     viewDataset: '查看数据集 →',
   },
 } as const;
@@ -60,23 +64,52 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
         {d.description && (
           <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
         )}
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <Stat label={t.conversations} value={localeNumber(d.conversation_count, locale)} />
-          <Stat
-            label={t.medianReqConvo}
-            value={perConversation(s.medianRequestsPerConversation, locale)}
-          />
-          <Stat
-            label={t.meanReqConvo}
-            value={perConversation(s.meanRequestsPerConversation, locale)}
-          />
-          <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
-          <Stat label={t.subagentGroups} value={compact(s.subagentGroups ?? 0)} />
-          <Stat label={t.cachedInput} value={cachedPct} />
-          <Stat label={t.totalInput} value={`${compact(s.totalIn ?? 0)} tok`} />
-          <Stat label={t.totalOutput} value={`${compact(s.totalOut ?? 0)} tok`} />
-        </dl>
-        <div className="mt-3 text-xs font-medium text-primary">{t.viewDataset}</div>
+        <div className="mb-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+          <div className="text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground">
+            {t.conversations}
+          </div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+            {localeNumber(d.conversation_count, locale)}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <section className="min-w-0" aria-labelledby={`${d.slug}-request-shape`}>
+            <h4
+              id={`${d.slug}-request-shape`}
+              className="mb-1.5 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+            >
+              {t.requestShape}
+            </h4>
+            <dl className="grid gap-y-1.5 text-xs">
+              <Stat
+                label={t.medianReqConvo}
+                value={perConversation(s.medianRequestsPerConversation, locale)}
+              />
+              <Stat
+                label={t.meanReqConvo}
+                value={perConversation(s.meanRequestsPerConversation, locale)}
+              />
+              <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
+              <Stat label={t.subagentGroups} value={compact(s.subagentGroups ?? 0)} />
+            </dl>
+          </section>
+          <section className="min-w-0" aria-labelledby={`${d.slug}-token-volume`}>
+            <h4
+              id={`${d.slug}-token-volume`}
+              className="mb-1.5 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+            >
+              {t.tokenVolume}
+            </h4>
+            <dl className="grid gap-y-1.5 text-xs">
+              <Stat label={t.cachedInput} value={cachedPct} />
+              <Stat label={t.totalInput} value={`${compact(s.totalIn ?? 0)} tok`} />
+              <Stat label={t.totalOutput} value={`${compact(s.totalOut ?? 0)} tok`} />
+            </dl>
+          </section>
+        </div>
+        <div className="mt-4 border-t border-border/40 pt-3 text-xs font-medium text-primary">
+          {t.viewDataset}
+        </div>
       </Card>
     </Link>
   );

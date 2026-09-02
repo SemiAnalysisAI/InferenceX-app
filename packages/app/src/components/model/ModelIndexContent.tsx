@@ -66,6 +66,21 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
             {pages.map(({ slug, page }) => {
               const model = toModel(page.entry.displayName);
               const arch = model ? getModelArchitecture(model) : undefined;
+              const architectureLabel = arch
+                ? arch.architectureType === 'moe'
+                  ? locale === 'zh'
+                    ? 'MoE（混合专家）'
+                    : 'MoE'
+                  : locale === 'zh'
+                    ? 'Dense（稠密）'
+                    : 'Dense'
+                : null;
+              const attentionLabel =
+                arch?.attentionType === 'AlternatingSinkGQA'
+                  ? locale === 'zh'
+                    ? 'Sink/Full GQA'
+                    : 'Sink/Full GQA'
+                  : arch?.attentionType;
               return (
                 <li key={slug}>
                   <ModelIndexLink
@@ -73,7 +88,7 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
                     slug={slug}
                     locale={locale}
                     data-testid={`model-index-link-${slug}`}
-                    className="group h-full rounded-lg border border-border/50 bg-muted/30 px-4 py-3 flex flex-col gap-2 hover:bg-muted/50 transition-colors"
+                    className="group h-full rounded-lg border border-border/50 bg-muted/30 px-4 py-3 flex flex-col gap-2 transition-[border-color,background-color,box-shadow] hover:border-brand/45 hover:bg-brand/5 hover:shadow-sm focus-visible:outline-none"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex items-center gap-2 text-base font-semibold group-hover:text-primary transition-colors">
@@ -91,12 +106,12 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
                     {arch && (
                       <span className="flex flex-wrap items-center gap-1.5">
                         <Badge variant="outline" className="text-xs py-0">
-                          {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
+                          {architectureLabel}
                         </Badge>
                         <Badge variant="outline" className="text-xs py-0">
                           {arch.attentionType === 'AlternatingSinkGQA'
-                            ? 'Sink/Full GQA'
-                            : arch.attentionType}
+                            ? attentionLabel
+                            : attentionLabel}
                         </Badge>
                         <Badge variant="outline" className="text-xs py-0">
                           {formatParamCount(arch.totalParams)}

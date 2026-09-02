@@ -25,7 +25,8 @@ import {
 import { track } from '@/lib/analytics';
 import { Sequence } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 const STRINGS = {
   en: {
@@ -35,6 +36,7 @@ const STRINGS = {
     agenticDescription:
       'Narrow the chart by chip vendor, serving framework, deployment mode, and power-measurement status. Selecting none in a group shows all.',
     selected: 'selected',
+    all: 'All',
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show only the best configuration for each chip',
     vendor: 'Vendor',
@@ -67,6 +69,7 @@ const STRINGS = {
     agenticDescription:
       '按芯片厂商、推理框架、部署模式和功耗测量状态筛选图表。某组不选则显示全部。',
     selected: '项已选',
+    all: '全部',
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片只显示表现最佳的配置',
     vendor: '厂商',
@@ -103,10 +106,6 @@ const SPEC_MODES: { value: SpecMode; label: string }[] = [
   { value: 'stp', label: 'STP' },
 ];
 const POWER_TIERS: PowerTier[] = ['certified', 'legacy'];
-
-function toggleValue<T extends string>(current: T[], value: T): T[] {
-  return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
-}
 
 export function QuickFiltersDialog({
   open,
@@ -195,7 +194,7 @@ export function QuickFiltersDialog({
             selected: quickFilters.spec,
           },
         ]),
-    // Shown for agentic too — the pills auto-disable when no measured
+    // Shown for agentic too — the options auto-disable when no measured
     // telemetry exists for the current selection.
     {
       key: 'power' as const,
@@ -211,29 +210,33 @@ export function QuickFiltersDialog({
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
 
-  const handleToggle = (
+  const handleGroupChange = (
     category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power',
-    value: string,
+    values: string[],
   ) => {
-    const wasActive =
+    const previous =
       category === 'vendor'
-        ? quickFilters.vendors.includes(value)
+        ? quickFilters.vendors
         : category === 'framework'
-          ? quickFilters.frameworks.includes(value)
+          ? quickFilters.frameworks
           : category === 'deployment'
-            ? quickFilters.deployment.includes(value as DeploymentMode)
+            ? quickFilters.deployment
             : category === 'power'
-              ? quickFilters.power.includes(value as PowerTier)
-              : quickFilters.spec.includes(value as SpecMode);
-    if (category === 'vendor') setQuickFilterVendors(toggleValue(quickFilters.vendors, value));
-    else if (category === 'framework')
-      setQuickFilterFrameworks(toggleValue(quickFilters.frameworks, value));
-    else if (category === 'deployment')
-      setQuickFilterDeployment(toggleValue(quickFilters.deployment, value as DeploymentMode));
-    else if (category === 'power')
-      setQuickFilterPower(toggleValue(quickFilters.power, value as PowerTier));
-    else setQuickFilterSpec(toggleValue(quickFilters.spec, value as SpecMode));
-    track('inference_quick_filter_toggled', { category, value, active: !wasActive });
+              ? quickFilters.power
+              : quickFilters.spec;
+    const changed = new Set([...previous, ...values]);
+    for (const value of changed) {
+      const wasActive = previous.includes(value);
+      const isActive = values.includes(value);
+      if (wasActive !== isActive) {
+        track('inference_quick_filter_toggled', { category, value, active: isActive });
+      }
+    }
+    if (category === 'vendor') setQuickFilterVendors(values);
+    else if (category === 'framework') setQuickFilterFrameworks(values);
+    else if (category === 'deployment') setQuickFilterDeployment(values as DeploymentMode[]);
+    else if (category === 'power') setQuickFilterPower(values as PowerTier[]);
+    else setQuickFilterSpec(values as SpecMode[]);
   };
 
   const clearFilters = () => {
@@ -288,7 +291,7 @@ export function QuickFiltersDialog({
               className="grid gap-2 px-3 py-3 sm:grid-cols-[7rem_1fr] sm:items-start"
             >
               <div className="flex items-center gap-1 pt-1">
-                <h3 className="text-xs font-semibold text-muted-foreground">{group.label}</h3>
+                <Label htmlFor={`quick-filter-${group.key}-select`}>{group.label}</Label>
                 {group.key === 'power' && (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -296,7 +299,7 @@ export function QuickFiltersDialog({
                         type="button"
                         aria-label={t.powerHelpLabel}
                         data-testid="measured-power-help"
-                        className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none"
                       >
                         <Info className="size-3.5" aria-hidden="true" />
                       </button>
@@ -315,31 +318,25 @@ export function QuickFiltersDialog({
                   </Popover>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {group.options.map((option) => {
-                  const active = group.selected.includes(option.value);
-                  const disabled = !option.available && !active;
-                  return (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      size="sm"
-                      variant={active ? 'default' : 'outline'}
-                      aria-pressed={active}
-                      disabled={disabled}
-                      title={disabled ? t.noData : undefined}
-                      className={cn(
-                        'h-7 rounded-full px-3 text-xs',
-                        active && 'bg-brand hover:bg-brand/90',
-                      )}
-                      data-testid={`quick-filter-${group.key}-${option.value}`}
-                      onClick={() => handleToggle(group.key, option.value)}
-                    >
-                      {option.label}
-                    </Button>
-                  );
-                })}
-              </div>
+              <MultiSelect
+                options={group.options.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                  disabled: !option.available && !group.selected.includes(option.value),
+                  title: option.available ? undefined : t.noData,
+                  testId: `quick-filter-${group.key}-${option.value}`,
+                }))}
+                value={[...group.selected]}
+                onChange={(values) => handleGroupChange(group.key, values)}
+                placeholder={t.all}
+                ariaLabel={group.label}
+                triggerId={`quick-filter-${group.key}-select`}
+                triggerTestId={`quick-filter-${group.key}-select`}
+                searchable={false}
+                plainSelectedText
+                showSelectionSummary={false}
+                showClearAll={false}
+              />
             </section>
           ))}
         </div>

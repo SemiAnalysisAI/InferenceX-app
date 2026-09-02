@@ -6,6 +6,8 @@ import { BarChart3, Radar, Table2 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import {
@@ -100,6 +102,9 @@ const STRINGS = {
     scaleUpHeading: 'Scale-Up Topology Diagrams',
     scaleUpDescription:
       'Intra-node scale-up interconnect topology for each Chip SKU, showing Chip → NVSwitch or direct Chip-to-Chip connectivity.',
+    tableHint: 'Compare the full hardware matrix. Scroll horizontally on smaller screens.',
+    chartHint: 'Compare one hardware metric at a time across all Chip SKUs.',
+    radarHint: 'Compare the relative shape of compute, memory, and interconnect capabilities.',
   },
   zh: {
     heading: '芯片规格',
@@ -129,6 +134,9 @@ const STRINGS = {
     scaleOutDescription: '每台服务器的横向扩展网络拓扑，展示芯片 → NIC → Leaf 交换机的连接方式。',
     scaleUpHeading: '纵向扩展拓扑图',
     scaleUpDescription: '节点内纵向扩展互联拓扑，展示芯片 → NVSwitch 或芯片直连方式。',
+    tableHint: '比较完整硬件矩阵；在较小屏幕上可横向滚动查看。',
+    chartHint: '逐项比较所有芯片 SKU 的硬件指标。',
+    radarHint: '比较计算、显存和互联能力的相对轮廓。',
   },
 } as const;
 
@@ -386,19 +394,23 @@ export function GpuSpecsContent() {
     <div data-testid="gpu-specs-content" className="flex flex-col gap-4">
       <section>
         <Card>
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm">{t.description}</p>
-            </div>
-            <ChartShareActions />
-          </div>
+          <DashboardSectionHeader
+            title={t.heading}
+            description={t.description}
+            actions={<ChartShareActions />}
+          />
         </Card>
       </section>
       <section className="pt-8 md:pt-0">
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between pb-4">
-            <div />
+          <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="min-w-0 text-xs text-muted-foreground">
+              {viewMode === 'table'
+                ? t.tableHint
+                : viewMode === 'chart'
+                  ? t.chartHint
+                  : t.radarHint}
+            </p>
             <SegmentedToggle
               value={viewMode}
               options={viewModeOptions}
@@ -433,7 +445,9 @@ export function GpuSpecsContent() {
       </section>
       <section className="pt-8 md:pt-0">
         <Card>
-          <h3 className="text-lg font-semibold mb-2">{t.scaleOutHeading}</h3>
+          <Heading as="h3" level="card" className="mb-2">
+            {t.scaleOutHeading}
+          </Heading>
           <p className="text-muted-foreground text-sm mb-6">{t.scaleOutDescription}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {specsWithTopology.map((spec) => (
@@ -456,7 +470,9 @@ export function GpuSpecsContent() {
       </section>
       <section className="pt-8 md:pt-0">
         <Card>
-          <h3 className="text-lg font-semibold mb-2">{t.scaleUpHeading}</h3>
+          <Heading as="h3" level="card" className="mb-2">
+            {t.scaleUpHeading}
+          </Heading>
           <p className="text-muted-foreground text-sm mb-6">{t.scaleUpDescription}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {GPU_SPECS.map((spec) => (

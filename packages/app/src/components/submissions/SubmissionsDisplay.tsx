@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { exportToCsv } from '@/lib/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
@@ -43,6 +45,8 @@ const STRINGS = {
     subtitleTested: 'tested',
     subtitleLLMs: 'LLMs',
     subtitleSKUs: 'SKUs',
+    tableCaption: 'Submission records',
+    tableHint: 'Search, sort, or expand a row to inspect the exact benchmark configuration.',
   },
   zh: {
     heading: '基准测试提交',
@@ -66,6 +70,8 @@ const STRINGS = {
     subtitleTested: '个配置',
     subtitleLLMs: '个 LLM',
     subtitleSKUs: '种 SKU',
+    tableCaption: '提交记录',
+    tableHint: '可搜索、排序，或展开行查看完整的基准测试配置。',
   },
 } as const;
 
@@ -130,15 +136,11 @@ export default function SubmissionsDisplay() {
       {/* Header */}
       <section>
         <Card>
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm">{t.description}</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <ChartShareActions />
-            </div>
-          </div>
+          <DashboardSectionHeader
+            title={t.heading}
+            description={t.description}
+            actions={<ChartShareActions />}
+          />
         </Card>
       </section>
 
@@ -200,7 +202,9 @@ export default function SubmissionsDisplay() {
                 mode={chartMode}
                 caption={
                   <>
-                    <h3 className="text-lg font-semibold">{t.chartCaption}</h3>
+                    <Heading as="h3" level="card">
+                      {t.chartCaption}
+                    </Heading>
                     <p className="text-sm text-muted-foreground">{t.chartSource}</p>
                   </>
                 }
@@ -217,6 +221,12 @@ export default function SubmissionsDisplay() {
       {/* Submissions table */}
       <section>
         <Card>
+          <div className="mb-4">
+            <Heading as="h2" level="card">
+              {t.tableCaption}
+            </Heading>
+            <p className="mt-1 text-sm text-muted-foreground">{t.tableHint}</p>
+          </div>
           {isLoading ? (
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
               {t.loadingTable}

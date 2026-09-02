@@ -1,6 +1,30 @@
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  it('keeps full requests and response schemas readable on mobile', () => {
+    cy.viewport(390, 720);
+    cy.visit('/zh/api');
+    cy.get('[data-testid="copyable-code-block"]')
+      .first()
+      .within(() => {
+        cy.contains('button', '复制').should('be.visible');
+        cy.get('pre').should('have.attr', 'tabindex', '0').and('contain.text', 'curl');
+      });
+    cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
+    cy.get('[data-testid="api-endpoint-list-benchmarks"]').within(() => {
+      cy.get('[role="region"][aria-labelledby="list-benchmarks-parameters"]')
+        .should('have.attr', 'tabindex', '0')
+        .and('contain.text', 'model');
+      cy.get('[data-testid="copyable-code-block"]').should(($blocks) => {
+        for (const block of $blocks) {
+          const bounds = block.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(390);
+        }
+      });
+    });
+  });
+
   it('exposes the localized reference and its OpenAPI contract', () => {
     cy.visit('/api');
 

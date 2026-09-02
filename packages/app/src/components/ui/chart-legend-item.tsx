@@ -96,7 +96,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
       <label
         htmlFor={id}
         className={cn(
-          'group/item flex items-center cursor-pointer hover:underline peer-focus-visible:ring-1 peer-focus-visible:ring-offset-1 peer-focus-visible:outline-none rounded-sm',
+          'group/item flex items-center cursor-pointer hover:underline peer-focus-visible:outline-none rounded-sm',
           isLegendExpanded ? 'w-fit whitespace-nowrap' : 'max-w-full',
         )}
         title={!isLegendExpanded && isLongText ? label : title}
@@ -189,7 +189,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           // Reduced opacity at rest (still visible/tappable on touch), full on
           // row hover or keyboard focus. ml-auto pins the icon to the row's
           // right edge so icons align in a column across variable-length labels.
-          className="ml-auto shrink-0 p-1 -my-1 rounded-sm text-muted-foreground hover:text-foreground opacity-35 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity no-export"
+          className="ml-auto shrink-0 p-1 -my-1 rounded-sm text-muted-foreground hover:text-foreground opacity-35 group-hover/row:opacity-100 transition-opacity no-export"
         >
           <Table2 size={13} />
         </button>

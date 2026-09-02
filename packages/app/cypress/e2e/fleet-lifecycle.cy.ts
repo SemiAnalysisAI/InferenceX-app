@@ -171,6 +171,20 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
   });
 
+  it('keeps fleet economics inputs together in the assumptions group', () => {
+    cy.viewport(1280, 900);
+    cy.get('[data-testid="calculator-lifecycle-section"] fieldset').should('have.length', 2);
+    cy.contains(
+      '[data-testid="calculator-lifecycle-section"] fieldset',
+      'Fleet economics & assumptions',
+    ).within(() => {
+      cy.get('[data-testid="calc-lifecycle-price-input"]').should('be.visible');
+      cy.get('[data-testid="calc-lifecycle-output-price-input"]').should('be.visible');
+      cy.get('[data-testid="calc-lifecycle-horizon-input"]').should('be.visible');
+      cy.contains('Fleet economics & assumptions').should('be.visible');
+    });
+  });
+
   it('the default MW budget drives the lifecycle table', () => {
     // The figure opens on the chart; the table is the other tab.
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');

@@ -89,7 +89,7 @@ export function ComparePairCardLink({
       data-scenario={scenarioLabel}
       data-pending={pending || undefined}
       aria-busy={pending || undefined}
-      className="motion-nav-pending group relative flex flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
+      className="motion-nav-pending group relative flex flex-col rounded-xl border border-border bg-background/20 p-5 backdrop-blur-[2px] transition-[border-color,background-color,box-shadow,opacity] duration-200 hover:border-brand/50 hover:bg-brand/3 hover:shadow-lg hover:shadow-brand/5 focus-visible:outline-none"
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         e.preventDefault();

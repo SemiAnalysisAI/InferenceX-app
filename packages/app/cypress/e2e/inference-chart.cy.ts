@@ -53,7 +53,7 @@ describe('Inference Chart', () => {
   it('shows chart caption with model and source info', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
-      .find('figcaption p')
+      .find('[data-testid="result-context"]')
       .should('contain', 'SemiAnalysis InferenceX');
   });
 
@@ -61,19 +61,33 @@ describe('Inference Chart', () => {
     cy.get('.sidebar-legend').should('be.visible');
   });
 
-  it('renders quick filters and toggles a vendor pill', () => {
+  it('renders quick filters and selects vendors from a combobox', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-deployment-select"]').click();
     cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
     cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
     cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
+    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-pressed', 'false')
-      .click()
-      .should('have.attr', 'aria-pressed', 'true')
-      .click()
-      .should('have.attr', 'aria-pressed', 'false');
+      .should('have.attr', 'aria-selected', 'false')
+      .click();
+    cy.get('[data-testid="quick-filter-vendor-select"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click();
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
+      .should('have.attr', 'aria-selected', 'true')
+      .click();
+    cy.get('[data-testid="quick-filter-vendor-select"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click();
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
+    );
+    cy.get('body').type('{esc}');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -121,10 +135,9 @@ describe('Inference Chart', () => {
       .first()
       .find('[data-testid="token-revenue-subtitle-prices"]')
       .should('have.text', 'Uncached $1.122/M tok · Cached $0.08/M tok · Output $3.366/M tok')
-      .then(($prices) => {
-        const subtitle = $prices.parent().text();
-        expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('Updated:'));
-      });
+      .closest('[data-testid="result-context"]')
+      .should('contain.text', 'Cost basis:')
+      .and('contain.text', 'Updated:');
     cy.get('[data-testid="openrouter-pricing-link"]').should(
       'have.attr',
       'href',
@@ -235,10 +248,9 @@ describe('Inference Chart', () => {
         'have.text',
         '未缓存 $1.122/百万 token · 缓存 $0.08/百万 token · 输出 $3.366/百万 token',
       )
-      .then(($prices) => {
-        const subtitle = $prices.parent().text();
-        expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('更新时间：'));
-      });
+      .closest('[data-testid="result-context"]')
+      .should('contain.text', '成本口径:')
+      .and('contain.text', '更新时间:');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
@@ -317,7 +329,9 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
     cy.get('[data-testid="inference-results-table"]')
       .should('contain.text', '芯片')
       .and('contain.text', '精度')
-      .and('contain.text', '并发数');
+      .and('contain.text', '精度');
+    cy.get('[data-testid="data-table-preset-all"]').click();
+    cy.get('[data-testid="inference-results-table"]').should('contain.text', '并发数');
     cy.get('[data-testid="export-button"]')
       .should('be.visible')
       .and('have.attr', 'aria-label', '下载图表');

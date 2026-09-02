@@ -17,7 +17,10 @@ import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { ResultContext } from '@/components/ui/result-context';
 import { exportToCsv } from '@/lib/csv-export';
 import { historicalTrendToCsv } from '@/lib/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -65,6 +68,7 @@ const STRINGS = {
     retry: 'Reload page',
     trendLoadError: 'Historical trend data could not be loaded.',
     trendRetry: 'Retry loading trend data',
+    targetHint: 'Adjust the operating point used by the trend interpolation.',
   },
   zh: {
     heading: '历史趋势',
@@ -83,6 +87,7 @@ const STRINGS = {
     retry: '重新加载页面',
     trendLoadError: '历史趋势数据加载失败。',
     trendRetry: '重试加载趋势数据',
+    targetHint: '调整趋势插值所使用的交互性水平。',
   },
 };
 
@@ -226,22 +231,23 @@ export default function HistoricalTrendsDisplay() {
     return (
       <section data-testid="historical-trends-display">
         <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-destructive text-sm">{t.loadError}</p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                track('historical_reload_clicked');
-                window.location.reload();
-              }}
-            >
-              {t.retry}
-            </Button>
-          </div>
+          <DashboardSectionHeader
+            title={t.heading}
+            description={t.loadError}
+            descriptionClassName="text-destructive"
+            actions={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  track('historical_reload_clicked');
+                  window.location.reload();
+                }}
+              >
+                {t.retry}
+              </Button>
+            }
+          />
         </Card>
       </section>
     );
@@ -252,10 +258,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-            </div>
+            <DashboardSectionHeader title={t.heading} description={t.description} />
             <ChartControls hideGpuComparison />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
@@ -276,22 +279,23 @@ export default function HistoricalTrendsDisplay() {
     return (
       <section data-testid="historical-trends-display">
         <Card data-testid="historical-trend-error">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-destructive text-sm">{t.trendLoadError}</p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                track('historical_trend_retry_clicked');
-                void refetchTrendData();
-              }}
-            >
-              {t.trendRetry}
-            </Button>
-          </div>
+          <DashboardSectionHeader
+            title={t.heading}
+            description={t.trendLoadError}
+            descriptionClassName="text-destructive"
+            actions={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  track('historical_trend_retry_clicked');
+                  void refetchTrendData();
+                }}
+              >
+                {t.trendRetry}
+              </Button>
+            }
+          />
         </Card>
       </section>
     );
@@ -302,32 +306,33 @@ export default function HistoricalTrendsDisplay() {
       {/* Controls card — same selectors as Inference Performance tab */}
       <Card className="relative z-30">
         <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-            </div>
-            <ChartShareActions />
-          </div>
+          <DashboardSectionHeader
+            title={t.heading}
+            description={t.description}
+            actions={<ChartShareActions />}
+          />
           <ChartControls hideGpuComparison />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
             <TooltipProvider delayDuration={0}>
-              <div className="space-y-2">
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
                 <LabelWithTooltip
                   htmlFor="historical-target"
                   label={t.targetLabel}
                   tooltip={t.targetTooltip}
                 />
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
+                <p className="text-xs text-muted-foreground">{t.targetHint}</p>
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <div className="min-w-0 flex-1">
                     <input
                       type="range"
                       min={interactivityRange.min}
                       max={interactivityRange.max}
                       step={1}
                       value={targetInteractivity}
+                      aria-label={t.targetLabel}
+                      data-testid="historical-target-slider"
                       onChange={handleSliderChange}
                       onPointerUp={() =>
                         track('historical_trend_target_set', { value: targetInteractivity })
@@ -363,8 +368,10 @@ export default function HistoricalTrendsDisplay() {
                     value={interactivityInput}
                     onChange={handleInputChange}
                     onBlur={handleInputBlur}
-                    className="w-24 h-9"
+                    className="w-24 shrink-0"
                     min={0}
+                    aria-label={t.targetLabel}
+                    data-testid="historical-target-input"
                   />
                 </div>
               </div>
@@ -398,22 +405,23 @@ export default function HistoricalTrendsDisplay() {
                 chartId="historical-trend"
                 caption={
                   <>
-                    <h2 className="text-lg font-semibold">
+                    <Heading as="h2" level="card">
                       {t.captionTitle(currentYTitle, targetInteractivity)}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {getModelLabel(selectedModel as Model)} •{' '}
-                      {selectedPrecisions
+                    </Heading>
+                    <ResultContext
+                      locale={locale}
+                      model={getModelLabel(selectedModel as Model)}
+                      workload={getSequenceLabel(selectedSequence as Sequence, locale)}
+                      precision={selectedPrecisions
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
-                        .join(', ')}{' '}
-                      • {getSequenceLabel(selectedSequence as Sequence, locale)} • {t.source}
-                      {selectedRunDate && (
-                        <>
-                          {' '}
-                          • {t.updated} {historicalRunDate(selectedRunDate, locale)}
-                        </>
-                      )}
-                    </p>
+                        .join(', ')}
+                      metric={currentYLabel}
+                      target={`${targetInteractivity} tok/s/user`}
+                      date={
+                        selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
+                      }
+                      source="SemiAnalysis InferenceX™"
+                    />
                     {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                     {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
                     <MetricAssumptionNotes

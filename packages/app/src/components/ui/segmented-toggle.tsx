@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+import { SEGMENTED_CONTAINER_STYLE } from '@/components/ui/control-styles';
 
 interface SegmentedToggleOptionBase<TValue extends string> {
   value: TValue;
@@ -35,6 +36,10 @@ interface SegmentedToggleProps<TValue extends string> {
   buttonClassName?: string;
   activeButtonClassName?: string;
   inactiveButtonClassName?: string;
+  /** Compact chart toolbars still retain full touch targets on phones. */
+  size?: 'sm' | 'default';
+  /** Use pressed buttons for value filters, tabs for chart/table view switches. */
+  role?: 'tablist' | 'group';
 }
 
 export function SegmentedToggle<TValue extends string>({
@@ -47,14 +52,17 @@ export function SegmentedToggle<TValue extends string>({
   buttonClassName,
   activeButtonClassName = 'bg-muted text-foreground',
   inactiveButtonClassName = 'text-muted-foreground hover:text-foreground',
+  size = 'sm',
+  role = 'tablist',
 }: SegmentedToggleProps<TValue>) {
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5',
+        SEGMENTED_CONTAINER_STYLE,
+        size === 'sm' ? 'md:min-h-8' : 'md:min-h-9',
         className,
       )}
-      role="tablist"
+      role={role}
       aria-label={ariaLabel}
       data-testid={testId}
     >
@@ -62,12 +70,14 @@ export function SegmentedToggle<TValue extends string>({
         <button
           key={option.value}
           type="button"
-          role="tab"
-          aria-selected={value === option.value}
+          role={role === 'tablist' ? 'tab' : undefined}
+          aria-selected={role === 'tablist' ? value === option.value : undefined}
+          aria-pressed={role === 'group' ? value === option.value : undefined}
           aria-label={option.ariaLabel}
           title={option.title}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+            'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
+            size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,
             value === option.value ? activeButtonClassName : inactiveButtonClassName,
             option.className,

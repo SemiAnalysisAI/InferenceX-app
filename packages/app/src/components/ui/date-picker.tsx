@@ -230,7 +230,7 @@ export function DatePicker({
           size="sm"
           onClick={handleGoToLatestExternal}
           disabled={isCurrentDateLatest() || Boolean(isCheckingAvailableDates)}
-          className="text-xs px-2"
+          className="px-2"
         >
           {t.latest}
         </Button>
@@ -239,7 +239,7 @@ export function DatePicker({
           size="icon"
           onClick={handleGoPrevious}
           disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
-          className="size-8"
+          className="size-11 md:size-8"
           suppressHydrationWarning
           aria-label={t.previousDate}
         >
@@ -248,12 +248,12 @@ export function DatePicker({
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button
-              variant="ghost"
-              className="min-w-0 flex-1 !px-4 sm:min-w-[200px] sm:flex-none sm:!px-5 dark:bg-input/90 dark:hover:bg-input/50"
+              variant="outline"
+              className="min-w-0 flex-1 overflow-hidden px-3 sm:min-w-[200px] sm:flex-none"
             >
-              <Calendar className="mr-0 size-4" />
-              <strong>{t.runDate}</strong>
-              <span className="tabular-nums inline-block w-[6.5em] text-left">
+              <Calendar className="mr-0 hidden size-4 sm:block" />
+              <strong className="sr-only sm:not-sr-only">{t.runDate}</strong>
+              <span className="tabular-nums inline-block min-w-0 truncate text-left sm:min-w-[6.5em]">
                 {getDisplayText()}
               </span>
             </Button>
@@ -308,7 +308,7 @@ export function DatePicker({
           size="icon"
           onClick={handleGoNext}
           disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
-          className="size-8"
+          className="size-11 md:size-8"
           aria-label={t.nextDate}
         >
           <ChevronRight className="size-4" />

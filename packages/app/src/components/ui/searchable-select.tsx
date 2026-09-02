@@ -5,7 +5,33 @@ import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
+import {
+  CONTROL_HEIGHT,
+  CONTROL_FOCUS,
+  CONTROL_OPTION_STYLE,
+  SELECT_TRIGGER_STYLE,
+  CONTROL_SEARCH_STYLE,
+  CONTROL_SEARCH_CLEAR_STYLE,
+} from './control-styles';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select...',
+    searchPlaceholder: 'Search...',
+    searchAriaLabel: 'Search options',
+    clearSearchLabel: 'Clear search',
+    noResultsLabel: 'No results',
+  },
+  zh: {
+    placeholder: '请选择...',
+    searchPlaceholder: '搜索...',
+    searchAriaLabel: '搜索选项',
+    clearSearchLabel: '清除搜索',
+    noResultsLabel: '没有结果',
+  },
+} as const;
 
 export interface SearchableSelectOption {
   value: string;
@@ -25,6 +51,7 @@ interface SearchableSelectProps {
   className?: string;
   triggerId?: string;
   triggerTestId?: string;
+  size?: 'sm' | 'default';
   disabled?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
@@ -39,18 +66,25 @@ export function SearchableSelect({
   groups,
   value,
   onValueChange,
-  placeholder = 'Select...',
+  placeholder: placeholderProp,
   className,
   triggerId,
   triggerTestId,
+  size = 'default',
   disabled = false,
   searchable = true,
-  searchPlaceholder = 'Search...',
-  searchAriaLabel = 'Search options',
-  clearSearchLabel = 'Clear search',
-  noResultsLabel = 'No results',
+  searchPlaceholder: searchPlaceholderProp,
+  searchAriaLabel: searchAriaLabelProp,
+  clearSearchLabel: clearSearchLabelProp,
+  noResultsLabel: noResultsLabelProp,
   trackPrefix,
 }: SearchableSelectProps) {
+  const t = STRINGS[useLocale()];
+  const placeholder = placeholderProp ?? t.placeholder;
+  const searchPlaceholder = searchPlaceholderProp ?? t.searchPlaceholder;
+  const searchAriaLabel = searchAriaLabelProp ?? t.searchAriaLabel;
+  const clearSearchLabel = clearSearchLabelProp ?? t.clearSearchLabel;
+  const noResultsLabel = noResultsLabelProp ?? t.noResultsLabel;
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
@@ -142,14 +176,17 @@ export function SearchableSelect({
             id={triggerId}
             data-testid={triggerTestId}
             data-slot="select-trigger"
-            data-size="default"
+            data-size={size}
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
             aria-controls={listboxId}
             disabled={disabled}
             className={cn(
-              "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 min-h-9",
+              SELECT_TRIGGER_STYLE,
+              CONTROL_HEIGHT[size],
+              CONTROL_FOCUS,
+              'w-full',
               className,
             )}
           >
@@ -158,6 +195,7 @@ export function SearchableSelect({
                 'flex-1 text-left truncate',
                 (!mounted || !selectedLabel) && 'text-muted-foreground',
               )}
+              title={mounted ? (selectedLabel ?? placeholder) : placeholder}
             >
               {mounted ? (selectedLabel ?? placeholder) : placeholder}
             </span>
@@ -204,7 +242,7 @@ export function SearchableSelect({
                 }}
                 placeholder={searchPlaceholder}
                 aria-label={searchAriaLabel}
-                className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+                className={CONTROL_SEARCH_STYLE}
               />
               {search && (
                 <button
@@ -213,7 +251,7 @@ export function SearchableSelect({
                     setSearch('');
                     searchRef.current?.focus();
                   }}
-                  className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                  className={cn(CONTROL_SEARCH_CLEAR_STYLE, CONTROL_FOCUS)}
                   aria-label={clearSearchLabel}
                 >
                   <XIcon className="size-3.5" />
@@ -250,8 +288,9 @@ export function SearchableSelect({
                       onClick={() => handleSelect(option.value)}
                       onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(
-                        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-[background-color,color,box-shadow] duration-150 ease-in-out",
-                        'hover:bg-primary/20 hover:shadow-sm',
+                        "[&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-[background-color,color,box-shadow] duration-150 ease-in-out",
+                        CONTROL_OPTION_STYLE,
+                        'hover:bg-accent',
                         isSelected && 'bg-primary/10 font-medium',
                       )}
                     >

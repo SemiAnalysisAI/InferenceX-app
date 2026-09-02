@@ -1,4 +1,5 @@
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
 
 describe('Inference ChartControls', () => {
@@ -82,6 +83,69 @@ describe('Inference ChartControls', () => {
     // The GPU Config label should be present (hideGpuComparison defaults to false)
     cy.contains('Chip Config').should('be.visible');
     cy.get('[data-testid="gpu-multiselect"]').should('be.visible');
+  });
+
+  it('keeps benchmark and chart controls side by side above comparison history on desktop', () => {
+    cy.viewport(1280, 900);
+    cy.get('fieldset').should('have.length', 3);
+    cy.get('fieldset').then(($groups) => {
+      const rects = [...$groups].map((group) => group.getBoundingClientRect());
+      expect(Math.abs(rects[0].top - rects[1].top)).to.be.lessThan(2);
+      expect(rects[2].top).to.be.greaterThan(Math.max(rects[0].bottom, rects[1].bottom));
+    });
+  });
+
+  it('wraps the semantic groups into a single column on narrow screens', () => {
+    cy.viewport(390, 844);
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('fieldset')
+      .should('have.length', 3)
+      .then(($groups) => {
+        const rects = [...$groups].map((group) => group.getBoundingClientRect());
+        expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+        expect(rects[2].top).to.be.greaterThan(rects[1].bottom);
+        expect(rects[0].width).to.be.closeTo(rects[1].width, 2);
+      });
+  });
+
+  it('keeps primary controls visible while secondary controls collapse on mobile', () => {
+    cy.viewport(390, 844);
+    mountWithProviders(<InferenceChartControls />, { inference: {} });
+
+    cy.get('#model-select').should('be.visible');
+    cy.get('[data-testid="inference-secondary-controls"] > button')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click()
+      .should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+
+    cy.get('[data-testid="inference-secondary-controls"] > button')
+      .click()
+      .should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
+    cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
+  });
+
+  it('shows secondary controls by default on desktop', () => {
+    cy.viewport(1280, 900);
+    mountWithProviders(<InferenceChartControls />, { inference: {} });
+
+    cy.get('[data-testid="inference-secondary-controls"] > button').should('not.be.visible');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+  });
+
+  it('localizes the mobile secondary changed-count label', () => {
+    cy.viewport(390, 844);
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <InferenceChartControls />
+      </PathnameContext.Provider>,
+      { inference: {} },
+    );
+    // The count is derived from actual non-default settings, not merely present controls.
+    cy.get('[data-testid="inference-secondary-controls"] > button')
+      .should('contain.text', '更多图表设置')
+      .and('contain.text', '项已更改');
   });
 });
 

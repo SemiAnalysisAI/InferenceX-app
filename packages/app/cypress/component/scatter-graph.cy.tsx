@@ -25,6 +25,38 @@ const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
 describe('ScatterGraph', () => {
+  it('offers the complete table when matching official points are all clipped', () => {
+    const point = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
+    mountWithProviders(
+      <div style={{ width: 800 }}>
+        <ScatterGraph
+          chartId="empty-clipped"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          clippedData={[{ point, reasons: ['cost'] }]}
+          xLabel="Concurrency"
+          yLabel="Cost"
+          chartDefinition={defaultChartDef}
+          onShowTable={cy.stub().as('showCompleteTable')}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {},
+      },
+    );
+    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'clipped');
+    cy.get('[data-testid="scatter-empty-show-table"]').click();
+    cy.get('@showCompleteTable').should('have.been.calledOnce');
+    cy.get('@setQuickFilterVendors').should('not.have.been.called');
+    cy.get('@selectAllHwTypes').should('not.have.been.called');
+  });
+
   it('renders SVG within chart container', () => {
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
@@ -105,8 +137,85 @@ describe('ScatterGraph', () => {
       },
     );
     cy.contains('暂无数据').should('be.visible');
-    cy.contains('请调整模型、序列长度、精度、日期范围或芯片选项。').should('be.visible');
+    cy.contains('请检查上方的基准测试设置，或调整快捷筛选。').should('be.visible');
     cy.contains('No data available').should('not.exist');
+  });
+
+  it('offers targeted quick-filter recovery without changing model, precision or date', () => {
+    mountWithProviders(
+      <div style={{ width: 800 }}>
+        <ScatterGraph
+          chartId="empty-filtered"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Concurrency"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          quickFilters: {
+            vendors: ['AMD'],
+            frameworks: ['vllm'],
+            deployment: [],
+            spec: [],
+            power: [],
+          },
+        },
+        unofficial: {},
+      },
+    );
+    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
+    cy.get('[data-testid="scatter-empty-clear-filters"]').click();
+    cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
+    cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
+    cy.get('@setSelectedModel').should('not.have.been.called');
+    cy.get('@setSelectedPrecisions').should('not.have.been.called');
+    cy.get('@setSelectedDateRange').should('not.have.been.called');
+  });
+
+  it('restores hidden matching official and unofficial chip series together', () => {
+    const restore = cy.stub().as('restoreUnified');
+    const official = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
+    const overlay = createMockInferenceData({ hwKey: 'h100', precision: Precision.FP4 });
+    mountWithProviders(
+      <div style={{ width: 800 }}>
+        <ScatterGraph
+          chartId="empty-hidden"
+          modelLabel="DeepSeek R1"
+          data={[official]}
+          xLabel="Concurrency"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          overlayData={{ data: [overlay], hardwareConfig: hwConfig, label: 'test-run' }}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          localOfficialOverride: new Set(),
+          activeOverlayHwTypes: new Set(),
+          allOverlayHwTypes: new Set(['h100']),
+          setUnifiedOverlaySelection: restore,
+        },
+      },
+    );
+    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'hidden');
+    cy.get('[data-testid="scatter-empty-show-chips"]').click();
+    cy.get('@restoreUnified')
+      .should('have.been.calledOnce')
+      .then(() => {
+        expect([...restore.lastCall.args[0]]).to.include('b200_trt');
+        expect([...restore.lastCall.args[1]]).to.include('h100');
+      });
+    cy.get('@setQuickFilterVendors').should('not.have.been.called');
   });
 
   it('renders scatter points as shapes in SVG with mock data', () => {
@@ -1259,6 +1368,7 @@ describe('ChartDisplay engine comparison guard', () => {
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
+    cy.get('[data-testid="data-table-preset-all"]').click();
     cy.get('[data-testid="inference-results-table"] tbody')
       .contains('tr', '7.0')
       .should('contain.text', 'SGLang')

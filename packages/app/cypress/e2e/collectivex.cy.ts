@@ -155,7 +155,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-precision-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-sku-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-backend-select"]').should('be.visible');
-    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-fabric-scope-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
   });
@@ -168,6 +168,17 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'mori')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+  });
+
+  it('places the chart filters before the explorer chart', () => {
+    cy.get('[data-testid="collectivex-chart-filters"]').should('be.visible');
+    cy.get('[data-testid="collectivex-chart-filters"]').then(($filters) => {
+      cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
+        expect(
+          $filters[0].compareDocumentPosition($chart[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).to.be.greaterThan(0);
+      });
+    });
   });
 
   it('renders an nccl-ep backend series end to end', () => {
@@ -208,27 +219,40 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@runs');
     cy.wait('@run');
 
-    cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
-    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
-      'have.length',
-      2,
-    );
+    cy.get('[data-testid="collectivex-mode-select"]')
+      .should('have.attr', 'role', 'combobox')
+      .click();
+    cy.get('[role="listbox"] [aria-selected="true"]').should('have.length', 2);
+    cy.contains('[role="option"]', 'Low-latency').should(($option) => {
+      const option = $option[0];
+      const bounds = option.getBoundingClientRect();
+      const hit = option.ownerDocument.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.bottom - 2,
+      );
+      expect(option.contains(hit), 'menu stays above the following chart card').to.equal(true);
+    });
     cy.get('[data-testid="chart-legend"]')
       .should('contain.text', 'normal')
       .and('contain.text', 'low-latency');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+    cy.contains('[role="option"]', /^Normal$/u).click();
+    cy.get('[data-testid="collectivex-mode-select"]').click();
+    cy.contains('[role="option"]', 'Low-latency')
+      .should('have.attr', 'aria-selected', 'true')
+      .and('be.disabled');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.contains('[role="option"]', /^Normal$/u).click();
 
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP16').click();
-    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
-
+    cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP8').click();
-    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
-      'have.length',
-      2,
-    );
+    cy.get('[data-testid="collectivex-mode-select"]').click();
+    cy.get('[role="listbox"] [aria-selected="true"]').should('have.length', 2);
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+    cy.get('[data-testid="collectivex-mode-select"]').click();
   });
 
   it('normalizes runner-pool suffixes in SKU controls and chart labels', () => {

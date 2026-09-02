@@ -101,7 +101,7 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 }
 
 const RAW_SOURCE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
+  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none';
 
 /** No result for this GPU. The reason reads as visible text, mirroring the
  *  stack line on a populated cell — a `title` tooltip reaches neither keyboard
@@ -849,7 +849,7 @@ export function OverviewEngineScopeSwitcher({
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
   const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:w-auto';
+    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none sm:w-auto';
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
@@ -943,7 +943,7 @@ export function OverviewComparisonSwitcher({
   // darker light-theme blue also keeps this small active label above AA
   // contrast on the page background; dark mode retains the brand primary.
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none sm:min-w-[140px]';
   const inactiveOptionClass =
     'border-transparent text-muted-foreground hover:border-muted-foreground/30';
   return (

@@ -192,13 +192,13 @@ export function DateRangePicker({
           <Button
             variant="outline"
             className={cn(
-              'w-full justify-start text-left font-normal',
+              'w-full min-w-0 justify-start overflow-hidden text-left font-normal',
               !dateRange.startDate && !dateRange.endDate && 'text-muted-foreground',
               className,
             )}
           >
             <Calendar className="mr-2 size-4" />
-            {getDisplayText()}
+            <span className="min-w-0 truncate">{getDisplayText()}</span>
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[900px]">

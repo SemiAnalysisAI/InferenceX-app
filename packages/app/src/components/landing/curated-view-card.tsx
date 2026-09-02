@@ -30,24 +30,22 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
     <a
       href={href}
       onClick={onClick}
-      className={`group relative flex flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]${preset.wide ? ' sm:col-span-2' : ''}`}
+      className={`group relative flex min-w-0 flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-colors duration-200 hover:border-brand/50 hover:bg-brand/5 focus-visible:outline-none${preset.wide ? ' sm:col-span-2' : ''}`}
       data-testid={`curated-view-${preset.id}`}
     >
       <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200">
+        <h3 className="font-semibold text-base leading-snug group-hover:text-brand transition-colors duration-200">
           <span className="align-middle">{title}</span>
           {isNew && (
             <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-3xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
-              New
+              {isZh ? '新' : 'New'}
             </span>
           )}
         </h3>
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed mt-1.5 line-clamp-2">
-        {description}
-      </p>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
       <div className="flex flex-wrap gap-1.5 mt-auto pt-3">
         {visibleTags.map((tag) => (
           <Badge

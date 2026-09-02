@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -42,6 +43,8 @@ const STRINGS = {
     meanSubagents: 'Mean subagents / trace',
     cachedInput: 'Cached input',
     totalTokens: 'Total tokens',
+    overviewGroup: 'Conversation overview',
+    agentMixGroup: 'Agent and token mix',
     modelMix: 'Model mix (turns)',
     distributions: 'Distributions',
     inputTokensPerTurn: 'Input tokens per turn',
@@ -90,6 +93,8 @@ const STRINGS = {
     meanSubagents: '每 trace 平均 subagent 数',
     cachedInput: '缓存输入',
     totalTokens: '总 token 数',
+    overviewGroup: '对话概览',
+    agentMixGroup: 'Agent 与 token 组成',
     modelMix: '模型组合（按轮次）',
     distributions: '分布',
     inputTokensPerTurn: '每轮输入 token 数',
@@ -260,25 +265,51 @@ export function DatasetDetail({ slug }: { slug: string }) {
 
       {/* summary stats */}
       <Card className="p-4">
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-          <Stat label={t.conversations} value={localeNumber(dataset.conversation_count, locale)} />
-          <Stat
-            label={t.medianReqConvo}
-            value={perConversation(s.medianRequestsPerConversation, locale)}
-          />
-          <Stat
-            label={t.meanReqConvo}
-            value={perConversation(s.meanRequestsPerConversation, locale)}
-          />
-          <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
-          <Stat
-            label={t.medianSubagents}
-            value={perConversation(s.medianSubagentsPerTrace, locale)}
-          />
-          <Stat label={t.meanSubagents} value={perConversation(s.meanSubagentsPerTrace, locale)} />
-          <Stat label={t.cachedInput} value={formatPct(s.cachedPct)} />
-          <Stat label={t.totalTokens} value={compact((s.totalIn ?? 0) + (s.totalOut ?? 0))} />
-        </dl>
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
+          <section className="min-w-0" aria-labelledby="dataset-overview-group">
+            <h2
+              id="dataset-overview-group"
+              className="mb-2 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+            >
+              {t.overviewGroup}
+            </h2>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2">
+              <Stat
+                label={t.conversations}
+                value={localeNumber(dataset.conversation_count, locale)}
+              />
+              <Stat
+                label={t.medianReqConvo}
+                value={perConversation(s.medianRequestsPerConversation, locale)}
+              />
+              <Stat
+                label={t.meanReqConvo}
+                value={perConversation(s.meanRequestsPerConversation, locale)}
+              />
+              <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
+            </dl>
+          </section>
+          <section className="min-w-0" aria-labelledby="dataset-agent-mix-group">
+            <h2
+              id="dataset-agent-mix-group"
+              className="mb-2 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+            >
+              {t.agentMixGroup}
+            </h2>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2">
+              <Stat
+                label={t.medianSubagents}
+                value={perConversation(s.medianSubagentsPerTrace, locale)}
+              />
+              <Stat
+                label={t.meanSubagents}
+                value={perConversation(s.meanSubagentsPerTrace, locale)}
+              />
+              <Stat label={t.cachedInput} value={formatPct(s.cachedPct)} />
+              <Stat label={t.totalTokens} value={compact((s.totalIn ?? 0) + (s.totalOut ?? 0))} />
+            </dl>
+          </section>
+        </div>
         {s.modelMix && Object.keys(s.modelMix).length > 0 && (
           <div className="mt-4 border-t border-border/40 pt-3">
             <div className="mb-1.5 text-xs font-medium text-muted-foreground">{t.modelMix}</div>
@@ -356,13 +387,13 @@ export function DatasetDetail({ slug }: { slug: string }) {
             <span className="text-sm font-normal text-muted-foreground">({total})</span>
           </h2>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <input
+            <Input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t.searchPlaceholder}
               aria-label={t.searchAria}
-              className="h-8 w-full rounded-md border border-border/40 bg-background px-2 text-xs outline-none focus:border-primary sm:w-40"
+              className="w-full px-2 sm:w-40"
             />
             <Select
               value={sort}
@@ -375,12 +406,12 @@ export function DatasetDetail({ slug }: { slug: string }) {
                 track('datasets_conversations_sorted', { mode: v });
               }}
             >
-              <SelectTrigger className="h-8 w-full text-xs sm:w-[12rem]" aria-label={t.sortAria}>
+              <SelectTrigger className="w-full sm:w-[12rem]" aria-label={t.sortAria}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {sorts.map((o) => (
-                  <SelectItem key={o.value} value={o.value} className="text-xs">
+                  <SelectItem key={o.value} value={o.value}>
                     {o.label}
                   </SelectItem>
                 ))}

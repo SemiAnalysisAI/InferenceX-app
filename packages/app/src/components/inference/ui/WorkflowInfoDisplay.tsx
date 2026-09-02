@@ -159,7 +159,7 @@ export default function WorkflowInfoDisplay() {
             onClick={handleGoPreviousRun}
             aria-label={t.previousRun}
             disabled={!canGoPreviousRun()}
-            className="size-8"
+            className="size-11 md:size-8"
           >
             <ChevronLeft className="size-4" />
           </Button>
@@ -172,7 +172,7 @@ export default function WorkflowInfoDisplay() {
           >
             <SelectTrigger
               id="run-select"
-              className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
+              className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
               onPointerDown={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-external-link]')) {
@@ -227,7 +227,7 @@ export default function WorkflowInfoDisplay() {
             onClick={handleGoNextRun}
             aria-label={t.nextRun}
             disabled={!canGoNextRun()}
-            className="size-8"
+            className="size-11 md:size-8"
           >
             <ChevronRight className="size-4" />
           </Button>
@@ -236,7 +236,7 @@ export default function WorkflowInfoDisplay() {
       <div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
+            <Button variant="outline">
               <strong>{t.changelog}</strong>
               <ChevronDownIcon />
             </Button>
