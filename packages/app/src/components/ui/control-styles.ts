@@ -15,6 +15,10 @@ export const CONTROL_MIN_HEIGHT = {
 // Focus is functional but undecorated; selected and invalid states stay independent.
 export const CONTROL_FOCUS = 'outline-none';
 
+/** Quiet header utilities share one hover surface in every theme. */
+export const HEADER_ACTION_STYLE =
+  'inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 focus-visible:outline-none cursor-pointer';
+
 export const SELECT_TRIGGER_STYLE =
   "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex min-w-0 items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-sm font-normal shadow-xs transition-[color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50";
 

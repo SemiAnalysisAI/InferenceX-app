@@ -7,13 +7,12 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -116,56 +115,6 @@ function CategorySectionTitle({
         </TooltipContent>
       </TooltipRoot>
     </span>
-  );
-}
-
-/**
- * Info affordance shown beside the selected Agentic label inside its control.
- * It stays outside the option menu so the explainer link remains independent
- * of the select's outside-click handling. Stop portal events from reaching the
- * surrounding select trigger when someone follows the link.
- */
-function AgenticScenarioInfo({
-  tooltip,
-  learnMore,
-  href,
-}: {
-  tooltip: string;
-  learnMore: string;
-  href: string;
-}) {
-  return (
-    <TooltipRoot>
-      <TooltipTrigger asChild>
-        <span
-          className="inline-flex shrink-0 cursor-help text-muted-foreground"
-          data-testid="scenario-agentic-info"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <Info className="size-3.5" />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        collisionPadding={10}
-        className="z-[130]"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span>
-          {tooltip}{' '}
-          <a
-            href={href}
-            className="underline underline-offset-2"
-            data-testid="scenario-agentic-info-link"
-            onClick={() => track('selector_scenario_agentx_link')}
-          >
-            {learnMore}
-          </a>
-        </span>
-      </TooltipContent>
-    </TooltipRoot>
   );
 }
 
@@ -399,7 +348,7 @@ interface ScenarioSelectorProps {
 
 /**
  * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
- * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
+ * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
  * A single selected scenario stays visible in the same control, disabled when
@@ -422,86 +371,69 @@ export function ScenarioSelector({
   const fixedGroups = groupByCategory(fixedSeq, (s) =>
     getSequenceCategoryForModel(s as Sequence, model),
   );
-  const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
-
   if (availableSequences.length === 0) return null;
   const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
-  const agenticInfo = isAgenticSelected ? (
-    <AgenticScenarioInfo
-      tooltip={t.agenticScenarioTooltip}
-      learnMore={t.agenticScenarioLearnMore}
-      href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
-    />
-  ) : null;
+  const toScenarioOption = (seq: string) => ({
+    value: seq,
+    label: getSequenceLabel(seq as Sequence, locale),
+    help:
+      sequenceKind(seq as Sequence) === 'agentic' ? (
+        <p>
+          {t.agenticScenarioTooltip}{' '}
+          <a
+            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+            className="underline underline-offset-2"
+            data-testid="scenario-agentic-info-link"
+            onClick={() => track('selector_scenario_agentx_link')}
+          >
+            {t.agenticScenarioLearnMore}
+          </a>
+        </p>
+      ) : (
+        <>
+          <p>{t.islOslTooltip}</p>
+          {getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated' && (
+            <p>{t.deprecatedSequenceReason}</p>
+          )}
+        </>
+      ),
+  });
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <div>
-        <Select
-          key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
-          disabled={isOnlySelectedScenario}
-          value={value}
-          onValueChange={(v) => {
-            track('selector_scenario_changed', { scenario: v });
-            onChange(v as Sequence);
-          }}
-          open={isOnlySelectedScenario ? false : open}
-          onOpenChange={onOpenChange}
-        >
-          <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <SelectValue className="truncate">
-                {getSequenceLabel(value as Sequence, locale)}
-              </SelectValue>
-              {agenticInfo}
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            {/* Agentic entries listed first when available (display order only
-                — availability decides which scenario opens by default). They
-                carry no group header: they are named "Agentic" themselves, so a
-                heading above them would just repeat the word. They stay in their
-                own SelectGroup so the "Fixed Sequence Length" heading below
-                still reads as a separate section. */}
-            {agentic.length > 0 && (
-              <SelectGroup>
-                {agentic.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-            {fixedGroups.default.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
-                {fixedGroups.default.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-            {fixedGroups.deprecated.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>
-                  <CategorySectionTitle
-                    id="deprecated"
-                    label={t.fixedSequenceLengthDeprecated}
-                    reason={t.deprecatedSequenceReason}
-                  />
-                </SelectLabel>
-                {fixedGroups.deprecated.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-          </SelectContent>
-        </Select>
-      </div>
+      <SearchableSelect
+        key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
+        disabled={isOnlySelectedScenario}
+        value={value}
+        initialLabel={getSequenceLabel(value as Sequence, locale)}
+        placeholder={t.scenario}
+        triggerId={id}
+        triggerTestId={testId}
+        searchable={false}
+        onValueChange={(v) => {
+          track('selector_scenario_changed', { scenario: v });
+          onChange(v as Sequence);
+        }}
+        open={isOnlySelectedScenario ? false : open}
+        onOpenChange={onOpenChange}
+        groups={[
+          // Agentic is already named in its row, so it needs no repeated heading.
+          { label: '', options: agentic.map(toScenarioOption) },
+          { label: t.fixedSequenceLength, options: fixedGroups.default.map(toScenarioOption) },
+          {
+            label: t.fixedSequenceLengthDeprecated,
+            heading: (
+              <CategorySectionTitle
+                id="deprecated"
+                label={t.fixedSequenceLengthDeprecated}
+                reason={t.deprecatedSequenceReason}
+              />
+            ),
+            options: fixedGroups.deprecated.map(toScenarioOption),
+          },
+        ].filter((group) => group.options.length > 0)}
+      />
     </div>
   );
 }

@@ -383,7 +383,7 @@ describe('Default scenario', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     // The explainer sits beside the trigger, linking out to the dataset page.
-    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
@@ -397,7 +397,7 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
@@ -417,7 +417,7 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
   });
 });
 

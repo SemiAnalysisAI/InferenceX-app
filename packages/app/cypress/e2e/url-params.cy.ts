@@ -86,7 +86,7 @@ describe('URL Parameter Persistence', () => {
           cy.get(selector).parent().find('[role="button"][aria-label^="Hide "]').click();
           cy.get(selector).should('not.be.checked');
 
-          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+          cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
           cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
             force: true,
           });
@@ -113,7 +113,7 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
         .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
-          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+          cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
           cy.contains(
             '[data-select-option]',
             'Cost per Million Total Tokens (Owning - Hyperscaler)',
@@ -194,7 +194,7 @@ describe('URL Parameter Persistence', () => {
         .find('svg text[transform="rotate(-90)"]')
         .should('contain.text', 'Total Tokens per $1 TCO');
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.contains(
         '[data-select-option]',
         'Cost per Million Total Tokens (Owning - Hyperscaler)',
@@ -232,7 +232,7 @@ describe('URL Parameter Persistence', () => {
 
     it('selecting a Y-axis metric updates the displayed value', () => {
       visitWithDismissedModal('/inference');
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.get('[data-select-option]')
         .eq(1)
         .then(($option) => {
@@ -248,7 +248,7 @@ describe('URL Parameter Persistence', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
         force: true,
       });
@@ -298,7 +298,7 @@ describe('URL Parameter Persistence', () => {
           expect(svg.__zoom?.k, 'active zoom scale').to.be.greaterThan(1);
         });
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.contains('[data-select-option]', 'Input Token Throughput per Chip').click({ force: true });
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',

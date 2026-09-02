@@ -93,7 +93,7 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('be.visible');
     cy.get('[data-testid="scenario-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
     cy.get('body').type('{esc}');
   });
 
@@ -144,7 +144,7 @@ describe('Historical Trends — Content & Interactions', () => {
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-select-option]').should('have.length.greaterThan', 1);
 
     cy.get('[data-testid="yaxis-metric-selector"]')

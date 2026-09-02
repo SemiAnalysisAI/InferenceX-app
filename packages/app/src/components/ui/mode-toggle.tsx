@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
+import { HEADER_ACTION_STYLE } from './control-styles';
 
 type Theme = 'light' | 'dark' | 'minecraft';
 const THEME_CYCLE: Theme[] = ['light', 'dark', 'minecraft'];
@@ -26,12 +27,7 @@ export function ModeToggle() {
     track('theme_toggled', { theme: next });
   };
 
-  const buttonClasses = cn(
-    'inline-flex items-center justify-center rounded-md size-11',
-    'text-muted-foreground hover:text-foreground hover:bg-accent',
-    'transition-colors duration-200',
-    'focus-visible:outline-none',
-  );
+  const buttonClasses = cn(HEADER_ACTION_STYLE, 'size-11');
 
   if (!mounted) {
     return (

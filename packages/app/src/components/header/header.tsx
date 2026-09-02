@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
+import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { navigateInApp } from '@/lib/client-navigation';
@@ -126,7 +127,7 @@ function LanguageToggle({
       prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
-      className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+      className={cn(HEADER_ACTION_STYLE, 'min-h-11 px-2 text-sm font-medium whitespace-nowrap')}
       onClick={(event) => {
         track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
         if (!isOverview) navigateInApp(event, router, target + search);
@@ -270,7 +271,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 type="button"
                 data-testid="mobile-menu-toggle"
                 onClick={toggleMenu}
-                className="flex items-center justify-center size-11 rounded-md transition-colors hover:bg-muted cursor-pointer"
+                className={cn(HEADER_ACTION_STYLE, 'size-11')}
                 aria-expanded={mobileMenuOpen}
                 aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >

@@ -7,7 +7,7 @@ function openYAxisHelp(metric: string) {
       cy.wrap($toggle).click();
     }
   });
-  cy.get('[data-testid="yaxis-metric-selector"]').click();
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
   cy.get(`[data-testid="option-help-${metric}"]`).scrollIntoView().click();
 }
 

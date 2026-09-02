@@ -2,6 +2,7 @@ import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
 
@@ -34,13 +35,13 @@ describe('Inference ChartControls', () => {
   });
 
   it('Y-axis metric selector shows grouped options', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     // Should contain at least the "Throughput" group
     cy.contains('Throughput').should('exist');
   });
 
   it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     // "Throughput per GPU" is the label for y_tpPerGpu — pick a different one
     cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
@@ -63,7 +64,7 @@ describe('Inference ChartControls', () => {
     ];
 
     for (const option of options) {
-      cy.get('[data-testid="yaxis-metric-selector"]').click();
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
       cy.contains('Measured Energy')
         .closest('[role="rowgroup"]')
         .within(() => {
@@ -242,7 +243,7 @@ describe('Inference ChartControls cost metrics', () => {
   });
 
   it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains(
       '[data-slot="select-item"]',
       'Cost per Million Total Tokens (Owning - Hyperscaler)',
@@ -275,7 +276,7 @@ describe('Inference ChartControls cost metrics', () => {
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains(
       '[data-slot="select-item"]',
       'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
@@ -377,8 +378,78 @@ describe('Axis option help', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
   });
 
+  for (const searchable of [true, false]) {
+    it(`lets Tab leave the help grid in both directions (searchable=${searchable})`, () => {
+      mountWithProviders(
+        <div>
+          <button data-testid="before-field">Before</button>
+          <SearchableSelect
+            value="first"
+            onValueChange={cy.stub().as('selectMetric')}
+            searchable={searchable}
+            triggerTestId="keyboard-field"
+            placeholder="Metric"
+            groups={[
+              {
+                label: '',
+                options: [
+                  { value: 'first', label: 'First metric', help: <p>First explanation</p> },
+                  { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
+                ],
+              },
+            ]}
+          />
+          <button data-testid="after-field">After</button>
+        </div>,
+        { inference: {} },
+      );
+      cy.get('[data-testid="keyboard-field"]')
+        .should('have.attr', 'aria-label', 'Metric: First metric')
+        .click('right');
+      cy.focused().trigger('keydown', { key: 'Tab' });
+      cy.get('[data-testid="after-field"]').should('have.focus');
+      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="keyboard-field"]').click('right');
+      cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+      cy.get('[data-testid="before-field"]').should('have.focus');
+      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+      cy.get('@selectMetric').should('not.have.been.called');
+    });
+  }
+
+  for (const [trigger, value, explanation] of [
+    ['#scenario-select', Sequence.EightK_OneK, 'Input Sequence Length'],
+    ['#x-axis-mode-select', 'interactivity', 'Interactivity'],
+    ['#y-axis-select', 'y_tpPerGpu', 'Rate of total tokens'],
+  ]) {
+    it(`shows selected-value help inside ${trigger} without opening its menu`, () => {
+      cy.get(trigger).then(($trigger) => {
+        const bounds = $trigger[0].getBoundingClientRect();
+        cy.get(`[data-testid="selected-option-help-${value}"]`)
+          .should(($help) => {
+            const icon = $help.find('svg')[0].getBoundingClientRect();
+            expect(icon.left).to.be.greaterThan(bounds.left);
+            expect(icon.right).to.be.lessThan(bounds.right);
+            expect(icon.top).to.be.greaterThan(bounds.top);
+            expect(icon.bottom).to.be.lessThan(bounds.bottom);
+            expect($help[0].closest('button[role="combobox"]')).to.equal(null);
+          })
+          .trigger('pointermove', { pointerType: 'mouse' });
+      });
+      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
+        .should('be.visible')
+        .and('contain.text', explanation);
+      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
+      cy.get(trigger).click('right');
+      cy.get(`[data-testid="selected-option-help-${value}"]`).should('not.exist');
+      cy.get(`[data-testid="option-help-${value}"]`).should('be.visible').click();
+      cy.get(`[data-testid="option-help-content-${value}"]`).should('contain.text', explanation);
+      cy.get(trigger).should('have.attr', 'aria-expanded', 'true');
+    });
+  }
+
   it('opens descriptions and formulas without selecting an option or losing the search', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('input[aria-label="Search options"]').type('Neocloud Giant');
     cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
     cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
@@ -416,7 +487,7 @@ describe('Axis option help', () => {
   it('keeps long help readable on phones without horizontal overflow', () => {
     cy.viewport(390, 844);
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-testid="option-help-y_tokenRevenuePerGpuHour"]').scrollIntoView().click();
     cy.get('[data-testid="option-help-content-y_tokenRevenuePerGpuHour"]')
       .should('be.visible')
@@ -433,7 +504,7 @@ describe('Axis option help', () => {
   });
 
   it('exposes separate accessible selection and help actions', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
     cy.injectAxe();
     cy.checkA11y(

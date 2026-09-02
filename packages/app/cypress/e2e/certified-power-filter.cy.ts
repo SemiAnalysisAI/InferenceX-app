@@ -109,7 +109,7 @@ describe('Validated vs historical measured power', () => {
     // Pick "Measured Average Power per Chip" from the y-axis dropdown. The
     // select list is a scroll container and Measured Energy sits below the
     // fold, so scroll before clicking.
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
       .scrollIntoView()
       .should('be.visible')

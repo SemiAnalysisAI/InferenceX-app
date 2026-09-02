@@ -4,7 +4,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { OptionInfo } from '@/components/ui/option-info';
+import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
@@ -43,6 +43,7 @@ export interface SearchableSelectOption {
 
 export interface SearchableSelectGroup {
   label: string;
+  heading?: React.ReactNode;
   options: SearchableSelectOption[];
 }
 
@@ -58,6 +59,8 @@ interface SearchableSelectProps {
   triggerTestId?: string;
   size?: 'sm' | 'default';
   disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   searchable?: boolean;
   searchPlaceholder?: string;
   searchAriaLabel?: string;
@@ -78,6 +81,8 @@ export function SearchableSelect({
   triggerTestId,
   size = 'default',
   disabled = false,
+  open,
+  onOpenChange,
   searchable = true,
   searchPlaceholder: searchPlaceholderProp,
   searchAriaLabel: searchAriaLabelProp,
@@ -91,7 +96,8 @@ export function SearchableSelect({
   const searchAriaLabel = searchAriaLabelProp ?? t.searchAriaLabel;
   const clearSearchLabel = clearSearchLabelProp ?? t.clearSearchLabel;
   const noResultsLabel = noResultsLabelProp ?? t.noResultsLabel;
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isOpen = !disabled && (open ?? internalOpen);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
   // Defer the trigger label until the component has mounted on the client.
@@ -104,6 +110,7 @@ export function SearchableSelect({
   const listboxRef = React.useRef<HTMLDivElement>(null);
   const searchUsedRef = React.useRef(false);
   const escapeDismissedRef = React.useRef(false);
+  const tabFocusRef = React.useRef<HTMLElement | null>(null);
   // A grid gives option selection and help their own cells/buttons. A listbox
   // option cannot contain another interactive action accessibly.
   const hasOptionHelp = groups.some((group) => group.options.some((option) => option.help));
@@ -122,7 +129,8 @@ export function SearchableSelect({
       }
       setSearch('');
     }
-    setIsOpen(nextOpen);
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
 
   const filteredGroups = React.useMemo(() => {
@@ -130,7 +138,7 @@ export function SearchableSelect({
     const lower = search.toLowerCase();
     return groups
       .map((g) => ({
-        label: g.label,
+        ...g,
         options: g.options.filter(
           (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
         ),
@@ -146,6 +154,10 @@ export function SearchableSelect({
     return undefined;
   }, [groups, value]);
   const triggerLabel = mounted ? (selectedLabel ?? placeholder) : (initialLabel ?? placeholder);
+  const selectedOption = groups
+    .flatMap((group) => group.options)
+    .find((option) => (mounted ? option.value === value : option.label === initialLabel));
+  const selectedHelp = selectedOption?.help;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -206,7 +218,13 @@ export function SearchableSelect({
             aria-expanded={isOpen}
             aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}
             aria-controls={listboxId}
-            aria-label={hasOptionHelp ? placeholder : undefined}
+            aria-label={
+              hasOptionHelp
+                ? triggerLabel === placeholder
+                  ? placeholder
+                  : `${placeholder}: ${triggerLabel}`
+                : undefined
+            }
             disabled={disabled}
             className={cn(
               SELECT_TRIGGER_STYLE,
@@ -219,6 +237,7 @@ export function SearchableSelect({
             <span
               className={cn(
                 'flex-1 text-left truncate',
+                selectedHelp && 'mr-7',
                 (mounted ? !selectedLabel : !initialLabel) && 'text-muted-foreground',
               )}
               title={triggerLabel}
@@ -233,14 +252,65 @@ export function SearchableSelect({
             />
           </button>
         </PopoverTrigger>
+        {selectedHelp && selectedOption && !isOpen && (
+          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
+            {/* Mirror the label's width so help follows short labels and stays
+                inside long ones. This copy is only a layout spacer; the real
+                label and native select button above own the accessible name. */}
+            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
+              {triggerLabel}
+            </span>
+            <SelectedOptionInfo
+              key={selectedOption.value}
+              label={selectedOption.label}
+              value={selectedOption.value}
+            >
+              {selectedHelp}
+            </SelectedOptionInfo>
+          </div>
+        )}
         <PopoverContent
           data-slot="select-content"
           align="start"
           sideOffset={4}
+          onKeyDown={(event) => {
+            // Grid navigation uses arrows; Tab leaves the field instead of
+            // walking every option/help action or looping in Radix's scope.
+            // A nested help dialog retains its own keyboard behavior.
+            if (
+              hasOptionHelp &&
+              event.key === 'Tab' &&
+              event.currentTarget.contains(event.target as Node)
+            ) {
+              event.preventDefault();
+              const stops = [
+                ...document.querySelectorAll<HTMLElement>(
+                  'button, a[href], input, select, textarea, [tabindex]',
+                ),
+              ].filter(
+                (element) =>
+                  element.tabIndex >= 0 &&
+                  !element.matches(':disabled, [data-radix-focus-guard]') &&
+                  !element.closest('[inert]') &&
+                  !event.currentTarget.contains(element) &&
+                  element.getClientRects().length > 0 &&
+                  getComputedStyle(element).visibility !== 'hidden',
+              );
+              const index = stops.indexOf(triggerRef.current!);
+              tabFocusRef.current = stops[index + (event.shiftKey ? -1 : 1)] ?? triggerRef.current;
+              handleOpenChange(false);
+            }
+          }}
           onEscapeKeyDown={() => {
             escapeDismissedRef.current = true;
           }}
           onCloseAutoFocus={(event) => {
+            if (tabFocusRef.current) {
+              event.preventDefault();
+              tabFocusRef.current.focus();
+              tabFocusRef.current = null;
+              return;
+            }
             // Keyboard cancellation returns to the field, even if another
             // page interaction was recorded while the non-modal menu was open.
             // Outside clicks retain Radix's normal focus behavior.
@@ -325,11 +395,12 @@ export function SearchableSelect({
                 {group.label && (
                   <div role={hasOptionHelp ? 'row' : undefined}>
                     <div
+                      data-slot="select-label"
                       role={hasOptionHelp ? 'columnheader' : undefined}
                       aria-colspan={hasOptionHelp ? 2 : undefined}
                       className="text-muted-foreground px-2 py-1.5 text-xs font-medium"
                     >
-                      {group.label}
+                      {group.heading ?? group.label}
                     </div>
                   </div>
                 )}
@@ -349,6 +420,7 @@ export function SearchableSelect({
                         <div role="gridcell" className="min-w-0 flex-1">
                           <button
                             type="button"
+                            tabIndex={-1}
                             data-select-option
                             data-slot="select-item"
                             data-value={option.value}
@@ -375,6 +447,7 @@ export function SearchableSelect({
                             <OptionInfo
                               label={option.label}
                               value={option.value}
+                              tabIndex={-1}
                               onKeyDown={(event) => {
                                 if (event.key === 'ArrowLeft') {
                                   event.preventDefault();

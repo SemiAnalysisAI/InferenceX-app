@@ -21,7 +21,7 @@ describe('Dropdown one-click switching', () => {
 
     cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
@@ -82,7 +82,7 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('Escape closes the Y-axis SearchableSelect dropdown', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-slot="select-content"]').should('exist');
 

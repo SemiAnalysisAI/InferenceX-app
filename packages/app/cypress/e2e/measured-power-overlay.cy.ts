@@ -15,7 +15,7 @@ describe('Measured power on unofficial-run overlay', () => {
 
   it('exposes the Measured Energy dropdown group and renders overlay points', () => {
     // Open Y-axis dropdown
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-content"]').should('exist');
 
     // Verify the "Measured Energy" group + both options. The select list is a
@@ -45,7 +45,7 @@ describe('Measured power on unofficial-run overlay', () => {
   });
 
   it('switches to Measured Joules per Output Token without errors', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', 'Measured Joules per Output Token').click();
     cy.get('[data-slot="select-content"]').should('not.exist');
     cy.screenshot('measured-joules-selected', { capture: 'viewport' });

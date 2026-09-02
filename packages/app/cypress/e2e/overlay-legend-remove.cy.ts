@@ -104,7 +104,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
   });
 
   it('keeps the official SKU hidden when chart metrics change', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
     cy.contains(
       '[data-slot="select-item"]',
       'Cost per Million Total Tokens (Owning - Hyperscaler)',

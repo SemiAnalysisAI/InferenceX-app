@@ -114,11 +114,15 @@ function assertAgenticInfoInside(height: number) {
   cy.get('[data-testid="scenario-selector"]').should(($control) => {
     const control = $control[0];
     const bounds = control.getBoundingClientRect();
-    const info = control.querySelector('[data-testid="scenario-agentic-info"]');
+    const info = control.parentElement!.querySelector(
+      '[data-testid="selected-option-help-agentic-traces"] svg',
+    );
     expect(info, 'explainer is inside the scenario control').not.to.equal(null);
     const icon = info!.getBoundingClientRect();
-    const label = control.firstElementChild!.firstElementChild!.getBoundingClientRect();
-    expect(icon.left - label.right, 'explainer is directly beside Agentic').to.be.closeTo(6, 1);
+    const label = control
+      .parentElement!.querySelector('[aria-hidden="true"].invisible')!
+      .getBoundingClientRect();
+    expect(icon.left - label.right, 'explainer is directly beside Agentic').to.be.closeTo(7, 1);
     expect(icon.left).to.be.greaterThan(bounds.left);
     expect(icon.right).to.be.lessThan(bounds.right);
     expect(icon.top).to.be.greaterThan(bounds.top);
@@ -164,7 +168,7 @@ describe('Chart Selectors', () => {
         });
       assertHeights();
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', 'Agentic').click();
+      cy.contains('[data-select-option]', 'Agentic').click();
       cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
       cy.get('[data-slot="select-content"]').should('not.exist');
       for (const precision of ['FP8', 'BF16']) {
@@ -345,8 +349,8 @@ describe('Chart Selectors', () => {
       cy.mount(<ScenarioSelectorHarness />);
       cy.get('[data-testid="scenario-selector"]').should('have.text', 'Agentic');
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', 'Agentic').should('be.visible');
-      cy.contains('[role="option"]', 'Agentic Traces').should('not.exist');
+      cy.contains('[data-select-option]', 'Agentic').should('be.visible');
+      cy.contains('[data-select-option]', 'Agentic Traces').should('not.exist');
       // The lone agentic entry needs no "Agentic" heading above it.
       cy.get('[data-slot="select-content"]')
         .find('[data-slot="select-label"]')
@@ -356,7 +360,7 @@ describe('Chart Selectors', () => {
     it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       assertAgenticInfoInside(36);
-      cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
         pointerType: 'mouse',
       });
 
@@ -377,10 +381,10 @@ describe('Chart Selectors', () => {
         .click();
       cy.get('@followAgenticLink').should('have.been.calledOnceWith', false);
       cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="scenario-agentic-info"]').click();
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').click();
       cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', '8K / 1K').should('be.visible');
+      cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
     });
 
     it('keeps the fixed-sequence scenario visible without a one-option menu', () => {
@@ -424,7 +428,7 @@ describe('Chart Selectors', () => {
       cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
       cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
       assertAgenticInfoInside(36);
-      cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
         pointerType: 'mouse',
       });
       cy.get('[data-testid="scenario-agentic-info-link"]')
@@ -454,7 +458,7 @@ describe('Chart Selectors', () => {
           </PathnameContext.Provider>,
         );
         assertAgenticInfoInside(44);
-        cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+        cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
           pointerType: 'mouse',
         });
         cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
@@ -486,7 +490,8 @@ describe('Chart Selectors', () => {
         .should('have.length', 1)
         .and('have.text', 'Fixed Sequence Length (Deprecated)');
       cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length (Deprecated)')
-        .nextAll('[role="option"]')
+        .closest('[role="rowgroup"]')
+        .find('[data-select-option]')
         .first()
         .should('contain.text', '8K / 1K');
     });
@@ -519,14 +524,14 @@ describe('Chart Selectors', () => {
           locale === 'zh' ? '固定序列长度（已弃用）' : 'Fixed Sequence Length (Deprecated)';
         cy.get('[data-slot="select-label"]').should('have.length', 2);
         cy.contains('[data-slot="select-label"]', new RegExp(`^${active}$`, 'u'))
-          .parent()
-          .find('[role="option"]')
+          .closest('[role="rowgroup"]')
+          .find('[data-select-option]')
           .should('have.length', 1)
           .and('have.text', '8K / 1K');
         cy.contains('[data-slot="select-label"]', deprecated)
           .should('be.visible')
-          .parent()
-          .find('[role="option"]')
+          .closest('[role="rowgroup"]')
+          .find('[data-select-option]')
           .should('have.length', 1)
           .and('have.text', '1K / 1K');
         cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointermove', {
@@ -538,7 +543,7 @@ describe('Chart Selectors', () => {
             ? 'CI 容量已重新分配给智能体编程和多轮对话场景。'
             : 'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
         );
-        cy.contains('[role="option"]', '1K / 1K').click();
+        cy.contains('[data-select-option]', '1K / 1K').click();
         cy.get('@changeScenario').should('have.been.calledOnceWith', Sequence.OneK_OneK);
       });
     }
@@ -556,19 +561,19 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', '8K / 1K').should('be.visible');
+      cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
       cy.get('[data-slot="select-content"]').should('not.contain.text', 'Deprecated');
     });
 
     it('hides the agentic explainer on fixed-sequence scenarios', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-      cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
 
       // ...and appears as soon as the user picks the agentic scenario.
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', 'Agentic').click();
-      cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+      cy.contains('[data-select-option]', 'Agentic').click();
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
     });
   });
 

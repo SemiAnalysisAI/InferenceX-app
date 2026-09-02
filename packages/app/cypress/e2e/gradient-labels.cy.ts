@@ -105,7 +105,7 @@ describe('Gradient Labels Toggle', () => {
 
 const selectMetricAndEnableGradient = (metricLabel: string) => {
   // Switch to the target Y-axis metric
-  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
   cy.contains('[data-slot="select-item"]', metricLabel).click({ force: true });
 
   // Wait for chart to re-render with new metric
