@@ -238,6 +238,41 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('localized not-found pages', { testIsolation: true }, () => {
+    it('returns a noindex English 404 for unknown paths', () => {
+      const path = '/this-route-does-not-exist';
+      cy.request({ url: path, failOnStatusCode: false }).then(({ body, status }) => {
+        const document = new DOMParser().parseFromString(body, 'text/html');
+        const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
+
+        expect(status).to.eq(404);
+        expect(document.querySelector('h1')?.textContent).to.eq('404 - Page Not Found');
+        expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
+        expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
+          'noindex',
+        );
+        expect(document.querySelector('link[rel="canonical"]')).to.eq(null);
+      });
+    });
+
+    it('returns a noindex Chinese 404 for unknown /zh paths', () => {
+      const path = '/zh/this-route-does-not-exist';
+      cy.request({ url: path, failOnStatusCode: false }).its('status').should('eq', 404);
+      cy.visit(path, { failOnStatusCode: false });
+
+      cy.contains('h1', '404 - 页面不存在').should('be.visible');
+      cy.contains('找不到该页面。').should('be.visible');
+      cy.contains('a[href="/zh"]', '返回首页').should('be.visible');
+      cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
+      cy.get('link[rel="canonical"]').should('not.exist');
+      cy.get('link[rel="alternate"][hreflang]').should('not.exist');
+      cy.viewport(375, 812);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
   describe('zh blog post with math', () => {
     before(() => {
       cy.visit('/zh/blog/kimi-k3-the-manos-the-mythos-the');
