@@ -92,7 +92,7 @@ export default async function BlogPostPage({ params }: Props) {
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd(slug, meta.title);
 
   return (
-    <main data-testid="blog-post-page" data-blog-slug={slug} className="relative">
+    <main className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <JsonLd data={jsonLd} />

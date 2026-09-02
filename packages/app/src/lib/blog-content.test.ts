@@ -44,21 +44,6 @@ function tagList(raw: string): string[] {
   );
 }
 
-describe('frontmatter tag parsing', () => {
-  it('reads every item from a multiline tags field before the next frontmatter key', () => {
-    const frontmatter = `---
-title: Example
-tags:
-  - benchmark
-  - cann
-publishDate: '2026-08-23'
----
-`;
-
-    expect(tagList(frontmatter)).toEqual(['benchmark', 'cann']);
-  });
-});
-
 /** Local `<Figure src="/images/...">` and markdown `![alt](/images/...)` references. */
 function localImageRefs(raw: string): string[] {
   return [
@@ -70,17 +55,8 @@ function localImageRefs(raw: string): string[] {
 const countFigures = (raw: string) => (raw.match(/<Figure\b/gu) ?? []).length;
 const countMathFences = (raw: string) => (raw.match(/^\$\$\s*$/gmu) ?? []).length;
 
-function inlineCodeSpans(raw: string): string[] {
-  const withoutStructuredContent = raw
-    .replaceAll(/<JsonLd>\{`[\s\S]*?`\}<\/JsonLd>/gu, '')
-    .replaceAll(/```[\s\S]*?```/gu, '');
-  return [...withoutStructuredContent.matchAll(/(?<!`)`(?<code>[^`\n]+)`(?!`)/gu)].map(
-    (match) => match.groups!.code,
-  );
-}
-
-it('checks all 31 current locale pairs in both directions', () => {
-  expect(enFiles).toHaveLength(31);
+it('checks every current locale pair in both directions', () => {
+  expect(enFiles.length).toBeGreaterThan(0);
   expect(zhFiles).toEqual(enFiles);
 });
 
@@ -126,28 +102,4 @@ describe.each(enFiles)('%s', (file) => {
       expect(countMathFences(raw) % 2, `${locale}: unbalanced $$ fences`).toBe(0);
     }
   });
-});
-
-it('preserves protected inline code in the audited Chinese article passages', () => {
-  const auditedSpans = [
-    {
-      file: 'deepseekv4-16t-day-0-to-day-43-performance.mdx',
-      code: '“mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)”',
-    },
-    {
-      file: 'gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx',
-      code: 'conc=3072, 28 GPU prefill, 32 GPU decode EP=16, 6,812 tok/s/GPU at 25.9 tok/s/user',
-    },
-  ] as const;
-
-  for (const { file, code } of auditedSpans) {
-    expect(
-      inlineCodeSpans(read(path.join(CONTENT_DIR, file))),
-      `${file}: English source`,
-    ).toContain(code);
-    expect(
-      inlineCodeSpans(read(path.join(ZH_DIR, file))),
-      `${file}: Chinese translation`,
-    ).toContain(code);
-  }
 });

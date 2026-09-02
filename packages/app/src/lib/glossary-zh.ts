@@ -36,7 +36,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'AI 推理是使用已经训练好的模型处理新输入并生成输出的过程；对大语言模型而言，通常就是处理提示词并生成 token。',
     explanation:
-      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。周边软硬件栈不同，性能也会随之变化。',
+      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。整个系统的性能还会随配套的软硬件栈而变化。',
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
@@ -110,11 +110,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '闭环基准测试中的客户端会在前一个依赖请求完成后生成新工作，同时遵循工作负载记录的等待时间和分支结构。',
     explanation:
-      '并发量表示活跃客户端或会话的数量，同时在途的请求数会随时间变化。系统越快，完成轮次越早，因此在同一个 profiling 窗口内发出的请求也越多。由于每条采样会话的推进取决于请求完成时间，实际请求组合可能略有变化。',
+      '并发量表示活跃客户端或会话的数量，但同时在途的请求数会随时间变化。系统越快，每一轮就完成得越早，因此在同一个 profiling 窗口内会发出更多请求。由于每条采样会话的进度取决于请求完成时间，实际请求组合可能略有不同。',
     significance:
       '这种负载模型符合交互式 agent 的运行方式，因为下一步动作依赖上一步结果。响应更快时，会话也会更快地产生后续工作，所以吞吐量与延迟相互关联。低并发运行的采样波动通常会比大型请求池更明显。',
     benchmarkContext:
-      'AgentX 采用闭环并发。并发量表示同时运行的 agent 客户端数量；随着会话推进，请求批次大小会不断变化。解读结果时，应结合吞吐量、首 token 延迟和交互性。',
+      'AgentX 采用闭环并发。这里的并发量指同时运行的 agent 客户端数量；随着会话推进，每个批次中的请求数也会变化。解读结果时，应结合吞吐量、首 token 延迟和交互性。',
   },
   subagent: {
     term: '子智能体',
@@ -226,7 +226,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '批处理就像让多名乘客坐同一辆巴士：芯片一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
-      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。由此形成的批次形状会在预填充和解码过程中不断变化。',
+      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理；随着请求到达或完成，序列会动态加入或退出，无需等待固定批次全部处理完。因此，batch 形状会在 prefill 和 decode 过程中不断变化。',
     significance:
       '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
@@ -279,7 +279,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'InferenceX 根据每小时总体拥有成本和实测 token 吞吐量计算该指标。它可能按总 token 报告，也可能区分输入和输出 token，因此比较前必须确认分母。',
     significance:
-      '该指标把系统性能转化为服务经济性，但仍受工作负载、交互性、利用率、缓存命中和成本假设影响；低吞吐量的离线运行点与高交互性实时端点属于不同的运行区间，不能直接比较。',
+      '工作负载形状、交互性、利用率、缓存行为和成本假设，共同决定两个数值能否直接比较。低吞吐量的离线运行点与曲线高交互性一端的运行点属于不同运行区间，不能直接比较。',
     benchmarkContext:
       '成本曲线使用与吞吐曲线相同的并发扫描。在等交互性下，更低的 $/M 表示以更少建模成本提供相同流式体验。',
     measurement: {
@@ -390,15 +390,15 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: '投机解码',
     aliases: ['speculative decoding', '草稿与验证解码'],
     plainEnglish:
-      '投机解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，省去部分逐个生成步骤。',
+      '投机解码先让成本较低的辅助模块提前生成多个 token，再交给完整模型一次性验证，从而减少逐个生成的步骤。',
     definition:
-      '投机解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
+      '投机解码先以较低成本生成多个候选 token，再由目标模型批量验证，从而减少成本较高的串行 decode 步骤。',
     explanation:
-      '草稿模型或内置预测头生成候选，目标模型在一次批量验证中评估这些候选并接受有效前缀；严格实现时不会改变目标分布。',
+      'draft model 或内置预测头会生成候选 token，目标模型再通过一次批量验证评估这些候选，并接受其中有效的连续前缀。只要算法实现严格，目标分布就不会改变。',
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '应在真实接受率下比较投机解码方案并验证模型质量。定长场景仍把投机解码作为曲线标识的一部分，因此开启和关闭 MTP 的方案会分开绘制；agentic 曲线则把它当作数据点级元数据并合并这些点，在提示框中标明具体方式，因为 AgentX 按模型、芯片 SKU 和引擎给出可获得的最佳曲线。由于 AgentX 回放的内容是合成的，speculator 接受的 draft token 数会失真，因此运行时会套用一套按模型、speculator、draft 长度和思考模式在外部 agentic 编码数据集上采集的接受长度。',
+      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
@@ -407,24 +407,24 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供投机验证。',
     explanation:
-      'MTP 不需要独立草稿模型，候选来自目标模型自身表示，因此分布更一致、部署也更简单；但它要求检查点包含兼容 MTP 模块，且推理引擎支持验证路径。',
+      'MTP 不需要单独的 draft model；候选来自目标模型自身的表示，因此通常更贴合目标模型，也更易部署。不过，checkpoint 必须包含兼容的 MTP 模块，推理引擎也必须支持对应的验证路径。',
     significance:
-      'MTP 可用额外计算换取更少的内存受限解码步。草稿接受率高且验证能利用空闲计算时收益最大；大批次下额外工作可能减少优势。',
+      'MTP 可以利用原本闲置的计算资源，减少受显存带宽限制的 decode 步骤。draft token 接受率较高、且验证能够利用可用算力时，收益最大；batch 较大时，额外计算带来的收益可能下降。',
     benchmarkContext:
-      'InferenceX 将 MTP 作为方案维度。把基准收益迁移到生产时，必须考虑接受率/长度、工作负载分布、数值质量检查与匹配交互性。',
+      'InferenceX 将 MTP 作为测试配置中的一个维度。评估基准测试中的提升能否在生产环境复现时，需要同时考虑接受率或接受长度、工作负载分布、数值质量检查和匹配交互性。',
   },
   eagle: {
     term: 'EAGLE',
     aliases: ['EAGLE 投机解码', 'EAGLE-3'],
     plainEnglish: 'EAGLE 是一种为主模型起草多个可能后续 token 的方法，可让答案流式输出得更快。',
     definition:
-      'EAGLE 是一组投机解码方法：利用与目标语言模型相关的特征预测草稿序列，再由目标模型验证。',
+      'EAGLE 是一类投机解码方法：它根据与目标语言模型相关的特征预测 draft 序列，再交由目标模型验证。',
     explanation:
-      '推理框架通常通过投机步数、草稿 token 数和候选宽度等参数暴露 EAGLE。模型检查点、草稿组件与引擎实现必须匹配。',
+      '推理框架通常提供投机步数、draft token 数和候选宽度等参数来配置 EAGLE。模型 checkpoint、draft 组件和引擎实现必须相互匹配。',
     significance:
-      'EAGLE 能提高每个目标模型步接受的 token 数，但结果依赖工作负载；接受行为、草稿开销、模型架构和批大小共同决定端到端收益。',
+      'EAGLE 可以增加目标模型每一步接受的 token 数，但实际效果取决于工作负载。接受情况、draft 开销、模型架构和 batch 大小，共同决定这条额外路径能否提升端到端服务性能。',
     benchmarkContext:
-      '部分 InferenceX 曲线标注 MTP，是因为模型提供多 token 预测头，而引擎使用 EAGLE 风格管线。应查看方案参数与检查点细节，不能假设所有 MTP 曲线实现相同。',
+      '部分 InferenceX 曲线将这一功能标记为 MTP，因为模型提供多 token 预测头，而引擎使用的是 EAGLE 风格的投机解码管线。具体实现以测试配置中的 flags 和 checkpoint 详情为准。',
   },
   'tensor-parallelism': {
     term: '张量并行',
@@ -699,7 +699,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
     benchmarkContext:
-      'InferenceX 持续重跑版本固定的 SGLang 方案。对比不同版本的曲线，可以看出改动如何影响完整运行区间，并发现单个峰值点掩盖的回归或提升。',
+      'InferenceX 会持续重跑固定版本的 SGLang 测试配置。对比不同版本的曲线，可以看出改动对整个运行区间的影响，也能发现单看峰值时容易被掩盖的回归或提升。',
   },
   'tensorrt-llm': {
     term: 'TensorRT-LLM',

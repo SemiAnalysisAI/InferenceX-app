@@ -89,10 +89,6 @@
       "duration": 1751
     },
     {
-      "spec": "cypress/e2e/content-journeys.cy.ts",
-      "duration": 150000
-    },
-    {
       "spec": "cypress/e2e/csv-export-overlay.cy.ts",
       "duration": 1213
     },

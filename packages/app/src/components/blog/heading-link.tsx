@@ -19,11 +19,10 @@ export function HeadingLink({ id, locale = 'en' }: { id: string; locale?: Locale
     (e: React.MouseEvent) => {
       e.preventDefault();
       clearTimeout(timerRef.current);
-      track('blog_heading_link_clicked', { id, locale });
       const url = `${window.location.origin}${window.location.pathname}#${id}`;
       navigator.clipboard.writeText(url).then(
         () => {
-          track('blog_heading_link_copied', { id, locale });
+          track('blog_heading_link_copied', { id });
           setState('copied');
           timerRef.current = setTimeout(() => {
             setState('fading');
@@ -35,7 +34,7 @@ export function HeadingLink({ id, locale = 'en' }: { id: string; locale?: Locale
         },
       );
     },
-    [id, locale],
+    [id],
   );
 
   const visible = state !== 'idle';

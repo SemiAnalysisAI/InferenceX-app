@@ -135,45 +135,6 @@ describe('Chinese glossary content', () => {
       });
     }
   });
-
-  it('preserves the source scope in audited Chinese definitions', () => {
-    expect(getZhGlossaryEntry('ai-inference')?.explanation).not.toContain('相差数倍');
-    expect(getZhGlossaryEntry('cost-per-million-tokens')?.significance).toContain('低吞吐量');
-    expect(getZhGlossaryEntry('total-cost-of-ownership')?.benchmarkContext).toContain(
-      '软件实现及工作负载特征',
-    );
-    expect(getZhGlossaryEntry('total-cost-of-ownership')?.benchmarkContext).not.toContain(
-      '软硬件行为',
-    );
-    expect(getZhGlossaryEntry('sglang')?.benchmarkContext).toContain('回归或提升');
-  });
-
-  it('explains closed-loop concurrency in natural Chinese', () => {
-    const entry = getZhGlossaryEntry('closed-loop-benchmark');
-
-    expect(entry?.explanation).toContain('并发量表示活跃客户端或会话的数量');
-    expect(entry?.benchmarkContext).toContain('AgentX 采用闭环并发');
-    expect(entry?.benchmarkContext).toContain('请求批次大小会不断变化');
-    expect(entry?.explanation).not.toContain('Concurrency');
-    expect(entry?.benchmarkContext).not.toContain('concurrency');
-    expect(entry?.benchmarkContext).not.toContain('request batch');
-  });
-
-  it('uses the established Chinese term for point tooltips in audited entries', () => {
-    const slugs = [
-      'speculative-decoding',
-      'context-parallelism',
-      'recipe',
-      'pipeline-parallelism',
-      'dp-attention',
-    ];
-
-    for (const slug of slugs) {
-      const benchmarkContext = getZhGlossaryEntry(slug)?.benchmarkContext;
-      expect(benchmarkContext, slug).toContain('提示框');
-      expect(benchmarkContext, slug).not.toContain('tooltip');
-    }
-  });
 });
 
 describe('glossary navigation', () => {

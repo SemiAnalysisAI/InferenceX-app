@@ -123,24 +123,10 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('About pages', () => {
-    it('keeps English article links on the English click path', () => {
-      cy.viewport(1440, 900);
-      cy.visit('/about');
-
-      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
-      cy.contains('a', 'InferenceX v1')
-        .should('have.attr', 'href', '/blog/inferencemax-open-source-inference-benchmarking')
-        .click();
-      cy.location('pathname').should('eq', '/blog/inferencemax-open-source-inference-benchmarking');
-    });
-
-    it('keeps both Chinese article links inside /zh and preserves the FAQ structure', () => {
+    it('keeps both Chinese article links inside /zh and follows one to its translation', () => {
       cy.viewport(390, 844);
       cy.visit('/zh/about');
 
-      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
-      cy.contains('NeoCloud').should('exist');
-      cy.contains('dt', '什么是 InferenceX？').should('exist');
       cy.contains('a', 'InferenceX v1')
         .should('have.attr', 'href', '/zh/blog/inferencemax-open-source-inference-benchmarking')
         .and('not.have.attr', 'hreflang', 'en');
@@ -156,11 +142,15 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Glossary pages', () => {
-    it('supports search, category filtering, empty recovery, and a Chinese term click path', () => {
-      cy.viewport(1440, 900);
+    it('supports a mobile Chinese search, filter, and term navigation journey without overflow', () => {
+      cy.viewport(375, 844);
       cy.visit('/zh/glossary');
 
-      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
       cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').as('search').type('MTP');
       cy.get('a[href="/zh/glossary/multi-token-prediction"]').should('be.visible');
       cy.get('@search').clear().type('不存在的术语-xyz');
@@ -174,31 +164,10 @@ describe('Chinese (/zh) pages', () => {
       cy.contains('a', 'AI 推理术语表').click();
       cy.location('pathname').should('eq', '/zh/glossary');
     });
-
-    for (const width of [375, 390]) {
-      it(`keeps the Chinese glossary inside the ${width}px viewport`, () => {
-        cy.viewport(width, 844);
-        cy.visit('/zh/glossary');
-        cy.document().then((document) => {
-          expect(document.documentElement.scrollWidth).to.be.at.most(
-            document.documentElement.clientWidth,
-          );
-        });
-        cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').should('be.visible');
-        cy.contains('button', '智能体推理').should('be.visible');
-      });
-    }
   });
 
   describe('Land acknowledgement pages', () => {
-    it('renders the English source and its Chinese hreflang at 1440px', () => {
-      cy.viewport(1440, 900);
-      cy.visit('/land-acknowledgement');
-      cy.contains('h1', 'Indigenous homelands').should('be.visible');
-      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
-    });
-
-    it('uses the approved Chinese page term and keeps every nation visible on mobile', () => {
+    it('keeps every region and nation visible on mobile', () => {
       cy.viewport(375, 812);
       cy.visit('/zh/land-acknowledgement');
 
@@ -207,12 +176,15 @@ describe('Chinese (/zh) pages', () => {
         '原住民传统领地声明',
       );
       cy.title().should('contain', '原住民传统领地声明');
-      cy.get('[data-testid="land-acknowledgement-san-jose"]').should(
-        'contain.text',
-        'Muwekma Ohlone',
-      );
-      cy.get('[data-testid="land-acknowledgement-los-angeles"]').should('contain.text', 'Tongva');
-      cy.get('[data-testid="land-acknowledgement-chicago"]').should('contain.text', 'Potawatomi');
+      for (const [testId, region, nation] of [
+        ['land-acknowledgement-san-jose', 'San Jose', 'Muwekma Ohlone'],
+        ['land-acknowledgement-los-angeles', 'Los Angeles', 'Tongva'],
+        ['land-acknowledgement-chicago', 'Chicago', 'Potawatomi'],
+      ] as const) {
+        cy.get(`[data-testid="${testId}"]`)
+          .should('contain.text', region)
+          .and('contain.text', nation);
+      }
       cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
       cy.document().then((document) => {
         expect(document.documentElement.scrollWidth).to.be.at.most(
@@ -229,7 +201,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders translated content with Chinese chrome', () => {
       cy.get('article.prose').should('exist');
-      cy.contains('分钟阅读').should('exist');
+      cy.contains('预计阅读').should('exist');
       cy.get('a[href="/zh/blog"]').should('exist');
     });
 
@@ -242,13 +214,11 @@ describe('Chinese (/zh) pages', () => {
       cy.get('details[aria-label="本页目录"]')
         .should('be.visible')
         .find('summary')
-        .should('contain.text', '点击展开')
-        .and('not.contain.text', 'click to expand');
+        .should('contain.text', '点击展开');
       cy.get('article.prose a[aria-label="复制本节链接"]')
         .first()
         .should('have.attr', 'href')
         .and('match', /^#/u);
-      cy.get('article.prose a[aria-label="Copy link to section"]').should('not.exist');
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
       });

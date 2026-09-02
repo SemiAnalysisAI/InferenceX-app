@@ -13,7 +13,7 @@ import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS_ZH, ZH_LANG_TAG);
 
 const ABOUT_DESCRIPTION =
-  'InferenceX 对比各类加速器与服务栈的智能体推理和固定序列 AI 推理性能。AgentX 是其长上下文多轮编码场景。';
+  'InferenceX 对各类加速器和服务栈上的智能体推理与固定序列 AI 推理进行基准测试。AgentX 是其中的长上下文、多轮编码场景。';
 
 export const metadata: Metadata = {
   title: '关于',
@@ -46,18 +46,19 @@ export default function AboutPageZh() {
               持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
             </h2>
             <p className="text-muted-foreground mb-2">
-              随着全球迈向 AGI
-              的进程呈指数级加速，软件开发和模型发布也日新月异。静态基准测试很快就会过时；参与者提交的镜像往往专为基准测试打造，无法反映真实环境中的性能。
+              全球迈向 AGI
+              的进程呈指数级加速，软件开发和模型发布也日新月异。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
             </p>
             <p className="text-muted-foreground mb-2">
               <strong>InferenceX&trade;</strong>（原名
-              InferenceMAX）是我们独立、厂商中立、可复现的基准测试平台。它测试固定序列推理服务和
-              AgentX 长上下文多轮智能体编码工作负载，覆盖 ML 社区实际可用的各类 AI 加速器与服务栈。
+              InferenceMAX）是我们建立的独立、厂商中立且可复现的基准测试平台。它覆盖 ML
+              社区实际可用的各类 AI 加速器和服务栈，测试固定序列推理服务以及 AgentX
+              长上下文、多轮智能体编码工作负载。
             </p>
             <p className="text-muted-foreground">
-              我们的开放数据与洞察已被 ML 社区广泛采用，包括万亿美元级 Token 工厂和 AI
-              实验室的容量规划策略团队，以及多家数十亿美元级
-              NeoCloud。了解更多详情请阅读我们的文章：{' '}
+              我们的开放数据与洞察已被 ML 社区广泛采用，用户包括万亿美元级 Token 工厂和 AI
+              实验室中负责容量规划与战略的团队，以及多家价值数十亿美元的
+              NeoCloud。更多详情请参阅以下文章：{' '}
               <Link
                 href="/zh/blog/inferencemax-open-source-inference-benchmarking"
                 className="text-brand hover:underline font-medium"
@@ -122,7 +123,7 @@ export default function AboutPageZh() {
                   4
                 </span>
                 <div>
-                  <strong className="text-foreground">结果写入仪表板。</strong>{' '}
+                  <strong className="text-foreground">将结果导入仪表板。</strong>{' '}
                   运行成功后，结果将写入数据库并在仪表板中展示。每个图表的提示框都提供对应的 GitHub
                   Actions 运行记录链接。点击任意数据点即可核查其来源。
                 </div>

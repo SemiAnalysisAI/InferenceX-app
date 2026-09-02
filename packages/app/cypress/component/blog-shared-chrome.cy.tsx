@@ -26,13 +26,8 @@ describe('Blog shared chrome', () => {
       );
     });
     cy.contains('链接已复制').should('be.visible');
-    cy.get('@capture').should('have.been.calledWith', 'blog_heading_link_clicked', {
-      id: 'test-section',
-      locale: 'zh',
-    });
     cy.get('@capture').should('have.been.calledWith', 'blog_heading_link_copied', {
       id: 'test-section',
-      locale: 'zh',
     });
   });
 });

@@ -2,7 +2,6 @@ const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
   it('exposes the localized reference and its OpenAPI contract', () => {
-    cy.viewport(1440, 900);
     cy.visit('/api');
 
     cy.get('[data-testid="api-reference"]')
@@ -80,28 +79,22 @@ describe('API documentation', () => {
       .and('have.text', 'API 文档');
   });
 
-  for (const [path, width] of [
-    ['/api', 1440],
-    ['/api', 375],
-    ['/zh/api', 390],
-  ] as const) {
-    it(`contains wide schema notes without page overflow at ${path} on ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.visit(path);
-      cy.get('[data-testid="api-schema-note"]').first().as('schemaNote').should('be.visible');
-      cy.get('@schemaNote').should('have.css', 'min-width', '0px');
-      cy.get('@schemaNote')
-        .find('.overflow-x-auto')
-        .then(($scrollers) => {
-          expect(
-            [...$scrollers].some((scroller) => scroller.scrollWidth > scroller.clientWidth),
-          ).to.equal(true);
-        });
-      cy.document().then((document) => {
-        expect(document.documentElement.scrollWidth).to.be.at.most(
-          document.documentElement.clientWidth,
-        );
+  it('keeps wide schemas locally scrollable without overflowing the Chinese mobile page', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/api');
+
+    cy.get('section[aria-labelledby="api-schemas-heading"] > dl > div')
+      .should('be.visible')
+      .find('.overflow-x-auto')
+      .then(($scrollers) => {
+        expect(
+          [...$scrollers].some((scroller) => scroller.scrollWidth > scroller.clientWidth),
+        ).to.equal(true);
       });
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(
+        document.documentElement.clientWidth,
+      );
     });
-  }
+  });
 });

@@ -26,7 +26,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-models',
     question: '测试了哪些 AI 模型？',
     answer:
-      '各模型会在相应的固定序列配置（1k/1k、1k/8k、8k/1k tokens）和多个并发级别下接受测试；如果已有对应数据，还会运行 AgentX 长上下文多轮智能体编码场景。',
+      '各模型会在其支持的固定序列配置（1k/1k、1k/8k 和 8k/1k token）和多个并发级别下进行测试。对于支持 AgentX 且有相应数据的模型，现有结果还涵盖 AgentX 长上下文、多轮智能体编程测试。',
     list: GENERATED_FAQ_DATA.modelNames,
   },
   {
@@ -34,10 +34,10 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     question: '测试了哪些推理框架和配置？',
     answer: '',
     list: [
-      `框架：${GENERATED_FAQ_DATA.frameworkNames.join(', ')}`,
-      `精度：${GENERATED_FAQ_DATA.precisionNames.join(', ')}`,
+      `框架：${GENERATED_FAQ_DATA.frameworkNames.join('、')}`,
+      `精度：${GENERATED_FAQ_DATA.precisionNames.join('、')}`,
       '运行时：CUDA、ROCm',
-      '分离式推理（Disaggregated serving，独立的 prefill/decode 芯片池）',
+      '分离式推理（独立的 prefill/decode 芯片池）',
       '多 token 预测（MTP）',
       '面向 MoE 模型的宽专家并行（Wide Expert Parallelism）',
     ],
@@ -52,8 +52,8 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
       '每芯片输入和输出吞吐量',
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
-      'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与 subagent 执行情况',
-      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCloud 和裸机租赁定价',
+      'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与子智能体执行情况',
+      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCloud 和租赁定价',
       '每 token 能耗（焦耳，总计、输入、输出）',
       '用户自定义成本和功耗计算',
     ],
@@ -87,7 +87,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   },
   {
     id: 'faq-reproducibility',
-    question: '结果如何实现可复现？',
+    question: '如何保证结果可复现？',
     answer:
       '仪表板上的每个数据点都由公开的 GitHub Actions 工作流生成。测试配置（模型、框架、精度、并行度、序列长度和并发数）保存在代码仓库中，并在对应的目标硬件上运行。日志、指标和芯片追踪数据等产物会上传到运行记录页面。每个图表的提示框都提供链接，可直接打开生成该数据点的 GitHub Actions 运行记录。',
   },
@@ -101,7 +101,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-rerun-benchmark',
     question: '我可以自己重新运行基准测试吗？',
     answer:
-      '可以。基准测试脚本位于代码仓库的 /benchmarks 目录中，可以独立运行。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，也可以触发相同的 GitHub Actions 工作流来复现结果。',
+      '可以。基准测试配置以可独立运行的 shell 脚本形式保存在代码仓库的 /benchmarks 目录中。如果您拥有相同的硬件，可以 fork 仓库并直接运行脚本，也可以触发相同的 GitHub Actions 工作流来复现结果。',
   },
   {
     id: 'faq-old-runs',
@@ -111,7 +111,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   },
   {
     id: 'faq-data-use',
-    question: '我可以使用 InferenceX 的数据进行自己的分析吗？',
+    question: '我可以使用 InferenceX 数据自行分析吗？',
     answer:
       '可以。所有数据均可自由获取。仪表板支持按芯片、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
   },

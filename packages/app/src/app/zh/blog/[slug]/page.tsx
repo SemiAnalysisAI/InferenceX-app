@@ -88,7 +88,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);
 
   return (
-    <main data-testid="blog-post-page" data-blog-slug={slug} className="relative">
+    <main className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <JsonLd data={jsonLd} />
@@ -112,7 +112,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
                   })}
                 </time>
                 <span>&middot;</span>
-                <span>{meta.readingTime} 分钟阅读</span>
+                <span>预计阅读 {meta.readingTime} 分钟</span>
                 <span>&middot;</span>
                 <Link href={`/blog/${slug}`} hrefLang="en" className="hover:underline text-brand">
                   阅读英文原文
