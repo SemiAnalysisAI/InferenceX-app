@@ -112,7 +112,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
                   })}
                 </time>
                 <span>&middot;</span>
-                <span>{meta.readingTime} 分钟阅读</span>
+                <span>预计阅读 {meta.readingTime} 分钟</span>
                 <span>&middot;</span>
                 <Link href={`/blog/${slug}`} hrefLang="en" className="hover:underline text-brand">
                   阅读英文原文
@@ -135,7 +135,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
             </header>
             {headings.length > 0 && (
               <div className="mt-4">
-                <BlogToc headings={headings} label="本页目录" />
+                <BlogToc headings={headings} locale="zh" />
               </div>
             )}
             <div className="mt-6 pt-6 border-t border-border/40">

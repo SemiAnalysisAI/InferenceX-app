@@ -4,6 +4,7 @@ import {
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
+  collectiveXConclusionLabel,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
@@ -32,10 +33,40 @@ const dataset = makeCollectiveXDataset();
 // series[1]: MoRI EP16 scale-out (xGMI scale-up + RDMA scale-out, two nodes).
 const [scaleUp, scaleOut] = dataset.series;
 
+describe('collectiveXConclusionLabel', () => {
+  it.each([
+    ['success', '成功'],
+    ['failure', '失败'],
+    ['cancelled', '已取消'],
+    ['skipped', '已跳过'],
+    ['timed_out', '超时'],
+    ['startup_failure', '启动失败'],
+    ['action_required', '需要处理'],
+    ['neutral', '中立'],
+    ['stale', '已过期'],
+  ])('localizes the %s workflow conclusion in Chinese', (conclusion, expected) => {
+    expect(collectiveXConclusionLabel(conclusion, 'zh')).toBe(expected);
+  });
+
+  it('derives pending only from a null workflow conclusion', () => {
+    expect(collectiveXConclusionLabel(null, 'zh')).toBe('待处理');
+    expect(collectiveXConclusionLabel(null, 'en')).toBe('pending');
+  });
+
+  it('preserves known English values and hides unknown values on Chinese pages', () => {
+    expect(collectiveXConclusionLabel('startup_failure', 'en')).toBe('startup_failure');
+    expect(collectiveXConclusionLabel('future_status', 'en')).toBe('future_status');
+    expect(collectiveXConclusionLabel('future_status', 'zh')).toBe('未知状态');
+  });
+});
+
 describe('collectiveXTopologyLabel', () => {
   it('shows only the scale-up transport when there is no scale-out fabric', () => {
     expect(collectiveXTopologyLabel(scaleUp.system)).toBe(
       '1x8 · domain 8 · nvlink · h200-nvlink-island',
+    );
+    expect(collectiveXTopologyLabel(scaleUp.system, 'zh')).toBe(
+      '1x8 · 域内芯片数 8 · nvlink · h200-nvlink-island',
     );
   });
 
@@ -81,6 +112,15 @@ describe('collectiveXSeriesLabel', () => {
     expect(collectiveXLegendLabel(runSeries)).toBe(
       'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
+    expect(collectiveXLegendLabel(runSeries, 'zh')).toBe(
+      'H200 · deepep-v2 · EP8 · 常规 · 解码 · bf16',
+    );
+    expect(
+      collectiveXLegendLabel(
+        makeCollectiveXSeries({ mode: 'low-latency', phase: 'prefill' }),
+        'zh',
+      ),
+    ).toBe('H200 · deepep-v2 · EP8 · 低延迟 · 预填充 · bf16');
   });
 });
 
@@ -299,6 +339,9 @@ describe('chartPoints', () => {
       expect(point.x).toBeGreaterThan(0);
       expect(point.y).toBeGreaterThan(0);
     }
+    expect(chartPoints([scaleUp], 'dispatch', 'p50', 'latency', 'zh')[0].seriesLabel).toBe(
+      'H200 · deepep-v2 · EP8 · 常规 · 解码 · bf16',
+    );
   });
 
   it('drops points whose metric is unavailable', () => {

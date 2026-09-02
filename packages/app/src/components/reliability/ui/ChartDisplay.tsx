@@ -24,7 +24,7 @@ const STRINGS = {
   },
   zh: {
     heading: '芯片可靠性',
-    description: '各芯片型号推理运行的成功率百分比，展示硬件在一段时间内的推理运行可靠性。',
+    description: '汇总所选时间范围内各芯片型号的推理运行成功率，用于比较硬件可靠性。',
     captionHeading: '各芯片型号成功率',
     captionSource: '数据来源：SemiAnalysis InferenceX™',
   },

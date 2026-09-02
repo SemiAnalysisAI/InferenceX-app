@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AGE_MAX_RED_DAYS,
+  AGENTX_MAX_AGE_DAYS,
   ageColorStyle,
   ageRowStyle,
   baseFramework,
@@ -9,6 +10,7 @@ import {
   getActualLatestTag,
   getCurrentImageNodeTypeTooltip,
   isOutdated,
+  isStaleAgentx,
 } from './latest-image-utils';
 
 const lightnessOf = (s: string) =>
@@ -41,6 +43,22 @@ describe('daysSince', () => {
   it('clamps at 0 for future-dated submissions (never returns negative)', () => {
     const today = new Date('2026-05-27T00:00:00Z');
     expect(daysSince('2026-06-01', today)).toBe(0);
+  });
+});
+
+describe('isStaleAgentx', () => {
+  it('flags agentic rows strictly older than the two-week budget', () => {
+    expect(isStaleAgentx('agentic_traces', AGENTX_MAX_AGE_DAYS + 1)).toBe(true);
+    expect(isStaleAgentx('agentic_traces', 60)).toBe(true);
+  });
+
+  it('keeps agentic rows at or under two weeks fresh', () => {
+    expect(isStaleAgentx('agentic_traces', 0)).toBe(false);
+    expect(isStaleAgentx('agentic_traces', AGENTX_MAX_AGE_DAYS)).toBe(false);
+  });
+
+  it('never flags fixed-sequence rows regardless of age', () => {
+    expect(isStaleAgentx('single_turn', 365)).toBe(false);
   });
 });
 

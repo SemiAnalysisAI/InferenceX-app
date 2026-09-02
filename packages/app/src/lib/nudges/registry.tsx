@@ -10,11 +10,8 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
-
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
 import { isZhPathname, localePath } from '@/lib/i18n';
 import {
   AGENTIC_COACH_MARK_STORAGE_KEY,
@@ -26,11 +23,6 @@ import {
 } from '@/lib/nudges/agentic-point-coach-mark';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
-// Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
-const FeedbackForm = dynamic(
-  () => import('@/components/feedback-modal').then((m) => m.FeedbackForm),
-  { ssr: false },
-);
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
 import type { NudgeDefinition } from './types';
@@ -315,40 +307,6 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       shown: 'inference_agentic_point_coach_mark_shown',
       dismissed: 'inference_agentic_point_coach_mark_dismissed',
       action: 'inference_agentic_point_coach_mark_point_clicked',
-    },
-  },
-
-  // -------------------------------------------------------------------------
-  // Dashboard modals
-  // -------------------------------------------------------------------------
-  {
-    id: 'feedback-modal',
-    type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: {
-      type: 'timed',
-      durationMs: 3 * 24 * 60 * 60 * 1000,
-      cooldownStartsOnShow: true,
-    },
-    storageKey: 'inferencex-feedback-modal-snoozed',
-    permanentSuppressKey: 'inferencex-feedback-modal-submitted',
-    permanentSuppressEvent: FEEDBACK_SUBMITTED_EVENT,
-    priority: 5,
-    scope: 'dashboard',
-    content: {
-      icon: MessageSquareText,
-      iconClassName: 'text-brand',
-      title: 'Help us improve InferenceX',
-      titleZh: '帮助我们改进 InferenceX',
-      description: "We'd love to hear what's working and what isn't.",
-      descriptionZh: '我们非常希望了解哪些方面做得好，哪些方面需要改进。',
-      testId: 'feedback-modal',
-      centered: true,
-      renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
-    },
-    analytics: {
-      shown: 'feedback_modal_shown',
-      dismissed: 'feedback_modal_dismissed',
     },
   },
 

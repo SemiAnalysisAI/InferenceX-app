@@ -342,7 +342,12 @@ export function overviewScenarioForModel(
     return 'single_turn_8k1k';
   }
   if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
-  return model === Model.Kimi_K3 || model === Model.GLM_5_2 || model === Model.Qwen3_8_Flash_Next
+  // AgentX-only models: Kimi K3, GLM 5.2 and Qwen3.8 Flash Next never swept
+  // 8K/1K; MiniMax M3 retired it on 2026-08-04 (InferenceX#2493, MODELS.md).
+  return model === Model.Kimi_K3 ||
+    model === Model.GLM_5_2 ||
+    model === Model.Qwen3_8_Flash_Next ||
+    model === Model.MiniMax_M3
     ? 'agentx'
     : 'single_turn_8k1k';
 }
@@ -355,7 +360,10 @@ export function overviewScenarioForModel(
  */
 const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
   [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
-  [Model.MiniMax_M3]: ['single_turn_8k1k', 'agentx'],
+  // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
+  // (InferenceX#2493, MODELS.md), so the matrix must not keep a fixed-sequence
+  // row that will never refresh; AgentX is the model's only active scenario.
+  [Model.MiniMax_M3]: ['agentx'],
   [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],

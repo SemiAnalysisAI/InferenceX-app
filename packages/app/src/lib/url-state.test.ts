@@ -64,6 +64,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.e_bench).toBe('');
   });
 
+  it('has an empty default for the measured-power quick filter (filter off)', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_power).toBe('');
+  });
+
   it('has empty string default for i_gradlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
@@ -151,10 +156,40 @@ describe('readUrlParams', () => {
     await vi.runAllTimersAsync();
 
     expect(history.replaceState).toHaveBeenCalledWith(
-      null,
+      history.state,
       '',
       '/zh/evaluation?eval=42#sample-detail',
     );
+  });
+
+  it('skips the deferred cleanup entirely when the URL has no share-link params', async () => {
+    // The module initializes when dashboard chunks are evaluated, which on a
+    // landing → dashboard client navigation happens mid-transition. A
+    // replaceState here — even a same-URL one — routed through the Next-patched
+    // method would dispatch a stale router restore and revert the committed
+    // navigation (the "first dashboard click replays the landing" regression).
+    const { history } = setupWindow('?unrelated=1', '/');
+    await import('@/lib/url-state');
+    await vi.runAllTimersAsync();
+
+    expect(history.replaceState).not.toHaveBeenCalled();
+  });
+
+  it('cleans share-link params via the pristine History prototype, not the patched method', async () => {
+    // Next patches `window.history.replaceState` to sync the App Router; the
+    // cleanup must bypass it (same trick as `replaceClientSearch`) so the
+    // router never sees a mid-transition restore.
+    const { history } = setupWindow('?g_model=test&eval=42', '/inference');
+    const pristine = vi.fn();
+    vi.stubGlobal('History', { prototype: { replaceState: pristine } });
+    await import('@/lib/url-state');
+    await vi.runAllTimersAsync();
+
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(pristine).toHaveBeenCalledTimes(1);
+    expect(pristine.mock.calls[0]).toEqual([history.state, '', '/inference?eval=42']);
+    // `this` must be the history object for the prototype call to work.
+    expect(pristine.mock.contexts[0]).toBe(history);
   });
 });
 

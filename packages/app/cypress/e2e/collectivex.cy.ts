@@ -474,11 +474,76 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', 'KV');
     cy.get('[data-testid="collectivex-support-matrices"]')
       .should('contain.text', '已知 Kernel 支持情况')
+      .and('contain.text', '下表展示完整的 SKU × 集合通信库支持情况')
       .and('contain.text', '吞吐量 Kernel')
       .and('contain.text', '低延迟 Kernel')
       .and('contain.text', '可用')
       .and('contain.text', '已知不可用')
       .and('contain.text', '不适用');
+    cy.get(
+      '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="mi355x"][data-library="mori"] [data-testid="collectivex-known-ep"][data-degree="16"]',
+    )
+      .invoke('attr', 'aria-label')
+      .should('match', /（注 \d+）/u)
+      .and('not.include', '(note ');
+  });
+
+  it('localizes the complete chart and run-table click path on the Chinese route', () => {
+    cy.viewport(1440, 900);
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="collectivex-run-conclusion"]')
+      .should('contain.text', `#${runId}`)
+      .and('contain.text', '成功');
+    cy.get('[data-testid="collectivex-runs"]')
+      .should('contain.text', '运行记录')
+      .and('contain.text', '终态数据点');
+    cy.get('[data-testid="collectivex-display"]').should('contain.text', '终态用例');
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', '往返（实测）')
+      .and('contain.text', '常规')
+      .and('contain.text', '解码')
+      .and('contain.text', '延迟（µs）');
+
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '点击其他区域关闭')
+      .and('contain.text', '往返')
+      .and('contain.text', '常规')
+      .and('contain.text', '解码')
+      .and('contain.text', '延迟 p50 / p90 / p95 / p99');
+  });
+
+  it('keeps a selected cancelled run localized instead of showing it as pending', () => {
+    const cancelled = buildDataset({
+      shards: [makeRawShard()],
+      meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },
+    });
+    installRuns([cancelled]);
+    installRun(cancelled, 'cancelledRun');
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@cancelledRun');
+
+    cy.get('[data-testid="collectivex-run-conclusion"]')
+      .should('contain.text', '已取消')
+      .and('not.contain.text', '待处理')
+      .and('not.contain.text', 'cancelled');
+  });
+
+  it('keeps the Chinese explorer and runs table reachable at 375px', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="collectivex-main-chart"] svg').should('exist');
+    cy.get('[data-testid="collectivex-runs-table"]').scrollTo('right').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+    });
   });
 });
 
@@ -607,7 +672,8 @@ describe('CollectiveX availability states', () => {
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'API error: 404');
+      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('not.contain.text', 'API error: 404');
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
@@ -620,7 +686,41 @@ describe('CollectiveX availability states', () => {
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'API error: 503');
+      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('not.contain.text', 'API error: 503');
+  });
+
+  it('shows a safe localized error on the Chinese route', () => {
+    let failRequests = true;
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
+      request.reply(
+        failRequests
+          ? { statusCode: 503, body: { error: 'collectivex-internal-storage-detail' } }
+          : {
+              body: {
+                version: 1,
+                runs: [buildRunSummary(dataset)],
+                discovery_complete: true,
+              },
+            },
+      );
+    }).as('zhDown');
+    installRun();
+    cy.visit('/zh/collectivex');
+    cy.wait('@zhDown');
+    cy.wait('@zhDown');
+    cy.get('[data-testid="collectivex-error"]')
+      .should('contain.text', 'CollectiveX 运行暂不可用')
+      .and('contain.text', 'CollectiveX 数据集加载失败。')
+      .and('not.contain.text', 'collectivex-internal-storage-detail');
+    cy.contains('button', '重试')
+      .then(() => {
+        failRequests = false;
+      })
+      .click();
+    cy.wait('@zhDown');
+    cy.wait('@run');
+    cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 
   it('renders the loading state while the run resolves', () => {
@@ -853,6 +953,11 @@ describe('CollectiveX kv-transfer card', () => {
       .should('contain.text', 'X 轴对数缩放')
       .and('contain.text', 'Y 轴对数缩放')
       .and('contain.text', 'Bulk 连续传输基线');
+    cy.get('[data-testid="collectivex-kv-table"]')
+      .closest('[data-slot="card"]')
+      .should('contain.text', '分页行按随机块表')
+      .and('contain.text', '个用例 · 已测')
+      .and('contain.text', '批大小');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {

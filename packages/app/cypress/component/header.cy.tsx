@@ -81,15 +81,19 @@ describe('Header', () => {
       .and('have.attr', 'href', '/overview');
   });
 
-  it('uses resilient app navigation for the desktop Overview link', () => {
+  it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
+    // The old 250ms retry re-read the address bar, which a stale
+    // mid-transition restore could revert; the retry then stacked a duplicate
+    // history entry and visibly restarted the transition (landing "Full
+    // dashboard" regression). A single push is the contract now.
     cy.clock();
     cy.get('[data-testid="nav-link-overview"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
-    cy.tick(250);
-    cy.wrap(mockRouter.push).should('have.been.calledTwice');
+    cy.tick(5000);
+    cy.wrap(mockRouter.push).should('have.been.calledOnce');
   });
 
-  it('retains resilient locale navigation outside Overview', () => {
+  it('pushes locale navigation exactly once outside Overview', () => {
     cy.clock();
     mountHeader('/inference');
     cy.get('[data-testid="language-toggle"]')
@@ -98,8 +102,8 @@ describe('Header', () => {
         expect(href).to.include('/zh/inference');
         cy.get('[data-testid="language-toggle"]').click();
         cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
-        cy.tick(250);
-        cy.wrap(mockRouter.push).should('have.been.calledTwice');
+        cy.tick(5000);
+        cy.wrap(mockRouter.push).should('have.been.calledOnce');
       });
   });
 
@@ -207,14 +211,14 @@ describe('Header', () => {
     });
   });
 
-  it('uses resilient app navigation for the mobile Overview link', () => {
+  it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {
     cy.clock();
     cy.viewport(375, 812);
     cy.get('[data-testid="mobile-menu-toggle"]').click();
     cy.get('[data-testid="mobile-menu"]').contains('a', 'Overview').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
-    cy.tick(250);
-    cy.wrap(mockRouter.push).should('have.been.calledTwice');
+    cy.tick(5000);
+    cy.wrap(mockRouter.push).should('have.been.calledOnce');
   });
 
   it('uses the hamburger without horizontal overflow from 1009 through 1024 CSS pixels', () => {

@@ -162,6 +162,58 @@ describe('GPUGraph', () => {
     cy.get('[data-testid="gpu-graph"] svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
+  it('draws the historical-power ring and reports measured-point coverage', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 32,
+        y: 2.1,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+        power_tier: 'legacy',
+      }),
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 64,
+        y: 1.8,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+        power_tier: 'certified',
+      }),
+    ];
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <GPUGraph
+          chartId="test-gpu-measured-power"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Interactivity (tok/s/user)"
+          yLabel="Measured Joules per Output Token (J/tok)"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['h100'],
+          selectedDates: ['2025-03-01'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2025-03-01_h100']),
+          selectedPrecisions: [Precision.FP4],
+          selectedYAxisMetric: 'y_measuredJPerOutputToken',
+          hideNonOptimal: false,
+        },
+      },
+    );
+
+    cy.get('#test-gpu-measured-power svg .legacy-power-ring').should('have.length', 1);
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 2 of 2 measured points')
+      .and('contain.text', '1/1 validated')
+      .and('contain.text', '1/1 historical');
+  });
+
   it('shows spec decoding only on hover while retaining the offload halo', () => {
     const data = [
       createMockInferenceData({

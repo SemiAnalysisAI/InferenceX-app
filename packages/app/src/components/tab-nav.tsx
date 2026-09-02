@@ -138,7 +138,10 @@ export function TabNav() {
   const featureGateUnlocked = useFeatureGate();
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
   const current = dashboardRouteForPathname(pathname)?.key ?? 'inference';
-  const selectedTab = getDashboardRoute(current).navGroup === 'footer-only' ? '' : current;
+  const currentRoute = getDashboardRoute(current);
+  const selectedTab = currentRoute.navGroup === 'footer-only' ? '' : current;
+  const lockedCurrentGatedTab =
+    !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
@@ -182,6 +185,14 @@ export function TabNav() {
                     {tabLabel(route)}
                   </SelectItem>
                 ))}
+                {lockedCurrentGatedTab && (
+                  <SelectItem
+                    value={lockedCurrentGatedTab.key}
+                    data-ph-capture-attribute-tab={lockedCurrentGatedTab.key}
+                  >
+                    {tabLabel(lockedCurrentGatedTab)}
+                  </SelectItem>
+                )}
                 {featureGateUnlocked && (
                   <>
                     <SelectSeparator />

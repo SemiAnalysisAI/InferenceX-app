@@ -81,6 +81,7 @@ const STRINGS = {
     showKey: 'Show key',
     allDecryptsFailed: "All rows failed to decrypt — the key parses but doesn't match the data.",
     fetchError: 'Failed to load feedback rows.',
+    retry: 'Retry',
     loadingRows: 'Loading rows…',
     noRows: 'No feedback rows yet.',
     enterKey: 'Enter the key above to decrypt.',
@@ -91,6 +92,7 @@ const STRINGS = {
     whatWorksWell: 'What works well',
     whatCouldBeBetter: 'What could be better',
     wouldLikeToSee: 'Would like to see',
+    invalidKey: 'The decryption key must be valid base64 for exactly 32 bytes.',
   },
   zh: {
     heading: '用户反馈',
@@ -100,12 +102,13 @@ const STRINGS = {
     keyLabel: '解密密钥（base64，32 字节）',
     keyPlaceholder: 'base64 编码密钥',
     decrypt: '解密',
-    forgetKey: '忘记密钥',
+    forgetKey: '清除密钥',
     hideKey: '隐藏密钥',
     showKey: '显示密钥',
     allDecryptsFailed: '所有行均解密失败——密钥格式正确但与数据不匹配。',
     fetchError: '无法加载反馈数据。',
-    loadingRows: '加载中……',
+    retry: '重试',
+    loadingRows: '正在加载反馈记录……',
     noRows: '暂无反馈记录。',
     enterKey: '请在上方输入密钥进行解密。',
     encryptedRowsLoaded: (n: number) => `已加载 ${n} 条加密记录。`,
@@ -115,12 +118,13 @@ const STRINGS = {
     whatWorksWell: '做得好的地方',
     whatCouldBeBetter: '可以改进的地方',
     wouldLikeToSee: '希望看到的功能',
+    invalidKey: '解密密钥必须是有效的 base64 编码，解码后长度为 32 字节。',
   },
 } as const;
 
 export default function FeedbackViewer() {
   const router = useRouter();
-  const { data, isLoading, error: fetchError } = useFeedbackList();
+  const { data, isLoading, error: fetchError, refetch } = useFeedbackList();
   const locale = useLocale();
   const t = STRINGS[locale];
   const [keyInput, setKeyInput] = useState('');
@@ -147,14 +151,13 @@ export default function FeedbackViewer() {
         setCipherKey(k);
         setKeyError(null);
         track('feedback_viewer_key_accepted');
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'invalid key';
-        setKeyError(msg);
+      } catch {
+        setKeyError(t.invalidKey);
         setCipherKey(null);
-        track('feedback_viewer_key_rejected', { reason: msg });
+        track('feedback_viewer_key_rejected');
       }
     },
-    [keyInput],
+    [keyInput, t.invalidKey],
   );
 
   const handleForget = useCallback(() => {
@@ -202,7 +205,7 @@ export default function FeedbackViewer() {
           <label htmlFor="feedback-key" className="text-xs font-medium">
             {t.keyLabel}
           </label>
-          <div className="flex flex-row gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Input
                 id="feedback-key"
@@ -217,7 +220,10 @@ export default function FeedbackViewer() {
               />
               <button
                 type="button"
-                onClick={() => setShowKey((v) => !v)}
+                onClick={() => {
+                  setShowKey((v) => !v);
+                  track('feedback_viewer_key_visibility_toggled', { visible: !showKey });
+                }}
                 aria-label={showKey ? t.hideKey : t.showKey}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
@@ -258,7 +264,20 @@ export default function FeedbackViewer() {
 
       {fetchError && (
         <Card>
-          <p className="text-destructive text-sm">{t.fetchError}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-destructive text-sm">{t.fetchError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                track('feedback_viewer_retry_clicked');
+                void refetch();
+              }}
+            >
+              {t.retry}
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -300,15 +319,18 @@ export default function FeedbackViewer() {
 function FeedbackRow({ row }: { row: DecryptedRow }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const createdAt = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(row.createdAt));
   if (row.decryptError) {
     return (
       <Card>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="text-muted-foreground">#{row.id}</span>
           <span className="text-destructive">{t.decryptFailed}</span>
-          <span className="text-muted-foreground tabular-nums">
-            {new Date(row.createdAt).toISOString()}
-          </span>
+          <span className="text-muted-foreground tabular-nums">{createdAt} UTC</span>
         </div>
       </Card>
     );
@@ -318,7 +340,7 @@ function FeedbackRow({ row }: { row: DecryptedRow }) {
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
           <span>#{row.id}</span>
-          <span className="tabular-nums">{new Date(row.createdAt).toISOString()}</span>
+          <span className="tabular-nums">{createdAt} UTC</span>
           <span className="font-mono">{row.pagePath ?? '?'}</span>
         </div>
         {row.doingWell && (

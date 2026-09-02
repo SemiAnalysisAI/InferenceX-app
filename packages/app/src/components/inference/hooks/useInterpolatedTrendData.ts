@@ -331,6 +331,8 @@ interface UseInterpolatedTrendDataResult {
   hwKeysWithData: string[];
   loading: boolean;
   progress: number;
+  error: Error | null;
+  refetch: () => Promise<unknown>;
 }
 
 /**
@@ -351,7 +353,12 @@ export function useInterpolatedTrendData({
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
-  const { data: allRows, isLoading } = useBenchmarkHistory(
+  const {
+    data: allRows,
+    isLoading,
+    error,
+    refetch,
+  } = useBenchmarkHistory(
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
@@ -475,8 +482,10 @@ export function useInterpolatedTrendData({
       hwKeysWithData: [],
       loading: false,
       progress: 0,
+      error: null,
+      refetch,
     };
   }
 
-  return { trendLines, hwKeysWithData, loading: isLoading, progress };
+  return { trendLines, hwKeysWithData, loading: isLoading, progress, error, refetch };
 }

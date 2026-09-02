@@ -270,7 +270,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-latest-images',
-    sourceSha256: 'ae0d5535af9f5bf8d287c04f915067c0e470ec907efb2a848cb6c35660770d2d',
+    sourceSha256: 'a72e44393ff478d18973a050b009bdbaa9e5e5929837dac3781970d162b4de77',
   },
   {
     source: 'src/app/api/v1/log-availability/route.ts',
@@ -660,7 +660,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '54e398a2041040ed7b66bd5c813041db26287111774dafd13a70d5e545fb24f3',
+    sourceSha256: 'd80b18da9bae84079764238fb586090b26aff5eeddfea1a152ef735889bd3357',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -668,7 +668,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: '8ca280fec5bbe633493cf021fee294927aead799742ac07ac7dbe8c5092e38f2',
+    // Reviewed for the MiniMax M3 8k1k retirement (InferenceX#2493): only the
+    // curated OVERVIEW_MODEL_SCENARIOS list and the no-rows scenario fallback
+    // changed — no parameter or OverviewPageData shape change, so the docs
+    // stand.
+    sourceSha256: 'e80e92dc4c87fd4cbdd7194877b91cedab0e8a3267bfe5ec63731388be82b692',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -759,7 +763,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '80c69b9e9ed34e4279c6b95d8418c9535fcee1919ccb4883066d27954588c977',
+    sourceSha256: '98659d61fdfb73d955fd84ead82deaa51076b792ad73b0c111af4d7e512749f5',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',

@@ -818,13 +818,18 @@
       "decode_num_workers": 1,
       "num_prefill_gpu": 8,
       "num_decode_gpu": 8,
-      "benchmark_type": "single_turn",
-      "isl": 8192,
-      "osl": 1024,
+      "benchmark_type": "agentic_traces",
+      "isl": null,
+      "osl": null,
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "tput_per_gpu": 6510, "output_tput_per_gpu": 700 },
+      "metrics": {
+        "p90_itl": 0.02,
+        "p90_ttlt": 125,
+        "tput_per_gpu": 6510,
+        "output_tput_per_gpu": 700
+      },
       "date": "2026-07-18",
       "run_url": null
     }

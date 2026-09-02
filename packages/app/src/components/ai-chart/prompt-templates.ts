@@ -7,6 +7,7 @@ import {
   HW_REGISTRY,
 } from '@semianalysisai/inferencex-constants';
 import { Y_AXIS_METRICS } from '@/lib/chart-utils';
+import type { Locale } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Derived enum strings (built once at import time)
@@ -32,7 +33,15 @@ const Y_METRIC_LIST = Y_AXIS_METRICS.map((m) => `${m}`).join(', ');
  * System prompt for the LLM that parses user natural language into AiChartSpec(s).
  * Domain context is derived from shared constants so it stays in sync automatically.
  */
-export function buildParsePrompt(): string {
+export function buildParsePrompt(locale: Locale = 'en'): string {
+  const localeInstruction =
+    locale === 'zh'
+      ? `
+
+## Presentation Language
+
+Write title, description, and yAxisLabel in natural Simplified Chinese. Keep identifiers, model names, hardware SKUs, and units unchanged. JSON keys and enum values must remain exactly as specified below.`
+      : '';
   return `You are InferenceX's chart generation assistant. Parse natural language into chart specs.
 
 ## What InferenceX Is
@@ -104,7 +113,7 @@ Be generous with name matching: "deepseek r1" / "DSR1" / "deepseek" → DeepSeek
 
 ## Output
 
-Return ONLY valid JSON. No markdown, no preamble, no explanation.
+Return ONLY valid JSON. No markdown, no preamble, no explanation.${localeInstruction}
 
 Single chart object or array of 2 for comparisons:
 {
@@ -131,7 +140,12 @@ Single chart object or array of 2 for comparisons:
 export function buildSummaryPrompt(
   specs: { title: string; yAxisLabel: string; model: string; sequence: string }[],
   dataDescription: string,
+  locale: Locale = 'en',
 ): string {
+  const localeInstruction =
+    locale === 'zh'
+      ? '- 用自然、准确的简体中文回答；保留模型名、硬件 SKU、指标缩写、数字和单位。\n'
+      : '';
   const specSummary = specs
     .map(
       (s) => `Chart: ${s.title} | Metric: ${s.yAxisLabel} | Model: ${s.model}, Seq: ${s.sequence}`,
@@ -148,5 +162,5 @@ ${dataDescription}
 Rules:
 - Be technical and precise. Mention specific values and percentage differences.
 - Focus on the most interesting comparison or finding.
-- No markdown formatting, just plain text.`;
+${localeInstruction}- No markdown formatting, just plain text.`;
 }

@@ -8,15 +8,17 @@ import type {
   SpecMode,
 } from '@/components/inference/types';
 import { frameworkFamily } from '@/lib/framework-family';
+import type { PowerTier } from '@/lib/power-tier';
 
-export type { AvailableQuickFilters, DeploymentMode, QuickFilters, SpecMode };
+export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
 /** Vendor display order for the quick-filter pills. */
 const VENDOR_ORDER = ['NVIDIA', 'AMD'];
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,
- * serving framework, deployment mode, and speculative-decoding method without
+ * serving framework, deployment mode, speculative-decoding method, and
+ * measured-power certification tier without
  * touching the legend or GPU-config selectors. They are coarse pre-filters
  * applied to the point set (official + unofficial-run overlay), so the legend,
  * rooflines, and Pareto all reflect only the matching configs.
@@ -31,7 +33,11 @@ export const EMPTY_QUICK_FILTERS: QuickFilters = {
   frameworks: [],
   deployment: [],
   spec: [],
+  power: [],
 };
+
+/** Measured-power tier display order for the quick-filter pills. */
+const POWER_TIER_ORDER: readonly PowerTier[] = ['certified', 'legacy'];
 
 /**
  * Serving-framework families surfaced as quick filters, in display order. Each
@@ -63,6 +69,8 @@ export function computeAvailableQuickFilters(
   let hasDisagg = false;
   let hasMtp = false;
   let hasStp = false;
+  let hasCertified = false;
+  let hasLegacy = false;
   for (const p of points) {
     const vendor = pointVendor(String(p.hwKey));
     if (vendor) vendors.add(vendor);
@@ -74,6 +82,8 @@ export function computeAvailableQuickFilters(
     else hasSingleNode = true;
     if (pointSpecMode(p) === 'mtp') hasMtp = true;
     else hasStp = true;
+    if (p.power_tier === 'certified') hasCertified = true;
+    else if (p.power_tier === 'legacy') hasLegacy = true;
   }
   const deployment: DeploymentMode[] = [];
   if (hasSingleNode) deployment.push('single-node');
@@ -87,13 +97,18 @@ export function computeAvailableQuickFilters(
     frameworks: FRAMEWORK_FAMILY_ORDER.filter((f) => frameworks.has(f)),
     deployment,
     spec,
+    power: POWER_TIER_ORDER.filter((tier) => (tier === 'certified' ? hasCertified : hasLegacy)),
   };
 }
 
 /** True when at least one category constrains the point set. */
 export function quickFiltersActive(f: QuickFilters): boolean {
   return (
-    f.vendors.length > 0 || f.frameworks.length > 0 || f.deployment.length > 0 || f.spec.length > 0
+    f.vendors.length > 0 ||
+    f.frameworks.length > 0 ||
+    f.deployment.length > 0 ||
+    f.spec.length > 0 ||
+    f.power.length > 0
   );
 }
 
@@ -133,6 +148,13 @@ export function parseDeploymentModes(values: readonly string[]): DeploymentMode[
   );
 }
 
+/** Parse `i_power` URL values, deduping and dropping unknown strings. */
+export function parsePowerTiers(values: readonly string[]): PowerTier[] {
+  return [...new Set(values)].filter(
+    (tier): tier is PowerTier => tier === 'certified' || tier === 'legacy',
+  );
+}
+
 /** Whether a single data point satisfies every active quick-filter category. */
 export function matchesQuickFilters(point: InferenceData, f: QuickFilters): boolean {
   if (f.vendors.length > 0) {
@@ -145,6 +167,10 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
   }
   if (f.deployment.length > 0 && !f.deployment.includes(pointDeploymentMode(point))) return false;
   if (f.spec.length > 0 && !f.spec.includes(pointSpecMode(point))) return false;
+  if (f.power.length > 0) {
+    const tier = point.power_tier;
+    if (!tier || !f.power.includes(tier)) return false;
+  }
   return true;
 }
 

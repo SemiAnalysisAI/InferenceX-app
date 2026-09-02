@@ -19,6 +19,7 @@ describe('Current InferenceX Image localized routes', () => {
       disagg: false,
       isl: 1024,
       osl: 1024,
+      benchmark_type: 'single_turn',
       image: 'lmsysorg/sglang:v0.5.2',
       date: today,
     },
@@ -31,8 +32,22 @@ describe('Current InferenceX Image localized routes', () => {
       disagg: false,
       isl: 1024,
       osl: 1024,
+      benchmark_type: 'single_turn',
       image: 'vllm/vllm-openai:v0.10.1',
       date: today,
+    },
+    {
+      model: 'dsr1',
+      hardware: 'h200',
+      framework: 'sglang',
+      precision: 'fp8',
+      spec_method: 'none',
+      disagg: false,
+      isl: null,
+      osl: null,
+      benchmark_type: 'agentic_traces',
+      image: 'lmsysorg/sglang:v0.5.2',
+      date: '2026-08-01', // 22 days before fixedNow — past the 14-day AgentX budget.
     },
   ];
 
@@ -161,6 +176,34 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
       .should('include', '/zh/current-inferencex-image');
+  });
+
+  it('labels agentic rows as Agentic (never null/null) and flags stale AgentX submissions', () => {
+    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
+    cy.intercept('GET', '**/api/v1/framework-releases', {
+      sglang: 'v0.5.2',
+      vllm: 'v0.10.1',
+    });
+    cy.visit('/current-inferencex-image');
+    cy.get('#image-sequence-select').click();
+    cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
+    cy.get('[data-slot="select-item"]').contains('Agentic').click();
+    // The AgentX row is 22 days old — past the two-week budget — so it must be
+    // tinted stale even though its image tag matches the latest release.
+    cy.get('table').should('contain.text', '22d');
+    cy.get('td[title^="Last submission: 2026-08-01"]')
+      .should('have.length', 1)
+      .and('have.attr', 'style')
+      .and('match', /oklch/u);
+  });
+
+  it('labels agentic rows with the reviewed Chinese scenario copy', () => {
+    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
+    cy.intercept('GET', '**/api/v1/framework-releases', {});
+    visitCurrentImage();
+    cy.get('#image-sequence-select').click();
+    cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
+    cy.get('[data-slot="select-item"]').contains('智能体').should('be.visible');
   });
 
   it('supports the filter-to-table path at 1440px', () => {

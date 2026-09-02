@@ -78,4 +78,23 @@ describe('API documentation', () => {
       .should('have.attr', 'href', '/zh/api')
       .and('have.text', 'API 文档');
   });
+
+  it('keeps wide schemas locally scrollable without overflowing the Chinese mobile page', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/api');
+
+    cy.get('section[aria-labelledby="api-schemas-heading"] > dl > div')
+      .should('be.visible')
+      .find('.overflow-x-auto')
+      .then(($scrollers) => {
+        expect(
+          [...$scrollers].some((scroller) => scroller.scrollWidth > scroller.clientWidth),
+        ).to.equal(true);
+      });
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(
+        document.documentElement.clientWidth,
+      );
+    });
+  });
 });

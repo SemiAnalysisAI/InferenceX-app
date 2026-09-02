@@ -326,8 +326,11 @@ export interface LatestImageRow {
   precision: string;
   spec_method: string;
   disagg: boolean;
-  isl: number;
-  osl: number;
+  /** Null for agentic (AgentX) rows — the trace replay has no fixed sequence lengths. */
+  isl: number | null;
+  osl: number | null;
+  /** `single_turn` for fixed-sequence rows, `agentic_traces` for AgentX rows. */
+  benchmark_type: string;
   image: string;
   date: string;
 }

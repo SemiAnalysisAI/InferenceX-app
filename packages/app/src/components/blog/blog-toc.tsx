@@ -4,11 +4,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '@/lib/analytics';
 import type { TocHeading } from '@/lib/blog';
+import type { Locale } from '@/lib/i18n';
+
+const STRINGS = {
+  en: {
+    defaultLabel: 'On this page',
+    tableOfContents: 'Table of contents',
+    clickToExpand: '(click to expand)',
+  },
+  zh: {
+    defaultLabel: '本页目录',
+    tableOfContents: '本页目录',
+    clickToExpand: '（点击展开）',
+  },
+} as const;
 
 interface BlogTocProps {
   headings: TocHeading[];
   /** Heading label, e.g. '本页目录' on Chinese pages. */
   label?: string;
+  locale?: Locale;
 }
 
 function handleClick(heading: TocHeading) {
@@ -19,7 +34,9 @@ function handleClick(heading: TocHeading) {
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
-export function BlogToc({ headings, label = 'On this page' }: BlogTocProps) {
+export function BlogToc({ headings, label, locale = 'en' }: BlogTocProps) {
+  const t = STRINGS[locale];
+  const displayLabel = label ?? t.defaultLabel;
   const [activeId, setActiveId] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -141,9 +158,10 @@ export function BlogToc({ headings, label = 'On this page' }: BlogTocProps) {
     <>
       {/* Inline: when sidebar doesn't fit */}
       {!showSidebar && (
-        <details aria-label="Table of contents">
+        <details aria-label={t.tableOfContents}>
           <summary className="text-sm font-medium cursor-pointer">
-            {label} <span className="text-muted-foreground font-normal">(click to expand)</span>
+            {displayLabel}{' '}
+            <span className="text-muted-foreground font-normal">{t.clickToExpand}</span>
           </summary>
           <div className="mt-2">{list}</div>
         </details>
@@ -160,9 +178,9 @@ export function BlogToc({ headings, label = 'On this page' }: BlogTocProps) {
               top: Math.max(32, sectionTopRef.current - window.scrollY),
               scrollbarWidth: 'none',
             }}
-            aria-label="Table of contents"
+            aria-label={t.tableOfContents}
           >
-            <p className="text-sm font-medium mb-2">{label}</p>
+            <p className="text-sm font-medium mb-2">{displayLabel}</p>
             {list}
           </nav>,
           document.body,

@@ -126,7 +126,7 @@ const entries = [
   {
     slug: 'agentic-coding-workload',
     term: 'Agentic coding workload',
-    aliases: ['coding-agent workload', 'software-engineering agent workload'],
+    aliases: ['agentic coding', 'coding-agent workload', 'software-engineering agent workload'],
     category: 'Agentic inference',
     plainEnglish:
       'This is the request pattern created when a coding agent reads a repository, edits code, runs tools, and revisits the model until the task is done.',
@@ -559,7 +559,7 @@ const entries = [
   {
     slug: 'kv-cache',
     term: 'KV cache',
-    aliases: ['key-value cache', 'attention cache'],
+    aliases: ['KVCache', 'KV caching', 'key-value cache', 'attention cache'],
     category: 'Serving',
     plainEnglish:
       'The KV cache is the model’s working memory for the current conversation. It keeps useful notes and avoids rereading everything for every new token.',
@@ -1235,21 +1235,101 @@ const entries = [
   },
   {
     slug: 'kv-cache-offload',
-    term: 'KV cache offload',
-    aliases: ['CPU offload', 'KV offloading'],
+    term: 'KV cache offloading',
+    aliases: ['KV cache offload', 'KV offloading', 'KV cache tiering'],
     category: 'Serving',
     plainEnglish:
-      'KV cache offload parks attention state the chips cannot hold in host memory, so a long session can be resumed instead of recomputed.',
+      'KV cache offloading parks attention state the chips cannot hold in host memory, so a long session can be resumed instead of recomputed.',
     definition:
-      'KV cache offload moves KV blocks out of accelerator memory into a slower tier, usually host DRAM, and loads them back when a later request reuses that prefix.',
+      'KV cache offloading moves KV blocks out of accelerator memory into a slower tier, host DRAM first and NVMe below it, and loads them back when a later request reuses that prefix.',
     explanation:
       'Offload is usually a write-through cache: a prefix written to the HBM cache is also written to the slower tier, so it helps most when the offload pool is roughly one and a half to three times HBM capacity. Reloading a long prefix beats recomputing it by a wide margin at agentic context lengths, but the arithmetic reverses for short prompts, where the transfer costs more than the prefill it avoids.',
     significance:
       'Long agentic sessions exceed HBM KV capacity well before they exceed a plausible DRAM budget, so offload decides how many concurrent conversations stay resumable. It also shifts the bottleneck: once prefixes survive, store and load paths, transfer batching, and index bookkeeping become the costs worth optimizing.',
     benchmarkContext:
       'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Offload is an allowed but optional optimization, so a single curve can mix points with and without it.',
-    relatedTerms: ['kv-cache', 'prefix-caching', 'kv-cache-manager', 'high-bandwidth-memory'],
+    relatedTerms: [
+      'kv-cache',
+      'prefix-caching',
+      'cpu-offloading',
+      'nvme-offloading',
+      'kv-cache-manager',
+      'high-bandwidth-memory',
+    ],
     articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300],
+  },
+  {
+    slug: 'cpu-offloading',
+    term: 'CPU offloading',
+    aliases: ['CPU offload', 'DRAM offloading', 'host memory offloading'],
+    category: 'Serving',
+    plainEnglish:
+      'CPU offloading spills KV cache the accelerators cannot hold into the host machine DRAM, so long conversations resume from memory instead of being recomputed from scratch.',
+    definition:
+      'CPU offloading stores reusable KV cache blocks in host CPU DRAM instead of accelerator HBM and loads them back over the host link when a later request reuses that prefix.',
+    explanation:
+      'In inference serving the term almost always means KV cache offloading to DRAM, distinct from the training-side practice of parking weights or optimizer state on the CPU. Engines reach DRAM through connectors such as the vLLM CPU offloading connectors, LMCache, SGLang HiCache, Mooncake Store, and Dynamo KVBM. The pool is usually write-through, so it pays off when host DRAM for offload is roughly 1.5 to 3 times HBM KV capacity, and transfer efficiency decides the rest: AMD vLLM could not batch GPU-to-CPU copies before hipMemcpyBatchAsync landed in ROCm 7.14, which made its CPU offload path far less useful than the same feature on NVIDIA.',
+    significance:
+      'DRAM offloading decides how many concurrent agent sessions stay resumable once their combined KV working set exceeds HBM. It is not free capacity: at high concurrency, heavy reliance on the DRAM tier adds reload traffic that can push interactivity below acceptable levels, so the useful question is when the tier helps rather than whether it exists.',
+    benchmarkContext:
+      'AgentX treats CPU KV offloading as an allowed, optional optimization. Offload DRAM must scale with the fraction of GPUs used, with a 3 TB cap for systems without standardized DRAM configurations. Points that used offload are ringed with a dashed halo, and the point detail view reports the offload backend plus HBM and CPU cache hit rates.',
+    relatedTerms: [
+      'kv-cache-offload',
+      'nvme-offloading',
+      'kv-cache-manager',
+      'kv-cache',
+      'high-bandwidth-memory',
+    ],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_DSV4_B200_B300],
+  },
+  {
+    slug: 'nvme-offloading',
+    term: 'NVMe offloading',
+    aliases: ['NVMe offload', 'SSD offloading', 'flash KV cache offload'],
+    category: 'Serving',
+    plainEnglish:
+      'NVMe offloading extends the KV cache one tier further, onto local SSDs, so prefixes that no longer fit in GPU or CPU memory can still be reloaded later.',
+    definition:
+      'NVMe offloading stores reusable KV cache blocks on NVMe SSDs beneath the HBM and host DRAM tiers, trading slower reloads for a much larger retrievable KV working set.',
+    explanation:
+      'Each step down the memory hierarchy multiplies capacity and divides bandwidth, so the SSD tier only pays off when reloading a long prefix still beats recomputing it. KV cache managers such as LMCache and Mooncake Store already support local NVMe backends alongside DRAM and remote storage. The tier helps most when the reuse working set exceeds any plausible DRAM budget or when sessions return after idle gaps long enough that DRAM eviction has already discarded them.',
+    significance:
+      'NVMe offloading effectively lengthens cache lifetime for long-lived agent sessions, which matters as agents wait on tools, humans, or CI for minutes at a time. It is workload dependent: a high-concurrency deployment where DRAM offloading already degrades latency will not be rescued by an even slower tier, because the bottleneck is reload bandwidth rather than capacity.',
+    benchmarkContext:
+      'AgentX v1 measures HBM and DRAM tiers and defers NVMe offloading, with SSD/NVMe KV offloading planned as a fast follow to grow the working set beyond DRAM. The current 5 minute idle cap on replayed streams may rise alongside it so that longer cache lifetimes become measurable.',
+    relatedTerms: [
+      'kv-cache-offload',
+      'cpu-offloading',
+      'kv-cache-manager',
+      'kv-cache',
+      'prefix-cache-hit-rate',
+    ],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'long-context',
+    term: 'Long context',
+    aliases: ['long-context inference', 'long-context serving', 'long context length'],
+    category: 'Serving',
+    plainEnglish:
+      'Long context means the model is working over a very large amount of conversation, code, or documents at once, which stresses memory far more than raw compute.',
+    definition:
+      'Long context describes inference where prompts and accumulated conversation history reach tens or hundreds of thousands of tokens, so KV cache capacity, memory bandwidth, and cache reuse dominate serving behavior.',
+    explanation:
+      'KV cache size grows with every token in context, and prefill cost grows even faster, so long-context traffic drains HBM well before compute runs out. Coding agents are the canonical source: each turn appends files, tool output, and earlier responses to a session that can span hours. Model architectures respond with sliding window, latent, linear, and sparse attention, while serving stacks respond with prefix caching, KV cache offloading to DRAM and NVMe, and context parallelism.',
+    significance:
+      'Hardware and engine rankings measured on short fixed sequences do not transfer to long-context traffic, because the binding constraint shifts from arithmetic throughput to KV capacity and movement. Concurrency limits appear as capacity cliffs, and the systems that handle them define whether agents, retrieval pipelines, and document analysis are economical to serve.',
+    benchmarkContext:
+      'InferenceX covers long context from both directions: fixed sequence scenarios pin lengths such as 8K in and 1K out, while AgentX replays multi-turn coding sessions whose contexts grow turn by turn toward realistic agent working sets, sweeping concurrency across the HBM capacity cliff.',
+    relatedTerms: [
+      'context-window',
+      'kv-cache',
+      'kv-cache-offload',
+      'agentic-coding-workload',
+      'sparse-attention',
+      'context-parallelism',
+    ],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENTX_V3, KIMI_K3],
   },
   {
     slug: 'kv-cache-manager',
@@ -1972,7 +2052,7 @@ const entries = [
   {
     slug: 'context-window',
     term: 'Context window',
-    aliases: ['context length', 'max sequence length', 'long context'],
+    aliases: ['context length', 'max sequence length'],
     category: 'Model architecture',
     plainEnglish:
       'The context window is the maximum number of tokens a model can consider at once, covering both the input and everything generated so far.',
@@ -1985,6 +2065,7 @@ const entries = [
     benchmarkContext:
       'InferenceX covers the window from both directions: fixed sequence scenarios pin input and output lengths such as 8K in and 1K out, while AgentX replays sessions whose contexts grow turn by turn toward realistic agent working sets.',
     relatedTerms: [
+      'long-context',
       'kv-cache',
       'input-output-sequence-length',
       'sliding-window-attention',

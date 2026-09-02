@@ -40,7 +40,7 @@
     "@semianalysisai/inferencex-constants": "workspace:*",
     "postgres": "^3.4.9",
     "stream-chain": "^4.2.5",
-    "stream-json": "^3.5.0"
+    "stream-json": "^3.6.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
