@@ -61,7 +61,7 @@ describe('Y-Axis Metrics All Render Data', () => {
   metrics.forEach((label) => {
     it(`"${label}" renders scatter points without extra interaction`, () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.get('[role="option"]').contains(label).click({ force: true });
+      cy.get('[data-slot="select-item"]').contains(label).click({ force: true });
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')

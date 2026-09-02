@@ -1,6 +1,16 @@
 import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
 
+function openYAxisHelp(metric: string) {
+  cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
+    if ($toggle.is(':visible') && $toggle.attr('aria-expanded') === 'false') {
+      cy.wrap($toggle).click();
+    }
+  });
+  cy.get('[data-testid="yaxis-metric-selector"]').click();
+  cy.get(`[data-testid="option-help-${metric}"]`).scrollIntoView().click();
+}
+
 describe('Inference Chart', () => {
   before(() => {
     cy.viewport(1440, 900);
@@ -155,9 +165,8 @@ describe('Inference Chart', () => {
       'have.length.greaterThan',
       0,
     );
-    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
-    cy.get('[data-testid^="axis-metric-body-y-"]')
-      .first()
+    openYAxisHelp('y_tokenRevenuePerGpuHour');
+    cy.get('[data-testid="option-help-content-y_tokenRevenuePerGpuHour"]')
       .should('contain.text', 'OpenRouter')
       .and('contain.text', 'Agentic cache hit combines GPU and external cache')
       .and('contain.text', 'A partially measured cache frontier receives no cache discount.')
@@ -197,9 +206,8 @@ describe('Inference Chart', () => {
       'have.length.greaterThan',
       0,
     );
-    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
-    cy.get('[data-testid^="axis-metric-body-y-"]')
-      .first()
+    openYAxisHelp('y_tokensPerDollarN');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
       .should('contain.text', 'infrastructure spend')
       .and('contain.text', 'Neocloud Giant')
       .and('contain.text', 'all-in cost per chip-hour');
@@ -255,9 +263,8 @@ describe('Inference Chart', () => {
       .first()
       .find('h2')
       .should('contain.text', '按 OpenRouter 价格计算的每 GPU 小时 token 收入');
-    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
-    cy.get('[data-testid^="axis-metric-body-y-"]')
-      .first()
+    openYAxisHelp('y_tokenRevenuePerGpuHour');
+    cy.get('[data-testid="option-help-content-y_tokenRevenuePerGpuHour"]')
       .should(
         'contain.text',
         '已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加',
@@ -290,9 +297,8 @@ describe('Inference Chart', () => {
       'have.length.greaterThan',
       0,
     );
-    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
-    cy.get('[data-testid^="axis-metric-body-y-"]')
-      .first()
+    openYAxisHelp('y_tokensPerDollarN');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
       .should('contain.text', '基础设施开支')
       .and('contain.text', 'Neocloud Giant')
       .and('contain.text', '每芯片小时全包成本');

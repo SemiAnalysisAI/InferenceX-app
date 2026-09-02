@@ -170,7 +170,7 @@ export function selectXAxisMode(
   openXAxisMenu();
   cy.get(`[data-testid="x-axis-mode-${mode}"]`).click();
   cy.get('[data-testid="x-axis-mode-selector"]')
-    .should('have.attr', 'data-mode', mode)
+    .should('have.attr', 'data-value', mode)
     .and('have.attr', 'aria-expanded', 'false');
   if (label) cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', label);
 }

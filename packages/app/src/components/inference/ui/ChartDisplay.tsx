@@ -9,8 +9,7 @@ import chartDefinitions, {
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
-import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -93,7 +92,9 @@ import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegen
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 
-import AxisMetricFooter from './AxisMetricFooter';
+import ChartNotices from './ChartNotices';
+import { MetricExplanation } from './MetricExplanation';
+import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -792,24 +793,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-            // Which logical metric the x-axis plots right now. Classify off
-            // the field `resolveXAxisField` resolves for this chart's current
-            // state — the same resolver both chart pipelines plot with — so
-            // the footer always matches the drawn axis (e.g. an input metric
-            // without a `*_x` override keeps the natural interactivity x).
-            // Trace-derived agentic modes bypass that resolver, hence the flag.
-            const footerXAxisKind = resolveXAxisKind(graph.chartDefinition.chartType, {
-              xAxisField: resolveXAxisField(
-                graph.chartDefinition,
-                selectedYAxisMetric,
-                graph.chartDefinition.chartType === 'e2e'
-                  ? selectedE2eXAxisMetric
-                  : selectedXAxisMetric,
-                { isAgentic: isAgenticSequence, percentile: selectedPercentile },
-              ).xAxisField,
-              isDerivedNormalizedInteractivity: Boolean(derivedSpec),
-            });
-            // Notices for the axis-metric info footer: the KV-offload halo
+            // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
             // official points plus any loaded unofficial-run overlay for
@@ -959,61 +943,79 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {(() => {
                       const chartCaption = (
                         <>
-                          <Heading as="h2" level="card">
-                            {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
-                            {(() => {
-                              // For Input metrics with dynamic x-axis, use dynamic heading.
-                              // Classify off the ENGLISH title — the localized one has no
-                              // 'input' substring to match on zh pages.
-                              const isInputMetric = metricTitle(
-                                graph.chartDefinition,
-                                selectedYAxisMetric,
-                                'en',
-                              )
-                                .toLowerCase()
-                                .includes('input');
-                              if (
-                                graph.chartDefinition.chartType === 'interactivity' &&
-                                isInputMetric &&
-                                selectedXAxisMetric
-                              ) {
-                                if (selectedXAxisMetric === 'p99_ttft') {
-                                  return t.vsTtft('P99');
-                                } else if (selectedXAxisMetric === 'median_ttft') {
-                                  return t.vsTtft('Median');
+                          <div className="flex items-start gap-1">
+                            <Heading as="h2" level="card">
+                              {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
+                              {(() => {
+                                // For Input metrics with dynamic x-axis, use dynamic heading.
+                                // Classify off the ENGLISH title — the localized one has no
+                                // 'input' substring to match on zh pages.
+                                const isInputMetric = metricTitle(
+                                  graph.chartDefinition,
+                                  selectedYAxisMetric,
+                                  'en',
+                                )
+                                  .toLowerCase()
+                                  .includes('input');
+                                if (
+                                  graph.chartDefinition.chartType === 'interactivity' &&
+                                  isInputMetric &&
+                                  selectedXAxisMetric
+                                ) {
+                                  if (selectedXAxisMetric === 'p99_ttft') {
+                                    return t.vsTtft('P99');
+                                  } else if (selectedXAxisMetric === 'median_ttft') {
+                                    return t.vsTtft('Median');
+                                  }
                                 }
-                              }
 
-                              // The e2e chart heading follows the branch-level x-axis
-                              // mode selector.
-                              if (graph.chartDefinition.chartType === 'e2e') {
-                                const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
-                                if (modeSpec) {
-                                  const heading =
-                                    locale === 'zh' && modeSpec.headingZh
-                                      ? modeSpec.headingZh
-                                      : modeSpec.heading;
-                                  return heading(selectedPercentile.toUpperCase());
+                                // The e2e chart heading follows the branch-level x-axis
+                                // mode selector.
+                                if (graph.chartDefinition.chartType === 'e2e') {
+                                  const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
+                                  if (modeSpec) {
+                                    const heading =
+                                      locale === 'zh' && modeSpec.headingZh
+                                        ? modeSpec.headingZh
+                                        : modeSpec.heading;
+                                    return heading(selectedPercentile.toUpperCase());
+                                  }
+                                  if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
+                                    const percentile = selectedE2eXAxisMetric.replace(
+                                      /_ttft$/u,
+                                      '',
+                                    );
+                                    const word =
+                                      percentile === 'median' ? 'Median' : percentile.toUpperCase();
+                                    return t.vsTtft(word);
+                                  }
+                                  return isAgenticSequence
+                                    ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                    : t.vsE2eLatency();
                                 }
-                                if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
-                                  const percentile = selectedE2eXAxisMetric.replace(/_ttft$/u, '');
-                                  const word =
-                                    percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                  return t.vsTtft(word);
-                                }
-                                return isAgenticSequence
-                                  ? t.vsE2eLatency(selectedPercentile.toUpperCase())
-                                  : t.vsE2eLatency();
-                              }
 
-                              // Fall back to configured heading
-                              const configured =
-                                graph.chartDefinition[
-                                  `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                                ] || graph.chartDefinition.heading;
-                              return locale === 'zh' ? zhHeading(String(configured)) : configured;
-                            })()}
-                          </Heading>
+                                // Fall back to configured heading
+                                const configured =
+                                  graph.chartDefinition[
+                                    `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
+                                  ] || graph.chartDefinition.heading;
+                                return locale === 'zh' ? zhHeading(String(configured)) : configured;
+                              })()}
+                            </Heading>
+                            {embedded && (
+                              <OptionInfo
+                                label={metricRowLabel(
+                                  selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+                                  locale,
+                                )}
+                                value={selectedYAxisMetric}
+                              >
+                                <MetricExplanation
+                                  metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}
+                                />
+                              </OptionInfo>
+                            )}
+                          </div>
                           <ResultContext
                             locale={locale}
                             model={getModelLabel(graph.model as Model)}
@@ -1145,13 +1147,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
-                    <AxisMetricFooter
-                      chartId={`chart-${graphIndex}`}
-                      metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}
-                      xAxisKind={footerXAxisKind}
-                      xAxisLabel={graph.chartDefinition.x_label}
-                      notices={footerNotices}
-                    />
+                    <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
                     {replayAvailable && (
                       <ReplayLauncher
                         ref={(handle) => {

@@ -249,6 +249,9 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP8').click();
+    // Wait for Radix's closing focus handoff before opening the next menu.
+    // Firefox can otherwise restore focus to EP after Kernel mode has opened.
+    cy.get('[data-testid="collectivex-ep-select"]').should('have.focus');
     cy.get('[data-testid="collectivex-mode-select"]').click();
     cy.get('[role="listbox"] [aria-selected="true"]').should('have.length', 2);
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);

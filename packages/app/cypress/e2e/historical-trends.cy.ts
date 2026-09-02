@@ -145,12 +145,12 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 1);
+    cy.get('[data-select-option]').should('have.length.greaterThan', 1);
 
     cy.get('[data-testid="yaxis-metric-selector"]')
       .invoke('text')
       .then((initialText) => {
-        cy.get('[role="option"]').eq(2).click();
+        cy.get('[data-select-option]').eq(2).click();
         cy.get('[data-testid="yaxis-metric-selector"]')
           .invoke('text')
           .should('not.eq', initialText.trim());

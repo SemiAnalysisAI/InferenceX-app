@@ -30,7 +30,9 @@ describe('Tokens per currency and agentic controls', () => {
   it('reveals the token sale price source once Token Revenue per GPU Hour is selected', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('[role="option"]').contains('Token Revenue per GPU Hour').click({ force: true });
+    cy.get('[data-slot="select-item"]')
+      .contains('Token Revenue per GPU Hour')
+      .click({ force: true });
     cy.get('[data-testid="token-revenue-price-source"]').should('contain.text', 'Normalized');
   });
 
@@ -45,7 +47,7 @@ describe('Tokens per currency and agentic controls', () => {
   it('offers the same quantities priced in yuan', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('[role="option"]')
+    cy.get('[data-slot="select-item"]')
       .contains('Total Tokens per ¥1 TCO (Owning - Hyperscaler)')
       .click({ force: true });
     cy.get('[data-testid="scatter-graph"]')

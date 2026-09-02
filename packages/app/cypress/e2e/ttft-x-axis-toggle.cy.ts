@@ -145,12 +145,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', 'Interactivity');
     cy.get('[data-testid="x-axis-mode-buttons"]').should('not.exist');
     openXAxisMenu();
-    cy.get('[role="listbox"] [role="option"]').should('have.length', 4);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
       .should('have.text', 'E2E Normalized Interactivity')
-      .and('have.attr', 'aria-selected', 'false');
+      .and('have.attr', 'aria-pressed', 'false');
     cy.get('[data-testid="x-axis-mode-interactivity"]')
-      .should('have.attr', 'aria-selected', 'true')
+      .should('have.attr', 'aria-pressed', 'true')
       .click();
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="chart-figure"] svg').should(
@@ -159,14 +159,22 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('keeps the normalized-interactivity explanation in the X-axis help', () => {
-    cy.get('[aria-label="Help: X-Axis Metric"]').click();
+  it('explains normalized interactivity inside its option without changing the axis', () => {
+    openXAxisMenu();
+    cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').click();
     cy.get('[role="dialog"] [data-testid="normalized-interactivity-faq-link"]')
       .should('be.visible')
       .and('have.attr', 'href', '/about#faq-normalized-interactivity')
       .and('have.text', 'What does E2E Normalized Interactivity mean?');
-    cy.get('[role="dialog"]').should('contain.text', 'Time To First Token');
-    cy.get('[role="dialog"]').type('{esc}');
+    cy.get('[data-testid="option-help-content-e2e-normalized-interactivity"]')
+      .should('contain.text', 'output tokens divided by end-to-end latency')
+      .type('{esc}');
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').type('{esc}');
     cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
   });
 
@@ -183,7 +191,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
     cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
@@ -198,7 +206,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // The key lives in the axis-metric info footer (a `no-export` sibling of
     // the chart), so the PNG export clone — built from #chart-0 — carries the
     // halo decoration itself but not the textual key.
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]').should(
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
       'be.visible',
     );
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
@@ -236,7 +244,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    expandLegendAdvanced();
+    cy.get('[data-testid="legend-advanced-toggle"]').first().click({ scrollBehavior: 'center' });
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
@@ -291,7 +299,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').type('{esc}');
     cy.get('[data-testid="x-axis-mode-selector"]')
-      .should('have.attr', 'data-mode', 'ttft')
+      .should('have.attr', 'data-value', 'ttft')
       .and('have.focus');
   });
 
@@ -337,7 +345,7 @@ describe('X-axis mode URL param', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="x-axis-mode-selector"]')
-      .should('have.attr', 'data-mode', 'ttft')
+      .should('have.attr', 'data-value', 'ttft')
       .and('contain.text', 'TTFT');
     // Assert on the rendered chart too: the clobber happened one tick after
     // the buttons first painted, so a button-only check could pass too early.
@@ -434,7 +442,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     selectXAxisMode('ttft', 'TTFT');
     openXAxisMenu();
     cy.get('[data-testid="x-axis-mode-interactivity"]').focus().type('{esc}');
-    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-mode', 'ttft');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
@@ -442,7 +450,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k');
     openXAxisMenu();
-    cy.get('[role="listbox"] [role="option"]').should('have.length', 3);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
@@ -568,7 +576,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
   });

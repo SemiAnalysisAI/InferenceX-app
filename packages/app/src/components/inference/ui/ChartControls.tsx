@@ -34,7 +34,11 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
-import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
+import {
+  METRIC_CONTROL_GROUPS,
+  METRIC_REGISTRY,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
   formatTokenPrice,
@@ -42,6 +46,7 @@ import {
 } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
+import { MetricExplanation } from './MetricExplanation';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -218,6 +223,7 @@ export default function ChartControls({
             .filter((m) => METRIC_TITLE_MAP.has(m))
             .map((m) => ({
               value: m,
+              help: <MetricExplanation metricKey={m.replace(/^y_/u, '') as MetricKey} />,
               label:
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,

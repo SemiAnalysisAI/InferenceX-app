@@ -24,15 +24,15 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.contains('[data-slot="select-content"]', 'Measured Energy')
       .scrollIntoView()
       .should('be.visible');
-    cy.contains('[role="option"]', 'Measured Average Power per Chip')
+    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
       .scrollIntoView()
       .should('be.visible');
-    cy.contains('[role="option"]', 'Measured Joules per Output Token')
+    cy.contains('[data-slot="select-item"]', 'Measured Joules per Output Token')
       .scrollIntoView()
       .should('be.visible');
 
     // Select the power option
-    cy.contains('[role="option"]', 'Measured Average Power per Chip').click();
+    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').click();
     cy.get('[data-slot="select-content"]').should('not.exist');
 
     // Initial-load screenshot
@@ -46,7 +46,7 @@ describe('Measured power on unofficial-run overlay', () => {
 
   it('switches to Measured Joules per Output Token without errors', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Measured Joules per Output Token').click();
+    cy.contains('[data-slot="select-item"]', 'Measured Joules per Output Token').click();
     cy.get('[data-slot="select-content"]').should('not.exist');
     cy.screenshot('measured-joules-selected', { capture: 'viewport' });
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');

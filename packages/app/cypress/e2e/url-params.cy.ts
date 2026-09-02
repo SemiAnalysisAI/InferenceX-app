@@ -87,7 +87,7 @@ describe('URL Parameter Persistence', () => {
           cy.get(selector).should('not.be.checked');
 
           cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-          cy.contains('[role="option"]', 'All-in Provisioned Joules per Total Token').click({
+          cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
             force: true,
           });
           cy.get(selector).should('not.be.checked');
@@ -115,7 +115,7 @@ describe('URL Parameter Persistence', () => {
         .then((before) => {
           cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
           cy.contains(
-            '[role="option"]',
+            '[data-select-option]',
             'Cost per Million Total Tokens (Owning - Hyperscaler)',
           ).click({ force: true });
 
@@ -195,7 +195,10 @@ describe('URL Parameter Persistence', () => {
         .should('contain.text', 'Total Tokens per $1 TCO');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+      cy.contains(
+        '[data-select-option]',
+        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+      ).click({
         force: true,
       });
 
@@ -230,7 +233,7 @@ describe('URL Parameter Persistence', () => {
     it('selecting a Y-axis metric updates the displayed value', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.get('[role="option"]')
+      cy.get('[data-select-option]')
         .eq(1)
         .then(($option) => {
           const optionText = $option.text().trim();
@@ -246,7 +249,7 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'All-in Provisioned Joules per Total Token').click({
+      cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
         force: true,
       });
 
@@ -296,7 +299,7 @@ describe('URL Parameter Persistence', () => {
         });
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Input Token Throughput per Chip').click({ force: true });
+      cy.contains('[data-select-option]', 'Input Token Throughput per Chip').click({ force: true });
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
         'Input Token Throughput per Chip',

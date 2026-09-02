@@ -1,3 +1,5 @@
+import 'cypress-axe';
+import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
@@ -40,7 +42,7 @@ describe('Inference ChartControls', () => {
   it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
     // "Throughput per GPU" is the label for y_tpPerGpu — pick a different one
-    cy.contains('[role="option"]', 'Output Token Throughput per Chip').click();
+    cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
   });
 
@@ -63,9 +65,9 @@ describe('Inference ChartControls', () => {
     for (const option of options) {
       cy.get('[data-testid="yaxis-metric-selector"]').click();
       cy.contains('Measured Energy')
-        .parent()
+        .closest('[role="rowgroup"]')
         .within(() => {
-          cy.contains('[role="option"]', option.label)
+          cy.contains('[data-slot="select-item"]', option.label)
             .scrollIntoView()
             .should('be.visible')
             .click();
@@ -241,33 +243,43 @@ describe('Inference ChartControls cost metrics', () => {
 
   it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Output Tokens per $1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Input Tokens per $1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Total Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Output Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
-    cy.contains('[role="option"]', 'Input Tokens per ¥1 TCO (Owning - Hyperscaler)').should(
-      'exist',
-    );
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Output Tokens per $1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Input Tokens per $1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Total Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Output Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Input Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    ).should('exist');
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)').click();
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+    ).click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarN');
   });
 });
@@ -348,13 +360,147 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
     );
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', '交互性').click();
-    cy.get('[role="listbox"] [role="option"]').should('have.length', 4);
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
-      .should('have.text', '端到端归一化交互性')
-      .type('{esc}');
-    cy.get('[aria-label="X 轴指标说明"]').click();
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
+      'have.text',
+      '端到端归一化交互性',
+    );
+    cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').click();
     cy.get('[role="dialog"] [data-testid="normalized-interactivity-faq-link"]')
       .should('have.text', '什么是端到端归一化交互性？')
       .and('have.attr', 'href', '/zh/about#faq-normalized-interactivity');
+  });
+});
+
+describe('Axis option help', () => {
+  beforeEach(() => {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+  });
+
+  it('opens descriptions and formulas without selecting an option or losing the search', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('input[aria-label="Search options"]').type('Neocloud Giant');
+    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+      .should('be.visible')
+      .and('contain.text', 'infrastructure spend')
+      .find('code')
+      .should('have.text', 'tok/$ = (total tok/s/chip × 3,600) ÷ all-in cost per chip-hour ($)');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').type('{esc}');
+    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').should('have.focus');
+    cy.get('input[aria-label="Search options"]').should('have.value', 'Neocloud Giant');
+    cy.get('[data-select-option][data-value="y_tokensPerDollarN"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarN');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'false');
+  });
+
+  it('navigates to help with arrow keys and restores focus on Escape', () => {
+    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
+      .should('have.focus')
+      .type('{downarrow}{rightarrow}');
+    cy.get('[data-testid="option-help-e2e"]').should('have.focus').click();
+    cy.get('[data-testid="option-help-content-e2e"]')
+      .should('contain.text', 'total wall-clock time')
+      .type('{esc}');
+    cy.get('[data-testid="option-help-e2e"]').should('have.focus').type('{leftarrow}');
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('have.focus').type('{esc}');
+    cy.get('[data-testid="x-axis-mode-selector"]')
+      .should('have.focus')
+      .and('have.attr', 'aria-expanded', 'false');
+    cy.get('@setSelectedXAxisMode').should('not.have.been.called');
+  });
+
+  it('keeps long help readable on phones without horizontal overflow', () => {
+    cy.viewport(390, 844);
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="option-help-y_tokenRevenuePerGpuHour"]').scrollIntoView().click();
+    cy.get('[data-testid="option-help-content-y_tokenRevenuePerGpuHour"]')
+      .should('be.visible')
+      .and(($help) => {
+        const element = $help[0];
+        const rect = element.getBoundingClientRect();
+        expect(rect.left).to.be.at.least(0);
+        expect(rect.right).to.be.at.most(390);
+        expect(rect.top).to.be.at.least(0);
+        expect(rect.bottom).to.be.at.most(844);
+        expect(element.scrollWidth).to.equal(element.clientWidth);
+      });
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+  });
+
+  it('exposes separate accessible selection and help actions', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
+    cy.injectAxe();
+    cy.checkA11y(
+      '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarN"]',
+      {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
+      },
+    );
+  });
+});
+
+describe('Workflow run dropdown', () => {
+  const availableRuns = {
+    '12345678': {
+      runId: '12345678',
+      runDate: '2025-03-01',
+      runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/12345678',
+      conclusion: 'success',
+    },
+    '12345679': {
+      runId: '12345679',
+      runDate: '2025-03-01',
+      runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/12345679',
+      conclusion: 'failure',
+    },
+  };
+
+  it('removes run arrows but keeps date navigation, status, run selection, and external links', () => {
+    mountWithProviders(<WorkflowInfoDisplay />, {
+      inference: { availableRuns },
+      globalFilters: {},
+    });
+    cy.get('[aria-label="Previous run"], [aria-label="Next run"]').should('not.exist');
+    cy.get('[aria-label="Previous available date"]').should('be.visible');
+    cy.get('[aria-label="Next available date"]').should('be.visible');
+    cy.get('#run-select').should('contain.text', 'Run 1/2');
+    cy.get('#run-select [aria-label="Run succeeded"]').should('exist');
+    cy.window().then((win) => cy.stub(win, 'open').as('openRun'));
+    cy.get('#run-select [data-external-link] svg').click();
+    cy.get('@openRun').should(
+      'have.been.calledOnceWith',
+      availableRuns['12345678'].runUrl,
+      '_blank',
+      'noopener,noreferrer',
+    );
+    cy.get('#run-select').click();
+    cy.contains('[role="option"]', 'Run 2/2').click();
+    cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
+    cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
+  });
+
+  it('keeps the Chinese run dropdown touch-sized on phones', () => {
+    cy.viewport(390, 844);
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <WorkflowInfoDisplay />
+      </PathnameContext.Provider>,
+      { inference: { availableRuns }, globalFilters: {} },
+    );
+    cy.get('#run-select')
+      .should('have.attr', 'aria-label', '运行')
+      .and('contain.text', '第 1 次运行（共 2 次）')
+      .then(($run) => {
+        expect($run[0].getBoundingClientRect().height).to.equal(44);
+      });
+    cy.get('#run-select').click();
+    cy.contains('[role="option"]', '第 2 次运行（共 2 次）').click();
+    cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
   });
 });
