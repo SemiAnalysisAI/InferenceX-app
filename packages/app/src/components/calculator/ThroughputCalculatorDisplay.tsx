@@ -180,7 +180,7 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 const STRINGS = {
   en: {
     title: 'TCO Calculator',
-    benchmarkGroup: 'Benchmark & economics',
+    benchmarkGroup: 'Configuration & economics',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More comparison settings',
     changed: 'changed',
@@ -241,7 +241,7 @@ const STRINGS = {
   },
   zh: {
     title: 'TCO 计算器',
-    benchmarkGroup: '基准测试与经济性',
+    benchmarkGroup: '配置与经济性',
     comparisonGroup: '对比目标',
     secondaryControls: '更多对比设置',
     changed: '项已更改',

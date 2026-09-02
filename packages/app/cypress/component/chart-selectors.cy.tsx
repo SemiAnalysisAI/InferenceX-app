@@ -168,7 +168,7 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
       cy.get('[data-slot="select-content"]').should('not.exist');
       for (const precision of ['FP8', 'BF16']) {
-        cy.get('[data-testid="precision-multiselect"]').click();
+        cy.get('[data-testid="precision-multiselect"]').click('right');
         cy.contains('[role="option"]', precision).click();
         cy.get('[data-slot="select-content"]').should('not.exist');
         assertHeights();
@@ -178,7 +178,27 @@ describe('Chart Selectors', () => {
         'title',
         'FP4, FP8, BF16',
       );
-      cy.get('[data-testid="precision-multiselect"]').click();
+      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]')
+        .should('have.length', 3)
+        .should(($chips) => {
+          const tops = [...$chips].map((chip) => chip.getBoundingClientRect().top);
+          expect(new Set(tops).size, 'precision chips stay on a single row').to.equal(1);
+        });
+      if (width === 390) {
+        cy.get('[data-testid="precision-multiselect"] [data-slot="select-values"]').should(
+          ($values) => {
+            const values = $values[0];
+            expect(
+              values.scrollWidth,
+              'all chips remain reachable by horizontal scrolling',
+            ).to.be.greaterThan(values.clientWidth);
+            expect(values.ownerDocument.defaultView!.getComputedStyle(values).overflowX).to.equal(
+              'auto',
+            );
+          },
+        );
+      }
+      cy.get('[data-testid="precision-multiselect"]').click('right');
       cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);
       cy.get('[data-testid="toggle-options"]').click();
       cy.get('button#scenario-select').should('have.text', '8K / 1K');
@@ -230,6 +250,40 @@ describe('Chart Selectors', () => {
       cy.get('[role="option"]').contains('Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain', 'Qwen3.5 397B');
     });
+
+    for (const locale of ['en', 'zh']) {
+      it(`searches across model groups, recovers from no results, and selects by keyboard (${locale})`, () => {
+        cy.viewport(locale === 'zh' ? 390 : 1280, 720);
+        cy.mount(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <ModelSelectorHarness />
+          </PathnameContext.Provider>,
+        );
+        const searchLabel = locale === 'zh' ? '搜索选项' : 'Search options';
+        const clearLabel = locale === 'zh' ? '清除搜索' : 'Clear search';
+        cy.get('[data-testid="model-selector"]').click();
+        cy.focused().should('have.attr', 'aria-label', searchLabel).type('lLaMa');
+        cy.get('[role="option"]')
+          .should('have.length', 1)
+          .and('contain.text', 'Llama 3.3 70B Instruct');
+        cy.contains(locale === 'zh' ? '已弃用' : 'Deprecated').should('be.visible');
+        cy.contains(locale === 'zh' ? '维护模式' : 'Maintenance Mode').should('not.exist');
+        cy.get(`button[aria-label="${clearLabel}"]`).click();
+        cy.get('[role="option"]').should('have.length', 5);
+        cy.focused().should('have.attr', 'aria-label', searchLabel).type('no-such-model');
+        cy.get('[role="option"]').should('not.exist');
+        cy.contains(locale === 'zh' ? '没有结果' : 'No results').should('be.visible');
+        cy.get(`button[aria-label="${clearLabel}"]`).click();
+        cy.focused().type('QwEn3.5{downarrow}{enter}');
+        cy.get('[data-testid="model-selector"]')
+          .should('contain.text', 'Qwen3.5 397B')
+          .and('have.attr', 'aria-expanded', 'false');
+        cy.get('[data-slot="select-content"]').should('not.exist');
+        cy.get('[data-testid="model-selector"]').click();
+        cy.get(`input[aria-label="${searchLabel}"]`).should('have.value', '');
+        cy.get('[role="option"]').should('have.length', 5);
+      });
+    }
 
     it('groups maintenance models separately from deprecated models', () => {
       cy.get('[data-testid="model-selector"]').click();
@@ -524,7 +578,26 @@ describe('Chart Selectors', () => {
     });
 
     it('shows current selection', () => {
-      cy.get('[data-testid="precision-multiselect"]').should('contain', 'FP8');
+      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
+        'have.text',
+        'FP8',
+      );
+    });
+
+    it('removes a precision from its chip without opening the menu or losing other selections', () => {
+      cy.get('[data-testid="precision-multiselect"]').click('right');
+      cy.contains('[role="option"]', 'FP4').click();
+      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
+        'have.length',
+        2,
+      );
+      cy.get('[aria-label="Remove FP8"]').click();
+      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
+        'have.text',
+        'FP4',
+      );
+      cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
+      cy.get('[aria-label="Remove FP4"]').should('not.be.visible');
     });
 
     for (const locale of ['en', 'zh']) {
@@ -554,16 +627,16 @@ describe('Chart Selectors', () => {
             expect(minimumBounds.right).to.be.at.most($summary[0].getBoundingClientRect().right);
           });
         };
-        cy.get('[data-testid="precision-multiselect"]').click();
+        cy.get('[data-testid="precision-multiselect"]').click('right');
         assertSummary(1);
         cy.contains('[role="option"]', 'FP8').should('be.disabled');
         cy.contains('[role="option"]', 'FP4').click();
         cy.get('[data-slot="select-content"]').should('not.exist');
-        cy.get('[data-testid="precision-multiselect"]').click();
+        cy.get('[data-testid="precision-multiselect"]').click('right');
         assertSummary(2);
         cy.contains('[role="option"]', 'FP8').click();
         cy.get('[data-slot="select-content"]').should('not.exist');
-        cy.get('[data-testid="precision-multiselect"]').click();
+        cy.get('[data-testid="precision-multiselect"]').click('right');
         assertSummary(1);
         cy.contains('[role="option"]', 'FP4').should('be.disabled');
       });

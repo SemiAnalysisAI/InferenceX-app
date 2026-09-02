@@ -42,7 +42,7 @@ const STRINGS = {
   en: {
     title: 'Current InferenceX Image',
     description: 'Docker image tags for each model and chip configuration.',
-    benchmarkGroup: 'Benchmark configuration',
+    benchmarkGroup: 'Configuration',
     runtimeGroup: 'Hardware & runtime',
     imageVersions: 'Images & versions',
     configuration: 'Configuration',
@@ -94,7 +94,7 @@ const STRINGS = {
   zh: {
     title: 'InferenceX 当前镜像',
     description: '各模型与芯片配置的 Docker 镜像标签。',
-    benchmarkGroup: '基准测试配置',
+    benchmarkGroup: '配置',
     runtimeGroup: '硬件与运行环境',
     imageVersions: '镜像与版本',
     configuration: '配置',

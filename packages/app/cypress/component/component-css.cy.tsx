@@ -132,7 +132,7 @@ describe('component CSS harness', () => {
         cy.viewport(width, 720);
         cy.mount(
           <div className={theme}>
-            <ControlPanel legend="Benchmark" className="m-4">
+            <ControlPanel legend="Configuration" className="m-4">
               <Label htmlFor="control-input">Long benchmark configuration label</Label>
               <Input id="control-input" defaultValue="Full value remains editable" />
               <Select defaultValue="benchmark">
@@ -164,7 +164,13 @@ describe('component CSS harness', () => {
         cy.get('[data-slot="control-panel"]').should(($panel) => {
           const panel = $panel[0];
           expect(panel.tagName).to.eq('FIELDSET');
-          expect(panel.querySelector('legend')?.textContent).to.eq('Benchmark');
+          const legend = panel.querySelector('legend')!;
+          expect(legend.textContent).to.eq('Configuration');
+          const label = panel.querySelector('label')!;
+          expect(
+            label.getBoundingClientRect().top - legend.getBoundingClientRect().bottom,
+            'compact space between the legend and the first field label',
+          ).to.be.closeTo(4, 1);
           const input = panel.querySelector('input')!;
           const expectedFill = getComputedStyle(input).backgroundColor;
           const bounds = panel.getBoundingClientRect();

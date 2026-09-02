@@ -48,7 +48,7 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
-    benchmarkControls: 'Benchmark',
+    benchmarkControls: 'Configuration',
     chartControls: 'Chart',
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
@@ -87,7 +87,7 @@ const STRINGS = {
     changed: 'changed',
   },
   zh: {
-    benchmarkControls: '基准测试',
+    benchmarkControls: '配置',
     chartControls: '图表',
     compareHistory: '对比历史趋势',
     yAxisMetric: 'Y 轴指标',

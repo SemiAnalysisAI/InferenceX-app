@@ -428,7 +428,7 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   it('keeps table/chart actions reachable and localizes table labels and dates', () => {
     cy.contains('h2', '准确率评估').should('be.visible');
     cy.get('[data-testid="evaluation-chart-display"] fieldset legend')
-      .should('contain.text', '基准测试')
+      .should('contain.text', '配置')
       .and('contain.text', '运行信息');
     cy.get('[data-testid="share-button"]')
       .should('be.visible')

@@ -289,7 +289,7 @@ export function ModelSelector({
             minSelections={1}
             maxSelections={1}
             showClearAll={false}
-            searchable={false}
+            searchable
             plainSelectedText
             showSelectionSummary={false}
           />
@@ -604,7 +604,7 @@ export function PrecisionSelector({
           minSelections={1}
           showClearAll={false}
           searchable={false}
-          plainSelectedText
+          wrapSelectedChips={false}
         />
       </div>
     </div>

@@ -79,6 +79,8 @@ interface MultiSelectProps {
   showClearAll?: boolean;
   searchable?: boolean;
   plainSelectedText?: boolean;
+  /** Keep selected chips on one scrollable row in compact filter panels. */
+  wrapSelectedChips?: boolean;
   showSelectionSummary?: boolean;
   searchPlaceholder?: string;
   searchAriaLabel?: string;
@@ -107,6 +109,7 @@ function MultiSelect({
   showClearAll = true,
   searchable = true,
   plainSelectedText = false,
+  wrapSelectedChips = true,
   showSelectionSummary = true,
   searchPlaceholder,
   searchAriaLabel,
@@ -424,7 +427,14 @@ function MultiSelect({
           className,
         )}
       >
-        <div className="flex gap-1 flex-1 min-w-0 items-center min-h-5 flex-wrap">
+        <div
+          data-slot="select-values"
+          title={!plainSelectedText && !wrapSelectedChips ? selectedLabels.join(', ') : undefined}
+          className={cn(
+            'flex gap-1 flex-1 min-w-0 items-center min-h-5',
+            wrapSelectedChips ? 'flex-wrap' : 'flex-nowrap overflow-x-auto [scrollbar-width:none]',
+          )}
+        >
           {value.length > 0 ? (
             plainSelectedText ? (
               <span className="text-foreground flex min-w-0 items-center gap-1.5">
@@ -437,6 +447,7 @@ function MultiSelect({
               selectedLabels.map((label, index) => (
                 <span
                   key={value[index]}
+                  data-slot="select-chip"
                   className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {selectedOptions[index]?.icon}

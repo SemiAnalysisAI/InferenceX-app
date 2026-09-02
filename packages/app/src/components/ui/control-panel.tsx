@@ -13,7 +13,7 @@ export function ControlPanel({
     <fieldset
       data-slot="control-panel"
       className={cn(
-        'grid min-w-0 gap-4 rounded-md border border-border/70 bg-muted/10 p-4',
+        'grid min-w-0 gap-4 rounded-md border border-border/70 bg-muted/10 px-4 pb-4 pt-1',
         className,
       )}
       {...props}

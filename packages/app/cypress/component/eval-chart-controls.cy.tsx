@@ -14,6 +14,8 @@ describe('Evaluation ChartControls', () => {
   });
 
   it('renders the benchmark selector with the current benchmark', () => {
+    cy.contains('legend', 'Configuration').should('be.visible');
+    cy.get('label[for="eval-benchmark-select"]').should('have.text', 'Benchmark');
     cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
     // Default mock context: selectedBenchmark = 'mmlu'
     cy.get('[data-testid="evaluation-benchmark-selector"]').should('contain.text', 'MMLU');
