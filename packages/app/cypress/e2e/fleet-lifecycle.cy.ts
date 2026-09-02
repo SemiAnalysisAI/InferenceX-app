@@ -903,10 +903,13 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    cy.get('output[data-testid="fleet-sequence-selector"]')
+    cy.get('button[data-testid="fleet-sequence-selector"]')
       .should('be.visible')
-      .and('have.text', 'Agentic');
-    cy.get('output[data-testid="fleet-precision-selector"]').should('have.text', 'FP4');
+      .and('have.text', 'Agentic')
+      .and('be.disabled');
+    cy.get('button[data-testid="fleet-precision-selector"]')
+      .should('have.text', 'FP4')
+      .and('be.disabled');
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.wait('@agenticHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');

@@ -25,15 +25,14 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
-    // The default model is FP4-only, so Precision is a read-only value.
-    // Wait for the multi-precision model's availability to resolve and expose
-    // an actual combobox before clicking, not the previous read-only value.
+    // The default model is FP4-only, so Precision is disabled. Wait for
+    // the multi-precision model's availability to enable the combobox.
     cy.visit('/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
 
     // Frame both controls below the sticky header. Start with the lower
     // control so its open menu does not physically cover the next trigger.
-    cy.get('[data-testid="precision-multiselect"][role="combobox"]')
+    cy.get('[data-testid="precision-multiselect"][role="combobox"]:enabled')
       .scrollIntoView({ offset: { top: -240, left: 0 } })
       .click({ scrollBehavior: false });
     cy.get('[data-slot="select-content"]').should('have.length', 1);

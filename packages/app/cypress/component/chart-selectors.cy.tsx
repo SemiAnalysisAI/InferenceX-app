@@ -127,9 +127,26 @@ function assertAgenticInfoInside(height: number) {
   });
 }
 
+function assertDisabledBenchmarkControls() {
+  cy.get('[role="combobox"]')
+    .should('have.length', 2)
+    .each(($control) => {
+      cy.wrap($control)
+        .should('be.disabled')
+        .and('have.css', 'cursor', 'not-allowed')
+        .and('have.attr', 'aria-expanded', 'false')
+        .then(() => {
+          $control[0].click();
+          $control[0].focus();
+          expect($control[0].ownerDocument.activeElement).not.to.equal($control[0]);
+        });
+    });
+  cy.get('[data-slot="select-content"]').should('not.exist');
+}
+
 describe('Chart Selectors', () => {
   for (const width of [390, 768, 1280]) {
-    it(`keeps fixed and selectable values the same height at ${width}px`, () => {
+    it(`keeps fixed and selectable values the same height when disabled and enabled at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.mount(<SelectableContextHarness />);
       const height = width < 768 ? '44px' : '36px';
@@ -137,10 +154,14 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="scenario-selector"]').should('have.css', 'height', height);
         cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
       };
-      cy.get('output').should('have.length', 2);
+      assertDisabledBenchmarkControls();
       assertHeights();
       cy.get('[data-testid="toggle-options"]').click();
-      cy.get('[role="combobox"]').should('have.length', 2);
+      cy.get('[role="combobox"]')
+        .should('have.length', 2)
+        .each(($control) => {
+          cy.wrap($control).should('be.enabled');
+        });
       assertHeights();
       cy.get('[data-testid="scenario-selector"]').click();
       cy.contains('[role="option"]', 'Agentic').click();
@@ -159,10 +180,10 @@ describe('Chart Selectors', () => {
       );
       cy.get('[data-testid="precision-multiselect"]').click();
       cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);
-      cy.get('body').type('{esc}');
       cy.get('[data-testid="toggle-options"]').click();
-      cy.get('output#scenario-select').should('have.text', '8K / 1K');
-      cy.get('output#precision-select').should('have.text', 'FP4');
+      cy.get('button#scenario-select').should('have.text', '8K / 1K');
+      cy.get('button#precision-select').should('have.text', 'FP4');
+      assertDisabledBenchmarkControls();
       assertHeights();
     });
   }
@@ -184,10 +205,10 @@ describe('Chart Selectors', () => {
       </PathnameContext.Provider>,
     );
     cy.get('label[for="scenario-select"]').should('have.text', '场景');
-    cy.get('output#scenario-select').should('be.visible').and('have.text', '8K / 1K');
+    cy.get('button#scenario-select').should('be.visible').and('have.text', '8K / 1K');
     cy.get('label[for="precision-select"]').should('have.text', '精度');
-    cy.get('output#precision-select').should('be.visible').and('have.text', 'FP4');
-    cy.get('output').each(($value) => {
+    cy.get('button#precision-select').should('be.visible').and('have.text', 'FP4');
+    cy.get('[role="combobox"]').each(($value) => {
       const bounds = $value[0].getBoundingClientRect();
       expect(bounds.height).to.be.at.least(44);
       expect(bounds.right).to.be.at.most(390);
@@ -322,11 +343,11 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('output[data-testid="scenario-selector"]')
+      cy.get('button[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('have.text', '8K / 1K');
       cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('not.exist');
+      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
     });
 
     it('keeps the agentic scenario and its explanation visible with one option', () => {
@@ -343,11 +364,11 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('output[data-testid="scenario-selector"]')
+      cy.get('button[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('have.text', 'Agentic');
       cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('not.exist');
+      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
       assertAgenticInfoInside(36);
       cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
         pointerType: 'mouse',
@@ -466,11 +487,11 @@ describe('Chart Selectors', () => {
         </TooltipProvider>,
       );
       cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('output[data-testid="precision-multiselect"]')
+      cy.get('button[data-testid="precision-multiselect"]')
         .should('be.visible')
         .and('have.text', 'FP8');
       cy.get('label[for="precision-select"]').should('have.text', 'Precision');
-      cy.get('[role="combobox"]').should('not.exist');
+      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
     });
   });
 });

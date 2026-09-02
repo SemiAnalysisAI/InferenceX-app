@@ -98,12 +98,15 @@ describe('Historical Trends — Content & Interactions', () => {
   });
 
   it('keeps fixed precision visible and allows selection for multi-precision models', () => {
-    cy.get('output[data-testid="precision-multiselect"]')
+    cy.get('button[data-testid="precision-multiselect"]')
       .should('be.visible')
-      .and('have.text', 'FP4');
+      .and('have.text', 'FP4')
+      .and('be.disabled');
     cy.visit('/historical?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
-    cy.get('[data-testid="precision-multiselect"][role="combobox"]').should('be.visible');
+    cy.get('[data-testid="precision-multiselect"][role="combobox"]')
+      .should('be.visible')
+      .and('be.enabled');
   });
 
   it('legend sidebar renders with hardware items matching visible trend lines', () => {

@@ -177,7 +177,7 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, {
       evaluation: { availablePrecisions: ['fp4'], selectedPrecisions: ['fp4'] },
     });
-    cy.get('output#eval-precision-select').should('be.visible').and('have.text', 'FP4');
+    cy.get('button#eval-precision-select').should('be.visible').and('have.text', 'FP4');
     cy.get('fieldset')
       .first()
       .then(($group) => {

@@ -115,7 +115,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.contains('Precision').should('be.visible');
-        cy.get('output#calc-precision').should('have.text', 'FP4');
+        cy.get('button#calc-precision').should('have.text', 'FP4').and('be.disabled');
       });
     });
 
@@ -691,10 +691,13 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('output[data-testid="calc-sequence-selector"]')
+      cy.get('button[data-testid="calc-sequence-selector"]')
         .should('be.visible')
-        .and('have.text', 'Agentic');
-      cy.get('output[data-testid="calc-precision-selector"]').should('have.text', 'FP4');
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -752,10 +755,13 @@ describe('TCO Calculator', () => {
       cy.wait('@agenticBenchmarks');
 
       // Scenario and precision stay readable; only percentile is feature-gated.
-      cy.get('output[data-testid="calc-sequence-selector"]')
+      cy.get('button[data-testid="calc-sequence-selector"]')
         .should('be.visible')
-        .and('have.text', 'Agentic');
-      cy.get('output[data-testid="calc-precision-selector"]').should('have.text', 'FP4');
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
