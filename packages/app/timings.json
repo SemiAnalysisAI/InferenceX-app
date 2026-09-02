@@ -262,7 +262,7 @@
     },
     {
       "spec": "cypress/e2e/zh-pages.cy.ts",
-      "duration": 4454
+      "duration": 8892
     }
   ]
 }
