@@ -4,6 +4,7 @@ import chartDefinitions from '@/components/inference/metric-registry';
 
 import {
   buildAiLineData,
+  getAiRadarMetricLabel,
   getAiMetricDirection,
   normalizeAiRadarRows,
   rankAiHardwareKeys,
@@ -11,6 +12,21 @@ import {
 } from './ai-chart-data';
 
 const chartDefinition = chartDefinitions[0] as Record<string, unknown>;
+
+describe('getAiRadarMetricLabel', () => {
+  it('resolves a valid non-default radar metric through the Chinese metric registry', () => {
+    expect(getAiRadarMetricLabel('y_measuredAvgPower', chartDefinitions[0], 'zh')).toBe(
+      '每芯片实测平均功耗（W）',
+    );
+  });
+
+  it.each([
+    ['en' as const, 'Throughput/Chip'],
+    ['zh' as const, '每芯片吞吐量'],
+  ])('prefers the concise radar label over the registry label for %s', (locale, expected) => {
+    expect(getAiRadarMetricLabel('y_tpPerGpu', chartDefinitions[0], locale)).toBe(expected);
+  });
+});
 
 describe('readAiMetric', () => {
   it('preserves an explicitly measured zero while rejecting a missing telemetry property', () => {

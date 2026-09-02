@@ -9,6 +9,7 @@ import {
   matchesQuickFilters,
   pointDeploymentMode,
   parseDeploymentModes,
+  parsePowerTiers,
   pointVendor,
   quickFiltersActive,
   type QuickFilters,
@@ -67,6 +68,7 @@ describe('computeAvailableQuickFilters', () => {
         disagg: false,
         is_multinode: true,
         spec_decoding: 'none',
+        power_tier: 'certified',
       }),
     ];
     expect(computeAvailableQuickFilters(points)).toEqual({
@@ -74,6 +76,7 @@ describe('computeAvailableQuickFilters', () => {
       frameworks: ['vllm', 'trt', 'atom'],
       deployment: ['single-node', 'multi-node', 'disagg'],
       spec: ['mtp', 'stp'],
+      power: ['certified'],
     });
   });
 
@@ -86,7 +89,20 @@ describe('computeAvailableQuickFilters', () => {
       frameworks: ['vllm'],
       deployment: ['single-node'],
       spec: ['stp'],
+      power: [],
     });
+  });
+
+  it('reports exactly the power tiers present, in display order', () => {
+    const legacy = point({ power_tier: 'legacy' });
+    const certified = point({ power_tier: 'certified' });
+    expect(computeAvailableQuickFilters([legacy]).power).toEqual(['legacy']);
+    expect(computeAvailableQuickFilters([certified]).power).toEqual(['certified']);
+    // Display order stays certified-first even when legacy points come first.
+    expect(computeAvailableQuickFilters([legacy, certified]).power).toEqual([
+      'certified',
+      'legacy',
+    ]);
   });
 
   it('returns all-empty for an empty point set', () => {
@@ -95,6 +111,7 @@ describe('computeAvailableQuickFilters', () => {
       frameworks: [],
       deployment: [],
       spec: [],
+      power: [],
     });
   });
 });
@@ -106,6 +123,17 @@ describe('quickFiltersActive', () => {
     expect(quickFiltersActive(filters({ frameworks: ['vllm'] }))).toBe(true);
     expect(quickFiltersActive(filters({ deployment: ['disagg'] }))).toBe(true);
     expect(quickFiltersActive(filters({ spec: ['mtp'] }))).toBe(true);
+    expect(quickFiltersActive(filters({ power: ['certified'] }))).toBe(true);
+  });
+});
+
+describe('parsePowerTiers', () => {
+  it('keeps known tiers, removes duplicates, and drops unknown values', () => {
+    expect(parsePowerTiers(['certified', 'legacy', 'certified', 'bogus', ''])).toEqual([
+      'certified',
+      'legacy',
+    ]);
+    expect(parsePowerTiers([])).toEqual([]);
   });
 });
 
@@ -158,6 +186,24 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(point({ spec_decoding: 'none' }), mtpFilter)).toBe(false);
     expect(matchesQuickFilters(point({ spec_decoding: 'none' }), stpFilter)).toBe(true);
     expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), stpFilter)).toBe(true);
+  });
+
+  it('filters by measured-power certification tier', () => {
+    const certifiedOnly = filters({ power: ['certified'] });
+    const bothTiers = filters({ power: ['certified', 'legacy'] });
+    const certified = point({ power_tier: 'certified' });
+    const legacy = point({ power_tier: 'legacy' });
+    const tierless = point({});
+
+    expect(matchesQuickFilters(certified, certifiedOnly)).toBe(true);
+    expect(matchesQuickFilters(legacy, certifiedOnly)).toBe(false);
+    expect(matchesQuickFilters(tierless, certifiedOnly)).toBe(false);
+    // Both tiers still exclude points with no measured telemetry at all.
+    expect(matchesQuickFilters(certified, bothTiers)).toBe(true);
+    expect(matchesQuickFilters(legacy, bothTiers)).toBe(true);
+    expect(matchesQuickFilters(tierless, bothTiers)).toBe(false);
+    // No power constraint keeps tier-less points.
+    expect(matchesQuickFilters(tierless, EMPTY_QUICK_FILTERS)).toBe(true);
   });
 
   it('treats non-standard spec methods (e.g. eagle) as spec-on (MTP), never STP', () => {

@@ -233,12 +233,13 @@ export function createMockInferenceContextValues(
     setSelectedXAxisMode: namedStub('setSelectedXAxisMode'),
     scaleType: 'auto',
     setScaleType: namedStub('setScaleType'),
-    quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
-    availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
+    quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
+    availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     setQuickFilterVendors: namedStub('setQuickFilterVendors'),
     setQuickFilterFrameworks: namedStub('setQuickFilterFrameworks'),
     setQuickFilterDeployment: namedStub('setQuickFilterDeployment'),
     setQuickFilterSpec: namedStub('setQuickFilterSpec'),
+    setQuickFilterPower: namedStub('setQuickFilterPower'),
     isLegendExpanded: true,
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
@@ -413,6 +414,7 @@ export function createMockReliabilityContext(
   return {
     loading: false,
     error: null,
+    refetch: namedStub('refetchReliability').resolves(),
     dateRangeSuccessRateData: {
       'last-7-days': {
         [Model.DeepSeek_R1]: {

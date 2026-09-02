@@ -16,7 +16,10 @@ import type {
   TokenRevenuePriceSource,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import { applyTokenRevenuePricing } from '@/components/inference/token-revenue';
+import {
+  applyTokenRevenuePricing,
+  usesTokenSalePricing,
+} from '@/components/inference/token-revenue';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
   parseComparisonEntry,
@@ -548,9 +551,10 @@ export function useChartData(
           }
         }
 
+        const usesOpenRouterPricing = tokenRevenuePriceSource === 'openrouter';
         const revenueLabels: Partial<ChartDefinition> =
           selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
-            ? tokenRevenuePriceSource === 'openrouter'
+            ? usesOpenRouterPricing
               ? {
                   y_tokenRevenuePerGpuHour_label:
                     'Token Revenue per GPU Hour at OpenRouter Pricing ($/GPU/hr)',
@@ -563,11 +567,12 @@ export function useChartData(
                 }
               : {
                   y_tokenRevenuePerGpuHour_label:
-                    'Token Revenue per GPU Hour at $1/M tok ($/GPU/hr)',
+                    'Token Revenue per GPU Hour at Normalized Pricing ($/GPU/hr)',
                   y_tokenRevenuePerGpuHour_labelZh:
-                    '按 $1/百万 token 计价的每 GPU 小时 token 收入（$/GPU/hr）',
-                  y_tokenRevenuePerGpuHour_title: 'Token Revenue per GPU Hour at $1/M tok',
-                  y_tokenRevenuePerGpuHour_titleZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+                    '按标准化价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
@@ -602,7 +607,7 @@ export function useChartData(
   const graphs: RenderableGraph[] = useMemo(() => {
     if (chartData.length === 0) return [];
     if (
-      selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+      usesTokenSalePricing(selectedYAxisMetric) &&
       tokenRevenuePriceSource === 'openrouter' &&
       !tokenRevenuePricing
     ) {
@@ -619,7 +624,7 @@ export function useChartData(
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {
       dataSource = chartData.map((d) => calculatePowerForGpus(d, userPowers));
     }
-    if (selectedYAxisMetric === 'y_tokenRevenuePerGpuHour') {
+    if (usesTokenSalePricing(selectedYAxisMetric)) {
       dataSource = chartData.map((d) => applyTokenRevenuePricing(d, tokenRevenuePricing));
     }
 

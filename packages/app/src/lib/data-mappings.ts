@@ -498,6 +498,38 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
   return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
 }
 
+/**
+ * Scenarios retired for a specific model while staying active for others.
+ * `SEQUENCE_CONFIG` categories are global — 8K/1K is `default` because most
+ * fixed-seq models still sweep it — so a per-model retirement needs its own
+ * table. Listing a scenario here moves it under the Deprecated group in the
+ * scenario selector for that model only; historical rows stay queryable, the
+ * scenario just stops presenting as actively benchmarked.
+ *
+ * MiniMax M3: the Single-turn 8k1k sweep was removed on 2026-08-04
+ * (InferenceX#2493, per MODELS.md "Scenario and precision retirements");
+ * Agentic coding is the model's only active scenario.
+ */
+const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model retired the scenario even though it is globally active. */
+export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Sequence category as seen from one model's point of view: the global
+ * category, overridden to `deprecated` when the model retired the scenario.
+ * Selectors pass the selected model so a per-model retirement (MiniMax M3's
+ * 8K/1K) groups under Deprecated without touching other models.
+ */
+export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
+  if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
+  return getSequenceCategory(sequence);
+}
+
 export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
   const config = SEQUENCE_CONFIG[sequence];
   if (!config) return sequence;

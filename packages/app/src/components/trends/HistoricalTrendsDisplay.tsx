@@ -42,6 +42,8 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/official-preview-notice';
+import { metricLabel, metricTitle } from '@/lib/chart-utils';
+import { Button } from '@/components/ui/button';
 
 const STRINGS = {
   en: {
@@ -59,12 +61,16 @@ const STRINGS = {
     highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
     noData: 'No interactivity chart data available for the selected model and sequence.',
+    loadError: 'Historical benchmark data could not be loaded.',
+    retry: 'Reload page',
+    trendLoadError: 'Historical trend data could not be loaded.',
+    trendRetry: 'Retry loading trend data',
   },
   zh: {
     heading: '历史趋势',
-    description: '在固定交互性操作点下，各性能指标随时间的插值变化。',
-    targetLabel: '目标交互性 (tok/s/user)',
-    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各芯片在不同交互性水平下的性能变化。',
+    description: '将交互性固定在指定水平后，展示各项性能指标随时间的变化；数据经插值计算。',
+    targetLabel: '目标交互性（tok/s/user）',
+    targetTooltip: '设置插值计算采用的交互性水平。移动滑块可比较不同交互性水平下的芯片性能。',
     captionTitle: (yTitle: string, target: number) =>
       `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
     source: '来源：SemiAnalysis InferenceX™',
@@ -72,13 +78,27 @@ const STRINGS = {
     logScale: '对数缩放',
     highContrast: '高对比度',
     resetFilter: '重置筛选',
-    noData: '所选模型和序列无可用的交互性图表数据。',
+    noData: '所选模型和序列暂无交互性图表数据。',
+    loadError: '历史基准测试数据加载失败。',
+    retry: '重新加载页面',
+    trendLoadError: '历史趋势数据加载失败。',
+    trendRetry: '重试加载趋势数据',
   },
 };
 
+function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
+  if (locale !== 'zh') return date;
+  const [year, month, day] = date.split('-').map(Number);
+  return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day)
+    ? `${year}年${month}月${day}日`
+    : date;
+}
+
 export default function HistoricalTrendsDisplay() {
-  const t = STRINGS[useLocale()];
-  const { graphs, loading, hardwareConfig, hwTypesWithData, availableDates } = useInferenceData();
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
+    useInferenceData();
   const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
     useInferenceFilters();
   const { selectedYAxisMetric, tokenRevenuePricing, logScale, isLegendExpanded, highContrast } =
@@ -98,15 +118,13 @@ export default function HistoricalTrendsDisplay() {
   // Get Y-axis label and title from chart definition
   const currentYLabel = useMemo(() => {
     if (graphs.length === 0) return '';
-    const yLabelKey = `${selectedYAxisMetric}_label` as keyof (typeof graphs)[0]['chartDefinition'];
-    return (graphs[0].chartDefinition[yLabelKey] as string) || '';
-  }, [graphs, selectedYAxisMetric]);
+    return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+  }, [graphs, locale, selectedYAxisMetric]);
 
   const currentYTitle = useMemo(() => {
     if (graphs.length === 0) return '';
-    const yTitleKey = `${selectedYAxisMetric}_title` as keyof (typeof graphs)[0]['chartDefinition'];
-    return (graphs[0].chartDefinition[yTitleKey] as string) || '';
-  }, [graphs, selectedYAxisMetric]);
+    return metricTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+  }, [graphs, locale, selectedYAxisMetric]);
 
   // Interactivity range from current chart data
   const interactivityRange = useMemo(() => {
@@ -148,7 +166,12 @@ export default function HistoricalTrendsDisplay() {
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
   // Interpolated trend data
-  const { trendLines, loading: trendLoading } = useInterpolatedTrendData({
+  const {
+    trendLines,
+    loading: trendLoading,
+    error: trendError,
+    refetch: refetchTrendData,
+  } = useInterpolatedTrendData({
     selectedModel: selectedModel as Model,
     selectedSequence: selectedSequence as Sequence,
     selectedPrecisions,
@@ -196,7 +219,35 @@ export default function HistoricalTrendsDisplay() {
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
 
-  if (loading || graphs.length === 0 || trendLoading) {
+  // Check `error` before the loading skeleton: a failed benchmark query never
+  // produces rows, so `loading` (which includes "no rows yet") would otherwise
+  // pin the page on the skeleton forever instead of surfacing the error card.
+  if (error) {
+    return (
+      <section data-testid="historical-trends-display">
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-destructive text-sm">{t.loadError}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                track('historical_reload_clicked');
+                window.location.reload();
+              }}
+            >
+              {t.retry}
+            </Button>
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
+  if (loading || trendLoading) {
     return (
       <section data-testid="historical-trends-display">
         <Card className="relative z-30">
@@ -216,6 +267,31 @@ export default function HistoricalTrendsDisplay() {
           <Skeleton className="h-7 w-2/4 mb-1" />
           <Skeleton className="h-5 w-3/4 mb-2" />
           <Skeleton className="h-[600px] w-full" />
+        </Card>
+      </section>
+    );
+  }
+
+  if (trendError) {
+    return (
+      <section data-testid="historical-trends-display">
+        <Card data-testid="historical-trend-error">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-destructive text-sm">{t.trendLoadError}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                track('historical_trend_retry_clicked');
+                void refetchTrendData();
+              }}
+            >
+              {t.trendRetry}
+            </Button>
+          </div>
         </Card>
       </section>
     );
@@ -330,11 +406,11 @@ export default function HistoricalTrendsDisplay() {
                       {selectedPrecisions
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}{' '}
-                      • {getSequenceLabel(selectedSequence as Sequence)} • {t.source}
+                      • {getSequenceLabel(selectedSequence as Sequence, locale)} • {t.source}
                       {selectedRunDate && (
                         <>
                           {' '}
-                          • {t.updated} {selectedRunDate}
+                          • {t.updated} {historicalRunDate(selectedRunDate, locale)}
                         </>
                       )}
                     </p>

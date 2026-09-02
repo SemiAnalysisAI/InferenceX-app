@@ -168,17 +168,17 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       'Thanks to the AIPerf team for implementing and documenting the scenario, and to Callan Fox and Weka for the underlying agentic-coding trace work.',
   },
   zh: {
-    title: 'AgentX：基准测试如何工作',
+    title: 'AgentX：基准测试的工作原理',
     intro: [
-      'AgentX 按照编码智能体实际使用模型的方式衡量推理性能：长程多轮会话、共享前缀、轮次间停顿、并行子智能体以及持续的 KV cache 复用。它是 AIPerf 中的一套场景，基于公开的智能体编码轨迹与固定回放规则，使不同服务栈的结果能够在同一工作负载下进行比较。',
-      '这份 FAQ 介绍基准测试的运行机制、保障可比性的配置，以及最容易影响测试结果的部署细节。',
+      'AgentX 按照编码智能体实际使用模型的方式衡量推理性能。这类会话持续时间长、轮次多，会共享前缀并在轮次之间停顿；多个子智能体还可能并行运行，KV cache 也会被反复复用。AgentX 是 AIPerf 中的一种测试场景：它按照固定配置回放公开的智能体编码轨迹，使不同服务栈能够在同一工作负载下进行比较。',
+      '本 FAQ 介绍该基准测试的运行方式、确保结果可比的配置，以及最容易影响测试结果的部署细节。',
     ],
     sections: [
       {
         title: 'AgentX 衡量什么？',
         paragraphs: [
           '传统负载测试通常以固定请求速率发送互不相关的单轮 prompt。AgentX 则维持指定数量的完整会话树。根编码会话可以创建子会话、等待子会话结束，再继续执行。每一轮都会携带累计的消息历史，从而重现真实智能体系统中的长共享前缀与突发式 fan-out。',
-          'Prompt 文本是合成的，但工作负载形态来自真实会话记录：输入与输出长度、前缀共享关系、子智能体拓扑以及轮次间时间间隔。这样既不会回放用户的私密内容，又保留了对调度器、路由器和 prefix cache 真正重要的特征。',
+          'prompt 文本是合成的，但工作负载形态来自真实会话记录：输入与输出长度、前缀共享关系、子智能体拓扑以及轮次间时间间隔。这样既不会回放用户的私密内容，又保留了对调度器、路由器和 prefix cache 真正重要的特征。',
         ],
       },
       {
@@ -206,7 +206,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       {
         title: '最简运行命令是什么？',
         paragraphs: [
-          '请根据部署替换 URL、模型、语料和 concurrency。AIPerf 会补齐场景默认值，并将结果写入 ./artifacts/。固定 --random-seed 可精确复现采样并复用重建后的数据集 cache；当模型名称无法解析为 Hugging Face tokenizer 时，请额外传入 --tokenizer。',
+          '请根据部署情况替换 URL、模型、语料和 --concurrency 的值。AIPerf 会补齐场景默认值，并将结果写入 ./artifacts/。固定 --random-seed 可精确复现采样并复用重建后的数据集 cache；当模型名称无法解析为 Hugging Face tokenizer 时，请额外传入 --tokenizer。',
         ],
         code: `aiperf profile \\
   --scenario inferencex-agentx-mvp \\
@@ -224,46 +224,46 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         ],
       },
       {
-        title: 'Concurrency 表示什么？',
+        title: '并发数表示什么？',
         paragraphs: [
-          'Concurrency 表示同时存活的会话树数量，而不是正在进行的 HTTP 请求数。一个会话可能 fan-out 为多个子会话，因此瞬时请求并发数可以高于配置值。',
-          '该场景有意不提供请求速率控制。负载由活跃会话数量、记录的思考时间以及 fan-out 模式共同产生，因此 --concurrency 是主要负载调节项。',
+          '并发数表示同时存活的会话树数量，而不是正在处理的 HTTP 请求数。一个会话可能 fan-out 为多个子会话，因此瞬时请求并发数可以高于配置值。',
+          '该场景有意不提供请求速率控制。负载由活跃会话数、记录的思考时间和 fan-out 模式共同决定，因此 --concurrency 是主要的负载调节参数。',
         ],
       },
       {
         title: '为什么第一次运行可能很久？',
         paragraphs: [
-          '发送流量前，AIPerf 会下载语料，并将其重建为完成 token 化且带有 cache 结构的会话树。结果会存入 memory-mapped 磁盘 cache。只要语料、tokenizer、重建配置、条目数量和 seed 相同，后续测试通常可以在数秒内恢复准备好的数据集。',
-          '冷启动时应同时提高两个配置超时。随后依次执行数据集配置、warmup、定时 profiling 和 drain/export。Benchmark duration 仅覆盖 profiling，因此总耗时会更长。',
+          '发送流量前，AIPerf 会下载语料，并将其重建为完成 token 化且带有 cache 结构的会话树。结果会存入采用内存映射的磁盘 cache。只要语料、tokenizer、重建配置、条目数量和 seed 相同，后续测试通常可以在数秒内恢复准备好的数据集。',
+          '冷启动时应同时提高两个配置阶段的超时时间。随后依次执行数据集配置、warmup、定时 profiling 和 drain/export。基准测试时长只涵盖 profiling 阶段，因此总耗时会更长。',
         ],
         code: `export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
 export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       },
       {
-        title: '可以先跑一个短 smoke test 吗？',
+        title: '可以先运行一次简短的冒烟测试（smoke test）吗？',
         paragraphs: [
-          '有效测试不能短于 900 秒。低成本有效检查可以降低 concurrency，但仍需保留 900 秒下限。--num-dataset-entries 能减少重建工作量，但会改变工作负载，不应将这种结果用于正式比较或提交。',
-          '如需在几分钟内检查连通性，可配合短 duration 使用 --unsafe-override，并接受 invalid 标记。保留完整语料并固定 seed，可让后续有效测试复用重建后的数据集 cache。',
+          '有效测试不能短于 900 秒。低成本有效检查可以降低并发数，但仍需保留 900 秒下限。--num-dataset-entries 能减少重建工作量，但会改变工作负载，不应将这种结果用于正式比较或提交。',
+          '如需在几分钟内检查连通性，可使用 --unsafe-override 并缩短测试时长，同时接受 invalid 标记。保留完整语料并固定 seed，可让后续有效测试复用重建后的数据集 cache。',
         ],
       },
       {
-        title: '如何确认负载生成器不是瓶颈？',
+        title: '如何确认负载生成器（load generator）不是瓶颈？',
         paragraphs: [
-          'AIPerf 会将工作分配到多个 worker process，并每两秒上报健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU core 或负载生成器主机。',
-          '--show-trace-timing 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。Worker CPU 正常且连接池阻塞很少，才有充分依据认为瓶颈位于服务器端。',
+          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数或负载生成器主机。',
+          '--show-trace-timing 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。worker 的 CPU 使用率正常且连接池阻塞很少，才有充分依据认为瓶颈位于服务器端。',
         ],
       },
       {
-        title: '为什么运行中途会出现 connection reset？',
+        title: '为什么运行过程中会出现连接重置（connection reset）？',
         paragraphs: [
           '客户端与服务器的 keep-alive 配置可能不一致。如果 AIPerf 保留空闲连接的时间比服务器更长，客户端可能复用已经关闭的 socket。应将客户端 keep-alive 设置为低于服务器值。该问题通常出现在 profiling 阶段，因为 warmup 连接的空闲时间较短。',
         ],
         code: 'export AIPERF_HTTP_KEEPALIVE_TIMEOUT=4',
       },
       {
-        title: '多 replica 应如何路由？',
+        title: '多副本应如何路由？',
         paragraphs: [
-          '当路由器连接多个 replica 时，必须使用会话感知路由。如果同一会话的各轮落在不同 worker 上，prefix cache 复用会大幅下降，基准测试最终衡量的是路由分散程度，而不是服务栈的 cache 能力。',
+          '当路由器连接多个副本时，必须使用会话感知路由。如果同一会话的各轮落在不同 worker 上，prefix cache 复用会大幅下降，基准测试最终衡量的是路由分散程度，而不是服务栈的 cache 能力。',
           'AIPerf 会为每个会话分配稳定的 correlation ID；子智能体则拥有各自的稳定 ID。这些配置改变请求落点而非请求内容，因此不会被场景锁定。',
         ],
         bullets: [
@@ -286,7 +286,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
           '保持 cache busting 开启；关闭后，循环使用轨迹会夸大 cache-hit 结果。',
           '保留记录的时序；压缩单条轨迹的延迟会改变 cache TTL 行为和会话重叠程度。',
           '在判断结果受服务器限制前，先监控客户端 CPU 和连接池等待时间。',
-          '所有多 replica 部署都应使用会话感知路由。',
+          '所有多副本部署都应使用会话感知路由。',
           '不要解读合成 prompt 的语义；基准测试保留的是 token 与 cache 结构，而非文本含义。',
         ],
       },
@@ -295,9 +295,9 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
     adapted: '本文改编自 AIPerf AgentX 文档。上游源文件由 NVIDIA 维护，并采用 Apache-2.0 许可证。',
     authority:
       'AgentX 是使用 AIPerf 实现的 SemiAnalysis InferenceX 基准测试。关于当前 CLI、场景锁定规则、环境变量和产物 schema，请以 AIPerf 的文档与实现为准。',
-    sourceLabel: 'SemiAnalysis AgentX：基准测试如何工作（FAQ）— Nvidia AIPerf 文档',
+    sourceLabel: 'SemiAnalysis AgentX：基准测试的工作原理（FAQ）— NVIDIA AIPerf 文档',
     upstreamLabel: 'AgentX MVP 教程源文件 — ai-dynamo/aiperf',
-    repositoryLabel: 'Nvidia AIPerf repository',
+    repositoryLabel: 'NVIDIA AIPerf 代码仓库',
     thanks:
       '感谢 AIPerf 团队实现并记录这一场景，也感谢 Callan Fox 与 Weka 为底层智能体编码轨迹所做的工作。',
   },

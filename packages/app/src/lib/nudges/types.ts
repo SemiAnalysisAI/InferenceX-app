@@ -57,6 +57,9 @@ export interface NudgeAction {
 
 export interface NudgeRenderContext {
   dismiss: () => void;
+  /** IDs owned by the engine's dialog accessibility contract. */
+  titleId: string;
+  descriptionId: string;
 }
 
 export interface NudgeAnchor {

@@ -18,6 +18,38 @@ import {
 } from './ScatterGraph.test-harness';
 
 describe('ScatterGraph unofficial overlays', () => {
+  it('includes unofficial measured points in the validated/historical coverage summary', () => {
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      { ...point('h100', 'fp8', 30, 300, 2), power_tier: 'certified', run_url: runUrl },
+      { ...point('h100', 'fp8', 35, 350, 4), power_tier: 'legacy', run_url: runUrl },
+    ] as InferenceData[];
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y_measuredJPerOutputToken',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { container, unmount } = mountChart({
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(
+      container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
+    ).toContain('Showing 2 of 2 measured points: 1/1 validated · 1/1 historical.');
+    unmount();
+  });
+
   it('keeps unofficial-run overlay markers rendered through official toggles', () => {
     const overlayPoints = [point('h100', 'fp8', 30, 300, 2), point('h100', 'fp8', 35, 350, 4)].map(
       (p) => ({ ...p, run_url: 'https://github.com/o/r/actions/runs/123' }),
@@ -213,7 +245,7 @@ describe('ScatterGraph unofficial overlays', () => {
     // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
-      quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [] },
+      quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [], power: [] },
     };
     const { container, unmount } = mountChart({
       overlayData: {

@@ -37,11 +37,17 @@ export default function Error({
   return (
     <div
       role="alert"
+      lang={locale === 'zh' ? 'zh-CN' : 'en'}
       className="flex grow flex-col items-center justify-center px-4 text-center text-foreground"
     >
       <h2 className="text-4xl font-bold mb-4">{t.title}</h2>
       <p className="text-lg mb-4">{t.description}</p>
-      <p className="text-md mb-8 max-w-full break-words text-red-500">{error.message}</p>
+      <p
+        lang={locale === 'zh' ? 'en' : undefined}
+        className="text-md mb-8 max-w-full break-words text-red-500"
+      >
+        {error.message}
+      </p>
       <button
         type="button"
         className="min-h-11 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"

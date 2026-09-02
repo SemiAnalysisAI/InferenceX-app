@@ -191,7 +191,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   return (
     <header
       data-testid="header"
-      className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
+      className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
 import type { LatestImageRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { Sequence, getSequenceLabel } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { getFrameworkLabel } from '@/lib/utils';
 import {
@@ -30,6 +31,7 @@ import {
   getActualLatestTag,
   getCurrentImageNodeTypeTooltip,
   isOutdated,
+  isStaleAgentx,
 } from './latest-image-utils';
 
 const STRINGS = {
@@ -115,6 +117,20 @@ const STRINGS = {
 
 type NodeType = 'single' | 'disagg' | 'all';
 
+/**
+ * Scenario key for a row: 'agentic-traces' for AgentX rows (null isl/osl), the
+ * mapped '1k/1k'-style string for fixed-sequence rows, raw `isl/osl` fallback
+ * for unmapped fixed-sequence combos so they stay selectable rather than vanishing.
+ */
+function rowSequence(row: LatestImageRow): string {
+  return rowToSequence(row) ?? `${row.isl}/${row.osl}`;
+}
+
+/** Human label for a scenario key — AgentX rows read "Agentic"/"智能体", never "null/null". */
+function sequenceOptionLabel(seq: string, locale: 'en' | 'zh'): string {
+  return seq === Sequence.AgenticTraces ? getSequenceLabel(Sequence.AgenticTraces, locale) : seq;
+}
+
 function deriveOptions(data: LatestImageRow[]) {
   const models = new Set<string>();
   const precisions = new Set<string>();
@@ -127,8 +143,7 @@ function deriveOptions(data: LatestImageRow[]) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
     models.add(displayModel);
     precisions.add(row.precision);
-    const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
-    sequences.add(seq);
+    sequences.add(rowSequence(row));
     specMethods.add(row.spec_method);
     hardwares.add(row.hardware);
     frameworks.add(baseFramework(row.framework));
@@ -183,8 +198,7 @@ export function CurrentImageContent() {
         if (displayModel !== selectedModel) return false;
       }
       if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
-      const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
-      if (seq !== selectedSequence) return false;
+      if (rowSequence(row) !== selectedSequence) return false;
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       if (selectedNodeType !== 'all') {
@@ -333,7 +347,7 @@ export function CurrentImageContent() {
                 <SelectContent>
                   {options.sequences.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {sequenceOptionLabel(s, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -472,11 +486,13 @@ export function CurrentImageContent() {
                 const actualLatest = getActualLatestTag(row.framework, releases);
                 const outdated = isOutdated(row.image, actualLatest);
                 const ageDays = daysSince(row.date, today);
-                // Only tint by age when the row is actually outdated (image lags
-                // upstream latest, or uses an unstable tag). Up-to-date configs
-                // shouldn't look alarming just because a day passed.
-                const ageStyle = outdated ? ageColorStyle(ageDays) : undefined;
-                const rowStyle = outdated ? ageRowStyle(ageDays) : undefined;
+                // Tint by age when the row is actually outdated (image lags
+                // upstream latest, or uses an unstable tag) — up-to-date configs
+                // shouldn't look alarming just because a day passed — or when an
+                // AgentX submission has blown its two-week freshness budget.
+                const stale = outdated || isStaleAgentx(row.benchmark_type, ageDays);
+                const ageStyle = stale ? ageColorStyle(ageDays) : undefined;
+                const rowStyle = stale ? ageRowStyle(ageDays) : undefined;
 
                 return (
                   <tr

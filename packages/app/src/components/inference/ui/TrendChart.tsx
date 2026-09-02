@@ -18,6 +18,7 @@ import {
   logTickFormat,
 } from '@/lib/chart-rendering';
 import { getChartWatermark } from '@/lib/data-mappings';
+import { useLocale } from '@/lib/use-locale';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
@@ -35,6 +36,21 @@ interface TrendChartProps {
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
+
+const STRINGS = {
+  en: {
+    dismiss: 'Click elsewhere to dismiss',
+    noData: 'No historical data found for the tracked configurations.',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
+    aria: 'Historical performance trend chart',
+  },
+  zh: {
+    dismiss: '点击其他区域关闭',
+    noData: '当前追踪的配置暂无历史数据。',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
+    aria: '历史性能趋势图表',
+  },
+} as const;
 
 /** Prepared line data point with parsed date and timestamp for D3 scales. */
 interface PreparedPoint {
@@ -63,6 +79,27 @@ const TrendChart = React.memo(
     caption,
     selectedPrecisions,
   }: TrendChartProps) => {
+    const locale = useLocale();
+    const t = STRINGS[locale];
+    const dateFormatter = useMemo(
+      () =>
+        new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+      [locale],
+    );
+    const axisDateFormatter = useMemo(
+      () =>
+        new Intl.DateTimeFormat('zh-CN', {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+      [],
+    );
     // All data points flattened for computing axis domains — only from VISIBLE configs
     const visibleConfigIds = useMemo(() => new Set(lineConfigs.map((c) => c.id)), [lineConfigs]);
 
@@ -229,9 +266,9 @@ const TrendChart = React.memo(
         rulerType: 'crosshair' as const,
         content: (d: PreparedPoint, isPinned: boolean) =>
           `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
-            ${isPinned ? '<div class="text-muted-foreground text-3xs mb-1 italic">Click elsewhere to dismiss</div>' : ''}
+            ${isPinned ? `<div class="text-muted-foreground text-3xs mb-1 italic">${t.dismiss}</div>` : ''}
             <div class="font-semibold mb-1" style="color: ${getPointConfig(d)?.color ?? '#888'}">${getPointConfig(d)?.label ?? ''}</div>
-            <div class="text-muted-foreground">${d.raw.date}</div>
+            <div class="text-muted-foreground">${locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}</div>
             <div class="mt-1 font-medium">${yLabel}: ${formatLargeNumber(d.value)}</div>
           </div>`,
         getRulerX: (d: PreparedPoint, xScale: any) => xScale(d.x),
@@ -253,18 +290,21 @@ const TrendChart = React.memo(
         },
         attachToLayer: 1,
       }),
-      [getPointConfig, yLabel, selectedPrecisions],
+      [dateFormatter, getPointConfig, locale, selectedPrecisions, t.dismiss, yLabel],
     );
 
     const xAxisConfig = useMemo(
       () => ({
-        tickFormat: d3.timeFormat('%b %d') as any,
+        tickFormat: ((value: d3.AxisDomain) =>
+          locale === 'zh'
+            ? axisDateFormatter.format(new Date(Number(value)))
+            : d3.timeFormat('%b %d')(new Date(Number(value)))) as any,
         tickCount: 10,
         customize: (g: d3.Selection<SVGGElement, unknown, null, undefined>) => {
           g.selectAll('.tick text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
         },
       }),
-      [],
+      [axisDateFormatter, locale],
     );
 
     const yAxisConfig = useMemo(
@@ -289,34 +329,34 @@ const TrendChart = React.memo(
     if (allPoints.length === 0) {
       return (
         <div className="relative w-full min-h-[200px] flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">
-            No historical data found for the tracked configurations.
-          </p>
+          <p className="text-muted-foreground text-sm">{t.noData}</p>
         </div>
       );
     }
 
     return (
-      <D3Chart<PreparedPoint>
-        chartId={chartId}
-        data={flatPointData}
-        height={600}
-        margin={CHART_MARGIN}
-        watermark={getChartWatermark()}
-        testId="trend-chart-svg"
-        grabCursor
-        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset"
-        xScale={xScaleConfig}
-        yScale={yScaleConfig}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
-        layers={layers}
-        zoom={zoomConfig}
-        tooltip={tooltipConfig}
-        onRender={onRender}
-        legendElement={legendElement}
-        caption={caption}
-      />
+      <div role="group" aria-label={t.aria}>
+        <D3Chart<PreparedPoint>
+          chartId={chartId}
+          data={flatPointData}
+          height={600}
+          margin={CHART_MARGIN}
+          watermark={getChartWatermark()}
+          testId="trend-chart-svg"
+          grabCursor
+          instructions={t.instructions}
+          xScale={xScaleConfig}
+          yScale={yScaleConfig}
+          xAxis={xAxisConfig}
+          yAxis={yAxisConfig}
+          layers={layers}
+          zoom={zoomConfig}
+          tooltip={tooltipConfig}
+          onRender={onRender}
+          legendElement={legendElement}
+          caption={caption}
+        />
+      </div>
     );
   },
 );

@@ -18,6 +18,7 @@
  *     [--limit N]   only process the first N candidate rows (useful for
  *                   smoke-tests on a fresh deploy)
  *     [--force]     recompute every row, even if version already matches
+ *     [--run-id N] only process trace rows linked to one GitHub workflow run
  *     [--yes]       skip the confirmation prompt
  */
 
@@ -33,11 +34,13 @@ import { createAdminSql } from './etl/db-utils.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
+  parseRunIdFlag,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
+const githubRunId = parseRunIdFlag();
 
 // Neon's HTTP response and JS drivers should not receive a 100+ MB bytea as
 // one value. Slice oversized TOAST values into independent bounded reads and
@@ -69,9 +72,21 @@ async function main(): Promise<void> {
   console.log(`  STATS_VERSION = ${STATS_VERSION}`);
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
+  console.log(`  run_id = ${githubRunId ?? 'all'}`);
 
   await runCandidateIdBackfill(
     async () => {
+      const runFilter = githubRunId
+        ? sql`
+            and exists (
+              select 1
+              from benchmark_results br
+              join latest_workflow_runs wr on wr.id = br.workflow_run_id
+              where br.trace_replay_id = agentic_trace_replay.id
+                and wr.github_run_id = ${githubRunId}
+            )
+          `
+        : sql``;
       // Find candidates: rows missing stats, or whose stored version is stale.
       // Using >>'version'::int comparison would error on null; coalesce to -1 so
       // null-stats rows always count as stale.
@@ -79,14 +94,16 @@ async function main(): Promise<void> {
         ? await sql<{ id: number }[]>`
             select id
             from agentic_trace_replay
+            where true ${runFilter}
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `
         : await sql<{ id: number }[]>`
             select id
             from agentic_trace_replay
-            where aggregate_stats is null
-               or coalesce((aggregate_stats->>'version')::int, -1) <> ${STATS_VERSION}
+            where (aggregate_stats is null
+               or coalesce((aggregate_stats->>'version')::int, -1) <> ${STATS_VERSION})
+              ${runFilter}
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `;
@@ -132,7 +149,12 @@ async function main(): Promise<void> {
       // fields haven't changed since v3), so skip re-reading the huge server
       // blob and carry its KV/prefix distributions forward.
       const storedVersion = row.aggregate_stats?.version;
-      if (storedVersion !== undefined && storedVersion >= 3 && storedVersion < STATS_VERSION) {
+      if (
+        !flags.force &&
+        storedVersion !== undefined &&
+        storedVersion >= 3 &&
+        storedVersion < STATS_VERSION
+      ) {
         stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
       } else {
         const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`

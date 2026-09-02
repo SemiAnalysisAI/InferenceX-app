@@ -16,6 +16,18 @@ export interface LimitForceFlags {
   shardIndex: number;
 }
 
+/** Restrict a backfill to one GitHub run; malformed selectors must never scan all rows. */
+export function parseRunIdFlag(argv: readonly string[] = process.argv): number | undefined {
+  const index = argv.indexOf('--run-id');
+  if (index === -1) return undefined;
+  const raw = argv[index + 1];
+  const runId = Number(raw);
+  if (!raw || !/^\d+$/u.test(raw) || !Number.isSafeInteger(runId) || runId < 1) {
+    throw new Error('--run-id requires a positive integer GitHub workflow run ID');
+  }
+  return runId;
+}
+
 /** Parse the standard `--limit N` / `--force` backfill flags from argv. */
 export function parseLimitForceFlags(): LimitForceFlags {
   let limit: number | null = null;

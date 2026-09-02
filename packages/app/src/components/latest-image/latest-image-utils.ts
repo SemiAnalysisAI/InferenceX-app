@@ -30,6 +30,18 @@ export const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
 /** Age past which the cell is rendered at max red — anything older looks identical. */
 export const AGE_MAX_RED_DAYS = 60;
 
+/**
+ * AgentX (agentic) submissions must be refreshed at least every two weeks —
+ * anything older is stale regardless of whether its image tag still matches
+ * the latest framework release.
+ */
+export const AGENTX_MAX_AGE_DAYS = 14;
+
+/** True when an agentic (AgentX) row's last submission is older than the two-week budget. */
+export function isStaleAgentx(benchmarkType: string, ageDays: number): boolean {
+  return benchmarkType === 'agentic_traces' && ageDays > AGENTX_MAX_AGE_DAYS;
+}
+
 /** Preserve the legacy English product spelling while using the reviewed Chinese copy. */
 export function getCurrentImageNodeTypeTooltip(locale: 'en' | 'zh'): string {
   return locale === 'zh'

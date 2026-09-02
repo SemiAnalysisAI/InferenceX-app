@@ -65,7 +65,7 @@ import {
   Sequence,
   sequenceKind,
 } from '@/lib/data-mappings';
-import { NORMALIZED_TOKEN_REVENUE_PRICING } from './token-revenue';
+import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
 import { useLocale } from '@/lib/use-locale';
 import {
   EngineComparisonConflictToast,
@@ -96,7 +96,9 @@ import { bestSeriesPerSku } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
+  parsePowerTiers,
   type DeploymentMode,
+  type PowerTier,
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
@@ -226,8 +228,8 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tokensPerDollarN`. URL param still wins so existing
-   * shared links are unaffected.
+   * the dashboard's default `y_tokensPerDollarH`. URL param still wins so
+   * existing shared links are unaffected.
    */
   initialYAxisMetric?: string;
   /**
@@ -378,7 +380,7 @@ export function InferenceProvider({
   const openRouterModelId = getOpenRouterModelId(selectedModel);
   const openRouterPricingQuery = useOpenRouterPricing(
     openRouterModelId,
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' && tokenRevenuePriceSource === 'openrouter',
+    usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePriceSource === 'openrouter',
   );
   const tokenRevenuePricing =
     tokenRevenuePriceSource === 'normalized'
@@ -442,7 +444,7 @@ export function InferenceProvider({
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
 
-  // ── Quick filters (vendor / framework / deployment / mtp-stp) ───────────────
+  // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
   // Coarse pre-filters applied to the point set. Empty = no constraint.
   //
   // Initialized empty rather than from the URL so the first client render matches
@@ -455,8 +457,9 @@ export function InferenceProvider({
   const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
+  const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
   useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power') => {
       const v = getUrlParam(key);
       return v ? v.split(',').filter(Boolean) : [];
     };
@@ -466,10 +469,12 @@ export function InferenceProvider({
     // point, so expand it to both aggregate deployment modes.
     const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
+    const power = parsePowerTiers(parse('i_power'));
     if (vendors.length > 0) setQuickFilterVendors(vendors);
     if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
+    if (power.length > 0) setQuickFilterPower(power);
   }, [getUrlParam]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
@@ -477,8 +482,15 @@ export function InferenceProvider({
       frameworks: quickFilterFrameworks,
       deployment: quickFilterDeployment,
       spec: quickFilterSpec,
+      power: quickFilterPower,
     }),
-    [quickFilterVendors, quickFilterFrameworks, quickFilterDeployment, quickFilterSpec],
+    [
+      quickFilterVendors,
+      quickFilterFrameworks,
+      quickFilterDeployment,
+      quickFilterSpec,
+      quickFilterPower,
+    ],
   );
   // Historical Trends hides Quick Filters, so never apply invisible selections there.
   // Agentic charts expose vendor, framework, and deployment filters, but speculative
@@ -927,7 +939,7 @@ export function InferenceProvider({
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
   const openRouterPricingLoading =
-    selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+    usesTokenSalePricing(selectedYAxisMetric) &&
     tokenRevenuePriceSource === 'openrouter' &&
     openRouterPricingQuery.isLoading;
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
@@ -1466,8 +1478,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
-      i_revenue:
-        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
+      i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1492,6 +1503,7 @@ export function InferenceProvider({
       i_fw: quickFilterFrameworks.join(','),
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
+      i_power: quickFilterPower.join(','),
     },
     [
       selectedYAxisMetric,
@@ -1518,6 +1530,7 @@ export function InferenceProvider({
       quickFilterFrameworks,
       quickFilterDeployment,
       quickFilterSpec,
+      quickFilterPower,
     ],
   );
 
@@ -1784,6 +1797,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
+    setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
     setShowPointLabels,

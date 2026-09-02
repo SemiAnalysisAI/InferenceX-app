@@ -2,9 +2,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   parseLimitForceFlags,
+  parseRunIdFlag,
   runCandidateIdBackfill,
   runPerIdBackfill,
 } from './backfill-runner.js';
+
+describe('parseRunIdFlag', () => {
+  it('leaves unscoped backfills unchanged', () => {
+    expect(parseRunIdFlag(['bun', 'backfill.ts', '--force'])).toBeUndefined();
+  });
+
+  it('preserves large GitHub run IDs', () => {
+    expect(parseRunIdFlag(['bun', 'backfill.ts', '--run-id', '33418433573', '--yes'])).toBe(
+      33418433573,
+    );
+  });
+
+  it.each([undefined, '', '--yes', 'all', '0', '-1', '1.5', '1e3', '9007199254740992'])(
+    'rejects an invalid run selector: %s',
+    (value) => {
+      const argv = ['bun', 'backfill.ts', '--run-id'];
+      if (value !== undefined) argv.push(value);
+      expect(() => parseRunIdFlag(argv)).toThrow('--run-id requires a positive integer');
+    },
+  );
+});
 
 describe('parseLimitForceFlags', () => {
   const originalArgv = process.argv;

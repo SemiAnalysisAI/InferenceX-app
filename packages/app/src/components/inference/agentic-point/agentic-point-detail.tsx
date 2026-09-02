@@ -36,7 +36,6 @@ import { PointSummary } from './point-summary';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
 import { ServerLogViewer } from './server-log-viewer';
 import {
-  CumulativeUniqueInputTokensCard,
   InflightUniqueTokensCard,
   KvCacheUtilizationCard,
   PrefixCacheHitRateCard,
@@ -467,8 +466,6 @@ export function AgenticPointDetail({ id }: Props) {
             />
 
             <PromptTokenSourceCard sliced={sliced} />
-
-            <CumulativeUniqueInputTokensCard sliced={sliced} />
 
             {!requestChartQuery.isError && (
               <InflightUniqueTokensCard

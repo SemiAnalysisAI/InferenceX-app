@@ -2,10 +2,10 @@
  * Global e2e setup. Loaded before every `cy.visit` via `supportFile` in
  * `cypress.config.ts`.
  *
- * Suppresses the centered feedback-modal on the dashboard so its backdrop
- * doesn't sit on top of the UI under test. Specs that want to exercise the
- * feedback-modal flow can clear `inferencex-feedback-modal-snoozed` in their
- * own `onBeforeLoad`, which runs after this hook.
+ * Suppresses overlay nudges (telemetry tutorial, agentic coach mark) so
+ * their backdrops don't sit on top of the UI under test. Specs that want to
+ * exercise a nudge flow can clear its storage key in their own
+ * `onBeforeLoad`, which runs after this hook.
  */
 import 'cypress-axe';
 
@@ -71,7 +71,6 @@ Cypress.on('window:before:load', (win) => {
     viewTransition.skipTransition();
   });
   try {
-    win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
     }

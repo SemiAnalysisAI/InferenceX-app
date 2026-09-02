@@ -61,7 +61,26 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(explanation.description.en).toContain('OpenRouter');
     expect(explanation.description.zh).toContain('每百万 1 美元');
     expect(explanation.description.zh).toContain('OpenRouter');
+    expect(explanation.description.en).toContain(
+      'Agentic cache hit combines GPU and external cache',
+    );
+    expect(explanation.description.en).toContain('partially measured cache frontier');
+    expect(explanation.description.zh).toContain('缓存命中率由 GPU 与 external cache 相加');
+    expect(explanation.description.zh).toContain('缓存指标仅覆盖部分 frontier 数据点');
+    expect(explanation.description.en).not.toContain('—');
+    expect(explanation.description.zh).not.toContain('—');
     expect(explanation.formula.en).toContain('$/GPU/hr =');
+  });
+
+  it('defines total tokens per dollar as infrastructure purchasing power', () => {
+    const explanation = METRIC_EXPLANATIONS.tokensPerDollarN;
+    expect(explanation.description.en).toContain('infrastructure spend');
+    expect(explanation.description.en).toContain('Neocloud Giant');
+    expect(explanation.description.zh).toContain('基础设施开支');
+    expect(explanation.description.zh).toContain('Neocloud Giant');
+    expect(explanation.formula.en).toContain('all-in cost per chip-hour');
+    expect(explanation.description.en).not.toContain('—');
+    expect(explanation.description.zh).not.toContain('—');
   });
 });
 
@@ -146,5 +165,8 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
+    expect(metricRowLabel('tokensPerDollarN', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
+    );
   });
 });

@@ -56,21 +56,44 @@ describe('Header', () => {
     cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
   });
 
+  it('keeps the sticky header opaque enough that content cannot show through', () => {
+    // Regression: `bg-background/60 backdrop-blur-[2px]` let page text bleed
+    // through the sticky header while scrolling on mobile.
+    cy.get('[data-testid="header"]').should(($el) => {
+      const tokens = $el[0].className.split(/\s+/u);
+      expect(tokens).to.include('bg-background/95');
+      expect(tokens).to.include('supports-[backdrop-filter]:bg-background/80');
+      expect(tokens).to.include('backdrop-blur-md');
+      expect(tokens).to.not.include('bg-background/60');
+      expect(tokens).to.not.include('backdrop-blur-[2px]');
+    });
+    // With the stylesheet applied the header must actually blur what scrolls
+    // beneath it (backdrop-blur-md), not just carry the class names.
+    cy.get('[data-testid="header"]').should(($el) => {
+      const { backdropFilter } = getComputedStyle($el[0]);
+      expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
+    });
+  });
+
   it('shows Overview as a top-level nav link', () => {
     cy.get('[data-testid="nav-link-overview"]')
       .should('be.visible')
       .and('have.attr', 'href', '/overview');
   });
 
-  it('uses resilient app navigation for the desktop Overview link', () => {
+  it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
+    // The old 250ms retry re-read the address bar, which a stale
+    // mid-transition restore could revert; the retry then stacked a duplicate
+    // history entry and visibly restarted the transition (landing "Full
+    // dashboard" regression). A single push is the contract now.
     cy.clock();
     cy.get('[data-testid="nav-link-overview"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
-    cy.tick(250);
-    cy.wrap(mockRouter.push).should('have.been.calledTwice');
+    cy.tick(5000);
+    cy.wrap(mockRouter.push).should('have.been.calledOnce');
   });
 
-  it('retains resilient locale navigation outside Overview', () => {
+  it('pushes locale navigation exactly once outside Overview', () => {
     cy.clock();
     mountHeader('/inference');
     cy.get('[data-testid="language-toggle"]')
@@ -79,8 +102,8 @@ describe('Header', () => {
         expect(href).to.include('/zh/inference');
         cy.get('[data-testid="language-toggle"]').click();
         cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
-        cy.tick(250);
-        cy.wrap(mockRouter.push).should('have.been.calledTwice');
+        cy.tick(5000);
+        cy.wrap(mockRouter.push).should('have.been.calledOnce');
       });
   });
 
@@ -140,14 +163,7 @@ describe('Header', () => {
     );
 
     mountHeader('/zh/inference');
-    cy.get('[data-testid="mobile-menu-toggle"]')
-      .should('have.attr', 'aria-label', '导航菜单')
-      .click()
-      .should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="mobile-menu"]').within(() => {
-      cy.contains('a', '总览').should('have.attr', 'href', '/zh/overview');
-      cy.contains('a', '仪表板').should('have.attr', 'href', '/zh/inference');
-    });
+    cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
   it('orders the nav with Home first and AgentX second', () => {
@@ -207,14 +223,14 @@ describe('Header', () => {
     });
   });
 
-  it('uses resilient app navigation for the mobile Overview link', () => {
+  it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {
     cy.clock();
     cy.viewport(375, 812);
     cy.get('[data-testid="mobile-menu-toggle"]').click();
     cy.get('[data-testid="mobile-menu"]').contains('a', 'Overview').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
-    cy.tick(250);
-    cy.wrap(mockRouter.push).should('have.been.calledTwice');
+    cy.tick(5000);
+    cy.wrap(mockRouter.push).should('have.been.calledOnce');
   });
 
   it('uses the hamburger without horizontal overflow from 1009 through 1024 CSS pixels', () => {

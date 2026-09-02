@@ -7,7 +7,7 @@ import { getAllPosts, getPostBySlug } from '@/lib/blog';
 // article card. Swapping in a CJK-capable font is a known follow-up.
 import { renderOgImage, size } from '../../../blog/[slug]/og-image-render';
 
-export const alt = 'InferenceX Articles';
+export const alt = 'InferenceX 文章';
 export { size };
 export const contentType = 'image/png';
 

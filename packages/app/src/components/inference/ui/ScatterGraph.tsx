@@ -23,7 +23,6 @@ import {
   avoidPointLabelCollisions,
   parallelismLabelBoxes,
   placeLineLabels,
-  placeEndpointLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
@@ -122,6 +121,12 @@ import {
 } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import {
+  countPowerTiers,
+  MeasuredPowerSummary,
+} from '@/components/inference/ui/MeasuredPowerSummary';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
@@ -473,12 +478,16 @@ const ScatterGraph = React.memo(
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
+    // Legacy-power rings decorate points only while a Measured Energy y-axis
+    // is selected (see legacy-power-marker.ts).
+    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
 
     const {
       isUnofficialRun,
@@ -1084,17 +1093,20 @@ const ScatterGraph = React.memo(
       quickFilters.vendors.length +
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
+      quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
+      setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     ]);
 
     const pointsTable = useMemo(() => {
@@ -1334,6 +1346,30 @@ const ScatterGraph = React.memo(
         (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
       [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
     );
+
+    const powerTierCounts = useMemo(() => {
+      const officialTotal = pointsData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const overlayTotal = processedOverlayData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const officialVisible = officialTotal.filter(isPointVisible);
+      const overlayVisible = overlayTotal.filter(
+        (point) => activeOverlayHwTypes.has(String(point.hwKey)) && isOverlayPointVisible(point),
+      );
+      return {
+        total: countPowerTiers([...officialTotal, ...overlayTotal]),
+        visible: countPowerTiers([...officialVisible, ...overlayVisible]),
+      };
+    }, [
+      pointsData,
+      processedOverlayData,
+      selectedPrecisions,
+      isPointVisible,
+      activeOverlayHwTypes,
+      isOverlayPointVisible,
+    ]);
 
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
@@ -2245,17 +2281,15 @@ const ScatterGraph = React.memo(
             });
             const labelSeries = [...officialSeries, ...overlaySeries];
 
-            lineLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, xScale, yScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, xScale, yScale, {
-                    nudge: !pinLineLabels,
-                  });
+            // Both chart types spread labels along their lines with collision
+            // avoidance — endpoint-only placement stacked every label at the
+            // right edge of the e2e latency chart.
+            lineLabels = placeLineLabels(labelSeries, xScale, yScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
+            });
 
             // Keep hidden data-join entries for precision/date curves that lost
             // deduplication, preserving the chart's one-label-per-series identity.
@@ -2485,17 +2519,12 @@ const ScatterGraph = React.memo(
                 : [],
             );
             const labelSeries = [...officialSeries, ...overlaySeries];
-            const zoomLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, newXScale, newYScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, newXScale, newYScale, {
-                    nudge: !pinLineLabels,
-                  });
+            const zoomLabels = placeLineLabels(labelSeries, newXScale, newYScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(zoomGroup.node()),
+            });
             updateRenderedLineLabels(zoomGroup, zoomLabels);
           }
         },
@@ -2631,14 +2660,15 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload is the only persistent
-              // point decoration. Decode method remains in the tooltip.
+              // Match official points: KV offload and the measured-axis
+              // legacy-power ring are the only persistent point decorations.
+              // Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
-                renderOffloadHalo(
-                  d3.select(this),
-                  d,
-                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                const overlayStroke = overlayRunColor(
+                  overlayRunIndex(d.run_url ?? null, runIndexByUrl),
                 );
+                renderOffloadHalo(d3.select(this), d, overlayStroke);
+                renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
               // Labels
@@ -3003,6 +3033,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      isMeasuredEnergyAxis,
       chartDefinition,
       locale,
       drawPerfRuler,
@@ -3024,9 +3055,11 @@ const ScatterGraph = React.memo(
         // CSS transitions for smooth opacity animation on hw toggle
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
-        // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
+        // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
+        // Legacy-power ring: dotted ring on unvalidated telemetry, measured axes only.
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
+          renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, 'var(--foreground)');
         });
 
         avoidPointLabelCollisions(zoomGroup);
@@ -3056,6 +3089,9 @@ const ScatterGraph = React.memo(
         optimalPointKeys,
         getCssColor,
         resolveColor,
+        // A metric-only change must re-run the decoration pass so legacy-power
+        // rings appear/disappear with the Measured Energy axis selection.
+        isMeasuredEnergyAxis,
       ],
     );
 
@@ -3089,8 +3125,9 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the offload halo above that shape after the swap.
+        // Keep the decorations above that shape after the swap.
         point.selectAll('.offload-halo').raise();
+        point.selectAll('.legacy-power-ring').raise();
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
@@ -3703,6 +3740,14 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        {isMeasuredEnergyAxis && (
+          <MeasuredPowerSummary
+            total={powerTierCounts.total}
+            visible={powerTierCounts.visible}
+            bestPerSku={bestPerSku}
+            optimalOnly={hideNonOptimal}
+          />
+        )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}

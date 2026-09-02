@@ -23,7 +23,7 @@ const CHART_DEF = {
   y_costh_label: 'Cost per Million Total Tokens ($)',
   y_costh_roofline: 'lower_right',
   y_tokensPerDollarH: 'tokensPerDollarH.y',
-  y_tokensPerDollarH_label: 'Total Tokens per $1 (tok/$)',
+  y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
   y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 

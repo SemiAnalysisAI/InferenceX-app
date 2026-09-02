@@ -21,6 +21,7 @@
  *     [--force]     recompute every row, even if version already matches
  *     [--shard-count N] split work across N independent processes
  *     [--shard-index N] zero-based shard handled by this process
+ *     [--run-id N] only process trace rows linked to one GitHub workflow run
  *     [--yes]       skip the confirmation prompt
  */
 
@@ -30,11 +31,13 @@ import { createAdminSql } from './etl/db-utils.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
+  parseRunIdFlag,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
+const githubRunId = parseRunIdFlag();
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -48,6 +51,7 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
   console.log(`  shard = ${flags.shardIndex + 1}/${flags.shardCount}`);
+  console.log(`  run_id = ${githubRunId ?? 'all'}`);
 
   await runCandidateIdBackfill(
     async () => {
@@ -56,12 +60,24 @@ async function main(): Promise<void> {
       // null and the API serves them via the slow path (which also returns
       // null because there's no blob to parse — so the page falls into the
       // "no stored trace_replay blob" branch).
+      const runFilter = githubRunId
+        ? sql`
+            and exists (
+              select 1
+              from benchmark_results br
+              join latest_workflow_runs wr on wr.id = br.workflow_run_id
+              where br.trace_replay_id = agentic_trace_replay.id
+                and wr.github_run_id = ${githubRunId}
+            )
+          `
+        : sql``;
       const candidates = flags.force
         ? await sql<{ id: number }[]>`
             select id
             from agentic_trace_replay
             where server_metrics_json_gz is not null
               and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
+              ${runFilter}
             -- Restore the newest, most actively viewed runs first. The backfill is
             -- idempotent, so an interrupted pass resumes with only stale rows.
             order by id desc
@@ -76,6 +92,7 @@ async function main(): Promise<void> {
                 chart_series is null
                 or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
               )
+              ${runFilter}
             -- Restore the newest, most actively viewed runs first. The backfill is
             -- idempotent, so an interrupted pass resumes with only stale rows.
             order by id desc
