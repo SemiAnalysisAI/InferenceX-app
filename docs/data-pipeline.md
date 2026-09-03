@@ -114,6 +114,10 @@ updates both the first-class column and `metrics.offload_mode`; for example, a m
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
 metadata in one correction. Unrelated metrics remain unchanged.
 
+When extending an already-applied identity-changing correction, record its old
+`set` as `previousSet`. The recovery command accepts that declared prior patch
+before applying the new fields; unrecognized destination states still fail closed.
+
 Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
 the command requires confirmation unless passed `--yes`. It fails before writing when a
 target is missing, when a point's desired identity already exists, or when registry

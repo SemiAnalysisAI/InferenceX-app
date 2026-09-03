@@ -296,6 +296,8 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   offloadMode: string;
   /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
+  /** Previously applied patch accepted when extending an identity-changing backfill. */
+  previousSet?: BenchmarkPointBackfill['set'];
   set: {
     /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
@@ -529,6 +531,16 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     conc,
     offloadMode: 'off',
     recipeFingerprint,
+    // The offload-only version was applied before PR #975 added cache-hit fields.
+    previousSet: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+      },
+    },
     set: {
       offloadMode: 'on' as const,
       metricsRemove: ['allocated_cpu_dram_gb'],
@@ -1264,6 +1276,18 @@ export function validateRunBackfills(
       throw new Error(`${backfill.id}: recipeFingerprint must be null or non-empty`);
     }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
+    if (backfill.previousSet) {
+      const previous = backfill.previousSet;
+      if (
+        previous.offloadMode === undefined ||
+        previous.offloadMode !== backfill.set.offloadMode ||
+        previous.offloadMode === backfill.offloadMode ||
+        Object.keys(previous.metricsMerge ?? {}).length === 0
+      ) {
+        throw new Error(`${backfill.id}: previousSet must identify the prior destination patch`);
+      }
+      validateRunBackfills([], [{ ...backfill, previousSet: undefined, set: previous }]);
+    }
     const removeKeys = backfill.set.metricsRemove ?? [];
     if (
       backfill.set.offloadMode === undefined &&
