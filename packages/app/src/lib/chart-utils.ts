@@ -335,26 +335,26 @@ export function buildDerivedChartFields(
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
-  // Normalized placeholders for the MW-year axes: one all-in utility MW hosts
-  // 1000 / power GPUs for 8,760 hours. `applyTokenRevenuePricing` replaces
+  // Normalized placeholders for the GW-year axes: one all-in utility GW hosts
+  // 1,000,000 / power GPUs for 8,760 hours. `applyTokenRevenuePricing` replaces
   // these with the selected normalized or OpenRouter prices.
-  const gpuHoursPerMwYear = hardwarePower ? (1000 / hardwarePower) * HOURS_PER_YEAR : 0;
-  if (wants('tokenRevenuePerMwYear')) {
-    fields.tokenRevenuePerMwYear = chartMetric(millionTokensPerHour * gpuHoursPerMwYear);
+  const gpuHoursPerGwYear = hardwarePower ? (1_000_000 / hardwarePower) * HOURS_PER_YEAR : 0;
+  if (wants('tokenRevenuePerGwYear')) {
+    fields.tokenRevenuePerGwYear = chartMetric(millionTokensPerHour * gpuHoursPerGwYear);
   }
-  if (wants('tokenProfitPerMwYearH')) {
-    fields.tokenProfitPerMwYearH = chartMetric(
-      specs.costh ? (millionTokensPerHour - specs.costh) * gpuHoursPerMwYear : 0,
+  if (wants('tokenProfitPerGwYearH')) {
+    fields.tokenProfitPerGwYearH = chartMetric(
+      specs.costh ? (millionTokensPerHour - specs.costh) * gpuHoursPerGwYear : 0,
     );
   }
-  if (wants('tokenProfitPerMwYearN')) {
-    fields.tokenProfitPerMwYearN = chartMetric(
-      specs.costn ? (millionTokensPerHour - specs.costn) * gpuHoursPerMwYear : 0,
+  if (wants('tokenProfitPerGwYearN')) {
+    fields.tokenProfitPerGwYearN = chartMetric(
+      specs.costn ? (millionTokensPerHour - specs.costn) * gpuHoursPerGwYear : 0,
     );
   }
-  if (wants('tokenProfitPerMwYearR')) {
-    fields.tokenProfitPerMwYearR = chartMetric(
-      specs.costr ? (millionTokensPerHour - specs.costr) * gpuHoursPerMwYear : 0,
+  if (wants('tokenProfitPerGwYearR')) {
+    fields.tokenProfitPerGwYearR = chartMetric(
+      specs.costr ? (millionTokensPerHour - specs.costr) * gpuHoursPerGwYear : 0,
     );
   }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);

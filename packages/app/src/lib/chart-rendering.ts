@@ -146,6 +146,9 @@ export const applyHoverState = (
 };
 
 export const formatLargeNumber = (value: number): string => {
+  if (Math.abs(value) >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(value % 1_000_000_000 === 0 ? 0 : 1)}B`;
+  }
   if (Math.abs(value) >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
   }

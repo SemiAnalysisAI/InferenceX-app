@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import {
-  gpuHoursPerMwYear,
+  gpuHoursPerGwYear,
   NORMALIZED_TOKEN_REVENUE_PRICING,
 } from '@/components/inference/token-revenue';
 
@@ -110,7 +110,7 @@ describe('rowToLightweightPoint', () => {
     expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(2.261952, 10);
   });
 
-  it('prices the MW-year revenue and profit axes from the same OpenRouter revenue', () => {
+  it('prices the GW-year revenue and profit axes from the same OpenRouter revenue', () => {
     const pricing = {
       source: 'openrouter' as const,
       inputPerMillion: 1.122,
@@ -126,20 +126,20 @@ describe('rowToLightweightPoint', () => {
           median_intvty: 20,
         },
       }),
-      ['tokenRevenuePerMwYear', 'tokenProfitPerMwYearH', 'tokenProfitPerMwYearR'],
+      ['tokenRevenuePerGwYear', 'tokenProfitPerGwYearH', 'tokenProfitPerGwYearR'],
       pricing,
     );
 
     // H200: 1.37 kW all-in per GPU, TCO 1.22 (hyperscaler) and 2.05 (3-year rental) $/GPU/hr.
-    const gpuHours = gpuHoursPerMwYear('h200')!;
-    expect(gpuHours).toBeCloseTo((1000 / 1.37) * 8_760, 6);
-    expect(point?.tokenRevenuePerMwYear?.y).toBeCloseTo(2.261952 * gpuHours, 6);
-    expect(point?.tokenProfitPerMwYearH?.y).toBeCloseTo((2.261952 - 1.22) * gpuHours, 6);
-    expect(point?.tokenProfitPerMwYearR?.y).toBeCloseTo((2.261952 - 2.05) * gpuHours, 6);
-    expect(point?.tokenProfitPerMwYearR?.y).toBeGreaterThan(0);
+    const gpuHours = gpuHoursPerGwYear('h200')!;
+    expect(gpuHours).toBeCloseTo((1_000_000 / 1.37) * 8_760, -2);
+    expect(point?.tokenRevenuePerGwYear?.y).toBeCloseTo(2.261952 * gpuHours, -2);
+    expect(point?.tokenProfitPerGwYearH?.y).toBeCloseTo((2.261952 - 1.22) * gpuHours, -2);
+    expect(point?.tokenProfitPerGwYearR?.y).toBeCloseTo((2.261952 - 2.05) * gpuHours, -2);
+    expect(point?.tokenProfitPerGwYearR?.y).toBeGreaterThan(0);
   });
 
-  it('lets a MW-year profit axis go negative when sale prices sit below TCO', () => {
+  it('lets a GW-year profit axis go negative when sale prices sit below TCO', () => {
     const point = rowToLightweightPoint(
       makeBenchmarkRow({
         metrics: {
@@ -149,14 +149,14 @@ describe('rowToLightweightPoint', () => {
           median_intvty: 20,
         },
       }),
-      ['tokenProfitPerMwYearR'],
+      ['tokenProfitPerGwYearR'],
       NORMALIZED_TOKEN_REVENUE_PRICING,
     );
 
     // 100 tok/s/GPU at $1/M is $0.36/GPU/hr, well under the $2.05 rental TCO.
-    const gpuHours = gpuHoursPerMwYear('h200')!;
-    expect(point?.tokenProfitPerMwYearR?.y).toBeCloseTo((0.36 - 2.05) * gpuHours, 6);
-    expect(point?.tokenProfitPerMwYearR?.y).toBeLessThan(0);
+    const gpuHours = gpuHoursPerGwYear('h200')!;
+    expect(point?.tokenProfitPerGwYearR?.y).toBeCloseTo((0.36 - 2.05) * gpuHours, -2);
+    expect(point?.tokenProfitPerGwYearR?.y).toBeLessThan(0);
   });
 
   it('applies measured cache hits and cache-read pricing to historical points', () => {
@@ -551,24 +551,24 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(revenue).toBeCloseTo(throughput! * 0.0036, 10);
   });
 
-  it('interpolates MW-year revenue and profit through the priced $/GPU/hr path', () => {
-    const gpuHours = gpuHoursPerMwYear('h100')!;
+  it('interpolates GW-year revenue and profit through the priced $/GPU/hr path', () => {
+    const gpuHours = gpuHoursPerGwYear('h100')!;
     const points = [
       makePoint({
         x: 20,
         tpPerGpu: { y: 800, roof: false },
         input_tput_per_gpu: 640,
         output_tput_per_gpu: 160,
-        tokenRevenuePerMwYear: { y: 2.88 * gpuHours, roof: false },
-        tokenProfitPerMwYearH: { y: (2.88 - 1.17) * gpuHours, roof: false },
+        tokenRevenuePerGwYear: { y: 2.88 * gpuHours, roof: false },
+        tokenProfitPerGwYearH: { y: (2.88 - 1.17) * gpuHours, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 400, roof: false },
         input_tput_per_gpu: 320,
         output_tput_per_gpu: 80,
-        tokenRevenuePerMwYear: { y: 1.44 * gpuHours, roof: false },
-        tokenProfitPerMwYearH: { y: (1.44 - 1.17) * gpuHours, roof: false },
+        tokenRevenuePerGwYear: { y: 1.44 * gpuHours, roof: false },
+        tokenProfitPerGwYearH: { y: (1.44 - 1.17) * gpuHours, roof: false },
       }),
     ];
 
@@ -581,19 +581,19 @@ describe('interpolateMetricAtInteractivity', () => {
     const revenue = interpolateMetricAtInteractivity(
       points,
       40,
-      'tokenRevenuePerMwYear',
+      'tokenRevenuePerGwYear',
       NORMALIZED_TOKEN_REVENUE_PRICING,
     );
     const profit = interpolateMetricAtInteractivity(
       points,
       40,
-      'tokenProfitPerMwYearH',
+      'tokenProfitPerGwYearH',
       NORMALIZED_TOKEN_REVENUE_PRICING,
     );
     // H100 hyperscaler TCO is $1.17/GPU/hr; revenue at $1/M is throughput × 0.0036.
     const revenuePerGpuHour = throughput! * 0.0036;
-    expect(revenue).toBeCloseTo(revenuePerGpuHour * gpuHours, 6);
-    expect(profit).toBeCloseTo((revenuePerGpuHour - 1.17) * gpuHours, 6);
+    expect(revenue).toBeCloseTo(revenuePerGpuHour * gpuHours, -2);
+    expect(profit).toBeCloseTo((revenuePerGpuHour - 1.17) * gpuHours, -2);
   });
 
   it('returns exact boundary value at the lowest frontier x', () => {

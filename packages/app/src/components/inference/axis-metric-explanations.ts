@@ -151,53 +151,53 @@ function costPerMillion(basis: CostBasis, tokenType: TokenType): MetricExplanati
   };
 }
 
-function tokenRevenuePerMwYear(): MetricExplanation {
+function tokenRevenuePerGwYear(): MetricExplanation {
   return {
     description: {
       en:
-        'Gross token revenue one all-in utility megawatt could earn in a year at this operating ' +
+        'Gross token revenue one all-in utility gigawatt could earn in a year at this operating ' +
         'point. It takes Token Revenue per GPU Hour, priced with the same normalized or ' +
-        'OpenRouter sale prices and cache rules, and scales it by the number of chips one MW ' +
-        'powers (1,000 kW divided by the all-in kW per chip) running for 8,760 hours. This ' +
+        'OpenRouter sale prices and cache rules, and scales it by the number of chips one GW ' +
+        'powers (1,000,000 kW divided by the all-in kW per chip) running for 8,760 hours. This ' +
         'makes the throughput/interactivity tradeoff comparable across chips with different ' +
         'power envelopes when the binding constraint is datacenter power rather than chip count.',
       zh:
-        '表示在该运行点下，1 MW 全电源配置功率一年可获得的 token 毛收入。' +
+        '表示在该运行点下，1 GW 全电源配置功率一年可获得的 token 毛收入。' +
         '它以每 GPU 小时 token 收入为基础，采用相同的标准化或 OpenRouter 售价与缓存计价规则，' +
-        '再按 1 MW 可供电的芯片数（1,000 kW 除以每芯片全电源配置 kW）乘以 8,760 小时进行换算。' +
+        '再按 1 GW 可供电的芯片数（1,000,000 kW 除以每芯片全电源配置 kW）乘以 8,760 小时进行换算。' +
         '当数据中心的瓶颈是供电而非芯片数量时，该指标可在不同功耗的芯片之间比较吞吐量与交互性的权衡。',
     },
     formula: {
-      en: '$/MW/yr = token revenue per GPU hour ($/GPU/hr) × (1,000 ÷ all-in kW per chip) × 8,760',
-      zh: '$/MW/yr = 每 GPU 小时 token 收入（$/GPU/hr）×（1,000 ÷ 每芯片全电源配置 kW）× 8,760',
+      en: '$/GW/yr = token revenue per GPU hour ($/GPU/hr) × (1,000,000 ÷ all-in kW per chip) × 8,760',
+      zh: '$/GW/yr = 每 GPU 小时 token 收入（$/GPU/hr）×（1,000,000 ÷ 每芯片全电源配置 kW）× 8,760',
     },
   };
 }
 
-function tokenProfitPerMwYear(basis: CostBasis): MetricExplanation {
+function tokenProfitPerGwYear(basis: CostBasis): MetricExplanation {
   return {
     description: {
       en:
-        'Net token profit one all-in utility megawatt could earn in a year at this operating ' +
+        'Net token profit one all-in utility gigawatt could earn in a year at this operating ' +
         'point. Revenue is Token Revenue per GPU Hour at the selected normalized or OpenRouter ' +
         `sale prices; cost is the ${COST_BASIS_EN[basis]}. The difference is scaled by the ` +
-        'number of chips one MW powers (1,000 kW divided by the all-in kW per chip) running for ' +
+        'number of chips one GW powers (1,000,000 kW divided by the all-in kW per chip) running for ' +
         '8,760 hours. Negative values mean the sale price does not cover the hardware cost at ' +
         'that operating point.',
       zh:
-        '表示在该运行点下，1 MW 全电源配置功率一年可获得的 token 净利润。' +
+        '表示在该运行点下，1 GW 全电源配置功率一年可获得的 token 净利润。' +
         '收入为按所选标准化或 OpenRouter 售价计算的每 GPU 小时 token 收入；' +
-        `成本为${COST_BASIS_ZH[basis]}。二者之差再按 1 MW 可供电的芯片数` +
-        '（1,000 kW 除以每芯片全电源配置 kW）乘以 8,760 小时进行换算。' +
+        `成本为${COST_BASIS_ZH[basis]}。二者之差再按 1 GW 可供电的芯片数` +
+        '（1,000,000 kW 除以每芯片全电源配置 kW）乘以 8,760 小时进行换算。' +
         '负值表示在该运行点下售价不足以覆盖硬件成本。',
     },
     formula: {
       en:
-        '$/MW/yr = (token revenue per GPU hour ($/GPU/hr) − all-in cost per chip-hour ($)) × ' +
-        '(1,000 ÷ all-in kW per chip) × 8,760',
+        '$/GW/yr = (token revenue per GPU hour ($/GPU/hr) − all-in cost per chip-hour ($)) × ' +
+        '(1,000,000 ÷ all-in kW per chip) × 8,760',
       zh:
-        '$/MW/yr =（每 GPU 小时 token 收入（$/GPU/hr）− 每芯片小时全包成本（$））×' +
-        '（1,000 ÷ 每芯片全电源配置 kW）× 8,760',
+        '$/GW/yr =（每 GPU 小时 token 收入（$/GPU/hr）− 每芯片小时全包成本（$））×' +
+        '（1,000,000 ÷ 每芯片全电源配置 kW）× 8,760',
     },
   };
 }
@@ -333,10 +333,10 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
   tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
-  tokenRevenuePerMwYear: tokenRevenuePerMwYear(),
-  tokenProfitPerMwYearH: tokenProfitPerMwYear('h'),
-  tokenProfitPerMwYearN: tokenProfitPerMwYear('n'),
-  tokenProfitPerMwYearR: tokenProfitPerMwYear('r'),
+  tokenRevenuePerGwYear: tokenRevenuePerGwYear(),
+  tokenProfitPerGwYearH: tokenProfitPerGwYear('h'),
+  tokenProfitPerGwYearN: tokenProfitPerGwYear('n'),
+  tokenProfitPerGwYearR: tokenProfitPerGwYear('r'),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),

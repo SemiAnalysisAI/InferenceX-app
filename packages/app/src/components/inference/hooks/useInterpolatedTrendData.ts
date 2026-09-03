@@ -124,13 +124,13 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  * a point-specific input/output mix; in that case multiplier recovery fails
  * safely and the metric itself is splined on the total-throughput frontier.
  *
- * The profit-per-MW-year axes are deliberately absent: they are affine in
+ * The profit-per-GW-year axes are deliberately absent: they are affine in
  * throughput (revenue minus a fixed TCO), not proportional, so they take the
  * sale-pricing path below or a direct metric spline when pricing is unavailable.
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokenRevenuePerGpuHour: 'tpPerGpu',
-  tokenRevenuePerMwYear: 'tpPerGpu',
+  tokenRevenuePerGwYear: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
   tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',

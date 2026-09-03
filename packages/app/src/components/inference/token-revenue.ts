@@ -6,21 +6,21 @@ import { getGpuSpecs } from '@/lib/constants';
 const SECONDS_PER_HOUR = 3_600;
 const TOKENS_PER_MILLION = 1_000_000;
 const RATE_SUM_RELATIVE_TOLERANCE = 0.01;
-/** Calendar hours in the one-year window behind every $/MW/yr axis (365 x 24). */
+/** Calendar hours in the one-year window behind every $/GW/yr axis (365 x 24). */
 export const HOURS_PER_YEAR = 8_760;
-const KW_PER_MW = 1_000;
+const KW_PER_GW = 1_000_000;
 
 /**
  * Y-axis metrics whose value depends on the selected normalized or OpenRouter
  * token sale prices. Revenue axes price throughput directly; profit axes
- * subtract the per-tier TCO hourly cost before scaling to one all-in MW-year.
+ * subtract the per-tier TCO hourly cost before scaling to one all-in GW-year.
  */
 export const TOKEN_SALE_PRICING_METRIC_KEYS = [
   'tokenRevenuePerGpuHour',
-  'tokenRevenuePerMwYear',
-  'tokenProfitPerMwYearH',
-  'tokenProfitPerMwYearN',
-  'tokenProfitPerMwYearR',
+  'tokenRevenuePerGwYear',
+  'tokenProfitPerGwYearH',
+  'tokenProfitPerGwYearN',
+  'tokenProfitPerGwYearR',
 ] as const;
 
 export type TokenSalePricingMetricKey = (typeof TOKEN_SALE_PRICING_METRIC_KEYS)[number];
@@ -31,9 +31,9 @@ const TOKEN_SALE_PRICING_METRIC_KEY_SET: ReadonlySet<string> = new Set(
 
 /** TCO tier subtracted by each profit axis; revenue axes have no cost side. */
 const PROFIT_TCO_TIER: Partial<Record<TokenSalePricingMetricKey, 'costh' | 'costn' | 'costr'>> = {
-  tokenProfitPerMwYearH: 'costh',
-  tokenProfitPerMwYearN: 'costn',
-  tokenProfitPerMwYearR: 'costr',
+  tokenProfitPerGwYearH: 'costh',
+  tokenProfitPerGwYearN: 'costn',
+  tokenProfitPerGwYearR: 'costr',
 };
 
 export const NORMALIZED_TOKEN_REVENUE_PRICING: TokenRevenuePricing = {
@@ -143,34 +143,34 @@ export function usesTokenSalePricing(metricConfigKey: string): boolean {
 }
 
 /**
- * GPU-hours one all-in utility megawatt buys in a year for this hardware.
+ * GPU-hours one all-in utility gigawatt buys in a year for this hardware.
  * `power` is the all-in kW per GPU from the SemiAnalysis AI Cloud TCO Model,
- * so 1 MW hosts `1000 / power` GPUs, each running 8,760 hours. Returns null
+ * so 1 GW hosts `1,000,000 / power` GPUs, each running 8,760 hours. Returns null
  * when the hardware has no power figure so callers never divide by zero.
  */
-export function gpuHoursPerMwYear(hwKey: string): number | null {
+export function gpuHoursPerGwYear(hwKey: string): number | null {
   const power = getGpuSpecs(hwKey).power;
   if (!(power > 0)) return null;
-  return (KW_PER_MW / power) * HOURS_PER_YEAR;
+  return (KW_PER_GW / power) * HOURS_PER_YEAR;
 }
 
-/** Scale gross $/GPU/hr revenue to $/MW/yr for the hardware's all-in power. */
-export function tokenRevenuePerMwYear(revenuePerGpuHour: number, hwKey: string): number | null {
-  const gpuHours = gpuHoursPerMwYear(hwKey);
+/** Scale gross $/GPU/hr revenue to $/GW/yr for the hardware's all-in power. */
+export function tokenRevenuePerGwYear(revenuePerGpuHour: number, hwKey: string): number | null {
+  const gpuHours = gpuHoursPerGwYear(hwKey);
   return gpuHours === null ? null : revenuePerGpuHour * gpuHours;
 }
 
 /**
- * Net $/MW/yr after TCO: (revenue $/GPU/hr - tier TCO $/GPU/hr) x GPU-hours
- * per MW-year. Negative when the sale price does not cover the hardware cost
+ * Net $/GW/yr after TCO: (revenue $/GPU/hr - tier TCO $/GPU/hr) x GPU-hours
+ * per GW-year. Negative when the sale price does not cover the hardware cost
  * at that operating point. Null when the hardware lacks a power or TCO figure.
  */
-export function tokenProfitPerMwYear(
+export function tokenProfitPerGwYear(
   revenuePerGpuHour: number,
   hwKey: string,
   tier: 'costh' | 'costn' | 'costr',
 ): number | null {
-  const gpuHours = gpuHoursPerMwYear(hwKey);
+  const gpuHours = gpuHoursPerGwYear(hwKey);
   if (gpuHours === null) return null;
   const tcoPerGpuHour = getGpuSpecs(hwKey)[tier];
   if (!(tcoPerGpuHour > 0)) return null;
@@ -188,9 +188,9 @@ export function tokenSalePricingMetricFromRevenuePerGpuHour(
   hwKey: string,
 ): number | null {
   if (metricKey === 'tokenRevenuePerGpuHour') return revenuePerGpuHour;
-  if (metricKey === 'tokenRevenuePerMwYear') return tokenRevenuePerMwYear(revenuePerGpuHour, hwKey);
+  if (metricKey === 'tokenRevenuePerGwYear') return tokenRevenuePerGwYear(revenuePerGpuHour, hwKey);
   const tier = PROFIT_TCO_TIER[metricKey];
-  return tier ? tokenProfitPerMwYear(revenuePerGpuHour, hwKey, tier) : null;
+  return tier ? tokenProfitPerGwYear(revenuePerGpuHour, hwKey, tier) : null;
 }
 
 const PRICE_SOURCE_SUFFIX_EN = {

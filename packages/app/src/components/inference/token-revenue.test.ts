@@ -6,14 +6,14 @@ import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
   formatTokenPrice,
-  gpuHoursPerMwYear,
+  gpuHoursPerGwYear,
   HOURS_PER_YEAR,
   inputTokenShareForRevenue,
   isTokenSalePricingMetric,
   NORMALIZED_TOKEN_REVENUE_PRICING,
-  tokenProfitPerMwYear,
+  tokenProfitPerGwYear,
   tokenRevenuePerGpuHour,
-  tokenRevenuePerMwYear,
+  tokenRevenuePerGwYear,
   tokenRevenueFromRatesPerGpuHour,
   tokenSalePricingLabels,
   tokenSalePricingMetricFromRevenuePerGpuHour,
@@ -54,64 +54,64 @@ const openRouterPricing: TokenRevenuePricing = {
 describe('token revenue', () => {
   it('scopes the token price source to revenue and profit axes', () => {
     expect(usesTokenSalePricing('y_tokenRevenuePerGpuHour')).toBe(true);
-    expect(usesTokenSalePricing('y_tokenRevenuePerMwYear')).toBe(true);
-    expect(usesTokenSalePricing('y_tokenProfitPerMwYearH')).toBe(true);
-    expect(usesTokenSalePricing('y_tokenProfitPerMwYearN')).toBe(true);
-    expect(usesTokenSalePricing('y_tokenProfitPerMwYearR')).toBe(true);
+    expect(usesTokenSalePricing('y_tokenRevenuePerGwYear')).toBe(true);
+    expect(usesTokenSalePricing('y_tokenProfitPerGwYearH')).toBe(true);
+    expect(usesTokenSalePricing('y_tokenProfitPerGwYearN')).toBe(true);
+    expect(usesTokenSalePricing('y_tokenProfitPerGwYearR')).toBe(true);
     expect(usesTokenSalePricing('y_tokensPerDollarN')).toBe(false);
     expect(usesTokenSalePricing('y_outputTokensPerDollarH')).toBe(false);
     expect(usesTokenSalePricing('y_tpPerMw')).toBe(false);
-    expect(isTokenSalePricingMetric('tokenProfitPerMwYearR')).toBe(true);
+    expect(isTokenSalePricingMetric('tokenProfitPerGwYearR')).toBe(true);
     expect(isTokenSalePricingMetric('costr')).toBe(false);
   });
 
-  it('converts B200 all-in power into GPU-hours per MW-year', () => {
-    // 1 MW / 1.71 kW per GPU = 584.8 GPUs, each running 8,760 hours.
-    expect(gpuHoursPerMwYear('b200')).toBeCloseTo((1000 / 1.71) * HOURS_PER_YEAR, 6);
+  it('converts B200 all-in power into GPU-hours per GW-year', () => {
+    // 1 GW / 1.71 kW per GPU = 584,795 GPUs, each running 8,760 hours.
+    expect(gpuHoursPerGwYear('b200')).toBeCloseTo((1_000_000 / 1.71) * HOURS_PER_YEAR, -2);
     expect(HOURS_PER_YEAR).toBe(8_760);
-    expect(gpuHoursPerMwYear('not-a-gpu')).toBeNull();
+    expect(gpuHoursPerGwYear('not-a-gpu')).toBeNull();
   });
 
-  it('scales $/GPU/hr revenue to $/MW/yr with the same pricing', () => {
+  it('scales $/GPU/hr revenue to $/GW/yr with the same pricing', () => {
     const revenue = tokenRevenuePerGpuHour(point(), NORMALIZED_TOKEN_REVENUE_PRICING)!;
-    const gpuHours = gpuHoursPerMwYear('b200')!;
-    expect(tokenRevenuePerMwYear(revenue, 'b200')).toBeCloseTo(7.2 * gpuHours, 6);
-    expect(tokenRevenuePerMwYear(revenue, 'not-a-gpu')).toBeNull();
+    const gpuHours = gpuHoursPerGwYear('b200')!;
+    expect(tokenRevenuePerGwYear(revenue, 'b200')).toBeCloseTo(7.2 * gpuHours, -2);
+    expect(tokenRevenuePerGwYear(revenue, 'not-a-gpu')).toBeNull();
   });
 
-  it('subtracts the selected TCO tier before scaling profit to a MW-year', () => {
-    const gpuHours = gpuHoursPerMwYear('b200')!;
+  it('subtracts the selected TCO tier before scaling profit to a GW-year', () => {
+    const gpuHours = gpuHoursPerGwYear('b200')!;
     // B200 TCO tiers: hyperscaler 1.73, Neocloud Giant 2.07, 3-year rental 2.6 $/GPU/hr.
-    expect(tokenProfitPerMwYear(7.2, 'b200', 'costh')).toBeCloseTo((7.2 - 1.73) * gpuHours, 6);
-    expect(tokenProfitPerMwYear(7.2, 'b200', 'costn')).toBeCloseTo((7.2 - 2.07) * gpuHours, 6);
-    expect(tokenProfitPerMwYear(7.2, 'b200', 'costr')).toBeCloseTo((7.2 - 2.6) * gpuHours, 6);
+    expect(tokenProfitPerGwYear(7.2, 'b200', 'costh')).toBeCloseTo((7.2 - 1.73) * gpuHours, -2);
+    expect(tokenProfitPerGwYear(7.2, 'b200', 'costn')).toBeCloseTo((7.2 - 2.07) * gpuHours, -2);
+    expect(tokenProfitPerGwYear(7.2, 'b200', 'costr')).toBeCloseTo((7.2 - 2.6) * gpuHours, -2);
     // Profit goes negative when sale prices sit below the hardware cost.
-    expect(tokenProfitPerMwYear(1, 'b200', 'costr')).toBeLessThan(0);
-    expect(tokenProfitPerMwYear(7.2, 'not-a-gpu', 'costh')).toBeNull();
+    expect(tokenProfitPerGwYear(1, 'b200', 'costr')).toBeLessThan(0);
+    expect(tokenProfitPerGwYear(7.2, 'not-a-gpu', 'costh')).toBeNull();
   });
 
   it('derives every sale-priced axis from one $/GPU/hr revenue figure', () => {
-    const gpuHours = gpuHoursPerMwYear('b200')!;
+    const gpuHours = gpuHoursPerGwYear('b200')!;
     expect(tokenSalePricingMetricFromRevenuePerGpuHour('tokenRevenuePerGpuHour', 7.2, 'b200')).toBe(
       7.2,
     );
     expect(
-      tokenSalePricingMetricFromRevenuePerGpuHour('tokenRevenuePerMwYear', 7.2, 'b200'),
-    ).toBeCloseTo(7.2 * gpuHours, 6);
+      tokenSalePricingMetricFromRevenuePerGpuHour('tokenRevenuePerGwYear', 7.2, 'b200'),
+    ).toBeCloseTo(7.2 * gpuHours, -2);
     expect(
-      tokenSalePricingMetricFromRevenuePerGpuHour('tokenProfitPerMwYearN', 7.2, 'b200'),
-    ).toBeCloseTo((7.2 - 2.07) * gpuHours, 6);
+      tokenSalePricingMetricFromRevenuePerGpuHour('tokenProfitPerGwYearN', 7.2, 'b200'),
+    ).toBeCloseTo((7.2 - 2.07) * gpuHours, -2);
   });
 
-  it('applies pricing to the revenue and profit MW-year axes together', () => {
+  it('applies pricing to the revenue and profit GW-year axes together', () => {
     const [priced] = applyTokenRevenuePricing([point()], openRouterPricing);
     const revenue = tokenRevenuePerGpuHour(point(), openRouterPricing)!;
-    const gpuHours = gpuHoursPerMwYear('b200')!;
+    const gpuHours = gpuHoursPerGwYear('b200')!;
     expect(priced.tokenRevenuePerGpuHour?.y).toBeCloseTo(revenue, 6);
-    expect(priced.tokenRevenuePerMwYear?.y).toBeCloseTo(revenue * gpuHours, 6);
-    expect(priced.tokenProfitPerMwYearH?.y).toBeCloseTo((revenue - 1.73) * gpuHours, 6);
-    expect(priced.tokenProfitPerMwYearN?.y).toBeCloseTo((revenue - 2.07) * gpuHours, 6);
-    expect(priced.tokenProfitPerMwYearR?.y).toBeCloseTo((revenue - 2.6) * gpuHours, 6);
+    expect(priced.tokenRevenuePerGwYear?.y).toBeCloseTo(revenue * gpuHours, -2);
+    expect(priced.tokenProfitPerGwYearH?.y).toBeCloseTo((revenue - 1.73) * gpuHours, -2);
+    expect(priced.tokenProfitPerGwYearN?.y).toBeCloseTo((revenue - 2.07) * gpuHours, -2);
+    expect(priced.tokenProfitPerGwYearR?.y).toBeCloseTo((revenue - 2.6) * gpuHours, -2);
   });
 
   it('names the price source in revenue and profit axis copy', () => {
@@ -125,12 +125,12 @@ describe('token revenue', () => {
     expect(normalized.label).toBe('Token Revenue per GPU Hour at Normalized Pricing ($/GPU/hr)');
     expect(normalized.titleZh).toBe('按标准化价格计算的每 GPU 小时 token 收入');
 
-    const profit = tokenSalePricingLabels(METRIC_REGISTRY.tokenProfitPerMwYearR, 'openrouter');
+    const profit = tokenSalePricingLabels(METRIC_REGISTRY.tokenProfitPerGwYearR, 'openrouter');
     expect(profit.label).toBe(
-      'Token Profit per All in Utility MW per Year at OpenRouter Pricing ($/MW/yr)',
+      'Token Profit per All in Utility GW per Year at OpenRouter Pricing ($/GW/yr)',
     );
     expect(profit.title).toBe(
-      'Token Profit per All in Utility MW per Year at OpenRouter Pricing (3 Year Rental)',
+      'Token Profit per All in Utility GW per Year at OpenRouter Pricing (3 Year Rental)',
     );
   });
 
@@ -272,8 +272,8 @@ describe('token revenue', () => {
     });
     const [cleared] = applyTokenRevenuePricing([original], null);
     expect(cleared).not.toHaveProperty('tokenRevenuePerGpuHour');
-    expect(cleared).not.toHaveProperty('tokenRevenuePerMwYear');
-    expect(cleared).not.toHaveProperty('tokenProfitPerMwYearH');
+    expect(cleared).not.toHaveProperty('tokenRevenuePerGwYear');
+    expect(cleared).not.toHaveProperty('tokenProfitPerGwYearH');
     expect(cleared.tokensPerDollarN).toEqual({ y: 2_000_000, roof: false });
     expect(original.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
     expect(original.tokensPerDollarN).toEqual({ y: 2_000_000, roof: false });
