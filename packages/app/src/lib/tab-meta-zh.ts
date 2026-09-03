@@ -45,7 +45,7 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   'profit-estimator': {
     title: '推理利润估算器',
     description:
-      '估算每款芯片一个吉瓦年的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型实验室分成与运营方利润。',
+      '估算每款芯片一个吉瓦年的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。',
   },
   reliability: {
     title: '服务商可靠性指标',
@@ -102,7 +102,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   fleet:
     '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润率与回本时间。',
   'profit-estimator':
-    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从毛利中抽取的分成，以及运营方所剩利润。',
+    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
@@ -184,6 +184,13 @@ export const MODEL_TAB_META_ZH: Record<
       `计算 ${seoName} 推理的吞吐量与总拥有成本（TCO）。跨硬件配置对比 ${seoName} 推理服务的芯片成本效益。`,
     intro: (seoName) =>
       `本页面提供 ${seoName} 吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 ${seoName} 推理服务的每百万 token 成本与性价比。`,
+  },
+  'profit-estimator': {
+    title: (seoName) => `${seoName} 推理利润估算器`,
+    description: (seoName) =>
+      `估算每款芯片一个吉瓦年运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
+    intro: (seoName) =>
+      `本页面按芯片估算一个全电源配置吉瓦年运行 ${seoName} 智能体推理的收入、算力支出（TCO）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
   },
 };
 

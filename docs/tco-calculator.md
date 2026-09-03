@@ -1014,7 +1014,8 @@ other.
 ## Profit Estimator (`/profit-estimator`)
 
 > Hosted by `ProfitEstimatorDisplay.tsx` with the math in `profit-estimator.ts` and the
-> bars in `ProfitEstimatorChart.tsx`. Mirrored at `/zh/profit-estimator`.
+> bars in `ProfitEstimatorChart.tsx`. Mirrored at `/zh/profit-estimator`. Per-model
+> routes live at `/profit-estimator/<slug>` (and `/zh/...`), see below.
 
 Fleet Lifecycle answers "what did a fixed fleet earn over its life". This page answers
 a narrower, present-tense question: at one interactivity operating point, what does a
@@ -1028,13 +1029,15 @@ gpuHoursPerGwYear = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h
 revenue           = $/GPU/hr(sale) × gpuHoursPerGwYear × utilization
 tco               = $/GPU/hr(cost) × gpuHoursPerGwYear
 grossMargin       = revenue − tco
-labCut            = max(grossMargin, 0) × labCutPct
-profit            = grossMargin − labCut
+licenseFee        = revenue × licenseFeePct       # `labCut` in code
+profit            = revenue − tco − licenseFee
 ```
 
 `$/GPU/hr(sale)` comes from `tokenRevenueFromRatesPerGpuHour`, so it reuses the
 calculator's input/cached/output token split and the OpenRouter catalog price (or a
-custom price pair). `$/GPU/hr(cost)` is the selected TCO tier from `getGpuSpecs`, and
+custom price pair). `$/GPU/hr(cost)` is the selected TCO tier from `getGpuSpecs`, or,
+with the **Custom $/GPU/hr** provider, one number per base chip typed by the reader
+(seeded from the hyperscaler tier; an empty box drops that chip as "no cost"), and
 the power figure is the same all-in kW per GPU that `tok/s/MW` uses. This is the same
 GW-year normalization as the Revenue/Profit-per-GW y-metrics on the calculator; the
 helper lives in its own module for now so this page does not depend on that branch,
@@ -1046,13 +1049,48 @@ and the two can be collapsed into one once both are on master.
   the benchmark says it could produce. Chips are paid for whether or not they are
   busy, so TCO is untouched. The haircut is not drawn as its own segment; the bar
   simply tops out at realized revenue, and the caption states the rate.
-- **The lab cut is a share of gross margin, not revenue.** It goes to zero when the
-  SKU is under water, so a loss bar is just TCO above the axis and the shortfall
-  below it in the destructive color. The tooltip shows the raw gross margin so the
-  zero is visible rather than silent.
+- **The model license fee is a share of revenue, not of gross margin.** It is a
+  royalty on every token sold, so it is owed even when compute alone already exceeds
+  revenue. The UI calls it "Model License Fee (%)"; code and test ids keep the older
+  `labCut` name. A loss bar is TCO and license fee above the axis and the shortfall below it, hatched
+  in the SKU colour. The tooltip still shows gross margin (revenue minus TCO) so
+  the two deductions can be read separately.
+- **Every segment is labelled in place.** Name and dollar amount sit inside each
+  rectangle when it is tall enough, amount only when it is shorter, nothing when
+  it would not fit. Revenue and operator margin (profit ÷ revenue) sit above the
+  bar.
+- **Out-of-range reads are excluded, not clamped.** A config the target
+  interactivity falls outside of (H200 on Kimi K3 at 45 tok/s/user, say) is not
+  drawn and not offered in the legend; the caption names it with the reason. This
+  matches the fleet page, which drops those points rather than showing an edge
+  value that was never measured.
+- **Agentic traces only.** The page pins the sequence to agentic traces, so there is
+  no scenario selector and no precision selector (precision stays in auto mode, the
+  densest measured run set). The interactivity target is a typed number in the same
+  row as utilization and the license fee.
+- **Kimi K3 only, for now.** The model selector offers the tab's route allow-list
+  (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` in `model-routes.ts`) intersected with
+  the models that have an agentic run. The bare path opens on Kimi K3
+  (`defaultRouteModel('profit-estimator')`); `/profit-estimator/kimi-k3` is the same
+  page, aliases 308 to the canonical slug, and any model outside the allow-list 404s.
+  Widening the page to more models is one list edit plus fixture rows.
+- **Vendor marks on the x axis.** Each rotated SKU label carries its vendor logo
+  (`getLineLabelVendorIcon`), kept upright and inverted in dark mode, so a chip's
+  maker can be read without parsing the name.
 - **Legend is the SKU filter.** Same click semantics as the fleet page (click to
   isolate, click again to restore), and the same `resolveCalculatorVisibility`
   intent so the choice survives a model change when the SKU still exists.
 - **Unpriceable SKUs are listed, not dropped quietly.** A SKU with no power figure,
   no TCO for the chosen tier, or no recorded input/output mix is named in the
   caption with the reason.
+- **The heading reads like `/inference`.** Model, workload, and target in the title;
+  cost tier, utilization, run date, and source beneath it; TCO $/chip/hr badges, the
+  selling prices, and the segment key under that. The formula sits in a fold under
+  the chart, and the export button writes PNG and CSV.
+
+### Fixtures
+
+The captured API fixtures carry no `agentic_traces` rows, so the Cypress spec
+(`cypress/e2e/profit-estimator.cy.ts`) intercepts availability and benchmarks with
+synthetic Kimi K3 curves from `cypress/support/profit-fixtures.ts`. The H200 curve
+stops below 45 tok/s/user on purpose so the "Not priced" path stays covered.

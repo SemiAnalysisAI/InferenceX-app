@@ -8,7 +8,7 @@ import {
 } from '@/lib/dashboard-routes';
 import { languageAlternates } from '@/lib/i18n';
 import {
-  DEFAULT_ROUTE_MODEL,
+  defaultRouteModel,
   modelRoutePath,
   type ModelRoute,
   type ModelRouteTab,
@@ -49,7 +49,7 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   'profit-estimator': {
     title: 'Inference Profit Estimator',
     description:
-      'Estimate what one gigawatt-year of AI inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model lab cut, and operator profit.',
+      'Estimate what one gigawatt-year of AI inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.',
   },
   reliability: {
     title: 'Provider Reliability Metrics',
@@ -118,6 +118,11 @@ export const MODEL_TAB_META: Record<
     description: (seoName) =>
       `Calculate ${seoName} inference throughput and total cost of ownership. Compare chip cost-efficiency for serving ${seoName} across hardware configurations.`,
   },
+  'profit-estimator': {
+    title: (seoName) => `${seoName} Inference Profit Estimator`,
+    description: (seoName) =>
+      `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.`,
+  },
 };
 
 /**
@@ -127,7 +132,7 @@ export const MODEL_TAB_META: Record<
  * self-canonical.
  */
 export function modelTabCanonicalPath(tab: ModelRouteTab, route: ModelRoute): string {
-  return route.model === DEFAULT_ROUTE_MODEL
+  return route.model === defaultRouteModel(tab)
     ? getDashboardRoute(tab).canonicalPath
     : modelRoutePath(tab, route.slug);
 }

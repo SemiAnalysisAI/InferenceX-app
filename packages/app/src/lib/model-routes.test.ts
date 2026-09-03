@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Model, MODEL_OPTIONS } from './data-mappings';
 import {
   DEFAULT_ROUTE_MODEL,
+  defaultRouteModel,
   MODEL_ROUTE_TABS,
   MODEL_ROUTES,
   modelRoutePath,
@@ -33,6 +34,19 @@ describe('MODEL_ROUTES registry', () => {
     // DEFAULT_ROUTE_MODEL; if the app-wide default drifted, plain page loads
     // would rewrite the URL.
     expect(PARAM_DEFAULTS.g_model).toBe(DEFAULT_ROUTE_MODEL);
+  });
+
+  it('gives every tab a default model, with the profit estimator pinned to Kimi K3', () => {
+    expect(MODEL_ROUTE_TABS).toEqual(['calculator', 'historical', 'profit-estimator']);
+    expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
+    expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
+    // The estimator only plots agentic traces, and Kimi K3 is the model with
+    // the widest agentic hardware coverage; the page seeds its provider from
+    // this same helper.
+    expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
+    for (const tab of MODEL_ROUTE_TABS) {
+      expect(MODEL_ROUTES.some((route) => route.model === defaultRouteModel(tab))).toBe(true);
+    }
   });
 });
 
@@ -125,6 +139,19 @@ describe('modelRoutePathnameRewrite', () => {
   it('rewrites bare paths only for non-default models', () => {
     expect(modelRoutePathnameRewrite('/calculator', DEFAULT_ROUTE_MODEL)).toBeNull();
     expect(modelRoutePathnameRewrite('/calculator', Model.Kimi_K3)).toBe('/calculator/kimi-k3');
+    // Per-tab default: the profit estimator's bare path means Kimi K3, so the
+    // app-wide default model is the one that gets a slug there.
+    expect(modelRoutePathnameRewrite('/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/zh/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/profit-estimator', DEFAULT_ROUTE_MODEL)).toBe(
+      `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+    );
+    expect(
+      modelRoutePathnameRewrite(
+        `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+        Model.Kimi_K3,
+      ),
+    ).toBe('/profit-estimator/kimi-k3');
     expect(modelRoutePathnameRewrite('/zh/historical', Model.Kimi_K3)).toBe(
       '/zh/historical/kimi-k3',
     );

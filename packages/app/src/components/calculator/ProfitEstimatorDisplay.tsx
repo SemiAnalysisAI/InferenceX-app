@@ -1,11 +1,18 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import {
+  DISPLAY_MODEL_TO_DB,
+  HW_REGISTRY,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
+import { Info, Plus, X } from 'lucide-react';
+import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
 import {
-  resolveCalculatorTarget,
-  resolveCalculatorTargetInputValue,
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
@@ -17,23 +24,25 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/components/GlobalFilterContext';
-import { formatTokenPrice } from '@/components/inference/token-revenue';
+import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
+import { costTierLabel, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
-import {
-  ModelSelector,
-  PercentileSelector,
-  PrecisionSelector,
-  ScenarioSelector,
-} from '@/components/ui/chart-selectors';
+import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { ResultContext } from '@/components/ui/result-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -43,7 +52,16 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics';
 import { getGpuSpecs, getModelSortIndex } from '@/lib/constants';
-import { getOpenRouterModelId, Percentile, Sequence, type Model } from '@/lib/data-mappings';
+import { exportToCsv } from '@/lib/csv-export';
+import {
+  getModelLabel,
+  getOpenRouterModelId,
+  getSequenceLabel,
+  Percentile,
+  Sequence,
+  type Model,
+} from '@/lib/data-mappings';
+import { modelRoutesForTab } from '@/lib/model-routes';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
@@ -54,7 +72,8 @@ import {
   DEFAULT_PROFIT_INTERACTIVITY,
   DEFAULT_UTILIZATION_PCT,
   estimateProfitRows,
-  formatUsdCompact,
+  modelsWithAgenticData,
+  parseTokenPriceInput,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
 import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
@@ -63,11 +82,40 @@ import { useThroughputData } from './useThroughputData';
 
 type PriceSource = 'openrouter' | 'custom';
 
-const COST_PROVIDER_OPTIONS: { value: CostProvider; label: string; labelZh: string }[] = [
+/** The three published TCO tiers plus a per-chip $/GPU/hr the reader types. */
+type ProfitCostProvider = CostProvider | 'custom';
+
+const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
   { value: 'costh', label: 'Hyperscaler', labelZh: '超大规模云服务商' },
   { value: 'costn', label: 'Neocloud', labelZh: 'Neocloud' },
   { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
+  { value: 'custom', label: 'Custom $/GPU/hr', labelZh: '自定义 $/GPU/hr' },
 ];
+
+const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
+  costh: 'hyperscaler',
+  costn: 'neocloud',
+  costr: 'rental',
+  custom: 'custom',
+};
+
+/** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
+const CUSTOM_COST_SEED: CostProvider = 'costh';
+
+/** Base GPU (`h200`, `gb300`) of a legend key like `gb300_dynamo-sglang`. */
+function baseGpuOf(hwKey: string): string {
+  return hwKey.split('_')[0] ?? hwKey;
+}
+
+/**
+ * A typed custom cost. Empty or non-numeric → undefined, so the SKU drops out
+ * with the `no-cost` reason instead of being priced at zero.
+ */
+export function parseCustomCostInput(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
 
 const PRICE_SOURCE_OPTIONS: { value: PriceSource; label: string; labelZh: string }[] = [
   { value: 'openrouter', label: 'OpenRouter', labelZh: 'OpenRouter' },
@@ -78,10 +126,12 @@ const STRINGS = {
   en: {
     title: 'Profit Estimator',
     description:
-      'What one all-in utility gigawatt-year of each chip earns at a chosen interactivity. Each bar is that year’s revenue at the utilization you set, split into compute expense (TCO), the model lab’s cut of gross margin, and what is left for the operator. Every figure is US$ per GW per year.',
+      'What one all-in utility gigawatt-year of each chip earns at a chosen interactivity. Each bar is that year’s revenue at the utilization you set, split into compute expense (TCO), the model license fee paid to the lab, and what is left for the operator. Every figure is US$ per GW per year.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model.',
+      'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
+    customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
+    customCostSource: 'custom $/GPU/hr',
     costProviderPlaceholder: 'Cost provider',
     priceSourceLabel: 'Token Price',
     priceSourceTooltip:
@@ -89,18 +139,16 @@ const STRINGS = {
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
-    targetLabel: 'Target Interactivity (tok/s/user)',
-    targetTooltip:
-      'The interactivity operating point used for interpolation. Throughput per chip is read off each config’s Pareto frontier at this speed.',
+    cachedPriceLabel: 'Cached input $/M tok',
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Share of benchmarked throughput that is actually sold. 60% means the fleet bills 60% of the tokens it could produce. Revenue scales with it; compute expense does not, since the chips are paid for whether or not they are busy.',
-    labCutLabel: 'Lab Cut (% of margin)',
+    labCutLabel: 'Model License Fee (%)',
     labCutTooltip:
-      'Share of gross margin (revenue minus compute expense) paid to the model lab. It is zero when the margin is negative.',
+      'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
     highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
@@ -109,19 +157,39 @@ const STRINGS = {
       modelId
         ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
-    captionPrices: (input: string, cached: string, output: string, source: string) =>
-      `Sale price: $${input}/M input, $${cached}/M cached input, $${output}/M output (${source}).`,
+    chartTitle: (model: string, workload: string, percentile: string, target: number) =>
+      `${model} ${workload} Revenue & Profit Estimates per GigaWatt at ${percentile} ${target} tok/s/user Interactivity`,
+    sellingPriceLabel: 'Selling Price per Million Tokens',
+    sellingPrices: (input: string, cached: string, output: string, source: string) =>
+      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
+    tcoBadgesLabel: 'TCO $/chip/hr:',
+    sourceLabel: 'Source:',
+    formulaTitle: 'How the bars are computed',
+    formulaToggle: 'Toggle formula notes',
     captionFormula: (util: number, labCut: number) =>
-      `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Lab cut = ${labCut}% of gross margin when positive.`,
+      `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Operator profit = revenue − TCO − license fee. Operator margin above each bar is profit ÷ revenue.`,
+    csvHeaders: [
+      'SKU',
+      'Precision',
+      'Revenue ($/GW/yr)',
+      'Compute expense TCO ($/GW/yr)',
+      'Gross margin ($/GW/yr)',
+      'Model license fee ($/GW/yr)',
+      'Operator profit ($/GW/yr)',
+      'Operator margin',
+      'Revenue ($/GPU/hr, 100% util)',
+      'GPU-hours per GW-year',
+    ],
     skipped: (entries: string) => `Not priced: ${entries}.`,
     skipReason: {
+      'outside-measured-range': 'no measured point at the target interactivity',
       'no-power': 'no all-in power figure',
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
     segmentKey: {
       tco: 'Compute expense (TCO)',
-      labCut: 'Model lab cut',
+      labCut: 'Model license fee',
       profit: 'Operator profit',
       loss: 'Operator loss',
     },
@@ -129,10 +197,12 @@ const STRINGS = {
   zh: {
     title: '利润估算器',
     description:
-      '在选定的交互性下，每款芯片一个全电源配置吉瓦年能赚多少。每根柱形是按所设利用率计算的当年收入，拆分为算力支出（TCO）、模型实验室从毛利中抽取的分成，以及运营方所剩的利润。所有数字均为每吉瓦每年美元。',
+      '在选定的交互性下，每款芯片一个全电源配置吉瓦年能赚多少。每根柱形是按所设利用率计算的当年收入，拆分为算力支出（TCO）、支付给模型实验室的许可费，以及运营方所剩的利润。所有数字均为每吉瓦每年美元。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。',
+      '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
+    customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
+    customCostSource: '自定义 $/GPU/hr',
     costProviderPlaceholder: '成本供应商',
     priceSourceLabel: 'Token 售价',
     priceSourceTooltip:
@@ -140,16 +210,16 @@ const STRINGS = {
     priceSourcePlaceholder: 'Token 售价',
     inputPriceLabel: '输入 $/M tok',
     outputPriceLabel: '输出 $/M tok',
-    targetLabel: '目标交互性 (tok/s/user)',
-    targetTooltip: '用于插值的交互性操作点。按此速度在各配置的 Pareto 前沿上读取每芯片吞吐量。',
+    cachedPriceLabel: '缓存输入 $/M tok',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
       '实际售出的基准吞吐量比例。60% 表示集群只计费其可产出 token 的 60%。收入随之缩放；算力支出不变，因为芯片无论忙闲都要付费。',
-    labCutLabel: '实验室分成（占毛利 %）',
-    labCutTooltip: '支付给模型实验室的毛利（收入减算力支出）比例。毛利为负时为零。',
+    labCutLabel: '模型许可费（%）',
+    labCutTooltip:
+      '每售出一个 token 以许可费形式支付给模型实验室的收入比例。即使算力支出已超过收入也需支付，因此运营方可能亏损。',
     errorLoading: '加载数据出错，请尝试其他选择。',
     highContrast: '高对比度',
     resetFilter: '重置筛选',
@@ -158,34 +228,88 @@ const STRINGS = {
       modelId
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
-    captionPrices: (input: string, cached: string, output: string, source: string) =>
-      `售价：输入 $${input}/M，缓存输入 $${cached}/M，输出 $${output}/M（${source}）。`,
+    chartTitle: (model: string, workload: string, percentile: string, target: number) =>
+      `${model} ${workload} 每吉瓦收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+    sellingPriceLabel: '每百万 token 售价',
+    sellingPrices: (input: string, cached: string, output: string, source: string) =>
+      `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
+    tcoBadgesLabel: 'TCO $/chip/hr：',
+    sourceLabel: '来源：',
+    formulaTitle: '柱形计算方式',
+    formulaToggle: '展开或收起公式说明',
     captionFormula: (util: number, labCut: number) =>
-      `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。实验室分成 = 毛利为正时的 ${labCut}%。`,
+      `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。运营方利润 = 收入 − TCO − 许可费。柱形上方的运营方利润率 = 利润 ÷ 收入。`,
+    csvHeaders: [
+      'SKU',
+      '精度',
+      '收入（$/GW/yr）',
+      '算力支出 TCO（$/GW/yr）',
+      '毛利（$/GW/yr）',
+      '模型许可费（$/GW/yr）',
+      '运营方利润（$/GW/yr）',
+      '运营方利润率',
+      '收入（$/GPU/hr，100% 利用率）',
+      '每吉瓦年 GPU 小时数',
+    ],
     skipped: (entries: string) => `未定价：${entries}。`,
     skipReason: {
+      'outside-measured-range': '未在该交互性下实测',
       'no-power': '缺少全电源配置功率数据',
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
     segmentKey: {
       tco: '算力支出（TCO）',
-      labCut: '模型实验室分成',
+      labCut: '模型许可费',
       profit: '运营方利润',
       loss: '运营方亏损',
     },
   },
 } as const;
 
-const SLIDER_CLASS =
-  'w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0';
+/** A bordered note under the chart that folds behind its title, like the metric notes on /inference. */
+function InfoFold({
+  title,
+  toggleLabel,
+  children,
+  testId,
+}: {
+  title: string;
+  toggleLabel: string;
+  children: React.ReactNode;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="rounded-md border border-border px-3 py-2 text-xs" data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={toggleLabel}
+        className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
+        onClick={() => {
+          setOpen((prev) => !prev);
+          track('profit_formula_toggled', { open: !open });
+        }}
+      >
+        <Info className="size-3.5 text-muted-foreground" aria-hidden />
+        <span className="flex-1">{title}</span>
+        {open ? (
+          <X className="size-3.5 text-muted-foreground" aria-hidden />
+        ) : (
+          <Plus className="size-3.5 text-muted-foreground" aria-hidden />
+        )}
+      </button>
+      {open && <div className="mt-2 text-muted-foreground">{children}</div>}
+    </div>
+  );
+}
 
 export default function ProfitEstimatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
   return (
     <GlobalFilterProvider
       initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
+      initialSequence={Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
@@ -223,33 +347,59 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
 
+  // Precision is not a control here: `effectivePrecisions` stays in auto mode,
+  // which resolves to the densest measured precision per model, so the bars
+  // always reflect the best-covered run set.
   const {
     selectedModel,
-    effectiveSequence: selectedSequence,
+    effectiveSequence,
+    sequenceResolved,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
-    useGlobalFilterAvailability();
+  const { availableModels, availabilityRows } = useGlobalFilterAvailability();
+  // This page is agentic only: the sequence is pinned, and the model list is
+  // the tab's route allow-list (Kimi K3 for now) intersected with the models
+  // that have an agentic-traces run, so the selector never offers a model
+  // that would draw an empty chart. If the intersection is still loading or
+  // empty, the allow-list alone is offered so the selector is never blank.
+  const selectedSequence = Sequence.AgenticTraces;
+  const agenticModels = useMemo(() => {
+    const allowed = modelRoutesForTab('profit-estimator').map((route) => route.model);
+    const withData = modelsWithAgenticData(
+      availableModels,
+      availabilityRows,
+      (m) => DISPLAY_MODEL_TO_DB[m] ?? [m],
+    );
+    const both = allowed.filter((m) => withData.includes(m));
+    return both.length > 0 ? both : allowed;
+  }, [availableModels, availabilityRows]);
+  const modelAllowed = agenticModels.includes(selectedModel);
+  useEffect(() => {
+    if (!modelAllowed && agenticModels[0]) setSelectedModel(agenticModels[0]);
+  }, [modelAllowed, agenticModels, setSelectedModel]);
+  useEffect(() => {
+    if (sequenceResolved && effectiveSequence !== Sequence.AgenticTraces) {
+      setSelectedSequence(Sequence.AgenticTraces);
+    }
+  }, [sequenceResolved, effectiveSequence, setSelectedSequence]);
   const mode = 'interactivity_to_throughput' as const;
 
-  const [costProvider, setCostProvider] = useState<CostProvider>('costh');
+  const [costProvider, setCostProvider] = useState<ProfitCostProvider>('costh');
   const [priceSource, setPriceSource] = useState<PriceSource>('openrouter');
   const [customInputPrice, setCustomInputPrice] = useState('1');
+  const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
-  const [requestedTargetValue, setRequestedTargetValue] = useState<number>(
-    DEFAULT_PROFIT_INTERACTIVITY,
-  );
-  const [inputValue, setInputValue] = useState<string>(String(DEFAULT_PROFIT_INTERACTIVITY));
-  const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
+  const [targetValue, setTargetValue] = useState<number>(DEFAULT_PROFIT_INTERACTIVITY);
+  const [targetRaw, setTargetRaw] = useState<string>(String(DEFAULT_PROFIT_INTERACTIVITY));
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(DEFAULT_LAB_CUT_PCT, 'profit_lab_cut_set');
 
-  const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
+  const { hardwareConfig, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(
       selectedModel,
       selectedSequence,
@@ -262,7 +412,41 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       'total',
     );
 
-  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  // Per-base-GPU $/GPU/hr typed by the reader; seeded from the hyperscaler
+  // tier the first time each chip appears so the custom view starts identical
+  // to the default one.
+  const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
+  const customCostBases = useMemo(
+    () =>
+      [...new Set(availableHwKeys.map(baseGpuOf))]
+        .filter((base) => base in HW_REGISTRY)
+        .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b)),
+    [availableHwKeys],
+  );
+  useEffect(() => {
+    setCustomCosts((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const base of customCostBases) {
+        if (next[base] === undefined) {
+          next[base] = String(getGpuSpecs(base)[CUSTOM_COST_SEED]);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [customCostBases]);
+  const costPerGpuHourFor = useCallback(
+    (hwKey: string): number => {
+      const base = baseGpuOf(hwKey);
+      if (costProvider === 'custom') return parseCustomCostInput(customCosts[base]) ?? 0;
+      return getGpuSpecs(base)[costProvider];
+    },
+    [costProvider, customCosts],
+  );
+  const interpolationCostProvider: CostProvider =
+    costProvider === 'custom' ? CUSTOM_COST_SEED : costProvider;
+
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -271,82 +455,88 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
 
   const pricing = useMemo<TokenRevenuePricing | null>(() => {
     if (priceSource === 'custom') {
-      const input = Number.parseFloat(customInputPrice);
-      const output = Number.parseFloat(customOutputPrice);
-      if (!Number.isFinite(input) || input < 0 || !Number.isFinite(output) || output < 0) {
-        return null;
-      }
-      return { source: 'normalized', inputPerMillion: input, outputPerMillion: output };
+      const input = parseTokenPriceInput(customInputPrice);
+      const cached = parseTokenPriceInput(customCachedPrice);
+      const output = parseTokenPriceInput(customOutputPrice);
+      if (input === null || cached === null || output === null) return null;
+      return {
+        source: 'normalized',
+        inputPerMillion: input,
+        cachedInputPerMillion: cached,
+        outputPerMillion: output,
+      };
     }
     return openRouterQuery.data ?? null;
-  }, [priceSource, customInputPrice, customOutputPrice, openRouterQuery.data]);
-
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
-    .toSorted()
-    .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
-
-  const visibleHwKeys = useMemo(
-    () => resolveCalculatorVisibility(visibilityIntent, selectionKey, availableHwKeys),
-    [visibilityIntent, selectionKey, availableHwKeys],
-  );
-  const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor } = useThemeColors({ highContrast, activeKeys: visibleKeysArray });
-
-  const targetValue = useMemo(
-    () => resolveCalculatorTarget(requestedTargetValue, hasData, ranges.interactivity),
-    [hasData, ranges.interactivity, requestedTargetValue],
-  );
-  const currentRange = ranges.interactivity;
+  }, [priceSource, customInputPrice, customCachedPrice, customOutputPrice, openRouterQuery.data]);
 
   const assumptions = useMemo(
     () => ({ utilizationPct: utilization.value, labCutPct: labCut.value }),
     [utilization.value, labCut.value],
   );
 
-  const estimate = useMemo(() => {
+  // Price every SKU first, then build the legend from the ones that produced a
+  // bar. A config the target falls outside of (or that cannot be priced) is
+  // named in the caption instead of being offered as a legend chip.
+  const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const results = getResults(targetValue, mode, costProvider, visibleHwKeys);
+    const results = getResults(targetValue, mode, interpolationCostProvider);
     return estimateProfitRows(
       results,
-      (hwKey) => {
-        const specs = getGpuSpecs(hwKey);
-        return { powerKwPerGpu: specs.power, costPerGpuHour: specs[costProvider] };
-      },
+      (hwKey) => ({
+        powerKwPerGpu: getGpuSpecs(hwKey).power,
+        costPerGpuHour: costPerGpuHourFor(hwKey),
+      }),
       pricing,
       assumptions,
     );
-  }, [hasData, pricing, getResults, targetValue, mode, costProvider, visibleHwKeys, assumptions]);
+  }, [
+    hasData,
+    pricing,
+    getResults,
+    targetValue,
+    mode,
+    interpolationCostProvider,
+    costPerGpuHourFor,
+    assumptions,
+  ]);
 
-  const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
-    setRequestedTargetValue(value);
-    setInputValue(String(value));
+  const legendHwKeys = useMemo(() => {
+    const priced = new Set(fullEstimate.rows.map((row) => row.hwKey));
+    return availableHwKeys.filter((key) => priced.has(key));
+  }, [fullEstimate.rows, availableHwKeys]);
+
+  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+    .toSorted()
+    .join(',')}|${selectedRunDate}|${[...legendHwKeys].toSorted().join(',')}`;
+
+  const visibleHwKeys = useMemo(
+    () => resolveCalculatorVisibility(visibilityIntent, selectionKey, legendHwKeys),
+    [visibilityIntent, selectionKey, legendHwKeys],
+  );
+  const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
+  const { resolveColor } = useThemeColors({ highContrast, activeKeys: visibleKeysArray });
+
+  const estimate = useMemo(
+    () => ({
+      rows: fullEstimate.rows.filter((row) => visibleHwKeys.has(row.hwKey)),
+      skipped: fullEstimate.skipped,
+    }),
+    [fullEstimate, visibleHwKeys],
+  );
+
+  const handleTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTargetRaw(e.target.value);
+    const parsed = Number.parseFloat(e.target.value);
+    if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
   }, []);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    const parsed = parseFloat(e.target.value);
-    if (!isNaN(parsed) && parsed >= 0) setRequestedTargetValue(parsed);
-  }, []);
-
-  const handleInputFocus = useCallback(() => {
-    setInputValue(String(targetValue));
-    setIsTargetInputFocused(true);
-  }, [targetValue]);
-
-  const handleInputBlur = useCallback(() => {
-    const parsed = parseFloat(inputValue);
-    if (isNaN(parsed) || parsed < 0) {
-      setInputValue(String(targetValue));
-    } else {
-      const { min, max } = ranges.interactivity;
-      const clamped = Math.max(min, Math.min(max, parsed));
-      setRequestedTargetValue(clamped);
-      setInputValue(String(clamped));
-    }
-    setIsTargetInputFocused(false);
-    track('profit_target_set', { mode, value: targetValue });
-  }, [inputValue, targetValue, mode, ranges.interactivity]);
+  const handleTargetBlur = useCallback(() => {
+    const parsed = Number.parseFloat(targetRaw);
+    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : targetValue;
+    setTargetValue(next);
+    setTargetRaw(String(next));
+    track('profit_target_set', { mode, value: next });
+  }, [targetRaw, targetValue, mode]);
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -355,24 +545,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
-  );
-
-  const handleSequenceChange = useCallback(
-    (value: string) => {
-      setVisibilityIntent(null);
-      setSelectedSequence(value as Sequence);
-      track('profit_sequence_selected', { sequence: value });
-    },
-    [setSelectedSequence],
-  );
-
-  const handlePrecisionChange = useCallback(
-    (value: string[]) => {
-      setVisibilityIntent(null);
-      setSelectedPrecisions(value);
-      track('profit_precision_selected', { precision: value.join(',') });
-    },
-    [setSelectedPrecisions],
   );
 
   const handlePercentileChange = useCallback(
@@ -386,14 +558,14 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
 
   const toggleGpuVisibility = useCallback(
     (hwKey: string) => {
-      const visibleLegendKeys = availableHwKeys.filter((key) => visibleHwKeys.has(key));
-      const allVisible = visibleLegendKeys.length === availableHwKeys.length;
+      const visibleLegendKeys = legendHwKeys.filter((key) => visibleHwKeys.has(key));
+      const allVisible = visibleLegendKeys.length === legendHwKeys.length;
       const isVisible = visibleHwKeys.has(hwKey);
       let next: Set<string>;
       if (isVisible && allVisible) {
         next = new Set([hwKey]);
       } else if (isVisible && visibleLegendKeys.length === 1) {
-        next = new Set(availableHwKeys);
+        next = new Set(legendHwKeys);
       } else {
         next = new Set(visibleHwKeys);
         if (isVisible) next.delete(hwKey);
@@ -402,26 +574,26 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       setVisibilityIntent({
         scopeKey: selectionKey,
         visible: next,
-        known: new Set(availableHwKeys),
+        known: new Set(legendHwKeys),
       });
       track('profit_gpu_toggled', { gpu: hwKey });
     },
-    [availableHwKeys, visibleHwKeys, selectionKey],
+    [legendHwKeys, visibleHwKeys, selectionKey],
   );
 
   const handleResetGpus = useCallback(() => {
     setVisibilityIntent({
       scopeKey: selectionKey,
-      visible: new Set(availableHwKeys),
-      known: new Set(availableHwKeys),
+      visible: new Set(legendHwKeys),
+      known: new Set(legendHwKeys),
     });
-    track('profit_gpu_reset', { gpuCount: availableHwKeys.length });
-  }, [availableHwKeys, selectionKey]);
+    track('profit_gpu_reset', { gpuCount: legendHwKeys.length });
+  }, [legendHwKeys, selectionKey]);
 
   const legendItems = useMemo(
     () =>
       Object.entries(hardwareConfig)
-        .filter(([key]) => availableHwKeys.includes(key))
+        .filter(([key]) => legendHwKeys.includes(key))
         .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
         .map(([key, config]) => ({
           name: config.name,
@@ -432,7 +604,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
           isActive: visibleHwKeys.has(key),
           onClick: () => toggleGpuVisibility(key),
         })),
-    [hardwareConfig, availableHwKeys, visibleHwKeys, resolveColor, toggleGpuVisibility],
+    [hardwareConfig, legendHwKeys, visibleHwKeys, resolveColor, toggleGpuVisibility],
   );
 
   const pricingNotice = useMemo(() => {
@@ -448,11 +620,15 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     const ink = 'var(--foreground)';
     const hasLoss = estimate.rows.some((row) => row.profit < 0);
     const items: { key: string; label: string; style: React.CSSProperties }[] = [
-      { key: 'tco', label: t.segmentKey.tco, style: { background: 'var(--muted)' } },
+      {
+        key: 'tco',
+        label: t.segmentKey.tco,
+        style: { background: ink, opacity: 0.22, boxShadow: `inset 0 0 0 1px ${ink}` },
+      },
       {
         key: 'labCut',
         label: t.segmentKey.labCut,
-        style: { background: ink, opacity: 0.45, boxShadow: `inset 0 0 0 1px ${ink}` },
+        style: { background: ink, opacity: 0.5, boxShadow: `inset 0 0 0 1px ${ink}` },
       },
       { key: 'profit', label: t.segmentKey.profit, style: { background: ink } },
     ];
@@ -481,52 +657,139 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     );
   }, [estimate.rows, t]);
 
+  const costTier = costTierLabel(COST_PROVIDER_TIER[costProvider], locale);
+  const priceSourceLabel =
+    pricing?.source === 'openrouter'
+      ? `OpenRouter · ${pricing.openRouterModelId ?? ''}`.trim()
+      : locale === 'zh'
+        ? '自定义'
+        : 'custom';
+
+  const tcoBadges = useMemo(() => {
+    const bases = new Set<string>();
+    for (const key of legendHwKeys) {
+      const base = key.split('_')[0];
+      if (base in HW_REGISTRY) bases.add(base);
+    }
+    return [...bases]
+      .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+      .map((base) => ({
+        base,
+        label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
+        cost: costPerGpuHourFor(base),
+      }));
+  }, [legendHwKeys, costPerGpuHourFor]);
+
+  const skippedText = useMemo(() => {
+    if (estimate.skipped.length === 0) return null;
+    return t.skipped(
+      estimate.skipped
+        .map((sk) => {
+          const config = hardwareConfig[sk.hwKey];
+          const name = config ? getDisplayLabel(config) : sk.hwKey;
+          return `${sk.precision ? `${name} (${sk.precision.toUpperCase()})` : name} — ${t.skipReason[sk.reason]}`;
+        })
+        .join('; '),
+    );
+  }, [estimate.skipped, hardwareConfig, t]);
+
+  // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
-    const sourceLabel =
-      pricing.source === 'openrouter'
-        ? `OpenRouter · ${pricing.openRouterModelId ?? ''}`.trim()
-        : locale === 'zh'
-          ? '自定义'
-          : 'custom';
-    const cached = pricing.cachedInputPerMillion ?? pricing.inputPerMillion * 0.1;
-    const skippedText =
-      estimate.skipped.length > 0
-        ? t.skipped(
-            estimate.skipped
-              .map((s) => {
-                const config = hardwareConfig[s.hwKey];
-                const name = config ? getDisplayLabel(config) : s.hwKey;
-                return `${s.precision ? `${name} (${s.precision.toUpperCase()})` : name} — ${t.skipReason[s.reason]}`;
-              })
-              .join('; '),
-          )
-        : null;
     return (
-      <div
-        className="flex flex-col gap-1 text-xs text-muted-foreground"
-        data-testid="profit-caption"
-      >
-        {segmentKey}
-        <span>
-          {t.captionPrices(
-            formatTokenPrice(pricing.inputPerMillion),
-            formatTokenPrice(cached),
-            formatTokenPrice(pricing.outputPerMillion),
-            sourceLabel,
+      <div className="mb-2" data-testid="profit-caption">
+        <Heading as="h2" level="card">
+          <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
+          {t.chartTitle(
+            getModelLabel(selectedModel),
+            getSequenceLabel(Sequence.AgenticTraces, locale),
+            percentileLabel,
+            targetValue,
           )}
-        </span>
-        <span>{t.captionFormula(assumptions.utilizationPct, assumptions.labCutPct)}</span>
-        {skippedText && <span data-testid="profit-skipped">{skippedText}</span>}
+        </Heading>
+        <ResultContext
+          locale={locale}
+          costTier={costTier}
+          utilization={`${assumptions.utilizationPct}%`}
+          date={selectedRunDate}
+          source="SemiAnalysis InferenceX™"
+        />
+        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {t.tcoBadgesLabel}{' '}
+          {tcoBadges.map((badge) => (
+            <Badge key={badge.base} variant="outline">
+              {badge.label}: {badge.cost}
+            </Badge>
+          ))}
+        </p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          <small>
+            {t.sourceLabel}{' '}
+            {costProvider === 'custom' ? (
+              t.customCostSource
+            ) : (
+              <Link
+                target="_blank"
+                className="underline hover:text-foreground"
+                href={TCO_SOURCE_URL}
+              >
+                {TCO_SOURCE_TITLE}
+                <ExternalLinkIcon />
+              </Link>
+            )}
+          </small>
+        </p>
+        <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
+          <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
+          {t.sellingPrices(
+            formatTokenPrice(pricing.inputPerMillion),
+            formatTokenPrice(cachedInputPricePerMillion(pricing)),
+            formatTokenPrice(pricing.outputPerMillion),
+            priceSourceLabel,
+          )}
+        </p>
+        {segmentKey}
+        {skippedText && (
+          <p className="text-xs text-muted-foreground" data-testid="profit-skipped">
+            {skippedText}
+          </p>
+        )}
       </div>
     );
-  }, [pricing, locale, estimate.skipped, hardwareConfig, t, assumptions, segmentKey]);
+  }, [
+    pricing,
+    selectedModel,
+    locale,
+    percentileLabel,
+    targetValue,
+    costTier,
+    costProvider,
+    assumptions.utilizationPct,
+    selectedRunDate,
+    tcoBadges,
+    priceSourceLabel,
+    segmentKey,
+    skippedText,
+    t,
+  ]);
 
-  const summary = useMemo(() => {
-    if (estimate.rows.length === 0) return null;
-    const best = estimate.rows.toSorted((a, b) => b.profit - a.profit)[0];
-    return { label: rowLabel(best, hardwareConfig), profit: best.profit };
-  }, [estimate.rows, hardwareConfig]);
+  const handleExportCsv = useCallback(() => {
+    const rows = estimate.rows.map((row) => [
+      rowLabel(row, hardwareConfig),
+      row.precision?.toUpperCase() ?? '',
+      Math.round(row.revenue),
+      Math.round(row.tco),
+      Math.round(row.grossMargin),
+      Math.round(row.labCut),
+      Math.round(row.profit),
+      row.revenue > 0 ? (row.profit / row.revenue).toFixed(4) : '',
+      row.revenuePerGpuHour.toFixed(4),
+      Math.round(row.gpuHoursPerGwYear),
+    ]);
+    exportToCsv(`InferenceX_profit_estimator_${selectedModel}`, [...t.csvHeaders], rows, [
+      t.captionFormula(assumptions.utilizationPct, assumptions.labCutPct),
+    ]);
+  }, [estimate.rows, hardwareConfig, selectedModel, t, assumptions]);
 
   if (!loading && error) {
     console.error(error);
@@ -553,29 +816,21 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
             <TooltipProvider delayDuration={0}>
               <div
                 className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                  isAgenticSequence && featureGateUnlocked ? 'lg:grid-cols-6' : 'lg:grid-cols-5'
+                  featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
                 }`}
               >
-                <ModelSelector
-                  id="profit-model"
-                  data-testid="profit-model-selector"
-                  value={selectedModel}
-                  onChange={handleModelChange}
-                  open={openDropdown === 'model'}
-                  onOpenChange={handleDropdownOpenChange('model')}
-                  availableModels={availableModels}
-                />
-                <ScenarioSelector
-                  id="profit-sequence"
-                  data-testid="profit-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
-                  open={openDropdown === 'sequence'}
-                  onOpenChange={handleDropdownOpenChange('sequence')}
-                  availableSequences={availableSequences}
-                  model={selectedModel}
-                />
-                {isAgenticSequence && featureGateUnlocked && (
+                <div className="md:col-span-2">
+                  <ModelSelector
+                    id="profit-model"
+                    data-testid="profit-model-selector"
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    open={openDropdown === 'model'}
+                    onOpenChange={handleDropdownOpenChange('model')}
+                    availableModels={agenticModels}
+                  />
+                </div>
+                {featureGateUnlocked && (
                   <PercentileSelector
                     id="profit-percentile"
                     data-testid="profit-percentile-selector"
@@ -583,16 +838,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     onChange={handlePercentileChange}
                   />
                 )}
-                <PrecisionSelector
-                  id="profit-precision"
-                  data-testid="profit-precision-selector"
-                  value={selectedPrecisions}
-                  onChange={handlePrecisionChange}
-                  open={openDropdown === 'precision'}
-                  onOpenChange={handleDropdownOpenChange('precision')}
-                  availablePrecisions={availablePrecisions}
-                />
-
                 <div className="flex flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="profit-cost"
@@ -610,7 +855,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
-                        setCostProvider(next as CostProvider);
+                        setCostProvider(next as ProfitCostProvider);
                         track('profit_cost_provider_changed', { provider: next });
                       }}
                       open={openDropdown === 'costProvider'}
@@ -627,7 +872,29 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+                  priceSource === 'custom' ? 'lg:grid-cols-7' : 'lg:grid-cols-4'
+                }`}
+              >
+                <div className="flex flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="profit-target"
+                    label={t.targetAgenticLabel(percentileLabel)}
+                    tooltip={t.targetAgenticTooltip(percentileLabel)}
+                  />
+                  <Input
+                    id="profit-target"
+                    data-testid="profit-target-input"
+                    type="number"
+                    inputMode="decimal"
+                    min={1}
+                    step={1}
+                    value={targetRaw}
+                    onChange={handleTargetChange}
+                    onBlur={handleTargetBlur}
+                  />
+                </div>
                 <div className="flex flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="profit-price-source"
@@ -650,6 +917,9 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                         if (next === 'custom' && openRouterQuery.data) {
                           setCustomInputPrice(
                             formatTokenPrice(openRouterQuery.data.inputPerMillion),
+                          );
+                          setCustomCachedPrice(
+                            formatTokenPrice(cachedInputPricePerMillion(openRouterQuery.data)),
                           );
                           setCustomOutputPrice(
                             formatTokenPrice(openRouterQuery.data.outputPerMillion),
@@ -730,6 +1000,25 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                       />
                     </div>
                     <div className="flex flex-col space-y-1.5">
+                      <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
+                      <Input
+                        id="profit-cached-price"
+                        data-testid="profit-cached-price"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={0.001}
+                        value={customCachedPrice}
+                        onChange={(e) => setCustomCachedPrice(e.target.value)}
+                        onBlur={() =>
+                          track('profit_custom_price_set', {
+                            stream: 'cached',
+                            value: customCachedPrice,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col space-y-1.5">
                       <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
                       <Input
                         id="profit-output-price"
@@ -752,67 +1041,36 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 )}
               </div>
 
-              {!loading && hasData && (
-                <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="profit-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <input
-                        id="profit-target"
-                        type="range"
-                        min={currentRange.min}
-                        max={currentRange.max}
-                        step={1}
-                        value={targetValue}
-                        onChange={handleSliderChange}
-                        onPointerUp={() =>
-                          track('profit_target_slider_set', { mode, value: targetValue })
-                        }
-                        className={SLIDER_CLASS}
-                      />
-                      <div
-                        className="relative h-4 text-xs text-muted-foreground"
-                        style={{ marginLeft: 8, marginRight: 8 }}
-                      >
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span
-                            key={i}
-                            className="absolute -translate-x-1/2"
-                            style={{ left: `${(i / 5) * 100}%` }}
-                          >
-                            {Math.round(
-                              currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                            )}
-                          </span>
-                        ))}
+              {costProvider === 'custom' && customCostBases.length > 0 && (
+                <div
+                  data-testid="profit-custom-costs"
+                  className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6"
+                >
+                  {customCostBases.map((base) => {
+                    const label = HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase();
+                    return (
+                      <div key={base} className="flex flex-col space-y-1.5">
+                        <Label htmlFor={`profit-custom-cost-${base}`}>
+                          {t.customCostLabel(label)}
+                        </Label>
+                        <Input
+                          id={`profit-custom-cost-${base}`}
+                          data-testid={`profit-custom-cost-${base}`}
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step={0.01}
+                          value={customCosts[base] ?? ''}
+                          onChange={(e) =>
+                            setCustomCosts((prev) => ({ ...prev, [base]: e.target.value }))
+                          }
+                          onBlur={() =>
+                            track('profit_custom_cost_set', { gpu: base, value: customCosts[base] })
+                          }
+                        />
                       </div>
-                    </div>
-                    <Input
-                      type="number"
-                      data-testid="profit-target-input"
-                      aria-label={
-                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                      }
-                      value={resolveCalculatorTargetInputValue(
-                        inputValue,
-                        targetValue,
-                        isTargetInputFocused,
-                      )}
-                      onFocus={handleInputFocus}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      className="w-24"
-                      min={0}
-                    />
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </TooltipProvider>
@@ -827,7 +1085,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     <ChartLegendItem key={item.hw} {...item} sidebarMode />
                   ))}
                 </ul>
-                {visibleHwKeys.size < availableHwKeys.length && (
+                {visibleHwKeys.size < legendHwKeys.length && (
                   <Button
                     type="button"
                     variant="link"
@@ -878,15 +1136,15 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
               {pricingNotice}
             </div>
           )}
-          {summary && (
-            <p className="mb-2 text-sm text-muted-foreground" data-testid="profit-summary">
-              {locale === 'zh'
-                ? `运营方利润最高：${summary.label}，${formatUsdCompact(summary.profit)}/GW/yr`
-                : `Highest operator profit: ${summary.label} at ${formatUsdCompact(summary.profit)}/GW/yr`}
-            </p>
-          )}
           {pricing ? (
-            <div>
+            <figure data-testid="profit-figure" className="relative rounded-lg">
+              <ChartButtons
+                chartId="profit-estimator-chart"
+                analyticsPrefix="profit_estimator"
+                hideZoomReset
+                onExportCsv={handleExportCsv}
+                exportFileName={`InferenceX_profit_estimator_${selectedModel}`}
+              />
               <ProfitEstimatorChart
                 rows={estimate.rows}
                 hardwareConfig={hardwareConfig}
@@ -894,7 +1152,16 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 assumptions={assumptions}
                 caption={caption}
               />
-            </div>
+              <div className="mt-3">
+                <InfoFold
+                  title={t.formulaTitle}
+                  toggleLabel={t.formulaToggle}
+                  testId="profit-formula-notes"
+                >
+                  {t.captionFormula(assumptions.utilizationPct, assumptions.labCutPct)}
+                </InfoFold>
+              </div>
+            </figure>
           ) : (
             !pricingNotice && (
               <div className="flex items-center justify-center h-64 text-muted-foreground">

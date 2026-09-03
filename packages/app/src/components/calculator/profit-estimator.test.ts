@@ -10,6 +10,8 @@ import {
   gpuHoursPerGwYear,
   HOURS_PER_YEAR,
   isProfitEstimatorRow,
+  modelsWithAgenticData,
+  parseTokenPriceInput,
   type ProfitEstimatorRow,
 } from './profit-estimator';
 
@@ -70,7 +72,7 @@ describe('clampPercent', () => {
 });
 
 describe('estimateSkuProfit', () => {
-  it('stacks TCO, lab cut and profit back up to revenue at 100% utilization', () => {
+  it('stacks TCO, license fee and profit back up to revenue at 100% utilization', () => {
     const r = row(
       estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 100, labCutPct: 30 }),
     );
@@ -78,8 +80,8 @@ describe('estimateSkuProfit', () => {
     expect(r.revenue).toBeCloseTo(3.6 * B200_GPU_HOURS, 0);
     expect(r.tco).toBeCloseTo(1.73 * B200_GPU_HOURS, 0);
     expect(r.grossMargin).toBeCloseTo((3.6 - 1.73) * B200_GPU_HOURS, 0);
-    expect(r.labCut).toBeCloseTo(0.3 * r.grossMargin, 3);
-    expect(r.profit).toBeCloseTo(0.7 * r.grossMargin, 3);
+    expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
+    expect(r.profit).toBeCloseTo(r.revenue - r.tco - r.labCut, 3);
     // The three segments are exactly the revenue bar.
     expect(r.tco + r.labCut + r.profit).toBeCloseTo(r.revenue, 3);
   });
@@ -97,15 +99,15 @@ describe('estimateSkuProfit', () => {
     expect(partial.grossMargin).toBeCloseTo(partial.revenue - partial.tco, 3);
   });
 
-  it('takes the lab cut from gross margin, not from revenue', () => {
+  it('takes the license fee from revenue, not from gross margin', () => {
     const r = row(
       estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 60, labCutPct: 30 }),
     );
-    expect(r.labCut).toBeCloseTo(0.3 * (r.revenue - r.tco), 3);
-    expect(r.labCut).not.toBeCloseTo(0.3 * r.revenue, 0);
+    expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
+    expect(r.labCut).not.toBeCloseTo(0.3 * (r.revenue - r.tco), 0);
   });
 
-  it('zeroes the lab cut and reports a loss when the margin is negative', () => {
+  it('still owes the license fee and reports a loss when compute exceeds revenue', () => {
     const cheap: TokenRevenuePricing = {
       ...FLAT_PRICING,
       inputPerMillion: 0.2,
@@ -114,12 +116,12 @@ describe('estimateSkuProfit', () => {
     const r = row(estimateSkuProfit(result, B200, cheap, { utilizationPct: 60, labCutPct: 30 }));
     // 1000 tok/s * 3600 / 1e6 * $0.2 = $0.72/GPU/hr, then 60% -> well below $1.73.
     expect(r.grossMargin).toBeLessThan(0);
-    expect(r.labCut).toBe(0);
-    expect(r.profit).toBeCloseTo(r.grossMargin, 9);
-    expect(r.tco + r.profit).toBeCloseTo(r.revenue, 3);
+    expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
+    expect(r.profit).toBeCloseTo(r.grossMargin - r.labCut, 9);
+    expect(r.profit).toBeLessThan(r.grossMargin);
   });
 
-  it('honours a zero lab cut and clamps out-of-range percentages', () => {
+  it('honours a zero license fee and clamps out-of-range percentages', () => {
     const none = row(
       estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 100, labCutPct: 0 }),
     );
@@ -130,8 +132,8 @@ describe('estimateSkuProfit', () => {
       estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 250, labCutPct: 130 }),
     );
     expect(over.revenue).toBeCloseTo(3.6 * B200_GPU_HOURS, 0);
-    expect(over.labCut).toBeCloseTo(over.grossMargin, 3);
-    expect(over.profit).toBeCloseTo(0, 6);
+    expect(over.labCut).toBeCloseTo(over.revenue, 3);
+    expect(over.profit).toBeCloseTo(-over.tco, 3);
   });
 
   it('prices input and output streams separately when the prices differ', () => {
@@ -175,15 +177,12 @@ describe('estimateSkuProfit', () => {
     expect(isProfitEstimatorRow(noCost) ? null : noCost.reason).toBe('no-cost');
   });
 
-  it('carries the interpolation edge flags through', () => {
-    const r = row(
-      estimateSkuProfit({ ...result, clamped: true, clampedAbove: true }, B200, FLAT_PRICING, {
-        utilizationPct: 60,
-        labCutPct: 30,
-      }),
-    );
-    expect(r.clamped).toBe(true);
-    expect(r.clampedAbove).toBe(true);
+  it('skips a config the target falls outside of instead of pricing its edge point', () => {
+    const skipped = estimateSkuProfit({ ...result, clamped: true }, B200, FLAT_PRICING, {
+      utilizationPct: 60,
+      labCutPct: 30,
+    });
+    expect(isProfitEstimatorRow(skipped) ? null : skipped.reason).toBe('outside-measured-range');
   });
 });
 
@@ -219,5 +218,43 @@ describe('formatUsdCompact', () => {
     expect(formatUsdCompact(950_000)).toBe('$950.0k');
     expect(formatUsdCompact(12.34)).toBe('$12.3');
     expect(formatUsdCompact(Number.NaN)).toBe('—');
+  });
+});
+
+const dbKeysFor = (model: string) => [model.toLowerCase()];
+const aliasedDbKeys = (model: string) => (model === 'Kimi' ? ['kimi-k3', 'deepseek-v4-pro'] : []);
+
+describe('modelsWithAgenticData', () => {
+  const rows = [
+    { model: 'deepseek-v4-pro', benchmark_type: 'agentic_traces' },
+    { model: 'deepseek-v4-pro', benchmark_type: 'fixed' },
+    { model: 'llama-3.3-70b', benchmark_type: 'fixed' },
+  ];
+
+  it('keeps only models with an agentic_traces row', () => {
+    expect(modelsWithAgenticData(['DeepSeek-V4-Pro', 'Llama-3.3-70B'], rows, dbKeysFor)).toEqual([
+      'DeepSeek-V4-Pro',
+    ]);
+  });
+
+  it('matches through any of a model’s DB keys', () => {
+    expect(modelsWithAgenticData(['Kimi'], rows, aliasedDbKeys)).toEqual(['Kimi']);
+  });
+
+  it('returns every model while availability has not loaded', () => {
+    expect(modelsWithAgenticData(['A', 'B'], undefined, () => [])).toEqual(['A', 'B']);
+  });
+});
+
+describe('parseTokenPriceInput', () => {
+  it('accepts zero and positive decimals', () => {
+    expect(parseTokenPriceInput('0')).toBe(0);
+    expect(parseTokenPriceInput('0.066')).toBeCloseTo(0.066);
+  });
+
+  it('rejects empty, negative, and non-numeric input', () => {
+    expect(parseTokenPriceInput('')).toBeNull();
+    expect(parseTokenPriceInput('-1')).toBeNull();
+    expect(parseTokenPriceInput('abc')).toBeNull();
   });
 });

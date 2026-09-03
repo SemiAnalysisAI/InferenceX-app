@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import { DASHBOARD_ROUTE_KEYS } from './dashboard-routes';
-import { getTabTitle, isValidTab, LANDING_META, TAB_META, tabMetadata } from './tab-meta';
+import { Model } from '@/lib/data-mappings';
+import { defaultRouteModel, MODEL_ROUTES } from './model-routes';
+import {
+  getTabTitle,
+  isValidTab,
+  LANDING_META,
+  MODEL_TAB_META,
+  modelTabCanonicalPath,
+  modelTabMetadata,
+  TAB_META,
+  tabMetadata,
+} from './tab-meta';
 
 describe('agentic inference positioning', () => {
   it('uses agentic inference for the category and AgentX for the scenario', () => {
@@ -22,6 +33,31 @@ describe('current image metadata', () => {
     expect(meta.description).toBe(TAB_META['current-inferencex-image'].description);
     expect(meta.openGraph?.description).toBe(TAB_META['current-inferencex-image'].description);
     expect(meta.alternates?.languages).toBeDefined();
+  });
+});
+
+describe('per-model profit estimator metadata', () => {
+  const kimi = MODEL_ROUTES.find((route) => route.model === Model.Kimi_K3)!;
+  const deepseek = MODEL_ROUTES.find((route) => route.model === Model.DeepSeek_V4_Pro)!;
+
+  it('canonicalizes the default model (Kimi K3) to the bare tab path only', () => {
+    expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
+    expect(modelTabCanonicalPath('profit-estimator', kimi)).toBe('/profit-estimator');
+    expect(modelTabCanonicalPath('profit-estimator', deepseek)).toBe(
+      `/profit-estimator/${deepseek.slug}`,
+    );
+    // The app-wide default model is not this tab's default, so it keeps a slug.
+    expect(modelTabCanonicalPath('calculator', deepseek)).toBe('/calculator');
+  });
+
+  it('names the model in the title and description', () => {
+    const meta = modelTabMetadata('profit-estimator', deepseek);
+    expect(meta.title).toBe(MODEL_TAB_META['profit-estimator'].title(deepseek.seoName));
+    expect(meta.title).toContain(deepseek.seoName);
+    expect(meta.description).toContain(deepseek.seoName);
+    expect(meta.alternates?.canonical).toBe(
+      `https://inferencex.semianalysis.com/profit-estimator/${deepseek.slug}`,
+    );
   });
 });
 

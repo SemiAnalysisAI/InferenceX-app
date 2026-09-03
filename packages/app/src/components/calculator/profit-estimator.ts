@@ -9,14 +9,14 @@
  *   Revenue               = $/GPU/hr sale revenue x GPU-hours x utilization
  *   Compute expense (TCO) = tier $/GPU/hr x GPU-hours
  *   Gross margin          = Revenue - TCO
- *   Lab cut               = max(0, gross margin) x lab cut share
- *   Profit                = Gross margin - lab cut
+ *   Model license fee     = Revenue x license fee share
+ *   Profit                = Revenue - TCO - license fee
  *
  * Utilization scales revenue only. The fleet is paid for whether or not it is
  * busy, so TCO is unchanged; a 60% utilization simply sells 60% of the tokens
- * the benchmark says the chips can produce. The lab cut is a share of the
- * gross margin (what is left after compute), never of revenue, and it is zero
- * when the margin is negative — a lab does not fund a loss-making deployment.
+ * the benchmark says the chips can produce. The license fee is a revenue share (a
+ * royalty on every token sold), so it is owed even when compute alone already
+ * eats the revenue; the operator's profit can therefore go negative.
  */
 
 import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
@@ -31,13 +31,13 @@ const KW_PER_GW = 1_000_000;
 export const DEFAULT_PROFIT_INTERACTIVITY = 45;
 /** Fraction of benchmarked throughput that is actually sold. */
 export const DEFAULT_UTILIZATION_PCT = 60;
-/** Share of gross margin paid to the model lab. */
+/** Share of revenue paid to the model lab. */
 export const DEFAULT_LAB_CUT_PCT = 30;
 
 export interface ProfitEstimatorAssumptions {
   /** 0–100. Revenue is scaled by this share; TCO is not. */
   utilizationPct: number;
-  /** 0–100. Applied to positive gross margin only. */
+  /** 0–100. Share of revenue paid to the model lab. */
   labCutPct: number;
 }
 
@@ -55,17 +55,23 @@ export interface ProfitEstimatorRow {
   tco: number;
   /** $/GW/yr revenue minus TCO. Negative when the sale price does not cover compute. */
   grossMargin: number;
-  /** $/GW/yr paid to the model lab. Zero when gross margin is not positive. */
+  /** $/GW/yr paid to the model lab as a share of revenue. */
   labCut: number;
-  /** $/GW/yr left to the operator after compute and the lab cut. */
+  /** $/GW/yr left to the operator after compute and the license fee. */
   profit: number;
-  /** Interpolation edge flags carried over from the operating-point solve. */
-  clamped?: boolean;
-  clampedAbove?: boolean;
 }
 
-/** Why a SKU has no bar even though it is in the legend. */
-export type ProfitEstimatorSkipReason = 'no-power' | 'no-cost' | 'no-token-mix';
+/**
+ * Why a SKU has no bar. `outside-measured-range` is the common one: the
+ * config was never benchmarked at the target interactivity, so its nearest
+ * edge point would be a guess, not a read, and the fleet page excludes those
+ * for the same reason.
+ */
+export type ProfitEstimatorSkipReason =
+  | 'outside-measured-range'
+  | 'no-power'
+  | 'no-cost'
+  | 'no-token-mix';
 
 export interface ProfitEstimatorSkipped {
   hwKey: string;
@@ -103,20 +109,21 @@ export interface ProfitEstimatorSpecs {
 
 /**
  * Economics of one SKU at one operating point. Returns a skip reason instead of
- * a row when the SKU cannot be priced: no power figure, no tier cost, or a
- * price schedule that needs an input/output mix the benchmark did not record.
+ * a row when the SKU cannot be priced: the target sits outside the measured
+ * interactivity range, no power figure, no tier cost, or a price schedule that
+ * needs an input/output mix the benchmark did not record.
  */
 export function estimateSkuProfit(
   result: Pick<
     InterpolatedResult,
     'hwKey' | 'resultKey' | 'precision' | 'value' | 'inputTokenShare' | 'cacheHitRate' | 'clamped'
-  > &
-    Partial<Pick<InterpolatedResult, 'clampedAbove'>>,
+  >,
   specs: ProfitEstimatorSpecs,
   pricing: TokenRevenuePricing,
   assumptions: ProfitEstimatorAssumptions,
 ): ProfitEstimatorRow | ProfitEstimatorSkipped {
   const base = { hwKey: result.hwKey, resultKey: result.resultKey, precision: result.precision };
+  if (result.clamped) return { ...base, reason: 'outside-measured-range' };
   const gpuHours = gpuHoursPerGwYear(specs.powerKwPerGpu);
   if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
@@ -135,7 +142,7 @@ export function estimateSkuProfit(
   const revenue = revenuePerGpuHour * gpuHours * utilization;
   const tco = specs.costPerGpuHour * gpuHours;
   const grossMargin = revenue - tco;
-  const labCut = Math.max(0, grossMargin) * labShare;
+  const labCut = revenue * labShare;
   const profit = grossMargin - labCut;
 
   return {
@@ -147,8 +154,6 @@ export function estimateSkuProfit(
     grossMargin,
     labCut,
     profit,
-    clamped: result.clamped,
-    clampedAbove: result.clampedAbove,
   };
 }
 
@@ -192,4 +197,32 @@ export function formatUsdCompact(value: number, digits = 1): string {
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(digits)}M`;
   if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(digits)}k`;
   return `${sign}$${abs.toFixed(abs >= 100 ? 0 : digits)}`;
+}
+
+/**
+ * Models that have AgentX (agentic-trace) rows in the availability table, in
+ * the order of `models`. The estimator only prices agentic workloads: fixed
+ * ISL/OSL scenarios have no cache-hit telemetry and their token mix is
+ * synthetic, so a $/GW-year figure built on them would not describe a real
+ * serving fleet. `dbKeysFor` maps a display model to its DB model keys.
+ */
+export function modelsWithAgenticData<M extends string>(
+  models: readonly M[],
+  rows: readonly { model: string; benchmark_type: string }[] | undefined,
+  dbKeysFor: (model: M) => readonly string[],
+): M[] {
+  if (!rows) return [...models];
+  const agenticDbModels = new Set(
+    rows.filter((row) => row.benchmark_type === 'agentic_traces').map((row) => row.model),
+  );
+  return models.filter((model) => dbKeysFor(model).some((key) => agenticDbModels.has(key)));
+}
+
+/**
+ * Parse a custom $/M tok field. Empty or negative input is rejected so a
+ * half-typed field disables the chart instead of pricing tokens at $0.
+ */
+export function parseTokenPriceInput(raw: string): number | null {
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }

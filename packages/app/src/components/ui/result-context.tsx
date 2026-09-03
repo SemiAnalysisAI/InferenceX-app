@@ -9,6 +9,8 @@ export interface ResultContextProps {
   metric?: string;
   /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning Hyperscaler"). */
   costTier?: string;
+  /** Fleet utilization the revenue figures assume (e.g. "60%"). */
+  utilization?: string;
   target?: string;
   date?: string;
   dates?: readonly string[];
@@ -26,6 +28,7 @@ export function ResultContext({
   precision,
   metric,
   costTier,
+  utilization,
   target,
   date,
   dates,
@@ -47,6 +50,7 @@ export function ResultContext({
           source: '来源',
           cost: '成本口径',
           costTier: '成本层级',
+          utilization: '利用率',
         }
       : {
           model: 'Model',
@@ -59,6 +63,7 @@ export function ResultContext({
           source: 'Source',
           cost: 'Cost basis',
           costTier: 'Cost Tier',
+          utilization: 'Utilization',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
   const selectedDates = dates && dates.length > 1 ? dates.join(', ') : date;
@@ -105,6 +110,14 @@ export function ResultContext({
           <dt className="inline font-medium text-foreground">{labels.costTier}:</dt>{' '}
           <dd className="inline" data-testid="result-context-cost-tier">
             {costTier}
+          </dd>
+        </div>
+      )}
+      {utilization && (
+        <div>
+          <dt className="inline font-medium text-foreground">{labels.utilization}:</dt>{' '}
+          <dd className="inline" data-testid="result-context-utilization">
+            {utilization}
           </dd>
         </div>
       )}

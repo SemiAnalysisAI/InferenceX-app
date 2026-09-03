@@ -5,9 +5,12 @@ import type { HardwareConfig } from '@/components/inference/types';
 import type { ProfitEstimatorRow } from './profit-estimator';
 import {
   buildProfitSegments,
+  contrastingTextColor,
   generateProfitTooltipHTML,
+  operatorMarginLabel,
   profitYDomain,
   rowLabel,
+  segmentLabelLines,
 } from './ProfitEstimatorChart';
 
 function row(overrides: Partial<ProfitEstimatorRow> = {}): ProfitEstimatorRow {
@@ -31,7 +34,7 @@ const hardwareConfig = {
 } as unknown as HardwareConfig;
 
 describe('buildProfitSegments', () => {
-  it('stacks TCO, lab cut, and profit from zero upward for a profitable SKU', () => {
+  it('stacks TCO, license fee, and profit from zero upward for a profitable SKU', () => {
     const segments = buildProfitSegments([row()]);
     expect(segments.map((s) => s.kind)).toEqual(['tco', 'labCut', 'profit']);
     expect(segments[0]).toMatchObject({ y0: 0, y1: 400 });
@@ -40,7 +43,7 @@ describe('buildProfitSegments', () => {
     expect(segments[2].y1).toBeCloseTo(1000);
   });
 
-  it('draws a loss below zero and omits the lab cut when margin is negative', () => {
+  it('draws a loss below zero and omits the license fee when margin is negative', () => {
     const segments = buildProfitSegments([
       row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 0, profit: -100 }),
     ]);
@@ -94,7 +97,7 @@ describe('rowLabel', () => {
 describe('generateProfitTooltipHTML', () => {
   const assumptions = { utilizationPct: 60, labCutPct: 30 };
 
-  it('lists revenue, TCO, lab cut, and profit with the configured percentages', () => {
+  it('lists revenue, TCO, license fee, and profit with the configured percentages', () => {
     const html = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false);
     expect(html).toContain('$1.0k');
     expect(html).toContain('$400');
@@ -103,17 +106,18 @@ describe('generateProfitTooltipHTML', () => {
     expect(html).toContain('Operator profit');
   });
 
-  it('labels a negative result as a loss and drops the lab cut line', () => {
+  it('labels a negative result as a loss and still lists the license fee, which is a share of revenue', () => {
     const html = generateProfitTooltipHTML(
-      row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 0, profit: -100 }),
+      row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 90, profit: -190 }),
       hardwareConfig,
       assumptions,
       'en',
       false,
     );
     expect(html).toContain('Operator loss');
-    expect(html).toContain('-$100');
-    expect(html).not.toContain('Model lab cut');
+    expect(html).toContain('-$190');
+    expect(html).toContain('Model license fee');
+    expect(html).toContain('$90');
   });
 
   it('renders Chinese copy and the pin hint when requested', () => {
@@ -133,5 +137,66 @@ describe('generateProfitTooltipHTML', () => {
     );
     expect(html).not.toContain('<img>');
     expect(html).toContain('&lt;img&gt;');
+  });
+});
+
+const SEGMENT_WORDS = {
+  tco: 'Compute expense (TCO)',
+  labCut: 'Model license fee',
+  profit: 'Operator profit',
+  loss: 'Operator loss',
+};
+
+describe('segmentLabelLines', () => {
+  it('names the segment and its amount when the rectangle is tall enough', () => {
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual([
+      'Compute expense (TCO)',
+      '$400',
+    ]);
+    expect(segmentLabelLines('labCut', row(), 40, SEGMENT_WORDS)).toEqual([
+      'Model license fee',
+      '$180',
+    ]);
+    expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual([
+      'Operator profit',
+      '$420',
+    ]);
+  });
+
+  it('drops to the amount alone, then to nothing, as the rectangle shrinks', () => {
+    expect(segmentLabelLines('profit', row(), 20, SEGMENT_WORDS)).toEqual(['$420']);
+    expect(segmentLabelLines('profit', row(), 10, SEGMENT_WORDS)).toEqual([]);
+  });
+
+  it('labels a loss with the loss word and the negative amount', () => {
+    const lossRow = row({ tco: 1300, grossMargin: -300, labCut: 300, profit: -600 });
+    expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual([
+      'Operator loss',
+      '-$600',
+    ]);
+  });
+});
+
+describe('contrastingTextColor', () => {
+  it('puts dark text on light fills and light text on dark fills', () => {
+    expect(contrastingTextColor('#ffffff')).toBe('#111111');
+    expect(contrastingTextColor('#f2c94c')).toBe('#111111');
+    expect(contrastingTextColor('#000000')).toBe('#ffffff');
+    expect(contrastingTextColor('#1f4e79')).toBe('#ffffff');
+  });
+
+  it('falls back to white when the fill cannot be parsed', () => {
+    expect(contrastingTextColor('var(--primary)')).toBe('#ffffff');
+  });
+});
+
+describe('operatorMarginLabel', () => {
+  it('formats profit as a share of revenue with the caller-supplied word', () => {
+    expect(operatorMarginLabel(row(), 'margin')).toBe('42.0% margin');
+    expect(operatorMarginLabel(row({ profit: -600 }), '利润率')).toBe('-60.0% 利润率');
+  });
+
+  it('returns nothing when there is no revenue to divide by', () => {
+    expect(operatorMarginLabel(row({ revenue: 0 }), 'margin')).toBe('');
   });
 });
