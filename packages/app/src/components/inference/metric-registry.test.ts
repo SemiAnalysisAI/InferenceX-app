@@ -196,12 +196,18 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarN');
   });
 
-  it('maps links for the removed ¥ axes to the same tokens priced in $', () => {
-    expect(resolveMetricConfigKey('y_tokensPerRmbH')).toBe('y_tokensPerDollarH');
-    expect(resolveMetricConfigKey('y_tokensPerRmbN')).toBe('y_tokensPerDollarN');
-    expect(resolveMetricConfigKey('y_tokensPerRmbR')).toBe('y_tokensPerDollarR');
-    expect(resolveMetricConfigKey('y_outputTokensPerRmbH')).toBe('y_outputTokensPerDollarH');
-    expect(resolveMetricConfigKey('y_inputTokensPerRmbR')).toBe('y_inputTokensPerDollarR');
+  it.each([
+    ['y_tokensPerRmbH', 'y_tokensPerDollarH'],
+    ['y_tokensPerRmbN', 'y_tokensPerDollarN'],
+    ['y_tokensPerRmbR', 'y_tokensPerDollarR'],
+    ['y_outputTokensPerRmbH', 'y_outputTokensPerDollarH'],
+    ['y_outputTokensPerRmbN', 'y_outputTokensPerDollarN'],
+    ['y_outputTokensPerRmbR', 'y_outputTokensPerDollarR'],
+    ['y_inputTokensPerRmbH', 'y_inputTokensPerDollarH'],
+    ['y_inputTokensPerRmbN', 'y_inputTokensPerDollarN'],
+    ['y_inputTokensPerRmbR', 'y_inputTokensPerDollarR'],
+  ])('maps removed RMB axis %s to its USD equivalent %s', (legacy, expected) => {
+    expect(resolveMetricConfigKey(legacy)).toBe(expected);
   });
 
   it('preserves valid benchmark, derived, and custom metric identities', () => {

@@ -45,12 +45,13 @@ describe('ResultContext', () => {
     expect(context.textContent).toContain('成本口径: Input $1/M tok · Output $8/M tok');
   });
 
-  it('renders only Cost Tier, Updated, and Source when the heading carries the identity', () => {
+  it('keeps precision with Cost Tier, Updated, and Source when the heading carries other identity', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
         <ResultContext
           locale="en"
+          precision="FP8"
           costTier="Owning Hyperscaler"
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
@@ -58,12 +59,12 @@ describe('ResultContext', () => {
       );
     });
     const text = container.textContent ?? '';
+    expect(text).toContain('Precision: FP8');
     expect(text).toContain('Cost Tier: Owning Hyperscaler');
     expect(text).toContain('Updated: 2026-09-01');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
-    expect(text).not.toContain('Precision:');
     expect(text).not.toContain('Metric:');
     expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
       'Owning Hyperscaler',
