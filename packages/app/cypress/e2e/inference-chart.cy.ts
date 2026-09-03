@@ -207,7 +207,12 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)');
+      .should('contain.text', 'Total Tokens per $1 TCO')
+      .and('not.contain.text', '(Owning');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="result-context-cost-tier"]')
+      .should('have.text', 'Owning Neocloud Giant');
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -302,7 +307,12 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）');
+      .should('contain.text', '每 1 美元 TCO 对应的总 token 数')
+      .and('not.contain.text', '（自有');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="result-context-cost-tier"]')
+      .should('have.text', '自有（Neocloud Giant）');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,
