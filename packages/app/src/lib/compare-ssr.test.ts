@@ -13,7 +13,7 @@ import {
   META_DESCRIPTION_MAX,
   type SsrInterpolatedRow,
 } from './compare-ssr';
-import { compareMetaDescriptionZh } from './compare-ssr-zh';
+import { buildJsonLdZh, compareMetaDescriptionZh, formatModelListZh } from './compare-ssr-zh';
 
 // BenchmarkRow.id is required (stable per-point id from benchmark_results);
 // hand out a fresh one per stub so id-keyed logic can't collide across rows.
@@ -26,6 +26,13 @@ describe('compare URL validators', () => {
 
   it('accepts AgentX as a comparison scenario override', () => {
     expect(KNOWN_SEQUENCES.has('agentic-traces')).toBe(true);
+  });
+});
+
+describe('Chinese compare formatting', () => {
+  it('formats model lists with Chinese delimiters', () => {
+    const models = COMPARE_MODEL_SLUGS.slice(0, 3);
+    expect(formatModelListZh(models)).toBe(models.map((model) => model.label).join('、'));
   });
 });
 
@@ -254,7 +261,7 @@ describe('compareMetaDescription', () => {
     ]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
     expect(desc).toBe(
-      'B200 delivers 34% more tok/s/chip than B300 on GLM-5; B300 is 12% cheaper per token. Verified open-source benchmarks from InferenceX by SemiAnalysis.',
+      'B200 delivers 34% more tok/s/chip than B300 on GLM-5; B300 is 12% more cost-efficient than B200. Verified open-source InferenceX benchmarks.',
     );
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
     expect(desc.startsWith('B200 delivers 34% more tok/s/chip than B300 on GLM-5')).toBe(true);
@@ -271,7 +278,7 @@ describe('compareMetaDescription', () => {
   it('emits only the cost clause (with "than") when throughput is tied', () => {
     const ssr = makeSsrRows([[40, ir(100, 1.5), ir(100, 1)]]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
-    expect(desc).toContain('B300 is 50% cheaper per token than B200 on GLM-5');
+    expect(desc).toContain('B300 is 50% more cost-efficient than B200 on GLM-5');
     expect(desc.includes('more tok/s/chip')).toBe(false);
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });
@@ -342,8 +349,8 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     expect(zh).toContain('B300');
     expect(zh).toContain('34%');
     expect(zh).toContain('12%');
-    expect(zh).toContain('每芯片吞吐量');
-    expect(zh).toContain('每 token 成本');
+    expect(zh).toContain('单芯片吞吐量');
+    expect(zh).toContain('成本效率');
     expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });
 
@@ -367,5 +374,55 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     expect(compareMetaDescriptionZh(DSV4, 'gb200', 'gb300', big).length).toBeLessThanOrEqual(
       META_DESCRIPTION_MAX,
     );
+  });
+});
+
+describe('Chinese compare JSON-LD', () => {
+  it('uses localized human-readable property names', () => {
+    const summary = {
+      hardware: 'b200',
+      configCount: 1,
+      bestThroughputPerGpu: 100,
+      bestMedianTtft: 0.2,
+      bestMedianTpot: 0.01,
+    };
+    const jsonLd = buildJsonLdZh(
+      'full',
+      GLM,
+      'b200',
+      'b300',
+      'https://inferencex.ai/zh/compare/example',
+      summary,
+      { ...summary, hardware: 'b300' },
+      makeSsrRows([[40, ir(134, 1.12), ir(100, 1)]]),
+    );
+    const serialized = JSON.stringify(jsonLd);
+
+    for (const name of [
+      '类别',
+      '厂商',
+      '架构',
+      '最高单芯片吞吐量（tok/s）',
+      '最低 TTFT 中位数（s）',
+      '最低 TPOT 中位数（s）',
+      '基准测试配置数',
+      '模型',
+      '目标交互性（tok/s/user）',
+    ]) {
+      expect(serialized).toContain(`"name":"${name}"`);
+    }
+    for (const name of [
+      'Category',
+      'Vendor',
+      'Architecture',
+      'Best Throughput per Chip (tok/s)',
+      'Best Median TTFT (s)',
+      'Best Median TPOT (s)',
+      'Benchmark Configurations',
+      'Model',
+      'Target Interactivity (tok/s/user)',
+    ]) {
+      expect(serialized).not.toContain(`"name":"${name}"`);
+    }
   });
 });
