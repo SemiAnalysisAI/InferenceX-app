@@ -67,6 +67,33 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills()).not.toThrow();
   });
 
+  it('limits borrowed prefix-cache hit rates to GB300 dynamo-vllm DeepSeek-V4 AgentX points', () => {
+    const cacheHitKeys = [
+      'server_gpu_cache_hit_rate',
+      'server_external_cache_hit_rate',
+      'server_cpu_cache_hit_rate',
+    ];
+    const borrowed = BENCHMARK_POINT_BACKFILLS.filter((backfill) =>
+      cacheHitKeys.some((key) => key in (backfill.set.metricsMerge ?? {})),
+    );
+
+    // Only the GB300 sweeps missed the backend worker metrics scrape; every
+    // other hardware measured its own hit rate and must never inherit one.
+    expect(borrowed.length).toBe(14);
+    for (const backfill of borrowed) {
+      expect(backfill.config.hardware).toBe('gb300');
+      expect(backfill.config.framework).toBe('dynamo-vllm');
+      expect(backfill.config.model).toBe('dsv4');
+      expect(backfill.benchmarkType).toBe('agentic_traces');
+      for (const key of cacheHitKeys) {
+        const value = backfill.set.metricsMerge?.[key];
+        expect(typeof value).toBe('number');
+        expect(value).toBeGreaterThanOrEqual(0);
+        expect(value).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   it('requires a stable ID, reason, exact selector, and non-empty patch', () => {
     expect(() => validateRunBackfills([], [examplePointBackfill({ id: 'Not Valid' })])).toThrow(
       /kebab-case/u,
