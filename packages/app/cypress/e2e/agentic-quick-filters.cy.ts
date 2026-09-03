@@ -118,7 +118,6 @@ describe('Agentic Quick Filters', () => {
     cy.get('[data-testid^="quick-filter-spec-"]').should('not.exist');
     cy.contains('Spec Decoding').should('not.exist');
 
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
@@ -126,7 +125,6 @@ describe('Agentic Quick Filters', () => {
 
     // An incompatible cross-group selection produces zero points. The dialog
     // must stay mounted so the reader can recover without reloading the page.
-    cy.get('[data-testid="quick-filter-framework-select"]').click();
     cy.get('[data-testid="quick-filter-framework-vllm"]').click();
     cy.get('[data-testid="scatter-empty-quick-filters"]').should('exist');
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
@@ -141,7 +139,6 @@ describe('Agentic Quick Filters', () => {
     visitAgenticQuickFilters();
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 
@@ -151,7 +148,6 @@ describe('Agentic Quick Filters', () => {
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
-    cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-selected', 'false');
+    cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-pressed', 'false');
   });
 });
