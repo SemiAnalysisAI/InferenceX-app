@@ -28,6 +28,7 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import { CHART_SERIES_VERSION, computeChartSeries } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
+import { getServerMetricsContext } from './queries/server-logs.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
@@ -105,13 +106,14 @@ async function main(): Promise<void> {
         {
           server_metrics_json_gz: Buffer | null;
           framework: string | null;
+          benchmark_result_id: number;
           disagg: boolean | null;
         }[]
       >`
-        select atr.server_metrics_json_gz, source.framework, source.disagg
+        select atr.server_metrics_json_gz, source.framework, source.disagg, source.benchmark_result_id
         from agentic_trace_replay atr
         left join lateral (
-          select c.framework, c.disagg
+          select c.framework, c.disagg, br.id as benchmark_result_id
           from benchmark_results br
           join configs c on c.id = br.config_id
           where br.trace_replay_id = atr.id
@@ -125,10 +127,11 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
-      const series = await computeChartSeries(row.server_metrics_json_gz, {
+      const context = await getServerMetricsContext(sql, row.benchmark_result_id, {
         framework: row.framework,
         disagg: row.disagg ?? false,
       });
+      const series = await computeChartSeries(row.server_metrics_json_gz, context);
 
       await sql`
         update agentic_trace_replay

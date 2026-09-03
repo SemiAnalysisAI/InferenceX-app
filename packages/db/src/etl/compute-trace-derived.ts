@@ -21,7 +21,7 @@ import {
 import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline.js';
 import { collectMetricPhases } from './gzip-json-stream.js';
 import { ATOM_KV_BLOCKS_METRIC, atomKvCacheBlocksFromMetricPhases } from './atom-kv-capacity.js';
-import type { ServerMetricsContext } from './server-metrics-adapters.js';
+import { normalizeServerMetrics, type ServerMetricsContext } from './server-metrics-adapters.js';
 
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
@@ -82,7 +82,10 @@ export async function computeTraceDerivedPayloads(
     const aggregateMetrics = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);
-    aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics);
+    aggregateStats = withServerMetricAggregateStats(
+      aggregateStats,
+      normalizeServerMetrics(aggregateMetrics, phases.inputConfig, metricsContext),
+    );
 
     // The historical in-memory path builds chart timing metadata from every
     // metric, while its oversized streaming fallback retains only chart keys.
@@ -95,7 +98,12 @@ export async function computeTraceDerivedPayloads(
       ? phases.warmupMetrics
       : selectMetrics(phases.warmupMetrics, CHART_METRIC_KEYS);
     try {
-      chartSeries = computeChartSeriesFromMetricPhases(profiling, warmup, metricsContext);
+      chartSeries = computeChartSeriesFromMetricPhases(
+        profiling,
+        warmup,
+        metricsContext,
+        phases.inputConfig,
+      );
     } catch {
       chartSeries = null;
     }

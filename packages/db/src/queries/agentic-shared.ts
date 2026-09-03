@@ -50,8 +50,9 @@ import {
  * timelines or attempting to combine per-point percentiles.
  *
  * v9: extract ATOM KV utilization and admitted prefix-cache hit rates.
+ * v10: exclude llm-d frontend mirrors from server metric aggregates.
  */
-export const STATS_VERSION = 9;
+export const STATS_VERSION = 10;
 
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string; was_cancelled?: boolean };

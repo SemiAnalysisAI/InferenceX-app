@@ -22,6 +22,7 @@
  *     original source sweep run, so public links point at the real benchmark run.
  */
 
+import { getServerMetricsContext } from './queries/server-logs.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -660,8 +661,11 @@ async function main(): Promise<void> {
                         serverMetricsCsv: trace.serverMetricsCsv,
                         serverMetricsJson: trace.serverMetricsJson,
                         metricsContext: {
-                          framework: toInsert[0]?.config.framework,
-                          disagg: toInsert[0]?.config.disagg,
+                          ...(await getServerMetricsContext(sql, insertedIds[0]!, {
+                            framework: toInsert[0]?.config.framework,
+                            disagg: toInsert[0]?.config.disagg,
+                            endpointRoles: trace.endpointRoles,
+                          })),
                         },
                       },
                       // oxlint-disable-next-line no-loop-func -- each callback closes over this iteration's block-scoped trace metadata

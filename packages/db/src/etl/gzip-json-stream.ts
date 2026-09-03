@@ -17,6 +17,7 @@ import Assembler from 'stream-json/assembler.js';
 import type { Token } from 'stream-json/parser.js';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
+import type { ServerMetricsInputConfig } from './server-metrics-adapters.js';
 
 /** Bound peak memory while retaining the fast path for ordinary metric blobs. */
 const MAX_IN_MEMORY_JSON_BYTES = 128 * 1024 * 1024;
@@ -81,6 +82,7 @@ export interface MetricPhaseMaps<T> {
   warmupMetrics: Record<string, T>;
   /** True when the bounded fast path retained every metric in the document. */
   complete: boolean;
+  inputConfig?: ServerMetricsInputConfig;
 }
 
 function isValueStart(token: Token): boolean {
@@ -120,6 +122,7 @@ async function streamCollectMetricPhases<T>(
   let valueAssembler: Assembler<T> | null = null;
   let valueTarget: Record<string, T> | null = null;
   let valueKey: string | null = null;
+  const metadata: Record<string, T> = {};
 
   // Packed-only values avoid emitting start/chunk/end tokens in addition to
   // their complete value token. This materially reduces the token count for
@@ -161,7 +164,12 @@ async function streamCollectMetricPhases<T>(
       }
     } else if (isValueStart(token)) {
       if (depthBefore === 1 && topLevelKey !== null) {
-        if (token.name === 'startObject' && topLevelKey === 'metrics') {
+        if (token.name === 'startObject' && topLevelKey === 'input_config') {
+          valueTarget = metadata;
+          valueKey = topLevelKey;
+          valueAssembler = new Assembler<T>();
+          valueAssembler.consume(token);
+        } else if (token.name === 'startObject' && topLevelKey === 'metrics') {
           metrics = {};
           phase = 'metrics';
         } else if (token.name === 'startObject' && topLevelKey === 'warmup_metrics') {
@@ -193,7 +201,14 @@ async function streamCollectMetricPhases<T>(
     }
   }
 
-  return { metrics, warmupMetrics, complete: false };
+  return {
+    metrics,
+    warmupMetrics,
+    complete: false,
+    ...(metadata.input_config
+      ? { inputConfig: metadata.input_config as ServerMetricsInputConfig }
+      : {}),
+  };
 }
 
 /**
@@ -210,11 +225,13 @@ export async function collectMetricPhases<T>(
     const parsed = JSON.parse(json) as {
       metrics?: Record<string, T>;
       warmup_metrics?: Record<string, T>;
+      input_config?: ServerMetricsInputConfig;
     };
     return {
       metrics: parsed.metrics ?? {},
       warmupMetrics: parsed.warmup_metrics ?? {},
       complete: true,
+      ...(parsed.input_config ? { inputConfig: parsed.input_config } : {}),
     };
   }
 

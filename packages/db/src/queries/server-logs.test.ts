@@ -4,6 +4,7 @@ import type { DbClient } from '../connection.js';
 import {
   escapePostgresRegexLiteral,
   getServerLogAvailability,
+  getServerMetricsContext,
   getServerLogChunk,
   getServerLogFileNames,
   searchServerLogs,
@@ -217,5 +218,32 @@ describe('getServerLogAvailability', () => {
     const { sql, call } = mockSql([]);
     await expect(getServerLogAvailability(sql, [])).resolves.toEqual({});
     expect(call).not.toHaveBeenCalled();
+  });
+});
+
+it('loads llm-d roles from bounded discovery matches without changing other backends', async () => {
+  const call = vi
+    .fn()
+    .mockResolvedValueOnce([{ file_name: 'slurm.out' }])
+    .mockResolvedValueOnce([
+      {
+        file_name: 'slurm.out',
+        match_position: 41,
+        char_count: 100,
+        has_more: false,
+        before_text: '- address: 10.0.0.1\n  labels:\n    ',
+        match_text: 'llm-d.ai/role:',
+        after_text: ' prefill\n  name: prefill-0\n',
+      },
+    ])
+    .mockResolvedValueOnce([{ match_position: 0, char_count: 20, has_more: false }]);
+  const sql = call as unknown as DbClient;
+  const dynamo = { framework: 'dynamo-vllm', disagg: true };
+  expect(await getServerMetricsContext(sql, 42, dynamo)).toEqual(dynamo);
+  expect(call).not.toHaveBeenCalled();
+  expect(await getServerMetricsContext(sql, 42, { framework: 'llmd-vllm', disagg: true })).toEqual({
+    framework: 'llmd-vllm',
+    disagg: true,
+    endpointRoles: { '10.0.0.1': 'prefill' },
   });
 });

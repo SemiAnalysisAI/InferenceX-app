@@ -151,19 +151,25 @@ async function main(): Promise<void> {
       if (
         !flags.force &&
         storedVersion !== undefined &&
-        storedVersion >= 9 &&
+        storedVersion >= 10 &&
         storedVersion < STATS_VERSION
       ) {
         stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
       } else {
-        const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
-          select server_metrics_json_gz
-          from agentic_trace_replay
-          where id = ${id}
+        const [serverRow] = await sql<
+          { server_metrics_json_gz: Buffer | null; framework: string; disagg: boolean }[]
+        >`
+          select atr.server_metrics_json_gz, c.framework, c.disagg
+          from agentic_trace_replay atr
+          join benchmark_results br on br.trace_replay_id = atr.id
+          join configs c on c.id = br.config_id
+          where atr.id = ${id}
+          order by br.id limit 1
         `;
         const serverStats = await computeAggregateStats({
           profileBlob: null,
           serverBlob: serverRow?.server_metrics_json_gz ?? null,
+          metricsContext: serverRow,
         });
         stats = mergeProfileStatsUpgrade(serverStats, profileStats);
       }

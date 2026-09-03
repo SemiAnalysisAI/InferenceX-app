@@ -8,6 +8,29 @@
  * authoritative number.
  */
 
+/** Read llm-d's emitted discovery records, never infer roles from token counts. */
+export function llmdEndpointRolesFromLogs(
+  logs: readonly string[],
+): Record<string, 'prefill' | 'decode'> {
+  const roles = new Map<string, Set<'prefill' | 'decode'>>();
+  const record =
+    /^- address: (?<address>[^\r\n]+)\r?\n  labels:\r?\n    llm-d\.ai\/role: (?<role>prefill|decode)\r?$/gmu;
+  for (const log of logs) {
+    for (const match of log.matchAll(record)) {
+      const address = match.groups!.address!.trim();
+      const role = match.groups!.role as 'prefill' | 'decode';
+      const values = roles.get(address) ?? new Set<'prefill' | 'decode'>();
+      values.add(role);
+      roles.set(address, values);
+    }
+  }
+  return Object.fromEntries(
+    [...roles]
+      .filter(([, values]) => values.size === 1)
+      .map(([address, values]) => [address, [...values][0]!]),
+  );
+}
+
 /**
  * Total KV-cache pool size in tokens.
  *

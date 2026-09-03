@@ -140,3 +140,143 @@ describe('computeTraceDerivedPayloads', () => {
     expect(optimized.requestTimeline).toEqual(await computeRequestTimeline(profileBlob));
   });
 });
+
+const llmdSeries = (endpoint_url: string, rate: number, avg: number) => ({
+  endpoint_url,
+  labels: { engine: '0', model_name: 'deepseek-ai/DeepSeek-V4-Pro-0813' },
+  timeslices: [0, 1].map((t) => ({ start_ns: t * 1e9, end_ns: (t + 1) * 1e9, rate, avg })),
+});
+
+describe('llm-d metric sources', () => {
+  const frontend = 'http://gateway.test:9000/metrics';
+  const prefill = 'http://prefill.test:8200/metrics';
+  const decode = 'http://decode.test:8200/metrics';
+  const context = {
+    framework: 'llmd-vllm',
+    disagg: true,
+    endpointRoles: { [prefill]: 'prefill', [decode]: 'decode' },
+  } as const;
+  const metrics = {
+    'vllm:kv_cache_usage_perc': {
+      series: [
+        llmdSeries(prefill, 0, 0.2),
+        llmdSeries(decode, 0, 0.2),
+        llmdSeries(frontend, 0, 0.9),
+      ],
+    },
+    'vllm:generation_tokens': {
+      series: [
+        llmdSeries(prefill, 1, 0),
+        llmdSeries(decode, 50, 0),
+        llmdSeries(frontend, 10000, 0),
+      ],
+    },
+  };
+  const input_config = {
+    endpoint: { urls: ['http://gateway.test:9000'] },
+    server_metrics: { urls: [prefill, decode] },
+  };
+
+  it.each([undefined, 1])(
+    'filters the frontend and retains same-rank workers (stream limit %s)',
+    async (maxInMemoryBytes) => {
+      const blob = gzipSync(JSON.stringify({ metrics, warmup_metrics: metrics, input_config }));
+      const result = await computeTraceDerivedPayloads(null, blob, context, { maxInMemoryBytes });
+      expect(result.chartSeries?.decodeTps).toEqual([
+        { t: 0, value: 51 },
+        { t: 1, value: 51 },
+      ]);
+      expect(result.chartSeries?.kvCacheUsageByEngine).toHaveLength(2);
+      expect(
+        result.chartSeries?.metricSources.map(({ source }) => [source.role, source.endpointUrl]),
+      ).toEqual([
+        ['prefill', prefill],
+        ['decode', decode],
+      ]);
+      expect(result.aggregateStats.kvCacheUtil?.mean).toBeCloseTo(0.2);
+      expect(result.chartSeries).toEqual(await computeChartSeries(blob, context));
+      expect(result.aggregateStats).toEqual(
+        await computeAggregateStats({
+          profileBlob: null,
+          serverBlob: blob,
+          metricsContext: context,
+        }),
+      );
+    },
+  );
+
+  it.each([undefined, 1])(
+    'uses the same frontend selection across phases and entry points (stream limit %s)',
+    async (maxInMemoryBytes) => {
+      const blob = gzipSync(
+        JSON.stringify({
+          metrics,
+          warmup_metrics: {
+            'vllm:generation_tokens': { series: [llmdSeries(frontend, 10000, 0)] },
+          },
+          input_config,
+        }),
+      );
+      const result = await computeTraceDerivedPayloads(null, blob, context, { maxInMemoryBytes });
+      expect(result.chartSeries?.decodeTps).toEqual([
+        { t: 0, value: 51 },
+        { t: 1, value: 51 },
+      ]);
+      expect(result.chartSeries).toEqual(await computeChartSeries(blob, context));
+      expect(result.aggregateStats).toEqual(
+        await computeAggregateStats({
+          profileBlob: null,
+          serverBlob: blob,
+          metricsContext: context,
+        }),
+      );
+    },
+  );
+
+  it('preserves the frontend when it is explicitly requested or has no direct metric counterpart', async () => {
+    for (const urls of [[prefill, decode, frontend], []]) {
+      const blob = gzipSync(
+        JSON.stringify({ metrics, input_config: { ...input_config, server_metrics: { urls } } }),
+      );
+      const result = await computeChartSeries(blob, context);
+      expect(result?.decodeTps[0]?.value).toBe(10051);
+      expect(result?.kvCacheUsageByEngine).toHaveLength(3);
+    }
+    const blob = gzipSync(
+      JSON.stringify({
+        metrics: { 'vllm:generation_tokens': { series: [llmdSeries(frontend, 10, 0)] } },
+        input_config,
+      }),
+    );
+    const result = await computeChartSeries(blob, context);
+    expect(result?.decodeTps[0]?.value).toBe(10);
+  });
+
+  it.each(['vllm', 'dynamo-vllm', 'trtllm'])(
+    'does not apply llm-d filtering to %s',
+    async (framework) => {
+      const blob = gzipSync(JSON.stringify({ metrics, input_config }));
+      const result = await computeChartSeries(blob, { framework, disagg: true });
+      expect(result?.decodeTps[0]?.value).toBe(10051);
+    },
+  );
+
+  it('keeps an explicitly configured localhost worker', async () => {
+    const localhost = 'http://localhost:8080/metrics';
+    const blob = gzipSync(
+      JSON.stringify({
+        input_config: {
+          endpoint: { urls: ['http://localhost:8080'] },
+          server_metrics: { urls: [localhost, decode] },
+        },
+        metrics: {
+          'vllm:generation_tokens': {
+            series: [llmdSeries(localhost, 20, 0), llmdSeries(decode, 50, 0)],
+          },
+        },
+      }),
+    );
+    const result = await computeChartSeries(blob, context);
+    expect(result?.decodeTps[0]?.value).toBe(70);
+  });
+});
