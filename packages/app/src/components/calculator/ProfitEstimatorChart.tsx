@@ -185,7 +185,9 @@ export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): Profit
 /** Y domain that always includes zero, with headroom for the revenue label. */
 export function profitYDomain(rows: readonly ProfitEstimatorRow[]): [number, number] {
   if (rows.length === 0) return [0, 1];
-  const top = Math.max(0, ...rows.map((row) => Math.max(row.revenue, row.tco)));
+  // A loss bar stacks TCO and the license fee above the axis, and that sum can
+  // exceed both revenue and TCO, so size the top to the tallest positive stack.
+  const top = Math.max(0, ...rows.map((row) => Math.max(row.revenue, row.tco + row.labCut)));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   return [bottom * 1.12, top === 0 ? 1 : top * 1.2];
 }

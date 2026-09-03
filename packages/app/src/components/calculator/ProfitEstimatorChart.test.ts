@@ -81,6 +81,14 @@ describe('profitYDomain', () => {
     expect(bottom).toBeLessThan(-100);
     expect(top).toBeGreaterThan(400);
   });
+
+  it('covers the TCO plus license-fee stack of a loss bar, not just revenue or TCO', () => {
+    const [bottom, top] = profitYDomain([
+      row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 90, profit: -190 }),
+    ]);
+    expect(bottom).toBeLessThan(-190);
+    expect(top).toBeGreaterThan(490);
+  });
 });
 
 describe('rowLabel', () => {
