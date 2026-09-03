@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { ChartEmpty, PERCENTILE_COLORS } from './chart-shared';
+import { useLocale } from '@/lib/use-locale';
 
 export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p95' | 'p99';
 
@@ -58,6 +59,14 @@ export function AggregateChart({
   width?: number;
   height?: number;
 }) {
+  const locale = useLocale();
+  const percentileLines = useMemo(
+    () =>
+      PERCENTILE_LINES.map((line) =>
+        line.key === 'mean' && locale === 'zh' ? { ...line, label: '平均值' } : line,
+      ),
+    [locale],
+  );
   const W = width;
   const H = height;
   const fmt = (v: number) =>
@@ -71,7 +80,7 @@ export function AggregateChart({
     if (points.length === 0) return null;
     let yMaxComputed = 0;
     for (const p of points) {
-      for (const line of PERCENTILE_LINES) {
+      for (const line of percentileLines) {
         const v = p.values[line.key];
         if (typeof v === 'number' && Number.isFinite(v) && v > yMaxComputed) yMaxComputed = v;
       }
@@ -80,7 +89,7 @@ export function AggregateChart({
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - PAD.bottom;
     return { yTop, innerW, innerH };
-  }, [points, W, H, yMax]);
+  }, [points, W, H, yMax, percentileLines]);
 
   if (!computed) {
     return <ChartEmpty height={H} />;
@@ -102,7 +111,7 @@ export function AggregateChart({
     const p = points[Math.max(0, Math.min(points.length - 1, idx))];
     if (!p) return null;
     const items: HoverItem[] = [];
-    for (const line of PERCENTILE_LINES) {
+    for (const line of percentileLines) {
       const v = p.values[line.key];
       if (typeof v !== 'number' || !Number.isFinite(v)) continue;
       items.push({ color: line.color, label: line.label, value: fmt(v) });
@@ -113,14 +122,16 @@ export function AggregateChart({
   return (
     <div className="w-full">
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        {PERCENTILE_LINES.map((line) => (
+        {percentileLines.map((line) => (
           <div key={line.key} className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-0.5" style={{ backgroundColor: line.color }} />
             <span className="text-muted-foreground">{line.label}</span>
           </div>
         ))}
         <span className="ml-auto text-muted-foreground">
-          {points.length} configs · units: {unit}
+          {locale === 'zh'
+            ? `${points.length} 个配置 · 单位：${unit}`
+            : `${points.length} configs · units: ${unit}`}
         </span>
       </div>
       <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
@@ -191,7 +202,7 @@ export function AggregateChart({
 
         {/* Horizontal connecting lines per percentile — faint backdrop so the
             eye can follow how each percentile changes across configs. */}
-        {PERCENTILE_LINES.map((line) => {
+        {percentileLines.map((line) => {
           const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
           let prev: { x: number; y: number } | null = null;
           for (let i = 0; i < points.length; i++) {
@@ -228,10 +239,12 @@ export function AggregateChart({
         {points.map((p, i) => {
           const x = xOf(i);
           // Collect percentile values present for this sibling.
-          const present = PERCENTILE_LINES.filter(
-            (line) =>
-              typeof p.values[line.key] === 'number' && Number.isFinite(p.values[line.key]!),
-          ).map((line) => ({ ...line, value: p.values[line.key]! }));
+          const present = percentileLines
+            .filter(
+              (line) =>
+                typeof p.values[line.key] === 'number' && Number.isFinite(p.values[line.key]!),
+            )
+            .map((line) => ({ ...line, value: p.values[line.key]! }));
           if (present.length === 0) return null;
           // Only the *percentile* values define the bar extent; mean might be
           // outside the percentile span on weird distributions.

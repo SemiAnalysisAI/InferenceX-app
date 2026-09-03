@@ -47,7 +47,7 @@ describe('toCalculatorBenchmarkRows', () => {
   });
 
   it('keeps all three cache tiers — the trim cannot know which one a row will use', () => {
-    // `cacheHitRateOf` picks between external and CPU per row, so the allowlist
+    // `measuredCacheHitRate` picks between external and CPU per row, so the allowlist
     // has to pass all three through or the choice is made for it by the trim.
     // This runs on every calculator response, agentic included.
     const cached = toCalculatorBenchmarkRows(

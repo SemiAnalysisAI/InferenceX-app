@@ -43,6 +43,7 @@ function sourceAt(revision: string, file: string): string {
 }
 
 interface ChangedFile {
+  readonly status: string;
   readonly baseFile: string;
   readonly headFile: string;
 }
@@ -68,11 +69,12 @@ function changedFiles(base: string, head: string): ChangedFile[] {
   for (let index = 0; index < fields.length;) {
     const status = fields[index++];
     if (status.startsWith('R') || status.startsWith('C')) {
-      changed.push({ baseFile: fields[index++], headFile: fields[index++] });
+      changed.push({ status: status[0], baseFile: fields[index++], headFile: fields[index++] });
       continue;
     }
     const file = fields[index++];
     changed.push({
+      status,
       baseFile: status === 'A' ? '' : file,
       headFile: status === 'D' ? '' : file,
     });
@@ -83,13 +85,17 @@ function changedFiles(base: string, head: string): ChangedFile[] {
 const options = parseOptions(process.argv.slice(2));
 const mergeBase = git(['merge-base', options.base, options.head]);
 const files = changedFiles(mergeBase, options.head);
-const violations = files.flatMap(({ baseFile, headFile }) => {
+const violations = files.flatMap(({ status, baseFile, headFile }) => {
   const baseSource = sourceAt(mergeBase, baseFile);
   const headSource = sourceAt(options.head, headFile);
-  const preferredFile = headFile || baseFile;
-  const preferred = compareEnglishSurfaces(preferredFile, baseSource, headSource);
-  if (preferred.length > 0 || baseFile === headFile || !baseFile) return preferred;
-  return compareEnglishSurfaces(baseFile, baseSource, headSource);
+  if (status === 'R') {
+    return [
+      ...compareEnglishSurfaces(baseFile, baseSource, ''),
+      ...compareEnglishSurfaces(headFile, '', headSource),
+    ];
+  }
+  if (status === 'C') return compareEnglishSurfaces(headFile, '', headSource);
+  return compareEnglishSurfaces(headFile || baseFile, baseSource, headSource);
 });
 
 if (violations.length > 0) {

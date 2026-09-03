@@ -211,6 +211,46 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
     });
 
+    it('groups a per-model retired scenario under Deprecated (MiniMax M3 8K/1K)', () => {
+      // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
+      // (InferenceX#2493): with the model passed in, 8K / 1K moves out of the
+      // default fixed-seq group into the Deprecated group.
+      cy.mount(
+        <TooltipProvider delayDuration={0}>
+          <ScenarioSelector
+            value={Sequence.AgenticTraces}
+            onChange={() => {}}
+            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+            model={Model.MiniMax_M3}
+            data-testid="scenario-selector"
+          />
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[data-slot="select-label"]', 'Deprecated').should('be.visible');
+      cy.contains('[data-slot="select-label"]', 'Deprecated')
+        .nextAll('[role="option"]')
+        .first()
+        .should('contain.text', '8K / 1K');
+    });
+
+    it('keeps 8K/1K in the default group for models still sweeping it', () => {
+      cy.mount(
+        <TooltipProvider delayDuration={0}>
+          <ScenarioSelector
+            value={Sequence.AgenticTraces}
+            onChange={() => {}}
+            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+            model={Model.DeepSeek_V4_Pro}
+            data-testid="scenario-selector"
+          />
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[role="option"]', '8K / 1K').should('be.visible');
+      cy.get('[data-slot="select-content"]').should('not.contain.text', 'Deprecated');
+    });
+
     it('hides the agentic explainer on fixed-sequence scenarios', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');

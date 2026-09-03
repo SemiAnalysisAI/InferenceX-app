@@ -5,10 +5,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Model } from '@/lib/data-mappings';
+import { getModelArchitecture } from '@/lib/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
   theme: { resolved: 'light' },
+  pathname: { value: '/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
@@ -23,8 +25,13 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';
+
+interface ArchitectureRendererModule {
+  renderDiagram: (...args: unknown[]) => void;
+}
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -85,6 +92,7 @@ beforeEach(() => {
   observedWidth = 500;
   mocks.theme.resolved = 'light';
   mocks.renderDiagram.mockReset();
+  mocks.pathname.value = '/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   clientWidthSpy = vi
@@ -103,6 +111,39 @@ afterEach(() => {
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
+  it('preserves the exact English release sentence spacing', () => {
+    render();
+    expand();
+
+    expect(container.textContent).toContain('Released by DeepSeek on');
+    expect(container.textContent).not.toContain('DeepSeekon');
+  });
+
+  it('localizes the complete architecture chrome and keeps technical feature data intact', () => {
+    mocks.pathname.value = '/zh/inference';
+    render();
+
+    const toggle = container.querySelector('[data-testid="model-architecture-toggle"]');
+    expect(toggle?.textContent).toContain('模型架构');
+    expect(toggle?.textContent).toContain('MoE');
+
+    expand();
+    expect(container.textContent).toContain('特性：');
+    expect(container.textContent).toContain('发布方 DeepSeek，发布于');
+    expect(container.textContent).not.toContain('DeepSeek ，');
+    expect(container.textContent).not.toContain('Features:');
+    expect(container.textContent).not.toContain('Released by');
+  });
+
+  it('localizes the inline architecture chrome and renderer', () => {
+    mocks.pathname.value = '/zh/model/deepseek-r1';
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    expect(container.textContent).toContain('模型架构');
+    expect(container.textContent).not.toContain('Model Architecture');
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
+  });
+
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
     render();
     expand();
@@ -140,5 +181,49 @@ describe('ModelArchitectureDiagram rendering', () => {
 
     render(Model.GptOss);
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(4);
+  });
+
+  it('passes locale to the renderer and includes it in the render cache key', () => {
+    render();
+    expand();
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('en');
+
+    mocks.pathname.value = '/zh/inference';
+    render();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
+  });
+
+  it('renders objective English and Chinese SVG labels', async () => {
+    const renderer = await vi.importActual<ArchitectureRendererModule>(
+      './model-architecture-diagram-renderer',
+    );
+    const renderActual = renderer.renderDiagram;
+    const arch = getModelArchitecture(Model.DeepSeek_R1);
+    expect(arch).toBeDefined();
+
+    const wrapper = document.createElement('div');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    wrapper.append(svg);
+    document.body.append(wrapper);
+
+    renderActual(svg, arch!, false, new Set(), vi.fn(), 'en');
+    expect(svg.textContent).toContain('Token Embedding');
+    expect(svg.textContent).toContain('Dense Transformer Block');
+    expect(svg.textContent).toContain('Output Head (LM Head)');
+    expect(svg.textContent).toContain('Type');
+    expect(svg.textContent).toContain('Layers');
+    expect(svg.textContent).toContain('Context');
+
+    renderActual(svg, arch!, false, new Set(), vi.fn(), 'zh');
+    expect(svg.textContent).toContain('Token 嵌入');
+    expect(svg.textContent).toContain('稠密 Transformer 块');
+    expect(svg.textContent).toContain('输出头（LM Head）');
+    expect(svg.textContent).toContain('类型');
+    expect(svg.textContent).toContain('层数');
+    expect(svg.textContent).toContain('上下文');
+    expect(svg.textContent).not.toContain('Token Embedding');
+
+    wrapper.remove();
   });
 });

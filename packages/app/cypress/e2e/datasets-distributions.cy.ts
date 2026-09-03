@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
 
 const distribution = (values: {
   median: number;
@@ -179,9 +179,7 @@ describe('Dataset distribution percentiles', () => {
       expect(getComputedStyle(element).overflowX).to.eq('auto');
       expect(element.scrollWidth).to.be.greaterThan(element.clientWidth);
     });
-    cy.window().then((win) => {
-      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
-    });
+    expectNoPageOverflow();
   });
 });
 
@@ -235,9 +233,7 @@ describe('Dataset detail loading stability', () => {
     cy.contains('[data-testid="dataset-detail-error"] button', '重试').click();
     cy.wait('@datasetRetryRequest').its('response.statusCode').should('eq', 200);
     cy.contains('h1', 'Layout dataset').should('be.visible');
-    cy.window().then((win) => {
-      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
-    });
+    expectNoPageOverflow();
   });
 
   it('reserves the not-found state for a successful 404 response', () => {

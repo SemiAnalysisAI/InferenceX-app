@@ -24,6 +24,8 @@ interface ChartSectionProps {
   leadingControls?: ReactNode;
   /** Disable PNG image export (e.g., when showing a table view). */
   hideImageExport?: boolean;
+  /** Keep chart actions reachable on narrow screens. */
+  mobileActions?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function ChartSection({
   exportFileName,
   leadingControls,
   hideImageExport,
+  mobileActions,
 }: ChartSectionProps) {
   return (
     <section className={className}>
@@ -58,6 +61,7 @@ export function ChartSection({
           exportFileName={exportFileName}
           leadingControls={leadingControls}
           hideImageExport={hideImageExport}
+          mobileVisible={mobileActions}
         />
 
         <Card>{children}</Card>

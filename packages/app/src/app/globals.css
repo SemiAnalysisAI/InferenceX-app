@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import './motion.css';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *, .minecraft *));
@@ -40,20 +41,21 @@
   content: none;
 }
 
-/* Pride theme for the InferenceX wordmark — the transgender flag's stripe colors
-   painted onto the brand text via a clipped gradient: light blue, pink, white,
-   pink, light blue. The white stripe is darkened to a readable slate here, the
-   same treatment the earlier flag themes used, so the clipped wordmark stays
-   legible on the light header. Fixed flag colors, independent of the theme
-   tokens, so it renders the same in light, dark, and minecraft modes. */
+/* September theme for the InferenceX wordmark — Childhood Cancer Awareness Month
+   ("Go Gold"). The gold awareness ribbon's palette painted onto the brand text
+   via a clipped gradient, running from deep goldenrod through bright gold and
+   back. The darker anchors keep the clipped wordmark legible on the light
+   header, the same treatment the earlier flag themes used. Fixed colors,
+   independent of the theme tokens, so it renders the same in light, dark, and
+   minecraft modes. */
 .pride-wordmark {
   background-image: linear-gradient(
     90deg,
-    #5bcefa 0%,
-    #f5a9b8 25%,
-    #8a8f99 50%,
-    #f5a9b8 75%,
-    #5bcefa 100%
+    #9a6a00 0%,
+    #d4a017 30%,
+    #ffd700 50%,
+    #d4a017 70%,
+    #9a6a00 100%
   );
   background-clip: text;
   -webkit-background-clip: text;

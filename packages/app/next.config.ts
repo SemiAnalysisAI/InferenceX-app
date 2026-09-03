@@ -28,6 +28,13 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
+    // NOTE: route transitions (src/app/motion.css "Route transitions" block)
+    // need no config here. Next 15–16.2 gated React's <ViewTransition> behind
+    // `experimental.viewTransition`; the React build vendored by Next 16.3
+    // exports it as stable `React.ViewTransition`, and 16.3 removed the flag
+    // from the config schema (setting it now fails validation).
+    // components/motion/route-transition.tsx feature-detects the export, so
+    // navigation correctness never depends on it.
     // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
     // "Render-blocking requests" insight and rejected: it embeds the full CSS
     // text in every route's RSC payload (~46 KiB gz, duplicated 2×), so every

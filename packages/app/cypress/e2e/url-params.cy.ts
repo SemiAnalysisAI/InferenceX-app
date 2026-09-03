@@ -188,12 +188,12 @@ describe('URL Parameter Persistence', () => {
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
       visitWithDismissedModal('/inference');
 
-      // The dashboard opens on the tokens-per-dollar default; this asserts the
-      // starting label before switching, not that throughput is the default.
+      // The dashboard opens on Hyperscaler ownership Total Tokens per $1 TCO,
+      // so the first axis is infrastructure purchasing power before switching.
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('contain.text', 'Total Tokens per $1 USD');
+        .should('contain.text', 'Total Tokens per $1 TCO');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
       cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
@@ -206,17 +206,17 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('tokens-per-dollar URL metric is independent from cost per million', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollarH');
+    it('maps the removed API-pricing URL to Neocloud TCO', () => {
+      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 USD (Owning - Hyperscaler)',
+        'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 USD (tok/$)');
+        .should('have.text', 'Total Tokens per $1 TCO (tok/$)');
     });
 
     it('keeps the legacy i_metric=y alias on raw throughput', () => {

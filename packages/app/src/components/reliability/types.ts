@@ -78,6 +78,7 @@ export type DateRangeSuccessRateData = Record<string, Record<string, SuccessRate
 export interface ReliabilityChartContextType {
   loading: boolean;
   error: string | null;
+  refetch: () => Promise<unknown>;
   dateRangeSuccessRateData: DateRangeSuccessRateData;
   filteredReliabilityData: ModelSuccessRateData[];
   chartData: (ModelSuccessRateData & { modelLabel: string })[];

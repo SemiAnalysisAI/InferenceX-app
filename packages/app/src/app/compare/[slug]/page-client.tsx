@@ -140,7 +140,12 @@ export default function ComparePageClient({
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · {t.eyebrowSuffix}
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
+              {/* `vt-compare-title` pairs with the compare-catalog card the
+                  visitor clicked for a cross-document shared-element morph
+                  (see motion.css); inert without View Transitions support. */}
+              <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+                {label}
+              </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
                   <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（

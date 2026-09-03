@@ -120,8 +120,17 @@ import {
  * per-rank detail stays reachable as that source's own
  * `kvCacheUsageByEngine`.
  *
+ * v16: extract TensorRT-LLM's native `trtllm_*` token, cache, queue, and KV
+ * metrics, including per-prefill/decode source series for Dynamo disaggregation.
+ *
+ * v17: derive TensorRT-LLM prompt throughput from its actual metric shape:
+ * cached-token counter rate plus the prefill-batch-token histogram sum per
+ * timeslice. TRT-LLM does not currently expose the prompt-token counter that
+ * v16 expected.
+ *
+ * v18: retain Dynamo's per-DP-rank KV gauges within each TRT-LLM worker.
  */
-export const CHART_SERIES_VERSION = 15;
+export const CHART_SERIES_VERSION = 18;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -204,7 +213,10 @@ interface RawSlice {
   end_ns?: number;
   avg?: number;
   rate?: number;
+  sum?: number;
 }
+
+type RawSliceField = 'avg' | 'rate' | 'sumRate';
 
 interface RawSeries {
   endpoint_url?: string;
@@ -244,6 +256,20 @@ export const CHART_METRIC_KEYS = new Set([
   'sglang:realtime_tokens',
   'sglang:hicache_host_used_tokens',
   'sglang:hicache_host_total_tokens',
+  // TensorRT-LLM
+  'dynamo_component_gpu_cache_usage_percent',
+  'trtllm_kv_cache_utilization',
+  'trtllm_kv_cache_host_utilization',
+  'trtllm_kv_cache_hit_rate',
+  'trtllm_prompt_cached_tokens',
+  'trtllm_prompt_cached_tokens_total',
+  'trtllm_prompt_tokens',
+  'trtllm_prompt_tokens_total',
+  'trtllm_prefill_batch_tokens',
+  'trtllm_generation_tokens',
+  'trtllm_generation_tokens_total',
+  'trtllm_num_requests_running',
+  'trtllm_num_requests_waiting',
 ]);
 
 /**
@@ -473,7 +499,7 @@ const MIRROR_RATE_RELATIVE_TOLERANCE = 0.05;
  * request counts) whose mirrors agree almost exactly. Rates need a relative
  * test because their magnitude is unbounded.
  */
-function looksMirrored(means: readonly number[], field: 'avg' | 'rate'): boolean {
+function looksMirrored(means: readonly number[], field: RawSliceField): boolean {
   const spread = Math.max(...means) - Math.min(...means);
   if (field === 'avg') return spread <= MIRROR_MEAN_TOLERANCE;
   const scale = Math.max(...means.map((m) => Math.abs(m)));
@@ -555,7 +581,7 @@ function spanOf(scrapes: ScrapeMap): number {
 function resolveComponents(
   series: readonly RawSeries[] | undefined,
   tOf: (ns: number) => number,
-  field: 'avg' | 'rate' = 'avg',
+  field: RawSliceField = 'avg',
 ): ResolvedEngine[] {
   const groups = new Map<string, EngineGroup>();
   for (const s of series ?? []) {
@@ -573,7 +599,16 @@ function resolveComponents(
     }
     for (const ts of s.timeslices ?? []) {
       if (typeof ts.start_ns !== 'number' || !Number.isFinite(ts.start_ns)) continue;
-      const value = ts[field];
+      const durationS =
+        typeof ts.start_ns === 'number' && typeof ts.end_ns === 'number'
+          ? (ts.end_ns - ts.start_ns) / 1e9
+          : 0;
+      const value =
+        field === 'sumRate'
+          ? typeof ts.sum === 'number' && durationS > 0
+            ? ts.sum / durationS
+            : undefined
+          : ts[field];
       if (typeof value !== 'number' || !Number.isFinite(value)) continue;
       const at = scrapes.get(ts.start_ns);
       if (at) {
@@ -915,7 +950,7 @@ function sumOntoGrid(
 function summedSeries(
   series: readonly RawSeries[] | undefined,
   tOf: (ns: number) => number,
-  field: 'avg' | 'rate',
+  field: RawSliceField,
   tickS: number | null,
 ): TimeSeriesPoint[] {
   const components = resolveComponents(series, tOf, field).map((c) => c.points);
@@ -972,11 +1007,24 @@ function buildSeriesFromMetrics(
 
   // KV cache usage (gauge, 0..1) — average across engines so the value
   // stays a fraction (each engine has its own KV pool).
-  const kvSeries = pickSeries(
-    'vllm:kv_cache_usage_perc',
-    'vllm:gpu_cache_usage_perc',
-    'sglang:token_usage',
-  );
+  const nativeTrtKv = metrics['trtllm_kv_cache_utilization']?.series ?? [];
+  const dynamoTrtKv =
+    selectServerMetricsAdapter(context).id === 'trtllm'
+      ? (metrics['dynamo_component_gpu_cache_usage_percent']?.series ?? [])
+      : [];
+  const rankedEndpoints = new Set(dynamoTrtKv.map((s) => s.endpoint_url));
+  // Dynamo gauges omit worker_id. Preserve endpoint identity so two workers
+  // with similar utilization and the same DP rank cannot be mistaken for mirrors.
+  const trtKv = [
+    ...dynamoTrtKv.map((s) => ({
+      ...s,
+      labels: { ...s.labels, metric_endpoint: s.endpoint_url ?? '' },
+    })),
+    ...nativeTrtKv.filter((s) => !rankedEndpoints.has(s.endpoint_url)),
+  ];
+  const kvSeries =
+    pickSeries('vllm:kv_cache_usage_perc', 'vllm:gpu_cache_usage_perc', 'sglang:token_usage') ??
+    trtKv;
   // One entry per logical engine (v13) — mirrored API-server frontends and the
   // warmup/profiling phase split are collapsed here rather than showing up as
   // extra "engines".
@@ -989,11 +1037,18 @@ function buildSeriesFromMetrics(
 
   // Prefix cache hit rate per scrape: Σhits.rate / Σqueries.rate across
   // engines, joined on start_ns. SGLang names: cached_tokens / prompt_tokens.
-  const hitsSeries = pickSeries('vllm:prefix_cache_hits', 'sglang:cached_tokens');
+  const hitsSeries = pickSeries(
+    'vllm:prefix_cache_hits',
+    'sglang:cached_tokens',
+    'trtllm_prompt_cached_tokens',
+    'trtllm_prompt_cached_tokens_total',
+  );
   const qsSeries = pickSeries(
     'vllm:prefix_cache_queries',
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'trtllm_prompt_tokens',
+    'trtllm_prompt_tokens_total',
   );
   const hitsOnGrid = summedSeries(hitsSeries, tOf, 'rate', tickS);
   const qsOnGrid = summedSeries(qsSeries, tOf, 'rate', tickS);
@@ -1003,10 +1058,25 @@ function buildSeriesFromMetrics(
     const q = qsByT.get(t);
     if (q !== undefined && q > 0) prefixCacheHitRate.push({ t, value: h / q });
   }
+  if (prefixCacheHitRate.length === 0) {
+    prefixCacheHitRate.push(
+      ...averageAcrossEngines(
+        resolveLogicalEngines(metrics['trtllm_kv_cache_hit_rate']?.series, tOf),
+      ),
+    );
+  }
 
   // Queue depth: sum running + waiting across engines per timeslice.
-  const runSeries = pickSeries('vllm:num_requests_running', 'sglang:num_running_reqs');
-  const waitSeries = pickSeries('vllm:num_requests_waiting', 'sglang:num_queue_reqs');
+  const runSeries = pickSeries(
+    'vllm:num_requests_running',
+    'sglang:num_running_reqs',
+    'trtllm_num_requests_running',
+  );
+  const waitSeries = pickSeries(
+    'vllm:num_requests_waiting',
+    'sglang:num_queue_reqs',
+    'trtllm_num_requests_waiting',
+  );
   const runOnGrid = summedSeries(runSeries, tOf, 'avg', tickS);
   const waitByT = byT(summedSeries(waitSeries, tOf, 'avg', tickS));
   const runByT = byT(runOnGrid);
@@ -1025,11 +1095,45 @@ function buildSeriesFromMetrics(
   // work.
   const counterRate = (...names: string[]): TimeSeriesPoint[] =>
     summedSeries(pickSeries(...names), tOf, 'rate', tickS);
-  const prefillTps = counterRate('vllm:prompt_tokens', 'sglang:prompt_tokens');
-  const decodeTps = counterRate('vllm:generation_tokens', 'sglang:generation_tokens');
+  const promptCounterTps = counterRate(
+    'vllm:prompt_tokens',
+    'sglang:prompt_tokens',
+    'trtllm_prompt_tokens',
+    'trtllm_prompt_tokens_total',
+  );
+  const decodeTps = counterRate(
+    'vllm:generation_tokens',
+    'sglang:generation_tokens',
+    'trtllm_generation_tokens',
+    'trtllm_generation_tokens_total',
+  );
   // Tokens served from prefix cache per scrape. Lets the frontend derive
   // "cumulative unique input tokens served" = cumsum(prefillTps) − cumsum(hits).
-  const prefixCacheHitsTps = counterRate('vllm:prefix_cache_hits', 'sglang:cached_tokens');
+  const prefixCacheHitsTps = counterRate(
+    'vllm:prefix_cache_hits',
+    'sglang:cached_tokens',
+    'trtllm_prompt_cached_tokens',
+    'trtllm_prompt_cached_tokens_total',
+  );
+  const trtllmComputedPromptTps = summedSeries(
+    metrics['trtllm_prefill_batch_tokens']?.series,
+    tOf,
+    'sumRate',
+    tickS,
+  );
+  const prefillTps =
+    promptCounterTps.length > 0
+      ? promptCounterTps
+      : sumOntoGrid([trtllmComputedPromptTps, prefixCacheHitsTps], tickS);
+  if (prefixCacheHitRate.length === 0 && (!qsSeries || qsSeries.length === 0)) {
+    const prefillByT = byT(prefillTps);
+    for (const { t, value: cached } of prefixCacheHitsTps) {
+      const prompt = prefillByT.get(t);
+      if (prompt !== undefined && prompt > 0) {
+        prefixCacheHitRate.push({ t, value: cached / prompt });
+      }
+    }
+  }
 
   // SGLang hicache: host-pool KV cache utilization as used/total per
   // timeslice. Both metrics are gauges in absolute tokens. Total stays
@@ -1048,6 +1152,13 @@ function buildSeriesFromMetrics(
     if (total !== undefined && total > 0) {
       hostKvCacheUsage.push({ t, value: used / total });
     }
+  }
+  if (hostKvCacheUsage.length === 0) {
+    hostKvCacheUsage.push(
+      ...averageAcrossEngines(
+        resolveLogicalEngines(metrics['trtllm_kv_cache_host_utilization']?.series, tOf),
+      ),
+    );
   }
 
   // Per-source prompt tokens — sum across engines per source label.
@@ -1115,14 +1226,42 @@ function buildSeriesFromMetrics(
     const arr = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
     if (arr.length > 0) promptTokensBySource[source] = arr;
   }
+  if (Object.keys(promptTokensBySource).length === 0) {
+    const cached = prefixCacheHitsTps.filter((point) => point.value > 0);
+    const cachedByT = byT(prefixCacheHitsTps);
+    const computed =
+      trtllmComputedPromptTps.length > 0
+        ? trtllmComputedPromptTps.filter((point) => point.value > 0)
+        : promptCounterTps
+            .map(({ t, value: prompt }) => ({
+              t,
+              value: Math.max(0, prompt - (cachedByT.get(t) ?? 0)),
+            }))
+            .filter((point) => point.value > 0);
+    if (cached.length > 0) promptTokensBySource['cache hit (HBM)'] = cached;
+    if (computed.length > 0) promptTokensBySource['compute (miss)'] = computed;
+  }
 
   const metricSources: MetricSourceSeries[] = [];
   const adapter = selectServerMetricsAdapter(context);
   if (includeMetricSources && context.disagg && adapter.id !== 'generic') {
+    const endpointRoles = new Map<string, string>();
+    for (const metric of Object.values(metrics)) {
+      for (const series of metric.series ?? []) {
+        const endpointUrl = series.endpoint_url;
+        const role = series.labels?.['disaggregation_mode'] ?? series.labels?.['dynamo_component'];
+        if (endpointUrl && role) endpointRoles.set(endpointUrl, role);
+      }
+    }
     const grouped = new Map<string, { source: MetricSource; metrics: MetricsMap }>();
     for (const [metricName, metric] of Object.entries(metrics)) {
       for (const series of metric.series ?? []) {
-        const source = adapter.identifySource(series);
+        const roleHint = series.endpoint_url ? endpointRoles.get(series.endpoint_url) : undefined;
+        const identifiedSeries =
+          roleHint && !series.labels?.['disaggregation_mode']
+            ? { ...series, labels: { ...series.labels, disaggregation_mode: roleHint } }
+            : series;
+        const source = adapter.identifySource(identifiedSeries);
         let group = grouped.get(source.id);
         if (!group) {
           group = { source, metrics: {} };

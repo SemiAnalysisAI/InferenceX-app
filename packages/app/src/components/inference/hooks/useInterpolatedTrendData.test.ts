@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 
 import type { BenchmarkRow } from '@/lib/api';
 
@@ -105,6 +106,98 @@ describe('rowToLightweightPoint', () => {
 
     expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(2.261952, 10);
   });
+
+  it('applies measured cache hits and cache-read pricing to historical points', () => {
+    const point = rowToLightweightPoint(
+      makeBenchmarkRow({
+        metrics: {
+          tput_per_gpu: 1_000,
+          input_tput_per_gpu: 800,
+          output_tput_per_gpu: 200,
+          median_intvty: 20,
+          server_gpu_cache_hit_rate: 0.8,
+          server_external_cache_hit_rate: 0.1,
+          server_cpu_cache_hit_rate: 0.05,
+        },
+      }),
+      ['tokenRevenuePerGpuHour'],
+      {
+        source: 'openrouter',
+        inputPerMillion: 2,
+        cachedInputPerMillion: 0.2,
+        outputPerMillion: 10,
+      },
+    );
+
+    expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(8.2944, 10);
+  });
+
+  it('derives infrastructure total tokens per dollar from throughput and hourly cost', () => {
+    const point = rowToLightweightPoint(makeBenchmarkRow(), [
+      'tokensPerDollarH',
+      'tokensPerDollarN',
+      'tokensPerDollarR',
+      'costh',
+      'costn',
+      'costr',
+    ]);
+
+    expect(point!.tokensPerDollarH!.y * point!.costh!.y).toBeCloseTo(1_000_000, 8);
+    expect(point!.tokensPerDollarN!.y * point!.costn!.y).toBeCloseTo(1_000_000, 8);
+    expect(point!.tokensPerDollarR!.y * point!.costr!.y).toBeCloseTo(1_000_000, 8);
+  });
+});
+
+describe('cache-aware token revenue interpolation', () => {
+  const revenuePoint = (interactivity: number, throughput: number, cacheHitRate?: number) =>
+    rowToLightweightPoint(
+      makeBenchmarkRow({
+        metrics: {
+          tput_per_gpu: throughput,
+          input_tput_per_gpu: throughput * 0.8,
+          output_tput_per_gpu: throughput * 0.2,
+          median_intvty: interactivity,
+          ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
+        },
+      }),
+      ['tokenRevenuePerGpuHour', 'tpPerGpu'],
+    )!;
+
+  it('interpolates throughput, token share, and cache hit before pricing dollars', () => {
+    const cacheAware = [revenuePoint(20, 800, 0.8), revenuePoint(40, 600, 0.9)];
+    const uncached = [revenuePoint(20, 800), revenuePoint(40, 600)];
+
+    const cachedRevenue = interpolateMetricAtInteractivity(
+      cacheAware,
+      30,
+      'tokenRevenuePerGpuHour',
+      NORMALIZED_TOKEN_REVENUE_PRICING,
+    );
+    const uncachedRevenue = interpolateMetricAtInteractivity(
+      uncached,
+      30,
+      'tokenRevenuePerGpuHour',
+      NORMALIZED_TOKEN_REVENUE_PRICING,
+    );
+
+    expect(cachedRevenue).not.toBeNull();
+    expect(uncachedRevenue).not.toBeNull();
+    expect(cachedRevenue!).toBeLessThan(uncachedRevenue!);
+    expect(cachedRevenue).toBeCloseTo(0.935015625, 10);
+  });
+
+  it('opts a partly measured cache frontier out of the discount', () => {
+    const points = [revenuePoint(20, 800, 0.8), revenuePoint(40, 600)];
+    const throughput = interpolateMetricAtInteractivity(points, 30, 'tpPerGpu');
+    const revenue = interpolateMetricAtInteractivity(
+      points,
+      30,
+      'tokenRevenuePerGpuHour',
+      NORMALIZED_TOKEN_REVENUE_PRICING,
+    );
+
+    expect(revenue).toBeCloseTo(throughput! * 0.0036, 10);
+  });
 });
 
 describe('rowSupportsTrendMetric', () => {
@@ -184,28 +277,6 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result!).toBeGreaterThanOrEqual(0);
   });
 
-  it('interpolates tokens per dollar as a throughput-proportional metric', () => {
-    const points = [
-      makePoint({
-        x: 20,
-        tpPerGpu: { y: 800, roof: false },
-        tokensPerDollarH: { y: 800_000, roof: false },
-      }),
-      makePoint({
-        x: 40,
-        tpPerGpu: { y: 600, roof: false },
-        tokensPerDollarH: { y: 600_000, roof: false },
-      }),
-      makePoint({
-        x: 60,
-        tpPerGpu: { y: 400, roof: false },
-        tokensPerDollarH: { y: 400_000, roof: false },
-      }),
-    ];
-    const result = interpolateMetricAtInteractivity(points, 30, 'tokensPerDollarH');
-    expect(result).toBeCloseTo(700_000, 0);
-  });
-
   it('uses the matching output-throughput Pareto knots for output tokens per dollar', () => {
     const points = [
       makePoint({
@@ -262,6 +333,25 @@ describe('interpolateMetricAtInteractivity', () => {
       1_162_500,
       0,
     );
+  });
+
+  it('keeps infrastructure total tokens per dollar proportional to total throughput', () => {
+    const points = [
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        tokensPerDollarN: { y: 2_000_000, roof: false },
+      }),
+      makePoint({
+        x: 60,
+        tpPerGpu: { y: 400, roof: false },
+        tokensPerDollarN: { y: 1_000_000, roof: false },
+      }),
+    ];
+
+    const throughput = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
+    const purchasingPower = interpolateMetricAtInteractivity(points, 40, 'tokensPerDollarN');
+    expect(purchasingPower).toBeCloseTo(throughput! * 2_500, 10);
   });
 
   it('filters dominated points via Pareto front', () => {
@@ -439,6 +529,10 @@ describe('trendMetricDependencies', () => {
       'costhOutput',
       'outputTputPerGpu',
     ]);
+  });
+
+  it('loads total throughput with infrastructure purchasing power', () => {
+    expect(trendMetricDependencies('tokensPerDollarN')).toEqual(['tpPerGpu', 'tokensPerDollarN']);
   });
 
   it('does not route custom user metrics through benchmark-derived history fields', () => {

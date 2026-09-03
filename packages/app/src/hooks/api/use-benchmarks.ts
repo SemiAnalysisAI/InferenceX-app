@@ -16,6 +16,13 @@ export function benchmarkQueryOptions(
   view?: { type: 'calculator'; sequence: string; cacheScope?: string },
   initialData?: BenchmarkRow[],
   scope?: string,
+  /** Keep the previous result rendered (as placeholder data) while a new
+   *  query key for the SAME model fetches, so date/run/scope changes update
+   *  in place instead of unmounting the charts. Model switches still start
+   *  from the loading state — stale rows from another model would render a
+   *  misleading chart. Consumers can distinguish the placeholder window via
+   *  `isPlaceholderData` / `isFetching`. */
+  keepPreviousForModel?: boolean,
 ) {
   const canonicalDate = date === 'latest' ? '' : date;
   return {
@@ -40,6 +47,14 @@ export function benchmarkQueryOptions(
     // Pair-scoped SSR payloads must preserve their exact identity and contents;
     // supplemental rows are merged on every ordinary network read above.
     ...(initialData ? { initialData } : {}),
+    ...(keepPreviousForModel
+      ? {
+          placeholderData: (
+            previousData: BenchmarkRow[] | undefined,
+            previousQuery: { queryKey: readonly unknown[] } | undefined,
+          ) => (previousQuery?.queryKey[1] === model ? previousData : undefined),
+        }
+      : {}),
   };
 }
 
@@ -52,6 +67,7 @@ export function useBenchmarks(
   view?: { type: 'calculator'; sequence: string; cacheScope?: string },
   initialData?: BenchmarkRow[],
   scope?: string,
+  keepPreviousForModel?: boolean,
 ) {
   return useQuery(
     benchmarkQueryOptions(
@@ -64,6 +80,7 @@ export function useBenchmarks(
       view,
       initialData,
       scope,
+      keepPreviousForModel,
     ),
   );
 }

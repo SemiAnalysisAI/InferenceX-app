@@ -20,13 +20,18 @@ on:
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
+      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+      github.event.label.name || 'code' }}
   cancel-in-progress: true
 
 jobs:
   vitest:
     name: Typecheck and unit tests
-    if: ${{ !github.event.pull_request.draft }}
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+          github.event.action != 'labeled' && github.event.action != 'unlabeled' }}
     timeout-minutes: 10
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
@@ -35,7 +40,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
       - name: Setup Bun
         id: setup-bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -60,6 +64,39 @@ jobs:
         run: bun run typecheck
       - name: Unit tests
         run: bun run test:unit
+
+  zh-copy-only:
+    name: Chinese-only English-byte guard
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+          (((github.event.action != 'labeled' && github.event.action != 'unlabeled') &&
+            contains(github.event.pull_request.labels.*.name, 'chinese-copy-only')) ||
+           ((github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+            github.event.label.name == 'chinese-copy-only')) }}
+    timeout-minutes: 5
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm the Chinese-only guard is disabled
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
+        run: echo 'chinese-copy-only label removed; English-byte guard is not required.'
+      - name: Checkout full history for the Chinese-only guard
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Bun
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
       - name: Preserve English bytes in explicitly Chinese-only changes
         if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
         env:

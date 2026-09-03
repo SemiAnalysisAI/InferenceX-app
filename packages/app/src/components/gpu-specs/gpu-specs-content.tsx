@@ -9,6 +9,8 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import {
+  formatScaleOutTopology,
+  formatScaleUpTopology,
   formatTflops,
   getScaleUpDomainMemory,
   getScaleUpDomainMemoryBw,
@@ -74,6 +76,7 @@ const STRINGS = {
     viewTable: 'Table',
     viewChart: 'Chart',
     viewRadar: 'Radar',
+    viewMode: 'View mode',
     colGpu: 'Chip',
     colMemory: 'Memory',
     colMemBw: 'Mem BW',
@@ -104,6 +107,7 @@ const STRINGS = {
     viewTable: '表格',
     viewChart: '图表',
     viewRadar: '雷达图',
+    viewMode: '显示模式',
     colGpu: '芯片',
     colMemory: '显存',
     colMemBw: '显存带宽',
@@ -137,7 +141,8 @@ function GpuSpecsTable({
   onTopologyClick?: (gpuName: string) => void;
   onScaleUpTopologyClick?: (gpuName: string) => void;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse min-w-[1400px]">
@@ -243,7 +248,7 @@ function GpuSpecsTable({
                     track('gpu_specs_scaleup_topology_cell_clicked', { gpu: spec.name });
                   }}
                 >
-                  {spec.scaleUpTopology}
+                  {formatScaleUpTopology(spec.scaleUpTopology, locale)}
                 </button>
               </SpecCell>
               <SpecCell
@@ -306,7 +311,7 @@ function GpuSpecsTable({
                       track('gpu_specs_topology_cell_clicked', { gpu: spec.name });
                     }}
                   >
-                    {spec.scaleOutTopology}
+                    {formatScaleOutTopology(spec.scaleOutTopology, locale)}
                   </button>
                 )}
               </SpecCell>
@@ -329,7 +334,8 @@ function GpuSpecsTable({
 
 export function GpuSpecsContent() {
   const specsWithTopology = GPU_SPECS.filter((spec) => spec.scaleOutTopology !== null);
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const [viewMode, setViewMode] = useState<GpuSpecsViewMode>('table');
   const [selectedMetric, setSelectedMetric] = useState(GPU_CHART_METRICS[0].key);
@@ -397,7 +403,7 @@ export function GpuSpecsContent() {
               value={viewMode}
               options={viewModeOptions}
               onValueChange={handleViewModeChange}
-              ariaLabel="View mode"
+              ariaLabel={t.viewMode}
               testId="gpu-specs-view-toggle"
             />
           </div>

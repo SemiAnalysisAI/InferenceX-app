@@ -193,120 +193,52 @@ ground truth.
 
 ## Objective CI contract / 客观 CI 检查范围
 
-The objective guard covers only invariants that can be decided without reading a sentence for
-style. Its source scan and mutation fixtures call the same parsers and matchers. Every rule must
-include a failing mutation and an accepted correction; a rule with an exception must also include
-an accepted exception mutation.
+The objective CI guard covers only invariants that can be decided without editorial judgment. The
+real source scan and regression fixtures use the same parsing logic; every rule requires a mutation
+test showing that a violating change fails and the correct fix passes.
 
-客观检查只覆盖无需判断文风即可确定的约束。源码扫描与 mutation fixture 必须调用同一套
-解析器和 matcher。每条规则都要同时提供会失败的 mutation 和可通过的修正；存在例外时，
-还必须提供可通过的例外 mutation。
+客观 CI 检查只覆盖无需编辑判断即可确定的约束。真实源码扫描和回归用例使用同一套解析逻辑；每项规则都必须用 mutation test 证明：违规改动会失败，正确修复可以通过。
 
-- App Router parity discovers every real `page.tsx`, removes route groups, and compares English
-  and `/zh` route patterns in both directions. Dynamic, noindex, hidden, and feature-gated pages are
-  included. API handlers, `feed.xml`, `llms*.txt`, sitemap handlers, and per-post OG renderers are
-  not page routes and therefore are not sibling candidates.
-- Blog pairing is bidirectional and includes scheduled posts. Chinese posts continue to reuse the
-  English OG image. Paired content preserves fenced code, math blocks, `Figure` sources, protected
-  inline code, flags, identifiers, normalized unit multisets, link destinations, and JSON-LD
-  syntax/shape. Backtick and tilde fences of any legal length are recognized, as are inline-code
-  delimiters longer than one backtick. Markdown links and static MDX/JSX `href`/`src` props share
-  the same matcher; bare destinations with balanced parentheses, angle-bracket destinations,
-  reference definitions, and static string/template-literal props are all covered. Chinese
-  internal links may add `/zh` (including `/blog` → `/zh/blog`),
-  same-page heading fragments may be localized, and link order may change when paragraphs are
-  reorganized. JSX attribute expressions use a JSX-aware JavaScript tokenizer, so division,
-  regular-expression literals, comments, nested template interpolation, nested JSX or fragments,
-  comparisons, and arrow operators before a static link prop do not truncate the tag. Protected-token
-  counts are bidirectional: deleting or adding a flag, identifier, or unit occurrence fails. Protected
-  forms include throughput, FLOP,
-  bit-bandwidth, power-per-GPU, slash or hyphen GPU/chip-hour forms, and numeric cost-rate units used
-  by the real corpus. JSON-LD wrappers may contain legal whitespace and newlines, including in fenced
-  examples without leaking into prose scans. Their prose values may be translated; keys, types,
-  array shape, and the exact object/array paths of URLs, numbers, booleans, dates, flags, and
-  identifiers remain protected. GPU/chip-hour occurrence counts remain protected even when they
-  appear inside otherwise translatable JSON-LD prose.
-- Every containing object with an explicit `en` or `zh` object literal must carry the other locale,
-  and the two objects must have the same statically declared nested key shape. Identifier and
-  quoted locale keys are treated alike. Computed keys and spread contents cannot be proven locally
-  and remain outside this structural check; their explicit assignment and shorthand sibling keys
-  are still checked. Temporary dictionary exceptions are consumed once, so one digest cannot hide
-  two identical object violations.
-- A PR labeled `chinese-copy-only` runs the merge-base-aware English-byte check. English Blog MDX
-  is protected as a whole, while mixed TypeScript/TSX/JSON files protect raw `en` subtrees. The
-  repository-root pathspec works from the workflow's `packages/app` working directory, and
-  rename-aware base/head mapping preserves unchanged moves while still checking an edited renamed
-  file. Additions, copies, modifications, renames, deletions, and Git type changes are included.
-  The objective-guard exception manifest is locale-neutral plumbing rather than UI copy. The check
-  intentionally permits that plumbing and tests; remove the label when English copy is intentionally
-  part of the change.
-- High-confidence copy rules remain limited to the documented `Chip` common-noun case,
-  prose-like hardcoded English labels beside a Chinese dictionary, redundant English-first
-  loanword translations, and unambiguous malformed punctuation such as whitespace before Chinese
-  terminal punctuation. TS/TSX string literals and JSX visible text, and MDX attributes and visible
-  prose, are scanned independently so one clean segment cannot hide another bad one. Units,
-  identifiers, and acronym/unit labels keep their documented English forms.
+The App Router check scans actual `page.tsx` files, removes route groups, and checks
+English-to-Chinese and Chinese-to-English route coverage separately. A one-way route with a genuine
+design reason must be listed as a direction-specific exception. The only current exception is
+`/zh/[...notFound]`, which handles unknown Chinese paths.
 
-- App Router 路由检查会发现所有真实的 `page.tsx`，去掉 route group 后双向比对英文与
-  `/zh` 路由。动态、noindex、隐藏和 feature-gated 页面都在范围内。API handler、
-  `feed.xml`、`llms*.txt`、sitemap handler 和文章 OG renderer 不是页面路由，因此不要求
-  `/zh` sibling。
-- Blog 文章双向配对，定时发布的文章也不例外；中文文章继续复用英文 OG 图。中英文配对
-  必须保留 fenced code、数学公式块、`Figure` 图片来源、受保护的 inline code、flag、
-  identifier、规范化后的单位多重集、链接目标，以及 JSON-LD 的语法和结构。检查器同时识别
-  任意合法长度的反引号或波浪线 fence，以及由多个反引号界定的 inline code；Markdown 链接
-  与 MDX/JSX 中静态的 `href`/`src` 属性共用同一 matcher；带平衡括号的普通 destination、
-  尖括号 destination、reference definition，以及静态字符串或 template literal 属性都在
-  检查范围内。中文站内链接可以添加 `/zh`
-  （包括 `/blog` → `/zh/blog`）；页内标题锚点可以随中文标题本地化；段落重组时链接顺序可以
-  变化。JSX 属性表达式会使用支持 JSX 的 JavaScript tokenizer，因此静态链接属性前的除法、
-  正则表达式 literal、注释、嵌套 template interpolation、嵌套 JSX 或 fragment、比较和箭头
-  运算符都不会截断标签。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位
-  都会失败；
-  实际语料中的吞吐量、FLOP、bit 带宽、每 GPU 功耗、斜杠或连字符形式的 GPU/chip-hour，
-  以及数值成本率等单位都会覆盖。JSON-LD wrapper 可以包含合法空白与换行；即使它位于 fenced
-  示例中，也不会泄漏到正文扫描。JSON-LD 中的说明性文案可以翻译，但 key、type、数组结构，
-  以及 URL、数字、boolean、日期、flag 和 identifier 所在的对象/数组路径必须保持不变；即使
-  GPU/chip-hour 出现在其他内容可翻译的 JSON-LD 文案中，其出现次数仍受保护。
-- 只要一个 containing object 中显式声明了 `en` 或 `zh` object literal，就必须同时声明另一
-  个 locale，且两者的静态嵌套 key 结构一致；identifier key 与带引号的 locale key 采用相同
-  规则。computed key 和 spread 的内容无法在本地可靠推断，不纳入该结构检查；同一对象中的
-  显式 assignment 与 shorthand sibling key 仍会检查。临时字典例外按次消费，单个 digest
-  不能同时掩盖两个相同的对象错误。
-- PR 添加 `chinese-copy-only` label 后，会运行基于 merge base 的英文逐字节检查。英文 Blog
-  MDX 整体受保护；混合语言 TypeScript、TSX 和 JSON 文件则保护原始 `en` subtree。路径检查
-  固定从仓库根目录解析，因此工作流在 `packages/app` 下执行也不会漏扫；rename-aware 的
-  base/head 映射允许内容不变的移动，同时仍会拦截重命名文件中的英文改动；新增、复制、修改、
-  重命名、删除和 Git type change 都会纳入。客观检查的例外 manifest 属于 locale-neutral
-  plumbing，而不是 UI 英文文案。测试和这类 plumbing 可以修改；如果 PR 本来就要改英文文案，
-  应移除该 label。
-- 高置信度文案规则仅限于已记录的 `Chip` 普通名词、已有中文字典旁绕过本地化的英文说明
-  标签、English-first 重复翻译，以及中文句末标点前多余空格等无歧义错误。单位和 identifier
-  继续保留文档规定的英文写法；缩写和单位标签也明确豁免。TS/TSX 的字符串 literal 与 JSX
-  可见文本、MDX 属性与可见正文会分别扫描，避免一个正常片段掩盖另一个片段中的错误。
+App Router 检查会扫描实际的 page.tsx，忽略 route group 后，分别核对英文路由是否有 /zh 对应页面，以及中文路由是否有英文对应页面。确有设计原因的单向路由必须按方向单独列为例外。目前唯一例外是用于处理未知中文路径的 /zh/[...notFound]。
 
-Temporary baseline exceptions live in
-`packages/app/src/lib/zh-objective-guard-exceptions.json`. Every row must record a reason and an
-explicit removal condition. Blog inline-code exceptions match exact English and Chinese spans;
-each file's protected-token exception set is pinned to the SHA-256 digest of the complete paired
-English/Chinese source, so a waiver cannot migrate to another occurrence after either post changes.
-an empty side records one exact addition/removal rather than a wildcard, and duplicate occurrences
-require duplicate rows. Dictionary exceptions fingerprint the exact mismatched key set. A stale,
-broadened, or newly different exception fails its non-vacuity test.
+Within any one object, an explicit `en` or `zh` object literal requires its other locale, and both
+must expose the same explicitly declared nested key shape. The check uses the TypeScript AST and
+does not infer computed keys or spread contents that cannot be resolved statically.
 
-临时 baseline 例外统一记录在
-`packages/app/src/lib/zh-objective-guard-exceptions.json`。每条记录都必须说明原因和明确的
-删除条件。Blog inline-code 例外精确匹配中英文两侧文本；每个文件的 protected-token 例外集合
-还会绑定中英文完整源码对的 SHA-256 digest，因此任一文章变化后，豁免都不能迁移到其他位置。
-空字符串一侧表示一次明确的新增或删除，并非通配符；重复出现的差异必须逐条记录。字典例外
-对完整的 key 差异集合计算 fingerprint。
-失效、扩大范围或内容发生变化的例外都会在非空验证中失败。
+同一对象中只要显式声明 en 或 zh 对象字面量，就必须声明另一种语言，且两者显式声明的嵌套键结构一致。检查基于 TypeScript AST；无法静态确认的 computed key 和 spread 内容不作推断。
 
-The deterministic guard never scores fluency, clause order, sentence structure, register,
-contextual pronouns, marketing tone, or quotation voice. It also does not use English-token ratios
-or a closed list to decide whether an established ML infrastructure term should remain English.
-Those decisions stay with `review-zh-copy` and the Chinese maintainer.
+English and Chinese Blog posts must use the same filename. CI compares only structure that
+translation must not change: code fences, math, `Figure` image sources, link destinations, and
+JSON-LD syntax, key and array shape, plus path-bound URLs, numbers, booleans, and types. Chinese
+internal links may add `/zh`, and same-page anchors may follow translated headings. CI does not
+mechanically compare unit or English-token counts in prose, because normal Chinese rewrites may
+change them.
 
-确定性检查永远不评价流畅度、分句顺序、句法、语域、上下文相关的第二人称、营销语气或引用
-者口吻，也不会通过英文 token 占比或封闭术语表来判断 ML 基础设施术语是否应保留英文。
-这些判断继续由 `review-zh-copy` 和中文维护者完成。
+中英文博客必须使用相同文件名。CI 只核对不应随翻译改变的结构：代码块、数学公式、Figure 图片地址、链接目标，以及 JSON-LD 的语法、键与数组结构和按路径绑定的 URL、数字、布尔值与类型。中文站内链接可以增加 /zh，页内锚点可以随标题翻译。正文中的单位或英文 token 出现次数不作机械对比，以免正常的中文改写被误报。
+
+Inline code is checked in one direction and by occurrence count: every English identifier must
+remain unchanged in Chinese, while Chinese may add inline-code formatting for translated terms.
+Link destinations are compared as a multiset so translations may reorder clauses without adding,
+removing, or replacing a destination.
+
+行内代码按出现次数单向核对：英文中的每个标识符都必须在中文中原样保留；中文可为译文中的术语额外添加行内代码格式。链接目标按出现次数整体核对，允许译文调整分句顺序，但不得增删或替换目标。
+
+A PR labeled `chinese-copy-only` runs an English-byte check against the merge base. English Blog
+files are protected in full and keep their repository path. In mixed-language TypeScript, TSX, and
+JSON files, explicitly declared `en` object initializers are protected in source order, so moving or
+swapping English dictionaries also fails. Tests and locale-neutral guard plumbing may change.
+Remove the label when the PR intentionally edits English copy.
+
+带有 `chinese-copy-only` 标签的 PR 会以 merge base 为基准，逐字节检查英文内容。英文 Blog 文件会整体保护，文件路径也不得改变；对于混合语言的 TypeScript、TSX 和 JSON 文件，检查会按源码顺序逐一保护显式声明的 `en` 对象初始化表达式，因此移动或调换英文字典也会失败。测试和不涉及语言内容的检查基础代码可以修改；如果本次 PR 本就需要修改英文文案，应移除该标签。
+
+The deterministic guard does not judge fluency, clause order, syntax, register, context-dependent
+pronouns, marketing tone, or the quoted speaker's voice. It also does not use English-token ratios
+or a closed list to decide whether established ML infrastructure terms should remain English.
+Those decisions remain with `review-zh-copy` and the Chinese maintainer.
+
+确定性检查不评判流畅度、分句顺序、句法、语域、需要结合上下文判断的代词、营销语气，也不评判引语中说话者的语气。它也不会依据英文 token 占比或封闭词表，决定行业已普遍使用的 ML 基础设施术语是否应保留英文。这些判断仍由 review-zh-copy 和中文维护者完成。

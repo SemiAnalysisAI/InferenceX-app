@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Copy,
   Download,
-  FileWarning,
   LoaderCircle,
   Search,
   Terminal,
@@ -22,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
@@ -119,6 +119,15 @@ interface LogSelection {
 }
 
 const SEARCH_JUMP_CONTEXT_SIZE = 16 * 1024;
+
+export function retryInitialServerLogQuery(
+  filesFailed: boolean,
+  refetchFiles: () => unknown,
+  refetchContent: () => unknown,
+): void {
+  if (filesFailed) void refetchFiles();
+  else void refetchContent();
+}
 
 /** Console surface. Kept dark in every theme — these are raw terminal artifacts. */
 const LOG_SURFACE = 'bg-[#0b0e13]';
@@ -386,13 +395,14 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     );
   }
   if (filesQuery.isError || (query.isError && !hasLoadedLog)) {
+    const filesFailed = filesQuery.isError;
     return (
-      <LogViewerNotice
-        tone="destructive"
-        icon={<FileWarning className="size-4" aria-hidden="true" />}
-      >
-        {t.error}
-      </LogViewerNotice>
+      <RetryableQueryError
+        message={t.error}
+        analyticsEvent={`${analyticsPrefix}_${filesFailed ? 'log_files' : 'log_content'}_retry_clicked`}
+        onRetry={() => retryInitialServerLogQuery(filesFailed, filesQuery.refetch, query.refetch)}
+        testId={filesFailed ? 'server-log-files-query-error' : 'server-log-content-query-error'}
+      />
     );
   }
   if (files.length === 0 || selectedFile === null || query.data?.pages[0] === null) {
@@ -514,9 +524,12 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         <p className="text-2xs text-muted-foreground">{t.searchHint}</p>
 
         {searchTerm && searchQuery.isError ? (
-          <p className="text-xs text-destructive" role="alert">
-            {t.searchError}
-          </p>
+          <RetryableQueryError
+            message={t.searchError}
+            analyticsEvent={`${analyticsPrefix}_log_search_retry_clicked`}
+            onRetry={searchQuery.refetch}
+            testId="server-log-search-query-error"
+          />
         ) : null}
         {searchTerm && searchQuery.data ? (
           <div className="grid gap-1.5 pt-1" data-testid="server-log-search-results">

@@ -1,0 +1,48 @@
+name: Recompute Agentic Metrics
+run-name: Recompute production metrics for run ${{ inputs.run-id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: Already-ingested GitHub benchmark run to recompute in production
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.run-id }}
+  cancel-in-progress: false
+
+jobs:
+  recompute:
+    name: Recompute stored server metrics
+    if: github.ref == 'refs/heads/master'
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Recompute chart series and aggregate statistics
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: |
+          bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --force --yes
+          bun run --cwd packages/db db:backfill-aggregate-stats --run-id "$RUN_ID" --force --yes
+      - name: Invalidate production cache
+        env:
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com

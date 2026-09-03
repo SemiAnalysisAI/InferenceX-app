@@ -32,21 +32,22 @@ function pageFiles(directory: string): string[] {
 describe('actual App Router Chinese sibling coverage', () => {
   const pages = pageFiles(APP_ROUTER_DIR);
 
-  it('discovers the complete current page tree non-vacuously', () => {
-    expect(pages.length).toBeGreaterThan(80);
-    expect(pages.filter((file) => file.startsWith('src/app/zh/')).length).toBeGreaterThan(40);
-    expect(pages.filter((file) => !file.startsWith('src/app/zh/')).length).toBeGreaterThan(40);
+  it('discovers both locale roots and the Chinese-only fallback', () => {
+    expect(pages).toEqual(
+      expect.arrayContaining([
+        'src/app/(landing)/page.tsx',
+        'src/app/zh/page.tsx',
+        'src/app/zh/[...notFound]/page.tsx',
+      ]),
+    );
   });
 
   it('pairs every English page with a Chinese page in both directions', () => {
-    // /model and /model/[slug] are intentionally English-only: their metadata
-    // declares a canonical URL without hreflang alternates (see the comment in
-    // src/app/model/page.tsx), and they are absent from ZH_MIRRORED_ROUTES.
-    const EN_ONLY_ROUTES = new Set(['/model', '/model/[slug]']);
-    for (const route of EN_ONLY_ROUTES) {
-      expect(hasZhSibling(route), `${route} gained a /zh sibling; drop its exemption`).toBe(false);
-    }
-    expect(findRoutePairViolations(pages, EN_ONLY_ROUTES)).toEqual([]);
+    expect(
+      findRoutePairViolations(pages, {
+        chineseOnly: new Set(['/[...notFound]']),
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -109,6 +110,11 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(true);
   });
 
+  it('matches the model index and model detail pages', () => {
+    expect(hasZhSibling('/model')).toBe(true);
+    expect(hasZhSibling('/model/deepseek-r1')).toBe(true);
+  });
+
   it('matches datasets, gated tabs, and agentic detail pages', () => {
     expect(hasZhSibling('/agentx')).toBe(true);
     expect(hasZhSibling('/agentx/some-set/conversations/abc123')).toBe(true);
@@ -162,6 +168,12 @@ describe('switchLocalePath', () => {
   it('switches datasets pages within the language trees', () => {
     expect(switchLocalePath('/agentx')).toBe('/zh/agentx');
     expect(switchLocalePath('/zh/agentx/some-set')).toBe('/agentx/some-set');
+  });
+
+  it('switches model pages within the language trees', () => {
+    expect(switchLocalePath('/model')).toBe('/zh/model');
+    expect(switchLocalePath('/model/deepseek-r1')).toBe('/zh/model/deepseek-r1');
+    expect(switchLocalePath('/zh/model/deepseek-r1')).toBe('/model/deepseek-r1');
   });
 
   it('falls back to the other homepage for unmirrored paths', () => {

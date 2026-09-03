@@ -123,6 +123,7 @@ describe('Chinese glossary content', () => {
     expect(getZhGlossaryEntry('trace-replay')?.term).toBe('轨迹回放');
     expect(getZhGlossaryEntry('closed-loop-benchmark')?.term).toBe('闭环基准测试');
     expect(getZhGlossaryEntry('subagent')?.term).toBe('子智能体');
+    expect(getZhGlossaryEntry('speculative-decoding')?.term).toBe('投机解码');
     expect(getZhGlossaryEntry('multi-token-prediction')?.term).toBe('多 token 预测');
     expect(getZhGlossaryEntry('not-a-real-term')).toBeUndefined();
 

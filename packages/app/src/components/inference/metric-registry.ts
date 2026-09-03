@@ -13,6 +13,7 @@ export interface MetricDefinition {
   x?: string;
   source?: 'custom';
   xLabel?: string;
+  xLabelZh?: string;
   heading?: string;
 }
 
@@ -34,6 +35,7 @@ export const METRIC_REGISTRY = {
     polarity: 'higher',
     x: 'p90_ttft',
     xLabel: 'P90 Time To First Token (s)',
+    xLabelZh: 'P90 首 token 延迟 (s)',
     heading: 'vs. P90 Time To First Token',
   },
   outputTputPerGpu: {
@@ -50,6 +52,30 @@ export const METRIC_REGISTRY = {
     labelZh: '每 GPU 小时 token 收入（$/GPU/hr）',
     title: 'Token Revenue per GPU Hour',
     titleZh: '每 GPU 小时 token 收入',
+    polarity: 'higher',
+  },
+  tokensPerDollarH: {
+    field: 'tokensPerDollarH.y',
+    label: 'Total Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模）',
+    polarity: 'higher',
+  },
+  tokensPerDollarN: {
+    field: 'tokensPerDollarN.y',
+    label: 'Total Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
+    polarity: 'higher',
+  },
+  tokensPerDollarR: {
+    field: 'tokensPerDollarR.y',
+    label: 'Total Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 TCO (3 Year Rental)',
+    titleZh: '每 1 美元 TCO 对应的总 token 数（3 年租赁）',
     polarity: 'higher',
   },
   tpPerMw: {
@@ -148,148 +174,124 @@ export const METRIC_REGISTRY = {
     titleZh: '每百万输入 token 成本（3 年租赁）',
     polarity: 'lower',
   },
-  tokensPerDollarH: {
-    field: 'tokensPerDollarH.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (Owning - Hyperscaler)',
-    titleZh: '每 1 美元可购买的总 token 数（自有 - 超大规模）',
-    polarity: 'higher',
-  },
-  tokensPerDollarN: {
-    field: 'tokensPerDollarN.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (Owning - Neocloud Giant)',
-    titleZh: '每 1 美元可购买的总 token 数（自有 - Neocloud Giant）',
-    polarity: 'higher',
-  },
-  tokensPerDollarR: {
-    field: 'tokensPerDollarR.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (3 Year Rental)',
-    titleZh: '每 1 美元可购买的总 token 数（3 年租赁）',
-    polarity: 'higher',
-  },
   outputTokensPerDollarH: {
     field: 'outputTokensPerDollarH.y',
-    label: 'Output Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输出 token 数（tok/$）',
-    title: 'Output Tokens per $1 USD (Owning - Hyperscaler)',
-    titleZh: '每 1 美元可购买的输出 token 数（自有 - 超大规模）',
+    label: 'Output Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输出 token 数（tok/$）',
+    title: 'Output Tokens per $1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 美元 TCO 对应的输出 token 数（自有 - 超大规模）',
     polarity: 'higher',
   },
   outputTokensPerDollarN: {
     field: 'outputTokensPerDollarN.y',
-    label: 'Output Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输出 token 数（tok/$）',
-    title: 'Output Tokens per $1 USD (Owning - Neocloud Giant)',
-    titleZh: '每 1 美元可购买的输出 token 数（自有 - Neocloud Giant）',
+    label: 'Output Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输出 token 数（tok/$）',
+    title: 'Output Tokens per $1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 美元 TCO 对应的输出 token 数（自有 - Neocloud Giant）',
     polarity: 'higher',
   },
   outputTokensPerDollarR: {
     field: 'outputTokensPerDollarR.y',
-    label: 'Output Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输出 token 数（tok/$）',
-    title: 'Output Tokens per $1 USD (3 Year Rental)',
-    titleZh: '每 1 美元可购买的输出 token 数（3 年租赁）',
+    label: 'Output Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输出 token 数（tok/$）',
+    title: 'Output Tokens per $1 TCO (3 Year Rental)',
+    titleZh: '每 1 美元 TCO 对应的输出 token 数（3 年租赁）',
     polarity: 'higher',
   },
   inputTokensPerDollarH: {
     field: 'inputTokensPerDollarH.y',
-    label: 'Input Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输入 token 数（tok/$）',
-    title: 'Input Tokens per $1 USD (Owning - Hyperscaler)',
-    titleZh: '每 1 美元可购买的输入 token 数（自有 - 超大规模）',
+    label: 'Input Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输入 token 数（tok/$）',
+    title: 'Input Tokens per $1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 美元 TCO 对应的输入 token 数（自有 - 超大规模）',
     polarity: 'higher',
   },
   inputTokensPerDollarN: {
     field: 'inputTokensPerDollarN.y',
-    label: 'Input Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输入 token 数（tok/$）',
-    title: 'Input Tokens per $1 USD (Owning - Neocloud Giant)',
-    titleZh: '每 1 美元可购买的输入 token 数（自有 - Neocloud Giant）',
+    label: 'Input Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输入 token 数（tok/$）',
+    title: 'Input Tokens per $1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 美元 TCO 对应的输入 token 数（自有 - Neocloud Giant）',
     polarity: 'higher',
   },
   inputTokensPerDollarR: {
     field: 'inputTokensPerDollarR.y',
-    label: 'Input Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的输入 token 数（tok/$）',
-    title: 'Input Tokens per $1 USD (3 Year Rental)',
-    titleZh: '每 1 美元可购买的输入 token 数（3 年租赁）',
+    label: 'Input Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的输入 token 数（tok/$）',
+    title: 'Input Tokens per $1 TCO (3 Year Rental)',
+    titleZh: '每 1 美元 TCO 对应的输入 token 数（3 年租赁）',
     polarity: 'higher',
   },
   tokensPerRmbH: {
     field: 'tokensPerRmbH.y',
-    label: 'Total Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的总 token 数（tok/¥）',
-    title: 'Total Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    titleZh: '每 1 元人民币可购买的总 token 数（自有 - 超大规模）',
+    label: 'Total Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的总 token 数（tok/¥）',
+    title: 'Total Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 元人民币 TCO 对应的总 token 数（自有 - 超大规模）',
     polarity: 'higher',
   },
   tokensPerRmbN: {
     field: 'tokensPerRmbN.y',
-    label: 'Total Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的总 token 数（tok/¥）',
-    title: 'Total Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    titleZh: '每 1 元人民币可购买的总 token 数（自有 - Neocloud Giant）',
+    label: 'Total Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的总 token 数（tok/¥）',
+    title: 'Total Tokens per ¥1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 元人民币 TCO 对应的总 token 数（自有 - Neocloud Giant）',
     polarity: 'higher',
   },
   tokensPerRmbR: {
     field: 'tokensPerRmbR.y',
-    label: 'Total Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的总 token 数（tok/¥）',
-    title: 'Total Tokens per ¥1 RMB (3 Year Rental)',
-    titleZh: '每 1 元人民币可购买的总 token 数（3 年租赁）',
+    label: 'Total Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的总 token 数（tok/¥）',
+    title: 'Total Tokens per ¥1 TCO (3 Year Rental)',
+    titleZh: '每 1 元人民币 TCO 对应的总 token 数（3 年租赁）',
     polarity: 'higher',
   },
   outputTokensPerRmbH: {
     field: 'outputTokensPerRmbH.y',
-    label: 'Output Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输出 token 数（tok/¥）',
-    title: 'Output Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    titleZh: '每 1 元人民币可购买的输出 token 数（自有 - 超大规模）',
+    label: 'Output Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输出 token 数（tok/¥）',
+    title: 'Output Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 元人民币 TCO 对应的输出 token 数（自有 - 超大规模）',
     polarity: 'higher',
   },
   outputTokensPerRmbN: {
     field: 'outputTokensPerRmbN.y',
-    label: 'Output Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输出 token 数（tok/¥）',
-    title: 'Output Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    titleZh: '每 1 元人民币可购买的输出 token 数（自有 - Neocloud Giant）',
+    label: 'Output Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输出 token 数（tok/¥）',
+    title: 'Output Tokens per ¥1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 元人民币 TCO 对应的输出 token 数（自有 - Neocloud Giant）',
     polarity: 'higher',
   },
   outputTokensPerRmbR: {
     field: 'outputTokensPerRmbR.y',
-    label: 'Output Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输出 token 数（tok/¥）',
-    title: 'Output Tokens per ¥1 RMB (3 Year Rental)',
-    titleZh: '每 1 元人民币可购买的输出 token 数（3 年租赁）',
+    label: 'Output Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输出 token 数（tok/¥）',
+    title: 'Output Tokens per ¥1 TCO (3 Year Rental)',
+    titleZh: '每 1 元人民币 TCO 对应的输出 token 数（3 年租赁）',
     polarity: 'higher',
   },
   inputTokensPerRmbH: {
     field: 'inputTokensPerRmbH.y',
-    label: 'Input Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输入 token 数（tok/¥）',
-    title: 'Input Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    titleZh: '每 1 元人民币可购买的输入 token 数（自有 - 超大规模）',
+    label: 'Input Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输入 token 数（tok/¥）',
+    title: 'Input Tokens per ¥1 TCO (Owning - Hyperscaler)',
+    titleZh: '每 1 元人民币 TCO 对应的输入 token 数（自有 - 超大规模）',
     polarity: 'higher',
   },
   inputTokensPerRmbN: {
     field: 'inputTokensPerRmbN.y',
-    label: 'Input Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输入 token 数（tok/¥）',
-    title: 'Input Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    titleZh: '每 1 元人民币可购买的输入 token 数（自有 - Neocloud Giant）',
+    label: 'Input Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输入 token 数（tok/¥）',
+    title: 'Input Tokens per ¥1 TCO (Owning - Neocloud Giant)',
+    titleZh: '每 1 元人民币 TCO 对应的输入 token 数（自有 - Neocloud Giant）',
     polarity: 'higher',
   },
   inputTokensPerRmbR: {
     field: 'inputTokensPerRmbR.y',
-    label: 'Input Tokens per ¥1 RMB (tok/¥)',
-    labelZh: '每 1 元人民币可购买的输入 token 数（tok/¥）',
-    title: 'Input Tokens per ¥1 RMB (3 Year Rental)',
-    titleZh: '每 1 元人民币可购买的输入 token 数（3 年租赁）',
+    label: 'Input Tokens per ¥1 TCO (tok/¥)',
+    labelZh: '每 1 元人民币 TCO 对应的输入 token 数（tok/¥）',
+    title: 'Input Tokens per ¥1 TCO (3 Year Rental)',
+    titleZh: '每 1 元人民币 TCO 对应的输入 token 数（3 年租赁）',
     polarity: 'higher',
   },
   costUser: {
@@ -303,10 +305,10 @@ export const METRIC_REGISTRY = {
   },
   tokensPerDollarUser: {
     field: 'tokensPerDollarUser.y',
-    label: 'Total Tokens per $1 USD (tok/$)',
-    labelZh: '每 1 美元可购买的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 USD (Custom User Values)',
-    titleZh: '每 1 美元可购买的总 token 数（自定义值）',
+    label: 'Total Tokens per $1 TCO (tok/$)',
+    labelZh: '每 1 美元 TCO 对应的总 token 数（tok/$）',
+    title: 'Total Tokens per $1 TCO (Custom User Values)',
+    titleZh: '每 1 美元 TCO 对应的总 token 数（自定义值）',
     polarity: 'higher',
     source: 'custom',
   },
@@ -424,7 +426,11 @@ export type CustomMetricKey = {
 export type BenchmarkMetricKey = Exclude<MetricKey, CustomMetricKey>;
 export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 
-export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarN' satisfies MetricConfigKey;
+export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarH' satisfies MetricConfigKey;
+
+const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
+  y_tokensPerDollar: 'y_tokensPerDollarN',
+};
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
@@ -455,6 +461,8 @@ export function resolveMetricConfigKey(
   fallback?: string,
 ): MetricConfigKey {
   if (metricConfigKey === 'y') return 'y_tpPerGpu';
+  const aliasedMetric = metricConfigKey ? LEGACY_METRIC_ALIASES[metricConfigKey] : undefined;
+  if (aliasedMetric) return aliasedMetric;
   if (metricConfigKey?.startsWith('y_')) {
     const metricKey = metricConfigKey.slice(2);
     if (isMetricKey(metricKey)) return metricConfigKey as MetricConfigKey;
@@ -483,6 +491,33 @@ export interface MetricControlGroup {
   gated?: boolean;
 }
 
+/**
+ * The nine runner-telemetry y-axes in the "Measured Energy" control group.
+ * Exported (and referenced by the group below, so the two cannot drift) for
+ * consumers that treat measured axes specially — the legacy-power point ring,
+ * tooltip tier line, and footer legend key.
+ */
+export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_measuredAvgPower',
+  'y_measuredJPerInputToken',
+  'y_measuredJPerOutputToken',
+  'y_measuredJPerTotalToken',
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+  'y_measuredPowerPercentTdp',
+] as const satisfies readonly MetricConfigKey[];
+
+const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+);
+
+/** Whether a y-axis config key plots one of the Measured Energy metrics. */
+export function isMeasuredEnergyConfigKey(configKey: string): boolean {
+  return MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Throughput',
@@ -502,33 +537,33 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     metrics: ['y_tokenRevenuePerGpuHour'],
   },
   {
-    label: 'Total Tokens per $1 USD',
-    labelZh: '每 1 美元可购买的总 token 数',
+    label: 'Total Tokens per $1 TCO',
+    labelZh: '每 1 美元 TCO 对应的总 token 数',
     metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
   },
   {
-    label: 'Total Tokens per ¥1 CNY',
-    labelZh: '每 1 元人民币可购买的总 token 数',
+    label: 'Total Tokens per ¥1 TCO',
+    labelZh: '每 1 元人民币 TCO 对应的总 token 数',
     metrics: ['y_tokensPerRmbH', 'y_tokensPerRmbN', 'y_tokensPerRmbR'],
   },
   {
-    label: 'Output Tokens per $1 USD',
-    labelZh: '每 1 美元可购买的输出 token 数',
+    label: 'Output Tokens per $1 TCO',
+    labelZh: '每 1 美元 TCO 对应的输出 token 数',
     metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarN', 'y_outputTokensPerDollarR'],
   },
   {
-    label: 'Output Tokens per ¥1 CNY',
-    labelZh: '每 1 元人民币可购买的输出 token 数',
+    label: 'Output Tokens per ¥1 TCO',
+    labelZh: '每 1 元人民币 TCO 对应的输出 token 数',
     metrics: ['y_outputTokensPerRmbH', 'y_outputTokensPerRmbN', 'y_outputTokensPerRmbR'],
   },
   {
-    label: 'Input Tokens per $1 USD',
-    labelZh: '每 1 美元可购买的输入 token 数',
+    label: 'Input Tokens per $1 TCO',
+    labelZh: '每 1 美元 TCO 对应的输入 token 数',
     metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarN', 'y_inputTokensPerDollarR'],
   },
   {
-    label: 'Input Tokens per ¥1 CNY',
-    labelZh: '每 1 元人民币可购买的输入 token 数',
+    label: 'Input Tokens per ¥1 TCO',
+    labelZh: '每 1 元人民币 TCO 对应的输入 token 数',
     metrics: ['y_inputTokensPerRmbH', 'y_inputTokensPerRmbN', 'y_inputTokensPerRmbR'],
   },
   {
@@ -554,17 +589,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: [
-      'y_measuredPrefillAvgPower',
-      'y_measuredDecodeAvgPower',
-      'y_measuredAvgPower',
-      'y_measuredJPerInputToken',
-      'y_measuredJPerOutputToken',
-      'y_measuredJPerTotalToken',
-      'y_measuredJPerSuccessfulQuery',
-      'y_measuredWhPerSuccessfulQuery',
-      'y_measuredPowerPercentTdp',
-    ],
+    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   },
   {
     label: 'Custom User Values',
@@ -586,8 +611,10 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     chartType,
     heading: chartType === 'interactivity' ? 'vs. Interactivity' : 'vs. End-to-end Latency',
     x: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
+    x_scale_field: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
     x_label:
       chartType === 'interactivity' ? 'Interactivity (tok/s/user)' : 'End-to-end Latency (s)',
+    x_labelZh: chartType === 'interactivity' ? '交互性 (tok/s/user)' : '端到端延迟 (s)',
     y: 'tput_per_gpu',
     y_cost_limit: 5,
     y_latency_limit: 60,
@@ -608,6 +635,7 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     }
     if ('x' in metric) definition[`${configKey}_x`] = metric.x;
     if ('xLabel' in metric) definition[`${configKey}_x_label`] = metric.xLabel;
+    if ('xLabelZh' in metric) definition[`${configKey}_x_labelZh`] = metric.xLabelZh;
     if ('heading' in metric && chartType === 'interactivity') {
       definition[`${configKey}_heading`] = metric.heading;
     }

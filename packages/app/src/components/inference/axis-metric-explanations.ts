@@ -108,16 +108,28 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
     description: {
       en:
         'Gross token revenue a GPU could earn per hour at this operating point. The normalized ' +
-        'source prices every input and output token at $1 per million; the OpenRouter source uses ' +
-        "the selected model's current public input and output prices. This turns the " +
+        'source prices uncached input and output at $1 per million and cached input at $0.10 per ' +
+        'million. The OpenRouter source uses the selected model’s current public prices, with a ' +
+        '10%-of-input fallback when no cache-read price is published. Revenue prices uncached ' +
+        'input, cached input, and output separately. Input share comes from compatible measured ' +
+        'input/output throughput. When disaggregated rates use different GPU denominators, fixed ' +
+        'sequences use ISL:OSL and Agentic traces use measured prompt/generation tokens. Agentic ' +
+        'cache hit combines GPU and external cache when external cache is reported, otherwise GPU ' +
+        'and CPU cache. Historical Trends interpolates total throughput, input share, and cache ' +
+        'hit separately before pricing. A partially measured cache frontier receives no cache ' +
+        'discount. This turns the ' +
         'throughput/interactivity tradeoff into a business-facing SLA curve.',
       zh:
-        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式将输入和输出 token 均按每百万 1 美元计价；' +
-        'OpenRouter 模式采用所选模型当前公开的输入和输出价格。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
+        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式下，未缓存输入和输出均按每百万 1 美元计价，' +
+        '缓存输入按每百万 0.10 美元计价。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。' +
+        '未缓存输入、缓存输入与输出分别计价。输入 token 占比优先采用口径一致的实测输入/输出吞吐量。解耦运行的两类速率使用不同 GPU 分母时，' +
+        '固定序列采用 ISL:OSL，Agentic trace 采用实测 prompt/generation token 构成。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
+        '否则由 GPU 与 CPU cache 相加。Historical Trends 会在计价前分别插值总吞吐量、输入 token 占比和缓存命中率。' +
+        '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
     },
     formula: {
-      en: '$/GPU/hr = total tok/s/GPU × (input share × input $/M + output share × output $/M) × 3,600 ÷ 1,000,000',
-      zh: '$/GPU/hr = 总 tok/s/GPU ×（输入占比 × 输入 $/百万 + 输出占比 × 输出 $/百万）× 3,600 ÷ 1,000,000',
+      en: '$/GPU/hr = (uncached input × input price + cached input × cache-read price + output × output price) per GPU-second, scaled to one hour',
+      zh: '$/GPU/hr = 每 GPU 秒的（未缓存输入 × 输入价格 + 缓存输入 × 缓存读取价格 + 输出 × 输出价格），再换算为一小时',
     },
   };
 }
@@ -197,6 +209,15 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
   };
 }
 
+/** Validation-status note appended to every Measured Energy explanation. */
+const MEASURED_TIER_NOTE_EN =
+  ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
+  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
+  'marks them. Filter either status under Quick Filters → Measured Power.';
+const MEASURED_TIER_NOTE_ZH =
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
+  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
+
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
 const MEASURED_PHASE_EN: Record<MeasuredPhase, string> = {
@@ -216,11 +237,13 @@ function measuredPower(phase: MeasuredPhase): MetricExplanation {
     description: {
       en:
         `Average per-chip accelerator power actually drawn during ${MEASURED_PHASE_EN[phase]}, ` +
-        'read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ' +
-        'measured draw, not the provisioned budget.',
+        `read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ` +
+        `measured draw, not the provisioned budget.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `${MEASURED_PHASE_ZH[phase]}每块加速器芯片的实际平均功耗，来自运行器遥测数据。` +
-        '与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。',
+        `与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
     },
     formula: {
       en: `W = mean of sampled per-chip accelerator power draw over ${MEASURED_PHASE_EN[phase]}`,
@@ -236,10 +259,10 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
         `Measured accelerator energy consumed per ${
           tokenType === 'total' ? 'token (including prompt tokens)' : `${tokenType} token`
         }, from runner power telemetry integrated over the run. Lower means the system converts ` +
-        'electricity into tokens more efficiently.',
+        `electricity into tokens more efficiently.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `每个${TOKEN_TYPE_ZH[tokenType]}消耗的加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。` +
-        '数值越低，说明系统把电能转化为 token 的效率越高。',
+        `数值越低，说明系统把电能转化为 token 的效率越高。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: `J/tok = measured accelerator energy over the run ÷ ${TOKEN_TYPE_EN[tokenType]} processed`,
@@ -341,12 +364,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredJPerSuccessfulQuery: {
     description: {
       en:
-        'Measured accelerator energy consumed per successfully completed request, from runner ' +
-        'power telemetry. It charges the energy of the whole run only to requests that finished ' +
-        'successfully.',
+        `Measured accelerator energy consumed per successfully completed request, from runner ` +
+        `power telemetry. It charges the energy of the whole run only to requests that finished ` +
+        `successfully.${MEASURED_TIER_NOTE_EN}`,
       zh:
-        '每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。' +
-        '整个运行的能耗只计入成功完成的请求。',
+        `每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。` +
+        `整个运行的能耗只计入成功完成的请求。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'J/query = measured accelerator energy over the run ÷ successfully completed requests',
@@ -356,9 +379,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredWhPerSuccessfulQuery: {
     description: {
       en:
-        'The same measured energy per successful request expressed in watt-hours, a more ' +
-        'familiar household unit (1 Wh = 3,600 J).',
-      zh: '与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。',
+        `The same measured energy per successful request expressed in watt-hours, a more ` +
+        `familiar household unit (1 Wh = 3,600 J).${MEASURED_TIER_NOTE_EN}`,
+      zh: `与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'Wh/query = measured J per successful query ÷ 3,600',
@@ -368,11 +391,13 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredPowerPercentTdp: {
     description: {
       en:
-        'Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ' +
-        'below 100% suggest the workload leaves thermal or power headroom on the table.',
+        `Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ` +
+        `below 100% suggest the workload leaves thermal or power headroom on the table.${
+          MEASURED_TIER_NOTE_EN
+        }`,
       zh:
-        '每芯片实测平均功耗占加速器额定 TDP 的百分比。' +
-        '明显低于 100% 说明该工作负载没有用满散热或供电余量。',
+        `每芯片实测平均功耗占加速器额定 TDP 的百分比。` +
+        `明显低于 100% 说明该工作负载没有用满散热或供电余量。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: '% TDP = measured average power per chip (W) ÷ rated TDP (W) × 100',

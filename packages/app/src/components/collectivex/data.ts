@@ -1,5 +1,7 @@
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import type { Locale } from '@/lib/i18n';
+
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
@@ -24,6 +26,52 @@ export interface CollectiveXSeriesSelection {
 }
 
 const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+
+const COLLECTIVEX_CONCLUSION_LABELS = {
+  en: {
+    action_required: 'action_required',
+    cancelled: 'cancelled',
+    failure: 'failure',
+    neutral: 'neutral',
+    skipped: 'skipped',
+    stale: 'stale',
+    startup_failure: 'startup_failure',
+    success: 'success',
+    timed_out: 'timed_out',
+  },
+  zh: {
+    action_required: '需要处理',
+    cancelled: '已取消',
+    failure: '失败',
+    neutral: '中立',
+    skipped: '已跳过',
+    stale: '已过期',
+    startup_failure: '启动失败',
+    success: '成功',
+    timed_out: '超时',
+  },
+} as const;
+
+const COLLECTIVEX_MODE_LABELS_ZH: Record<CollectiveXMode, string> = {
+  normal: '常规',
+  'low-latency': '低延迟',
+};
+
+const COLLECTIVEX_PHASE_LABELS_ZH: Record<CollectiveXPhase, string> = {
+  decode: '解码',
+  prefill: '预填充',
+};
+
+/** Format every conclusion emitted by the GitHub Actions workflow-run API. */
+export function collectiveXConclusionLabel(conclusion: string | null, locale: Locale): string {
+  if (conclusion === null) return locale === 'zh' ? '待处理' : 'pending';
+  const labels = COLLECTIVEX_CONCLUSION_LABELS[locale];
+  return conclusion in labels
+    ? labels[conclusion as keyof typeof labels]
+    : locale === 'zh'
+      ? '未知状态'
+      : conclusion;
+}
 
 /**
  * CollectiveX artifacts identify runner pools in the SKU (for example,
@@ -70,20 +118,28 @@ export function collectiveXTopologyLabel(
     | 'scale_out_transport'
     | 'topology_class'
   >,
+  locale: Locale = 'en',
 ): string {
   const transports = system.scale_out_transport
     ? `${system.scale_up_transport}+${system.scale_out_transport}`
     : system.scale_up_transport;
-  return `${system.nodes}x${system.gpus_per_node} · domain ${system.scale_up_domain} · ${transports} · ${system.topology_class}`;
+  const domain =
+    locale === 'zh' ? `域内芯片数 ${system.scale_up_domain}` : `domain ${system.scale_up_domain}`;
+  return `${system.nodes}x${system.gpus_per_node} · ${domain} · ${transports} · ${system.topology_class}`;
 }
 
-export function collectiveXLegendLabel(series: CollectiveXSeries): string {
-  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+export function collectiveXLegendLabel(series: CollectiveXSeries, locale: Locale = 'en'): string {
+  const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
+  const phase = locale === 'zh' ? COLLECTIVEX_PHASE_LABELS_ZH[series.phase] : series.phase;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
 }
 
-export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
+export function collectiveXSeriesLabel(
+  series: CollectiveXSeries | CollectiveXRunSeries,
+  locale: Locale = 'en',
+): string {
   const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
-  return `${runPrefix}${collectiveXLegendLabel(series)}`;
+  return `${runPrefix}${collectiveXLegendLabel(series, locale)}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -202,6 +258,7 @@ export function chartPoints(
   operation: CollectiveXOperation,
   percentile: CollectiveXPercentile,
   yAxis: CollectiveXYAxis,
+  locale: Locale = 'en',
 ): CollectiveXChartPoint[] {
   return series.flatMap((item) =>
     item.points.flatMap((point) => {
@@ -211,7 +268,7 @@ export function chartPoints(
       return [
         {
           seriesId: item.series_id,
-          seriesLabel: collectiveXSeriesLabel(item),
+          seriesLabel: collectiveXSeriesLabel(item, locale),
           colorKey: collectiveXColorKey(item),
           x,
           y,
@@ -281,6 +338,9 @@ export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
 export interface CollectiveXKvFrontierSelection {
   op: 'pull' | 'push';
   pageTokens: number;
+  /** Overlap view only: pin the ladder to this ISL. Absent means each
+   * series reads at its own largest measured ISL. */
+  isl?: number;
 }
 
 export interface CollectiveXKvFrontierPoint {
@@ -297,23 +357,23 @@ export interface CollectiveXKvFrontierPoint {
   row: CollectiveXKvRow;
 }
 
-/** More throughput at no worse per-request cost, strictly better in one. */
-function frontierDominates(
+/** Strictly more aggregate bandwidth at the same operating ISL. */
+function frontierBeats(
   a: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
   b: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
 ): boolean {
-  return a.x >= b.x && a.y <= b.y && (a.x > b.x || a.y < b.y);
+  return a.x === b.x && a.y > b.y;
 }
 
 /**
- * Concurrency-frontier points: each case's batch ladder at the largest
- * measured ISL (the same slice the batch view plots), re-expressed as
- * aggregate GB/s against p95 latency per in-flight request. A backend that
- * overlaps requests traces a curve toward the lower right; a serializing
- * backend collapses to a point (constant aggregate rate, constant
- * per-request cost). Two dominance tiers: within a series (its own best
- * operating points) and across every series of the same SKU (which backend
- * to deploy on that machine).
+ * Bandwidth-against-ISL frontier points: every measured (ISL, batch) rung of
+ * the selected op and page size becomes a point, with x the sequence length
+ * and y the burst-aggregate GB/s at p50. The batch sweep folds into two
+ * per-ISL tiers: onSeriesFrontier marks the backend's best batch at each ISL
+ * (the achievable envelope the chart draws a line through), and onSkuFrontier
+ * marks the best backend on that machine at each ISL. A backend that overlaps
+ * requests lifts its envelope well above its batch-1 rung; a serializing
+ * backend's rungs stack on top of each other.
  */
 export function collectiveXKvFrontierPoints(
   cases: readonly CollectiveXKvRunCase[],
@@ -324,38 +384,156 @@ export function collectiveXKvFrontierPoints(
       (row) =>
         row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
     );
-    if (matching.length === 0) return [];
-    const isl = Math.max(...matching.map((row) => row.isl));
-    return matching
-      .filter((row) => row.isl === isl)
-      .flatMap((row) => {
-        const x = row.gbps_p50;
-        const y = row.latency_ms.p95 / row.batch;
-        if (!Number.isFinite(x) || x <= 0 || !Number.isFinite(y) || y <= 0) return [];
-        return [
-          {
-            seriesId: `${kase.run_id}:${kase.case_id}`,
-            seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
-            colorKey: collectiveXKvColorKey(kase),
-            sku: normalizeCollectiveXSku(kase.sku),
-            x,
-            y,
-            onSeriesFrontier: false,
-            onSkuFrontier: false,
-            row,
-          },
-        ];
-      });
+    return matching.flatMap((row) => {
+      const x = row.isl;
+      const y = row.gbps_p50;
+      if (!Number.isFinite(x) || x <= 0 || !Number.isFinite(y) || y <= 0) return [];
+      return [
+        {
+          seriesId: `${kase.run_id}:${kase.case_id}`,
+          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          colorKey: collectiveXKvColorKey(kase),
+          sku: normalizeCollectiveXSku(kase.sku),
+          x,
+          y,
+          onSeriesFrontier: false,
+          onSkuFrontier: false,
+          row,
+        },
+      ];
+    });
   });
   for (const point of points) {
     point.onSeriesFrontier = !points.some(
-      (other) => other.seriesId === point.seriesId && frontierDominates(other, point),
+      (other) => other.seriesId === point.seriesId && frontierBeats(other, point),
     );
     point.onSkuFrontier = !points.some(
-      (other) => other.sku === point.sku && frontierDominates(other, point),
+      (other) => other.sku === point.sku && frontierBeats(other, point),
     );
   }
   return points;
+}
+
+/**
+ * Overlap-gain points: aggregate bandwidth relative to the batch-1 rung at
+ * one ISL of the selected direction and page size, so y is 1 at batch 1 by
+ * construction. The ISL is `selection.isl` when set, else each series' own
+ * largest measured ISL. An ideal overlapper tracks y = batch until the wire
+ * saturates; a serializing backend stays flat at 1. A series without a
+ * batch-1 rung at that ISL has no baseline and is dropped.
+ */
+export function collectiveXKvOverlapPoints(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvFrontierSelection,
+): CollectiveXKvChartPoint[] {
+  return cases.flatMap((kase) => {
+    const matching = kase.rows.filter(
+      (row) =>
+        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
+    );
+    if (matching.length === 0) return [];
+    const isl = selection.isl ?? Math.max(...matching.map((row) => row.isl));
+    const atIsl = matching.filter((row) => row.isl === isl);
+    const baseline = atIsl.find((row) => row.batch === 1);
+    if (!baseline || !(baseline.gbps_p50 > 0)) return [];
+    const seriesId = `${kase.run_id}:${kase.case_id}`;
+    return atIsl.flatMap((row) => {
+      const y = row.gbps_p50 / baseline.gbps_p50;
+      if (!Number.isFinite(y) || y <= 0) return [];
+      return [
+        {
+          seriesId,
+          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          colorKey: collectiveXKvColorKey(kase),
+          x: row.batch,
+          y,
+          row,
+        },
+      ];
+    });
+  });
+}
+
+/**
+ * Distinct measured ISLs of the paged rows matching the selected direction
+ * and page size, ascending. Drives the overlap view's ISL selector; a series
+ * with no rows at a chosen ISL simply drops from the chart via the missing
+ * batch-1 baseline.
+ */
+export function collectiveXKvIslValues(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: Pick<CollectiveXKvFrontierSelection, 'op' | 'pageTokens'>,
+): number[] {
+  const values = new Set<number>();
+  for (const kase of cases) {
+    for (const row of kase.rows) {
+      if (
+        row.kind === 'paged' &&
+        row.op === selection.op &&
+        row.page_tokens === selection.pageTokens
+      ) {
+        values.add(row.isl);
+      }
+    }
+  }
+  return [...values].toSorted((a, b) => a - b);
+}
+
+/**
+ * Distinct page sizes across the measured paged rows, descending. Drives the
+ * page toggle and the table's paged columns: the sweep's page ladder has
+ * already changed once (64/16 to the production block 256), and hardcoding it
+ * left every view empty against the new rows.
+ */
+export function collectiveXKvPageValues(cases: readonly CollectiveXKvRunCase[]): number[] {
+  const values = new Set<number>();
+  for (const kase of cases) {
+    for (const row of kase.rows) {
+      if (row.kind === 'paged' && row.page_tokens !== null) values.add(row.page_tokens);
+    }
+  }
+  return [...values].toSorted((a, b) => b - a);
+}
+
+export interface CollectiveXKvWireCeilingPoint {
+  x: number;
+  y: number;
+  row: CollectiveXKvRow;
+}
+
+/**
+ * Wire-ceiling lines for the envelope view: each series' bulk rows of the
+ * selected direction across the ISL ladder, keyed by series id. A bulk row
+ * moves the same bytes as the paged rungs at that ISL in one contiguous
+ * descriptor, so it is what the fabric itself achieves; the gap from a paged
+ * rung up to this line is per-descriptor software overhead, not the wire.
+ * Bulk rows have no page size, so the page toggle does not apply. When
+ * several bulk rows share an ISL (a batch ladder), the fastest one is the
+ * ceiling.
+ */
+export function collectiveXKvWireCeilings(
+  cases: readonly CollectiveXKvRunCase[],
+  op: 'pull' | 'push',
+): Map<string, CollectiveXKvWireCeilingPoint[]> {
+  const ceilings = new Map<string, CollectiveXKvWireCeilingPoint[]>();
+  for (const kase of cases) {
+    const byIsl = new Map<number, CollectiveXKvRow>();
+    for (const row of kase.rows) {
+      if (row.kind !== 'bulk' || row.op !== op) continue;
+      if (!Number.isFinite(row.isl) || row.isl <= 0) continue;
+      if (!Number.isFinite(row.gbps_p50) || row.gbps_p50 <= 0) continue;
+      const best = byIsl.get(row.isl);
+      if (!best || row.gbps_p50 > best.gbps_p50) byIsl.set(row.isl, row);
+    }
+    if (byIsl.size === 0) continue;
+    ceilings.set(
+      `${kase.run_id}:${kase.case_id}`,
+      [...byIsl.values()]
+        .toSorted((a, b) => a.isl - b.isl)
+        .map((row) => ({ x: row.isl, y: row.gbps_p50, row })),
+    );
+  }
+  return ceilings;
 }
 
 export function collectiveXKvChartPoints(

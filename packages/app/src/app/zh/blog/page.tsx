@@ -11,7 +11,7 @@ import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-con
 
 export const metadata: Metadata = {
   title: '文章',
-  description: `${SITE_NAME} by ${AUTHOR_NAME} 发布关于智能体推理基准测试、AgentX 结果、芯片性能与 ML 基础设施的技术文章。`,
+  description: `${AUTHOR_NAME} 通过 ${SITE_NAME} 发布技术文章，涵盖智能体推理基准测试、AgentX 结果、芯片性能和 ML 基础设施。`,
   alternates: zhAlternates('/blog'),
   openGraph: {
     title: `文章 | ${SITE_NAME} by ${AUTHOR_NAME}`,
@@ -102,7 +102,7 @@ export default async function ZhBlogPage({
                             })}
                           </time>
                           <span>&middot;</span>
-                          <span>{post.readingTime} 分钟阅读</span>
+                          <span>预计阅读 {post.readingTime} 分钟</span>
                         </div>
                         <h2 className="text-2xl font-semibold mb-2 group-hover:underline group-hover:text-brand">
                           {post.title}

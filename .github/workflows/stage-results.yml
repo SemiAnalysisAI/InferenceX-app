@@ -254,7 +254,7 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: ./.github/workflows/ingest-agentic-results.yml
+    uses: $/.github/workflows/ingest-agentic-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}
@@ -265,10 +265,34 @@ jobs:
       INFX_MAIN_PAT: ${{ secrets.INFX_MAIN_PAT }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  refresh-chart-series:
+    name: Refresh staged chart series
+    needs: [validate, ingest]
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Recompute stale chart series for staged run
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+          RUN_ID: ${{ needs.validate.outputs.run-id }}
+        run: bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --yes
+
   report:
     name: Report staging result
     if: ${{ always() && needs.validate.result == 'success' }}
-    needs: [validate, sync-staging-branch, prepare-staging-database, ingest]
+    needs: [validate, sync-staging-branch, prepare-staging-database, ingest, refresh-chart-series]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -280,7 +304,7 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
           REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
-          STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
+          STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' && needs['refresh-chart-series'].result == 'success' }}
         with:
           github-token: ${{ secrets.PAT }}
           script: |

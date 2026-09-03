@@ -36,7 +36,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'AI 推理是使用已经训练好的模型处理新输入并生成输出的过程；对大语言模型而言，通常就是处理提示词并生成 token。',
     explanation:
-      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。相同模型在不同软硬件栈上的表现可能相差数倍。',
+      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。整个系统的性能还会随配套的软硬件栈而变化。',
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
@@ -71,7 +71,12 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'agentic-coding-workload': {
     term: '智能体编码工作负载',
-    aliases: ['agentic coding workload', '编码智能体工作负载', '软件工程智能体工作负载'],
+    aliases: [
+      'agentic coding',
+      'agentic coding workload',
+      '编码智能体工作负载',
+      '软件工程智能体工作负载',
+    ],
     plainEnglish:
       '编码智能体读取代码仓库、修改代码并运行工具，随后继续请求模型，直到完成任务；这一连串请求就是智能体编码工作负载。',
     definition:
@@ -105,11 +110,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '闭环基准测试中的客户端会在前一个依赖请求完成后生成新工作，同时遵循工作负载记录的等待时间和分支结构。',
     explanation:
-      'Concurrency 表示活跃客户端或会话数量，同时存在的请求数会随时间变化。更快的系统更早完成轮次，因此会在同一个 profiling 窗口内发出更多请求。每条采样会话的推进速度取决于请求完成时间，实际请求组合可能有小幅变化。',
+      '并发量表示活跃客户端或会话的数量，但同时在途的请求数会随时间变化。系统越快，每一轮就完成得越早，因此在同一个 profiling 窗口内会发出更多请求。由于每条采样会话的进度取决于请求完成时间，实际请求组合可能略有不同。',
     significance:
       '这种负载模型符合交互式 agent 的运行方式，因为下一步动作依赖上一步结果。响应更快时，会话也会更快地产生后续工作，所以吞吐量与延迟相互关联。低并发运行的采样波动通常会比大型请求池更明显。',
     benchmarkContext:
-      'AgentX 使用闭环 concurrency。该数值表示同时运行的 agent 客户端数量；request batch 会随着会话推进而变化。解读结果时需要结合吞吐量、首 token 延迟与交互性。',
+      'AgentX 采用闭环并发。这里的并发量指同时运行的 agent 客户端数量；随着会话推进，每个批次中的请求数也会变化。解读结果时，应结合吞吐量、首 token 延迟和交互性。',
   },
   subagent: {
     term: '子智能体',
@@ -221,7 +226,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '批处理就像让多名乘客坐同一辆巴士：芯片一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
-      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。',
+      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理；随着请求到达或完成，序列会动态加入或退出，无需等待固定批次全部处理完。因此，batch 形状会在 prefill 和 decode 过程中不断变化。',
     significance:
       '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
@@ -274,7 +279,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'InferenceX 根据每小时总体拥有成本和实测 token 吞吐量计算该指标。它可能按总 token 报告，也可能区分输入和输出 token，因此比较前必须确认分母。',
     significance:
-      '该指标把系统性能转化为服务经济性，但仍受工作负载、交互性、利用率、缓存命中和成本假设影响；离线低交互点不能直接与实时端点比较。',
+      '工作负载形状、交互性、利用率、缓存行为和成本假设，共同决定两个数值能否直接比较。低吞吐量的离线运行点与曲线高交互性一端的运行点属于不同运行区间，不能直接比较。',
     benchmarkContext:
       '成本曲线使用与吞吐曲线相同的并发扫描。在等交互性下，更低的 $/M 表示以更少建模成本提供相同流式体验。',
     measurement: {
@@ -292,7 +297,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值 FLOPS 不能单独决定服务经济性；内存、网络、软件成熟度、数值精度和实际利用率都会影响最终比值。',
     benchmarkContext:
-      'InferenceX 在匹配交互性时比较 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。图表用每美元 token 数表达同一套经济性，它数值越大越好，也是默认的 Y 轴。',
+      'InferenceX 在匹配交互性时比较基础设施 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。每百万 token 成本以及总 token、输入 token 和输出 token 购买力轴都采用这套 TCO 经济性口径。',
   },
   'total-cost-of-ownership': {
     term: '总体拥有成本',
@@ -304,7 +309,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'TCO 比标价更适合跨系统经济性比较，尤其是网络与电力基础设施不同的机架级产品；但它仍是模型，必须连同假设一起阅读。',
     benchmarkContext:
-      'InferenceX 将 SemiAnalysis AI Cloud TCO 输入与实测 tok/s/chip 结合，从而区分每小时系统成本和决定该小时 token 产出的软硬件行为。',
+      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合，从而把系统每小时成本与决定这一小时 token 产出的软件实现及工作负载特征分开考察。',
   },
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
@@ -339,13 +344,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '每个新 token 都依赖此前 token，因此时间维度无法完全并行。模型会反复读取权重与该序列的 KV 缓存，使解码对内存带宽、批处理和通信尤其敏感。',
     significance:
-      '解码决定流式交互性，也常主导长输出成本。推测解码、MTP、量化和宽专家并行都试图减少每个有效 token 的工作量或耗时。',
+      '解码决定流式交互性，也常主导长输出成本。投机解码、MTP、量化和宽专家并行都试图减少每个有效 token 的工作量或耗时。',
     benchmarkContext:
       'InferenceX 用 tok/s/user 与总 tok/s/chip 展示不同并发下的解码性能。公平比较必须匹配输出长度、批形状、精度和并行策略。',
   },
   'kv-cache': {
     term: 'KV 缓存',
-    aliases: ['KV cache', '键值缓存', '注意力缓存'],
+    aliases: ['KV cache', 'KVCache', 'KV caching', '键值缓存', '注意力缓存'],
     plainEnglish: 'KV 缓存是模型对当前对话的工作记忆，让它生成新 token 时不必每次从头重读。',
     definition:
       'KV 缓存保存已经处理过的 token 的注意力 key/value 状态，避免每个解码步重新计算它们。',
@@ -382,44 +387,44 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'InferenceX 中的 disagg 不是万能开关。应查看预填充/解码 world size、TP/EP 布局、框架、网络域，以及分离前沿真正领先的交互性区间。',
   },
   'speculative-decoding': {
-    term: '推测解码',
+    term: '投机解码',
     aliases: ['speculative decoding', '草稿与验证解码'],
     plainEnglish:
-      '推测解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，省去部分逐个生成步骤。',
+      '投机解码先让成本较低的辅助模块提前生成多个 token，再交给完整模型一次性验证，从而减少逐个生成的步骤。',
     definition:
-      '推测解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
+      '投机解码先以较低成本生成多个候选 token，再由目标模型批量验证，从而减少成本较高的串行 decode 步骤。',
     explanation:
-      '草稿模型或内置预测头生成候选，目标模型在一次批量验证中评估这些候选并接受有效前缀；严格实现时不会改变目标分布。',
+      'draft model 或内置预测头会生成候选 token，目标模型再通过一次批量验证评估这些候选，并接受其中有效的连续前缀。只要算法实现严格，目标分布就不会改变。',
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '应在真实接受率下比较投机解码方案并验证模型质量。定长场景仍把投机解码作为曲线标识的一部分，因此开启和关闭 MTP 的方案会分开绘制；agentic 曲线则把它当作数据点级元数据并合并这些点，在 tooltip 中标明具体方式，因为 AgentX 按模型、芯片 SKU 和引擎给出可获得的最佳曲线。由于 AgentX 回放的内容是合成的，speculator 接受的 draft token 数会失真，因此运行时会套用一套按模型、speculator、draft 长度和思考模式在外部 agentic 编码数据集上采集的接受长度。',
+      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
     aliases: ['multi-token prediction', '多 token 预测头'],
     plainEnglish: 'MTP 让模型一次猜测多个后续 token 并一起验证，从而减少缓慢的逐 token 步骤。',
     definition:
-      '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供推测验证。',
+      '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供投机验证。',
     explanation:
-      'MTP 不需要独立草稿模型，候选来自目标模型自身表示，因此分布更一致、部署也更简单；但它要求检查点包含兼容 MTP 模块，且推理引擎支持验证路径。',
+      'MTP 不需要单独的 draft model；候选来自目标模型自身的表示，因此通常更贴合目标模型，也更易部署。不过，checkpoint 必须包含兼容的 MTP 模块，推理引擎也必须支持对应的验证路径。',
     significance:
-      'MTP 可用额外计算换取更少的内存受限解码步。草稿接受率高且验证能利用空闲计算时收益最大；大批次下额外工作可能减少优势。',
+      'MTP 可以利用原本闲置的计算资源，减少受显存带宽限制的 decode 步骤。draft token 接受率较高、且验证能够利用可用算力时，收益最大；batch 较大时，额外计算带来的收益可能下降。',
     benchmarkContext:
-      'InferenceX 将 MTP 作为方案维度。把基准收益迁移到生产时，必须考虑接受率/长度、工作负载分布、数值质量检查与匹配交互性。',
+      'InferenceX 将 MTP 作为测试配置中的一个维度。评估基准测试中的提升能否在生产环境复现时，需要同时考虑接受率或接受长度、工作负载分布、数值质量检查和匹配交互性。',
   },
   eagle: {
     term: 'EAGLE',
-    aliases: ['EAGLE 推测解码', 'EAGLE-3'],
+    aliases: ['EAGLE 投机解码', 'EAGLE-3'],
     plainEnglish: 'EAGLE 是一种为主模型起草多个可能后续 token 的方法，可让答案流式输出得更快。',
     definition:
-      'EAGLE 是一组推测解码方法：利用与目标语言模型相关的特征预测草稿序列，再由目标模型验证。',
+      'EAGLE 是一类投机解码方法：它根据与目标语言模型相关的特征预测 draft 序列，再交由目标模型验证。',
     explanation:
-      '推理框架通常通过推测步数、草稿 token 数和候选宽度等参数暴露 EAGLE。模型检查点、草稿组件与引擎实现必须匹配。',
+      '推理框架通常提供投机步数、draft token 数和候选宽度等参数来配置 EAGLE。模型 checkpoint、draft 组件和引擎实现必须相互匹配。',
     significance:
-      'EAGLE 能提高每个目标模型步接受的 token 数，但结果依赖工作负载；接受行为、草稿开销、模型架构和批大小共同决定端到端收益。',
+      'EAGLE 可以增加目标模型每一步接受的 token 数，但实际效果取决于工作负载。接受情况、draft 开销、模型架构和 batch 大小，共同决定这条额外路径能否提升端到端服务性能。',
     benchmarkContext:
-      '部分 InferenceX 曲线标注 MTP，是因为模型提供多 token 预测头，而引擎使用 EAGLE 风格管线。应查看方案参数与检查点细节，不能假设所有 MTP 曲线实现相同。',
+      '部分 InferenceX 曲线将这一功能标记为 MTP，因为模型提供多 token 预测头，而引擎使用的是 EAGLE 风格的投机解码管线。具体实现以测试配置中的 flags 和 checkpoint 详情为准。',
   },
   'tensor-parallelism': {
     term: '张量并行',
@@ -690,11 +695,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'SGLang 是用于快速服务语言模型的开源软件，提供面向复杂 AI 工作负载的调度和优化功能。',
     definition: 'SGLang 是面向高性能 LLM 与多模态推理的开源服务引擎和语言模型编程系统。',
     explanation:
-      '服务运行时包含连续批处理、前缀感知调度、分布式并行、推测解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE 内核后端。',
+      '服务运行时包含连续批处理、前缀感知调度、分布式并行、投机解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE 内核后端。',
     significance:
       'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
     benchmarkContext:
-      'InferenceX 持续重跑固定版本的 SGLang 方案。跨版本曲线会保留改动对完整性能区间的影响。',
+      'InferenceX 会持续重跑固定版本的 SGLang 测试配置。对比不同版本的曲线，可以看出改动对整个运行区间的影响，也能发现单看峰值时容易被掩盖的回归或提升。',
   },
   'tensorrt-llm': {
     term: 'TensorRT-LLM',
@@ -740,17 +745,18 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'tokens-per-dollar': {
     term: '每美元 token 数',
-    aliases: ['tokens per dollar', 'tok/$', '每 1 美元 token 数'],
-    plainEnglish: '每美元 token 数表示一美元基础设施支出能买到多少 token，数值越大说明系统越便宜。',
+    aliases: ['tokens per dollar', 'tok/$', '每 1 美元 TCO 对应的 token 数'],
+    plainEnglish:
+      '每美元 token 数表示按图表注明的成本口径，每投入 1 美元基础设施开支可以产出多少 token。',
     definition:
-      '每美元 token 数是某个配置在一单位建模成本下产出的 token 数量，即每 token 成本的倒数。',
+      '每美元总 token 数用每芯片小时产出的总 token 数除以建模得出的每芯片小时全包基础设施成本。',
     explanation:
-      '它由每芯片吞吐量和建模的每芯片小时成本直接得出，因此与每百万 token 成本共用同一套假设，只是换成了人们规划容量时更习惯的方向。InferenceX 为总 token、输入 token 和输出 token 分别给出该指标，覆盖每种成本口径，并同时提供人民币与美元两种计价。',
+      '超大规模云厂商自有硬件、Neocloud Giant 自有硬件和 3 年期租赁三个版本分别采用对应的 TCO 每小时成本。Historical Trends 会插值对应的总吞吐量、输入吞吐量或输出吞吐量，再应用每小时成本系数。',
     significance:
-      '每百万 token 成本与每美元 token 数对系统的排序完全一致，但后者随硬件变好而升高，与吞吐量方向相同，因此同一张图里的坐标轴不会中途反向。该数值完全依赖背后的成本模型，脱离所声明的口径就不成立。',
+      '该指标衡量硬件和软件的成本效率，因此比较时必须采用相同的模型、工作负载、交互性目标、token 类型和基础设施成本口径。',
     benchmarkContext:
-      'InferenceX 推理图表默认的 Y 轴就是每 1 美元可购买的总 token 数。阅读时请对照图表上方的 TCO 行，并只在同一成本口径内比较：自有（超大规模费率）、自有（neocloud 费率）和 3 年租赁对同一颗芯片会给出不同结果。',
-    measurement: { label: '常用单位', value: '每 1 美元 token 数（tok/$）' },
+      'InferenceX 分别提供按超大规模云厂商自有硬件、Neocloud Giant 自有硬件和 3 年期租赁成本计算的每美元总 token 数轴，其中超大规模云厂商自有硬件轴是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
+    measurement: { label: '常用单位', value: '每 1 美元 TCO 对应的 token 数（tok/$）' },
   },
   'energy-per-token': {
     term: '每 token 能耗',
@@ -779,21 +785,49 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '张量并行会在每个 rank 上复制完整 KV cache，数据并行注意力则把会话绑定在持有其分片的 rank 上，两者在上下文达到几十万 token 时都难以扩展。上下文并行直接针对这一点，而且收益随输入长度增长，而不是随 batch 大小增长。',
     benchmarkContext:
-      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
+      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
   },
   'kv-cache-offload': {
-    term: 'KV cache offload',
-    aliases: ['KV cache offload', 'CPU offload', 'KV 卸载'],
+    term: 'KV cache offloading',
+    aliases: ['KV cache offload', 'KV offloading', 'KV 卸载', 'KV cache 分层'],
     plainEnglish:
       '把芯片放不下的注意力状态暂存到主机内存，长会话下一轮就能直接恢复，而不必整段重算。',
     definition:
-      'KV cache offload 把 KV block 从加速器显存移到更慢的存储层（通常是主机 DRAM），并在后续请求复用该前缀时再读回来。',
+      'KV cache offloading 把 KV block 从加速器显存移到更慢的存储层，先是主机 DRAM，其下还有 NVMe，并在后续请求复用该前缀时再读回来。',
     explanation:
       'offload 通常实现为写穿缓存：写入 HBM 缓存的前缀会同时写入较慢的一层，因此当 offload 池容量大致是 HBM 的 1.5 到 3 倍时效果最好。在 agentic 的上下文长度下，重新载入长前缀远比重算划算；但对短提示词结论相反，传输开销会超过它省下的 prefill。',
     significance:
       '长 agentic 会话超出 HBM 中 KV 容量的时间，远早于超出合理的 DRAM 预算，因此 offload 决定了有多少并发对话仍可恢复。它也会转移瓶颈：前缀能够留存之后，store 与 load 路径、传输批量化和索引记账才是值得优化的开销。',
     benchmarkContext:
       'InferenceX 会给每个使用了 offload 的数据点加上虚线光环，无论它是否位于 Pareto 前沿；点详情视图还会给出 offload 类型、引擎，以及芯片与 CPU 两侧的缓存命中率。offload 属于允许但可选的优化，因此同一条曲线上可以同时存在启用和未启用的数据点。',
+  },
+  'cpu-offloading': {
+    term: 'CPU offloading',
+    aliases: ['CPU offload', 'DRAM offloading', '主机内存卸载'],
+    plainEnglish:
+      'CPU offloading 把加速器装不下的 KV cache 溢出到主机 DRAM，让长对话可以从内存中恢复，而不必从头重算。',
+    definition:
+      'CPU offloading 把可复用的 KV cache block 保存在主机 CPU DRAM 而非加速器 HBM 中，当后续请求复用该前缀时再经主机链路读回。',
+    explanation:
+      '在推理服务语境下，这个词几乎总是指把 KV cache offload 到 DRAM，与训练侧把权重或优化器状态放到 CPU 的做法不同。引擎通过 connector 访问 DRAM，例如 vLLM 的 CPU offloading connector、LMCache、SGLang HiCache、Mooncake Store 和 Dynamo KVBM。该池通常是写穿实现，因此当用于 offload 的主机 DRAM 约为 HBM KV 容量的 1.5 到 3 倍时收益最大；其余取决于传输效率：在 hipMemcpyBatchAsync 于 ROCm 7.14 落地之前，AMD vLLM 无法批量执行 GPU 到 CPU 的拷贝，其 CPU offload 路径远不如 NVIDIA 上的同类功能好用。',
+    significance:
+      '当并发会话的 KV 工作集总量超过 HBM 时，DRAM offloading 决定了有多少智能体会话仍可恢复。它并非免费容量：在高并发下过度依赖 DRAM 层会增加重载流量，可能把交互性拖到可接受水平之下，所以真正值得回答的问题是这一层什么时候有用，而不是它是否存在。',
+    benchmarkContext:
+      'AgentX 把 CPU KV offloading 视为允许但可选的优化。用于 offload 的 DRAM 必须随所用 GPU 的比例同步扩缩，非标准化 DRAM 配置的系统另有 3 TB 上限。使用了 offload 的数据点会被虚线光环标记，点详情视图会给出 offload 后端以及 HBM 与 CPU 两侧的缓存命中率。',
+  },
+  'nvme-offloading': {
+    term: 'NVMe offloading',
+    aliases: ['NVMe offload', 'SSD offloading', '闪存 KV cache 卸载'],
+    plainEnglish:
+      'NVMe offloading 把 KV cache 再向下延伸一层到本地 SSD，让 GPU 和 CPU 内存都装不下的前缀日后仍能重新载入。',
+    definition:
+      'NVMe offloading 把可复用的 KV cache block 保存在 HBM 与主机 DRAM 之下的 NVMe SSD 层，用更慢的重载速度换取大得多的可取回 KV 工作集。',
+    explanation:
+      '存储层级每往下一层，容量成倍增长而带宽成倍下降，因此只有当重新载入长前缀仍然比重算划算时，SSD 层才有收益。LMCache、Mooncake Store 等 KV cache 管理器已经在 DRAM 和远端存储之外支持本地 NVMe 后端。这一层在两种情况下帮助最大：复用工作集超出任何合理的 DRAM 预算，或会话空闲太久、DRAM 淘汰已经把它丢弃之后才回来。',
+    significance:
+      'NVMe offloading 实际上延长了长生命周期智能体会话的缓存存活时间，当 agent 需要等待工具、人类或 CI 数分钟时这一点尤为重要。它高度依赖工作负载：如果高并发部署下 DRAM offloading 已经在拖累延迟，更慢的一层也救不回来，因为瓶颈在重载带宽而不是容量。',
+    benchmarkContext:
+      'AgentX v1 测量 HBM 和 DRAM 两层，暂缓 NVMe offloading；SSD/NVMe KV offloading 已列为快速跟进项，用来把工作集扩展到 DRAM 之外。届时回放流当前 5 分钟的空闲上限也可能随之提高，使更长的缓存存活时间变得可测量。',
   },
   'kv-cache-manager': {
     term: 'KV cache 管理器',
@@ -847,7 +881,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值规格无法描述服务性能，同一颗芯片在不同配置下可以相差数倍。把整套组合写清楚，结论才可核查：脱离配置的单个数字既无法复现，也无法与其他厂商公平比较。',
     benchmarkContext:
-      'InferenceX 的测试配置主要跟随 vLLM 与 SGLang 官方 cookbook，并使用上游镜像，因此结果反映用户实际能部署的性能，而不是为基准测试特调过的镜像。数据点 tooltip 会展示背后的配置，并给出运行溯源链接。',
+      'InferenceX 的测试配置主要跟随 vLLM 与 SGLang 官方 cookbook，并使用上游镜像，因此结果反映用户实际能部署的性能，而不是为基准测试特调过的镜像。数据点的提示框会展示背后的配置，并给出运行溯源链接。',
   },
   'tail-latency': {
     term: '尾部延迟',
@@ -991,7 +1025,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '对最大的那批模型来说，这首先是容量手段，其次才是提速手段。有些前沿模型根本装不进单个节点，流水线并行才让它们可服务；当某项竞争性优化拒绝与任何方案组合时，它甚至是唯一选项。',
     benchmarkContext:
-      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示流水线并行度，且仅在大于 1 时显示。可组合性与并行度同样重要：一种会导致投机解码无法启用的阶段切分，代价可能超过它节省的显存。',
+      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示流水线并行度，且仅在大于 1 时显示。可组合性与并行度同样重要：一种会导致投机解码无法启用的阶段切分，代价可能超过它节省的显存。',
   },
   'dp-attention': {
     term: '数据并行注意力',
@@ -1005,7 +1039,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '由于每个 rank 只拥有缓存池的私有一份，请求落在哪里就成了影响性能的关键：长会话一旦被路由到不持有其前缀的 rank，就要全部重算。此时实测命中率会远低于理论上限，而原因与缓存大小毫无关系。',
     benchmarkContext:
-      'InferenceX 会在数据点 tooltip 的并行策略部分展示 DP attention。它是否有利取决于模型；当缓存局部性变成路由约束时，不启用它的配置有时反而占据前沿曲线。',
+      'InferenceX 会在数据点提示框的并行策略部分展示 DP attention。它是否有利取决于模型；当缓存局部性变成路由约束时，不启用它的配置有时反而占据前沿曲线。',
   },
   int4: {
     term: 'INT4',
@@ -1280,9 +1314,23 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     benchmarkContext:
       'InferenceX 吞吐量对交互性曲线的最右端，即批次最大、单用户速度最低处，近似离线运行。在一条曲线的两端各读一次，就能看到该配置从在线到离线的完整成本区间。',
   },
+  'long-context': {
+    term: '长上下文',
+    aliases: ['long context', '长上下文推理', '长上下文服务'],
+    plainEnglish:
+      '长上下文指模型一次要处理非常大量的对话、代码或文档，此时压力主要落在内存上，而不是原始算力上。',
+    definition:
+      '长上下文指提示词和累积的对话历史达到数万甚至数十万 token 的推理场景，此时 KV cache 容量、内存带宽和缓存复用主导服务行为。',
+    explanation:
+      'KV cache 随上下文中的每个 token 增长，prefill 开销增长得更快，因此长上下文流量会在算力耗尽之前先耗尽 HBM。编码智能体是最典型的来源：每一轮都把文件、工具输出和历史回答追加到可能持续数小时的会话中。模型架构用滑动窗口、潜在注意力、线性注意力和稀疏注意力应对，服务栈则用前缀缓存、向 DRAM 和 NVMe 的 KV cache offloading 以及上下文并行应对。',
+    significance:
+      '在短固定序列上测出的硬件与引擎排名无法直接迁移到长上下文流量，因为约束条件从算术吞吐量转移到了 KV 容量和数据搬运。并发上限表现为容量悬崖，而应对这些悬崖的系统能力，决定了智能体、检索流水线和文档分析是否具备可服务的经济性。',
+    benchmarkContext:
+      'InferenceX 从两个方向覆盖长上下文：固定序列场景钉住输入输出长度，例如 8K 输入 1K 输出；AgentX 则回放上下文逐轮增长、逼近真实 agent 工作集的多轮编码会话，并让并发扫描跨越 HBM 容量悬崖。',
+  },
   'context-window': {
     term: '上下文窗口',
-    aliases: ['context window', '上下文长度', '长上下文'],
+    aliases: ['context window', '上下文长度', '最大序列长度'],
     plainEnglish: '上下文窗口是模型一次能处理的最大 token 数，涵盖输入和到目前为止生成的全部内容。',
     definition:
       '上下文窗口是模型支持的最大序列长度，约束提示词、对话历史、检索材料与生成输出的 token 总数。',

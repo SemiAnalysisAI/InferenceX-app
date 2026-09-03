@@ -11,6 +11,9 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+const localeState = vi.hoisted(() => ({ pathname: '/' }));
+vi.mock('next/navigation', () => ({ usePathname: () => localeState.pathname }));
+
 import { ShareButton } from '@/components/ui/share-button';
 
 let container: HTMLDivElement;
@@ -21,6 +24,7 @@ function renderUi(ui: React.ReactNode) {
 }
 
 beforeEach(() => {
+  localeState.pathname = '/';
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -32,6 +36,24 @@ afterEach(() => {
 });
 
 describe('ShareButton', () => {
+  it('renders Chinese trigger, dialog chrome, and accessible input name on a Chinese route', () => {
+    localeState.pathname = '/zh/inference';
+    renderUi(<ShareButton />);
+
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="share-button"]');
+    expect(trigger?.textContent).toContain('分享');
+    expect(trigger?.title).toBe('分享当前视图');
+    act(() => trigger?.click());
+
+    expect(document.querySelector('[data-testid="share-popover"]')?.textContent).toContain(
+      '复制链接',
+    );
+    expect(
+      document.querySelector('[data-testid="share-url-input"]')?.getAttribute('aria-label'),
+    ).toBe('当前视图的分享链接');
+    expect(document.body.textContent).not.toContain('Share this view');
+  });
+
   it('renders a closed popover trigger by default', () => {
     renderUi(<ShareButton />);
 

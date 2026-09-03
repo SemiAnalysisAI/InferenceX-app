@@ -1,10 +1,11 @@
 'use client';
 
 import * as d3 from 'd3';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   D3Chart,
@@ -30,6 +31,27 @@ const TOTAL_COLOR = '#6b7280';
 const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date('2025-12-16').getTime();
+const NARROW_VIEWPORT_QUERY = '(max-width: 39.999rem)';
+const NOOP = () => {};
+
+function subscribeToNarrowViewport(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return NOOP;
+  const mediaQuery = window.matchMedia(NARROW_VIEWPORT_QUERY);
+  mediaQuery.addEventListener('change', onStoreChange);
+  return () => mediaQuery.removeEventListener('change', onStoreChange);
+}
+
+function getNarrowViewportSnapshot(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(NARROW_VIEWPORT_QUERY).matches
+  );
+}
+
+function useNarrowViewport(): boolean {
+  return useSyncExternalStore(subscribeToNarrowViewport, getNarrowViewportSnapshot, () => false);
+}
 
 interface ChartPoint {
   date: number;
@@ -47,40 +69,72 @@ function lineColor(key: string): string {
 const LINE_KEYS = ['nvidia', 'amd', 'total'] as const;
 type LineKey = (typeof LINE_KEYS)[number];
 
-const LINE_META: Record<LineKey, { label: string; color: string }> = {
-  nvidia: { label: 'NVIDIA', color: NVIDIA_COLOR },
-  amd: { label: 'AMD', color: AMD_COLOR },
-  total: { label: 'Total', color: TOTAL_COLOR },
-};
-
-function generateTooltipContent(d: ChartPoint, isPinned: boolean): string {
-  const dateStr = new Date(d.date).toLocaleDateString('en-US', {
+const SUBMISSION_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  });
+    timeZone: 'UTC',
+  }),
+  zh: new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }),
+};
+
+export function formatSubmissionDate(date: number | Date, locale: Locale): string {
+  return SUBMISSION_DATE_FORMATTERS[locale].format(new Date(date));
+}
+
+function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale): string {
+  const t = SUBMISSIONS_STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
+  const dateStr = formatSubmissionDate(d.date, locale);
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${dateStr}</div>
       <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${NVIDIA_COLOR};"></span>
-        <span>NVIDIA:</span> <strong>${d.nvidia.toLocaleString()}</strong>
+        <span>NVIDIA:</span> <strong>${d.nvidia.toLocaleString(numberLocale)}</strong>
       </div>
       <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${AMD_COLOR};"></span>
-        <span>AMD:</span> <strong>${d.amd.toLocaleString()}</strong>
+        <span>AMD:</span> <strong>${d.amd.toLocaleString(numberLocale)}</strong>
       </div>
       <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${TOTAL_COLOR};"></span>
-        <span>Total:</span> <strong>${d.total.toLocaleString()}</strong>
+        <span>${t.total}:</span> <strong>${d.total.toLocaleString(numberLocale)}</strong>
       </div>
     </div>`;
 }
 
 const SUBMISSIONS_STRINGS = {
-  en: { onChangeOnly: 'On-change only' },
-  zh: { onChangeOnly: '仅变更' },
+  en: {
+    onChangeOnly: 'On-change only',
+    total: 'Total',
+    dismiss: 'Click elsewhere to dismiss',
+    markerLine1: 'Switched to',
+    markerLine2: 'on-change runs',
+    noData: 'No submission data to display.',
+    instructions:
+      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    aria: 'Benchmark submission activity chart',
+    yAxis: 'Datapoints',
+  },
+  zh: {
+    onChangeOnly: '仅显示变更触发的运行',
+    total: '合计',
+    dismiss: '点击其他区域关闭',
+    markerLine1: '自此改为',
+    markerLine2: '仅在变更时运行',
+    noData: '暂无可显示的提交数据。',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    aria: '基准测试提交活动图表',
+    yAxis: '数据点数量',
+  },
 } as const;
 
 export default function SubmissionsChart({ volume, mode, caption }: SubmissionsChartProps) {
@@ -88,6 +142,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
   const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
   const [onChangeOnly, setOnChangeOnly] = useState(true);
   const locale = useLocale();
+  const isNarrowViewport = useNarrowViewport();
   const legendT = SUBMISSIONS_STRINGS[locale];
 
   const toggleLine = useCallback((name: string) => {
@@ -107,12 +162,12 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
     () =>
       LINE_KEYS.map((key) => ({
         name: key,
-        label: LINE_META[key].label,
-        color: LINE_META[key].color,
+        label: key === 'total' ? legendT.total : key === 'nvidia' ? 'NVIDIA' : 'AMD',
+        color: lineColor(key),
         isActive: enabledLines.has(key),
         onClick: toggleLine,
       })),
-    [enabledLines, toggleLine],
+    [enabledLines, legendT.total, toggleLine],
   );
 
   const filteredVolume = useMemo(() => {
@@ -196,8 +251,8 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
             .attr('fill', 'var(--foreground)')
             .attr('font-size', '11px')
             .attr('font-weight', '500');
-          text.append('tspan').attr('x', 0).attr('dy', '0.8em').text('Switched to');
-          text.append('tspan').attr('x', 0).attr('dy', '1.3em').text('on-change runs');
+          text.append('tspan').attr('x', 0).attr('dy', '0.8em').text(legendT.markerLine1);
+          text.append('tspan').attr('x', 0).attr('dy', '1.3em').text(legendT.markerLine2);
           text
             .append('tspan')
             .attr('x', 0)
@@ -205,7 +260,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
             .attr('font-size', '9px')
             .attr('font-weight', '400')
             .attr('fill', 'var(--muted-foreground)')
-            .text('Dec 16, 2025');
+            .text(formatSubmissionDate(NIGHTLY_END_DATE, locale));
           const bbox = (text.node() as SVGTextElement).getBBox();
           label
             .insert('rect', 'text')
@@ -238,19 +293,19 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         },
       },
     ],
-    [lineData],
+    [legendT.markerLine1, legendT.markerLine2, lineData, locale],
   );
 
   if (chartPoints.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[600px]">
-        <p className="text-muted-foreground text-sm">No submission data to display.</p>
+        <p className="text-muted-foreground text-sm">{legendT.noData}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative">
+    <div className="relative" role="group" aria-label={legendT.aria}>
       <D3Chart<ChartPoint>
         chartId={CHART_ID}
         data={chartPoints}
@@ -259,11 +314,15 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         watermark="logo"
         testId="submissions-chart-svg"
         grabCursor
-        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+        instructions={legendT.instructions}
         xScale={{ type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])], nice: false }}
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
-        xAxis={{ tickCount: 6 }}
+        xAxis={{
+          tickCount: isNarrowViewport ? 3 : 6,
+          tickFormat: (value) => formatSubmissionDate(Number(value), locale),
+        }}
         yAxis={{
+          label: locale === 'zh' ? legendT.yAxis : undefined,
           tickCount: 5,
           tickFormat: (d) => {
             const n = d as number;
@@ -279,7 +338,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         }}
         tooltip={{
           rulerType: 'vertical',
-          content: generateTooltipContent,
+          content: (point, isPinned) => generateTooltipContent(point, isPinned, locale),
           getRulerX: (d, xScale) => (xScale as unknown as d3.ScaleTime<number, number>)(d.date),
           getRulerY: (d, yScale) => yScale(d.total),
           proximityHover: true,

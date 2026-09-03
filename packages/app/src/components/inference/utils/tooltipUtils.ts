@@ -2,10 +2,12 @@ import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
 import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -97,10 +99,10 @@ export const getPointLabel = (d: InferenceData): string => {
   });
 };
 
-const runLinkHTML = (runUrl?: string) =>
+const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
   runUrl
     ? `<div style="font-size: 11px; margin-top: 4px;">
-        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">GitHub Actions Run</a>
+        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
       </div>`
     : '';
 
@@ -111,6 +113,13 @@ const tooltipLine = (label: string, value: string | number) =>
 
 const formatPct = (v: number | undefined): string | null =>
   v === undefined || v === null || Number.isNaN(v) ? null : `${(v * 100).toFixed(1)}%`;
+
+const formatTooltipDate = (value: string, locale: Locale): string => {
+  if (locale !== 'zh') return value;
+  const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/u.exec(value);
+  if (!match?.groups) return value;
+  return `${Number(match.groups.year)}年${Number(match.groups.month)}月${Number(match.groups.day)}日`;
+};
 
 /** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
  *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
@@ -135,6 +144,9 @@ const TOOLTIP_STRINGS = {
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
+    powerData: 'Power Measurement',
+    powerCertified: 'Validated (current PowerX method)',
+    powerLegacy: 'Historical (not validated under the current method)',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -149,8 +161,22 @@ const TOOLTIP_STRINGS = {
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
+    powerData: '功耗测量',
+    powerCertified: '已验证（采用当前 PowerX 方法）',
+    powerLegacy: '历史测量（尚未按当前方法验证）',
   },
 } as const;
+
+/**
+ * Measured-power certification tier line. Rendered only while a Measured
+ * Energy y-axis is selected and the point carries a tier — non-measured axes
+ * and telemetry-free points stay unchanged.
+ */
+const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
+  if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
+  const t = TOOLTIP_STRINGS[locale];
+  return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
+};
 
 const CACHE_STRINGS = {
   en: {
@@ -160,6 +186,7 @@ const CACHE_STRINGS = {
     router: 'Router',
     gpuHitRate: 'Chip Cache Hit Rate',
     cpuHitRate: 'CPU Cache Hit Rate',
+    combinedHitRate: 'Combined Chip + CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
@@ -171,6 +198,7 @@ const CACHE_STRINGS = {
     router: '路由器',
     gpuHitRate: '芯片 Cache 命中率',
     cpuHitRate: 'CPU Cache 命中率',
+    combinedHitRate: '芯片 + CPU 综合 Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
@@ -209,8 +237,10 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
   const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
   const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
-  if (gpuHit) parts.push(tooltipLine(t.gpuHitRate, gpuHit));
-  if (cpuHit && isKvOffloadEnabled(d)) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
+  const offloadEnabled = isKvOffloadEnabled(d);
+  const combinedHit = offloadEnabled && frameworkFamily(d.framework) === 'trt';
+  if (gpuHit) parts.push(tooltipLine(combinedHit ? t.combinedHitRate : t.gpuHitRate, gpuHit));
+  if (cpuHit && offloadEnabled && !combinedHit) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
   if (theoreticalHit) parts.push(tooltipLine(t.theoreticalHitRate, theoreticalHit));
   return parts.join('');
 };
@@ -220,8 +250,20 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
  * separately because fixed-sequence rows can carry it too.
  */
 const AGENTIC_STRINGS = {
-  en: { speculativeDecoding: 'Speculative Decoding', off: 'Off' },
-  zh: { speculativeDecoding: '投机解码', off: '关闭' },
+  en: {
+    speculativeDecoding: 'Speculative Decoding',
+    off: 'Off',
+    requests: 'Requests',
+    promptTokens: 'Prompt Tokens',
+    generatedTokens: 'Generated Tokens',
+  },
+  zh: {
+    speculativeDecoding: '投机解码',
+    off: '关闭',
+    requests: '请求',
+    promptTokens: '提示 token',
+    generatedTokens: '生成 token',
+  },
 } as const;
 
 const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
@@ -246,17 +288,17 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
         : '';
     parts.push(
       tooltipLine(
-        'Requests',
+        t.requests,
         `${d.num_requests_successful} / ${d.num_requests_total}${successPct}`,
       ),
     );
   }
 
   if (d.total_prompt_tokens !== undefined) {
-    parts.push(tooltipLine('Prompt Tokens', formatNumber(d.total_prompt_tokens)));
+    parts.push(tooltipLine(t.promptTokens, formatNumber(d.total_prompt_tokens)));
   }
   if (d.total_generation_tokens !== undefined) {
-    parts.push(tooltipLine('Generated Tokens', formatNumber(d.total_generation_tokens)));
+    parts.push(tooltipLine(t.generatedTokens, formatNumber(d.total_generation_tokens)));
   }
 
   // Histograms + time-series live on the dedicated detail page now; the
@@ -328,6 +370,9 @@ const PARALLELISM_STRINGS = {
     decodeContextParallelism: 'Decode Context Parallelism (DCP)',
     prefillContextParallelism: 'Prefill Context Parallelism (PCP)',
     dpAttention: 'DP Attention',
+    yes: 'True',
+    no: 'False',
+    workers: 'Workers',
   },
   zh: {
     strategy: '并行策略',
@@ -344,7 +389,10 @@ const PARALLELISM_STRINGS = {
     pipelineParallelism: '流水线并行 (PP)',
     decodeContextParallelism: '解码上下文并行 (DCP)',
     prefillContextParallelism: '预填充上下文并行 (PCP)',
-    dpAttention: 'DP Attention',
+    dpAttention: '数据并行注意力 (DPA)',
+    yes: '是',
+    no: '否',
+    workers: 'worker 数',
   },
 } as const;
 
@@ -394,10 +442,10 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     return `
       ${tooltipLine(t.deployment, deployment)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.prefill}${labelColon(t.prefill)}</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
+        <strong>${t.prefill}${labelColon(t.prefill)}</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? t.yes : t.no}, ${t.workers}: ${pw}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.decode}${labelColon(t.decode)}</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? 'True' : 'False'}, Workers: ${dw}
+        <strong>${t.decode}${labelColon(t.decode)}</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? t.yes : t.no}, ${t.workers}: ${dw}
       </div>`;
   }
 
@@ -408,7 +456,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}
     ${aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : ''}
     ${d.ep !== null && d.ep !== undefined ? tooltipLine(t.expertParallelism, d.ep) : ''}
-    ${tooltipLine(t.dpAttention, d.dp_attention ? 'True' : 'False')}`;
+    ${tooltipLine(t.dpAttention, d.dp_attention ? t.yes : t.no)}`;
 };
 
 /**
@@ -437,7 +485,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}
       </div>
-      ${tooltipLine(t.date, `${d.actualDate ?? d.date}`)}
+      ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${
         d?.image
           ? `
@@ -458,13 +506,14 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
           : ''
       }
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
-      ${runLinkHTML(runUrl)}
+      ${runLinkHTML(runUrl, locale)}
       ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
     </div>
   `;
@@ -478,7 +527,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
  * @returns HTML string for the tooltip content
  */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, overlayData } = config;
+  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
   const t = TOOLTIP_STRINGS[locale];
   const hwConfig = overlayData.hardwareConfig[d.hwKey];
@@ -495,9 +544,10 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         ${hwConfig ? getDisplayLabel(hwConfig) : d.hwKey}
       </div>
       ${tooltipLine(t.branch, `${branch}`)}
-      ${tooltipLine(t.date, `${d.actualDate ?? d.date}`)}
+      ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
@@ -533,7 +583,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      ${tooltipLine(t.date, `${d.date}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(d.actualDate)}</span>` : ''}`)}
+      ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}`)}
       ${
         d?.image
@@ -555,13 +605,14 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
           : ''
       }
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
-      ${runLinkHTML(runUrl)}
+      ${runLinkHTML(runUrl, locale)}
       ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, d.benchmark_type, locale)}
     </div>
   `;

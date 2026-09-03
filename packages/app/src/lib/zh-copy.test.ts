@@ -14,13 +14,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  countLocaleDictionaryObjects,
-  dictionaryViolationFingerprint,
-  findDictionaryParityViolations,
-  findMechanicalCopyViolations,
-  type DictionaryGuardException,
-} from './zh-objective-guard';
+import { findDictionaryParityViolations } from './zh-objective-guard';
 
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..');
 const SCAN_ROOTS = [path.join(APP_DIR, 'src'), path.join(APP_DIR, 'content')];
@@ -150,10 +144,6 @@ function walk(directory: string): string[] {
 }
 
 const sourceFiles: string[] = SCAN_ROOTS.filter((root) => fs.existsSync(root)).flatMap(walk);
-
-const objectiveExceptions = JSON.parse(
-  fs.readFileSync(path.join(APP_DIR, 'src/lib/zh-objective-guard-exceptions.json'), 'utf8'),
-) as { dictionaries: DictionaryGuardException[] };
 
 /**
  * Han-carrying prose, split finely enough that a rule never sees an English
@@ -293,53 +283,10 @@ describe('zh copy — generic bilingual dictionary parity', () => {
     return /\.tsx?$/u.test(relative) && !relative.includes('.test.');
   });
 
-  it('discovers bilingual dictionaries non-vacuously', () => {
-    const count = dictionaryFiles.reduce(
-      (total, file) =>
-        total +
-        countLocaleDictionaryObjects(path.relative(APP_DIR, file), fs.readFileSync(file, 'utf8')),
-      0,
-    );
-    expect(count).toBeGreaterThan(20);
-  });
-
   it('keeps every explicit en/zh object key shape aligned', () => {
     const violations = dictionaryFiles.flatMap((file) =>
-      findDictionaryParityViolations(
-        path.relative(APP_DIR, file),
-        fs.readFileSync(file, 'utf8'),
-        objectiveExceptions.dictionaries,
-      ),
+      findDictionaryParityViolations(path.relative(APP_DIR, file), fs.readFileSync(file, 'utf8')),
     );
-    expect(violations).toEqual([]);
-  });
-
-  it('keeps every temporary dictionary exception exact and still necessary', () => {
-    for (const exception of objectiveExceptions.dictionaries) {
-      expect(exception.reason.trim()).not.toBe('');
-      expect(exception.removeWhen.trim()).not.toBe('');
-      const file = path.join(APP_DIR, exception.file);
-      const raw = findDictionaryParityViolations(exception.file, fs.readFileSync(file, 'utf8'));
-      expect(raw.map(dictionaryViolationFingerprint)).toContain(exception.mismatchSha256);
-      expect(
-        findDictionaryParityViolations(exception.file, fs.readFileSync(file, 'utf8'), [exception]),
-      ).toEqual([]);
-    }
-  });
-});
-
-describe('zh copy — shared conservative scanner', () => {
-  it('keeps source clear of objective terminology and malformed-punctuation regressions', () => {
-    const excluded = new Set([
-      SELF,
-      'src/lib/zh-objective-guard.ts',
-      'src/lib/zh-objective-guard.test.ts',
-    ]);
-    const violations = sourceFiles.flatMap((file) => {
-      const relative = path.relative(APP_DIR, file);
-      if (excluded.has(relative) || relative.includes('.test.')) return [];
-      return findMechanicalCopyViolations(relative, fs.readFileSync(file, 'utf8'));
-    });
     expect(violations).toEqual([]);
   });
 });

@@ -45,14 +45,19 @@ describe('Compare canonical slug redirect', () => {
   });
 
   it('preserves query params across the bare-slug redirect', () => {
-    cy.visit('/compare/h100-vs-h200?i_seq=1k/1k');
-    // Assert pathname and search together so Cypress retries the pair atomically:
-    // on Firefox, reading them as two separate commands can catch a window where the
-    // redirect has landed but `search` momentarily reads empty mid-navigation.
-    cy.location().should((loc) => {
-      expect(loc.pathname).to.eq('/compare/deepseek-r1-h100-vs-h200');
-      expect(loc.search).to.contain('i_seq=1k%2F1k');
-    });
+    // Assert on the 308 itself, not the address bar after cy.visit: url-state.ts
+    // deliberately strips share-link params from the URL once the chart has
+    // snapshotted them, so the post-load address bar only kept the query by
+    // accident of hydration ordering (the Next router's hydration replaceState
+    // used to land after the strip and restore it).
+    cy.request({ url: '/compare/h100-vs-h200?i_seq=1k/1k', followRedirect: false }).then(
+      (response) => {
+        expect(response.status).to.eq(308);
+        const location = String(response.headers.location);
+        expect(location).to.contain('/compare/deepseek-r1-h100-vs-h200');
+        expect(location).to.contain('i_seq=1k%2F1k');
+      },
+    );
   });
 
   it('serves a non-deepseek canonical slug without redirecting', () => {

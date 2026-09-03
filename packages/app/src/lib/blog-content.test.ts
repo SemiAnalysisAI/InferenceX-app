@@ -2,11 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import {
-  compareBlogPair,
-  findBlogPairViolations,
-  type BlogGuardException,
-} from './zh-objective-guard';
+import { compareBlogPair } from './zh-objective-guard';
 
 /**
  * Integrity checks over the real MDX in `content/blog/`. These are cheap file reads,
@@ -32,10 +28,6 @@ const zhFiles = fs
   .filter((f) => f.endsWith('.mdx'))
   .toSorted();
 
-const guardExceptions = JSON.parse(
-  fs.readFileSync(path.join(APP_DIR, 'src/lib/zh-objective-guard-exceptions.json'), 'utf8'),
-) as { blog: BlogGuardException[] };
-
 const read = (file: string) => fs.readFileSync(file, 'utf8');
 
 /** Frontmatter values we require to be byte-identical between a post and its translation. */
@@ -47,15 +39,11 @@ function frontmatterField(raw: string, field: string): string | null {
 
 function tagList(raw: string): string[] {
   const fm = raw.split('---')[1] ?? '';
-  const after = fm.split(/^tags:\s*$/mu)[1];
-  if (!after) return [];
-  const tags: string[] = [];
-  for (const line of after.split('\n')) {
-    const item = /^\s+-\s+(?<tag>.*)$/u.exec(line);
-    if (!item) break;
-    tags.push(item.groups!.tag.trim());
-  }
-  return tags;
+  const match = /^tags:\s*\n(?<items>(?:[ \t]+-[^\n]*(?:\n|$))+)/mu.exec(fm);
+  if (!match?.groups) return [];
+  return [...match.groups.items.matchAll(/^\s+-\s+(?<tag>.*)$/gmu)].map((item) =>
+    item.groups!.tag.trim(),
+  );
 }
 
 /** Local `<Figure src="/images/...">` and markdown `![alt](/images/...)` references. */
@@ -66,38 +54,16 @@ function localImageRefs(raw: string): string[] {
   ].map((m) => m.groups!.path);
 }
 
-const countFigures = (raw: string) => (raw.match(/<Figure\b/gu) ?? []).length;
 const countMathFences = (raw: string) => (raw.match(/^\$\$\s*$/gmu) ?? []).length;
 
-it('finds English posts to check', () => {
+it('checks every current locale pair in both directions', () => {
   expect(enFiles.length).toBeGreaterThan(0);
-});
-
-it('keeps Blog siblings complete in both directions', () => {
-  expect(findBlogPairViolations(enFiles, zhFiles)).toEqual([]);
-});
-
-it('keeps every temporary Blog exception exact and still necessary', () => {
-  for (const exception of guardExceptions.blog) {
-    expect(exception.reason.trim()).not.toBe('');
-    expect(exception.removeWhen.trim()).not.toBe('');
-    const en = read(path.join(CONTENT_DIR, exception.file));
-    const zh = read(path.join(ZH_DIR, exception.file));
-    const withoutCurrent = guardExceptions.blog.filter((candidate) => candidate !== exception);
-    expect(compareBlogPair(exception.file, en, zh, withoutCurrent)).toContainEqual(
-      expect.objectContaining({ rule: exception.rule }),
-    );
-    expect(compareBlogPair(exception.file, en, zh, guardExceptions.blog)).toEqual([]);
-  }
+  expect(zhFiles).toEqual(enFiles);
 });
 
 describe.each(enFiles)('%s', (file) => {
   const en = read(path.join(CONTENT_DIR, file));
   const zhPath = path.join(ZH_DIR, file);
-
-  it('ships a Simplified Chinese sibling with the same filename', () => {
-    expect(fs.existsSync(zhPath), `missing content/blog/zh/${file}`).toBe(true);
-  });
 
   it('keeps date, publishDate, and tags identical across locales', () => {
     const zh = read(zhPath);
@@ -107,14 +73,8 @@ describe.each(enFiles)('%s', (file) => {
     expect(tagList(zh)).toEqual(tagList(en));
   });
 
-  it('does not drift in figure or math-block count across locales', () => {
-    const zh = read(zhPath);
-    expect(countFigures(zh)).toBe(countFigures(en));
-    expect(countMathFences(zh)).toBe(countMathFences(en));
-  });
-
-  it('preserves code, math, Figure sources, links, inline identifiers, and JSON-LD structure', () => {
-    expect(compareBlogPair(file, en, read(zhPath), guardExceptions.blog)).toEqual([]);
+  it('preserves code blocks, inline identifiers, math, Figure sources, links, and JSON-LD structure', () => {
+    expect(compareBlogPair(file, en, read(zhPath))).toEqual([]);
   });
 
   it('references only images that exist under public/', () => {

@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
 import path from 'node:path';
 
-import { Parser } from 'acorn';
-import jsx from 'acorn-jsx';
+import { createProcessor } from '@mdx-js/mdx';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import ts from 'typescript';
 
 export interface GuardViolation {
@@ -14,32 +14,58 @@ export interface GuardViolation {
   readonly missingFromZh?: readonly string[];
 }
 
-interface BlogGuardExceptionBase {
-  readonly file: string;
-  readonly en: string;
-  readonly zh: string;
-  readonly reason: string;
-  readonly removeWhen: string;
+/** Intentional one-sided pages, separated so a waiver cannot hide the opposite direction. */
+export interface RouteParityExceptions {
+  readonly englishOnly?: ReadonlySet<string>;
+  readonly chineseOnly?: ReadonlySet<string>;
 }
 
-export type BlogGuardException =
-  | (BlogGuardExceptionBase & { readonly rule: 'inline-code' })
-  | (BlogGuardExceptionBase & {
-      readonly rule: 'protected-token';
-      readonly pairSha256?: string;
-    });
-
-export interface DictionaryGuardException {
-  readonly file: string;
-  readonly mismatchSha256: string;
-  readonly reason: string;
-  readonly removeWhen: string;
+interface MdxPosition {
+  readonly start: { readonly offset?: number };
+  readonly end: { readonly offset?: number };
 }
 
-const HAN = /\p{Script=Han}/u;
-const STRING_LITERAL = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/gsu;
-const CHIP_UNIT = /(?:tok|tokens?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
-const MDX_EXPRESSION_PARSER = Parser.extend(jsx());
+interface MdxExpressionValue {
+  readonly type: string;
+  readonly value: string;
+}
+
+interface MdxAttribute {
+  readonly type: string;
+  readonly name?: string;
+  readonly value?: string | MdxExpressionValue | null;
+  readonly position?: MdxPosition;
+}
+
+interface MdxNode {
+  readonly type: string;
+  readonly name?: string | null;
+  readonly value?: string;
+  readonly url?: string;
+  readonly identifier?: string;
+  readonly attributes?: readonly MdxAttribute[];
+  readonly children?: readonly MdxNode[];
+  readonly position?: MdxPosition;
+}
+
+interface JsonLdValue {
+  readonly valid: boolean;
+  readonly value?: unknown;
+}
+
+interface BlogStructure {
+  readonly code: readonly string[];
+  readonly inlineCode: readonly string[];
+  readonly math: readonly string[];
+  readonly figureSources: readonly string[];
+  readonly links: readonly string[];
+  readonly jsonLd: readonly JsonLdValue[];
+}
+
+const MDX_PROCESSOR = createProcessor({
+  format: 'mdx',
+  remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
+});
 
 function normalizedFile(file: string): string {
   return file.split(path.sep).join('/');
@@ -61,27 +87,31 @@ function pageRoute(file: string): { locale: 'en' | 'zh'; route: string } | null 
 /** Compare real App Router page files after removing route groups. */
 export function findRoutePairViolations(
   pageFiles: readonly string[],
-  exemptRoutes: ReadonlySet<string> = new Set(),
+  exceptions: RouteParityExceptions = {},
 ): GuardViolation[] {
   const en = new Set<string>();
   const zh = new Set<string>();
   for (const file of pageFiles) {
     const page = pageRoute(file);
-    if (!page || exemptRoutes.has(page.route)) continue;
+    if (!page) continue;
     (page.locale === 'zh' ? zh : en).add(page.route);
   }
 
   return [
     ...[...en]
-      .filter((route) => !zh.has(route))
+      .filter((route) => !zh.has(route) && !exceptions.englishOnly?.has(route))
       .map((route) => ({
         rule: 'route-sibling',
         route,
         detail: 'missing Simplified Chinese page',
       })),
     ...[...zh]
-      .filter((route) => !en.has(route))
-      .map((route) => ({ rule: 'route-sibling', route, detail: 'orphan Simplified Chinese page' })),
+      .filter((route) => !en.has(route) && !exceptions.chineseOnly?.has(route))
+      .map((route) => ({
+        rule: 'route-sibling',
+        route,
+        detail: 'orphan Simplified Chinese page',
+      })),
   ].sort((a, b) => (a.route ?? '').localeCompare(b.route ?? ''));
 }
 
@@ -136,8 +166,8 @@ function structuralPaths(expression: ts.Expression, prefix = ''): Set<string> {
   } else if (ts.isArrayLiteralExpression(node)) {
     for (const element of node.elements) {
       if (ts.isSpreadElement(element)) continue;
-      for (const nested of structuralPaths(element, prefix ? `${prefix}[]` : '[]'))
-        paths.add(nested);
+      const next = prefix ? `${prefix}[]` : '[]';
+      for (const nested of structuralPaths(element, next)) paths.add(nested);
     }
   }
   return paths;
@@ -149,23 +179,8 @@ function parseSource(file: string, source: string): ts.SourceFile {
   return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
 }
 
-/** Find paired object-literal `en` / `zh` dictionaries and compare their explicit key shape. */
-export function dictionaryViolationFingerprint(violation: GuardViolation): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify({
-        missingFromEn: violation.missingFromEn ?? [],
-        missingFromZh: violation.missingFromZh ?? [],
-      }),
-    )
-    .digest('hex');
-}
-
-export function findDictionaryParityViolations(
-  file: string,
-  source: string,
-  exceptions: readonly DictionaryGuardException[] = [],
-): GuardViolation[] {
+/** Find direct object-literal `en` / `zh` siblings and compare their explicit key shape. */
+export function findDictionaryParityViolations(file: string, source: string): GuardViolation[] {
   const sourceFile = parseSource(file, source);
   const violations: GuardViolation[] = [];
   const visit = (node: ts.Node): void => {
@@ -203,37 +218,10 @@ export function findDictionaryParityViolations(
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  const remainingExceptions = [...exceptions];
-  return violations.filter((violation) => {
-    const index = remainingExceptions.findIndex(
-      (exception) =>
-        normalizedFile(file).endsWith(exception.file) &&
-        dictionaryViolationFingerprint(violation) === exception.mismatchSha256,
-    );
-    if (index === -1) return true;
-    remainingExceptions.splice(index, 1);
-    return false;
-  });
+  return violations;
 }
 
-/** Count object literals that contain at least one statically declared locale object. */
-export function countLocaleDictionaryObjects(file: string, source: string): number {
-  const sourceFile = parseSource(file, source);
-  let count = 0;
-  const visit = (node: ts.Node): void => {
-    if (ts.isObjectLiteralExpression(node)) {
-      const en = propertyInitializer(node, 'en');
-      const zh = propertyInitializer(node, 'zh');
-      if ((en && ts.isObjectLiteralExpression(en)) || (zh && ts.isObjectLiteralExpression(zh))) {
-        count += 1;
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return count;
-}
-
+/** Ordered raw initializers retain distinct dictionary identity and catch cross-dictionary swaps. */
 function englishSubtrees(file: string, source: string): string[] {
   const sourceFile = parseSource(file, source);
   const found: string[] = [];
@@ -244,12 +232,11 @@ function englishSubtrees(file: string, source: string): string[] {
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return found.sort();
+  return found;
 }
 
 function isEnglishSurfaceFile(file: string): boolean {
   const normalized = normalizedFile(file);
-  if (normalized.endsWith('src/lib/zh-objective-guard-exceptions.json')) return false;
   if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(normalized) || normalized.includes('/cypress/')) {
     return false;
   }
@@ -259,8 +246,8 @@ function isEnglishSurfaceFile(file: string): boolean {
 }
 
 /**
- * Explicit Chinese-only mode protects only provable English surfaces: complete English MDX files
- * and raw `en` property initializers. Locale-neutral plumbing is deliberately outside this check.
+ * Chinese-only mode protects complete English MDX files and ordered raw `en` initializers.
+ * Locale-neutral code and Chinese subtrees deliberately remain outside this comparison.
  */
 export function compareEnglishSurfaces(
   file: string,
@@ -281,352 +268,134 @@ export function compareEnglishSurfaces(
     : [{ rule: 'english-byte-preservation', file, detail: '`en` subtree bytes changed' }];
 }
 
-function multiset(values: readonly string[]): Map<string, number> {
-  const result = new Map<string, number>();
-  for (const value of values) result.set(value, (result.get(value) ?? 0) + 1);
-  return result;
+function nodeSource(node: { readonly position?: MdxPosition }, source: string): string {
+  const start = node.position?.start.offset;
+  const end = node.position?.end.offset;
+  return start === undefined || end === undefined ? '' : source.slice(start, end);
 }
 
-function multisetsEqual(left: readonly string[], right: readonly string[]): boolean {
-  const a = multiset(left);
-  const b = multiset(right);
-  return a.size === b.size && [...a].every(([key, count]) => b.get(key) === count);
+function staticStringExpression(expression: string): string | null {
+  const sourceFile = ts.createSourceFile(
+    'mdx-static-expression.tsx',
+    `const __value = (${expression});`,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const statement = sourceFile.statements[0];
+  if (!statement || !ts.isVariableStatement(statement)) return null;
+  const initializer = statement.declarationList.declarations[0]?.initializer;
+  if (!initializer) return null;
+  const value = unwrapExpression(initializer);
+  return ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value) ? value.text : null;
 }
 
-function multisetRemainder(left: readonly string[], right: readonly string[]): string[] {
-  const remaining = multiset(right);
-  return left.filter((value) => {
+function attributeValue(attribute: MdxAttribute): string | null {
+  if (typeof attribute.value === 'string') return attribute.value;
+  if (attribute.value && typeof attribute.value.value === 'string') {
+    return staticStringExpression(attribute.value.value);
+  }
+  return null;
+}
+
+function normalizeLocalizedLink(target: string): string {
+  if (target.startsWith('#')) return '#<localized-heading>';
+
+  const hashIndex = target.indexOf('#');
+  const destination = hashIndex === -1 ? target : target.slice(0, hashIndex);
+  const normalizedHash = hashIndex === -1 ? '' : '#<localized-heading>';
+  try {
+    const url = new URL(destination);
+    if (!['inferencex.com', 'inferencex.semianalysis.com'].includes(url.hostname)) return target;
+    url.pathname = url.pathname.replace(/^\/zh(?=\/|$)/u, '') || '/';
+    url.hash = normalizedHash;
+    return url.toString();
+  } catch {
+    return `${destination.replace(/^\/zh(?=\/|$)/u, '') || '/'}${normalizedHash}`;
+  }
+}
+
+function walkMdx(node: MdxNode, visit: (node: MdxNode) => void): void {
+  visit(node);
+  node.children?.forEach((child) => walkMdx(child, visit));
+}
+
+function linkDefinitions(root: MdxNode): Map<string, string> {
+  const definitions = new Map<string, string>();
+  walkMdx(root, (node) => {
+    if (node.type === 'definition' && node.identifier && node.url) {
+      definitions.set(node.identifier.toLowerCase(), node.url);
+    }
+  });
+  return definitions;
+}
+
+function jsonLdValue(node: MdxNode): JsonLdValue {
+  const expression = node.children?.find(
+    (child) => child.type === 'mdxFlowExpression' || child.type === 'mdxTextExpression',
+  );
+  const raw = expression?.value ? staticStringExpression(expression.value) : null;
+  if (raw === null) return { valid: false };
+  try {
+    return { valid: true, value: JSON.parse(raw) as unknown };
+  } catch {
+    return { valid: false };
+  }
+}
+
+function collectBlogStructure(source: string): BlogStructure {
+  const root = MDX_PROCESSOR.parse(source) as unknown as MdxNode;
+  const definitions = linkDefinitions(root);
+  const code: string[] = [];
+  const inlineCode: string[] = [];
+  const math: string[] = [];
+  const figureSources: string[] = [];
+  const links: string[] = [];
+  const jsonLd: JsonLdValue[] = [];
+
+  walkMdx(root, (node) => {
+    if (node.type === 'code') code.push(nodeSource(node, source));
+    if (node.type === 'inlineCode' && node.value !== undefined) inlineCode.push(node.value);
+    if (node.type === 'math' || node.type === 'inlineMath') math.push(nodeSource(node, source));
+    if ((node.type === 'link' || node.type === 'image') && node.url) links.push(node.url);
+    if ((node.type === 'linkReference' || node.type === 'imageReference') && node.identifier) {
+      const destination = definitions.get(node.identifier.toLowerCase());
+      if (destination) links.push(destination);
+    }
+    if (node.type !== 'mdxJsxFlowElement' && node.type !== 'mdxJsxTextElement') return;
+
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type !== 'mdxJsxAttribute' || !attribute.name) continue;
+      const value = attributeValue(attribute);
+      if (node.name === 'Figure' && attribute.name === 'src') {
+        figureSources.push(value ?? nodeSource(attribute, source));
+      }
+      if ((attribute.name === 'href' || attribute.name === 'src') && value !== null) {
+        links.push(value);
+      }
+    }
+    if (node.name === 'JsonLd') jsonLd.push(jsonLdValue(node));
+  });
+
+  return {
+    code,
+    inlineCode,
+    math,
+    figureSources,
+    links: links.map(normalizeLocalizedLink).sort(),
+    jsonLd,
+  };
+}
+
+function missingMultisetValues(required: readonly string[], actual: readonly string[]): string[] {
+  const remaining = new Map<string, number>();
+  actual.forEach((value) => remaining.set(value, (remaining.get(value) ?? 0) + 1));
+  return required.filter((value) => {
     const count = remaining.get(value) ?? 0;
     if (count === 0) return true;
     remaining.set(value, count - 1);
     return false;
   });
-}
-
-interface TextSpan {
-  readonly start: number;
-  readonly end: number;
-  readonly text: string;
-}
-
-function fencedCodeSpans(raw: string): TextSpan[] {
-  const lines = [...raw.matchAll(/[^\n]*(?:\n|$)/gu)].filter((match) => match[0] !== '');
-  const spans: TextSpan[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const openingText = line[0].replace(/\r?\n$/u, '');
-    const opening = /^ {0,3}(?<fence>`{3,}|~{3,})(?<info>.*)$/u.exec(openingText);
-    if (!opening?.groups) continue;
-    const fence = opening.groups.fence;
-    if (fence.startsWith('`') && opening.groups.info.includes('`')) continue;
-    const closing = new RegExp(
-      `^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*\\r?$`,
-      'u',
-    );
-    let endIndex = lines.length - 1;
-    for (let candidate = index + 1; candidate < lines.length; candidate += 1) {
-      if (closing.test(lines[candidate][0].replace(/\n$/u, ''))) {
-        endIndex = candidate;
-        break;
-      }
-    }
-    const start = line.index ?? 0;
-    const endingLine = lines[endIndex];
-    const end = (endingLine.index ?? 0) + endingLine[0].length;
-    spans.push({ start, end, text: raw.slice(start, end) });
-    index = endIndex;
-  }
-  return spans;
-}
-
-function fencedCode(raw: string): string[] {
-  return fencedCodeSpans(raw).map((span) => span.text);
-}
-
-function mathBlocks(raw: string): string[] {
-  return [...raw.matchAll(/^\$\$\s*$[\s\S]*?^\$\$\s*$/gmu)].map((match) => match[0]);
-}
-
-interface JsonLdBlock extends TextSpan {
-  readonly json: string;
-}
-
-function jsonLdBlocks(raw: string): JsonLdBlock[] {
-  return [...raw.matchAll(/<JsonLd\b[^>]*>\s*\{\s*`(?<json>[\s\S]*?)`\s*\}\s*<\/JsonLd\s*>/gu)].map(
-    (match) => ({
-      start: match.index,
-      end: match.index + match[0].length,
-      text: match[0],
-      json: match.groups?.json.trim() ?? '',
-    }),
-  );
-}
-
-function withoutProtectedBlocks(raw: string): string {
-  let cursor = 0;
-  const pieces: string[] = [];
-  const spans = [...fencedCodeSpans(raw), ...jsonLdBlocks(raw)].sort(
-    (left, right) => left.start - right.start,
-  );
-  for (const span of spans) {
-    if (span.end <= cursor) continue;
-    if (span.start < cursor) {
-      cursor = span.end;
-      continue;
-    }
-    pieces.push(raw.slice(cursor, span.start), '\n');
-    cursor = span.end;
-  }
-  pieces.push(raw.slice(cursor));
-  return pieces.join('');
-}
-
-function inlineCodeSpans(source: string): TextSpan[] {
-  const found: TextSpan[] = [];
-  for (let index = 0; index < source.length;) {
-    if (source[index] !== '`') {
-      index += 1;
-      continue;
-    }
-    let delimiterLength = 1;
-    while (source[index + delimiterLength] === '`') delimiterLength += 1;
-    const delimiter = '`'.repeat(delimiterLength);
-    let closing = source.indexOf(delimiter, index + delimiterLength);
-    while (
-      closing !== -1 &&
-      (source[closing - 1] === '`' || source[closing + delimiterLength] === '`')
-    ) {
-      closing = source.indexOf(delimiter, closing + delimiterLength);
-    }
-    if (closing === -1) {
-      index += delimiterLength;
-      continue;
-    }
-    found.push({
-      start: index,
-      end: closing + delimiterLength,
-      text: source.slice(index + delimiterLength, closing),
-    });
-    index = closing + delimiterLength;
-  }
-  return found;
-}
-
-function withoutSpans(source: string, spans: readonly TextSpan[]): string {
-  let cursor = 0;
-  const pieces: string[] = [];
-  for (const span of spans) {
-    pieces.push(source.slice(cursor, span.start), ' ');
-    cursor = span.end;
-  }
-  pieces.push(source.slice(cursor));
-  return pieces.join('');
-}
-
-function mdxExpressionClosingBrace(source: string, openingBrace: number): number | null {
-  const tokens = MDX_EXPRESSION_PARSER.tokenizer(source.slice(openingBrace + 1), {
-    ecmaVersion: 'latest',
-  });
-  let nestedBraceDepth = 0;
-  try {
-    for (;;) {
-      const token = tokens.getToken();
-      const label = token.type.label;
-      if (label === 'eof') return null;
-      if (label === '{' || label === '${') nestedBraceDepth += 1;
-      else if (label === '}') {
-        if (nestedBraceDepth === 0) return openingBrace + 1 + token.start;
-        nestedBraceDepth -= 1;
-      }
-    }
-  } catch {
-    return null;
-  }
-}
-
-function mdxTagSpans(source: string): TextSpan[] {
-  const spans: TextSpan[] = [];
-  for (let start = 0; start < source.length; start += 1) {
-    if (source[start] !== '<' || !/[!/A-Za-z]/u.test(source[start + 1] ?? '')) continue;
-    let quote = '';
-    let escaped = false;
-    for (let index = start + 1; index < source.length; index += 1) {
-      const character = source[index];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (character === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (quote) {
-        if (character === quote) quote = '';
-        continue;
-      }
-      if (character === '"' || character === "'" || character === '`') {
-        quote = character;
-        continue;
-      }
-      if (character === '{') {
-        const closingBrace = mdxExpressionClosingBrace(source, index);
-        if (closingBrace === null) break;
-        index = closingBrace;
-        continue;
-      }
-      if (character === '>') {
-        const end = index + 1;
-        spans.push({ start, end, text: source.slice(start, end) });
-        start = index;
-        break;
-      }
-    }
-  }
-  return spans;
-}
-
-function inlineCode(raw: string): string[] {
-  const source = withoutProtectedBlocks(raw);
-  return inlineCodeSpans(withoutSpans(source, mdxTagSpans(source))).map((span) => span.text);
-}
-
-function figureSources(raw: string): string[] {
-  return [
-    ...raw.matchAll(
-      /<Figure\b[\s\S]*?\bsrc=(?:"(?<double>[^"]+)"|'(?<single>[^']+)')[\s\S]*?\/?\s*>/gu,
-    ),
-  ].map((match) => match.groups?.double ?? match.groups?.single ?? '');
-}
-
-function normalizeLocalizedLink(target: string): string {
-  if (target.startsWith('#')) return '#<localized-heading>';
-  try {
-    const url = new URL(target);
-    if (['inferencex.com', 'inferencex.semianalysis.com'].includes(url.hostname)) {
-      url.pathname = url.pathname.replace(/^\/zh(?=\/|$)/u, '') || '/';
-      return url.toString();
-    }
-  } catch {
-    // Relative URL; normalize its locale prefix below.
-  }
-  return target.replace(/^\/zh(?=\/|$)/u, '') || '/';
-}
-
-function markdownDestination(source: string, start: number, allowEof = false): string | null {
-  let index = start;
-  while (/[ \t\n\r]/u.test(source[index] ?? '')) index += 1;
-  if (source[index] === '<') {
-    let target = '';
-    for (index += 1; index < source.length; index += 1) {
-      if (source[index] === '\\' && index + 1 < source.length) {
-        target += source[index + 1];
-        index += 1;
-      } else if (source[index] === '>') {
-        return target;
-      } else if (source[index] === '\n' || source[index] === '\r') {
-        return null;
-      } else {
-        target += source[index];
-      }
-    }
-    return null;
-  }
-
-  const targetStart = index;
-  let depth = 0;
-  for (; index < source.length; index += 1) {
-    const character = source[index];
-    if (character === '\\') {
-      index += 1;
-      continue;
-    }
-    if (character === '(') {
-      depth += 1;
-      continue;
-    }
-    if (character === ')') {
-      if (depth === 0) return source.slice(targetStart, index);
-      depth -= 1;
-      continue;
-    }
-    if (/\s/u.test(character) && depth === 0) return source.slice(targetStart, index);
-  }
-  return allowEof && depth === 0 ? source.slice(targetStart) : null;
-}
-
-function markdownLinkTargets(raw: string): string[] {
-  const targets: string[] = [];
-  for (let index = raw.indexOf(']('); index !== -1; index = raw.indexOf('](', index + 2)) {
-    const target = markdownDestination(raw, index + 2);
-    if (target !== null) targets.push(target);
-  }
-  for (const match of raw.matchAll(/^ {0,3}\[(?:\\.|[^\\\]\n])+\]:[ \t]*(?<destination>.*)$/gmu)) {
-    const destination = match.groups?.destination ?? '';
-    const target = markdownDestination(destination, 0, true);
-    if (target !== null) targets.push(target);
-  }
-  return targets;
-}
-
-function linkTargets(raw: string): string[] {
-  const markdown = markdownLinkTargets(raw);
-  const props = [
-    ...raw.matchAll(
-      /\b(?:href|src)\s*=\s*(?:"(?<double>[^"]+)"|'(?<single>[^']+)'|\{\s*"(?<expressionDouble>[^"]+)"\s*\}|\{\s*'(?<expressionSingle>[^']+)'\s*\}|\{\s*`(?<expressionTemplate>[^`]+)`\s*\})/gu,
-    ),
-  ].map(
-    (match) =>
-      match.groups?.double ??
-      match.groups?.single ??
-      match.groups?.expressionDouble ??
-      match.groups?.expressionSingle ??
-      match.groups?.expressionTemplate ??
-      '',
-  );
-  return [...markdown, ...props].map(normalizeLocalizedLink);
-}
-
-function jsonLdValues(raw: string): unknown[] {
-  const values: unknown[] = [];
-  for (const block of jsonLdBlocks(raw)) {
-    try {
-      values.push(JSON.parse(block.json));
-    } catch {
-      values.push({ __invalidJsonLd: block.json });
-    }
-  }
-  return values;
-}
-
-function invalidJsonLd(value: unknown): boolean {
-  return Boolean(value && typeof value === 'object' && '__invalidJsonLd' in value);
-}
-
-function normalizeProtectedToken(value: string): string {
-  return value
-    .replace(/^tokens?(?=\/s)/u, 'tok')
-    .replace(/^tokens?(?=\/sec)/u, 'tok')
-    .replace('/sec', '/s')
-    .replace(/GPU[/-](?:hr|hour)/u, 'gpu/hr')
-    .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
-    .replace('/GPU', '/gpu')
-    .replace(/M\s+tokens?$/u, 'M tok');
-}
-
-function protectedTokens(raw: string): string[] {
-  const withoutBlocks = withoutProtectedBlocks(raw);
-  const prose = withoutSpans(withoutBlocks, inlineCodeSpans(withoutBlocks));
-  const pattern =
-    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/(?:s|sec)(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b[KMGT]?bit\/s\b|\b(?:kW|MW)\/(?:gpu|GPU)\b|\b(?:GPU|chip)[/-](?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\d+(?:\.\d+)?\/M\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
-  const proseTokens = [...prose.matchAll(pattern)].map((match) =>
-    normalizeProtectedToken(match[0]),
-  );
-  const structuredGpuHours = jsonLdBlocks(raw).flatMap((block) =>
-    [...block.json.matchAll(/\b(?:GPU|chip)[/-](?:hr|hour)\b/gu)].map((match) =>
-      normalizeProtectedToken(match[0]),
-    ),
-  );
-  return [...proseTokens, ...structuredGpuHours];
 }
 
 function jsonShape(value: unknown): unknown {
@@ -647,7 +416,7 @@ function protectedJsonValues(value: unknown): string[] {
     if (Array.isArray(item)) {
       item.forEach((child, index) => visit(child, `${valuePath}[${index}]`));
     } else if (item && typeof item === 'object') {
-      Object.entries(item).forEach(([childKey, child]) => visit(child, `${valuePath}.${childKey}`));
+      Object.entries(item).forEach(([key, child]) => visit(child, `${valuePath}.${key}`));
     } else if (typeof item === 'number' || typeof item === 'boolean') {
       found.push(`${valuePath}:${JSON.stringify(item)}`);
     } else if (typeof item === 'string') {
@@ -675,79 +444,44 @@ function addDifference(
   }
 }
 
-function blogPairSha256(en: string, zh: string): string {
-  return createHash('sha256').update(JSON.stringify({ en, zh })).digest('hex');
-}
-
-function applyBlogExceptions(
-  rule: BlogGuardException['rule'],
-  file: string,
-  enValues: string[],
-  zhValues: string[],
-  exceptions: readonly BlogGuardException[],
-  pairSha256?: string,
-): void {
-  const protectedPairAuthorized =
-    rule !== 'protected-token' ||
-    exceptions.some(
-      (item) =>
-        item.file === file && item.rule === 'protected-token' && item.pairSha256 === pairSha256,
-    );
-  for (const exception of exceptions.filter(
-    (item) => item.file === file && item.rule === rule && protectedPairAuthorized,
-  )) {
-    const enIndex = exception.en === '' ? -1 : enValues.indexOf(exception.en);
-    const zhIndex = exception.zh === '' ? -1 : zhValues.indexOf(exception.zh);
-    const enMatched = exception.en === '' || enIndex !== -1;
-    const zhMatched = exception.zh === '' || zhIndex !== -1;
-    if (!enMatched || !zhMatched) continue;
-    if (enIndex !== -1) enValues.splice(enIndex, 1);
-    if (zhIndex !== -1) zhValues.splice(zhIndex, 1);
+/** Compare objective structural invariants in one English/Chinese MDX pair. */
+export function compareBlogPair(file: string, en: string, zh: string): GuardViolation[] {
+  let enStructure: BlogStructure;
+  let zhStructure: BlogStructure;
+  try {
+    enStructure = collectBlogStructure(en);
+  } catch (error) {
+    return [{ rule: 'mdx-syntax', file, detail: `English MDX: ${String(error)}` }];
   }
-}
+  try {
+    zhStructure = collectBlogStructure(zh);
+  } catch (error) {
+    return [{ rule: 'mdx-syntax', file, detail: `Chinese MDX: ${String(error)}` }];
+  }
 
-/** Compare objective, non-editorial invariants in one English/Chinese MDX pair. */
-export function compareBlogPair(
-  file: string,
-  en: string,
-  zh: string,
-  exceptions: readonly BlogGuardException[],
-): GuardViolation[] {
   const violations: GuardViolation[] = [];
-  addDifference(violations, 'fenced-code', file, fencedCode(en), fencedCode(zh));
-  addDifference(violations, 'math', file, mathBlocks(en), mathBlocks(zh));
-  addDifference(violations, 'figure-src', file, figureSources(en), figureSources(zh));
-
-  const enInline = inlineCode(en);
-  const zhInline = inlineCode(zh);
-  applyBlogExceptions('inline-code', file, enInline, zhInline, exceptions);
-  if (!multisetsEqual(enInline, zhInline)) violations.push({ rule: 'inline-code', file });
-  const enProtected = protectedTokens(en);
-  const zhProtected = protectedTokens(zh);
-  applyBlogExceptions(
-    'protected-token',
+  addDifference(violations, 'fenced-code', file, enStructure.code, zhStructure.code);
+  if (missingMultisetValues(enStructure.inlineCode, zhStructure.inlineCode).length > 0) {
+    violations.push({ rule: 'inline-code', file });
+  }
+  addDifference(violations, 'math', file, enStructure.math, zhStructure.math);
+  addDifference(
+    violations,
+    'figure-src',
     file,
-    enProtected,
-    zhProtected,
-    exceptions,
-    blogPairSha256(en, zh),
+    enStructure.figureSources,
+    zhStructure.figureSources,
   );
-  if (!multisetsEqual(enProtected, zhProtected)) {
-    violations.push({
-      rule: 'protected-token',
-      file,
-      detail: `missingFromZh=${JSON.stringify(multisetRemainder(enProtected, zhProtected))} missingFromEn=${JSON.stringify(multisetRemainder(zhProtected, enProtected))}`,
-    });
-  }
-  if (!multisetsEqual(linkTargets(en), linkTargets(zh))) {
-    violations.push({ rule: 'link-target', file });
-  }
+  addDifference(violations, 'link-target', file, enStructure.links, zhStructure.links);
 
-  const enJson = jsonLdValues(en);
-  const zhJson = jsonLdValues(zh);
-  if (enJson.some(invalidJsonLd) || zhJson.some(invalidJsonLd)) {
+  if (
+    enStructure.jsonLd.some((item) => !item.valid) ||
+    zhStructure.jsonLd.some((item) => !item.valid)
+  ) {
     violations.push({ rule: 'json-ld-syntax', file });
   }
+  const enJson = enStructure.jsonLd.filter((item) => item.valid).map((item) => item.value);
+  const zhJson = zhStructure.jsonLd.filter((item) => item.valid).map((item) => item.value);
   addDifference(violations, 'json-ld-shape', file, enJson.map(jsonShape), zhJson.map(jsonShape));
   addDifference(
     violations,
@@ -757,99 +491,4 @@ export function compareBlogPair(
     zhJson.flatMap(protectedJsonValues),
   );
   return violations;
-}
-
-/**
- * Markdown link destinations are verbatim URL slugs — often English words like
- * `.../inference-chip/` — not translatable copy, so drop them before scanning.
- */
-function withoutMarkdownLinkDestinations(source: string): string {
-  return source.replaceAll(/\]\([^()\s]*\)/gu, ']');
-}
-
-function mdxChineseSegments(source: string): string[] {
-  const scannable = withoutMarkdownLinkDestinations(source);
-  const literals = (scannable.match(STRING_LITERAL) ?? []).filter((text) => HAN.test(text));
-  // Strip MDX/HTML tags to a fixed point so nested or adjacent delimiters cannot
-  // leave a reassembled tag fragment behind after a single pass.
-  let stripped = scannable.replaceAll(STRING_LITERAL, 'X');
-  for (let previous = ''; previous !== stripped;) {
-    previous = stripped;
-    stripped = stripped.replaceAll(/<[^>]*>/gsu, '');
-  }
-  const visible = stripped.split('\n').filter((text) => HAN.test(text));
-  return [...literals, ...visible];
-}
-
-function chineseSegments(file: string, source: string): string[] {
-  if (!HAN.test(source)) return [];
-  if (file.endsWith('.mdx')) return mdxChineseSegments(source);
-
-  const sourceFile = parseSource(file, source);
-  const segments: string[] = [];
-  const visit = (node: ts.Node): void => {
-    if (
-      ts.isStringLiteral(node) ||
-      ts.isNoSubstitutionTemplateLiteral(node) ||
-      ts.isJsxText(node) ||
-      node.kind === ts.SyntaxKind.TemplateHead ||
-      node.kind === ts.SyntaxKind.TemplateMiddle ||
-      node.kind === ts.SyntaxKind.TemplateTail
-    ) {
-      const text = node.getText(sourceFile);
-      if (HAN.test(text)) segments.push(text);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return segments.length > 0 ? segments : [source];
-}
-
-/** High-confidence copy checks only; no fluency, clause-order, register, or pronoun heuristics. */
-export function findMechanicalCopyViolations(file: string, source: string): GuardViolation[] {
-  const violations: GuardViolation[] = [];
-  const scanSource = file.endsWith('.mdx') ? withoutProtectedBlocks(source) : source;
-  for (const text of chineseSegments(file, scanSource)) {
-    const withoutUnits = text.replaceAll(CHIP_UNIT, '');
-    if (/\b[Cc]hip\b/gu.test(withoutUnits)) {
-      violations.push({ rule: 'chip-untranslated', file });
-    }
-    if (
-      /\b(?:warmup(?:\s+预热|\s*[（(]\s*预热\s*[）)])|seed(?:\s+随机种子|\s*[（(]\s*随机种子\s*[）)])|offload(?:\s+卸载|\s*[（(]\s*卸载\s*[）)]))/iu.test(
-        text,
-      )
-    ) {
-      violations.push({ rule: 'duplicated-technical-loanword', file });
-    }
-    if (/\s+[，。！？；：]|(?:,，|，,|\.。|。\.)/u.test(text)) {
-      violations.push({
-        rule: 'malformed-chinese-punctuation',
-        file,
-        detail: text.replaceAll(/\s+/gu, ' ').trim().slice(0, 160),
-      });
-    }
-  }
-  if (countLocaleDictionaryObjects(file, source) > 0) {
-    const labels = [...source.matchAll(/<strong>(?<label>[A-Za-z][^<${}]{2,45}):<\/strong>/gu)]
-      .map((match) => match.groups?.label ?? '')
-      .filter((label) => !label.includes('/') && !/^[A-Z0-9]+$/u.test(label));
-    if (labels.length > 0) violations.push({ rule: 'hardcoded-english-label', file });
-  }
-  return violations;
-}
-
-export function findBlogPairViolations(
-  englishFiles: readonly string[],
-  chineseFiles: readonly string[],
-): GuardViolation[] {
-  const en = new Set(englishFiles);
-  const zh = new Set(chineseFiles);
-  return [
-    ...[...en]
-      .filter((file) => !zh.has(file))
-      .map((file) => ({ rule: 'blog-sibling', file, detail: 'missing Simplified Chinese post' })),
-    ...[...zh]
-      .filter((file) => !en.has(file))
-      .map((file) => ({ rule: 'blog-sibling', file, detail: 'orphan Simplified Chinese post' })),
-  ].sort((a, b) => (a.file ?? '').localeCompare(b.file ?? ''));
 }
