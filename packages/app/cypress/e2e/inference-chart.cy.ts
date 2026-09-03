@@ -60,8 +60,10 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', 'Agentic Total Tokens per $1 TCO')
-      .and('contain.text', 'vs. P90 Interactivity')
+      // The metric runs straight into the x-axis phrase: no "(Owning - …)" tier
+      // between them. The scenario word varies with the default sequence.
+      .should('contain.text', 'Total Tokens per $1 TCO vs.')
+      .and('contain.text', 'Interactivity')
       .and('not.contain.text', '(Owning');
     // The heading names the model, so the caption no longer repeats it.
     cy.get('[data-testid="chart-figure"]')
