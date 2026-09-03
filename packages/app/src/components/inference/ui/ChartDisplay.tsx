@@ -956,7 +956,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {/* Model + workload lead the heading; the cost tier that used
                                   to trail the metric title lives in the caption's Cost Tier
                                   line instead, so the title reads as one measurement. */}
-                              <ModelLogo model={graph.model as Model} className="mr-1.5" />
+                              <ModelLogo
+                                model={graph.model as Model}
+                                className="mr-2 size-6 align-[-0.3em]"
+                              />
                               {getModelLabel(graph.model as Model)}{' '}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
