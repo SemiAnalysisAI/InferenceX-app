@@ -206,3 +206,40 @@ describe('token revenue', () => {
     expect(tokenRevenuePerGpuHour(unknownMix, openRouterPricing)).toBeNull();
   });
 });
+
+describe('GB300 cache hit-rate fallback', () => {
+  // A GB300 AgentX point shaped like production run 32146276534: ~97% of the
+  // 130k tok/s/GPU is cached input, but the server hit rate never got scraped.
+  const unmeasuredGb300 = point({
+    hw: 'gb300',
+    hwKey: 'gb300_dynamo-vllm',
+    tput_per_gpu: 130_000,
+    input_tput_per_gpu: 129_000,
+    output_tput_per_gpu: 1_000,
+    theoretical_cache_hit_rate: 0.97,
+  });
+
+  it('prices GB300 cached input from the theoretical ceiling when no server rate exists', () => {
+    const revenue = tokenRevenuePerGpuHour(unmeasuredGb300, NORMALIZED_TOKEN_REVENUE_PRICING)!;
+    const inputShare = 129_000 / 130_000;
+    const blended = inputShare * (0.03 * 1 + 0.97 * 0.1) + (1 - inputShare) * 1;
+    expect(revenue).toBeCloseTo((130_000 * 3_600 * blended) / 1_000_000, 6);
+    expect(revenue).toBeLessThan(80);
+  });
+
+  it('still bills other hardware at the uncached price when no server rate exists', () => {
+    const gb200 = point({ ...unmeasuredGb300, hw: 'gb200', hwKey: 'gb200_dynamo-vllm' });
+    expect(tokenRevenuePerGpuHour(gb200, NORMALIZED_TOKEN_REVENUE_PRICING)).toBeCloseTo(
+      (130_000 * 3_600) / 1_000_000,
+      6,
+    );
+  });
+
+  it('lets a measured GB300 rate win over the theoretical ceiling', () => {
+    const measured = point({ ...unmeasuredGb300, server_gpu_cache_hit_rate: 0.5 });
+    const fallback = tokenRevenuePerGpuHour(unmeasuredGb300, NORMALIZED_TOKEN_REVENUE_PRICING)!;
+    expect(tokenRevenuePerGpuHour(measured, NORMALIZED_TOKEN_REVENUE_PRICING)).toBeGreaterThan(
+      fallback,
+    );
+  });
+});
