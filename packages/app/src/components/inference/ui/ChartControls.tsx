@@ -37,6 +37,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  metricOptionTitle,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import {
@@ -134,12 +135,20 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
+// Option labels carry the cost tier ("… (Owning - Hyperscaler)") so the three
+// pricing variants read apart in the selector; the chart heading drops it.
 const METRIC_TITLE_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.title]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'en'),
+  ]),
 );
 
 const METRIC_TITLE_ZH_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.titleZh]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'zh'),
+  ]),
 );
 
 interface ChartControlsProps {
