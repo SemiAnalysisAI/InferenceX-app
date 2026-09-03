@@ -53,7 +53,7 @@ interface ComparePairCardLinkProps {
   slug: string;
   label: string;
   archLine: string;
-  scenarioLabel?: 'AgentX' | '8K→1K';
+  scenarioLabel?: 'AgentX' | '8K/1K';
   /** When both sides are provided, the title renders each hardware label with
    *  its vendor logo beside it instead of the plain `label` string. */
   hardwareA?: PairHardware;
@@ -111,16 +111,16 @@ export function ComparePairCardLink({
           <div className="flex flex-wrap items-center gap-2">
             <h3
               ref={titleRef}
-              className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200"
+              className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200"
             >
               {hardwareA && hardwareB ? (
                 <>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <HwVendorLogo vendor={hardwareA.vendor} />
                     {hardwareA.label}
                   </span>{' '}
                   <span className="font-normal text-muted-foreground">vs</span>{' '}
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <HwVendorLogo vendor={hardwareB.vendor} />
                     {hardwareB.label}
                   </span>

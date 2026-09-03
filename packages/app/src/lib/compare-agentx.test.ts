@@ -45,7 +45,7 @@ describe('AgentX comparison links', () => {
     }
   });
 
-  it('uses AgentX for supported models and 8K→1K for the rest', () => {
+  it('uses AgentX for supported models and 8K/1K for the rest', () => {
     const deepSeekV4 = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'deepseek-v4')!;
     const deepSeekR1 = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'deepseek-r1')!;
 
@@ -57,7 +57,7 @@ describe('AgentX comparison links', () => {
       '/compare/deepseek-v4-h100-vs-h200/agentic',
     );
     expect(comparisonScenarioForModel(deepSeekR1)).toEqual({
-      label: '8K→1K',
+      label: '8K/1K',
       sequence: '8k/1k',
     });
     expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1)).toBe(

@@ -21,6 +21,7 @@ import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group';
+import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 
 function focusAppearance(element: Element) {
   const style = getComputedStyle(element);
@@ -470,6 +471,60 @@ describe('component CSS harness', () => {
   });
 
   for (const width of [375, 1280]) {
+    it(`aligns comparison names and vs without splitting hardware names at ${width}px`, () => {
+      cy.viewport(width, 720);
+      cy.mount(
+        <div className="max-w-xl p-4">
+          <ComparePairCardLink
+            href="/compare/deepseek-r1-b200-vs-b300/8k-1k"
+            slug="deepseek-r1-b200-vs-b300"
+            label="B200 vs B300"
+            archLine="Blackwell · Blackwell"
+            scenarioLabel="8K/1K"
+            hardwareA={{ label: 'B200', vendor: 'nvidia' }}
+            hardwareB={{ label: 'B300', vendor: 'nvidia' }}
+          />
+          <ComparePairCardLink
+            href="/compare/deepseek-v4-gb200-vs-gb300/agentic"
+            slug="deepseek-v4-gb200-vs-gb300"
+            label="GB200 NVL72 vs GB300 NVL72"
+            archLine="Blackwell · Blackwell"
+            scenarioLabel="AgentX"
+            hardwareA={{ label: 'GB200 NVL72', vendor: 'nvidia' }}
+            hardwareB={{ label: 'GB300 NVL72', vendor: 'nvidia' }}
+          />
+        </div>,
+      );
+      cy.get('a')
+        .first()
+        .find('h3 > span')
+        .should(($parts) => {
+          const bounds = $parts.toArray().map((part) => {
+            const range = part.ownerDocument.createRange();
+            range.selectNodeContents(part.lastChild!);
+            return range.getBoundingClientRect();
+          });
+          expect(bounds).to.have.length(3);
+          for (const rect of bounds.slice(1)) {
+            expect(rect.top, 'hardware and vs text share a baseline').to.be.closeTo(
+              bounds[0].top,
+              1,
+            );
+            expect(rect.bottom).to.be.closeTo(bounds[0].bottom, 1);
+          }
+        });
+      cy.get('a').each(($card) => {
+        const card = $card[0];
+        expect(card.scrollWidth).to.be.at.most(card.clientWidth);
+        for (const group of card.querySelectorAll('h3 > span:has(img)')) {
+          const range = group.ownerDocument.createRange();
+          range.selectNodeContents(group.lastChild!);
+          expect(range.getClientRects().length, 'each hardware name stays on one line').to.equal(1);
+        }
+      });
+      cy.get('a').first().should('contain.text', '8K/1K').and('not.contain.text', '8K→1K');
+    });
+
     it(`keeps dashboard heading actions clear of long descriptions at ${width}px`, () => {
       cy.viewport(width, 720);
       cy.mount(

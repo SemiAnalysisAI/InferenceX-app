@@ -120,13 +120,13 @@ async function CompareCatalog() {
             Comparison catalog
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
-            AgentX and 8K→1K results
+            AgentX and 8K/1K results
           </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Models with AgentX data open long-context,
             multi-turn trace replay results. Models not yet covered by AgentX open the controlled
-            8K→1K workload. Each card identifies its scenario.
+            8K/1K workload. Each card identifies its scenario.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
