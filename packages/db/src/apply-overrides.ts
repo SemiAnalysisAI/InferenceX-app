@@ -11,6 +11,7 @@
  * Usage:
  *   bun run db:apply-overrides            # preview + confirm
  *   bun run db:apply-overrides --yes      # skip confirmation
+ *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
  *
  * Commits to run-overrides.ts are applied to production automatically after merge.
  * Use this command directly only for local preview or manual recovery.
@@ -22,18 +23,23 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { configCacheKey } from './etl/config-cache.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
+import { selectRunOverrides } from './lib/run-override-selection.js';
 import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
-  BENCHMARK_POINT_BACKFILLS,
-  CHANGELOG_BACKFILLS,
-  CONCLUSION_OVERRIDES,
-  PURGED_BENCHMARK_POINTS,
-  PURGED_RUN_ATTEMPTS,
-  PURGED_RUNS,
   validateRunBackfills,
 } from './etl/run-overrides.js';
+
+const {
+  runId,
+  benchmarks: BENCHMARK_POINT_BACKFILLS,
+  changelogs: CHANGELOG_BACKFILLS,
+  conclusions: CONCLUSION_OVERRIDES,
+  purgedPoints: PURGED_BENCHMARK_POINTS,
+  purgedAttempts: PURGED_RUN_ATTEMPTS,
+  purgedRuns: PURGED_RUNS,
+} = selectRunOverrides(process.argv.slice(2));
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -600,6 +606,7 @@ async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
 async function main(): Promise<void> {
   validateRunBackfills();
   console.log('=== apply-overrides ===');
+  if (runId !== undefined) console.log(`  Scoped to GitHub run ${runId}`);
 
   // Phase 1: preview (read-only)
   let hasWork = false;
