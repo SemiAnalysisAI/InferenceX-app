@@ -609,10 +609,13 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
 
   const pricingNotice = useMemo(() => {
     if (priceSource !== 'openrouter') return null;
-    if (openRouterQuery.isPending) return t.pricingLoading;
+    // A model with no OpenRouter listing never starts the query, and TanStack v5
+    // leaves a disabled query `isPending`, so check the id before the fetch state.
+    if (openRouterModelId === null) return t.pricingUnavailable(null);
+    if (openRouterQuery.isLoading) return t.pricingLoading;
     if (!openRouterQuery.data) return t.pricingUnavailable(openRouterModelId);
     return null;
-  }, [priceSource, openRouterQuery.isPending, openRouterQuery.data, openRouterModelId, t]);
+  }, [priceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
   const segmentKey = useMemo(() => {
     // Swatches are drawn in the neutral foreground colour: on the chart each
