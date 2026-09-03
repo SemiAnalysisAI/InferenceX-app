@@ -1,11 +1,15 @@
 'use client';
 
+import { ControlPanel } from '@/components/ui/control-panel';
 import { useMemo, useState } from 'react';
 
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -38,6 +42,19 @@ const STRINGS = {
   en: {
     title: 'Current InferenceX Image',
     description: 'Docker image tags for each model and chip configuration.',
+    benchmarkGroup: 'Configuration',
+    runtimeGroup: 'Hardware & runtime',
+    imageVersions: 'Images & versions',
+    configuration: 'Configuration',
+    resultsCount: (count: number) => `${count} configuration${count === 1 ? '' : 's'}`,
+    sortHint: 'Oldest submission first',
+    versionHint:
+      'Current tags are the images used by InferenceX. Latest tags are upstream framework releases.',
+    scrollHint: 'Scroll horizontally to see all image and version details.',
+    reviewImage: 'Review image',
+    reviewHint: 'The image differs from the latest release or uses an unstable tag.',
+    staleAgentx: 'AgentX submission over 14 days old',
+    unknownRelease: 'Not available',
     loading: 'Loading...',
     error: 'Failed to load image data.',
     releaseError: 'Failed to load current framework release tags. Image rows remain available.',
@@ -77,6 +94,18 @@ const STRINGS = {
   zh: {
     title: 'InferenceX 当前镜像',
     description: '各模型与芯片配置的 Docker 镜像标签。',
+    benchmarkGroup: '配置',
+    runtimeGroup: '硬件与运行环境',
+    imageVersions: '镜像与版本',
+    configuration: '配置',
+    resultsCount: (count: number) => `${count} 个配置`,
+    sortHint: '按提交时间从早到晚排列',
+    versionHint: '当前标签指 InferenceX 使用的镜像，最新标签指上游框架的发布版本。',
+    scrollHint: '横向滚动可查看完整的镜像与版本信息。',
+    reviewImage: '镜像需核查',
+    reviewHint: '镜像与最新发布版本不同，或使用了不稳定标签。',
+    staleAgentx: 'AgentX 提交已超过 14 天',
+    unknownRelease: '暂无信息',
     loading: '加载中……',
     error: '无法加载镜像数据。',
     releaseError: '无法加载框架最新版本标签，但镜像记录仍可查看。',
@@ -228,11 +257,14 @@ export function CurrentImageContent() {
   ]);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
-        <p className="mt-2 text-muted-foreground">{t.description}</p>
-      </div>
+    <div className="w-full min-w-0">
+      <Card className="mb-4">
+        <DashboardSectionHeader
+          headingAs={locale === 'zh' ? 'h2' : 'h1'}
+          title={t.title}
+          description={t.description}
+        />
+      </Card>
 
       {isLoading && <div className="py-12 text-center text-muted-foreground">{t.loading}</div>}
 
@@ -273,188 +305,199 @@ export function CurrentImageContent() {
 
       {options && (
         <TooltipProvider delayDuration={0}>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-model-select"
-                label={t.labelModel}
-                tooltip={t.tooltipModel}
-              />
-              <Select
-                value={selectedModel}
-                onValueChange={(v) => {
-                  track('current_image_model_changed', { model: v });
-                  setSelectedModel(v);
-                }}
-              >
-                <SelectTrigger id="image-model-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.allModels}</SelectItem>
-                  {options.models.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div
+            className="mb-6 grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-[1.4fr_1fr]"
+            data-testid="current-image-filters"
+          >
+            <ControlPanel legend={t.benchmarkGroup}>
+              <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                <div className="flex min-w-0 flex-col space-y-1.5 col-span-2 sm:col-span-3 xl:col-span-2">
+                  <LabelWithTooltip
+                    htmlFor="image-model-select"
+                    label={t.labelModel}
+                    tooltip={t.tooltipModel}
+                  />
+                  <Select
+                    value={selectedModel}
+                    onValueChange={(v) => {
+                      track('current_image_model_changed', { model: v });
+                      setSelectedModel(v);
+                    }}
+                  >
+                    <SelectTrigger id="image-model-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.allModels}</SelectItem>
+                      {options.models.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-precision-select"
-                label={t.labelPrecision}
-                tooltip={t.tooltipPrecision}
-              />
-              <Select
-                value={selectedPrecision}
-                onValueChange={(v) => {
-                  track('current_image_precision_changed', { precision: v });
-                  setSelectedPrecision(v);
-                }}
-              >
-                <SelectTrigger id="image-precision-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.all}</SelectItem>
-                  {options.precisions.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="image-precision-select"
+                    label={t.labelPrecision}
+                    tooltip={t.tooltipPrecision}
+                  />
+                  <Select
+                    value={selectedPrecision}
+                    onValueChange={(v) => {
+                      track('current_image_precision_changed', { precision: v });
+                      setSelectedPrecision(v);
+                    }}
+                  >
+                    <SelectTrigger id="image-precision-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.all}</SelectItem>
+                      {options.precisions.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-sequence-select"
-                label={t.labelIslOsl}
-                tooltip={t.tooltipIslOsl}
-              />
-              <Select
-                value={selectedSequence}
-                onValueChange={(v) => {
-                  track('current_image_sequence_changed', { sequence: v });
-                  setSelectedSequence(v);
-                }}
-              >
-                <SelectTrigger id="image-sequence-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.sequences.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {sequenceOptionLabel(s, locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="image-sequence-select"
+                    label={t.labelIslOsl}
+                    tooltip={t.tooltipIslOsl}
+                  />
+                  <Select
+                    value={selectedSequence}
+                    onValueChange={(v) => {
+                      track('current_image_sequence_changed', { sequence: v });
+                      setSelectedSequence(v);
+                    }}
+                  >
+                    <SelectTrigger id="image-sequence-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.sequences.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {sequenceOptionLabel(s, locale)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-spec-decode-select"
-                label={t.labelSpecDecode}
-                tooltip={t.tooltipSpecDecode}
-              />
-              <Select
-                value={selectedSpecMethod}
-                onValueChange={(v) => {
-                  track('current_image_spec_decode_changed', { spec_decode: v });
-                  setSelectedSpecMethod(v);
-                }}
-              >
-                <SelectTrigger id="image-spec-decode-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.all}</SelectItem>
-                  {options.specMethods.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {formatSpecMethod(m, t.off)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="flex min-w-0 flex-col space-y-1.5 col-span-2 sm:col-span-1">
+                  <LabelWithTooltip
+                    htmlFor="image-spec-decode-select"
+                    label={t.labelSpecDecode}
+                    tooltip={t.tooltipSpecDecode}
+                  />
+                  <Select
+                    value={selectedSpecMethod}
+                    onValueChange={(v) => {
+                      track('current_image_spec_decode_changed', { spec_decode: v });
+                      setSelectedSpecMethod(v);
+                    }}
+                  >
+                    <SelectTrigger id="image-spec-decode-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.all}</SelectItem>
+                      {options.specMethods.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {formatSpecMethod(m, t.off)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </ControlPanel>
+            <ControlPanel legend={t.runtimeGroup}>
+              <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-3">
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="image-hardware-select"
+                    label={t.labelGpuSku}
+                    tooltip={t.tooltipGpuSku}
+                  />
+                  <Select
+                    value={selectedHardware}
+                    onValueChange={(v) => {
+                      track('current_image_hardware_changed', { hardware: v });
+                      setSelectedHardware(v);
+                    }}
+                  >
+                    <SelectTrigger id="image-hardware-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.all}</SelectItem>
+                      {options.hardwares.map((h) => (
+                        <SelectItem key={h} value={h}>
+                          {h.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-hardware-select"
-                label={t.labelGpuSku}
-                tooltip={t.tooltipGpuSku}
-              />
-              <Select
-                value={selectedHardware}
-                onValueChange={(v) => {
-                  track('current_image_hardware_changed', { hardware: v });
-                  setSelectedHardware(v);
-                }}
-              >
-                <SelectTrigger id="image-hardware-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.all}</SelectItem>
-                  {options.hardwares.map((h) => (
-                    <SelectItem key={h} value={h}>
-                      {h.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="image-node-type-select"
+                    label={t.labelNodeType}
+                    tooltip={getCurrentImageNodeTypeTooltip(locale)}
+                  />
+                  <Select
+                    value={selectedNodeType}
+                    onValueChange={(v) => {
+                      track('current_image_node_type_changed', { node_type: v });
+                      setSelectedNodeType(v as NodeType);
+                    }}
+                  >
+                    <SelectTrigger id="image-node-type-select" className="w-full min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">{t.singleNode}</SelectItem>
+                      <SelectItem value="disagg">{t.disagg}</SelectItem>
+                      <SelectItem value="all">{t.all}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-node-type-select"
-                label={t.labelNodeType}
-                tooltip={getCurrentImageNodeTypeTooltip(locale)}
-              />
-              <Select
-                value={selectedNodeType}
-                onValueChange={(v) => {
-                  track('current_image_node_type_changed', { node_type: v });
-                  setSelectedNodeType(v as NodeType);
-                }}
-              >
-                <SelectTrigger id="image-node-type-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="single">{t.singleNode}</SelectItem>
-                  <SelectItem value="disagg">{t.disagg}</SelectItem>
-                  <SelectItem value="all">{t.all}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip
-                htmlFor="image-framework-multiselect"
-                label={t.labelFramework}
-                tooltip={t.tooltipFramework}
-              />
-              <MultiSelect
-                triggerId="image-framework-multiselect"
-                triggerTestId="image-framework-multiselect"
-                options={options.frameworks.map((fw) => ({
-                  value: fw,
-                  label: getFrameworkLabel(fw),
-                }))}
-                value={selectedFrameworks}
-                onChange={(v) => {
-                  track('current_image_framework_changed', {
-                    frameworks: v.join(',') || 'all',
-                  });
-                  setSelectedFrameworks(v);
-                }}
-                placeholder={t.allFrameworks}
-              />
-            </div>
+                <div className="flex min-w-0 flex-col space-y-1.5 col-span-2 xl:col-span-1">
+                  <LabelWithTooltip
+                    htmlFor="image-framework-multiselect"
+                    label={t.labelFramework}
+                    tooltip={t.tooltipFramework}
+                  />
+                  <MultiSelect
+                    className="data-[size=default]:min-h-11 md:data-[size=default]:min-h-9"
+                    triggerId="image-framework-multiselect"
+                    triggerTestId="image-framework-multiselect"
+                    options={options.frameworks.map((fw) => ({
+                      value: fw,
+                      label: getFrameworkLabel(fw),
+                    }))}
+                    value={selectedFrameworks}
+                    onChange={(v) => {
+                      track('current_image_framework_changed', {
+                        frameworks: v.join(',') || 'all',
+                      });
+                      setSelectedFrameworks(v);
+                    }}
+                    placeholder={t.allFrameworks}
+                  />
+                </div>
+              </div>
+            </ControlPanel>
           </div>
         </TooltipProvider>
       )}
@@ -464,87 +507,142 @@ export function CurrentImageContent() {
       )}
 
       {filtered.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[900px] border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thModel}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thPrecision}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thGpuSku}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thSpecDecode}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thCurrentTag}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thActualLatest}</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold whitespace-nowrap">
-                  {t.thDaysSince}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row, i) => {
-                const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-                const gpuLabel = row.hardware.toUpperCase();
-                const actualLatest = getActualLatestTag(row.framework, releases);
-                const outdated = isOutdated(row.image, actualLatest);
-                const ageDays = daysSince(row.date, today);
-                // Tint by age when the row is actually outdated (image lags
-                // upstream latest, or uses an unstable tag) — up-to-date configs
-                // shouldn't look alarming just because a day passed — or when an
-                // AgentX submission has blown its two-week freshness budget.
-                const stale = outdated || isStaleAgentx(row.benchmark_type, ageDays);
-                const ageStyle = stale ? ageColorStyle(ageDays) : undefined;
-                const rowStyle = stale ? ageRowStyle(ageDays) : undefined;
+        <section
+          aria-labelledby="current-image-results"
+          className="overflow-hidden rounded-lg border border-border"
+        >
+          <div className="space-y-2 border-b border-border px-4 py-4 md:px-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <Heading as="h2" level="card" id="current-image-results">
+                {t.imageVersions}
+              </Heading>
+              <p className="text-xs text-muted-foreground" data-testid="current-image-result-count">
+                <span className="font-medium tabular-nums text-foreground">
+                  {t.resultsCount(filtered.length)}
+                </span>
+                {' · '}
+                {t.sortHint}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">{t.versionHint}</p>
+            <p id="current-image-scroll-hint" className="text-xs text-muted-foreground lg:hidden">
+              {t.scrollHint}
+            </p>
+          </div>
+          <div
+            className="overflow-x-auto focus-visible:outline-none"
+            tabIndex={0}
+            role="region"
+            aria-label={t.imageVersions}
+            aria-describedby="current-image-scroll-hint"
+          >
+            <table className="w-full min-w-[900px] table-fixed border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th scope="col" className="w-[26%] px-4 py-3 text-left text-sm font-semibold">
+                    {t.configuration}
+                  </th>
+                  <th scope="col" className="w-[40%] px-4 py-3 text-left text-sm font-semibold">
+                    {t.thCurrentTag}
+                  </th>
+                  <th scope="col" className="w-[16%] px-4 py-3 text-left text-sm font-semibold">
+                    {t.thActualLatest}
+                  </th>
+                  <th scope="col" className="w-[18%] px-4 py-3 text-left text-sm font-semibold">
+                    {t.thDaysSince}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, i) => {
+                  const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
+                  const gpuLabel = row.hardware.toUpperCase();
+                  const actualLatest = getActualLatestTag(row.framework, releases);
+                  const outdated = isOutdated(row.image, actualLatest);
+                  const ageDays = daysSince(row.date, today);
+                  // Preserve the existing age and image-status rules; only the presentation changes.
+                  const staleAgentx = isStaleAgentx(row.benchmark_type, ageDays);
+                  const stale = outdated || staleAgentx;
+                  const ageStyle = stale ? ageColorStyle(ageDays) : undefined;
+                  const rowStyle = stale ? ageRowStyle(ageDays) : undefined;
 
-                return (
-                  <tr
-                    key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${i}`}
-                    className={`border-b border-border last:border-b-0 transition-colors ${
-                      rowStyle ? 'hover:brightness-110' : 'hover:bg-muted/30'
-                    }`}
-                    style={rowStyle}
-                  >
-                    <td className="px-4 py-3 text-sm font-medium">{displayModel}</td>
-                    <td className="px-4 py-3 text-sm uppercase">{row.precision}</td>
-                    <td className="px-4 py-3 text-sm">{gpuLabel}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {row.spec_method === 'none' ? (
-                        <span className="text-muted-foreground">{t.off}</span>
-                      ) : (
-                        <span className="uppercase">{row.spec_method}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <code
-                        className={`rounded px-1.5 py-0.5 font-mono text-xs ${
-                          outdated ? 'bg-red-500/20 text-red-400' : 'bg-muted'
-                        }`}
-                      >
-                        {row.image}
-                      </code>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {actualLatest ? (
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                          {actualLatest}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-sm tabular-nums whitespace-nowrap ${
-                        ageStyle ? 'font-medium' : 'text-muted-foreground'
+                  return (
+                    <tr
+                      key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${i}`}
+                      className={`border-b border-border last:border-b-0 transition-colors ${
+                        rowStyle ? 'hover:brightness-110' : 'hover:bg-muted/30'
                       }`}
-                      style={ageStyle}
-                      title={`${t.lastSubmission} ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? t.ageClamp(AGE_MAX_RED_DAYS) : ''}`}
+                      style={rowStyle}
                     >
-                      {t.days(ageDays)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <th scope="row" className="px-4 py-4 text-left align-top font-normal">
+                        <div className="break-words text-sm font-medium">{displayModel}</div>
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                          <span className="rounded border border-border/70 bg-background/50 px-1.5 py-0.5">
+                            {gpuLabel}
+                          </span>
+                          <span className="rounded border border-border/70 bg-background/50 px-1.5 py-0.5 uppercase">
+                            {row.precision}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                          <p>
+                            {t.labelSpecDecode}:{' '}
+                            <span className="text-foreground">
+                              {formatSpecMethod(row.spec_method, t.off)}
+                            </span>
+                          </p>
+                          <p className="break-words">
+                            <span className="font-mono">{row.framework}</span> ·{' '}
+                            {row.disagg ? t.disagg : t.singleNode}
+                          </p>
+                        </div>
+                      </th>
+                      <td className="px-4 py-4 align-top text-sm">
+                        <code
+                          className={`block break-all rounded-md px-2.5 py-2 font-mono text-xs leading-relaxed select-all ${outdated ? 'bg-red-500/10 text-red-700 dark:text-red-300' : 'bg-muted'}`}
+                        >
+                          {row.image}
+                        </code>
+                        {outdated && (
+                          <p className="mt-2 text-xs text-muted-foreground" title={t.reviewHint}>
+                            {t.reviewImage}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 align-top text-sm">
+                        {actualLatest ? (
+                          <code className="inline-block break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs select-all">
+                            {actualLatest}
+                          </code>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{t.unknownRelease}</span>
+                        )}
+                      </td>
+                      <td
+                        className={`px-4 py-4 align-top text-sm tabular-nums ${ageStyle ? 'font-medium' : 'text-muted-foreground'}`}
+                        style={ageStyle}
+                        title={`${t.lastSubmission} ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? t.ageClamp(AGE_MAX_RED_DAYS) : ''}`}
+                      >
+                        <span className="whitespace-nowrap">{t.days(ageDays)}</span>
+                        <time
+                          dateTime={row.date}
+                          className="mt-1 block text-xs font-normal text-muted-foreground"
+                        >
+                          {row.date}
+                        </time>
+                        {staleAgentx && (
+                          <p className="mt-2 text-xs font-normal text-muted-foreground">
+                            {t.staleAgentx}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
     </div>
   );

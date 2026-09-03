@@ -98,6 +98,8 @@ export default function CalculatorTable({
         cell: (r) => getLabel(r, hardwareConfig),
         sortValue: (r) => getLabel(r, hardwareConfig),
         className: 'font-medium whitespace-nowrap',
+        importance: 'key',
+        pinned: true,
       },
       {
         header: `${throughputLabel}${s.throughputSuffix}`,
@@ -105,6 +107,7 @@ export default function CalculatorTable({
         cell: (r) => formatCalculatorTableNumber(getThroughputForType(r, costType), 1, locale),
         sortValue: (r) => getThroughputForType(r, costType),
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: `${s.costPrefix}${costLabel}${s.costSuffix}`,
@@ -112,6 +115,7 @@ export default function CalculatorTable({
         cell: (r) => `$${getCost(r, costType).toFixed(3)}`,
         sortValue: (r) => getCost(r, costType),
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: mwLabel,
@@ -119,6 +123,7 @@ export default function CalculatorTable({
         cell: (r) => formatCalculatorTableNumber(getTpPerMwForType(r, costType), 0, locale),
         sortValue: (r) => getTpPerMwForType(r, costType),
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: s.concurrency,
@@ -126,6 +131,7 @@ export default function CalculatorTable({
         cell: (r) => `~${r.concurrency}`,
         sortValue: (r) => r.concurrency,
         className: 'tabular-nums',
+        importance: 'key',
       },
     ],
     [costType, hardwareConfig, throughputLabel, costLabel, mwLabel, locale, s],

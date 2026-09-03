@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics';
 import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
@@ -15,6 +16,8 @@ const PAGE_SIZE = 50;
 
 const STRINGS = {
   en: {
+    title: 'Evaluation samples',
+    searchScope: 'Search this page only',
     score: 'score',
     filterAll: 'All',
     filterPassed: 'Passed',
@@ -49,6 +52,8 @@ const STRINGS = {
     copied: 'Copied',
   },
   zh: {
+    title: '评估样本',
+    searchScope: '仅搜索当前页',
     score: '得分',
     filterAll: '全部',
     filterPassed: '通过',
@@ -247,6 +252,7 @@ export default function EvalSamplesDrawer({
       }}
     >
       <DialogContent
+        data-testid="eval-samples-drawer"
         className="
           inset-x-0 bottom-0 top-auto left-auto translate-x-0 translate-y-0
           w-auto max-w-none h-auto max-h-[85vh]
@@ -256,7 +262,7 @@ export default function EvalSamplesDrawer({
           data-[state=open]:slide-in-from-left-0! data-[state=open]:slide-in-from-bottom!
           data-[state=closed]:slide-out-to-left-0! data-[state=closed]:slide-out-to-bottom!
           sm:inset-x-auto sm:right-0 sm:top-0 sm:bottom-auto sm:left-auto
-          sm:w-[90vw] sm:max-w-none sm:h-screen sm:max-h-screen
+          sm:w-[90vw] sm:max-w-4xl sm:h-screen sm:max-h-screen
           sm:rounded-none sm:border-l sm:border-t-0
           sm:data-[state=open]:slide-in-from-bottom-0! sm:data-[state=open]:slide-in-from-right!
           sm:data-[state=closed]:slide-out-to-bottom-0! sm:data-[state=closed]:slide-out-to-right!
@@ -265,32 +271,31 @@ export default function EvalSamplesDrawer({
       >
         {/* Header — `DialogContent` renders its own absolute-positioned close
             button in the top-right, so we leave room with `pr-10`. */}
-        <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-10">
+        <div className="flex items-start gap-3 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:pr-12">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-sm font-semibold">
-              {row ? (
-                <span className="font-mono">{row.configLabel.replaceAll('\n', ' ')}</span>
-              ) : (
-                ''
-              )}
-            </DialogTitle>
+            <DialogTitle className="text-base leading-snug">{t.title}</DialogTitle>
             {row && (
-              <div className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-2 break-words font-mono text-xs leading-relaxed text-muted-foreground">
+                {row.configLabel.replaceAll('\n', ' ')}
+              </p>
+            )}
+            {row && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
                 <span className="uppercase">{row.benchmark}</span>
-                {' · '}
-                <span>
+                <span className="font-medium text-foreground">
                   {t.score} {(row.score * 100).toFixed(1)}%
                 </span>
-                {' · '}
                 <span>{row.date}</span>
               </div>
             )}
           </div>
           {row && row.evalResultId > 0 && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => handleShare()}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="h-11 shrink-0 md:h-8"
               aria-label={t.shareSample}
               title={t.shareSample}
               data-testid="eval-drawer-share-button"
@@ -301,12 +306,12 @@ export default function EvalSamplesDrawer({
                 <Share2 className="size-3.5" />
               )}
               {copiedTarget === 'drawer' ? t.copied : t.shareSample}
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Filter chips + search */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
           <FilterChip
             label={t.filterAll}
             count={passedTotal + failedTotal}
@@ -327,21 +332,27 @@ export default function EvalSamplesDrawer({
             onClick={() => handleFilterChange('failed')}
             tone="failed"
           />
-          <div className="relative ml-auto max-w-xs flex-1">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              className="h-7 w-full rounded-md border border-border bg-transparent pl-8 pr-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label={t.searchAriaLabel}
-            />
+          <div className="order-last w-full sm:order-none sm:ml-auto sm:min-w-0 sm:max-w-xs sm:flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none md:h-8 md:text-xs"
+                aria-label={t.searchAriaLabel}
+                aria-describedby="eval-samples-search-scope"
+              />
+            </div>
+            <p id="eval-samples-search-scope" className="mt-1 text-2xs text-muted-foreground">
+              {t.searchScope}
+            </p>
           </div>
         </div>
 
         {/* Body */}
-        <div ref={bodyRef} className="overflow-auto px-4 py-3">
+        <div ref={bodyRef} className="min-h-0 overflow-auto px-4 py-4 sm:px-6">
           {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               {t.liveUnavailable}
@@ -380,17 +391,21 @@ export default function EvalSamplesDrawer({
                 <button
                   type="button"
                   onClick={() => handleToggleExpand(s.docId)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-3 text-left focus-visible:outline-none"
                   aria-expanded={expanded.has(s.docId)}
                 >
                   <PassFailBadge passed={s.passed} />
-                  <span className="font-mono text-3xs text-muted-foreground tabular-nums">
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
                     #{s.docId}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-xs">{s.prompt ?? t.noPrompt}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{s.prompt ?? t.noPrompt}</span>
+                  <ChevronRight
+                    className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded.has(s.docId) ? 'rotate-90' : ''}`}
+                    aria-hidden="true"
+                  />
                 </button>
                 {expanded.has(s.docId) && (
-                  <div className="space-y-2 border-t border-border/50 px-3 py-3 text-xs">
+                  <div className="space-y-4 border-t border-border/50 px-3 py-4 text-xs">
                     <FewShotBlock demonstrations={s.demonstrations} locale={locale} />
                     <Block label={t.prompt} value={s.prompt} emptyText={t.empty} />
                     {s.rawResponse !== null && s.rawResponse !== s.response ? (
@@ -400,14 +415,22 @@ export default function EvalSamplesDrawer({
                           value={s.rawResponse}
                           emptyText={t.empty}
                         />
-                        <Block label={t.target} value={s.target} emptyText={t.empty} />
-                        <Block label={t.extractedAnswer} value={s.response} emptyText={t.empty} />
+                        <div
+                          className="grid gap-3 sm:grid-cols-2"
+                          data-testid="eval-sample-answer-comparison"
+                        >
+                          <Block label={t.target} value={s.target} emptyText={t.empty} />
+                          <Block label={t.extractedAnswer} value={s.response} emptyText={t.empty} />
+                        </div>
                       </>
                     ) : (
-                      <>
+                      <div
+                        className="grid gap-3 sm:grid-cols-2"
+                        data-testid="eval-sample-answer-comparison"
+                      >
                         <Block label={t.target} value={s.target} emptyText={t.empty} />
                         <Block label={t.modelResponse} value={s.response} emptyText={t.empty} />
-                      </>
+                      </div>
                     )}
                     {Object.keys(s.metrics).length > 0 && (
                       <Block
@@ -419,10 +442,12 @@ export default function EvalSamplesDrawer({
                       />
                     )}
                     {row && row.evalResultId > 0 && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleShare(s.docId)}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="h-11 md:h-8"
                         aria-label={t.shareSample}
                         title={t.shareSample}
                         data-testid={`eval-sample-share-${s.docId}`}
@@ -433,7 +458,7 @@ export default function EvalSamplesDrawer({
                           <Share2 className="size-3.5" />
                         )}
                         {copiedTarget === s.docId ? t.copied : t.shareSample}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -443,7 +468,7 @@ export default function EvalSamplesDrawer({
         </div>
 
         {/* Footer pagination */}
-        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground tabular-nums sm:px-6">
           <span>
             {t.pagination(
               safePage * PAGE_SIZE + 1,
@@ -456,7 +481,7 @@ export default function EvalSamplesDrawer({
               type="button"
               onClick={() => handlePageChange(-1)}
               disabled={safePage === 0}
-              className="rounded p-1 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex size-11 items-center justify-center rounded-md hover:bg-muted focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 md:size-8"
               aria-label={t.prevPage}
             >
               <ChevronLeft className="size-4" />
@@ -468,7 +493,7 @@ export default function EvalSamplesDrawer({
               type="button"
               onClick={() => handlePageChange(1)}
               disabled={safePage >= totalPages - 1}
-              className="rounded p-1 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex size-11 items-center justify-center rounded-md hover:bg-muted focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 md:size-8"
               aria-label={t.nextPage}
             >
               <ChevronRight className="size-4" />
@@ -517,7 +542,7 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border border-border px-2.5 py-1 text-xs transition-colors ${toneClass}`}
+      className={`min-h-11 rounded-full border border-border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none md:min-h-8 ${toneClass}`}
       aria-pressed={active}
     >
       {label}
@@ -620,11 +645,9 @@ function Block({
   emptyText: string;
 }) {
   return (
-    <div>
-      <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded border border-border/40 bg-muted/30 p-2 font-mono text-2xs leading-snug wrap-break-word">
+    <div className="min-w-0">
+      <div className="mb-2 text-xs font-semibold text-muted-foreground">{label}</div>
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border/50 bg-muted/30 p-3 font-mono text-xs leading-relaxed wrap-break-word">
         {value ?? <span className="italic text-muted-foreground">{emptyText}</span>}
       </pre>
     </div>

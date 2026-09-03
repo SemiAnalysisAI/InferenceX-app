@@ -24,13 +24,15 @@ describe('Historical Trends Tab', () => {
   });
 
   it('renders a slider for target interactivity', () => {
-    cy.get('[data-testid="historical-trends-display"]').find('input[type="range"]').should('exist');
+    cy.get('[data-testid="historical-target-slider"]')
+      .should('exist')
+      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
   });
 
   it('renders a number input for precise interactivity value', () => {
-    cy.get('[data-testid="historical-trends-display"]')
-      .find('input[type="number"]')
-      .should('exist');
+    cy.get('[data-testid="historical-target-input"]')
+      .should('exist')
+      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
   });
 
   it('renders a trend chart SVG after data loads', () => {
@@ -91,17 +93,20 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('be.visible');
     cy.get('[data-testid="scenario-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
     cy.get('body').type('{esc}');
   });
 
-  it('precision multi-select is present only for multi-precision models', () => {
-    // The default model is FP4-only in the fixtures, so the control is hidden;
-    // a multi-precision model brings it back.
-    cy.get('[data-testid="precision-multiselect"]').should('not.exist');
+  it('keeps fixed precision visible and allows selection for multi-precision models', () => {
+    cy.get('button[data-testid="precision-multiselect"]')
+      .should('be.visible')
+      .and('have.text', 'FP4')
+      .and('be.disabled');
     cy.visit('/historical?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
-    cy.get('[data-testid="precision-multiselect"]').should('be.visible');
+    cy.get('[data-testid="precision-multiselect"][role="combobox"]')
+      .should('be.visible')
+      .and('be.enabled');
   });
 
   it('legend sidebar renders with hardware items matching visible trend lines', () => {
@@ -139,13 +144,13 @@ describe('Historical Trends — Content & Interactions', () => {
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 1);
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('[data-select-option]').should('have.length.greaterThan', 1);
 
     cy.get('[data-testid="yaxis-metric-selector"]')
       .invoke('text')
       .then((initialText) => {
-        cy.get('[role="option"]').eq(2).click();
+        cy.get('[data-select-option]').eq(2).click();
         cy.get('[data-testid="yaxis-metric-selector"]')
           .invoke('text')
           .should('not.eq', initialText.trim());
@@ -159,7 +164,7 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="historical-trend-figure"]').should('exist');
 
-    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
       .invoke('text')
       .then((initialSubtitle) => {
@@ -168,7 +173,7 @@ describe('Historical Trends — Content & Interactions', () => {
           if ($options.length <= 1) return;
           cy.wrap($options).last().click();
 
-          cy.get('[data-testid="historical-trend-figure"] figcaption p')
+          cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
             .first()
             .invoke('text')
             .should('not.eq', initialSubtitle);
@@ -228,7 +233,7 @@ describe('Historical Trends — Chinese route', () => {
     );
     cy.wait('@agenticAvailability');
     cy.wait('@agenticBenchmarks');
-    cy.get('[data-testid="historical-trend-figure"] figcaption p')
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
       .should('contain.text', '智能体')
       .and('contain.text', '2025年3月1日')

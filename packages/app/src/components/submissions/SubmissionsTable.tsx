@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCompare } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -13,6 +13,8 @@ import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { InfoHelp } from '@/components/ui/option-info';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -92,6 +94,7 @@ const STRINGS = {
     expandRow: 'Expand configuration details',
     collapseRow: 'Collapse configuration details',
     changedTo: 'changed to',
+    scrollHint: 'On smaller screens, swipe horizontally to see all columns.',
   },
   zh: {
     searchPlaceholder: '搜索配置……',
@@ -152,6 +155,7 @@ const STRINGS = {
     expandRow: '展开配置详情',
     collapseRow: '收起配置详情',
     changedTo: '更新为',
+    scrollHint: '在较小屏幕上可横向滑动查看全部列。',
   },
 } as const;
 
@@ -169,14 +173,9 @@ function DetailItem({
   return (
     <div className="flex items-center gap-1">
       <span className="text-muted-foreground">{label}</span>
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info className="size-3 text-muted-foreground/50 cursor-help shrink-0" />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
-          <span className="text-xs">{tip}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp label={label} value={`submission-${label}`} triggerClassName="-my-1">
+        {tip}
+      </InfoHelp>
       <span className="font-medium">{children}</span>
     </div>
   );
@@ -316,7 +315,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <input
+      <Input
         type="text"
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
@@ -324,10 +323,11 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}
         placeholder={t.searchPlaceholder}
-        className="w-full max-w-sm px-3 py-1.5 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        className="max-w-sm"
       />
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-sm">
+      <p className="text-xs text-muted-foreground md:hidden">{t.scrollHint}</p>
+      <div className="overflow-x-auto rounded-md border border-border shadow-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-muted/50">
             <tr>
               <th className="w-8 px-2" />
@@ -516,7 +516,7 @@ function SubmissionRow({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" collisionPadding={10}>
-                  <span className="text-xs">
+                  <span>
                     {t.compareTipPre}
                     {previousRun.date} → {row.date}
                     {t.compareTipPost}

@@ -113,13 +113,13 @@ async function CompareCatalogZh() {
             对比结果目录
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
-            AgentX 与 8K→1K 结果
+            AgentX 与 8K/1K 结果
           </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组推理基准测试的正面对比，涵盖{' '}
             {formatModelList(modelsWithPairs)}
             。已有 AgentX 数据的模型默认打开长上下文、多轮 trace replay 结果；尚未纳入 AgentX
-            的模型默认打开受控的 8K→1K 工作负载。每张卡片均标明对应场景。
+            的模型默认打开受控的 8K/1K 工作负载。每张卡片均标明对应场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link

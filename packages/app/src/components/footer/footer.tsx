@@ -80,15 +80,15 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
   // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
-    <footer data-testid="footer" className="relative w-full overflow-visible mt-auto pt-32">
-      <div className="container mx-auto px-4 lg:px-8 py-12">
+    <footer
+      data-testid="footer"
+      className="relative mt-auto w-full overflow-visible pt-16 md:pt-20"
+    >
+      <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
         {/* Main grid */}
-        <div className="flex flex-col md:flex-row md:justify-between gap-10 md:gap-8 mb-10">
+        <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
           {/* Left — Brand */}
-          <div
-            data-testid="footer-brand"
-            className="flex flex-col gap-4 items-center md:items-start"
-          >
+          <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
             <Link
               data-testid="footer-brand-link"
               target="_blank"
@@ -105,7 +105,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </Link>
             <p
               data-testid="footer-brand-description"
-              className="text-sm text-muted-foreground max-w-xs text-center md:text-left"
+              className="max-w-prose text-sm leading-relaxed text-muted-foreground lg:max-w-xs"
             >
               {t.description}
             </p>
@@ -114,16 +114,16 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           {/* Center — Links */}
           <div
             data-testid="footer-links"
-            className="grid grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)] gap-x-6 gap-y-8 break-words hyphens-auto min-w-0"
+            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
           >
-            <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
-              <span className="text-sm font-medium text-foreground">{t.semianalysis}</span>
+            <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.semianalysis}</h2>
               <a
                 data-testid="footer-link-main-site"
                 href="https://semianalysis.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.mainSite}
               </a>
@@ -132,7 +132,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://newsletter.semianalysis.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.newsletter}
               </a>
@@ -141,17 +141,17 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://semianalysis.com/about/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.about}
               </a>
             </div>
-            <div data-testid="footer-links-legal" className="flex flex-col gap-2.5">
-              <span className="text-sm font-medium text-foreground">{t.legal}</span>
+            <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
               <Link
                 data-testid="footer-link-land-acknowledgement"
                 href={`${prefix}/land-acknowledgement`}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.landAcknowledgement}
               </Link>
@@ -160,7 +160,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://semianalysis.com/privacy-policy/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.privacyPolicy}
               </a>
@@ -169,19 +169,19 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://semianalysis.com/cookie-policy/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.cookiePolicy}
               </a>
             </div>
-            <div data-testid="footer-links-contribute" className="flex flex-col gap-2.5">
-              <span className="text-sm font-medium text-foreground">{t.contribute}</span>
+            <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.contribute}</h2>
               <a
                 data-testid="footer-link-benchmarks"
                 href="https://github.com/SemiAnalysisAI/InferenceX"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.benchmarks}
               </a>
@@ -190,7 +190,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://github.com/SemiAnalysisAI/agentx-harness"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.agentxHarness}
               </a>
@@ -199,7 +199,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 href="https://github.com/SemiAnalysisAI/InferenceX-app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.visualization}
               </a>
@@ -209,15 +209,15 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 one balanced row instead of wrapping below the others. */}
             <div
               data-testid="footer-links-more"
-              className="col-span-2 xl:col-span-1 flex flex-col gap-2.5"
+              className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
             >
-              <span className="text-sm font-medium text-foreground">{t.more}</span>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                 <Link
                   data-testid="footer-link-supporters"
                   href={`${prefix}/quotes`}
                   onClick={() => track('footer_supporters_clicked')}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.supporters}
                 </Link>
@@ -225,7 +225,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="footer-link-agentx"
                   href={`${prefix}/agentx`}
                   onClick={() => track('footer_agentx_clicked')}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.agentx}
                 </Link>
@@ -233,7 +233,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="footer-link-telemetry"
                   href={`${prefix}/inference/agentic`}
                   onClick={() => track('footer_telemetry_clicked')}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.telemetry}
                 </Link>
@@ -241,7 +241,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="footer-link-articles"
                   href={`${prefix}/blog`}
                   onClick={() => track('footer_articles_clicked')}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.articles}
                 </Link>
@@ -249,56 +249,56 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="footer-link-api"
                   href={`${prefix}/api`}
                   onClick={() => track('footer_api_clicked')}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.apiReference}
                 </Link>
                 <Link
                   data-testid="footer-link-reliability"
                   href={`${prefix}/reliability`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.gpuReliability}
                 </Link>
                 <Link
                   data-testid="footer-link-compare-per-dollar"
                   href={`${prefix}/compare-per-dollar`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.perfPerDollar}
                 </Link>
                 <Link
                   data-testid="footer-link-model-architectures"
                   href={`${prefix}/model`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.modelArchitectures}
                 </Link>
                 <Link
                   data-testid="footer-link-glossary"
                   href={`${prefix}/glossary`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.glossary}
                 </Link>
                 <Link
                   data-testid="footer-link-chips"
                   href={`${prefix}/chips`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.chipSpecs}
                 </Link>
                 <Link
                   data-testid="footer-link-rankings"
                   href={`${prefix}/rankings`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.rankings}
                 </Link>
                 <Link
                   data-testid="footer-link-run"
                   href={`${prefix}/run`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.runPages}
                 </Link>
@@ -307,7 +307,10 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
 
           {/* Right — CTA + Social */}
-          <div data-testid="footer-cta" className="flex flex-col gap-4 items-center md:items-end">
+          <div
+            data-testid="footer-cta"
+            className="flex min-w-0 flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between lg:col-span-2"
+          >
             <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
               <div className="rounded-md bg-background/80 w-fit">
                 <StarButton starCount={starCount} />
@@ -319,7 +322,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 <ShareLinkedInButton />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center md:text-right max-w-xs">
+            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-right">
               {t.cta}
             </p>
           </div>

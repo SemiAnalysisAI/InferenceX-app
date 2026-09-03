@@ -105,7 +105,7 @@ export default async function ComparePerDollarIndexPageZh() {
           </p>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             具备 AgentX 数据的模型会打开长上下文、多轮 trace 回放结果；尚未纳入 AgentX
-            的模型则打开受控的 8K→1K 负载。每张卡片都会标明其对应场景。
+            的模型则打开受控的 8K/1K 负载。每张卡片都会标明其对应场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -146,7 +146,7 @@ export default async function ComparePerDollarIndexPageZh() {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
         // Same scenario split /compare uses: models with AgentX data open the
-        // agentic trace replay, the rest open the fixed 8K→1K workload.
+        // agentic trace replay, the rest open the fixed 8K/1K workload.
         const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>

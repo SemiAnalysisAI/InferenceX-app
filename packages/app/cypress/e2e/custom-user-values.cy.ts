@@ -1,13 +1,13 @@
 const selectCustomCostMetric = () => {
-  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-  cy.get('[role="option"]')
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+  cy.get('[data-slot="select-item"]')
     .contains('Cost per Million Total Tokens (Custom User Values)')
     .click({ force: true });
 };
 
 const selectCustomPowerMetric = () => {
-  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-  cy.get('[role="option"]')
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+  cy.get('[data-slot="select-item"]')
     .contains('Token Throughput per All in Utility MW (Custom User Values)')
     .click({ force: true });
 };

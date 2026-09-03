@@ -283,7 +283,7 @@ export function CoachMark({
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute right-2 top-2 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="absolute right-2 top-2 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
           aria-label={strings.close}
           data-testid={testId ? `${testId}-dismiss` : undefined}
         >

@@ -68,6 +68,36 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').should('contain.text', 'TCO Calculator');
     });
 
+    it('groups benchmark economics above the comparison target', () => {
+      cy.viewport(1280, 900);
+      cy.get('[data-testid="calculator-controls"] fieldset').should('have.length', 2);
+      cy.get('[data-testid="calculator-controls"] fieldset').then(($groups) => {
+        const rects = [...$groups].map((group) => group.getBoundingClientRect());
+        expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+      });
+      cy.get('[data-testid="calc-cost-selector"]').should('contain.text', 'Hyperscaler');
+      cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
+      cy.get('[data-testid="calculator-metric-throughput"]')
+        .parent()
+        .should(($group) => {
+          const bounds = $group[0].getBoundingClientRect();
+          const buttons = [...$group[0].querySelectorAll('button')];
+          const first = buttons[0].getBoundingClientRect();
+          expect(bounds.height, 'metric group matches regular desktop controls').to.equal(36);
+          expect(first.top, 'joined fill reaches the upper border').to.equal(bounds.top + 1);
+          expect(first.bottom, 'joined fill reaches the lower border').to.equal(bounds.bottom - 1);
+          for (let i = 1; i < buttons.length; i++) {
+            // Firefox can round adjacent fractional coordinates differently;
+            // a subpixel tolerance still rejects any visible inset or gap.
+            expect(
+              buttons[i].getBoundingClientRect().left,
+              'segments have no inset gaps',
+            ).to.be.closeTo(buttons[i - 1].getBoundingClientRect().right, 0.1);
+          }
+        });
+      cy.get('input[type="range"]').should('be.visible');
+    });
+
     it('renders Model selector', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-model').should('exist');
@@ -80,12 +110,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('hides the Precision selector for a single-precision model', () => {
-      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
-      // is nothing to choose, so the control is hidden entirely.
+    it('shows the precision for a single-precision model', () => {
+      // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('not.exist');
+        cy.contains('Precision').should('be.visible');
+        cy.get('button#calc-precision').should('have.text', 'FP4').and('be.disabled');
       });
     });
 
@@ -330,10 +360,12 @@ describe('TCO Calculator', () => {
 
     it('sequence selector has selectable options', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').click();
+        cy.get('#calc-sequence').click('right');
       });
-      cy.get('[role="option"]').should('have.length.greaterThan', 0);
+      cy.get('[data-select-option]').should('have.length.greaterThan', 0);
       cy.get('body').type('{esc}');
+      // Wait for the preceding popover's focus restoration before opening the next menu.
+      cy.get('#calc-sequence').should('be.focused');
     });
 
     it('cost provider selector appears and has all three options', () => {
@@ -659,10 +691,13 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      // The agentic fixture exposes a single scenario, so the scenario
-      // control disappears entirely — no dropdown, no static readout.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      cy.get('button[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -719,10 +754,14 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      // Single-scenario fixture → the scenario control disappears entirely;
-      // the gate is locked, so no percentile selector either.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      // Scenario and precision stay readable; only percentile is feature-gated.
+      cy.get('button[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -877,13 +916,15 @@ describe('TCO Calculator Chinese route', () => {
 
   it('localizes chart internals, table headers, and preserved units', () => {
     cy.contains('label', '计价方式').should('be.visible');
+    cy.get('[data-testid="calculator-secondary-controls"] > button').click();
     cy.contains('label', '目标交互性 (tok/s/user)')
       .parent()
-      .find('svg.cursor-help')
-      .trigger('pointermove');
-    cy.get('[role="tooltip"]')
+      .find('button')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[role="dialog"]')
       .should('contain.text', '用于插值计算的交互性目标值。')
       .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
+    cy.get('body').type('{esc}');
     cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
     cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
       'contain.text',

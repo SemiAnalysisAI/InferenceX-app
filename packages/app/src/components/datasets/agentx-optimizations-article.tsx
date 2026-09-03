@@ -49,7 +49,7 @@ function SectionFigure({
       target="_blank"
       rel="noopener noreferrer"
       prefetch={false}
-      className="group my-7 block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
         className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"

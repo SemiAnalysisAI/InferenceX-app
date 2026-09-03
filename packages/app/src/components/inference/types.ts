@@ -461,6 +461,8 @@ export interface ScatterGraphProps {
   yLabel: string;
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
+  /** Opens the complete table when all matching measurements are clipped. */
+  onShowTable?: () => void;
   /**
    * When true, show all hardware types from the data without filtering by activeHwTypes.
    * Used for unofficial run visualization where hardware types may differ from official data.

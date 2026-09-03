@@ -9,6 +9,8 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { Input } from '@/components/ui/input';
@@ -77,6 +79,8 @@ const STRINGS = {
     correlationScatter: 'Correlation scatter',
     shareTitle: 'Copy share link',
     chip: 'Chip',
+    chartToolbar: 'Chart controls',
+    correlationAxes: 'Correlation axes',
   },
   zh: {
     heading: 'PowerX',
@@ -113,6 +117,8 @@ const STRINGS = {
     correlationScatter: '相关性散点图',
     shareTitle: '复制分享链接',
     chip: '芯片',
+    chartToolbar: '图表控制',
+    correlationAxes: '相关性坐标轴',
   },
 } as const;
 
@@ -357,33 +363,35 @@ export default function GpuMetricsDisplay() {
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
         <div className="space-y-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-              <p className="text-muted-foreground text-sm">
+          <DashboardSectionHeader
+            title={t.heading}
+            description={
+              <>
                 {t.descPre}{' '}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code>{' '}
                 {t.descPost}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs text-muted-foreground"
-                onClick={() => {
-                  relockFeatureGate();
-                  track('powerx_relocked');
-                  router.push(localePath('/inference', locale));
-                }}
-                title={t.relockButton}
-              >
-                <Lock className="size-3" />
-                {t.relockButton}
-              </Button>
-              <ChartShareActions />
-            </div>
-          </div>
+              </>
+            }
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs text-muted-foreground"
+                  onClick={() => {
+                    relockFeatureGate();
+                    track('powerx_relocked');
+                    router.push(localePath('/inference', locale));
+                  }}
+                  title={t.relockButton}
+                >
+                  <Lock className="size-3" />
+                  {t.relockButton}
+                </Button>
+                <ChartShareActions />
+              </div>
+            }
+          />
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1">
               <Label htmlFor="gpu-metrics-run-id">{t.runIdLabel}</Label>
@@ -443,38 +451,53 @@ export default function GpuMetricsDisplay() {
       {runInfo && artifacts.length > 0 && (
         <>
           <Card className="mb-4">
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
-              <span>
-                <span className="text-muted-foreground">{t.runLabel}</span>{' '}
-                <a
-                  href={runInfo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand hover:underline font-medium"
-                >
-                  {runInfo.name} #{runInfo.id}
-                </a>
-              </span>
-              <span>
-                <span className="text-muted-foreground">{t.branchLabel}</span> {runInfo.branch}
-              </span>
-              <span>
-                <span className="text-muted-foreground">{t.dateLabel}</span>{' '}
-                {locale === 'zh'
-                  ? new Date(runInfo.createdAt).toLocaleDateString('zh-CN')
-                  : new Date(runInfo.createdAt).toLocaleDateString()}
-              </span>
-              <span>
-                <span className="text-muted-foreground">{t.statusLabel}</span>{' '}
-                {getGpuRunConclusionLabel(runInfo.conclusion, locale)}
-              </span>
-              <span>
-                <span className="text-muted-foreground">{t.dataPointsLabel}</span>{' '}
-                {locale === 'zh'
-                  ? currentData.length.toLocaleString('zh-CN')
-                  : currentData.length.toLocaleString()}
-              </span>
-            </div>
+            <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.runLabel}</dt>
+                <dd className="break-words font-medium">
+                  <a
+                    href={runInfo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand hover:underline font-medium"
+                  >
+                    {runInfo.name} #{runInfo.id}
+                  </a>
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.branchLabel}</dt>
+                <dd className="break-words font-medium">{runInfo.branch}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.dateLabel}</dt>
+                <dd className="font-medium">
+                  {locale === 'zh'
+                    ? new Date(runInfo.createdAt).toLocaleDateString('zh-CN')
+                    : new Date(runInfo.createdAt).toLocaleDateString()}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.statusLabel}</dt>
+                <dd className="font-medium">
+                  {getGpuRunConclusionLabel(runInfo.conclusion, locale)}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.dataPointsLabel}</dt>
+                <dd className="font-medium tabular-nums">
+                  {locale === 'zh'
+                    ? currentData.length.toLocaleString('zh-CN')
+                    : currentData.length.toLocaleString()}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{t.artifactLabel}</dt>
+                <dd className="break-all font-mono text-xs" title={selectedArtifact}>
+                  {selectedArtifact}
+                </dd>
+              </div>
+            </dl>
 
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
               {artifacts.length > 1 && (
@@ -504,7 +527,7 @@ export default function GpuMetricsDisplay() {
                   <SelectTrigger
                     id="gpu-metrics-metric-select"
                     data-testid="gpu-metrics-metric-select"
-                    className="w-[200px]"
+                    className="w-full sm:w-56"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -525,7 +548,8 @@ export default function GpuMetricsDisplay() {
             data-testid="gpu-metrics-chart-container"
             className="relative"
           >
-            <div className="flex items-center justify-end mb-2">
+            <div className="flex flex-col gap-2 border-b border-border/60 pb-3 mb-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs font-medium text-muted-foreground">{t.chartToolbar}</span>
               <div className="flex items-center gap-1.5 no-export">
                 <SegmentedToggle
                   value={chartView}
@@ -541,7 +565,7 @@ export default function GpuMetricsDisplay() {
                   variant="outline"
                   size="sm"
                   onClick={handleShare}
-                  className="h-7 gap-1.5 text-xs"
+                  className="gap-1.5 text-xs"
                   title={t.shareTitle}
                   data-testid="gpu-metrics-share-button"
                 >
@@ -561,44 +585,46 @@ export default function GpuMetricsDisplay() {
             </div>
 
             {chartView === 'correlation' && (
-              <div className="flex flex-wrap items-end gap-3 mb-3 no-export">
-                <div className="space-y-1">
-                  <Label className="text-xs">{t.xAxis}</Label>
-                  <Select
-                    value={corrXMetric}
-                    onValueChange={(v) => handleCorrelationMetricChange('x', v)}
-                  >
-                    <SelectTrigger className="h-8 w-[160px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMetrics.map((m) => (
-                        <SelectItem key={m.key} value={m.key}>
-                          {getGpuMetricLabel(m, locale)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <ControlPanel legend={t.correlationAxes} className="mb-3 no-export">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1 min-w-0">
+                    <Label htmlFor="gpu-metrics-correlation-x">{t.xAxis}</Label>
+                    <Select
+                      value={corrXMetric}
+                      onValueChange={(v) => handleCorrelationMetricChange('x', v)}
+                    >
+                      <SelectTrigger id="gpu-metrics-correlation-x" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMetrics.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>
+                            {getGpuMetricLabel(m, locale)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <Label htmlFor="gpu-metrics-correlation-y">{t.yAxis}</Label>
+                    <Select
+                      value={corrYMetric}
+                      onValueChange={(v) => handleCorrelationMetricChange('y', v)}
+                    >
+                      <SelectTrigger id="gpu-metrics-correlation-y" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMetrics.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>
+                            {getGpuMetricLabel(m, locale)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t.yAxis}</Label>
-                  <Select
-                    value={corrYMetric}
-                    onValueChange={(v) => handleCorrelationMetricChange('y', v)}
-                  >
-                    <SelectTrigger className="h-8 w-[160px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMetrics.map((m) => (
-                        <SelectItem key={m.key} value={m.key}>
-                          {getGpuMetricLabel(m, locale)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              </ControlPanel>
             )}
 
             {chartView === 'chart' && (

@@ -503,7 +503,7 @@ function ModalRenderer({
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
         aria-label={rs.close}
       >
         <X className="size-4" />
@@ -667,7 +667,7 @@ function BannerRenderer({
         <button
           type="button"
           onClick={handleDismiss}
-          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
           aria-label={rs.dismissBanner}
           data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
         >

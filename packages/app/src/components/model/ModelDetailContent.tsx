@@ -106,7 +106,10 @@ export default async function ModelDetailContent({
               </span>
             </div>
           </header>
-          <div className="mt-6">
+          <div
+            className="mt-6 overflow-x-auto rounded-xl border border-border/40 bg-muted/10 p-3 md:p-5"
+            data-testid="model-architecture-diagram"
+          >
             <ModelArchitectureInline displayName={entry.displayName} />
           </div>
           <div className="mt-6 pt-6 border-t border-border/40">

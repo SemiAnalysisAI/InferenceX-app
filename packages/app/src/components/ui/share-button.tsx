@@ -79,7 +79,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
           data-testid="share-button"
           size="sm"
           className={cn(
-            'h-8 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium',
+            'h-11 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium md:h-8',
             className,
           )}
           title={t.title}
@@ -112,7 +112,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
               value={url}
               aria-label={t.inputLabel}
               onFocus={(event) => event.currentTarget.select()}
-              className="border-input bg-background h-8 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="border-input bg-background h-8 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none"
             />
             <Button
               data-testid="share-copy-button"

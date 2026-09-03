@@ -67,14 +67,17 @@ function QuoteCard({
   link?: string;
 }) {
   const content = (
-    <blockquote id={id} className="space-y-4 scroll-mt-24">
+    <blockquote
+      id={id}
+      className="scroll-mt-24 space-y-5 rounded-lg border-l-2 border-brand/40 pl-4 sm:pl-6"
+    >
       <p className="text-base lg:text-lg leading-relaxed text-muted-foreground italic">
         &ldquo;{highlightBrand(text)}&rdquo;
       </p>
-      <footer className="flex items-center gap-3">
+      <footer className="flex min-w-0 items-center gap-3">
         <CompanyLogo org={org} logo={logo} />
-        <div className="h-12 w-0.5 bg-brand" />
-        <div className="text-sm">
+        <div className="h-12 w-px shrink-0 bg-border" />
+        <div className="min-w-0 text-sm">
           {link ? (
             <a
               href={link}
@@ -115,7 +118,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
                     track('quotes_logo_clicked', { org });
                     scrollToOrg(org);
                   }}
-                  className="group flex items-center justify-center h-10 px-3 cursor-pointer rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="group flex items-center justify-center min-h-11 px-3 cursor-pointer rounded-md transition-colors hover:bg-muted focus-visible:outline-none"
                   title={t.jumpTo(org)}
                   aria-label={t.jumpTo(org)}
                 >
@@ -130,7 +133,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
               ))}
             </div>
             <div className="mt-6 pt-6 border-t border-border/40">
-              <div className="flex flex-col gap-10 md:gap-12">
+              <div className="mx-auto flex max-w-4xl flex-col gap-8 md:gap-10">
                 {QUOTES.map((quote, i) => (
                   <Fragment key={`${quote.org}-${quote.name}`}>
                     {i > 0 && <hr className="border-t border-border/40" aria-hidden="true" />}

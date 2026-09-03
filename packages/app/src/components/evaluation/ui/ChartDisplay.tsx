@@ -10,7 +10,10 @@ import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { ResultContext } from '@/components/ui/result-context';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +47,7 @@ export const EVALUATION_DISPLAY_STRINGS = {
     description:
       'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations.',
     captionHeading: 'Evaluation Score by Hardware Configuration',
+    scoreMetric: 'Score',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
@@ -59,6 +63,7 @@ export const EVALUATION_DISPLAY_STRINGS = {
     heading: '准确率评估',
     description: '基准测试结果展示不同芯片、量化精度和推理配置下，模型质量与吞吐量之间的权衡。',
     captionHeading: '各硬件配置的评估得分',
+    scoreMetric: '得分',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
@@ -146,18 +151,24 @@ export default function EvaluationChartDisplay() {
 
   const caption = (
     <>
-      <h3 className="text-lg font-semibold">{t.captionHeading}</h3>
-      <p className="text-sm text-muted-foreground mb-2">
-        {selectedModel} •{' '}
-        {selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')} •{' '}
-        {selectedBenchmark} • {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-        {selectedRunDate && (
-          <>
-            {' '}
-            • {t.updated} {evaluationCaptionDate(selectedRunDate, locale)}
-          </>
-        )}
-      </p>
+      <Heading as="h3" level="card">
+        {t.captionHeading}
+      </Heading>
+      <ResultContext
+        locale={locale}
+        model={selectedModel ?? '—'}
+        workload={selectedBenchmark?.toUpperCase() ?? '—'}
+        precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
+        metric={t.scoreMetric}
+        date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
+        source={
+          isUnofficialRun
+            ? locale === 'zh'
+              ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
+              : 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays'
+            : 'SemiAnalysis InferenceX™'
+        }
+      />
       <UnofficialDomainNotice />
     </>
   );
@@ -167,13 +178,11 @@ export default function EvaluationChartDisplay() {
       <section className="relative z-10">
         <Card>
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-                <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-              </div>
-              <ChartShareActions />
-            </div>
+            <DashboardSectionHeader
+              title={t.heading}
+              description={t.description}
+              actions={<ChartShareActions />}
+            />
             <EvaluationChartControls />
           </div>
         </Card>

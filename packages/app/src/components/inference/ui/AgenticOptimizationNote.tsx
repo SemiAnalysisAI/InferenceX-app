@@ -1,11 +1,4 @@
-import { Info } from 'lucide-react';
-
-import {
-  TooltipContent,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { InfoHelp } from '@/components/ui/option-info';
 import { useLocale } from '@/lib/use-locale';
 
 const STRINGS = {
@@ -29,25 +22,17 @@ export function AgenticOptimizationNote() {
   return (
     <div
       data-testid="agentic-optimization-note"
-      className="flex w-full items-center gap-1 px-1 pr-2 text-xs italic text-blue-600 dark:text-blue-400"
+      className="inline-flex max-w-full items-center gap-1 text-xs leading-5 text-muted-foreground"
     >
-      <span>*{t.label}</span>
-      <TooltipProvider delayDuration={100}>
-        <TooltipRoot>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label={t.aria}
-              className="inline-flex cursor-help rounded-sm p-0.5 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 dark:hover:text-blue-200"
-            >
-              <Info size={13} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={6} className="max-w-70 not-italic leading-snug">
-            {t.details}
-          </TooltipContent>
-        </TooltipRoot>
-      </TooltipProvider>
+      <span>{t.label}</span>
+      <InfoHelp
+        label={t.label}
+        value="agentic-optimizations"
+        ariaLabel={t.aria}
+        triggerClassName="-my-1"
+      >
+        {t.details}
+      </InfoHelp>
     </div>
   );
 }

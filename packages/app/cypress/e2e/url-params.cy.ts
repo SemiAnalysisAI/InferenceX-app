@@ -1,3 +1,4 @@
+import { selectXAxisMode } from '../support/e2e';
 /**
  * Tests that URL parameters correctly drive UI state and that user interactions
  * update the visible output (selector text, SVG axis labels).
@@ -85,14 +86,13 @@ describe('URL Parameter Persistence', () => {
           cy.get(selector).parent().find('[role="button"][aria-label^="Hide "]').click();
           cy.get(selector).should('not.be.checked');
 
-          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-          cy.contains('[role="option"]', 'All-in Provisioned Joules per Total Token').click({
+          cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+          cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
             force: true,
           });
           cy.get(selector).should('not.be.checked');
 
-          cy.get('[data-testid="x-axis-mode-ttft"]').click();
-          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          selectXAxisMode('ttft');
           cy.get(selector).should('not.be.checked');
         });
     });
@@ -113,9 +113,9 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
         .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
-          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+          cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
           cy.contains(
-            '[role="option"]',
+            '[data-select-option]',
             'Cost per Million Total Tokens (Owning - Hyperscaler)',
           ).click({ force: true });
 
@@ -127,8 +127,7 @@ describe('URL Parameter Persistence', () => {
           );
           cy.contains('button', 'Done').click();
           cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-          cy.get('[data-testid="x-axis-mode-ttft"]').click();
-          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          selectXAxisMode('ttft');
           cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').then(
             ($inputs) => {
               const after = [...$inputs].map((input) => input.id).toSorted();
@@ -195,8 +194,11 @@ describe('URL Parameter Persistence', () => {
         .find('svg text[transform="rotate(-90)"]')
         .should('contain.text', 'Total Tokens per $1 TCO');
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.contains(
+        '[data-select-option]',
+        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+      ).click({
         force: true,
       });
 
@@ -230,8 +232,8 @@ describe('URL Parameter Persistence', () => {
 
     it('selecting a Y-axis metric updates the displayed value', () => {
       visitWithDismissedModal('/inference');
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.get('[role="option"]')
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.get('[data-select-option]')
         .eq(1)
         .then(($option) => {
           const optionText = $option.text().trim();
@@ -246,8 +248,8 @@ describe('URL Parameter Persistence', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'All-in Provisioned Joules per Total Token').click({
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
         force: true,
       });
 
@@ -296,8 +298,8 @@ describe('URL Parameter Persistence', () => {
           expect(svg.__zoom?.k, 'active zoom scale').to.be.greaterThan(1);
         });
 
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Input Token Throughput per Chip').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.contains('[data-select-option]', 'Input Token Throughput per Chip').click({ force: true });
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
         'Input Token Throughput per Chip',

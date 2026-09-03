@@ -140,4 +140,26 @@ describe('DatePicker', () => {
       .and('not.contain.text', 'Cancel')
       .and('not.contain.text', 'Close');
   });
+  for (const locale of ['en', 'zh']) {
+    it(`keeps the full date readable and adjacent actions touch-sized in a narrow ${locale} panel`, () => {
+      cy.viewport(375, 812);
+      cy.mount(
+        <PathnameContext.Provider value={locale === 'zh' ? '/zh/evaluation' : '/evaluation'}>
+          <div style={{ width: 285 }}>
+            <DatePickerWrapper initialDate="2025-11-15" useDefaults />
+          </div>
+        </PathnameContext.Provider>,
+      );
+      cy.get('button').each(($button) => {
+        expect($button[0].getBoundingClientRect().height).to.be.at.least(44);
+      });
+      cy.get('button span.tabular-nums').should(($date) => {
+        expect($date[0].scrollWidth).to.be.at.most($date[0].clientWidth);
+      });
+      cy.get(
+        `button[aria-label="${locale === 'zh' ? '上一个可用日期' : 'Previous available date'}"]`,
+      ).click();
+      cy.get('button span.tabular-nums').should('contain.text', '10');
+    });
+  }
 });

@@ -21,22 +21,26 @@ describe('Dropdown one-click switching', () => {
 
     cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
-    // The default model is FP4-only in the fixtures, which hides the Precision
-    // control — switch to a multi-precision model so both dropdowns exist.
+    // The default model is FP4-only, so Precision is disabled. Wait for
+    // the multi-precision model's availability to enable the combobox.
     cy.visit('/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
 
-    cy.get('[data-testid="model-selector"]').click();
+    // Frame both controls below the sticky header. Start with the lower
+    // control so its open menu does not physically cover the next trigger.
+    cy.get('[data-testid="precision-multiselect"][role="combobox"]:enabled')
+      .scrollIntoView({ offset: { top: -240, left: 0 } })
+      .click({ scrollBehavior: false });
     cy.get('[data-slot="select-content"]').should('have.length', 1);
 
-    cy.get('[data-testid="precision-multiselect"]').click();
+    cy.get('[data-testid="model-selector"]').click({ scrollBehavior: false });
     cy.get('[data-slot="select-content"]').should('have.length', 1);
-    cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
   });
 
   it('Escape closes an open MultiSelect dropdown', () => {
@@ -78,7 +82,7 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('Escape closes the Y-axis SearchableSelect dropdown', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-slot="select-content"]').should('exist');
 

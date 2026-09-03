@@ -488,7 +488,7 @@ export function AgentXCompareHero({
                   analyticsTarget={model.slug}
                   analyticsSurface={surface}
                   appNavigation
-                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     {MODEL_LOGOS[model.slug] && (

@@ -69,12 +69,15 @@ export default function InferenceTable({
         cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         className: 'font-medium whitespace-nowrap',
+        importance: 'key',
+        pinned: true,
       },
       {
         header: headers.precision,
         cell: (row) => (row.precision ? getPrecisionLabel(row.precision as Precision) : ''),
         sortValue: (row) => row.precision ?? '',
         className: 'whitespace-nowrap',
+        importance: 'key',
       },
       {
         header: headers.tensorParallelism,
@@ -82,6 +85,7 @@ export default function InferenceTable({
         cell: (row) => row.tp,
         sortValue: (row) => row.tp,
         className: 'tabular-nums',
+        importance: 'secondary',
       },
       {
         header: headers.concurrency,
@@ -89,6 +93,7 @@ export default function InferenceTable({
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
         className: 'tabular-nums',
+        importance: 'secondary',
       },
       {
         header: headers.yMetric,
@@ -96,6 +101,7 @@ export default function InferenceTable({
         cell: (row) => formatInferenceTableNumber(yPath ? getNestedYValue(row, yPath) : row.y),
         sortValue: (row) => (yPath ? getNestedYValue(row, yPath) : row.y),
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: headers.xMetric,
@@ -103,6 +109,7 @@ export default function InferenceTable({
         cell: (row) => formatInferenceTableNumber(row.x),
         sortValue: (row) => row.x,
         className: 'tabular-nums',
+        importance: 'key',
       },
       {
         header: headers.throughput,
@@ -110,6 +117,7 @@ export default function InferenceTable({
         cell: (row) => formatInferenceTableNumber(row.tput_per_gpu ?? 0, 1),
         sortValue: (row) => row.tput_per_gpu ?? 0,
         className: 'tabular-nums',
+        importance: 'key',
       },
     ],
     [yPath, headers],

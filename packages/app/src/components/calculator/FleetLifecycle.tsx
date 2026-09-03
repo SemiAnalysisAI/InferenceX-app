@@ -18,11 +18,15 @@ import {
   VeraRubinOfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
@@ -108,6 +112,8 @@ const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
 const STRINGS = {
   en: {
     title: 'Fleet Lifecycle',
+    fleetSizingGroup: 'Fleet sizing',
+    assumptionsGroup: 'Fleet economics & assumptions',
     viewChart: 'Chart',
     viewTable: 'Table',
     viewAria: 'View mode',
@@ -222,6 +228,8 @@ const STRINGS = {
   },
   zh: {
     title: '集群生命周期',
+    fleetSizingGroup: '集群规模',
+    assumptionsGroup: '集群经济性与假设',
     viewChart: '图表',
     viewTable: '表格',
     viewAria: '显示模式',
@@ -844,16 +852,6 @@ export default function FleetLifecycle({
     [t],
   );
 
-  /**
-   * The same options without test ids. The toggle is rendered twice — once in the
-   * button row, once in the caption for narrow screens — and two elements sharing
-   * a test id makes every `cy.click` on it ambiguous.
-   */
-  const mobileViewOptions = useMemo<SegmentedToggleOption<LifecycleView>[]>(
-    () => viewOptions.map(({ testId: _testId, ...option }) => option),
-    [viewOptions],
-  );
-
   const handleViewChange = useCallback((value: LifecycleView) => {
     setView(value);
     track('calculator_lifecycle_view_changed', { view: value });
@@ -1049,16 +1047,9 @@ export default function FleetLifecycle({
    */
   const caption = (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <h2 className="text-lg font-semibold">{t.title}</h2>
-        <SegmentedToggle
-          value={view}
-          options={mobileViewOptions}
-          onValueChange={handleViewChange}
-          ariaLabel={t.viewAria}
-          className="md:hidden shrink-0"
-        />
-      </div>
+      <Heading as="h2" level="card">
+        {t.title}
+      </Heading>
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
         {t.captionTarget(targetValue)}
@@ -1262,7 +1253,7 @@ export default function FleetLifecycle({
 
     return (
       <>
-        <div className="flex flex-wrap gap-4">
+        <ControlPanel legend={t.assumptionsGroup} className="sm:grid-cols-2 xl:grid-cols-3">
           <div className="flex flex-col space-y-1.5">
             <LabelWithTooltip
               htmlFor="calc-lifecycle-price"
@@ -1279,7 +1270,7 @@ export default function FleetLifecycle({
                 value={priceInput}
                 onChange={handlePriceChange}
                 aria-label={t.priceInputLabel}
-                className="w-24 h-9"
+                className="w-24"
               />
               <Input
                 id="calc-lifecycle-output-price"
@@ -1290,17 +1281,19 @@ export default function FleetLifecycle({
                 value={outputPriceInput}
                 onChange={handleOutputPriceChange}
                 aria-label={t.outputPriceInputLabel}
-                className="w-24 h-9"
+                className="w-24"
               />
               {priceEdited.current && breakEven !== null && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={handlePriceReset}
                   data-testid="calc-lifecycle-price-reset"
-                  className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   {t.priceReset}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -1347,11 +1340,11 @@ export default function FleetLifecycle({
                 step={input.id === 'calc-lifecycle-ramp' ? 0.25 : 'any'}
                 value={input.value}
                 onChange={input.onChange}
-                className="w-32 h-9"
+                className="w-32"
               />
             </div>
           ))}
-        </div>
+        </ControlPanel>
 
         {rows.length > 0 && Number.isFinite(anchorMs) ? (
           <figure data-testid="calculator-lifecycle-figure" className="relative rounded-lg">
@@ -1529,28 +1522,27 @@ export default function FleetLifecycle({
       <section data-testid="calculator-lifecycle-section">
         <Card>
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.title}</h2>
-              <p className="text-muted-foreground text-sm">{t.description}</p>
-            </div>
+            <DashboardSectionHeader title={t.title} description={t.description} />
             {/* Outside `body()` on purpose: every other control is only meaningful
                 once a fleet exists, but this is the one that brings it into being,
                 so it has to render in the empty state too. */}
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
-              <Input
-                id="calc-fleet-mw"
-                data-testid="calc-fleet-mw-input"
-                type="number"
-                min={0}
-                step="any"
-                placeholder={t.mwPlaceholder}
-                value={mwInput}
-                onChange={(e) => onMwInputChange(e.target.value)}
-                onBlur={() => track('calculator_fleet_mw_set', { mw: mwInput })}
-                className="w-32 h-9"
-              />
-            </div>
+            <ControlPanel legend={t.fleetSizingGroup} className="sm:max-w-md">
+              <div className="flex min-w-0 flex-col space-y-1.5">
+                <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
+                <Input
+                  id="calc-fleet-mw"
+                  data-testid="calc-fleet-mw-input"
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder={t.mwPlaceholder}
+                  value={mwInput}
+                  onChange={(e) => onMwInputChange(e.target.value)}
+                  onBlur={() => track('calculator_fleet_mw_set', { mw: mwInput })}
+                  className="w-full sm:w-32"
+                />
+              </div>
+            </ControlPanel>
             {body()}
           </div>
         </Card>

@@ -61,7 +61,7 @@ export function CollapsibleSection({
             setOpen(next);
             onToggle?.(next);
           }}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-[3px] cursor-pointer"
+          className="text-muted-foreground hover:text-foreground rounded-sm outline-none cursor-pointer"
         >
           <ChevronDownIcon
             className={cn('size-5 transition-transform duration-200', open && 'rotate-180')}

@@ -34,7 +34,12 @@ describe('Header', () => {
       <AppRouterContext.Provider value={mockRouter}>
         <PathnameContext.Provider value={pathname}>
           <QueryClientProvider client={queryClient}>
-            <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              themes={['light', 'dark', 'minecraft']}
+              disableTransitionOnChange
+            >
               <Header />
             </ThemeProvider>
           </QueryClientProvider>
@@ -44,6 +49,9 @@ describe('Header', () => {
   }
 
   beforeEach(() => {
+    // ThemeProvider reads persisted state, so isolate each header story from
+    // the preceding theme-cycle story (including the minecraft audio tools).
+    cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
   });
@@ -221,6 +229,30 @@ describe('Header', () => {
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Telemetry').should('not.exist');
     });
+  });
+
+  it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
+    cy.viewport(390, 844);
+    for (const theme of ['light', 'dark', 'minecraft']) {
+      cy.get('[data-testid="theme-toggle"]').should(
+        'have.attr',
+        'aria-label',
+        `Switch theme (currently ${theme} mode)`,
+      );
+      cy.get('[data-testid="language-toggle"]').then(($language) => {
+        const language = getComputedStyle($language[0]);
+        for (const selector of ['theme-toggle', 'mobile-menu-toggle']) {
+          cy.get(`[data-testid="${selector}"]`).should(($control) => {
+            const style = getComputedStyle($control[0]);
+            expect(style.color, `${theme}: ${selector} color`).to.equal(language.color);
+            expect(style.borderRadius, `${theme}: ${selector} shape`).to.equal(
+              language.borderRadius,
+            );
+          });
+        }
+      });
+      cy.get('[data-testid="theme-toggle"]').click();
+    }
   });
 
   it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {

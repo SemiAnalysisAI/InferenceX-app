@@ -40,7 +40,7 @@ export function ChartSection({
   analyticsPrefix,
   children,
   zoomResetEvent,
-  className = 'pt-8 md:pt-0',
+  className,
   setIsLegendExpanded,
   onExportCsv,
   exportFileName,
@@ -50,7 +50,7 @@ export function ChartSection({
 }: ChartSectionProps) {
   return (
     <section className={className}>
-      <figure className="relative rounded-lg">
+      <figure className="relative min-w-0 rounded-xl">
         {/* Export and Reset Zoom Buttons */}
         <ChartButtons
           chartId={chartId}

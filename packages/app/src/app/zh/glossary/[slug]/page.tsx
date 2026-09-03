@@ -182,7 +182,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                   </p>
                 </section>
 
-                <section aria-labelledby="technical-definition-heading" className="mt-8">
+                <section aria-labelledby="technical-definition-heading" className="mt-8 max-w-3xl">
                   <h2
                     id="technical-definition-heading"
                     className="text-xl font-semibold tracking-tight"
@@ -203,7 +203,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                   </div>
                 )}
 
-                <div className="mt-10 space-y-10 border-t border-border/50 pt-10">
+                <div className="mt-10 max-w-3xl space-y-10 border-t border-border/50 pt-10">
                   <section aria-labelledby="engineering-details">
                     <h2 id="engineering-details" className="text-xl font-semibold tracking-tight">
                       工程细节
@@ -234,7 +234,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                     <Link
                       key={related.slug}
                       href={`/zh/glossary/${related.slug}`}
-                      className="group border-b border-border/40 py-3 text-sm font-medium transition-colors last:border-b-0 hover:text-brand"
+                      className="group border-b border-border/40 py-3 text-sm font-medium transition-colors last:border-b-0 hover:text-brand focus-visible:outline-none"
                     >
                       <span className="flex items-center justify-between gap-3">
                         {related.term}
@@ -273,7 +273,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                     <Link
                       key={article.slug}
                       href={`/zh/blog/${article.slug}`}
-                      className="group grid gap-2 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
+                      className="group grid gap-2 py-5 focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
                     >
                       <div>
                         <h3 className="font-semibold leading-snug group-hover:text-brand group-hover:underline">
@@ -300,7 +300,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
             {adjacent.previous ? (
               <Link
                 href={`/zh/glossary/${adjacent.previous.slug}`}
-                className="rounded-xl border border-border/40 bg-background/20 p-5 backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5"
+                className="rounded-xl border border-border/40 bg-background/20 p-5 backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none"
               >
                 <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
                   ← 上一条
@@ -313,7 +313,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
             {adjacent.next && (
               <Link
                 href={`/zh/glossary/${adjacent.next.slug}`}
-                className="rounded-xl border border-border/40 bg-background/20 p-5 text-right backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5"
+                className="rounded-xl border border-border/40 bg-background/20 p-5 text-right backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none"
               >
                 <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
                   下一条 →

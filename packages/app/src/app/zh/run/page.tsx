@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import type { RunPageEntry } from '@/lib/run-pages';
@@ -84,19 +84,26 @@ export default async function ZhRunIndexPage() {
 
           <section className="mt-10 mb-16 space-y-8">
             {models.map((model) => (
-              <Card key={model.slug} className="p-5">
-                <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+              <Card key={model.slug} className="gap-0 p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                    {(byModel.get(model.slug) ?? []).length} 款 GPU
+                  </span>
+                </div>
+                <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                   {(byModel.get(model.slug) ?? []).map((entry) => {
                     const chipLabel = entry.chip.label;
                     return (
                       <li key={entry.slug}>
-                        <Link
+                        <CatalogLinkCard
                           href={`/zh/run/${entry.slug}`}
-                          className="text-sm font-medium text-brand hover:underline"
-                        >
-                          {model.seoName} 运行在 {chipLabel}
-                        </Link>
+                          title={`${model.seoName} 运行在 ${chipLabel}`}
+                          description="实测吞吐量、延迟与成本"
+                          slug={entry.slug}
+                          locale="zh"
+                          event="run_index_entry_clicked"
+                        />
                       </li>
                     );
                   })}

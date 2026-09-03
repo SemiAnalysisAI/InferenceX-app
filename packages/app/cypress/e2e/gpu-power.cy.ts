@@ -187,14 +187,23 @@ describe('PowerX Chinese route', () => {
       'aria-label',
       '显示模式',
     );
+    cy.get('[data-testid="gpu-metrics-chart-container"]').should('contain.text', '图表控制');
     cy.get('[data-testid="gpu-metrics-share-button"]').should('have.attr', 'title', '复制分享链接');
     cy.get('[data-testid="gpu-metrics-display"]')
       .should('contain.text', '2026/8/23')
+      .and('contain.text', 'GPU metrics test')
+      .and('contain.text', 'feat/test')
+      .and('contain.text', 'gpu_metrics_h200_test')
       .and('contain.text', '芯片 0')
       .and('contain.text', '单芯片统计信息')
       .and('contain.text', '样本数')
       .and('contain.text', '最小值');
-    cy.contains('span', '状态：')
+    cy.contains('dt', '产物')
+      .next('dd')
+      .should('have.css', 'white-space', 'normal')
+      .and('have.text', 'gpu_metrics_h200_test');
+    cy.contains('dt', '运行：').next('dd').should('have.css', 'white-space', 'normal');
+    cy.contains('dt', '状态：')
       .parent()
       .should('contain.text', '成功')
       .and('not.contain.text', 'success');

@@ -615,6 +615,27 @@ describe('Model Architecture Diagram', () => {
       cy.contains('button', 'Config Changelog').click();
       cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
     });
+
+    it('retains the axis selector even though the full filter panel is hidden', () => {
+      cy.get('[data-testid="chart-figure"] [data-testid^="option-help-y_"]')
+        .first()
+        .should('have.class', 'no-export')
+        .click();
+      cy.get('[data-testid^="option-help-content-y_"]')
+        .should('contain.text', 'infrastructure spend')
+        .and('contain.text', 'Formula')
+        .type('{esc}');
+      cy.get('[data-testid^="axis-metric-row-"]').should('not.exist');
+      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-ttft"]').click();
+      cy.get('[data-testid="x-axis-mode-selector"]')
+        .should('contain.text', 'TTFT')
+        .and('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="chart-figure"] h2')
+        .first()
+        .should('contain.text', 'Time To First Token');
+      cy.get('[data-testid="model-selector"]').should('not.exist');
+    });
   });
 
   describe('Dashboard architecture icon link (replaces the banner row)', () => {

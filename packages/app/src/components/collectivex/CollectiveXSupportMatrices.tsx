@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/use-locale';
 
 import {
@@ -91,7 +92,7 @@ export function CollectiveXSupportMatrices() {
     <Card data-testid="collectivex-support-matrices" className="min-w-0">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">{t.title}</h2>
+          <Heading level="card">{t.title}</Heading>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t.description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs text-muted-foreground">

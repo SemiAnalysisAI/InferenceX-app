@@ -8,7 +8,7 @@
  * overlay point now survives exactly when it is non-dominated on the axes on
  * screen, and Show All remains the way to inspect the rest.
  */
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
   countVisible,
   DOMINATED_CONFIG,
@@ -37,11 +37,8 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
       },
     );
     cy.wait('@unofficialRun');
-    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
-    // is the default — clicked anyway so the suite does not depend on that.
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
-      .click()
-      .should('have.attr', 'data-state', 'active');
+    // Explicitly select Interactivity so this suite does not depend on the default.
+    selectXAxisMode('interactivity');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     // All six are rendered; visibility is what Optimal Only changes.
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
