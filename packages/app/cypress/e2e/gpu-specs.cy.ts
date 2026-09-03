@@ -409,10 +409,12 @@ describe('GPU Specs Navigation', () => {
     cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
   });
 
-  it('tab switcher activates GPU Specs', () => {
-    cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
+  it('footer link opens GPU Specs and the tab strip shows no active tab', () => {
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
+    cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
     cy.url().should('include', '/gpu-specs');
     cy.get('h2').should('contain.text', 'Chip Specifications');
+    cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]').should('not.exist');
   });
 });
 
