@@ -64,10 +64,8 @@ import {
 } from '@/components/unofficial-run-provider';
 import {
   type Model,
-  type Precision,
   Sequence,
   getModelLabel,
-  getPrecisionLabel,
   getSequenceLabel,
   sequenceKind,
 } from '@/lib/data-mappings';
@@ -1037,9 +1035,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            precision={selectedPrecisions
-                              .map((precision) => getPrecisionLabel(precision as Precision))
-                              .join(', ')}
                             costTier={(() => {
                               const tier = metricCostTier(
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
