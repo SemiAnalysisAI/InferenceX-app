@@ -60,6 +60,6 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference?i_seq=8k%2F1k');
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-spec-select"]').should('exist');
+    cy.get('[data-testid="quick-filter-spec-options"]').should('exist');
   });
 });

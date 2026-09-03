@@ -25,8 +25,8 @@ import {
 import { track } from '@/lib/analytics';
 import { Sequence } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 
 const STRINGS = {
   en: {
@@ -36,7 +36,6 @@ const STRINGS = {
     agenticDescription:
       'Narrow the chart by chip vendor, serving framework, deployment mode, and power-measurement status. Selecting none in a group shows all.',
     selected: 'selected',
-    all: 'All',
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show only the best configuration for each chip',
     bestPerSkuHelp:
@@ -78,7 +77,6 @@ const STRINGS = {
     agenticDescription:
       '按芯片厂商、推理框架、部署模式和功耗测量状态筛选图表。某组不选则显示全部。',
     selected: '项已选',
-    all: '全部',
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片只显示表现最佳的配置',
     bestPerSkuHelp:
@@ -123,6 +121,10 @@ const SPEC_MODES: { value: SpecMode; label: string }[] = [
   { value: 'stp', label: 'STP' },
 ];
 const POWER_TIERS: PowerTier[] = ['certified', 'legacy'];
+
+function toggleValue<T extends string>(current: readonly T[], value: T): T[] {
+  return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+}
 
 export function QuickFiltersDialog({
   open,
@@ -248,11 +250,13 @@ export function QuickFiltersDialog({
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
 
-  const handleGroupChange = (
+  // Every option is a visible toggle: one tap adds or removes it, no dropdown
+  // to open first. Empty selection in a group means "all".
+  const handleToggle = (
     category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power',
-    values: string[],
+    value: string,
   ) => {
-    const previous =
+    const previous: readonly string[] =
       category === 'vendor'
         ? quickFilters.vendors
         : category === 'framework'
@@ -262,14 +266,12 @@ export function QuickFiltersDialog({
             : category === 'power'
               ? quickFilters.power
               : quickFilters.spec;
-    const changed = new Set([...previous, ...values]);
-    for (const value of changed) {
-      const wasActive = previous.includes(value);
-      const isActive = values.includes(value);
-      if (wasActive !== isActive) {
-        track('inference_quick_filter_toggled', { category, value, active: isActive });
-      }
-    }
+    const values = toggleValue(previous, value);
+    track('inference_quick_filter_toggled', {
+      category,
+      value,
+      active: values.includes(value),
+    });
     if (category === 'vendor') setQuickFilterVendors(values);
     else if (category === 'framework') setQuickFilterFrameworks(values);
     else if (category === 'deployment') setQuickFilterDeployment(values as DeploymentMode[]);
@@ -341,7 +343,7 @@ export function QuickFiltersDialog({
               className="grid gap-2 px-3 py-3 sm:grid-cols-[7rem_1fr] sm:items-start"
             >
               <div className="flex items-start gap-1 sm:pt-2">
-                <Label htmlFor={`quick-filter-${group.key}-select`}>{group.label}</Label>
+                <Label id={`quick-filter-${group.key}-label`}>{group.label}</Label>
                 <OptionInfo
                   label={group.label}
                   value={`quick-filter-${group.key}`}
@@ -352,25 +354,36 @@ export function QuickFiltersDialog({
                   {help[group.key]}
                 </OptionInfo>
               </div>
-              <MultiSelect
-                options={group.options.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                  disabled: !option.available && !group.selected.includes(option.value),
-                  title: option.available ? undefined : t.noData,
-                  testId: `quick-filter-${group.key}-${option.value}`,
-                }))}
-                value={[...group.selected]}
-                onChange={(values) => handleGroupChange(group.key, values)}
-                placeholder={t.all}
-                ariaLabel={group.label}
-                triggerId={`quick-filter-${group.key}-select`}
-                triggerTestId={`quick-filter-${group.key}-select`}
-                searchable={false}
-                plainSelectedText
-                showSelectionSummary={false}
-                showClearAll={false}
-              />
+              <div
+                role="group"
+                aria-labelledby={`quick-filter-${group.key}-label`}
+                data-testid={`quick-filter-${group.key}-options`}
+                className="flex flex-wrap gap-2"
+              >
+                {group.options.map((option) => {
+                  const active = group.selected.includes(option.value);
+                  const disabled = !option.available && !active;
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      size="sm"
+                      variant={active ? 'default' : 'outline'}
+                      aria-pressed={active}
+                      disabled={disabled}
+                      title={disabled ? t.noData : undefined}
+                      className={cn(
+                        'rounded-full font-normal',
+                        active && 'bg-brand hover:bg-brand/90',
+                      )}
+                      data-testid={`quick-filter-${group.key}-${option.value}`}
+                      onClick={() => handleToggle(group.key, option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </section>
           ))}
         </div>

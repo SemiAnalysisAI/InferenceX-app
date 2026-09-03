@@ -132,7 +132,6 @@ describe('Validated vs historical measured power', () => {
     // Quick Filters gains the Measured Power category with both options enabled.
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-power-select"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
@@ -143,7 +142,6 @@ describe('Validated vs historical measured power', () => {
 
     // Certified-only: legacy points (and with them every ring and the legend
     // key) leave the chart while the certified series stays.
-    cy.get('[data-testid="quick-filter-power-select"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
@@ -156,19 +154,17 @@ describe('Validated vs historical measured power', () => {
     // Clear filters restores the legacy series, rings, and legend key.
     cy.contains('button', 'Clear filters').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
-    cy.get('[data-testid="quick-filter-power-select"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').should(
       'have.attr',
-      'aria-selected',
+      'aria-pressed',
       'false',
     );
-    cy.get('body').type('{esc}');
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
     cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
     cy.get('[data-testid="legacy-power-key"]').should('be.visible');
   });
 
-  it('restores a shared i_power=certified link with the option pre-selected', () => {
+  it('restores a shared i_power=certified link with the toggle pre-selected', () => {
     // Note: filter writes live in the in-memory share-link store (the address
     // bar is deliberately stripped after load — see url-state.ts), so the
     // durable observable behavior is the restore direction tested here.
@@ -179,10 +175,9 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="legacy-power-key"]').should('not.exist');
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filter-power-select"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').should(
       'have.attr',
-      'aria-selected',
+      'aria-pressed',
       'true',
     );
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');

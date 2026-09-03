@@ -71,32 +71,19 @@ describe('Inference Chart', () => {
     cy.get('.sidebar-legend').should('be.visible');
   });
 
-  it('renders quick filters and selects vendors from a combobox', () => {
+  it('renders quick filters as visible toggles and toggles a vendor', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-deployment-select"]').click();
     cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
     cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
     cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-selected', 'false')
-      .click();
-    cy.get('[data-testid="quick-filter-vendor-select"]')
-      .should('have.attr', 'aria-expanded', 'false')
-      .click();
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-selected', 'true')
-      .click();
-    cy.get('[data-testid="quick-filter-vendor-select"]')
-      .should('have.attr', 'aria-expanded', 'false')
-      .click();
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should(
-      'have.attr',
-      'aria-selected',
-      'false',
-    );
+      .should('have.attr', 'aria-pressed', 'false')
+      .click()
+      .should('have.attr', 'aria-pressed', 'true')
+      .click()
+      .should('have.attr', 'aria-pressed', 'false');
     cy.get('body').type('{esc}');
   });
 

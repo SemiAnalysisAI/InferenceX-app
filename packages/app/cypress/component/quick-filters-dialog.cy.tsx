@@ -69,11 +69,11 @@ describe('QuickFiltersDialog', () => {
       inference: { availableQuickFilters },
     });
     cy.clock();
-    cy.get('[data-testid="quick-filter-vendor-select"]').focus();
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').focus();
     cy.get('[data-testid="option-help-quick-filter-vendor"]').trigger('pointerover', {
       pointerType: 'mouse',
     });
-    cy.get('[data-testid="quick-filter-vendor-select"]').should('have.focus');
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should('have.focus');
     cy.get('[data-testid="option-help-quick-filter-vendor"]').trigger('pointerout', {
       pointerType: 'mouse',
     });
@@ -87,7 +87,7 @@ describe('QuickFiltersDialog', () => {
     });
     cy.tick(250);
     cy.get('[data-testid="option-help-content-quick-filter-vendor"]').should('not.exist');
-    cy.get('[data-testid="quick-filter-vendor-select"]').should('have.focus');
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should('have.focus');
     cy.get('@changeOpen').should('not.have.been.called');
     cy.clock().then((clock) => clock.restore());
   });
@@ -104,10 +104,8 @@ describe('QuickFiltersDialog', () => {
     cy.get('body').type('{esc}');
     cy.get('[data-testid="option-help-quick-filter-framework"]').should('have.focus');
     cy.get('@changeOpen').should('not.have.been.called');
-    cy.get('[data-testid="quick-filter-framework-select"]').click();
     cy.get('[data-testid="quick-filter-framework-vllm"]').click();
     cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', ['vllm']);
-    cy.get('[role="listbox"]').should('not.exist');
   });
 
   it('removes only the chosen visible filter without resetting the benchmark scope', () => {
@@ -158,19 +156,31 @@ describe('QuickFiltersDialog', () => {
     cy.get('@setQuickFilterSpec').should('not.have.been.called');
   });
 
-  it('closes a keyboard-opened dropdown before dismissing the dialog', () => {
+  it('toggles visible options with one keyboard press and lets Escape close the dialog', () => {
     mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub().as('changeOpen')} />, {
-      inference: { availableQuickFilters },
+      inference: {
+        availableQuickFilters,
+        quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [], power: [] },
+      },
     });
 
-    cy.get('[data-testid="quick-filter-vendor-select"]').focus().type('{downarrow}');
-    cy.focused().should('have.text', 'NVIDIA').type('{downarrow}');
-    cy.focused().should('have.text', 'AMD').type('{esc}');
-    cy.get('[role="listbox"]').should('not.exist');
-    cy.get('[data-testid="quick-filter-vendor-select"]').should('be.focused');
+    // Every option is rendered up front — nothing to open before selecting.
+    cy.get('[data-testid="quick-filter-vendor-options"]')
+      .should('have.attr', 'role', 'group')
+      .find('button')
+      .should('have.length', 2);
+    cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
+      .should('have.attr', 'aria-pressed', 'false')
+      .focus()
+      .should('have.focus');
+    cy.press(Cypress.Keyboard.Keys.SPACE);
+    cy.get('@setQuickFilterVendors').should('have.been.calledOnceWith', ['AMD', 'NVIDIA']);
+    cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
+    cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
     cy.get('@changeOpen').should('not.have.been.called');
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.focused().type('{esc}');
+    cy.get('body').type('{esc}');
     cy.get('@changeOpen').should('have.been.calledWith', false);
   });
 
@@ -180,19 +190,10 @@ describe('QuickFiltersDialog', () => {
     });
 
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should('exist');
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
-    cy.get('[data-testid="quick-filter-framework-select"]').click();
-    cy.get('[data-testid="quick-filter-framework-vllm"]').should('exist');
-    cy.get('[data-testid="quick-filter-framework-select"]').click();
-    cy.get('[data-testid="quick-filter-deployment-select"]').click();
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('exist');
-    cy.get('[data-testid="quick-filter-deployment-select"]').click();
-    cy.get('[data-testid="quick-filter-spec-select"]').click();
-    cy.get('[data-testid="quick-filter-spec-mtp"]').should('exist');
-    cy.get('[data-testid="quick-filter-spec-select"]').click();
-    cy.get('[data-testid="quick-filter-power-select"]').click();
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-framework-vllm"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-spec-mtp"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
   });
@@ -218,20 +219,10 @@ describe('QuickFiltersDialog', () => {
       },
     });
 
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').click();
     cy.get('@setQuickFilterVendors').should('have.been.calledWith', ['NVIDIA']);
-    cy.get('[data-testid="quick-filter-vendor-select"]').should(
-      'have.attr',
-      'aria-expanded',
-      'false',
-    );
-    cy.get('[data-testid="quick-filter-framework-select"]').should('exist').click();
-    cy.get('[data-testid="quick-filter-framework-vllm"]').should('exist');
-    cy.get('[data-testid="quick-filter-framework-select"]').click();
-    cy.get('[data-testid="quick-filter-deployment-select"]').should('exist').click();
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('exist');
-    cy.get('[data-testid="quick-filter-deployment-select"]').click();
+    cy.get('[data-testid="quick-filter-framework-vllm"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('be.visible');
     cy.get('[data-testid^="quick-filter-spec-"]').should('not.exist');
     cy.contains('Spec Decoding').should('not.exist');
   });
@@ -251,15 +242,12 @@ describe('QuickFiltersDialog', () => {
       },
     });
 
-    cy.get('[data-testid="quick-filter-vendor-select"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]')
-      .should('have.attr', 'aria-selected', 'true')
-      .and('not.have.attr', 'aria-disabled', 'true');
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should(
-      'have.attr',
-      'aria-disabled',
-      'true',
-    );
+      .should('have.attr', 'aria-pressed', 'true')
+      .and('be.enabled');
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
+      .should('be.disabled')
+      .and('have.attr', 'title', 'No data for the current selection');
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
   });
