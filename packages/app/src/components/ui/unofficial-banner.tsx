@@ -44,7 +44,7 @@ export function UnofficialBanner({
   if (runs.length === 0) return null;
   const multiple = runs.length > 1;
 
-  return (
+  const banner = (
     <div
       data-slot="unofficial-banner"
       className={cn(
@@ -89,6 +89,10 @@ export function UnofficialBanner({
       </div>
     </div>
   );
+
+  // Compare and model pages render the standalone banner outside their own
+  // content containers, so it needs the same width and page gutters here.
+  return attached ? banner : <div className="container mx-auto mb-4 px-4 lg:px-8">{banner}</div>;
 }
 
 function RunChip({
