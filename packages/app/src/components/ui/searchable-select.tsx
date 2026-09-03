@@ -55,6 +55,7 @@ interface SearchableSelectProps {
   /** Hydration-safe label for selectors with a known server-side default. */
   initialLabel?: string;
   className?: string;
+  contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
   size?: 'sm' | 'default';
@@ -77,6 +78,7 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
+  contentClassName,
   triggerId,
   triggerTestId,
   size = 'default',
@@ -330,7 +332,10 @@ export function SearchableSelect({
               (options.find((option) => option.dataset.value === value) ?? options[0])?.focus();
             }
           }}
-          className="z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none"
+          className={cn(
+            'z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none',
+            contentClassName,
+          )}
         >
           {/* Search header lives outside the scrollable region so it never picks up
            * `sticky` → `position: fixed` resolution that puts it behind the page

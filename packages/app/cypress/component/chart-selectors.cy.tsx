@@ -593,10 +593,10 @@ describe('Chart Selectors', () => {
       });
     }
 
-    it('combines the fixed-length and deprecated headings for a retired scenario', () => {
+    it('marks model-specific retired scenarios in their option labels', () => {
       // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
       // (InferenceX#2493): with the model passed in, 8K / 1K moves out of the
-      // default fixed-seq group into the Deprecated group.
+      // option label gains the deprecated status without a separate group.
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
@@ -611,16 +611,16 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-selector"]').click();
       cy.get('[data-slot="select-label"]')
         .should('have.length', 1)
-        .and('have.text', 'Fixed Sequence Length (Deprecated)');
-      cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length (Deprecated)')
+        .and('have.text', 'Fixed Sequence Length');
+      cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length')
         .closest('[role="rowgroup"]')
         .find('[data-select-option]')
         .first()
-        .should('contain.text', '8K / 1K');
+        .should('have.text', '8K / 1K (deprecated)');
     });
 
     for (const locale of ['en', 'zh']) {
-      it(`keeps active and deprecated fixed-length choices in separate groups (${locale})`, () => {
+      it(`keeps retired choices selectable in one fixed-length group with inline status (${locale})`, () => {
         cy.viewport(390, 720);
         cy.mount(
           <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
@@ -643,37 +643,47 @@ describe('Chart Selectors', () => {
         );
         cy.get('[data-testid="scenario-selector"]').click('right');
         const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
-        const deprecated =
-          locale === 'zh' ? '固定序列长度（已弃用）' : 'Fixed Sequence Length (Deprecated)';
-        cy.get('[data-slot="select-label"]').should('have.length', 2);
+        const deprecated = locale === 'zh' ? '1K / 1K（已弃用）' : '1K / 1K (deprecated)';
+        cy.get('[data-slot="select-label"]').should('have.length', 1);
+        cy.contains('[data-select-option]', deprecated).should(($option) => {
+          const option = $option[0];
+          const label = option.querySelector('span')!;
+          const css = label.ownerDocument.defaultView!.getComputedStyle(label);
+          expect(
+            label.getBoundingClientRect().height,
+            'status fits on one line on phones',
+          ).to.be.at.most(parseFloat(css.lineHeight) + 1);
+          const popup = option.closest('[data-slot="select-content"]')!.getBoundingClientRect();
+          expect(popup.left).to.be.at.least(0);
+          expect(popup.right).to.be.at.most(option.ownerDocument.documentElement.clientWidth);
+        });
         cy.contains('[data-slot="select-label"]', new RegExp(`^${active}$`, 'u'))
           .closest('[role="rowgroup"]')
           .find('[data-select-option]')
-          .should('have.length', 1)
-          .and('have.text', '8K / 1K');
-        cy.contains('[data-slot="select-label"]', deprecated)
-          .should('be.visible')
-          .closest('[role="rowgroup"]')
-          .find('[data-select-option]')
-          .should('have.length', 1)
-          .and('have.text', '1K / 1K');
-        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointerover', {
+          .should('have.length', 2)
+          .then(($options) => {
+            expect([...$options].map((option) => option.textContent)).to.deep.equal([
+              '8K / 1K',
+              deprecated,
+            ]);
+          });
+        cy.get('[data-testid="selector-category-deprecated-info"]').should('not.exist');
+        cy.get(`[data-testid="option-help-${Sequence.OneK_OneK}"]`).trigger('pointerover', {
           pointerType: 'mouse',
         });
-        cy.get('[data-testid="option-help-content-selector-category-deprecated"]').should(
+        cy.get(`[data-testid="option-help-content-${Sequence.OneK_OneK}"]`).should(
           'contain.text',
           locale === 'zh'
             ? 'CI 容量已重新分配给智能体编程和多轮对话场景。'
             : 'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
         );
-        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointerout', {
+        cy.get(`[data-testid="option-help-${Sequence.OneK_OneK}"]`).trigger('pointerout', {
           pointerType: 'mouse',
         });
-        cy.get('[data-testid="option-help-content-selector-category-deprecated"]').should(
-          'not.exist',
-        );
+        cy.get(`[data-testid="option-help-content-${Sequence.OneK_OneK}"]`).should('not.exist');
         cy.contains('[data-select-option]', '1K / 1K').click();
         cy.get('@changeScenario').should('have.been.calledOnceWith', Sequence.OneK_OneK);
+        cy.get('[data-slot="select-content"]').should('not.exist');
       });
     }
 

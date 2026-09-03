@@ -15,6 +15,8 @@ it.each([
   ['/zh/inference', Sequence.AgenticTraces, '智能体'],
   ['/inference', Sequence.EightK_OneK, '8K / 1K'],
   ['/zh/inference', Sequence.EightK_OneK, '8K / 1K'],
+  ['/inference', Sequence.OneK_OneK, '1K / 1K (deprecated)'],
+  ['/zh/inference', Sequence.OneK_OneK, '1K / 1K（已弃用）'],
 ])('renders the sole scenario label before hydration on %s (%s)', (pathname, value, label) => {
   route.pathname = pathname;
   const container = document.createElement('div');

@@ -53,7 +53,7 @@ const STRINGS = {
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
     fixedSequenceLength: 'Fixed Sequence Length',
-    fixedSequenceLengthDeprecated: 'Fixed Sequence Length (Deprecated)',
+    deprecatedSequenceLabel: (label: string) => `${label} (deprecated)`,
     experimentalSupport: 'Experimental Support (WIP)',
     maintenanceMode: 'Maintenance Mode',
     maintenanceReason: 'Updated at a lower priority because these models are irrelevant.',
@@ -80,7 +80,7 @@ const STRINGS = {
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
     fixedSequenceLength: '固定序列长度',
-    fixedSequenceLengthDeprecated: '固定序列长度（已弃用）',
+    deprecatedSequenceLabel: (label: string) => `${label}（已弃用）`,
     experimentalSupport: '实验性支持（开发中）',
     maintenanceMode: '维护模式',
     maintenanceReason: '这些模型的相关性较低，因此以较低优先级更新。',
@@ -338,7 +338,7 @@ interface ScenarioSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so per-model scenario retirements group as Deprecated. */
+  /** Selected model, so retired scenarios carry the correct status in their labels. */
   model?: Model | null;
   'data-testid'?: string;
 }
@@ -370,9 +370,15 @@ export function ScenarioSelector({
   );
   if (availableSequences.length === 0) return null;
   const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  const scenarioLabel = (seq: string) => {
+    const label = getSequenceLabel(seq as Sequence, locale);
+    return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
+      ? t.deprecatedSequenceLabel(label)
+      : label;
+  };
   const toScenarioOption = (seq: string) => ({
     value: seq,
-    label: getSequenceLabel(seq as Sequence, locale),
+    label: scenarioLabel(seq),
     help:
       sequenceKind(seq as Sequence) === 'agentic' ? (
         <p>
@@ -403,7 +409,8 @@ export function ScenarioSelector({
         key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
         disabled={isOnlySelectedScenario}
         value={value}
-        initialLabel={getSequenceLabel(value as Sequence, locale)}
+        initialLabel={scenarioLabel(value)}
+        contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
         placeholder={t.scenario}
         triggerId={id}
         triggerTestId={testId}
@@ -417,17 +424,9 @@ export function ScenarioSelector({
         groups={[
           // Agentic is already named in its row, so it needs no repeated heading.
           { label: '', options: agentic.map(toScenarioOption) },
-          { label: t.fixedSequenceLength, options: fixedGroups.default.map(toScenarioOption) },
           {
-            label: t.fixedSequenceLengthDeprecated,
-            heading: (
-              <CategorySectionTitle
-                id="deprecated"
-                label={t.fixedSequenceLengthDeprecated}
-                reason={t.deprecatedSequenceReason}
-              />
-            ),
-            options: fixedGroups.deprecated.map(toScenarioOption),
+            label: t.fixedSequenceLength,
+            options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
           },
         ].filter((group) => group.options.length > 0)}
       />
