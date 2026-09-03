@@ -56,6 +56,7 @@ function ChartLegendWrapper({
   const [expanded, setExpanded] = useState(true);
   const [legendItems, setLegendItems] = useState(items);
   const [optimal, setOptimal] = useState(true);
+  const [gradientLabels, setGradientLabels] = useState(false);
   const [logScale, setLogScale] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,13 @@ function ChartLegendWrapper({
                 label: 'Optimal Only',
                 checked: optimal,
                 onCheckedChange: setOptimal,
+                infoTooltip: 'Only show the optimal data points.',
+              },
+              {
+                id: 'gradient-labels',
+                label: 'Gradient Labels',
+                checked: gradientLabels,
+                onCheckedChange: setGradientLabels,
               },
               {
                 id: 'log-scale',
@@ -181,7 +189,91 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('.sidebar-legend input[type="text"]').should('not.exist');
   });
 
+  it('fits the longest single-line name with a compact, aligned points-button column', () => {
+    const showPoints = cy.stub().as('showPoints');
+    const items = [
+      { ...MOCK_ITEMS[0], label: 'GB300 NVL72 (Dynamo vLLM)', onShowPoints: showPoints },
+      { ...MOCK_ITEMS[1], label: 'H200 (vLLM)', onShowPoints: showPoints },
+      {
+        ...MOCK_ITEMS[2],
+        name: 'unofficial-run-99',
+        hw: 'overlay-run-99',
+        label: '✕ comparison-run',
+        isRemovable: false,
+        onShowPoints: showPoints,
+      },
+    ];
+    cy.viewport(1280, 900);
+    cy.mount(<ChartLegendWrapper inChart items={items} />);
+    cy.get('[data-testid="chart-legend"]').should(($legend) => {
+      const panel = $legend[0].getBoundingClientRect();
+      const labels = [...$legend[0].querySelectorAll<HTMLLabelElement>('label[for^="checkbox-"]')];
+      const icons = labels.map((label) => label.nextElementSibling!.getBoundingClientRect());
+      const widestLabel = labels[0].getBoundingClientRect();
+      expect(panel.width, 'only panel padding around the name and button').to.be.lessThan(
+        widestLabel.width + icons[0].width + 24,
+      );
+      for (const [index, label] of labels.entries()) {
+        const text = label.lastElementChild as HTMLElement;
+        expect(text.scrollWidth, `${label.textContent} is not truncated`).to.be.at.most(
+          text.clientWidth,
+        );
+        expect(text.getBoundingClientRect().height, 'single-line name').to.equal(20);
+        expect(icons[index].x, 'aligned points buttons').to.be.closeTo(icons[0].x, 1);
+        expect(icons[index].width, 'unchanged click target').to.be.at.least(21);
+      }
+      const range = labels[0].ownerDocument.createRange();
+      range.selectNodeContents(labels[0].lastElementChild!);
+      const glyph = labels[0].nextElementSibling!.querySelector('svg')!.getBoundingClientRect();
+      expect(glyph.left - range.getBoundingClientRect().right, 'name-to-icon gap').to.be.closeTo(
+        8,
+        1,
+      );
+      const optimal = $legend.find('[data-testid="optimal"]')[0].getBoundingClientRect();
+      const gradient = $legend.find('[data-testid="gradient-labels"]')[0].getBoundingClientRect();
+      expect(gradient.top, 'display controls have separate rows').to.be.greaterThan(optimal.bottom);
+    });
+    cy.get('[data-testid="legend-points-h100-sxm"]').click();
+    cy.get('@showPoints').should('have.been.calledWith', 'h100-sxm');
+    cy.get('#checkbox-h100-sxm').should('be.checked');
+    cy.get('[data-testid="legend-points-overlay-run-99"]').click();
+    cy.get('@showPoints').should('have.been.calledWith', 'overlay-run-99');
+    cy.get('[data-testid="gradient-labels"]').click().should('have.attr', 'aria-checked', 'true');
+  });
+
   for (const width of [390, 1280]) {
+    it(`keeps long unofficial names and their points action inside the panel at ${width}px`, () => {
+      const label = '✕ qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+      cy.viewport(width, 900);
+      cy.mount(
+        <ChartLegendWrapper
+          inChart
+          items={[
+            ...MOCK_ITEMS,
+            {
+              ...MOCK_ITEMS[0],
+              name: 'unofficial-run-99',
+              hw: 'overlay-run-99',
+              label,
+              isRemovable: false,
+              onShowPoints: cy.stub().as('overlayPoints'),
+            },
+          ]}
+        />,
+      );
+      cy.get('[data-testid="legend-points-overlay-run-99"]')
+        .should(($button) => {
+          const panel = $button.closest('.sidebar-legend')[0].getBoundingClientRect();
+          expect($button[0].getBoundingClientRect().right).to.be.at.most(panel.right);
+          expect(panel.right).to.be.at.most(width);
+        })
+        .click();
+      cy.get('@overlayPoints').should('have.been.calledWith', 'overlay-run-99');
+      cy.get('label[for="checkbox-overlay-run-99"]')
+        .should('have.attr', 'title', label)
+        .and('contain.text', label);
+    });
+
     it(`keeps the same toggle and hit area in place across collapse and reopen at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.mount(<ChartLegendWrapper inChart />);

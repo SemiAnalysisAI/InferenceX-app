@@ -131,9 +131,8 @@ export default function ChartLegend({
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
-  // Sidebar items always render in the compact (truncate + title tooltip)
-  // layout: the panel is a fixed-width in-flow column and must never grow
-  // over the plot area.
+  // Sidebar items stay on one line. The in-flow panel fits their content up to
+  // the wrapper's width cap; unusually long names retain a title tooltip.
   const itemsExpanded = isSidebar ? false : isLegendExpanded;
   // Counts only removable series: the guard below exists to stop the user
   // emptying the chart, and label-only entries (unofficial runs) are not
@@ -190,7 +189,7 @@ export default function ChartLegend({
   // preserving the toggle's inset, so the chart reclaims the remaining width.
   const outerClasses = isSidebar
     ? cn(
-        'p-3 rounded-md border bg-background text-sm flex flex-col w-full',
+        'px-2 py-3 rounded-md border bg-background text-sm flex flex-col w-full',
         isLegendExpanded
           ? 'border-border/60 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
           : 'border-transparent no-export',
@@ -299,7 +298,11 @@ export default function ChartLegend({
 
   const renderSwitches = (items: LegendSwitchConfig[]) =>
     items.length > 0 ? (
-      <div className={cn(grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2')}>
+      <div
+        className={cn(
+          isSidebar || grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
+        )}
+      >
         {items.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
             <Switch
@@ -468,7 +471,11 @@ export default function ChartLegend({
     keyIndicators ||
     hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
-    <div data-testid="legend-display-controls" className="shrink-0 grow-0">
+    <div
+      data-testid="legend-display-controls"
+      // Display options wrap within the label-sized panel rather than widening it.
+      className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
+    >
       {!isSidebar && actionElements}
       {switchElements}
       {fpIndicators}
@@ -482,7 +489,7 @@ export default function ChartLegend({
     grouped && rows ? (
       <div
         ref={scrollRef}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {rows.map((row, i) => (
@@ -526,7 +533,7 @@ export default function ChartLegend({
     ) : (
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {(isSidebar ? sortedItems : legendItems).map((item) => renderItem(item))}
