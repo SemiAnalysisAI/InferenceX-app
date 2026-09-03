@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   firstNonCollidingRect,
+  fitsVertically,
+  horizontalShiftIntoBounds,
   placeLineLabels,
   rectsOverlap,
   type LineLabelSeries,
@@ -44,6 +46,38 @@ describe('line-label collision primitives', () => {
     ];
 
     expect(firstNonCollidingRect(candidates, placed)).toBeNull();
+  });
+});
+
+describe('point-label plot bounding box primitives', () => {
+  const plot = { left: 0, right: 100, top: 0, bottom: 50 };
+
+  it('needs no shift when the rect already sits inside the plot', () => {
+    expect(horizontalShiftIntoBounds({ left: 10, right: 40, top: 5, bottom: 15 }, plot)).toBe(0);
+  });
+
+  it('slides a rect that spills past the left edge back inside', () => {
+    expect(horizontalShiftIntoBounds({ left: -8, right: 22, top: 5, bottom: 15 }, plot)).toBe(8);
+  });
+
+  it('slides a rect that spills past the right edge back inside', () => {
+    expect(horizontalShiftIntoBounds({ left: 90, right: 115, top: 5, bottom: 15 }, plot)).toBe(-15);
+  });
+
+  it('gives up on a rect wider than the plot', () => {
+    expect(horizontalShiftIntoBounds({ left: -10, right: 120, top: 5, bottom: 15 }, plot)).toBe(
+      null,
+    );
+  });
+
+  it('accepts a rect touching the plot edges as fitting', () => {
+    expect(horizontalShiftIntoBounds({ left: 0, right: 100, top: 0, bottom: 50 }, plot)).toBe(0);
+    expect(fitsVertically({ left: 0, right: 100, top: 0, bottom: 50 }, plot)).toBe(true);
+  });
+
+  it('rejects any vertical overflow, however small', () => {
+    expect(fitsVertically({ left: 10, right: 20, top: -0.5, bottom: 10 }, plot)).toBe(false);
+    expect(fitsVertically({ left: 10, right: 20, top: 40, bottom: 50.5 }, plot)).toBe(false);
   });
 });
 
