@@ -6,10 +6,10 @@ import {
   Circle,
   Diamond,
   Info,
-  PanelRight,
+  PanelRightClose,
+  PanelRightOpen,
   Square,
   Triangle,
-  X,
 } from 'lucide-react';
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -186,10 +186,15 @@ export default function ChartLegend({
   };
 
   // Sidebar: a fixed in-flow panel that takes layout space next to the plot
-  // (Epoch-style). It never overlays the chart; closing it (X) removes it
-  // entirely and the chart reclaims the width.
+  // It never overlays the chart. Collapsing removes the panel contents while
+  // preserving the toggle's inset, so the chart reclaims the remaining width.
   const outerClasses = isSidebar
-    ? 'p-3 rounded-md border border-border/60 bg-background text-sm flex flex-col max-h-96 lg:max-h-[575px] legend-container sidebar-legend w-full'
+    ? cn(
+        'p-3 rounded-md border bg-background text-sm flex flex-col w-full',
+        isLegendExpanded
+          ? 'border-border/60 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
+          : 'border-transparent no-export',
+      )
     : grouped
       ? cn(
           'py-1 px-2 md:py-1 rounded-sm border text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
@@ -239,25 +244,6 @@ export default function ChartLegend({
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
 
-  // Fully-closed sidebar: render only a reopen affordance at the top-right of
-  // the chart area (all hooks above have already run unconditionally).
-  if (isSidebar && !isLegendExpanded) {
-    return (
-      <div className="flex justify-end no-export">
-        <button
-          type="button"
-          data-testid="legend-open-button"
-          onClick={toggleLegendOpen}
-          aria-label={t.showLegend}
-          title={t.showLegend}
-          className="p-1.5 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <PanelRight size={16} />
-        </button>
-      </div>
-    );
-  }
-
   const actionElements =
     actions && actions.length > 0 ? (
       <div
@@ -285,23 +271,25 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  // Put series actions in the space previously occupied by a lone close icon.
-  // The panel fits short lists; only the series region scrolls for long lists.
+  // Keep the same button mounted in the same padded header in both states.
+  // Only its arrow and accessible label change; focus and pointer position stay put.
+  const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
   const panelHeader = isSidebar ? (
     <div
       data-testid="legend-toolbar"
       className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
     >
-      <div className="min-w-0 flex-1">{actionElements}</div>
+      <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
       <button
         type="button"
-        data-testid="legend-close-button"
+        data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
         onClick={toggleLegendOpen}
-        aria-label={t.hideLegend}
-        title={t.hideLegend}
+        aria-expanded={isLegendExpanded}
+        aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+        title={isLegendExpanded ? t.hideLegend : t.showLegend}
         className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
       >
-        <X size={14} />
+        <LegendToggleIcon size={16} aria-hidden="true" />
       </button>
     </div>
   ) : null;
@@ -547,10 +535,14 @@ export default function ChartLegend({
 
   const content = (
     <div className={isSidebar ? 'min-w-0' : 'relative'}>
-      <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
+      <div
+        data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
+        className={outerClasses}
+        style={outerStyle}
+      >
         {panelHeader}
-        {scrollContent}
-        {bottomControls}
+        {(!isSidebar || isLegendExpanded) && scrollContent}
+        {(!isSidebar || isLegendExpanded) && bottomControls}
       </div>
     </div>
   );

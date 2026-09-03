@@ -182,6 +182,50 @@ describe('ChartLegend (sidebar variant)', () => {
   });
 
   for (const width of [390, 1280]) {
+    it(`keeps the same toggle and hit area in place across collapse and reopen at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper inChart />);
+      cy.get('[data-testid="legend-close-button"]')
+        .should('have.attr', 'aria-expanded', 'true')
+        .then(($button) => {
+          const button = $button[0];
+          const bounds = button.getBoundingClientRect();
+          const plotWidth = Cypress.$('[data-testid="d3-chart-svg"]')[0].getBoundingClientRect()
+            .width;
+          cy.wrap($button).click({ scrollBehavior: false });
+          cy.get('[data-testid="legend-open-button"]')
+            .should('have.focus')
+            .and('have.attr', 'aria-expanded', 'false')
+            .and('have.attr', 'aria-label', 'Show legend')
+            .should(($toggle) => {
+              expect($toggle[0], 'same focused DOM button').to.equal(button);
+              const collapsed = $toggle[0].getBoundingClientRect();
+              for (const edge of ['x', 'y', 'width', 'height'] as const) {
+                expect(collapsed[edge], `collapsed ${edge}`).to.be.closeTo(bounds[edge], 1);
+              }
+              if (width >= 1024) {
+                expect(
+                  Cypress.$('[data-testid="d3-chart-svg"]')[0].getBoundingClientRect().width,
+                ).to.be.greaterThan(plotWidth);
+              }
+            })
+            .find('svg')
+            .should('have.class', 'lucide-panel-right-open');
+          cy.get('[data-testid="legend-open-button"]').click({ scrollBehavior: false });
+          cy.get('[data-testid="legend-close-button"]')
+            .should('have.focus')
+            .and('have.attr', 'aria-label', 'Hide legend')
+            .should(($toggle) => {
+              expect($toggle[0]).to.equal(button);
+              const reopened = $toggle[0].getBoundingClientRect();
+              expect(reopened.x).to.be.closeTo(bounds.x, 1);
+              expect(reopened.y).to.be.closeTo(bounds.y, 1);
+            })
+            .find('svg')
+            .should('have.class', 'lucide-panel-right-close');
+        });
+    });
+
     it(`fits a short list and keeps actions with the close button at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
