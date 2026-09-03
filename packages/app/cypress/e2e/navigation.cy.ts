@@ -19,8 +19,8 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-calculator"]').click();
     cy.url().should('include', '/calculator');
 
-    cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
-    cy.url().should('include', '/gpu-specs');
+    cy.get('[data-testid="tab-trigger-submissions"]').click();
+    cy.url().should('include', '/submissions');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.url().should('include', '/inference');
@@ -32,6 +32,14 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="footer-link-reliability"]').scrollIntoView().click();
     cy.url().should('include', '/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
+  });
+
+  it('opens Chip Specs from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
+    cy.url().should('include', '/gpu-specs');
+    cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
   it('shows mobile chart select dropdown on small viewport', () => {

@@ -145,8 +145,8 @@ describe('URL Parameter Persistence', () => {
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
       // Navigate immediately to cover pending writes inside the debounce window.
-      cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
-      cy.url().should('include', '/gpu-specs');
+      cy.get('[data-testid="tab-trigger-submissions"]').click();
+      cy.url().should('include', '/submissions');
       cy.get('[data-testid="tab-trigger-inference"]').click();
 
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
