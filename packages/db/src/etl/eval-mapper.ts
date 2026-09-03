@@ -123,8 +123,9 @@ export function mapEvalRow(
     return {
       config,
       task: taskName.toLowerCase(),
-      isl: parseInt2(meta.isl) ?? null,
-      osl: parseInt2(meta.osl) ?? null,
+      // Agentic eval metadata uses zero for unspecified sequence lengths.
+      isl: parseInt2(meta.isl) || null,
+      osl: parseInt2(meta.osl) || null,
       conc: parseInt2(meta.conc) ?? null,
       lmEvalVersion,
       metrics,

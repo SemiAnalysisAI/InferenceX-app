@@ -172,6 +172,33 @@ describe('mapEvalRow', () => {
     expect(result[0].conc).toBeNull();
   });
 
+  it.each([0, '0'])('maps unspecified agentic eval lengths (%j) to null', (length) => {
+    const tracker = createSkipTracker();
+    const [row] = mapEvalRow(
+      makeMeta({
+        infmax_model_prefix: 'minimaxm3',
+        hw: 'h100-dgxc-slurm_00',
+        isl: length,
+        osl: length,
+        conc: 8,
+      }),
+      makeResults(),
+      tracker,
+    );
+
+    expect(row.isl).toBeNull();
+    expect(row.osl).toBeNull();
+    expect(row.conc).toBe(8);
+    expect(row.metrics.em_strict).toBe(0.85);
+    expect(tracker.skips.unmappedModel).toBe(0);
+  });
+
+  it('preserves positive eval lengths when the other length is unspecified', () => {
+    const [row] = mapEvalRow(makeMeta({ isl: 0, osl: 1 }), makeResults(), createSkipTracker());
+    expect(row.isl).toBeNull();
+    expect(row.osl).toBe(1);
+  });
+
   it('returns null lmEvalVersion when missing from results', () => {
     const tracker = createSkipTracker();
     const results = makeResults();
