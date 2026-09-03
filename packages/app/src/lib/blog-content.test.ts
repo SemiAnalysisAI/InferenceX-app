@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { compareBlogPair } from './zh-objective-guard';
+
 /**
  * Integrity checks over the real MDX in `content/blog/`. These are cheap file reads,
  * not a rendering test — they catch the mistakes that only surface at build time or,
@@ -52,7 +54,6 @@ function localImageRefs(raw: string): string[] {
   ].map((m) => m.groups!.path);
 }
 
-const countFigures = (raw: string) => (raw.match(/<Figure\b/gu) ?? []).length;
 const countMathFences = (raw: string) => (raw.match(/^\$\$\s*$/gmu) ?? []).length;
 
 it('checks every current locale pair in both directions', () => {
@@ -64,10 +65,6 @@ describe.each(enFiles)('%s', (file) => {
   const en = read(path.join(CONTENT_DIR, file));
   const zhPath = path.join(ZH_DIR, file);
 
-  it('ships a Simplified Chinese sibling with the same filename', () => {
-    expect(fs.existsSync(zhPath), `missing content/blog/zh/${file}`).toBe(true);
-  });
-
   it('keeps date, publishDate, and tags identical across locales', () => {
     const zh = read(zhPath);
     for (const field of ['date', 'publishDate', 'modifiedDate']) {
@@ -76,10 +73,8 @@ describe.each(enFiles)('%s', (file) => {
     expect(tagList(zh)).toEqual(tagList(en));
   });
 
-  it('does not drift in figure or math-block count across locales', () => {
-    const zh = read(zhPath);
-    expect(countFigures(zh)).toBe(countFigures(en));
-    expect(countMathFences(zh)).toBe(countMathFences(en));
+  it('preserves code blocks, inline identifiers, math, Figure sources, links, and JSON-LD structure', () => {
+    expect(compareBlogPair(file, en, read(zhPath))).toEqual([]);
   });
 
   it('references only images that exist under public/', () => {

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import nodePath from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -13,6 +16,40 @@ import {
   zhAlternates,
   zhPath,
 } from './i18n';
+import { findRoutePairViolations } from './zh-objective-guard';
+
+const APP_ROUTER_DIR = nodePath.resolve(import.meta.dirname, '..', 'app');
+const APP_DIR = nodePath.resolve(APP_ROUTER_DIR, '..', '..');
+
+function pageFiles(directory: string): string[] {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const full = nodePath.join(directory, entry.name);
+    if (entry.isDirectory()) return pageFiles(full);
+    return entry.name === 'page.tsx' ? [nodePath.relative(APP_DIR, full)] : [];
+  });
+}
+
+describe('actual App Router Chinese sibling coverage', () => {
+  const pages = pageFiles(APP_ROUTER_DIR);
+
+  it('discovers both locale roots and the Chinese-only fallback', () => {
+    expect(pages).toEqual(
+      expect.arrayContaining([
+        'src/app/(landing)/page.tsx',
+        'src/app/zh/page.tsx',
+        'src/app/zh/[...notFound]/page.tsx',
+      ]),
+    );
+  });
+
+  it('pairs every English page with a Chinese page in both directions', () => {
+    expect(
+      findRoutePairViolations(pages, {
+        chineseOnly: new Set(['/[...notFound]']),
+      }),
+    ).toEqual([]);
+  });
+});
 
 describe('zhPath', () => {
   it('maps the root to /zh without a trailing slash', () => {

@@ -190,3 +190,55 @@ ground truth.
 维护者。CI 不全局禁用 `预热`、`随机种子` 或 `卸载`，因为这些写法在解释与引用中可能
 正确；`warmup 预热` 这类与上下文无关的重复表达则可由 CI 拦截。#819 中经过单独验证的
 机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写不得自动视为标准答案。
+
+## Objective CI contract / 客观 CI 检查范围
+
+The objective CI guard covers only invariants that can be decided without editorial judgment. The
+real source scan and regression fixtures use the same parsing logic; every rule requires a mutation
+test showing that a violating change fails and the correct fix passes.
+
+客观 CI 检查只覆盖无需编辑判断即可确定的约束。真实源码扫描和回归用例使用同一套解析逻辑；每项规则都必须用 mutation test 证明：违规改动会失败，正确修复可以通过。
+
+The App Router check scans actual `page.tsx` files, removes route groups, and checks
+English-to-Chinese and Chinese-to-English route coverage separately. A one-way route with a genuine
+design reason must be listed as a direction-specific exception. The only current exception is
+`/zh/[...notFound]`, which handles unknown Chinese paths.
+
+App Router 检查会扫描实际的 page.tsx，忽略 route group 后，分别核对英文路由是否有 /zh 对应页面，以及中文路由是否有英文对应页面。确有设计原因的单向路由必须按方向单独列为例外。目前唯一例外是用于处理未知中文路径的 /zh/[...notFound]。
+
+Within any one object, an explicit `en` or `zh` object literal requires its other locale, and both
+must expose the same explicitly declared nested key shape. The check uses the TypeScript AST and
+does not infer computed keys or spread contents that cannot be resolved statically.
+
+同一对象中只要显式声明 en 或 zh 对象字面量，就必须声明另一种语言，且两者显式声明的嵌套键结构一致。检查基于 TypeScript AST；无法静态确认的 computed key 和 spread 内容不作推断。
+
+English and Chinese Blog posts must use the same filename. CI compares only structure that
+translation must not change: code fences, math, `Figure` image sources, link destinations, and
+JSON-LD syntax, key and array shape, plus path-bound URLs, numbers, booleans, and types. Chinese
+internal links may add `/zh`, and same-page anchors may follow translated headings. CI does not
+mechanically compare unit or English-token counts in prose, because normal Chinese rewrites may
+change them.
+
+中英文博客必须使用相同文件名。CI 只核对不应随翻译改变的结构：代码块、数学公式、Figure 图片地址、链接目标，以及 JSON-LD 的语法、键与数组结构和按路径绑定的 URL、数字、布尔值与类型。中文站内链接可以增加 /zh，页内锚点可以随标题翻译。正文中的单位或英文 token 出现次数不作机械对比，以免正常的中文改写被误报。
+
+Inline code is checked in one direction and by occurrence count: every English identifier must
+remain unchanged in Chinese, while Chinese may add inline-code formatting for translated terms.
+Link destinations are compared as a multiset so translations may reorder clauses without adding,
+removing, or replacing a destination.
+
+行内代码按出现次数单向核对：英文中的每个标识符都必须在中文中原样保留；中文可为译文中的术语额外添加行内代码格式。链接目标按出现次数整体核对，允许译文调整分句顺序，但不得增删或替换目标。
+
+A PR labeled `chinese-copy-only` runs an English-byte check against the merge base. English Blog
+files are protected in full and keep their repository path. In mixed-language TypeScript, TSX, and
+JSON files, explicitly declared `en` object initializers are protected in source order, so moving or
+swapping English dictionaries also fails. Tests and locale-neutral guard plumbing may change.
+Remove the label when the PR intentionally edits English copy.
+
+带有 `chinese-copy-only` 标签的 PR 会以 merge base 为基准，逐字节检查英文内容。英文 Blog 文件会整体保护，文件路径也不得改变；对于混合语言的 TypeScript、TSX 和 JSON 文件，检查会按源码顺序逐一保护显式声明的 `en` 对象初始化表达式，因此移动或调换英文字典也会失败。测试和不涉及语言内容的检查基础代码可以修改；如果本次 PR 本就需要修改英文文案，应移除该标签。
+
+The deterministic guard does not judge fluency, clause order, syntax, register, context-dependent
+pronouns, marketing tone, or the quoted speaker's voice. It also does not use English-token ratios
+or a closed list to decide whether established ML infrastructure terms should remain English.
+Those decisions remain with `review-zh-copy` and the Chinese maintainer.
+
+确定性检查不评判流畅度、分句顺序、句法、语域、需要结合上下文判断的代词、营销语气，也不评判引语中说话者的语气。它也不会依据英文 token 占比或封闭词表，决定行业已普遍使用的 ML 基础设施术语是否应保留英文。这些判断仍由 review-zh-copy 和中文维护者完成。
