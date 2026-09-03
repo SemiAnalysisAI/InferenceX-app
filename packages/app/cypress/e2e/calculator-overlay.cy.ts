@@ -35,8 +35,8 @@ const BARS = '[data-testid="calculator-bar-chart"] svg .bar';
 const Y_TICKS = '[data-testid="calculator-bar-chart"] svg .y-axis .tick text';
 
 const selectSequence = (label: string) => {
-  cy.get('[data-testid="calc-sequence-selector"]').click();
-  cy.get('[role="option"]').contains(label).click();
+  cy.get('[data-testid="calc-sequence-selector"]').click('right');
+  cy.contains('[data-select-option]', label).click();
 };
 
 /**

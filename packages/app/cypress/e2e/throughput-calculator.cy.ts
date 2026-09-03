@@ -360,9 +360,9 @@ describe('TCO Calculator', () => {
 
     it('sequence selector has selectable options', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').click();
+        cy.get('#calc-sequence').click('right');
       });
-      cy.get('[role="option"]').should('have.length.greaterThan', 0);
+      cy.get('[data-select-option]').should('have.length.greaterThan', 0);
       cy.get('body').type('{esc}');
       // Wait for the preceding popover's focus restoration before opening the next menu.
       cy.get('#calc-sequence').should('be.focused');

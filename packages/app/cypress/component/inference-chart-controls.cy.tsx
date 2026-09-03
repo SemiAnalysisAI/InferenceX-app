@@ -442,9 +442,113 @@ describe('Axis option help', () => {
       cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
       cy.get(trigger).click('right');
       cy.get(`[data-testid="selected-option-help-${value}"]`).should('not.exist');
-      cy.get(`[data-testid="option-help-${value}"]`).should('be.visible').click();
-      cy.get(`[data-testid="option-help-content-${value}"]`).should('contain.text', explanation);
+      cy.get(`[data-testid="option-help-${value}"]`)
+        .should('be.visible')
+        .trigger('pointerover', { pointerType: 'mouse' });
+      cy.get(`[data-testid="option-help-content-${value}"]`)
+        .should('be.visible')
+        .and('contain.text', explanation);
       cy.get(trigger).should('have.attr', 'aria-expanded', 'true');
+    });
+
+    it(`keeps selected-value help open when activating its focused button in ${trigger}`, () => {
+      cy.get(`[data-testid="selected-option-help-${value}"]`).focus().click();
+      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
+        .should('be.visible')
+        .and('contain.text', explanation);
+      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
+      cy.get(`[data-testid="selected-option-help-${value}"]`).type('{esc}');
+      cy.get(`[data-testid="selected-option-help-content-${value}"]`).should('not.exist');
+    });
+  }
+
+  it('keeps hover help readable across the pointer gap without taking search focus', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('input[aria-label="Search options"]').type('Neocloud Giant');
+    cy.clock();
+    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').trigger('pointerover', {
+      pointerType: 'mouse',
+    });
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').should('be.visible');
+    cy.get('input[aria-label="Search options"]').should('have.focus');
+    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').trigger('pointerout', {
+      pointerType: 'mouse',
+    });
+    cy.tick(100);
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').trigger('pointerover', {
+      pointerType: 'mouse',
+    });
+    cy.tick(300);
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+      .should('be.visible')
+      .and('contain.text', 'infrastructure spend')
+      .trigger('pointerout', { pointerType: 'mouse' });
+    cy.tick(300);
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').should('not.exist');
+    cy.get('input[aria-label="Search options"]')
+      .should('have.focus')
+      .and('have.value', 'Neocloud Giant');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
+  });
+
+  it('dismisses hover help with Escape and still allows clicking it to keep it open', () => {
+    cy.get('[data-testid="x-axis-mode-selector"]').click('right');
+    cy.get('[data-testid="option-help-e2e"]').trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[data-testid="option-help-content-e2e"]').should('be.visible');
+    cy.focused().type('{esc}');
+    cy.get('[data-testid="option-help-content-e2e"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'aria-expanded', 'true');
+    cy.clock();
+    cy.get('[data-testid="option-help-e2e"]')
+      .trigger('pointerout', { pointerType: 'mouse' })
+      .trigger('pointerover', { pointerType: 'mouse' })
+      .click()
+      .trigger('pointerout', { pointerType: 'mouse' });
+    cy.tick(300);
+    cy.clock().then((clock) => clock.restore());
+    cy.get('[data-testid="option-help-content-e2e"]').should('be.visible').type('{esc}');
+    cy.get('[data-testid="option-help-e2e"]').should('have.focus');
+    cy.get('@setSelectedXAxisMode').should('not.have.been.called');
+  });
+
+  for (const width of [390, 1280]) {
+    it(`aligns help with the first line of wrapped options at ${width}px`, () => {
+      cy.viewport(width, 844);
+      mountWithProviders(
+        <div className="w-64">
+          <SearchableSelect
+            value="long"
+            onValueChange={cy.stub()}
+            triggerTestId="wrapped-field"
+            placeholder="Metric"
+            groups={[
+              {
+                label: '',
+                options: [
+                  {
+                    value: 'long',
+                    label: 'Output Token Throughput per Chip with a long wrapped description',
+                    help: <p>Explanation</p>,
+                  },
+                ],
+              },
+            ]}
+          />
+        </div>,
+        { inference: {} },
+      );
+      cy.get('[data-testid="wrapped-field"]').click('right');
+      cy.get('[data-select-option] > span').then(($label) => {
+        const label = $label[0];
+        const rect = label.getBoundingClientRect();
+        const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+        expect(rect.height).to.be.greaterThan(lineHeight);
+        cy.get('[data-testid="option-help-long"] svg').should(($icon) => {
+          const icon = $icon[0].getBoundingClientRect();
+          expect(icon.top + icon.height / 2).to.be.closeTo(rect.top + lineHeight / 2, 1);
+        });
+      });
     });
   }
 

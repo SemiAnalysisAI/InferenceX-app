@@ -429,7 +429,7 @@ export function SearchableSelect({
                             onClick={() => handleSelect(option.value)}
                             onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                             className={cn(
-                              'flex size-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent',
+                              'flex size-full cursor-pointer items-start gap-2 rounded-sm px-2 py-3 md:py-1.5 text-left text-sm outline-hidden hover:bg-accent',
                               CONTROL_OPTION_STYLE,
                             )}
                           >
@@ -437,12 +437,12 @@ export function SearchableSelect({
                             {isSelected && (
                               <CheckIcon
                                 aria-hidden="true"
-                                className="size-3.5 shrink-0 text-primary"
+                                className="mt-0.5 size-3.5 shrink-0 text-primary"
                               />
                             )}
                           </button>
                         </div>
-                        <div role="gridcell" className="flex items-center">
+                        <div role="gridcell" className="flex items-start">
                           {option.help && (
                             <OptionInfo
                               label={option.label}
