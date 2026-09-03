@@ -77,6 +77,26 @@ describe('Consistent informational help', () => {
           ['selected-option-help-test-selected', 'selected-option-help-content-test-selected'],
           ['option-help-test-option', 'option-help-content-test-option'],
         ]) {
+          cy.get(`[data-testid="${trigger}"] [data-slot="info-help-icon"]`).should(($icon) => {
+            const icon = $icon[0];
+            const bounds = icon.getBoundingClientRect();
+            const css = icon.ownerDocument.defaultView!.getComputedStyle(icon);
+            expect(bounds.width, 'same circular hover surface for every help placement').to.equal(
+              24,
+            );
+            expect(bounds.height).to.equal(bounds.width);
+            expect(parseFloat(css.borderRadius)).to.be.at.least(bounds.width / 2);
+            const target = icon.parentElement!.getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(target.left);
+            expect(bounds.right).to.be.at.most(target.right);
+            expect(bounds.top).to.be.at.least(target.top);
+            expect(bounds.bottom).to.be.at.most(target.bottom);
+            if (trigger === 'option-help-test-option') {
+              expect(target.width, 'keep the larger option touch target').to.equal(
+                width < 768 ? 44 : 32,
+              );
+            }
+          });
           cy.get('[data-testid="unrelated-input"]').focus();
           cy.get(`[data-testid="${trigger}"]`).trigger('pointerover', { pointerType: 'mouse' });
           cy.get(`[data-testid="${content}"]`)

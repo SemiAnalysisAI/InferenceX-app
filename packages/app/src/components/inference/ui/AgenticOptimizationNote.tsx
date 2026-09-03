@@ -22,9 +22,9 @@ export function AgenticOptimizationNote() {
   return (
     <div
       data-testid="agentic-optimization-note"
-      className="flex w-full items-center gap-1 px-1 pr-2 text-xs italic text-blue-600 dark:text-blue-400"
+      className="inline-flex max-w-full items-center gap-1 text-xs leading-5 text-muted-foreground"
     >
-      <span>*{t.label}</span>
+      <span>{t.label}</span>
       <InfoHelp
         label={t.label}
         value="agentic-optimizations"

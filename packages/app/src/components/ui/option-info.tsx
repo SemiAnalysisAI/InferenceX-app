@@ -135,14 +135,21 @@ export function InfoHelp({
           onKeyDown={onKeyDown}
           tabIndex={tabIndex}
           className={cn(
-            'no-export inline-flex shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none',
+            'no-export group/info-help inline-flex shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none',
             variant === 'option' && 'size-11 md:size-8',
             variant === 'inline' && 'size-6 -my-0.5',
             variant === 'selected' && 'pointer-events-auto h-full w-7',
             triggerClassName,
           )}
         >
-          <Info aria-hidden="true" className="size-3.5" />
+          {/* Keep the hover circle consistent without shrinking the touch target. */}
+          <span
+            aria-hidden="true"
+            data-slot="info-help-icon"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-full group-hover/info-help:bg-muted"
+          >
+            <Info className="size-3.5" />
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent

@@ -24,7 +24,7 @@ export function LegacyPowerLegendKey() {
   return (
     <div
       data-testid="legacy-power-key"
-      className="flex w-full items-center gap-2 px-1 pr-2 text-xs text-muted-foreground"
+      className="inline-flex max-w-full items-center gap-2 text-xs leading-5 text-muted-foreground"
     >
       <svg
         width="16"

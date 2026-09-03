@@ -1277,6 +1277,132 @@ describe('ScatterGraph', () => {
   });
 });
 
+describe('ChartDisplay responsive status notes', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    for (const width of [390, 1440]) {
+      it(`uses available width and preserves complete notices (${locale}, ${width}px)`, () => {
+        cy.viewport(width, 900);
+        const point = createMockInferenceData({ framework: 'atom', offload_mode: 'on' });
+        mountWithProviders(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <div className="p-4">
+              <ChartDisplay />
+            </div>
+          </PathnameContext.Provider>,
+          {
+            inference: {
+              selectedSequence: Sequence.AgenticTraces,
+              graphs: [
+                {
+                  model: Model.DeepSeek_R1,
+                  sequence: Sequence.AgenticTraces,
+                  chartDefinition: defaultChartDef,
+                  data: [point],
+                },
+              ],
+            },
+            globalFilters: {
+              selectedSequence: Sequence.AgenticTraces,
+              effectiveSequence: Sequence.AgenticTraces,
+            },
+            unofficial: {},
+          },
+        );
+        cy.get('[data-testid="chart-status-notes"]').should(($notes) => {
+          const notes = $notes[0];
+          const bounds = notes.getBoundingClientRect();
+          const offload = notes
+            .querySelector('[data-testid="offload-halo-key"]')!
+            .getBoundingClientRect();
+          const optimization = notes
+            .querySelector('[data-testid="agentic-optimization-note"]')!
+            .getBoundingClientRect();
+          const footnote = notes
+            .querySelector('[data-testid="atom-engine-footnote"]')!
+            .getBoundingClientRect();
+          for (const item of [offload, optimization, footnote]) {
+            expect(item.left).to.be.at.least(bounds.left);
+            expect(item.right).to.be.at.most(bounds.right + 1);
+          }
+          if (width === 1440) {
+            expect(optimization.left).to.be.greaterThan(offload.right);
+            expect(footnote.left).to.be.greaterThan(optimization.right);
+            expect(optimization.top + optimization.height / 2).to.be.closeTo(
+              offload.top + offload.height / 2,
+              1,
+            );
+          } else {
+            expect(footnote.top, 'long caveat wraps below short status notes').to.be.at.least(
+              optimization.bottom,
+            );
+            expect(notes.scrollWidth, 'notes never overflow horizontally').to.be.at.most(
+              notes.clientWidth,
+            );
+          }
+        });
+        cy.get('[data-testid="offload-halo-key"]').should(
+          'contain.text',
+          locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
+        );
+        cy.get('[data-testid="atom-engine-footnote"]').should(
+          'have.text',
+          locale === 'zh'
+            ? '1 ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。'
+            : '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
+        );
+        cy.get('[data-testid="agentic-optimization-note"] button').click();
+        cy.get('[data-testid="option-help-content-agentic-optimizations"]').should(
+          'contain.text',
+          locale === 'zh'
+            ? '每项配置可能使用推测解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
+            : 'Each configuration may use inference optimizations such as speculative decoding. Hover over a point to see its exact settings.',
+        );
+      });
+    }
+  }
+
+  it('includes offload and ATOM notices when only the unofficial overlay uses them', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/707';
+    const runInfo = {
+      id: 707,
+      name: 'footer-overlay',
+      branch: 'footer-overlay',
+      sha: 'abc707',
+      createdAt: '2026-08-09T00:00:00Z',
+      url: runUrl,
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+    mountWithProviders(<ChartDisplay />, {
+      inference: {},
+      globalFilters: {},
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runUrl]: 0, '707': 0 },
+        getOverlayData: () => ({
+          data: [
+            createMockInferenceData({ framework: 'atom', offload_mode: 'on', run_url: runUrl }),
+          ],
+          hardwareConfig: hwConfig,
+        }),
+        activeOverlayHwTypes: new Set(['b200_trt']),
+        allOverlayHwTypes: new Set(['b200_trt']),
+      },
+    });
+    cy.get('[data-testid="chart-status-notes"] [data-testid="offload-halo-key"]').should(
+      'contain.text',
+      'KV offload ON',
+    );
+    cy.get('[data-testid="chart-status-notes"] [data-testid="atom-engine-footnote"]').should(
+      'contain.text',
+      'has yet to serve production tokens',
+    );
+  });
+});
+
 describe('ChartDisplay engine comparison guard', () => {
   it('includes explicitly clipped official and unofficial points in table mode', () => {
     const chartDefinition = createMockChartDefinition({

@@ -835,10 +835,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             const footerNotices =
               hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
                 <>
-                  {hasOffloadHalo && <OffloadHaloLegendKey />}
-                  {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
-                  {isAgenticSequence && <AgenticOptimizationNote />}
-                  {hasAtomSeries && <AtomEngineFootnote />}
+                  <div
+                    data-testid="chart-status-notes"
+                    className="flex flex-wrap items-center gap-x-5 gap-y-2"
+                  >
+                    {hasOffloadHalo && <OffloadHaloLegendKey />}
+                    {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
+                    {isAgenticSequence && <AgenticOptimizationNote />}
+                    {hasAtomSeries && (
+                      <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
+                    )}
+                  </div>
                   {residentSequenceLengths && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"

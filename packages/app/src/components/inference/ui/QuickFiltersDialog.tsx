@@ -167,7 +167,7 @@ export function QuickFiltersDialog({
     ),
   };
 
-  const helpTriggerClassName = 'size-8 -my-1.5 -mr-1 hover:bg-muted';
+  const helpTriggerClassName = 'size-8 -my-1.5 -mr-1';
 
   const frameworkOptions = FRAMEWORK_FAMILIES.filter(
     (framework) =>
