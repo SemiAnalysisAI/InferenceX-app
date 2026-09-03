@@ -410,8 +410,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     label={t.costProviderLabel}
                     tooltip={t.costProviderTooltip}
                   />
-                  <div id="fleet-cost" data-testid="fleet-cost-selector">
+                  <div data-testid="fleet-cost-selector">
                     <MultiSelect
+                      triggerId="fleet-cost"
                       options={COST_PROVIDER_OPTIONS.map((provider) => ({
                         value: provider.value,
                         label: locale === 'zh' ? provider.labelZh : provider.label,
@@ -442,8 +443,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     label={t.tokenTypeLabel}
                     tooltip={t.tokenTypeTooltip}
                   />
-                  <div id="fleet-cost-type" data-testid="fleet-cost-type-selector">
+                  <div data-testid="fleet-cost-type-selector">
                     <MultiSelect
+                      triggerId="fleet-cost-type"
                       options={COST_TYPE_OPTIONS.map((ct) => ({
                         value: ct.value,
                         label: costTypeLabels[ct.value],
@@ -521,6 +523,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     </div>
                     <Input
                       type="number"
+                      aria-label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
                       value={resolveCalculatorTargetInputValue(
                         inputValue,
                         targetValue,
