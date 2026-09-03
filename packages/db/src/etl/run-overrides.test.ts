@@ -123,6 +123,63 @@ describe('audited run backfills', () => {
     }
   });
 
+  it.each([
+    [128, 4, 'd84f06bb4a4016f9f2fe917feb4f10b960f87ac5f48bfae1b0bca1d66d7c887b'],
+    [256, 4, '1472857d464c0780b5eeb41184ff70290c5f6b9ad6a8c07b2524697e21dd0e07'],
+    [512, 8, '6ab19ba8680ab38b81c0d6a251d252576caafaf660118007c508b1f62df08c39'],
+  ] as const)(
+    'corrects the GB300 Mooncake c%i recipe without changing performance',
+    (conc, prefillSize, recipeFingerprint) => {
+      const point = {
+        configId: prefillSize === 4 ? 2449 : 2448,
+        config: {
+          ...EXAMPLE_CONFIG,
+          prefillTp: prefillSize,
+          prefillEp: prefillSize,
+          numPrefillGpu: prefillSize,
+          decodeTp: 16,
+          decodeEp: 16,
+          numDecodeGpu: 16,
+        },
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        offloadMode: 'off',
+        recipeFingerprint,
+        metrics: {
+          kv_offloading: 'none',
+          allocated_cpu_dram_gb: 0,
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+        },
+      };
+      const applied = applyBenchmarkPointBackfill(32809502132, 1, point);
+      expect(applied.point.offloadMode).toBe('on');
+      expect(applied.point.metrics).toMatchObject({
+        offload_mode: 'on',
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+        median_itl: 0.1,
+        output_tput_per_gpu: 123,
+      });
+      expect(applied.point.metrics).not.toHaveProperty('allocated_cpu_dram_gb');
+      expect(applyBenchmarkPointBackfill(32809502132, 2, point).backfillId).toBeNull();
+      expect(
+        applyBenchmarkPointBackfill(32809502132, 1, { ...point, recipeFingerprint: null })
+          .backfillId,
+      ).toBeNull();
+      expect(applyBenchmarkPointBackfill(32809502132, 1, applied.point).point).toEqual(
+        applied.point,
+      );
+      expect(
+        BENCHMARK_POINT_BACKFILLS.find((b) => b.githubRunId === 32809502132 && b.conc === 4)?.set
+          .offloadMode,
+      ).toBeUndefined();
+    },
+  );
+
   it('limits borrowed prefix-cache hit rates to GB300 dynamo-vllm DeepSeek-V4 AgentX points', () => {
     const cacheHitKeys = [
       'server_gpu_cache_hit_rate',

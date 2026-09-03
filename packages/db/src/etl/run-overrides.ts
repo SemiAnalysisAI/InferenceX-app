@@ -639,31 +639,42 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
       ],
     ] as const
   ).map(
-    ([
-      githubRunId,
-      runAttempt,
-      productionConfigId,
-      conc,
-      donorConc,
-      recipeFingerprint,
-      config,
-    ]) => ({
-      id: `run-${githubRunId}-config-${productionConfigId}-conc-${conc}-gb200-cache-hit-rate`,
-      reason: GB300_CACHE_HIT_RATE_REASON,
-      githubRunId,
-      runAttempt,
-      productionConfigId,
-      config,
-      benchmarkType: 'agentic_traces',
-      isl: null,
-      osl: null,
-      conc,
-      offloadMode: 'off',
-      recipeFingerprint,
-      set: {
-        metricsMerge: gb200CacheHitRateMerge(donorConc),
-      },
-    }),
+    ([githubRunId, runAttempt, productionConfigId, conc, donorConc, recipeFingerprint, config]) => {
+      const usesMooncake = githubRunId === 32809502132 && conc !== 4;
+      return {
+        id: `run-${githubRunId}-config-${productionConfigId}-conc-${conc}-gb200-cache-hit-rate`,
+        reason:
+          GB300_CACHE_HIT_RATE_REASON +
+          (usesMooncake
+            ? ' The runtime also enabled Mooncake DRAM caching, which the artifact mislabeled as non-offloaded.'
+            : ''),
+        githubRunId,
+        runAttempt,
+        productionConfigId,
+        config,
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        offloadMode: 'off',
+        recipeFingerprint,
+        set: {
+          ...(usesMooncake
+            ? { offloadMode: 'on' as const, metricsRemove: ['allocated_cpu_dram_gb'] }
+            : {}),
+          metricsMerge: {
+            ...gb200CacheHitRateMerge(donorConc),
+            ...(usesMooncake
+              ? {
+                  kv_offloading: 'dram',
+                  kv_offload_backend: 'mooncake',
+                  kv_offload_backend_version: '0.3.11.post1',
+                }
+              : {}),
+          },
+        },
+      };
+    },
   ),
 
   // Every TensorRT-LLM recipe in run 31927376673 configures a 128 GiB native
