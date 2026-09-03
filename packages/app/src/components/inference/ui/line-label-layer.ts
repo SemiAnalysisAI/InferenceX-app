@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 
 export interface CartesianPoint {
   x: number;
@@ -45,6 +46,37 @@ export function firstNonCollidingRect(
     if (!placed.some((other) => rectsOverlap(candidates[i], other))) return i;
   }
   return null;
+}
+
+/**
+ * Horizontal shift that slides `rect` fully inside `bounds`, or `null` when it
+ * is wider than the bounds and cannot fit at any offset. Zero when it already
+ * fits; positive moves right, negative moves left.
+ */
+export function horizontalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): number | null {
+  if (rect.right - rect.left > bounds.right - bounds.left) return null;
+  if (rect.left < bounds.left) return bounds.left - rect.left;
+  if (rect.right > bounds.right) return bounds.right - rect.right;
+  return 0;
+}
+
+/** Whether `rect` lies fully inside `bounds` on the vertical axis. */
+export function fitsVertically(rect: RectBounds, bounds: RectBounds): boolean {
+  return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+}
+
+/**
+ * The plot area in zoom-group coordinates — the strict bounding box every
+ * point label must stay inside. Read from the clip rect `setupChart` puts on
+ * the zoom group; `null` for charts that do not clip (`clipContent: false`),
+ * where nothing is painted away and no constraint applies.
+ */
+export function plotAreaBounds(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+): RectBounds | null {
+  const node = zoomGroup.node();
+  const size = node ? plotClipSize(node) : null;
+  return size ? { left: 0, top: 0, right: size.width, bottom: size.height } : null;
 }
 
 /** A drawn pill box, as centre point + half-width, for overlap tests. */
@@ -365,12 +397,41 @@ export function updateRenderedLineLabels(
   });
 }
 
-export function avoidPointLabelCollisions(
+export interface PointLabelPlacementOptions {
+  /**
+   * Strict bounding box, in zoom-group coordinates, that every label must lie
+   * fully inside. Defaults to the plot's clip rect ({@link plotAreaBounds});
+   * pass `null` to skip the constraint (charts that clip nothing).
+   */
+  bounds?: RectBounds | null;
+  /**
+   * Whether labels also avoid each other and the run-name / parallelism pills.
+   * The single-run scatter keeps this on; the compare chart only needs the
+   * bounding box.
+   */
+  avoidCollisions?: boolean;
+}
+
+/**
+ * Lay out every visible `.point-label` inside `zoomGroup`.
+ *
+ * Each label tries a fixed ladder of vertical slots around its point (above,
+ * below, further above, further below). A slot is only eligible when the label
+ * fits inside `bounds` — sliding horizontally as far as needed to stay inside,
+ * so labels near the left/right edge hug the edge instead of spilling past
+ * it — and, with `avoidCollisions`, when it overlaps nothing placed so far.
+ * A label with no eligible slot is hidden rather than drawn partly outside
+ * the plot: the clip path would otherwise slice it in half.
+ */
+export function placePointLabels(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  options: PointLabelPlacementOptions = {},
 ): void {
+  const bounds = options.bounds === undefined ? plotAreaBounds(zoomGroup) : options.bounds;
+  const avoidCollisions = options.avoidCollisions ?? true;
   interface LabelInfo {
     element: SVGTextElement;
-    firstTspan: SVGTSpanElement;
+    tspans: SVGTSpanElement[];
     centerX: number;
     centerY: number;
     width: number;
@@ -394,18 +455,21 @@ export function avoidPointLabelCollisions(
     ) {
       return;
     }
-    const tspans = label.querySelectorAll<SVGTSpanElement>('tspan');
+    const tspans = [...label.querySelectorAll<SVGTSpanElement>('tspan')];
     if (tspans.length === 0) return;
     const transform = this.getAttribute('transform') ?? '';
     const match = transform.match(/translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u);
     if (!match) return;
     const lineCount = tspans.length;
     const defaultFirstY = -(8 + (lineCount - 1) * lineHeight);
+    // Reset to the centred default before measuring so a shift applied on a
+    // previous pass does not leak into this one.
     tspans[0].setAttribute('dy', `${defaultFirstY}px`);
+    for (const tspan of tspans) tspan.setAttribute('x', '0');
     label.style.opacity = '1';
     pending.push({
       element: label,
-      firstTspan: tspans[0],
+      tspans,
       centerX: Number.parseFloat(match[1]),
       centerY: Number.parseFloat(match[2]),
       lineCount,
@@ -422,7 +486,7 @@ export function avoidPointLabelCollisions(
   // sit underneath one is pushed to its next candidate slot (or hidden) rather
   // than being drawn through it. Point-label-vs-point-label behaviour below is
   // unchanged; the pills simply occupy space before the first label is placed.
-  const placed: RectBounds[] = pillObstacles(zoomGroup);
+  const placed: RectBounds[] = avoidCollisions ? pillObstacles(zoomGroup) : [];
 
   for (const label of labels) {
     const blockHeight = (label.lineCount - 1) * lineHeight + ascent + descent;
@@ -432,19 +496,70 @@ export function avoidPointLabelCollisions(
       label.defaultFirstY - blockHeight - 2,
       14 + blockHeight + 2,
     ];
-    const boxes = firstBaselines.map((firstY) => ({
-      left: label.centerX - label.width / 2 - padding,
-      right: label.centerX + label.width / 2 + padding,
-      top: label.centerY + firstY - ascent - padding,
-      bottom: label.centerY + firstY + (label.lineCount - 1) * lineHeight + descent + padding,
-    }));
-    const index = firstNonCollidingRect(boxes, placed);
+    const candidates: { firstY: number; dx: number; box: RectBounds }[] = [];
+    for (const firstY of firstBaselines) {
+      const box: RectBounds = {
+        left: label.centerX - label.width / 2 - padding,
+        right: label.centerX + label.width / 2 + padding,
+        top: label.centerY + firstY - ascent - padding,
+        bottom: label.centerY + firstY + (label.lineCount - 1) * lineHeight + descent + padding,
+      };
+      let dx = 0;
+      if (bounds) {
+        // The bounding box is strict: a slot that would leave any part of the
+        // label outside the plot is not a slot at all.
+        if (!fitsVertically(box, bounds)) continue;
+        const shift = horizontalShiftIntoBounds(box, bounds);
+        if (shift === null) continue;
+        dx = shift;
+      }
+      candidates.push({
+        firstY,
+        dx,
+        box: { left: box.left + dx, right: box.right + dx, top: box.top, bottom: box.bottom },
+      });
+    }
+    const index = avoidCollisions
+      ? firstNonCollidingRect(
+          candidates.map((candidate) => candidate.box),
+          placed,
+        )
+      : candidates.length > 0
+        ? 0
+        : null;
     if (index === null) {
       label.element.style.opacity = '0';
       continue;
     }
-    label.firstTspan.setAttribute('dy', `${firstBaselines[index]}px`);
+    const chosen = candidates[index];
+    label.tspans[0].setAttribute('dy', `${chosen.firstY}px`);
+    if (chosen.dx !== 0) {
+      for (const tspan of label.tspans) tspan.setAttribute('x', String(chosen.dx));
+    }
     label.element.style.opacity = '1';
-    placed.push(boxes[index]);
+    if (avoidCollisions) placed.push(chosen.box);
   }
+}
+
+/**
+ * Point-label layout for the single-run scatter: strict plot bounding box
+ * plus collision avoidance against other labels and the drawn pills.
+ */
+export function avoidPointLabelCollisions(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  bounds?: RectBounds | null,
+): void {
+  placePointLabels(zoomGroup, { bounds, avoidCollisions: true });
+}
+
+/**
+ * Point-label layout for charts without collision avoidance (the GPU compare
+ * chart): only the strict plot bounding box is enforced, so a label at the
+ * top edge flips below its point and one at a side edge slides inward.
+ */
+export function keepPointLabelsInPlot(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  bounds?: RectBounds | null,
+): void {
+  placePointLabels(zoomGroup, { bounds, avoidCollisions: false });
 }

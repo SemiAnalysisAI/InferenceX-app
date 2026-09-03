@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { plotBounds } from './plot-bounds';
+import { plotBounds, plotClipSize } from './plot-bounds';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -76,6 +76,40 @@ function renderChartSvg({
 
 afterEach(() => {
   document.body.innerHTML = '';
+});
+
+const zoomGroupOf = (svg: Element) => svg.querySelector('.zoom-group')!;
+
+describe('plotClipSize', () => {
+  it('returns the clip rect size in zoom-group units', () => {
+    expect(plotClipSize(zoomGroupOf(renderChartSvg()))).toEqual({ width: 730, height: 516 });
+  });
+
+  it('finds the owning SVG through the zoom group when none is passed', () => {
+    const svg = renderChartSvg({ decoyClip: true });
+    expect(plotClipSize(zoomGroupOf(svg))).toEqual({ width: 730, height: 516 });
+  });
+
+  it('returns null when the group is not clipped', () => {
+    expect(plotClipSize(zoomGroupOf(renderChartSvg({ clip: null })))).toBeNull();
+  });
+
+  it('returns null when the referenced clipPath is missing', () => {
+    const svg = renderChartSvg();
+    svg.querySelector(`#${CLIP_ID}`)!.remove();
+    expect(plotClipSize(zoomGroupOf(svg))).toBeNull();
+  });
+
+  it('returns null for a degenerate clip rect', () => {
+    const svg = renderChartSvg({ clip: { width: 730, height: 0 } });
+    expect(plotClipSize(zoomGroupOf(svg))).toBeNull();
+  });
+
+  it('returns null for a detached group with no owner SVG', () => {
+    const group = svgEl('g');
+    group.setAttribute('clip-path', `url(#${CLIP_ID})`);
+    expect(plotClipSize(group)).toBeNull();
+  });
 });
 
 describe('plotBounds', () => {

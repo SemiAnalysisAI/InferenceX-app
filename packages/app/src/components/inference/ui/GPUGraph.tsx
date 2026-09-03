@@ -94,6 +94,7 @@ import {
   MeasuredPowerSummary,
 } from '@/components/inference/ui/MeasuredPowerSummary';
 import {
+  keepPointLabelsInPlot,
   parallelismLabelBoxes,
   placeLineLabels,
   renderLineLabels,
@@ -1268,6 +1269,8 @@ const GPUGraph = React.memo(
                 d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)) as any,
               );
             }
+            // Zoom moves points toward the plot edges; keep their labels inside.
+            if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
           },
         }}
         tooltip={{
@@ -1372,6 +1375,12 @@ const GPUGraph = React.memo(
           },
           attachToLayer: 1,
         }}
+        onDisplayUpdate={(ctx: RenderContext) => {
+          // Point labels are laid out only while visible (a hidden label has
+          // no measurable box), so re-run the plot-bounds constraint once the
+          // display phase has turned them back on.
+          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+        }}
         onRender={(ctx: RenderContext) => {
           // Remembered so the perf-ruler effect can redraw against the same
           // layout and scales the chart was last drawn with.
@@ -1388,6 +1397,9 @@ const GPUGraph = React.memo(
           }
           // Set foreground color on scatter point labels
           ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
+          // Strict plot bounding box: a label that would be sliced by the clip
+          // path flips to the other side of its point or slides inward.
+          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
 
           // CSS transitions for smooth opacity animation on legend hover —
           // the hover handlers write opacity once and let these animate.
