@@ -1077,15 +1077,15 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         type: 'custom',
         key: 'unofficial-overlay',
         displayIdentity: `${showLabels}:${unofficialPaletteIdentity}`,
-        render: (group, { xScale: xs, yScale: ys, layout }) => {
+        render: (group, { xScale: xs, yScale: ys, layout, tooltipElement }) => {
           const xScale = xs as d3.ScaleLinear<number, number>;
           const yScale = ys as d3.ScaleBand<string>;
           const svgNode = layout.svg.node();
-          const tooltipNode = svgNode?.nextElementSibling as HTMLDivElement | null;
           const container = svgNode?.parentElement as HTMLDivElement | null;
-          if (!svgNode || !tooltipNode || !container) return;
+          if (!svgNode || !container) return;
 
-          const tooltip = d3.select(tooltipNode);
+          // The shared wrapper portals the tooltip to document.body.
+          const tooltip = d3.select(tooltipElement);
           const overlayPoints = group
             .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
             .data(unofficialChartData, (datum) => `${datum.runUrl ?? ''}|${datum.configLabel}`)
