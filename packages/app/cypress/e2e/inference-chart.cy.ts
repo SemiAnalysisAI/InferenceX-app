@@ -79,7 +79,7 @@ describe('Inference Chart', () => {
       });
   });
 
-  it('shows precision, cost tier, update date, and source in the caption', () => {
+  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
@@ -88,7 +88,7 @@ describe('Inference Chart', () => {
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
       .and('not.contain.text', 'Workload:')
-      .and('contain.text', 'Precision:')
+      .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
   });
 

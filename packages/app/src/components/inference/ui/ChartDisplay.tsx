@@ -1037,9 +1037,16 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            precision={selectedPrecisions
-                              .map((precision) => getPrecisionLabel(precision as Precision))
-                              .join(', ')}
+                            // The dashboard shows the Precision selector right above the
+                            // chart, so the caption omits it there; embedded model pages
+                            // render no controls and keep it as the only precision cue.
+                            precision={
+                              embedded
+                                ? selectedPrecisions
+                                    .map((precision) => getPrecisionLabel(precision as Precision))
+                                    .join(', ')
+                                : undefined
+                            }
                             costTier={(() => {
                               const tier = metricCostTier(
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,

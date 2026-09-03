@@ -27,9 +27,11 @@ describe('dashboard route registry', () => {
     expect(existsSync(chinesePage)).toBe(route.localeMirrored);
   });
 
-  it('keeps reliability footer-only and indexable, and feedback out of the sitemap', () => {
+  it('keeps reliability and gpu-specs footer-only and indexable, and feedback out of the sitemap', () => {
     expect(getDashboardRoute('reliability').navGroup).toBe('footer-only');
     expect(getDashboardRoute('reliability').indexable).toBe(true);
+    expect(getDashboardRoute('gpu-specs').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('gpu-specs').indexable).toBe(true);
     expect(getDashboardRoute('feedback').indexable).toBe(false);
   });
 
