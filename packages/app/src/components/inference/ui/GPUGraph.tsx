@@ -40,6 +40,7 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
+  type ShapeSelection,
 } from '@/lib/chart-rendering';
 import {
   isFrontierEligible,
@@ -1265,7 +1266,7 @@ const GPUGraph = React.memo(
             if (logScale) {
               const newYScale = ctx.newYScale as d3.ScaleLogarithmic<number, number>;
               ctx.layout.yAxisGroup.call(
-                d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)) as any,
+                d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)),
               );
             }
           },
@@ -1293,12 +1294,12 @@ const GPUGraph = React.memo(
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
             applyHoverState(
-              sel.select('.visible-shape') as any,
+              sel.select('.visible-shape') as ShapeSelection,
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onHoverEnd: (sel, d) =>
             applyNormalState(
-              sel.select('.visible-shape') as any,
+              sel.select('.visible-shape') as ShapeSelection,
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onPointClick: (d: InferenceData) => {
@@ -1383,7 +1384,7 @@ const GPUGraph = React.memo(
               number
             >;
             ctx.layout.yAxisGroup.call(
-              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
+              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)),
             );
           }
           // Set foreground color on scatter point labels

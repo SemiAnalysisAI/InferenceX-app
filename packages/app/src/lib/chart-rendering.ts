@@ -24,6 +24,14 @@ const getDiamondPath = (size: number) => `M 0 ${-size} L ${size} 0 L 0 ${size} L
 
 export type ShapeKey = 'circle' | 'square' | 'triangle' | 'diamond';
 
+/** A d3 selection of one of the SVG shape elements that point shapes render as. */
+export type ShapeSelection = d3.Selection<
+  SVGCircleElement | SVGRectElement | SVGPathElement,
+  unknown,
+  null,
+  undefined
+>;
+
 // Shape assignment order: first selected precision gets circle, second square, etc.
 export const SHAPE_ORDER: readonly ShapeKey[] = ['circle', 'square', 'triangle', 'diamond'];
 
@@ -98,10 +106,7 @@ export const getShapeKeyForPrecision = (
 export const getShapeConfig = (shapeKey: ShapeKey) => SHAPE_CONFIG[shapeKey];
 
 // Helper function to apply normal state attributes to a shape
-export const applyNormalState = (
-  shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
-  shapeKey: ShapeKey,
-) => {
+export const applyNormalState = (shape: ShapeSelection, shapeKey: ShapeKey) => {
   const config = getShapeConfig(shapeKey);
   if (config.type === 'path') {
     (shape as d3.Selection<SVGPathElement, unknown, null, undefined>)
@@ -122,10 +127,7 @@ export const applyNormalState = (
 };
 
 // Helper function to apply hover state attributes to a shape
-export const applyHoverState = (
-  shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
-  shapeKey: ShapeKey,
-) => {
+export const applyHoverState = (shape: ShapeSelection, shapeKey: ShapeKey) => {
   const config = getShapeConfig(shapeKey);
   if (config.type === 'path') {
     (shape as d3.Selection<SVGPathElement, unknown, null, undefined>)

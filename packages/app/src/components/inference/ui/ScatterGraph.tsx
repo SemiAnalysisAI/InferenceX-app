@@ -95,6 +95,7 @@ import {
   applyHoverState,
   applyNormalState,
   getShapeKeyForPrecision,
+  type ShapeSelection,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
@@ -1865,13 +1866,13 @@ const ScatterGraph = React.memo(
           if (xScaleConfig._isLog) {
             const newXS = ctx.newXScale as d3.ScaleLogarithmic<number, number>;
             ctx.layout.xAxisGroup.call(
-              d3.axisBottom(newXS).ticks(10).tickFormat(logTickFormat(newXS)) as any,
+              d3.axisBottom(newXS).ticks(10).tickFormat(logTickFormat(newXS)),
             );
           }
           if (yScaleConfig.type === 'log') {
             const newYS = ctx.newYScale as d3.ScaleLogarithmic<number, number>;
             ctx.layout.yAxisGroup.call(
-              d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
+              d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)),
             );
           }
           if (showPointLabels && !showGradientLabels) {
@@ -1915,12 +1916,12 @@ const ScatterGraph = React.memo(
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
           applyHoverState(
-            sel.select('.visible-shape') as any,
+            sel.select('.visible-shape') as ShapeSelection,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           ),
         onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
           applyNormalState(
-            sel.select('.visible-shape') as any,
+            sel.select('.visible-shape') as ShapeSelection,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           ),
         onPointClick: (d: InferenceData) => {
@@ -3074,13 +3075,13 @@ const ScatterGraph = React.memo(
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
           ctx.layout.xAxisGroup.call(
-            d3.axisBottom(xScale).ticks(10).tickFormat(logTickFormat(xScale)) as any,
+            d3.axisBottom(xScale).ticks(10).tickFormat(logTickFormat(xScale)),
           );
         }
         if (yScaleConfig.type === 'log') {
           const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
           ctx.layout.yAxisGroup.call(
-            d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
+            d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)),
           );
         }
       },

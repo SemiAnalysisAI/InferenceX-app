@@ -96,10 +96,12 @@ export const useStickyTooltip = <T = any>() => {
         // know the caller's selectedPrecisions.
         svg.selectAll('.dot-group').each(function () {
           const group = d3.select(this);
-          const shape = group.select<SVGElement>('.visible-shape');
+          const shape = group.select<SVGCircleElement | SVGRectElement | SVGPathElement>(
+            '.visible-shape',
+          );
           const node = shape.node();
           if (node) {
-            applyNormalState(shape as any, readShapeKey(node));
+            applyNormalState(shape, readShapeKey(node));
           }
         });
       }

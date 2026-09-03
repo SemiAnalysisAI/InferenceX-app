@@ -231,14 +231,14 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         if (svgRef?.current) {
           const transform = d3.zoomTransform(svgRef.current);
           if ((effectiveZoomAxes === 'x' || effectiveZoomAxes === 'both') && 'invert' in xScale) {
-            curX = transform.rescaleX(xScale as any);
+            curX = transform.rescaleX(xScale);
           }
           if (
             (effectiveZoomAxes === 'y' || effectiveZoomAxes === 'both') &&
             yScale &&
             'invert' in yScale
           ) {
-            curY = transform.rescaleY(yScale as any);
+            curY = transform.rescaleY(yScale);
           }
         }
         return { curX, curY };

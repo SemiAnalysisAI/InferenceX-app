@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import {
   HIT_AREA_RADIUS,
   type ShapeKey,
+  type ShapeSelection,
   getShapeConfig,
   getShapeKeyForPrecision,
   applyNormalState,
@@ -56,26 +57,21 @@ export function syncPointShape(
   const targetType = getShapeConfig(shapeKey).type;
   const existing = g.select<SVGElement>('.visible-shape').node();
   const currentType = existing?.tagName.toLowerCase();
+  let shape: ShapeSelection;
   if (!existing || currentType !== targetType) {
     g.select('.visible-shape').remove();
-    const shape = g
+    shape = g
       .append(targetType)
       .attr('class', 'visible-shape')
       .attr('data-shape-key', shapeKey)
       .attr('fill', fill)
       .attr('stroke', 'none')
-      .attr('cursor', 'pointer') as d3.Selection<
-      SVGCircleElement | SVGRectElement | SVGPathElement,
-      unknown,
-      null,
-      undefined
-    >;
-    applyNormalState(shape, shapeKey);
+      .attr('cursor', 'pointer') as ShapeSelection;
   } else {
-    const shape = g.select<SVGElement>('.visible-shape');
+    shape = g.select<SVGCircleElement | SVGRectElement | SVGPathElement>('.visible-shape');
     shape.attr('fill', fill).attr('data-shape-key', shapeKey);
-    applyNormalState(shape as any, shapeKey);
   }
+  applyNormalState(shape, shapeKey);
 }
 
 /**

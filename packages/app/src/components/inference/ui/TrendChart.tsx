@@ -16,6 +16,7 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
+  type ShapeSelection,
 } from '@/lib/chart-rendering';
 import { getChartWatermark } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -275,12 +276,12 @@ const TrendChart = React.memo(
         getRulerY: (d: PreparedPoint, yScale: any) => yScale(d.y),
         onHoverStart: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
           applyHoverState(
-            sel.select('.visible-shape') as any,
+            sel.select('.visible-shape') as ShapeSelection,
             getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
           ),
         onHoverEnd: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
           applyNormalState(
-            sel.select('.visible-shape') as any,
+            sel.select('.visible-shape') as ShapeSelection,
             getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
           ),
         onPointClick: (d: PreparedPoint) => {
@@ -295,10 +296,10 @@ const TrendChart = React.memo(
 
     const xAxisConfig = useMemo(
       () => ({
-        tickFormat: ((value: d3.AxisDomain) =>
+        tickFormat: (value: d3.AxisDomain) =>
           locale === 'zh'
             ? axisDateFormatter.format(new Date(Number(value)))
-            : d3.timeFormat('%b %d')(new Date(Number(value)))) as any,
+            : d3.timeFormat('%b %d')(new Date(Number(value))),
         tickCount: 10,
         customize: (g: d3.Selection<SVGGElement, unknown, null, undefined>) => {
           g.selectAll('.tick text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
