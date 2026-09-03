@@ -174,6 +174,31 @@ describe('point labels stay inside the plot bounding box', () => {
     expect(label.style('opacity')).toBe('0');
   });
 
+  it('shows the label again once its point zooms back into the plot', () => {
+    const { zoomGroup } = renderChart();
+    const label = addPoint(zoomGroup, { x: 200, y: -40 });
+    const group = zoomGroup.select<SVGGElement>('.dot-group');
+
+    placePointLabels(zoomGroup);
+    expect(label.style('opacity')).toBe('0');
+
+    group.attr('transform', 'translate(200,150)');
+    placePointLabels(zoomGroup);
+
+    expect(label.style('opacity')).toBe('1');
+    expect(firstDy(label)).toBe(-8);
+  });
+
+  it('leaves labels hidden for other reasons alone', () => {
+    const { zoomGroup } = renderChart();
+    const label = addPoint(zoomGroup, { x: 200, y: 150 });
+    label.style('opacity', 0);
+
+    placePointLabels(zoomGroup);
+
+    expect(label.style('opacity')).toBe('0');
+  });
+
   it('resets a previous horizontal shift before laying out again', () => {
     const { zoomGroup } = renderChart();
     const label = addPoint(zoomGroup, { x: 395, y: 150, width: 40 });

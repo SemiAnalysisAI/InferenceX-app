@@ -397,6 +397,13 @@ export function updateRenderedLineLabels(
   });
 }
 
+/**
+ * Marks a `.point-label` that {@link placePointLabels} hid because no slot fit
+ * (as opposed to one hidden by the label toggle or a legend hover), so the
+ * next pass knows it may un-hide it.
+ */
+export const PLACEMENT_HIDDEN_ATTR = 'data-placement-hidden';
+
 export interface PointLabelPlacementOptions {
   /**
    * Strict bounding box, in zoom-group coordinates, that every label must lie
@@ -446,8 +453,16 @@ export function placePointLabels(
 
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
     const label = this.querySelector<SVGTextElement>('.point-label');
+    if (!label) return;
+    // A label this pass hid on an earlier frame (no slot fit, or its point had
+    // left the plot) is only provisionally hidden: give it back its opacity so
+    // it is reconsidered now that the layout may have changed. Labels hidden
+    // for any other reason (toggle off, legend hover, faded series) stay put.
+    if (label.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
+      label.removeAttribute(PLACEMENT_HIDDEN_ATTR);
+      label.style.opacity = '1';
+    }
     if (
-      !label ||
       label.style.display === 'none' ||
       label.style.visibility === 'hidden' ||
       label.style.opacity === '0' ||
@@ -529,6 +544,7 @@ export function placePointLabels(
         : null;
     if (index === null) {
       label.element.style.opacity = '0';
+      label.element.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
       continue;
     }
     const chosen = candidates[index];
