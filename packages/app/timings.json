@@ -242,7 +242,7 @@
     },
     {
       "spec": "cypress/e2e/tokens-per-currency.cy.ts",
-      "duration": 2401
+      "duration": 1000
     },
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
@@ -258,7 +258,7 @@
     },
     {
       "spec": "cypress/e2e/yaxis-metrics-render.cy.ts",
-      "duration": 6839
+      "duration": 4000
     },
     {
       "spec": "cypress/e2e/zh-pages.cy.ts",
