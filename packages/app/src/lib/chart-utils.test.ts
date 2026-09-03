@@ -4,6 +4,7 @@ import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
+import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
   generateHighContrastColors,
@@ -16,6 +17,7 @@ import {
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
   paretoFrontUpperLeft,
+  metricChartTitle,
   metricTitle,
   metricLabel,
   xAxisLabel,
@@ -1715,5 +1717,40 @@ describe('xAxisLabel', () => {
 
     expect(xAxisLabel(chartDef, 'en')).toBe('End-to-end Latency (s)');
     expect(xAxisLabel(chartDef, 'zh')).toBe('端到端延迟 (s)');
+  });
+});
+
+describe('metricChartTitle', () => {
+  const [interactivity] = chartDefinitions;
+
+  it('reads the tier-free heading while metricTitle keeps the option label', () => {
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO',
+    );
+    expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    );
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数',
+    );
+  });
+
+  it('honors per-graph heading overrides such as the token-revenue price source', () => {
+    const patched = {
+      ...interactivity,
+      y_tokenRevenuePerGpuHour_chartTitle: 'Token Revenue per GPU Hour at OpenRouter Pricing',
+      y_tokenRevenuePerGpuHour_chartTitleZh: '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    };
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'en')).toBe(
+      'Token Revenue per GPU Hour at OpenRouter Pricing',
+    );
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'zh')).toBe(
+      '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    );
+  });
+
+  it('falls back to the option title when a definition has no chart title', () => {
+    const bare = { ...interactivity, y_tpPerGpu_chartTitle: undefined };
+    expect(metricChartTitle(bare, 'y_tpPerGpu', 'en')).toBe('Token Throughput per Chip');
   });
 });
