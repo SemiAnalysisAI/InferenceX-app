@@ -3,7 +3,15 @@
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { track } from '@/lib/analytics';
 import {
@@ -132,7 +140,7 @@ function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
   return { navRef, indicator, animate: hasAnimatedRef.current };
 }
 
-export function TabNav() {
+export function TabNav({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
@@ -164,61 +172,56 @@ export function TabNav() {
   };
 
   return (
-    <>
-      {/* Mobile: Dropdown */}
-      <div className="lg:hidden mb-4">
-        <div className="w-full pb-6" />
-        <Card>
-          <div className="space-y-2">
-            <Label htmlFor="chart-select">{locale === 'zh' ? '选择图表' : 'Select Chart'}</Label>
-            <Select value={selectedTab} onValueChange={handleMobileChange}>
-              <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-                <SelectValue placeholder={locale === 'zh' ? '选择图表' : 'Select Chart'} />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIMARY_TABS.map((route) => (
-                  <SelectItem
-                    key={route.key}
-                    value={route.key}
-                    data-ph-capture-attribute-tab={route.key}
-                  >
-                    {tabLabel(route)}
-                  </SelectItem>
-                ))}
-                {lockedCurrentGatedTab && (
-                  <SelectItem
-                    value={lockedCurrentGatedTab.key}
-                    data-ph-capture-attribute-tab={lockedCurrentGatedTab.key}
-                  >
-                    {tabLabel(lockedCurrentGatedTab)}
-                  </SelectItem>
-                )}
-                {featureGateUnlocked && (
-                  <>
-                    <SelectSeparator />
-                    <SelectGroup>
-                      <SelectLabel>{locale === 'zh' ? '隐藏' : 'Hidden'}</SelectLabel>
-                      {GATED_TABS.map((route) => (
-                        <SelectItem
-                          key={route.key}
-                          value={route.key}
-                          data-ph-capture-attribute-tab={route.key}
-                        >
-                          {tabLabel(route)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </Card>
-      </div>
+    <div className="mb-4 pt-6 lg:pt-0">
+      <Card className="vt-dashboard-tabs p-0 md:p-0" data-slot="dashboard-navigation">
+        {/* Mobile: Dropdown */}
+        <div className="space-y-2 p-4 md:p-6 lg:hidden">
+          <Label htmlFor="chart-select">{locale === 'zh' ? '选择图表' : 'Select Chart'}</Label>
+          <Select value={selectedTab} onValueChange={handleMobileChange}>
+            <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
+              <SelectValue placeholder={locale === 'zh' ? '选择图表' : 'Select Chart'} />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIMARY_TABS.map((route) => (
+                <SelectItem
+                  key={route.key}
+                  value={route.key}
+                  data-ph-capture-attribute-tab={route.key}
+                >
+                  {tabLabel(route)}
+                </SelectItem>
+              ))}
+              {lockedCurrentGatedTab && (
+                <SelectItem
+                  value={lockedCurrentGatedTab.key}
+                  data-ph-capture-attribute-tab={lockedCurrentGatedTab.key}
+                >
+                  {tabLabel(lockedCurrentGatedTab)}
+                </SelectItem>
+              )}
+              {featureGateUnlocked && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>{locale === 'zh' ? '隐藏' : 'Hidden'}</SelectLabel>
+                    {GATED_TABS.map((route) => (
+                      <SelectItem
+                        key={route.key}
+                        value={route.key}
+                        data-ph-capture-attribute-tab={route.key}
+                      >
+                        {tabLabel(route)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Desktop: Nav links */}
-      <div className="hidden lg:flex flex-col mb-4">
-        <Card className="vt-dashboard-tabs overflow-x-auto py-6 md:py-6">
+        {/* Desktop: Nav links */}
+        <div className="hidden overflow-x-auto p-6 lg:block">
           <nav
             ref={navRef}
             data-testid="chart-section-tabs"
@@ -264,9 +267,10 @@ export function TabNav() {
               />
             )}
           </nav>
-        </Card>
-      </div>
-    </>
+        </div>
+        {footer}
+      </Card>
+    </div>
   );
 }
 
