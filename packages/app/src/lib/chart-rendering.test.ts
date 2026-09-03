@@ -215,6 +215,12 @@ describe('formatLargeNumber', () => {
     expect(formatLargeNumber(-2_000_000)).toBe('-2M');
   });
 
+  it('formats billions with B suffix', () => {
+    expect(formatLargeNumber(2_000_000_000)).toBe('2B');
+    expect(formatLargeNumber(36_900_000_000)).toBe('36.9B');
+    expect(formatLargeNumber(-1_500_000_000)).toBe('-1.5B');
+  });
+
   it('handles negative thousands', () => {
     expect(formatLargeNumber(-5_000)).toBe('-5k');
   });

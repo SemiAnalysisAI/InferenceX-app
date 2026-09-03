@@ -18,6 +18,7 @@ import {
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import { HOURS_PER_YEAR } from '@/components/inference/token-revenue';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -333,6 +334,28 @@ export function buildDerivedChartFields(
     // At $1 per million total tokens, million tokens per GPU hour is
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
+  }
+  // Normalized placeholders for the GW-year axes: one all-in utility GW hosts
+  // 1,000,000 / power GPUs for 8,760 hours. `applyTokenRevenuePricing` replaces
+  // these with the selected normalized or OpenRouter prices.
+  const gpuHoursPerGwYear = hardwarePower ? (1_000_000 / hardwarePower) * HOURS_PER_YEAR : 0;
+  if (wants('tokenRevenuePerGwYear')) {
+    fields.tokenRevenuePerGwYear = chartMetric(millionTokensPerHour * gpuHoursPerGwYear);
+  }
+  if (wants('tokenProfitPerGwYearH')) {
+    fields.tokenProfitPerGwYearH = chartMetric(
+      specs.costh ? (millionTokensPerHour - specs.costh) * gpuHoursPerGwYear : 0,
+    );
+  }
+  if (wants('tokenProfitPerGwYearN')) {
+    fields.tokenProfitPerGwYearN = chartMetric(
+      specs.costn ? (millionTokensPerHour - specs.costn) * gpuHoursPerGwYear : 0,
+    );
+  }
+  if (wants('tokenProfitPerGwYearR')) {
+    fields.tokenProfitPerGwYearR = chartMetric(
+      specs.costr ? (millionTokensPerHour - specs.costr) * gpuHoursPerGwYear : 0,
+    );
   }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {

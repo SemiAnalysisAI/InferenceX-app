@@ -287,6 +287,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   inputTputPerGpu?: { y: number; roof: boolean };
   /** Cache-aware gross token revenue using normalized or OpenRouter prices. */
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
+  /** Gross token revenue scaled to one all-in utility GW running for a year. */
+  tokenRevenuePerGwYear?: { y: number; roof: boolean };
+  /** Token revenue minus tier TCO per all-in utility GW-year; may be negative. */
+  tokenProfitPerGwYearH?: { y: number; roof: boolean };
+  tokenProfitPerGwYearN?: { y: number; roof: boolean };
+  tokenProfitPerGwYearR?: { y: number; roof: boolean };
   /** Total tokens produced per dollar of modeled infrastructure spend. */
   tokensPerDollarH?: { y: number; roof: boolean };
   tokensPerDollarN?: { y: number; roof: boolean };

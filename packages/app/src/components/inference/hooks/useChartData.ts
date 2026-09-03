@@ -4,6 +4,7 @@ import { useQueries } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions, {
+  METRIC_REGISTRY,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
 import type {
@@ -18,6 +19,8 @@ import type {
 } from '@/components/inference/types';
 import {
   applyTokenRevenuePricing,
+  isTokenSalePricingMetric,
+  tokenSalePricingLabels,
   usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
@@ -551,30 +554,22 @@ export function useChartData(
           }
         }
 
-        const usesOpenRouterPricing = tokenRevenuePriceSource === 'openrouter';
-        const revenueLabels: Partial<ChartDefinition> =
-          selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
-            ? usesOpenRouterPricing
-              ? {
-                  y_tokenRevenuePerGpuHour_label:
-                    'Token Revenue per GPU Hour at OpenRouter Pricing ($/GPU/hr)',
-                  y_tokenRevenuePerGpuHour_labelZh:
-                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
-                  y_tokenRevenuePerGpuHour_title:
-                    'Token Revenue per GPU Hour at OpenRouter Pricing',
-                  y_tokenRevenuePerGpuHour_titleZh:
-                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
-                }
-              : {
-                  y_tokenRevenuePerGpuHour_label:
-                    'Token Revenue per GPU Hour at Normalized Pricing ($/GPU/hr)',
-                  y_tokenRevenuePerGpuHour_labelZh:
-                    '按标准化价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
-                  y_tokenRevenuePerGpuHour_title:
-                    'Token Revenue per GPU Hour at Normalized Pricing',
-                  y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
-                }
-            : {};
+        // Sale-priced axes (revenue and profit) name the active price source in
+        // their axis label and title so a chart never presents OpenRouter and
+        // normalized dollars under the same heading.
+        const revenueLabels: Partial<ChartDefinition> = {};
+        if (isTokenSalePricingMetric(metricKey)) {
+          const labels = tokenSalePricingLabels(
+            METRIC_REGISTRY[metricKey],
+            tokenRevenuePriceSource,
+          );
+          (revenueLabels as Record<string, string>)[`${selectedYAxisMetric}_label`] = labels.label;
+          (revenueLabels as Record<string, string>)[`${selectedYAxisMetric}_labelZh`] =
+            labels.labelZh;
+          (revenueLabels as Record<string, string>)[`${selectedYAxisMetric}_title`] = labels.title;
+          (revenueLabels as Record<string, string>)[`${selectedYAxisMetric}_titleZh`] =
+            labels.titleZh;
+        }
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
         const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
 

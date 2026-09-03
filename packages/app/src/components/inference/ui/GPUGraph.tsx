@@ -544,9 +544,13 @@ const GPUGraph = React.memo(
         yMin =
           dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
       } else {
-        yMin = Math.max(0, yExtent[0] - yRange * 0.05);
+        // Profit axes (revenue minus TCO) can dip below zero; other metrics keep
+        // their zero floor.
+        yMin =
+          yExtent[0] < 0 ? yExtent[0] - yRange * 0.05 : Math.max(0, yExtent[0] - yRange * 0.05);
       }
-      return [yMin, yExtent[1] * 1.05] as [number, number];
+      const yMax = yExtent[1] >= 0 ? yExtent[1] * 1.05 : yExtent[1] + yRange * 0.05;
+      return [yMin, yMax] as [number, number];
     }, [filteredData, logScale]);
 
     const dataIdentity = useMemo(

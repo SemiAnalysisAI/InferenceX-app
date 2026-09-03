@@ -200,7 +200,9 @@ const TrendChart = React.memo(
           yMin = dataMin * 0.95;
         }
       } else {
-        yMin = Math.max(0, dataMin - yRange * 0.05);
+        // Profit axes (revenue minus TCO) can dip below zero; other metrics keep
+        // their zero floor.
+        yMin = dataMin < 0 ? dataMin - yRange * 0.05 : Math.max(0, dataMin - yRange * 0.05);
       }
       const yMax = dataMax + yRange * 0.05;
       return logScale
