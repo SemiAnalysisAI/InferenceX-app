@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/utils';
 
 /** Closed-field help sits beside the value, independently of the select button. */
 export function SelectedOptionInfo({
@@ -71,12 +72,18 @@ export function OptionInfo({
   children,
   onKeyDown,
   tabIndex,
+  triggerClassName,
+  triggerTestId,
+  align = 'end',
 }: {
   label: string;
   value: string;
   children: ReactNode;
   onKeyDown?: KeyboardEventHandler<HTMLButtonElement>;
   tabIndex?: number;
+  triggerClassName?: string;
+  triggerTestId?: string;
+  align?: 'start' | 'center' | 'end';
 }) {
   const locale = useLocale();
   const titleId = useId();
@@ -114,7 +121,7 @@ export function OptionInfo({
           ref={triggerRef}
           type="button"
           data-option-help
-          data-testid={`option-help-${value}`}
+          data-testid={triggerTestId ?? `option-help-${value}`}
           aria-label={locale === 'zh' ? `${label}说明` : `Help: ${label}`}
           onPointerEnter={(event) => {
             if (event.pointerType !== 'mouse') return;
@@ -138,7 +145,10 @@ export function OptionInfo({
           }}
           onKeyDown={onKeyDown}
           tabIndex={tabIndex}
-          className="no-export inline-flex size-11 md:size-8 shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none"
+          className={cn(
+            'no-export inline-flex size-11 md:size-8 shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none',
+            triggerClassName,
+          )}
         >
           <Info aria-hidden="true" className="size-3.5" />
         </button>
@@ -146,7 +156,7 @@ export function OptionInfo({
       <PopoverContent
         ref={contentRef}
         side="bottom"
-        align="end"
+        align={align}
         collisionPadding={12}
         aria-labelledby={titleId}
         onPointerEnter={cancelClose}
