@@ -1,29 +1,11 @@
 'use client';
 
-import {
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Diamond,
-  PanelRightClose,
-  PanelRightOpen,
-  Square,
-  Triangle,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
-import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
-
-const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; className?: string }>> = {
-  circle: Circle,
-  square: Square,
-  triangle: Triangle,
-  diamond: Diamond,
-};
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
@@ -76,14 +58,7 @@ export interface ChartLegendProps {
   switches?: LegendSwitchConfig[];
   actions?: LegendActionConfig[];
   grouped?: boolean;
-  /**
-   * Selected precisions, in selection order. When 2+ are provided, the legend
-   * renders a shape key: first precision → circle, second → square, third →
-   * triangle, fourth → diamond. Only the selected precisions are listed.
-   * A single precision (or none) hides the shape key entirely.
-   */
-  precisionIndicators?: readonly string[];
-  /** Optional extra key/legend explanation rendered alongside the FP indicators. */
+  /** Optional extra key/legend explanation rendered below the display switches. */
   keyIndicators?: React.ReactNode;
   enableTooltips?: boolean;
   maxHeight?: number;
@@ -110,7 +85,6 @@ export default function ChartLegend({
   switches,
   actions,
   grouped = false,
-  precisionIndicators,
   keyIndicators,
   enableTooltips = false,
   maxHeight,
@@ -220,20 +194,8 @@ export default function ChartLegend({
     [legendItems, hideAtomFootnote],
   );
 
-  const shapeIndicators = useMemo(() => {
-    if (!precisionIndicators || precisionIndicators.length < 2) return null;
-    return precisionIndicators.slice(0, SHAPE_ORDER.length).map((precision) => ({
-      precision,
-      shapeKey: getShapeKeyForPrecision(precision, precisionIndicators),
-    }));
-  }, [precisionIndicators]);
-
   const hasSidebarControls =
-    isSidebar &&
-    (shapeIndicators !== null ||
-      keyIndicators ||
-      (switches && switches.length > 0) ||
-      hasAtomFootnote);
+    isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-initial min-h-0 space-y-0.5',
@@ -368,27 +330,6 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const fpIndicators = shapeIndicators ? (
-    <div
-      className={cn(
-        'w-full md:w-auto mt-2 px-1 pr-2 gap-x-4 gap-y-1',
-        itemsExpanded ? 'flex flex-wrap' : 'grid grid-cols-2',
-      )}
-    >
-      {shapeIndicators.map(({ precision, shapeKey }) => {
-        const Icon = SHAPE_ICON[shapeKey];
-        return (
-          <div key={precision} className="flex items-center gap-2">
-            <Icon size={12} className="inline-block fill-gray-500" />
-            <span className="text-xs text-muted-foreground">
-              {getPrecisionLabel(precision as Precision)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  ) : null;
-
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps) =>
     cn(
@@ -453,11 +394,7 @@ export default function ChartLegend({
   // Display controls stay immediately below the series instead of being
   // pushed to the bottom of a chart-height panel. Overlay actions stay here.
   const hasBottomControls =
-    switchElements ||
-    (!isSidebar && actionElements) ||
-    fpIndicators ||
-    keyIndicators ||
-    hasAtomFootnote;
+    switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
@@ -466,7 +403,6 @@ export default function ChartLegend({
     >
       {!isSidebar && actionElements}
       {switchElements}
-      {fpIndicators}
       {keyIndicators}
       {hasAtomFootnote && <AtomEngineFootnote className="mt-2 no-export" />}
     </div>
