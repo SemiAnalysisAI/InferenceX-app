@@ -144,7 +144,7 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
-import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
+import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -708,27 +708,15 @@ const ScatterGraph = React.memo(
     });
 
     // --- Changelog ---
-    const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
-    const highlightedHwKeys = useMemo(() => {
-      if (availableRuns) {
-        const cl = availableRuns[selectedRunId]?.changelog;
-        if (cl) {
-          const hwKeys = cl.entries.flatMap((entry: any) =>
-            (entry.config_keys ?? entry['config-keys'] ?? [])
-              .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) =>
-                changelogConfigToHwKey(
-                  key,
-                  selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
-                ),
-              )
-              .filter((key: string | null): key is string => key !== null),
-          );
-          return new Set(hwKeys);
-        }
-      }
-      return new Set<string>();
-    }, [availableRuns, selectedRunId, selectedPrecisions, selectedSequence]);
+    const legendChangelogs = useMemo(
+      () =>
+        legendChangelogsByHardware(
+          data,
+          availableRuns,
+          selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn',
+        ),
+      [data, availableRuns, selectedSequence],
+    );
 
     // --- Data Processing ---
     const groupedData = useMemo(
@@ -3546,7 +3534,7 @@ const ScatterGraph = React.memo(
                     label: getDisplayLabel(hwConfig),
                     color: resolveColor(key),
                     title: hwConfig.gpu,
-                    isHighlighted: highlightedHwKeys.has(key),
+                    isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
                     hw: key,
                     isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
                     onClick: showAllHardwareTypes
@@ -3562,8 +3550,10 @@ const ScatterGraph = React.memo(
                         framework: hwConfig.framework ?? '',
                       });
                     },
-                    tooltip: changelog
-                      ? formatChangelogDescription(changelog.entries[0].description)
+                    tooltip: legendChangelogs.has(key)
+                      ? formatChangelogDescription(
+                          legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                        )
                       : null,
                   })),
               ]}

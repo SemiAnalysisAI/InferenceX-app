@@ -757,6 +757,96 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     },
   })),
 
+  // The Qwen metrics refresh retained the same 128 GiB host KV cache on
+  // prefill and decode, but its artifacts again reported offloading as disabled.
+  ...(
+    [
+      [
+        2360,
+        7,
+        '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 7 },
+        ),
+      ],
+      [
+        2361,
+        96,
+        '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 3 },
+        ),
+      ],
+      [
+        2362,
+        704,
+        'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 2 },
+        ),
+      ],
+      [
+        2363,
+        52,
+        '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 2 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+        ),
+      ],
+      [
+        2364,
+        565,
+        '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2365,
+        44,
+        '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 1 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-33219708211-config-${productionConfigId}-conc-${conc}-native-offload`,
+    reason:
+      'The Qwen TRT-LLM metrics refresh retained native host KV caching, but its offload metadata incorrectly placed it on a separate frontier from the original run.',
+    githubRunId: 33219708211,
+    runAttempt: 1,
+    productionConfigId,
+    config,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
   // The six disaggregated DeepSeek-V4-Pro recipes in run 32403083041
   // configure a 180 GiB native host KV cache on each prefill worker. The
   // master matrix omitted the offload annotation, so the artifacts reported

@@ -25,6 +25,84 @@ const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
 describe('ScatterGraph', () => {
+  for (const mixedRuns of [false, true]) {
+    it(`${mixedRuns ? 'hides' : 'shows'} the refresh changelog for a ${mixedRuns ? 'mixed' : 'matching'} run series`, () => {
+      const refreshUrl =
+        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219708211/attempts/1';
+      const point = createMockInferenceData({
+        hwKey: 'gb300_dynamo-trt',
+        model: Model.Qwen3_5,
+        run_url: refreshUrl,
+        benchmark_type: 'agentic_traces',
+      });
+      const description = 'Refresh to collect TensorRT-LLM server metrics.';
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="changelog-provenance"
+            modelLabel="Qwen3.5 397B"
+            data={
+              mixedRuns
+                ? [
+                    point,
+                    {
+                      ...point,
+                      x: 50,
+                      run_url:
+                        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/31927376673/attempts/1',
+                    },
+                  ]
+                : [point]
+            }
+            xLabel="Interactivity"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedModel: Model.Qwen3_5,
+            selectedSequence: Sequence.AgenticTraces,
+            selectedRunId: '33219708211',
+            selectedPrecisions: [Precision.FP4],
+            activeHwTypes: new Set(['gb300_dynamo-trt']),
+            hwTypesWithData: new Set(['gb300_dynamo-trt']),
+            hardwareConfig: {
+              'gb300_dynamo-trt': {
+                name: 'gb300-dynamo-trt',
+                label: 'GB300',
+                suffix: '(Dynamo TRTLLM)',
+                gpu: 'GB300',
+              },
+            },
+            availableRuns: {
+              '33219708211': {
+                runId: '33219708211',
+                runUrl: refreshUrl,
+                runDate: '2026-09-01',
+                conclusion: 'success',
+                changelog: {
+                  entries: [
+                    {
+                      config_keys: ['qwen3.5-fp4-gb300-dynamo-trt-agentic-disagg'],
+                      description,
+                      pr_link: null,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('label[for="checkbox-gb300_dynamo-trt"]')
+        .parent()
+        .trigger('pointermove', { pointerType: 'mouse' });
+      cy.contains('[role="tooltip"]', description).should(mixedRuns ? 'not.exist' : 'exist');
+    });
+  }
+
   it('offers the complete table when matching official points are all clipped', () => {
     const point = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
     mountWithProviders(

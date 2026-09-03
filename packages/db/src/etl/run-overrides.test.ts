@@ -67,6 +67,62 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills()).not.toThrow();
   });
 
+  it('corrects only the six Qwen metrics-refresh recipes without changing measurements', () => {
+    const backfills = BENCHMARK_POINT_BACKFILLS.filter((b) => b.githubRunId === 33219708211);
+    expect(backfills.map((b) => [b.productionConfigId, b.conc, b.recipeFingerprint])).toEqual([
+      [2360, 7, '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d'],
+      [2361, 96, '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f'],
+      [2362, 704, 'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0'],
+      [2363, 52, '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc'],
+      [2364, 565, '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4'],
+      [2365, 44, '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866'],
+    ]);
+    for (const backfill of backfills) {
+      const point = {
+        configId: backfill.productionConfigId,
+        config: backfill.config,
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: backfill.conc,
+        offloadMode: 'off',
+        recipeFingerprint: backfill.recipeFingerprint,
+        metrics: {
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+          server_gpu_cache_hit_rate: 0.5284,
+          kv_p2p_transfer: 'nixl',
+          allocated_cpu_dram_gb: 0,
+          kv_offloading: 'none',
+        },
+      };
+      const applied = applyBenchmarkPointBackfill(33219708211, 1, point);
+      expect(applied.point).toEqual({
+        ...point,
+        offloadMode: 'on',
+        metrics: {
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+          server_gpu_cache_hit_rate: 0.5284,
+          kv_p2p_transfer: 'nixl',
+          offload_mode: 'on',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'native',
+          kv_offload_backend_version: '1.3.0rc24',
+        },
+      });
+      expect(applyBenchmarkPointBackfill(33219708211, 2, point).backfillId).toBeNull();
+      expect(applyBenchmarkPointBackfill(31927376673, 1, point).backfillId).toBeNull();
+      expect(
+        applyBenchmarkPointBackfill(33219708211, 1, { ...point, recipeFingerprint: null })
+          .backfillId,
+      ).toBeNull();
+      expect(applyBenchmarkPointBackfill(33219708211, 1, applied.point).point).toEqual(
+        applied.point,
+      );
+    }
+  });
+
   it('limits borrowed prefix-cache hit rates to GB300 dynamo-vllm DeepSeek-V4 AgentX points', () => {
     const cacheHitKeys = [
       'server_gpu_cache_hit_rate',
