@@ -14,6 +14,7 @@ import {
   normalizeServerMetrics,
   type MetricSource,
   type ServerMetricsContext,
+  type ServerMetricsInputConfig,
 } from './server-metrics-adapters';
 
 /**
@@ -347,9 +348,10 @@ export function computeChartSeriesFromMetricPhases(
   profiling: MetricsMap,
   warmup: MetricsMap,
   context: ServerMetricsContext = {},
+  inputConfig: ServerMetricsInputConfig = {},
 ): ChartSeries {
   return buildSeriesFromMetrics(
-    normalizeServerMetrics(mergePhaseMetrics(profiling, warmup), {}, context),
+    normalizeServerMetrics(mergePhaseMetrics(profiling, warmup), inputConfig, context),
     context,
   );
 }

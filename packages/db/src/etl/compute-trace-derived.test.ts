@@ -205,6 +205,34 @@ describe('llm-d metric sources', () => {
     },
   );
 
+  it.each([undefined, 1])(
+    'uses the same frontend selection across phases and entry points (stream limit %s)',
+    async (maxInMemoryBytes) => {
+      const blob = gzipSync(
+        JSON.stringify({
+          metrics,
+          warmup_metrics: {
+            'vllm:generation_tokens': { series: [llmdSeries(frontend, 10000, 0)] },
+          },
+          input_config,
+        }),
+      );
+      const result = await computeTraceDerivedPayloads(null, blob, context, { maxInMemoryBytes });
+      expect(result.chartSeries?.decodeTps).toEqual([
+        { t: 0, value: 51 },
+        { t: 1, value: 51 },
+      ]);
+      expect(result.chartSeries).toEqual(await computeChartSeries(blob, context));
+      expect(result.aggregateStats).toEqual(
+        await computeAggregateStats({
+          profileBlob: null,
+          serverBlob: blob,
+          metricsContext: context,
+        }),
+      );
+    },
+  );
+
   it('preserves the frontend when it is explicitly requested or has no direct metric counterpart', async () => {
     for (const urls of [[prefill, decode, frontend], []]) {
       const blob = gzipSync(

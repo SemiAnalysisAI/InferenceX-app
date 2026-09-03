@@ -79,16 +79,13 @@ export async function computeTraceDerivedPayloads(
   let chartSeries: ChartSeries | null = null;
 
   if (phases) {
-    phases.metrics = normalizeServerMetrics(phases.metrics, phases.inputConfig, metricsContext);
-    phases.warmupMetrics = normalizeServerMetrics(
-      phases.warmupMetrics,
-      phases.inputConfig,
-      metricsContext,
-    );
     const aggregateMetrics = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);
-    aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics);
+    aggregateStats = withServerMetricAggregateStats(
+      aggregateStats,
+      normalizeServerMetrics(aggregateMetrics, phases.inputConfig, metricsContext),
+    );
 
     // The historical in-memory path builds chart timing metadata from every
     // metric, while its oversized streaming fallback retains only chart keys.
@@ -101,7 +98,12 @@ export async function computeTraceDerivedPayloads(
       ? phases.warmupMetrics
       : selectMetrics(phases.warmupMetrics, CHART_METRIC_KEYS);
     try {
-      chartSeries = computeChartSeriesFromMetricPhases(profiling, warmup, metricsContext);
+      chartSeries = computeChartSeriesFromMetricPhases(
+        profiling,
+        warmup,
+        metricsContext,
+        phases.inputConfig,
+      );
     } catch {
       chartSeries = null;
     }
