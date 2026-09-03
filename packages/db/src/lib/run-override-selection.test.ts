@@ -11,6 +11,27 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('makes an unregistered ingest a no-op without touching historical rows', () => {
+    expect(
+      selectRunOverrides(['--run-id', '33721476500', '--allow-unregistered-run', '--yes']),
+    ).toEqual({
+      runId: 33721476500,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set(),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
+  it('still selects registered corrections when allowing an unregistered run', () => {
+    expect(selectRunOverrides(['--run-id', '33219708211', '--allow-unregistered-run'])).toEqual(
+      selectRunOverrides(['--run-id', '33219708211']),
+    );
+    expect(() => selectRunOverrides(['--allow-unregistered-run'])).toThrow('requires --run-id');
+  });
+
   it('keeps all registered operations when no run is selected', () => {
     expect(selectRunOverrides(['--yes'])).toEqual({
       runId: undefined,
