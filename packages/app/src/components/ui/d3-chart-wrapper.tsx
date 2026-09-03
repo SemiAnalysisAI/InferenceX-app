@@ -148,8 +148,9 @@ export function D3ChartWrapper({
              legend label (capped) so full names display without truncation,
              while still sitting next to the plot without overlapping it; when
              closed the legend renders only a small reopen button and the
-             chart reclaims the width. */
-          <div className="w-full lg:w-auto lg:shrink-0 relative mt-3 lg:mt-0 has-[.sidebar-legend]:h-96 lg:has-[.sidebar-legend]:h-[575px] lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96">
+             chart reclaims the width. Height belongs to the legend itself:
+             short lists should not reserve an empty chart-height column. */
+          <div className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96">
             {legendElement}
           </div>
         )}

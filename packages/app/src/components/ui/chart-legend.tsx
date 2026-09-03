@@ -189,7 +189,7 @@ export default function ChartLegend({
   // (Epoch-style). It never overlays the chart; closing it (X) removes it
   // entirely and the chart reclaims the width.
   const outerClasses = isSidebar
-    ? 'p-3 rounded-md border border-border/60 bg-background text-sm flex flex-col h-full legend-container sidebar-legend w-full'
+    ? 'p-3 rounded-md border border-border/60 bg-background text-sm flex flex-col max-h-96 lg:max-h-[575px] legend-container sidebar-legend w-full'
     : grouped
       ? cn(
           'py-1 px-2 md:py-1 rounded-sm border text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
@@ -229,10 +229,10 @@ export default function ChartLegend({
     (shapeIndicators !== null ||
       keyIndicators ||
       (switches && switches.length > 0) ||
-      (actions && actions.length > 0));
+      hasAtomFootnote);
   const scrollClasses = isSidebar
     ? cn(
-        'overflow-y-auto flex-1 min-h-0 space-y-0.5',
+        'overflow-y-auto flex-initial min-h-0 space-y-0.5',
         hasSidebarControls && 'border-b border-border pb-2',
       )
     : grouped
@@ -258,16 +258,48 @@ export default function ChartLegend({
     );
   }
 
-  // Slim header: just the close (X) affordance, right-aligned (Epoch-style).
+  const actionElements =
+    actions && actions.length > 0 ? (
+      <div
+        className={cn(
+          'no-export flex flex-wrap gap-y-1',
+          isSidebar ? 'min-w-0 gap-x-1' : 'w-full gap-x-3',
+        )}
+      >
+        {actions.map((action) => (
+          <button
+            type="button"
+            key={action.id}
+            data-testid={action.id}
+            onClick={action.onClick}
+            className={cn(
+              'text-xs text-muted-foreground hover:text-foreground cursor-pointer',
+              isSidebar
+                ? 'min-h-8 rounded-md px-2 hover:bg-muted transition-colors'
+                : 'mt-2 underline',
+            )}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  // Put series actions in the space previously occupied by a lone close icon.
+  // The panel fits short lists; only the series region scrolls for long lists.
   const panelHeader = isSidebar ? (
-    <div className="pb-1 no-export flex justify-end">
+    <div
+      data-testid="legend-toolbar"
+      className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
+    >
+      <div className="min-w-0 flex-1">{actionElements}</div>
       <button
         type="button"
         data-testid="legend-close-button"
         onClick={toggleLegendOpen}
         aria-label={t.hideLegend}
         title={t.hideLegend}
-        className="p-1 rounded-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
       >
         <X size={14} />
       </button>
@@ -357,23 +389,6 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const actionElements =
-    actions && actions.length > 0 ? (
-      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
-        {actions.map((action) => (
-          <button
-            type="button"
-            key={action.id}
-            data-testid={action.id}
-            onClick={action.onClick}
-            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
   const fpIndicators = shapeIndicators ? (
     <div
       className={cn(
@@ -456,12 +471,17 @@ export default function ChartLegend({
     );
   };
 
-  // Bottom controls (switches, FP indicators, actions)
+  // Display controls stay immediately below the series instead of being
+  // pushed to the bottom of a chart-height panel. Overlay actions stay here.
   const hasBottomControls =
-    switchElements || actionElements || fpIndicators || keyIndicators || hasAtomFootnote;
+    switchElements ||
+    (!isSidebar && actionElements) ||
+    fpIndicators ||
+    keyIndicators ||
+    hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
-    <div className="shrink-0 grow-0">
-      {actionElements}
+    <div data-testid="legend-display-controls" className="shrink-0 grow-0">
+      {!isSidebar && actionElements}
       {switchElements}
       {fpIndicators}
       {keyIndicators}
@@ -526,7 +546,7 @@ export default function ChartLegend({
     );
 
   const content = (
-    <div className={isSidebar ? 'h-full' : 'relative'}>
+    <div className={isSidebar ? 'min-w-0' : 'relative'}>
       <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
         {panelHeader}
         {scrollContent}

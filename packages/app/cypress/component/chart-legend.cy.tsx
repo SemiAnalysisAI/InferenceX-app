@@ -1,10 +1,11 @@
-import { Profiler, useState } from 'react';
+import { Profiler, useRef, useState } from 'react';
 
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import type { InferenceData } from '@/components/inference/types';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
+import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
 
 const MOCK_ITEMS: CommonLegendItemProps[] = [
   {
@@ -41,13 +42,29 @@ const MOCK_ITEMS: CommonLegendItemProps[] = [
   },
 ];
 
-function ChartLegendWrapper({ items = MOCK_ITEMS }: { items?: CommonLegendItemProps[] }) {
+function ChartLegendWrapper({
+  items = MOCK_ITEMS,
+  inChart = false,
+  grouped = false,
+  onQuickFilters = () => {},
+}: {
+  items?: CommonLegendItemProps[];
+  inChart?: boolean;
+  grouped?: boolean;
+  onQuickFilters?: () => void;
+}) {
   const [expanded, setExpanded] = useState(true);
   const [legendItems, setLegendItems] = useState(items);
+  const [optimal, setOptimal] = useState(true);
+  const [logScale, setLogScale] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const handleItemClick = (name: string) => {
     setLegendItems((prev) =>
-      prev.map((item) => (item.name === name ? { ...item, isActive: !item.isActive } : item)),
+      prev.map((item) =>
+        (item.hw || item.name) === name ? { ...item, isActive: !item.isActive } : item,
+      ),
     );
   };
 
@@ -56,18 +73,58 @@ function ChartLegendWrapper({ items = MOCK_ITEMS }: { items?: CommonLegendItemPr
     onClick: handleItemClick,
   }));
 
-  return (
+  const legend = (
     <ChartLegend
       legendItems={itemsWithHandler}
       isLegendExpanded={expanded}
       onExpandedChange={setExpanded}
       variant="sidebar"
-      actions={
-        itemsWithHandler.some((i) => !i.isActive)
-          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
-          : []
+      grouped={grouped}
+      switches={
+        inChart
+          ? [
+              {
+                id: 'optimal',
+                label: 'Optimal Only',
+                checked: optimal,
+                onCheckedChange: setOptimal,
+              },
+              {
+                id: 'log-scale',
+                label: 'Log Scale',
+                checked: logScale,
+                onCheckedChange: setLogScale,
+                advanced: true,
+              },
+            ]
+          : undefined
       }
+      actions={[
+        ...(itemsWithHandler.some((i) => !i.isActive)
+          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
+          : []),
+        ...(inChart
+          ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }]
+          : []),
+      ]}
     />
+  );
+
+  return inChart ? (
+    <D3ChartWrapper
+      chartId="legend-layout-chart"
+      svgRef={svgRef}
+      tooltipRef={tooltipRef}
+      setContainerRef={() => {}}
+      dimensions={{ width: 600, height: 575 }}
+      pinnedPoint={null}
+      isPinned={() => false}
+      dismissTooltip={() => {}}
+      hideTooltipElements={() => {}}
+      legendElement={legend}
+    />
+  ) : (
+    legend
   );
 }
 
@@ -123,6 +180,72 @@ describe('ChartLegend (sidebar variant)', () => {
   it('renders no search input (removed from the sidebar panel)', () => {
     cy.get('.sidebar-legend input[type="text"]').should('not.exist');
   });
+
+  for (const width of [390, 1280]) {
+    it(`fits a short list and keeps actions with the close button at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
+      cy.get('[data-testid="chart-legend"]')
+        .scrollIntoView()
+        .should(($legend) => {
+          const panel = $legend[0].getBoundingClientRect();
+          const list = $legend.find('ul')[0].getBoundingClientRect();
+          const controls = $legend
+            .find('[data-testid="legend-display-controls"]')[0]
+            .getBoundingClientRect();
+          expect(panel.height).to.be.lessThan(280);
+          expect(controls.top - list.bottom).to.be.lessThan(16);
+          expect(panel.right).to.be.at.most(width);
+        });
+      cy.get('[data-testid="legend-toolbar"]').within(() => {
+        cy.get('[data-testid="quick-filters"]').click();
+        cy.get('[data-testid="legend-close-button"]').should('be.visible');
+      });
+      cy.get('@quickFilters').should('have.been.calledOnce');
+      cy.get('.sidebar-legend label').contains('NVIDIA H100 SXM').click();
+      cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
+      cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
+      cy.get('[data-testid="legend-advanced-toggle"]').click();
+      cy.get('[data-testid="log-scale"]').click().should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-testid="legend-close-button"]').click();
+      cy.get('[data-testid="legend-open-button"]').click();
+      cy.get('[data-testid="log-scale"]').should('have.attr', 'aria-checked', 'true');
+    });
+
+    for (const grouped of [false, true]) {
+      it(`scrolls a long ${grouped ? 'grouped' : 'flat'} list without hiding controls at ${width}px`, () => {
+        const items = Array.from({ length: 40 }, (_, index) => ({
+          ...MOCK_ITEMS[index % MOCK_ITEMS.length],
+          name: `hardware-${Math.floor(index / 5)} run-${index}`,
+          hw: `series-${index}`,
+          label: `Run ${index + 1} — hardware comparison`,
+          title: `Hardware ${Math.floor(index / 5) + 1}`,
+        }));
+        cy.viewport(width, 900);
+        cy.mount(<ChartLegendWrapper inChart grouped={grouped} items={items} />);
+        cy.get('[data-testid="chart-legend"]')
+          .scrollIntoView()
+          .should(($legend) => {
+            const panel = $legend[0].getBoundingClientRect();
+            const scroller = $legend.find('.custom-scrollbar')[0];
+            const controls = $legend
+              .find('[data-testid="legend-display-controls"]')[0]
+              .getBoundingClientRect();
+            expect(panel.height).to.be.at.most(width < 1024 ? 384 : 575);
+            expect(scroller.scrollHeight).to.be.greaterThan(scroller.clientHeight);
+            expect(controls.bottom).to.be.at.most(panel.bottom);
+          });
+        cy.get('.sidebar-legend label').contains('Run 40 —').scrollIntoView().click();
+        cy.get('#checkbox-series-39').should('not.be.checked');
+        cy.get('[data-testid="optimal"]')
+          .should('be.visible')
+          .click()
+          .should('have.attr', 'aria-checked', 'false');
+        cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
+        cy.get('#checkbox-series-39').should('be.checked');
+      });
+    }
+  }
 
   it('clicking a legend item toggles its active state', () => {
     cy.get('.sidebar-legend label').first().click();
