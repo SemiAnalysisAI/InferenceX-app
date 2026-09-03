@@ -198,52 +198,113 @@ function watermarkFont(size: number): string {
   return `bold ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 }
 
-/** Add a subtle watermark bar at the bottom of the exported image */
-function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
+/** Fraction of the chart capture the background logo may span (width and height). */
+const LOGO_WATERMARK_MAX_FRACTION = 0.6;
+
+/** Public path of the SemiAnalysis logo to tile behind the chart, per theme. */
+export function getLogoWatermarkSrc(isDark: boolean): string {
+  return isDark ? '/brand/logo-white.png' : '/brand/logo-color.png';
+}
+
+/** Opacity of the background logo, per theme (kept faint so data stays legible). */
+export function getLogoWatermarkOpacity(isDark: boolean): number {
+  return isDark ? 0.09 : 0.08;
+}
+
+/**
+ * Fit the logo inside the chart capture, centered, preserving aspect ratio and
+ * capped to a fraction of the capture so it reads as a background mark rather
+ * than a foreground element.
+ */
+export function getLogoWatermarkLayout(
+  capture: { width: number; height: number },
+  logo: { width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const maxWidth = capture.width * LOGO_WATERMARK_MAX_FRACTION;
+  const maxHeight = capture.height * LOGO_WATERMARK_MAX_FRACTION;
+  const scale = Math.min(maxWidth / logo.width, maxHeight / logo.height);
+  const width = Math.round(logo.width * scale);
+  const height = Math.round(logo.height * scale);
+  return {
+    x: Math.round((capture.width - width) / 2),
+    y: Math.round((capture.height - height) / 2),
+    width,
+    height,
+  };
+}
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.addEventListener('load', () => {
-      const WATERMARK_HEIGHT = 240;
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height + WATERMARK_HEIGHT;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-
-      // Draw original image
-      ctx.drawImage(img, 0, 0);
-
-      // Draw watermark bar
-      const isDark =
-        document.documentElement.classList.contains('dark') ||
-        document.documentElement.classList.contains('minecraft') ||
-        bgColor.includes('0 0%');
-      ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
-      ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
-
-      // Draw watermark text (shrink to fit on narrow exports)
-      const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
-      let fontSize = 80;
-      ctx.font = watermarkFont(fontSize);
-      const maxTextWidth = canvas.width - 48;
-      const textWidth = ctx.measureText(WATERMARK_TEXT).width;
-      if (textWidth > maxTextWidth) {
-        fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
-        ctx.font = watermarkFont(fontSize);
-      }
-      ctx.fillStyle = isDark ? '#aaa' : '#555';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(WATERMARK_TEXT, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
-
-      resolve(canvas.toDataURL('image/png'));
-    });
-    img.addEventListener('error', () => resolve(dataUrl));
-    img.src = dataUrl;
+    img.addEventListener('load', () => resolve(img));
+    img.addEventListener('error', () => resolve(null));
+    img.src = src;
   });
+}
+
+/**
+ * Compose the final export: theme background, a faint SemiAnalysis logo
+ * behind the chart, the (transparent) chart capture on top, and the branded
+ * footer bar. The chart is captured without a background so the logo really
+ * sits behind the plot instead of tinting the data on top.
+ */
+async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
+  const img = await loadImage(chartDataUrl);
+  if (!img) return chartDataUrl;
+
+  const isDark =
+    document.documentElement.classList.contains('dark') ||
+    document.documentElement.classList.contains('minecraft') ||
+    bgColor.includes('0 0%');
+
+  const WATERMARK_HEIGHT = 240;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height + WATERMARK_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return chartDataUrl;
+
+  // Solid theme background (the chart capture itself is transparent)
+  ctx.fillStyle = bgColor || (isDark ? '#131416' : '#eaebec');
+  ctx.fillRect(0, 0, canvas.width, img.height);
+
+  // Faint SemiAnalysis logo centered behind the chart. Skip silently if the
+  // asset fails to load so export never blocks on branding.
+  const logo = await loadImage(getLogoWatermarkSrc(isDark));
+  if (logo && logo.naturalWidth > 0 && logo.naturalHeight > 0) {
+    const layout = getLogoWatermarkLayout(
+      { width: img.width, height: img.height },
+      { width: logo.naturalWidth, height: logo.naturalHeight },
+    );
+    ctx.save();
+    ctx.globalAlpha = getLogoWatermarkOpacity(isDark);
+    ctx.drawImage(logo, layout.x, layout.y, layout.width, layout.height);
+    ctx.restore();
+  }
+
+  // Draw chart capture over the background + logo
+  ctx.drawImage(img, 0, 0);
+
+  // Draw watermark bar
+  ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
+  ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
+
+  // Draw watermark text (shrink to fit on narrow exports)
+  const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
+  let fontSize = 80;
+  ctx.font = watermarkFont(fontSize);
+  const maxTextWidth = canvas.width - 48;
+  const textWidth = ctx.measureText(WATERMARK_TEXT).width;
+  if (textWidth > maxTextWidth) {
+    fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
+    ctx.font = watermarkFont(fontSize);
+  }
+  ctx.fillStyle = isDark ? '#aaa' : '#555';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(WATERMARK_TEXT, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
+
+  return canvas.toDataURL('image/png');
 }
 
 /**
@@ -465,11 +526,12 @@ export function useChartExport({
         }
       }
       const captureDimensions = getExportCaptureDimensions(exportElement);
+      // Capture without a background: addWatermark paints the theme background
+      // and the SemiAnalysis logo underneath, then layers this capture on top.
       const chartDataUrl = await toPng(exportElement, {
         ...captureDimensions,
         quality: 1,
         pixelRatio: 2,
-        backgroundColor: bgColor,
         cacheBust: true,
         skipFonts: false,
         fontEmbedCSS,
@@ -481,7 +543,7 @@ export function useChartExport({
         },
       });
 
-      // Add watermark with InferenceX branding
+      // Compose background + SemiAnalysis logo watermark + chart + footer bar
       const dataUrl = await addWatermark(chartDataUrl, bgColor);
 
       const link = document.createElement('a');
