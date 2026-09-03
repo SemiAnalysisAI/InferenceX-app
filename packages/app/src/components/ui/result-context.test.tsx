@@ -45,6 +45,42 @@ describe('ResultContext', () => {
     expect(context.textContent).toContain('成本口径: Input $1/M tok · Output $8/M tok');
   });
 
+  it('renders only Cost Tier, Updated, and Source when the heading carries the identity', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          costTier="Owning Hyperscaler"
+          date="2026-09-01"
+          source="SemiAnalysis InferenceX™"
+        />,
+      );
+    });
+    const text = container.textContent ?? '';
+    expect(text).toContain('Cost Tier: Owning Hyperscaler');
+    expect(text).toContain('Updated: 2026-09-01');
+    expect(text).toContain('Source: SemiAnalysis InferenceX™');
+    expect(text).not.toContain('Model:');
+    expect(text).not.toContain('Workload:');
+    expect(text).not.toContain('Precision:');
+    expect(text).not.toContain('Metric:');
+    expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
+      'Owning Hyperscaler',
+    );
+  });
+
+  it('localizes the Cost Tier label', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext locale="zh" costTier="自有（超大规模）" date="2026-09-01" />,
+      );
+    });
+    expect(container.textContent).toContain('成本层级: 自有（超大规模）');
+    expect(container.textContent).not.toContain('模型:');
+  });
+
   it('does not imply a single date when several dates are selected', () => {
     const container = document.createElement('div');
     act(() => {

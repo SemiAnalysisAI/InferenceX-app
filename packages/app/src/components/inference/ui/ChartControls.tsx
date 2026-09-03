@@ -59,7 +59,7 @@ const STRINGS = {
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",

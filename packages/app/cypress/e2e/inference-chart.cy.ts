@@ -56,15 +56,38 @@ describe('Inference Chart', () => {
     cy.contains('No data available').should('not.exist');
   });
 
-  it('shows a chart heading with metric title', () => {
-    cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
+  it('leads the chart heading with the model and workload, without the cost tier', () => {
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', 'Agentic Total Tokens per $1 TCO')
+      .and('contain.text', 'vs. P90 Interactivity')
+      .and('not.contain.text', '(Owning');
+    // The heading names the model, so the caption no longer repeats it.
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .invoke('text')
+      .then((heading) => {
+        cy.get('[data-testid="model-selector"]')
+          .invoke('text')
+          .then((model) => {
+            expect(heading.trim().startsWith(model.trim())).to.equal(true);
+          });
+      });
   });
 
-  it('shows chart caption with model and source info', () => {
+  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('contain', 'SemiAnalysis InferenceX');
+      .should('contain.text', 'Cost Tier: Owning Hyperscaler')
+      .and('contain.text', 'Updated:')
+      .and('contain.text', 'SemiAnalysis InferenceX')
+      .and('not.contain.text', 'Model:')
+      .and('not.contain.text', 'Workload:')
+      .and('not.contain.text', 'Precision:')
+      .and('not.contain.text', 'Metric:');
   });
 
   it('shows the sidebar legend for GPU types', () => {

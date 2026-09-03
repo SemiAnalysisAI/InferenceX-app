@@ -162,9 +162,6 @@ describe('MetricAssumptionNotes', () => {
     'y_tokensPerDollarH',
     'y_tokensPerDollarN',
     'y_tokensPerDollarR',
-    'y_tokensPerRmbH',
-    'y_tokensPerRmbN',
-    'y_tokensPerRmbR',
   ])('hides the purchasing-power caveat for total-token metric %s', (metric) => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
@@ -180,7 +177,7 @@ describe('MetricAssumptionNotes', () => {
   it('narrows the TCO badges to the base GPUs of the active legend selection', () => {
     renderUi(
       <MetricAssumptionNotes
-        selectedYAxisMetric="y_tokensPerRmbH"
+        selectedYAxisMetric="y_tokensPerDollarH"
         activeHwKeys={['h200_dynamo-sglang', 'gb300_dynamo-sglang']}
       />,
     );
@@ -204,14 +201,14 @@ describe('MetricAssumptionNotes', () => {
   });
 
   it('falls back to every registry GPU when the selection is empty or unrecognized', () => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerRmbH" activeHwKeys={[]} />);
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollarH" activeHwKeys={[]} />);
 
     expect(getVisibleText()).toContain('H100:');
     expect(getVisibleText()).toContain('MI300X:');
 
     renderUi(
       <MetricAssumptionNotes
-        selectedYAxisMetric="y_tokensPerRmbH"
+        selectedYAxisMetric="y_tokensPerDollarH"
         activeHwKeys={['not-a-gpu_dynamo-sglang']}
       />,
     );
