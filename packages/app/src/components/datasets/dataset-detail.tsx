@@ -20,6 +20,7 @@ import {
 } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
 import { Stat } from './stat';
 
@@ -223,6 +224,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
   }
 
   const s = dataset.summary ?? {};
+  const description = getDatasetDescription(dataset, locale);
   const cd = dataset.chart_data ?? {};
   const total = convs?.total ?? 0;
   const pageCount = Math.ceil(total / PAGE);
@@ -258,8 +260,13 @@ export function DatasetDetail({ slug }: { slug: string }) {
             )}
           </div>
         </div>
-        {dataset.description && (
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{dataset.description}</p>
+        {description && (
+          <p
+            data-testid="dataset-description"
+            className="mt-2 max-w-3xl text-sm text-muted-foreground"
+          >
+            {description}
+          </p>
         )}
       </div>
 

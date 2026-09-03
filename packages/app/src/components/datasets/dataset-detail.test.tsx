@@ -18,6 +18,7 @@ const { conversationQueries, testState } = vi.hoisted(() => ({
         slug: 'trace',
         label: 'Trace dataset',
         variant: 'test',
+        description: null,
         conversation_count: 100,
         summary: {},
         chart_data: {},
@@ -25,6 +26,7 @@ const { conversationQueries, testState } = vi.hoisted(() => ({
         slug: string;
         label: string;
         variant: string;
+        description: string | null;
         conversation_count: number;
         summary: Record<string, never>;
         chart_data: Record<string, never>;
@@ -87,6 +89,7 @@ afterEach(() => {
       slug: 'trace',
       label: 'Trace dataset',
       variant: 'test',
+      description: null,
       conversation_count: 100,
       summary: {},
       chart_data: {},
@@ -103,6 +106,42 @@ afterEach(() => {
   };
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe('DatasetDetail descriptions', () => {
+  const fallbackEn =
+    'AgentX conversation traces with requests over 256,000 input + output tokens removed, preserving relative timing and subagent overlap.';
+  const fallbackZh =
+    'AgentX 会话 trace，已移除 input 与 output 合计超过 256,000 token 的请求，并保留其余请求的相对时间与 subagent 重叠关系。';
+
+  it.each([
+    ['en', 'cc-traces-weka-062126-256k', null, fallbackEn],
+    ['zh', 'cc-traces-weka-062126-256k', null, fallbackZh],
+    ['en', 'cc-traces-weka-062126-256k', '', fallbackEn],
+    ['zh', 'cc-traces-weka-062126-256k', '  \n ', fallbackZh],
+    [
+      'zh',
+      'cc-traces-weka-062126-256k',
+      'Updated source description.',
+      'Updated source description.',
+    ],
+    ['en', 'another-256k-dataset', null, null],
+  ] as const)(
+    'renders the appropriate description for %s / %s / %j',
+    (locale, slug, description, expected) => {
+      testState.locale = locale;
+      testState.dataset.data = { ...testState.dataset.data!, slug, description };
+      const container = document.createElement('div');
+      const root = createRoot(container);
+      act(() => root.render(createElement(DatasetDetail, { slug })));
+
+      expect(
+        container.querySelector('[data-testid="dataset-description"]')?.textContent ?? null,
+      ).toBe(expected);
+
+      act(() => root.unmount());
+    },
+  );
 });
 
 describe('DatasetDetail conversation search', () => {

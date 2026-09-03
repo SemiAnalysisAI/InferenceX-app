@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { useDatasets, type DatasetRecord } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, localeNumber, perConversation } from './format';
 
 const STRINGS = {
@@ -45,6 +46,7 @@ const STRINGS = {
 
 function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
   const t = STRINGS[locale];
+  const description = getDatasetDescription(d, locale);
   const s = d.summary ?? {};
   const cachedPct = formatPct(s.cachedPct);
   const prefix = locale === 'zh' ? '/zh' : '';
@@ -61,8 +63,13 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
             {d.variant}
           </span>
         </div>
-        {d.description && (
-          <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{d.description}</p>
+        {description && (
+          <p
+            data-testid="dataset-description"
+            className="mb-3 min-h-8 line-clamp-2 text-xs text-muted-foreground"
+          >
+            {description}
+          </p>
         )}
         <div className="mb-3 rounded-lg border border-border/40 bg-muted/20 p-3">
           <div className="text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground">
