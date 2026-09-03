@@ -118,6 +118,11 @@ When extending an already-applied identity-changing correction, record its old
 `set` as `previousSet`. The recovery command accepts that declared prior patch
 before applying the new fields; unrecognized destination states still fail closed.
 
+Post-ingest workflows scope recovery to the ingested run with `--run-id` and
+`--allow-unregistered-run` (a no-op for runs without corrections). They do not
+reapply unrelated historical corrections that may be absent from a staging branch.
+The standalone recovery command remains strict by default.
+
 Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
 the command requires confirmation unless passed `--yes`. It fails before writing when a
 target is missing, when a point's desired identity already exists, or when registry

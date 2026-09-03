@@ -12,6 +12,7 @@
  *   bun run db:apply-overrides            # preview + confirm
  *   bun run db:apply-overrides --yes      # skip confirmation
  *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
+ *   bun run db:apply-overrides --run-id 33721476500 --allow-unregistered-run --yes  # ingest
  *
  * Commits to run-overrides.ts are applied to production automatically after merge.
  * Use this command directly only for local preview or manual recovery.

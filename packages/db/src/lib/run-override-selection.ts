@@ -14,11 +14,15 @@ export function selectRunOverrides(args: string[]) {
     args,
     options: {
       'run-id': { type: 'string' },
+      'allow-unregistered-run': { type: 'boolean' },
       yes: { type: 'boolean', short: 'y' },
       'no-ssl': { type: 'boolean' },
     },
   });
   const value = values['run-id'];
+  if (values['allow-unregistered-run'] && value === undefined) {
+    throw new Error('--allow-unregistered-run requires --run-id');
+  }
   if (value !== undefined && (!/^[1-9]\d*$/u.test(value) || !Number.isSafeInteger(Number(value)))) {
     throw new Error('--run-id must be a positive integer GitHub run ID');
   }
@@ -35,6 +39,7 @@ export function selectRunOverrides(args: string[]) {
   };
   if (
     runId !== undefined &&
+    !values['allow-unregistered-run'] &&
     selection.conclusions.size +
       selection.changelogs.length +
       selection.benchmarks.length +
