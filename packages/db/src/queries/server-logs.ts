@@ -1,4 +1,23 @@
 import type { DbClient } from '../connection.js';
+import type postgres from 'postgres';
+import type { ServerMetricsContext } from '../etl/server-metrics-adapters.js';
+import { llmdEndpointRolesFromLogs } from '../etl/server-log-metrics';
+
+export async function getServerMetricsContext(
+  sql: DbClient | ReturnType<typeof postgres>,
+  benchmarkResultId: number,
+  context: ServerMetricsContext,
+): Promise<ServerMetricsContext> {
+  if (context.framework !== 'llmd-vllm' || !context.disagg || context.endpointRoles) return context;
+  const found = await searchServerLogs(sql as DbClient, benchmarkResultId, 'llm-d.ai/role:', 128);
+  if (found.truncated) return context;
+  return {
+    ...context,
+    endpointRoles: llmdEndpointRolesFromLogs(
+      found.matches.map((match) => match.before + match.match + match.after),
+    ),
+  };
+}
 
 /** Map of `benchmark_results.id` → true for each id with a linked log bundle. */
 export type ServerLogAvailabilityMap = Record<number, true>;

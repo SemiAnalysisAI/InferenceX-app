@@ -117,3 +117,18 @@ describe('discoverTraceReplayArtifacts', () => {
     );
   });
 });
+
+it('loads endpoint roles beside multinode concurrency directories', () => {
+  const root = tempDir();
+  const artifact = path.join(root, 'agentic_llmd_conc64');
+  writeTraceFiles(path.join(artifact, 'conc_64'));
+  fs.writeFileSync(
+    path.join(artifact, 'llmd_metrics_endpoints.json'),
+    JSON.stringify({
+      'http://worker.test:8200/metrics': { name: 'prefill-0', role: 'prefill' },
+    }),
+  );
+  expect(discoverTraceReplayArtifacts(root).get('llmd_conc64|64')?.endpointRoles).toEqual({
+    'http://worker.test:8200/metrics': 'prefill',
+  });
+});

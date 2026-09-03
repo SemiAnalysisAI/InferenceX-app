@@ -21,7 +21,7 @@ import {
 import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline.js';
 import { collectMetricPhases } from './gzip-json-stream.js';
 import { ATOM_KV_BLOCKS_METRIC, atomKvCacheBlocksFromMetricPhases } from './atom-kv-capacity.js';
-import type { ServerMetricsContext } from './server-metrics-adapters.js';
+import { normalizeServerMetrics, type ServerMetricsContext } from './server-metrics-adapters.js';
 
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
@@ -79,6 +79,12 @@ export async function computeTraceDerivedPayloads(
   let chartSeries: ChartSeries | null = null;
 
   if (phases) {
+    phases.metrics = normalizeServerMetrics(phases.metrics, phases.inputConfig, metricsContext);
+    phases.warmupMetrics = normalizeServerMetrics(
+      phases.warmupMetrics,
+      phases.inputConfig,
+      metricsContext,
+    );
     const aggregateMetrics = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);

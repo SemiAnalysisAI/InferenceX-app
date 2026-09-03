@@ -11,6 +11,7 @@
 import { collectMetricPhases } from './gzip-json-stream';
 import {
   selectServerMetricsAdapter,
+  normalizeServerMetrics,
   type MetricSource,
   type ServerMetricsContext,
 } from './server-metrics-adapters';
@@ -131,8 +132,9 @@ import {
  * v18: retain Dynamo's per-DP-rank KV gauges within each TRT-LLM worker.
  *
  * v19: extract ATOM's aggregate KV, queue, token and prefix-cache metrics.
+ * v20: exclude llm-d frontend mirrors and retain endpoint-scoped worker roles.
  */
-export const CHART_SERIES_VERSION = 19;
+export const CHART_SERIES_VERSION = 20;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -308,12 +310,12 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
  * that collects both phase blocks. Merges the warmup block into the profiling
  * one (v11) so the series span both phases.
  */
-async function parseMetrics(buffer: Buffer): Promise<MetricsMap> {
-  const { metrics, warmupMetrics } = await collectMetricPhases<RawMetric>(
+async function parseMetrics(buffer: Buffer, context: ServerMetricsContext): Promise<MetricsMap> {
+  const { metrics, warmupMetrics, inputConfig } = await collectMetricPhases<RawMetric>(
     buffer,
     CHART_METRIC_KEYS,
   );
-  return mergePhaseMetrics(metrics, warmupMetrics);
+  return normalizeServerMetrics(mergePhaseMetrics(metrics, warmupMetrics), inputConfig, context);
 }
 
 /**
@@ -328,7 +330,7 @@ export async function computeChartSeries(
   if (!blob) return null;
   let metrics: MetricsMap;
   try {
-    metrics = await parseMetrics(blob);
+    metrics = await parseMetrics(blob, context);
   } catch {
     // Malformed blob → no series (caller treats null as "no data").
     return null;
@@ -346,7 +348,10 @@ export function computeChartSeriesFromMetricPhases(
   warmup: MetricsMap,
   context: ServerMetricsContext = {},
 ): ChartSeries {
-  return buildSeriesFromMetrics(mergePhaseMetrics(profiling, warmup), context);
+  return buildSeriesFromMetrics(
+    normalizeServerMetrics(mergePhaseMetrics(profiling, warmup), {}, context),
+    context,
+  );
 }
 
 // Note: v14 removed `aggregateByStart`/`sortedEntries`. Nothing groups on an

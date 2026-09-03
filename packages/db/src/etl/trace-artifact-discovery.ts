@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { MetricSourceRole } from './server-metrics-adapters';
 
 export interface TraceReplayArtifactPaths {
   profileJsonl: string | null;
   serverMetricsCsv: string | null;
   serverMetricsJson: string | null;
+  endpointRoles?: Record<string, MetricSourceRole>;
 }
 
 const TRACE_SUBDIRS = ['aiperf_artifacts', 'trace_replay'];
@@ -33,7 +35,24 @@ function traceFilesIn(dir: string): TraceReplayArtifactPaths | null {
   }
 
   if (!profileJsonl && !serverMetricsCsv && !serverMetricsJson) return null;
-  return { profileJsonl, serverMetricsCsv, serverMetricsJson };
+  const manifestPath = path.join(path.dirname(dir), 'llmd_metrics_endpoints.json');
+  const endpointRoles: Record<string, MetricSourceRole> = {};
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<
+      string,
+      { role?: string }
+    >;
+    for (const [url, source] of Object.entries(manifest)) {
+      if (source.role === 'prefill' || source.role === 'decode' || source.role === 'combined')
+        endpointRoles[url] = source.role;
+    }
+  }
+  return {
+    profileJsonl,
+    serverMetricsCsv,
+    serverMetricsJson,
+    ...(Object.keys(endpointRoles).length > 0 ? { endpointRoles } : {}),
+  };
 }
 
 function extractMultinodeArchive(artifactDir: string): string | null {

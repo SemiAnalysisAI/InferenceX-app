@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
+import { kvCachePoolTokensFromServerLog, llmdEndpointRolesFromLogs } from './server-log-metrics';
 
 describe('kvCachePoolTokensFromServerLog', () => {
   it('returns null for empty / missing logs', () => {
@@ -40,4 +40,18 @@ describe('kvCachePoolTokensFromServerLog', () => {
     const log = `INFO GPU KV cache size: 1,234,567 tokens`;
     expect(kvCachePoolTokensFromServerLog(log)).toBe(1_234_567);
   });
+});
+
+it('reads llm-d discovery roles and rejects conflicting host assignments', () => {
+  const prefill =
+    '- address: 10.30.1.165\n  labels:\n    llm-d.ai/role: prefill\n  name: prefill-0';
+  const decode = '- address: 10.30.1.129\n  labels:\n    llm-d.ai/role: decode\n  name: decode-0';
+  expect(llmdEndpointRolesFromLogs([prefill, prefill, decode])).toEqual({
+    '10.30.1.165': 'prefill',
+    '10.30.1.129': 'decode',
+  });
+  expect(
+    llmdEndpointRolesFromLogs([prefill, prefill.replace('role: prefill', 'role: decode'), decode]),
+  ).toEqual({ '10.30.1.129': 'decode' });
+  expect(llmdEndpointRolesFromLogs(['engine=0 generation_tokens=100'])).toEqual({});
 });

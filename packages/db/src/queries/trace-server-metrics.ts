@@ -20,6 +20,7 @@ import {
 } from '../etl/compute-chart-series';
 
 import type { DbClient } from '../connection.js';
+import { getServerMetricsContext } from './server-logs';
 import { writeBackTraceReplayJsonb } from './agentic-shared';
 
 export type {
@@ -362,10 +363,11 @@ export async function getTraceServerMetrics(
 
   // `computeChartSeries` streams blobs that exceed its in-memory fast-path
   // ceiling so high-conc TP+EP rows succeed before the backfill drains them.
-  const series = await computeChartSeries(blob, {
+  const context = await getServerMetricsContext(sql, benchmarkResultId, {
     framework: row.framework,
     disagg: row.disagg,
   });
+  const series = await computeChartSeries(blob, context);
   if (!series) return null;
 
   // Self-heal the stored chart_series so the next request takes the fast path
@@ -423,10 +425,11 @@ export async function getTraceServerMetricSource(
   `) as unknown as RawBlobRow[];
   const blob = blobRows[0]?.blob;
   if (!blob) return null;
-  const series = await computeChartSeries(blob, {
+  const context = await getServerMetricsContext(sql, benchmarkResultId, {
     framework: row.framework,
     disagg: row.disagg,
   });
+  const series = await computeChartSeries(blob, context);
   if (!series) return null;
   writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
   return series.metricSources.find(({ source }) => source.id === sourceId) ?? null;

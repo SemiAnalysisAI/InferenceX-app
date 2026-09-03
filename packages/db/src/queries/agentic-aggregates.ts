@@ -13,16 +13,14 @@
  * or has no usable samples — frontend treats those as "no data".
  */
 
-import { Readable } from 'node:stream';
-import { createGunzip, gunzipSync } from 'node:zlib';
+import { gunzipSync } from 'node:zlib';
 
-import { chain } from 'stream-chain';
-
-import { parser } from 'stream-json';
-import { pick } from 'stream-json/filters/pick.js';
-import { streamObject } from 'stream-json/streamers/stream-object.js';
-
-import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
+import { collectMetricPhases } from '../etl/gzip-json-stream';
+import {
+  normalizeServerMetrics,
+  type ServerMetricsContext,
+  type ServerMetricsInputConfig,
+} from '../etl/server-metrics-adapters';
 import type { DbClient } from '../connection.js';
 import { computeDerivedFromBlob } from './derived-agentic-metrics';
 import {
@@ -143,12 +141,15 @@ function pickFirstNonEmpty(
   return undefined;
 }
 
-export function extractServerMetricSamples(json: string): {
+export function extractServerMetricSamples(
+  json: string,
+  context: ServerMetricsContext = {},
+): {
   kvCacheUtil: number[];
   prefixCacheHitRate: number[];
 } {
-  const parsed = JSON.parse(json) as MetricsJson;
-  const metrics = parsed.metrics ?? {};
+  const parsed = JSON.parse(json) as MetricsJson & { input_config?: ServerMetricsInputConfig };
+  const metrics = normalizeServerMetrics(parsed.metrics ?? {}, parsed.input_config, context);
 
   // KV cache util — per-engine gauge in [0, 1]. Average across engines so the
   // value stays a percentage; summing would give meaningless 0..N.
@@ -242,33 +243,15 @@ const TARGET_METRIC_KEYS = new Set([
  * Returns the same `{ kvCacheUtil, prefixCacheHitRate }` shape as the
  * synchronous fast path so callers can use either interchangeably.
  */
-async function streamExtractServerMetricSamples(
+export async function extractServerMetricSamplesFromBlob(
   buffer: Buffer,
+  context: ServerMetricsContext = {},
 ): Promise<{ kvCacheUtil: number[]; prefixCacheHitRate: number[] }> {
-  const collected: Record<string, MetricMeta> = {};
-  // stream-json's TypeScript types don't compose cleanly with node:stream's
-  // pipeline() generic, and several `.pipe()`/event APIs are typed loosely —
-  // cast to any for this local pipe chain. It works at runtime.
-  // stream-json composes transforms via stream-chain. `pick`/`streamObject`
-  // each return a Transform when called; `chain([...])` wires them.
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const pipeline = chain([
-    Readable.from(buffer),
-    createGunzip(),
-    parser(),
-    pick({ filter: 'metrics' }),
-    streamObject(),
-  ]);
-  await new Promise<void>((resolve, reject) => {
-    (pipeline as any).on('data', (chunk: unknown) => {
-      const { key, value } = chunk as { key: string; value: MetricMeta };
-      if (TARGET_METRIC_KEYS.has(key)) collected[key] = value;
-    });
-    (pipeline as any).on('end', resolve);
-    (pipeline as any).on('error', reject);
-  });
-  /* eslint-enable @typescript-eslint/no-explicit-any */
-  return extractServerMetricSamples(JSON.stringify({ metrics: collected }));
+  const phases = await collectMetricPhases<MetricMeta>(buffer, TARGET_METRIC_KEYS);
+  return extractServerMetricSamples(
+    JSON.stringify({ metrics: phases.metrics, input_config: phases.inputConfig }),
+    context,
+  );
 }
 
 export async function getAgenticAggregates(
@@ -379,22 +362,24 @@ export async function getAgenticAggregates(
     const rows = (await sql`
       select
         br.id as benchmark_result_id,
-        atr.server_metrics_json_gz as server_blob
+        atr.server_metrics_json_gz as server_blob, c.framework, c.disagg
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
+      join configs c on c.id = br.config_id
       where br.id = any(${chunk}::bigint[])
-    `) as { benchmark_result_id: number; server_blob: Buffer | null }[];
+    `) as {
+      benchmark_result_id: number;
+      server_blob: Buffer | null;
+      framework: string;
+      disagg: boolean;
+    }[];
     for (const row of rows) {
       const id = Number(row.benchmark_result_id);
       result[id] ??= blankAggregate(id);
       if (!row.server_blob) continue;
       let parsed: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
       try {
-        const json = gunzipJsonWithinLimit(row.server_blob);
-        parsed =
-          json === null
-            ? await streamExtractServerMetricSamples(row.server_blob)
-            : extractServerMetricSamples(json);
+        parsed = await extractServerMetricSamplesFromBlob(row.server_blob, row);
       } catch {
         // malformed blob or failed stream fallback — leave nulls
       }

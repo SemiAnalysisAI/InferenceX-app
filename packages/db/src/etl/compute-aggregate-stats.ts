@@ -13,10 +13,11 @@ import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { createGunzip } from 'node:zlib';
 
-import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
+import type { ServerMetricsContext } from './server-metrics-adapters';
 import {
   STATS_VERSION,
   extractServerMetricSamples,
+  extractServerMetricSamplesFromBlob,
   percentilesOf,
   sequenceLengthSketches,
   type MetricPercentiles,
@@ -206,22 +207,6 @@ export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
 ]);
 
 /**
- * Stream-parse the gzipped server_metrics_json and collect just the metric
- * subtrees we care about when the full JSON exceeds the in-memory fast-path
- * ceiling.
- */
-async function streamExtractServer(
-  buffer: Buffer,
-): Promise<{ kvCacheUtil: number[]; prefixCacheHitRate: number[] }> {
-  const collected = await streamCollectKeys<unknown>(
-    buffer,
-    'metrics',
-    AGGREGATE_SERVER_METRIC_KEYS,
-  );
-  return extractServerMetricSamples(JSON.stringify({ metrics: collected }));
-}
-
-/**
  * Add server-derived distributions to profile stats using an already parsed
  * profiling metric map. Ingest uses this to share one server JSON parse with
  * chart-series generation; the output shape and ordering match
@@ -251,6 +236,7 @@ export function withServerMetricAggregateStats(
 export async function computeAggregateStats(args: {
   profileBlob: Buffer | null;
   serverBlob: Buffer | null;
+  metricsContext?: ServerMetricsContext;
 }): Promise<AggregateStats> {
   const profile = args.profileBlob
     ? await computeProfileAggregateStatsFromCompressedChunks([args.profileBlob])
@@ -261,11 +247,7 @@ export async function computeAggregateStats(args: {
   if (args.serverBlob) {
     let server: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
     try {
-      const json = gunzipJsonWithinLimit(args.serverBlob);
-      server =
-        json === null
-          ? await streamExtractServer(args.serverBlob)
-          : extractServerMetricSamples(json);
+      server = await extractServerMetricSamplesFromBlob(args.serverBlob, args.metricsContext);
     } catch {
       // malformed blob or failed stream fallback — leave nulls
     }

@@ -203,6 +203,27 @@ The cluster average is then a mean across those logical engines on the union of 
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
 
+### llm-d Server Metrics
+
+The llm-d adapter identifies engines by endpoint plus native engine labels. It does
+not merge different workers because their ranks or utilization happen to match.
+AIPerf's `input_config` distinguishes inference URLs from explicit metrics URLs.
+For llm-d, frontend-proxied `vllm:` series are excluded only when an explicitly
+requested endpoint contains the same metric label set with samples. Explicitly
+requested localhost endpoints and metrics without a direct counterpart are kept;
+Dynamo, TRT-LLM, and generic backends retain their existing behavior.
+
+The same adapter normalization runs before chart and aggregate computation on both
+bounded and streaming JSON paths. Raw artifacts remain unchanged. Worker roles
+come from `llmd_metrics_endpoints.json` during ingest or the discovery records in
+stored server logs during historical recomputation. Ambiguous or missing roles
+stay unknown rather than being inferred from traffic or engine indices.
+
+After deployment, use the Recompute Agentic Metrics workflow with the affected
+run ID and `neon-branch: staging` to rebuild staging's stored chart and aggregate
+payloads. No GPU rerun is required. Preview cache namespaces must be distinct from
+production, and changing derived-data versions invalidates versioned chart caches.
+
 ### ATOM Server Metrics
 
 ATOM exports aggregate `atom:` gauges and counters. KV usage and request queues

@@ -2423,8 +2423,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回数据点元数据，以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
+      'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains backend-normalized worker descriptors, including llm-d prefill/decode roles when discovery metadata is available. Duplicate frontend-proxied llm-d counters are excluded when explicit worker metrics are present. Source-specific arrays are loaded by the point-detail UI only when selected.',
+      '返回数据点元数据，以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含按后端规则归一化的 worker 描述信息；有服务发现元数据时，也包含 llm-d 的 prefill/decode 角色。当显式配置的 worker 提供对应指标时，会排除 llm-d 前端代理返回的重复计数器。仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
     ),
     audience: 'public',
     stability: 'beta',

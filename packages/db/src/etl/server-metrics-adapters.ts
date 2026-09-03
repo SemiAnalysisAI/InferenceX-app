@@ -9,6 +9,7 @@ export type MetricSourceRole = 'router' | 'prefill' | 'decode' | 'combined' | 'u
 export interface RawMetricSourceSeries {
   endpoint_url?: string;
   labels?: Record<string, string>;
+  timeslices?: unknown[];
 }
 
 export interface ServerMetricsContext {
@@ -16,6 +17,16 @@ export interface ServerMetricsContext {
   framework?: string | null;
   /** Per-worker role series are only meaningful for disaggregated configs. */
   disagg?: boolean;
+  endpointRoles?: Record<string, MetricSourceRole>;
+}
+
+export interface ServerMetricsInputConfig {
+  endpoint?: { urls?: string[] };
+  server_metrics?: { urls?: string[] };
+}
+
+interface SourceMetric {
+  series?: RawMetricSourceSeries[];
 }
 
 export interface MetricSource {
@@ -34,6 +45,12 @@ interface ServerMetricsAdapter {
   id: string;
   matches: (context: ServerMetricsContext) => boolean;
   identifySource: (series: RawMetricSourceSeries) => MetricSource;
+  normalizeMetric?: <T extends SourceMetric>(
+    name: string,
+    metric: T,
+    input: ServerMetricsInputConfig,
+    context: ServerMetricsContext,
+  ) => T;
 }
 
 function stableId(adapter: string, parts: (string | null | undefined)[]): string {
@@ -130,8 +147,112 @@ const genericAdapter: ServerMetricsAdapter = {
   },
 };
 
-const ADAPTERS: readonly ServerMetricsAdapter[] = [trtllmAdapter, dynamoAdapter, genericAdapter];
+function parsedUrl(value: string | undefined): URL | null {
+  try {
+    return value ? new URL(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function metricsUrl(value: string): string {
+  const url = parsedUrl(value);
+  if (!url) return value;
+  url.pathname = `${url.pathname.replace(/\/(?:metrics\/?)?$/u, '')}/metrics`;
+  return url.href;
+}
+
+function labelKey(series: RawMetricSourceSeries): string {
+  return JSON.stringify(
+    Object.entries(series.labels ?? {}).toSorted(([a], [b]) => a.localeCompare(b)),
+  );
+}
+
+const llmdAdapter: ServerMetricsAdapter = {
+  id: 'llmd',
+  matches: ({ framework }) => framework === 'llmd-vllm',
+  identifySource(series) {
+    const endpointUrl = series.endpoint_url ?? null;
+    const nativeRole = series.labels?.['engine_type'] ?? series.labels?.['llm-d.ai/role'] ?? null;
+    const role: MetricSourceRole =
+      nativeRole === 'prefill' || nativeRole === 'decode' || nativeRole === 'combined'
+        ? nativeRole
+        : 'unknown';
+    return {
+      id: stableId('llmd', [endpointUrl]),
+      adapter: 'llmd',
+      role,
+      endpointUrl,
+      nativeRole,
+      workerId: endpointUrl,
+      dpRank: null,
+      engine: null,
+    };
+  },
+  normalizeMetric(name, metric, input, context) {
+    if (!name.startsWith('vllm:')) return metric;
+    const explicit = new Set((input.server_metrics?.urls ?? []).map(metricsUrl));
+    const frontends = new Set((input.endpoint?.urls ?? []).map((url) => parsedUrl(url)?.origin));
+    const directLabels = new Set(
+      (metric.series ?? [])
+        .filter((series) => explicit.has(series.endpoint_url ?? '') && series.timeslices?.length)
+        .map(labelKey),
+    );
+    return {
+      ...metric,
+      series: (metric.series ?? [])
+        .filter((series) => {
+          const url = parsedUrl(series.endpoint_url);
+          return (
+            !url ||
+            explicit.has(url.href) ||
+            !frontends.has(url.origin) ||
+            !directLabels.has(labelKey(series))
+          );
+        })
+        .map((series) => {
+          const url = parsedUrl(series.endpoint_url);
+          const role = context.disagg
+            ? (context.endpointRoles?.[series.endpoint_url ?? ''] ??
+              context.endpointRoles?.[url?.hostname ?? ''] ??
+              series.labels?.['llm-d.ai/role'])
+            : 'combined';
+          // Internal identity labels; the stored AIPerf blob remains unchanged.
+          return {
+            ...series,
+            labels: {
+              ...series.labels,
+              worker_id: series.endpoint_url ?? '',
+              ...(role ? { engine_type: role } : {}),
+            },
+          };
+        }),
+    };
+  },
+};
+
+const ADAPTERS: readonly ServerMetricsAdapter[] = [
+  trtllmAdapter,
+  dynamoAdapter,
+  llmdAdapter,
+  genericAdapter,
+];
 
 export function selectServerMetricsAdapter(context: ServerMetricsContext): ServerMetricsAdapter {
   return ADAPTERS.find((adapter) => adapter.matches(context)) ?? genericAdapter;
+}
+
+export function normalizeServerMetrics<T extends SourceMetric>(
+  metrics: Record<string, T>,
+  input: ServerMetricsInputConfig = {},
+  context: ServerMetricsContext = {},
+): Record<string, T> {
+  const normalize = selectServerMetricsAdapter(context).normalizeMetric;
+  if (!normalize) return metrics;
+  return Object.fromEntries(
+    Object.entries(metrics).map(([name, metric]) => [
+      name,
+      normalize(name, metric, input, context),
+    ]),
+  );
 }
