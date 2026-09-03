@@ -123,6 +123,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
+    key: 'profit-estimator',
+    path: '/profit-estimator',
+    canonicalPath: '/profit-estimator',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
     key: 'reliability',
     path: '/reliability',
     canonicalPath: '/reliability',

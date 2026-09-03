@@ -47,6 +47,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   historical: 'Historical Trends',
   calculator: 'TCO Calculator',
   fleet: 'Fleet Lifecycle',
+  'profit-estimator': 'Profit Estimator',
   reliability: 'Reliability',
   'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',

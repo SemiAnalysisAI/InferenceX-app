@@ -1010,3 +1010,49 @@ The first two default to
 the comment there. The MW budget is `c_mw`, defaults to 10 MW, and is shared by
 the calculator and Fleet Lifecycle page so a budget set on either seeds the
 other.
+
+## Profit Estimator (`/profit-estimator`)
+
+> Hosted by `ProfitEstimatorDisplay.tsx` with the math in `profit-estimator.ts` and the
+> bars in `ProfitEstimatorChart.tsx`. Mirrored at `/zh/profit-estimator`.
+
+Fleet Lifecycle answers "what did a fixed fleet earn over its life". This page answers
+a narrower, present-tense question: at one interactivity operating point, what does a
+**gigawatt-year** of each chip earn today, and who keeps it? One vertical stacked bar
+per SKU, all in US$ per all-in utility GW per year.
+
+### The arithmetic
+
+```
+gpuHoursPerGwYear = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h
+revenue           = $/GPU/hr(sale) × gpuHoursPerGwYear × utilization
+tco               = $/GPU/hr(cost) × gpuHoursPerGwYear
+grossMargin       = revenue − tco
+labCut            = max(grossMargin, 0) × labCutPct
+profit            = grossMargin − labCut
+```
+
+`$/GPU/hr(sale)` comes from `tokenRevenueFromRatesPerGpuHour`, so it reuses the
+calculator's input/cached/output token split and the OpenRouter catalog price (or a
+custom price pair). `$/GPU/hr(cost)` is the selected TCO tier from `getGpuSpecs`, and
+the power figure is the same all-in kW per GPU that `tok/s/MW` uses. This is the same
+GW-year normalization as the Revenue/Profit-per-GW y-metrics on the calculator; the
+helper lives in its own module for now so this page does not depend on that branch,
+and the two can be collapsed into one once both are on master.
+
+### Decisions worth knowing
+
+- **Utilization scales revenue only.** 60% means the fleet bills 60% of the tokens
+  the benchmark says it could produce. Chips are paid for whether or not they are
+  busy, so TCO is untouched. The haircut is not drawn as its own segment; the bar
+  simply tops out at realized revenue, and the caption states the rate.
+- **The lab cut is a share of gross margin, not revenue.** It goes to zero when the
+  SKU is under water, so a loss bar is just TCO above the axis and the shortfall
+  below it in the destructive color. The tooltip shows the raw gross margin so the
+  zero is visible rather than silent.
+- **Legend is the SKU filter.** Same click semantics as the fleet page (click to
+  isolate, click again to restore), and the same `resolveCalculatorVisibility`
+  intent so the choice survives a model change when the SKU still exists.
+- **Unpriceable SKUs are listed, not dropped quietly.** A SKU with no power figure,
+  no TCO for the chosen tier, or no recorded input/output mix is named in the
+  caption with the reason.

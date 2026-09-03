@@ -225,6 +225,10 @@
       "duration": 2287
     },
     {
+      "spec": "cypress/e2e/profit-estimator.cy.ts",
+      "duration": 11000
+    },
+    {
       "spec": "cypress/e2e/reliability-chart.cy.ts",
       "duration": 2136
     },

@@ -46,6 +46,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
   },
+  'profit-estimator': {
+    title: 'Inference Profit Estimator',
+    description:
+      'Estimate what one gigawatt-year of AI inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model lab cut, and operator profit.',
+  },
   reliability: {
     title: 'Provider Reliability Metrics',
     description:
