@@ -919,11 +919,12 @@ describe('TCO Calculator Chinese route', () => {
     cy.get('[data-testid="calculator-secondary-controls"] > button').click();
     cy.contains('label', '目标交互性 (tok/s/user)')
       .parent()
-      .find('svg.cursor-help')
-      .trigger('pointermove');
-    cy.get('[role="tooltip"]')
+      .find('button')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[role="dialog"]')
       .should('contain.text', '用于插值计算的交互性目标值。')
       .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
+    cy.get('body').type('{esc}');
     cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
     cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
       'contain.text',

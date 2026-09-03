@@ -42,6 +42,12 @@ Focus decoration is intentionally neutral by product request: no focus-only ring
 
 Rendered CSS regression tests live in `cypress/component/component-css.cy.tsx`; they check actual geometry, light/dark fills, label association, searchable keyboard selection, and filter actions inside forms.
 
+### Informational help
+
+Use `InfoHelp` for every standalone `(i)` explanation. `LabelWithTooltip`, `SelectedOptionInfo`, and `OptionInfo` reuse it for control labels, closed fields, and dropdown options. Hover and click must keep the same panel: mouse hover does not move focus, crossing into the explanation keeps it open, and click/tap/keyboard activation pins it until outside interaction or Escape. Keep help independent of the control's selection action.
+
+All help surfaces share `HELP_CONTENT_CLASS_NAME`: `text-sm`, relaxed line height, 12px padding, the popover background, border, rounded corners, and shadow. Short hints on links/buttons retain tooltip semantics so clicking still performs the primary action, but use the same visual surface. Do not introduce local font, padding, or color overrides. Chart data readouts retain their separate chart-specific layouts and export behavior.
+
 ## Chart text
 
 Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`useChartExport`) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stacks (`CHART_FONT_SANS`, `CHART_FONT_MINECRAFT`) live in the same module.

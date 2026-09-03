@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCompare } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -14,6 +14,7 @@ import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InfoHelp } from '@/components/ui/option-info';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -172,14 +173,9 @@ function DetailItem({
   return (
     <div className="flex items-center gap-1">
       <span className="text-muted-foreground">{label}</span>
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info className="size-3 text-muted-foreground/50 cursor-help shrink-0" />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
-          <span className="text-xs">{tip}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp label={label} value={`submission-${label}`} triggerClassName="-my-1">
+        {tip}
+      </InfoHelp>
       <span className="font-medium">{children}</span>
     </div>
   );
@@ -520,7 +516,7 @@ function SubmissionRow({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" collisionPadding={10}>
-                  <span className="text-xs">
+                  <span>
                     {t.compareTipPre}
                     {previousRun.date} → {row.date}
                     {t.compareTipPost}

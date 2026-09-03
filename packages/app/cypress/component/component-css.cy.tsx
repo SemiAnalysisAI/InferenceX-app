@@ -386,8 +386,7 @@ describe('component CSS harness', () => {
       </TooltipProvider>,
     );
     cy.get('button[aria-label="Help: Benchmark date"]').focus();
-    cy.get('[role="tooltip"]').should('contain.text', 'Choose a date with measured results.');
-    cy.get('button[aria-label="Help: Benchmark date"]').click();
+    cy.press(Cypress.Keyboard.Keys.SPACE);
     cy.get('[role="dialog"]').should('be.visible').and('contain.text', 'Choose a date');
     cy.get('[role="tooltip"]').should('not.exist');
     cy.get('[role="dialog"]').trigger('keydown', { key: 'Escape', code: 'Escape' });

@@ -1,6 +1,5 @@
 'use client';
 
-import { Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -16,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoHelp } from '@/components/ui/option-info';
 import {
   type Model,
   type Precision,
@@ -103,17 +102,15 @@ function CategorySectionTitle({
   return (
     <span className="flex items-center gap-1">
       {label}
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info
-            className="size-3 text-muted-foreground cursor-help"
-            data-testid={`selector-category-${id}-info`}
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10} className="z-[130]">
-          <span>{reason}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp
+        label={label}
+        value={`selector-category-${id}`}
+        triggerTestId={`selector-category-${id}-info`}
+        triggerClassName="-my-1"
+        tabIndex={-1}
+      >
+        {reason}
+      </InfoHelp>
     </span>
   );
 }

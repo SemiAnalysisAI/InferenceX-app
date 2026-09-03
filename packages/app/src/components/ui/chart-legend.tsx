@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Circle,
   Diamond,
-  Info,
   PanelRightClose,
   PanelRightOpen,
   Square,
@@ -29,6 +28,7 @@ const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; classNam
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
+import { InfoHelp } from './option-info';
 import { Switch } from './switch';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
 
@@ -318,27 +318,15 @@ export default function ChartLegend({
               {sw.label}
             </Label>
             {sw.infoTooltip && (
-              <TooltipProvider delayDuration={100}>
-                <TooltipRoot>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      data-testid={`${sw.id}-info`}
-                      aria-label={t.moreInfo(sw.label)}
-                      className="text-muted-foreground hover:text-foreground cursor-help -m-1.5 p-1.5 inline-flex items-center"
-                    >
-                      <Info size={14} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    sideOffset={6}
-                    className="max-w-[260px] text-xs leading-snug"
-                  >
-                    {sw.infoTooltip}
-                  </TooltipContent>
-                </TooltipRoot>
-              </TooltipProvider>
+              <InfoHelp
+                label={sw.label}
+                value={sw.id}
+                triggerTestId={`${sw.id}-info`}
+                ariaLabel={t.moreInfo(sw.label)}
+                triggerClassName="-my-1"
+              >
+                {sw.infoTooltip}
+              </InfoHelp>
             )}
           </div>
         ))}

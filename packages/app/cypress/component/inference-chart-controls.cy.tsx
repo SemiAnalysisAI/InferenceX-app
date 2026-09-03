@@ -434,7 +434,7 @@ describe('Axis option help', () => {
             expect(icon.bottom).to.be.lessThan(bounds.bottom);
             expect($help[0].closest('button[role="combobox"]')).to.equal(null);
           })
-          .trigger('pointermove', { pointerType: 'mouse' });
+          .trigger('pointerover', { pointerType: 'mouse' });
       });
       cy.get(`[data-testid="selected-option-help-content-${value}"]`)
         .should('be.visible')

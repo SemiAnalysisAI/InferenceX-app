@@ -7,8 +7,111 @@ import {
   SequenceSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
 import { Model, Sequence } from '@/lib/data-mappings';
+
+describe('Consistent informational help', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    for (const width of [390, 1280]) {
+      it(`uses the same surface for label, selected-value, option and action hints (${locale}, ${width}px)`, () => {
+        cy.viewport(width, 844);
+        const label = locale === 'zh' ? '配置' : 'Configuration';
+        const explanation =
+          locale === 'zh' ? '查看当前模型的配置说明。' : 'Inspect the current model configuration.';
+        cy.mount(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <div className="space-y-6 p-4" style={{ minHeight: 1200 }}>
+              <LabelWithTooltip htmlFor="test-label" label={label} tooltip={explanation} />
+              <input id="test-label" data-testid="unrelated-input" defaultValue="unchanged" />
+              <div className="flex h-9">
+                <SelectedOptionInfo label={label} value="test-selected">
+                  {explanation}
+                </SelectedOptionInfo>
+              </div>
+              <OptionInfo label={label} value="test-option">
+                {explanation}
+              </OptionInfo>
+              <TooltipProvider delayDuration={0}>
+                <TooltipRoot>
+                  <TooltipTrigger asChild>
+                    <button data-testid="hint-action" onClick={cy.stub().as('action')}>
+                      {label}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent data-testid="action-hint">{explanation}</TooltipContent>
+                </TooltipRoot>
+              </TooltipProvider>
+            </div>
+          </PathnameContext.Provider>,
+        );
+        let sharedStyle: Record<string, string>;
+        const checkSurface = ($content: JQuery<HTMLElement>) => {
+          const element = $content[0];
+          const css = element.ownerDocument.defaultView!.getComputedStyle(element);
+          const style = Object.fromEntries(
+            [
+              'padding',
+              'fontSize',
+              'lineHeight',
+              'fontWeight',
+              'borderRadius',
+              'backgroundColor',
+              'borderColor',
+            ].map((key) => [key, css[key as keyof CSSStyleDeclaration]]),
+          ) as Record<string, string>;
+          if (sharedStyle) expect(style).to.deep.equal(sharedStyle);
+          else sharedStyle = style;
+          const bounds = element.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(element.ownerDocument.documentElement.clientWidth);
+        };
+        for (const [trigger, content] of [
+          ['option-help-test-label', 'option-help-content-test-label'],
+          ['selected-option-help-test-selected', 'selected-option-help-content-test-selected'],
+          ['option-help-test-option', 'option-help-content-test-option'],
+        ]) {
+          cy.get('[data-testid="unrelated-input"]').focus();
+          cy.get(`[data-testid="${trigger}"]`).trigger('pointerover', { pointerType: 'mouse' });
+          cy.get(`[data-testid="${content}"]`)
+            .should('be.visible')
+            .and('contain.text', explanation)
+            .should(checkSurface);
+          cy.get('[data-testid="unrelated-input"]')
+            .should('have.focus')
+            .and('have.value', 'unchanged');
+          cy.get(`[data-testid="${content}"]`).then(($hoverContent) => {
+            cy.get(`[data-testid="${trigger}"]`).click();
+            cy.get(`[data-testid="${content}"]`)
+              .should(($clickedContent) => {
+                expect($clickedContent[0], 'hover and click keep the same surface').to.equal(
+                  $hoverContent[0],
+                );
+              })
+              .should(checkSurface);
+          });
+          cy.get('body').type('{esc}');
+          cy.get(`[data-testid="${content}"]`).should('not.exist');
+          cy.get(`[data-testid="${trigger}"]`).should('have.focus');
+          cy.press(Cypress.Keyboard.Keys.SPACE);
+          cy.get(`[data-testid="${content}"]`).should('be.visible').should(checkSurface);
+          cy.get('body').click(0, 0);
+          cy.get(`[data-testid="${content}"]`).should('not.exist');
+        }
+        cy.get('[data-testid="hint-action"]').trigger('pointermove', { pointerType: 'mouse' });
+        cy.get('[data-testid="action-hint"]').should('be.visible').should(checkSurface);
+        cy.get('[data-testid="hint-action"]').click();
+        cy.get('@action').should('have.been.calledOnce');
+      });
+    }
+  }
+});
 
 function ModelSelectorHarness() {
   const [value, setValue] = useState('DeepSeek-R1-0528');
@@ -301,7 +404,7 @@ describe('Chart Selectors', () => {
 
     it('explains maintenance mode in a tooltip', () => {
       cy.get('[data-testid="model-selector"]').click();
-      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointermove', {
+      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
 
@@ -320,7 +423,7 @@ describe('Chart Selectors', () => {
       cy.contains('维护模式').should('be.visible');
       cy.contains('已弃用').should('be.visible');
       cy.contains('Maintenance Mode').should('not.exist');
-      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointermove', {
+      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
       cy.contains('这些模型的相关性较低，因此以较低优先级更新。').should('be.visible');
@@ -360,7 +463,7 @@ describe('Chart Selectors', () => {
     it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
 
@@ -428,7 +531,7 @@ describe('Chart Selectors', () => {
       cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
       cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
       assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
       cy.get('[data-testid="scenario-agentic-info-link"]')
@@ -458,7 +561,7 @@ describe('Chart Selectors', () => {
           </PathnameContext.Provider>,
         );
         assertAgenticInfoInside(44);
-        cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointermove', {
+        cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
           pointerType: 'mouse',
         });
         cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
@@ -534,14 +637,20 @@ describe('Chart Selectors', () => {
           .find('[data-select-option]')
           .should('have.length', 1)
           .and('have.text', '1K / 1K');
-        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointermove', {
+        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointerover', {
           pointerType: 'mouse',
         });
-        cy.get('[role="tooltip"]').should(
+        cy.get('[data-testid="option-help-content-selector-category-deprecated"]').should(
           'contain.text',
           locale === 'zh'
             ? 'CI 容量已重新分配给智能体编程和多轮对话场景。'
             : 'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
+        );
+        cy.get('[data-testid="selector-category-deprecated-info"]').trigger('pointerout', {
+          pointerType: 'mouse',
+        });
+        cy.get('[data-testid="option-help-content-selector-category-deprecated"]').should(
+          'not.exist',
         );
         cy.contains('[data-select-option]', '1K / 1K').click();
         cy.get('@changeScenario').should('have.been.calledOnceWith', Sequence.OneK_OneK);

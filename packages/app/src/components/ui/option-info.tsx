@@ -11,7 +11,7 @@ import {
 } from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
+import { HELP_CONTENT_CLASS_NAME } from './tooltip';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
@@ -26,56 +26,25 @@ export function SelectedOptionInfo({
   value: string;
   children: ReactNode;
 }) {
-  const locale = useLocale();
-  const [open, setOpen] = useState(false);
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next && !open) track('selector_option_help_opened', { value, label });
-  };
   return (
-    <TooltipProvider delayDuration={0}>
-      <TooltipRoot open={open} onOpenChange={handleOpenChange}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            data-testid={`selected-option-help-${value}`}
-            aria-label={locale === 'zh' ? `${label}说明` : `Help: ${label}`}
-            onClick={(event) => {
-              // Focus/hover may already have opened it before activation. Keep
-              // it readable on click, tap, or Enter instead of toggling it shut.
-              event.preventDefault();
-              handleOpenChange(true);
-            }}
-            className="no-export pointer-events-auto inline-flex h-full w-7 shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none"
-          >
-            <Info aria-hidden="true" className="size-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          collisionPadding={12}
-          data-testid={`selected-option-help-content-${value}`}
-          className="z-[130] w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(28rem,var(--radix-tooltip-content-available-height))] overflow-y-auto space-y-3 p-3 text-sm leading-relaxed"
-        >
-          <p className="font-medium">{label}</p>
-          <div className="space-y-3 text-muted-foreground">{children}</div>
-        </TooltipContent>
-      </TooltipRoot>
-    </TooltipProvider>
+    <InfoHelp
+      label={label}
+      value={value}
+      variant="selected"
+      triggerTestId={`selected-option-help-${value}`}
+      contentTestId={`selected-option-help-content-${value}`}
+    >
+      {children}
+    </InfoHelp>
   );
 }
 
 /** A separate action beside an option, never nested inside its selection button. */
-export function OptionInfo({
-  label,
-  value,
-  children,
-  onKeyDown,
-  tabIndex,
-  triggerClassName,
-  triggerTestId,
-  align = 'end',
-}: {
+export function OptionInfo(props: Omit<InfoHelpProps, 'variant'>) {
+  return <InfoHelp {...props} variant="option" />;
+}
+
+interface InfoHelpProps {
   label: string;
   value: string;
   children: ReactNode;
@@ -83,8 +52,28 @@ export function OptionInfo({
   tabIndex?: number;
   triggerClassName?: string;
   triggerTestId?: string;
+  contentTestId?: string;
+  ariaLabel?: string;
   align?: 'start' | 'center' | 'end';
-}) {
+  variant?: 'inline' | 'option' | 'selected';
+  analyticsEvent?: 'selector_option_help_opened' | 'selector_help_opened';
+}
+
+/** One hover/click/keyboard help surface for labels, selected values and options. */
+export function InfoHelp({
+  label,
+  value,
+  children,
+  onKeyDown,
+  tabIndex,
+  triggerClassName,
+  triggerTestId,
+  contentTestId,
+  ariaLabel,
+  align = 'end',
+  variant = 'inline',
+  analyticsEvent = 'selector_option_help_opened',
+}: InfoHelpProps) {
   const locale = useLocale();
   const titleId = useId();
   const [open, setOpen] = useState(false);
@@ -111,7 +100,7 @@ export function OptionInfo({
         cancelClose();
         if (next) {
           hoverOpenedRef.current = false;
-          track('selector_option_help_opened', { value, label });
+          track(analyticsEvent, { value, label });
         }
         setOpen(next);
       }}
@@ -120,16 +109,16 @@ export function OptionInfo({
         <button
           ref={triggerRef}
           type="button"
-          data-option-help
+          data-option-help={variant === 'option' ? '' : undefined}
           data-testid={triggerTestId ?? `option-help-${value}`}
-          aria-label={locale === 'zh' ? `${label}说明` : `Help: ${label}`}
+          aria-label={ariaLabel ?? (locale === 'zh' ? `${label}说明` : `Help: ${label}`)}
           onPointerEnter={(event) => {
             if (event.pointerType !== 'mouse') return;
             cancelClose();
             if (!open) {
               hoverOpenedRef.current = true;
               setOpen(true);
-              track('selector_option_help_opened', { value, label });
+              track(analyticsEvent, { value, label });
             }
           }}
           onPointerLeave={closeAfterHover}
@@ -146,7 +135,10 @@ export function OptionInfo({
           onKeyDown={onKeyDown}
           tabIndex={tabIndex}
           className={cn(
-            'no-export inline-flex size-11 md:size-8 shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none',
+            'no-export inline-flex shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none',
+            variant === 'option' && 'size-11 md:size-8',
+            variant === 'inline' && 'size-6 -my-0.5',
+            variant === 'selected' && 'pointer-events-auto h-full w-7',
             triggerClassName,
           )}
         >
@@ -177,8 +169,11 @@ export function OptionInfo({
         onCloseAutoFocus={(event) => {
           if (hoverOpenedRef.current) event.preventDefault();
         }}
-        data-testid={`option-help-content-${value}`}
-        className="z-[130] w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3 text-sm leading-relaxed"
+        data-testid={contentTestId ?? `option-help-content-${value}`}
+        className={cn(
+          HELP_CONTENT_CLASS_NAME,
+          'z-[130] w-96 max-w-[min(calc(100vw-1.5rem),var(--radix-popover-content-available-width))] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
+        )}
       >
         <p id={titleId} className="font-medium text-foreground">
           {label}
