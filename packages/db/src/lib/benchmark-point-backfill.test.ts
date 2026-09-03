@@ -84,11 +84,14 @@ describe('benchmark point backfill recovery', () => {
     expect(metrics).not.toHaveProperty('allocated_cpu_dram_gb');
   });
 
-  it.each([null, [], [{}, 'not-json']])('rejects malformed metrics: %j', (metrics) => {
-    expect(() => planBenchmarkPointBackfill({ offload_mode: 'off', metrics }, backfill)).toThrow(
-      'unexpected JSON shape',
-    );
-  });
+  it.each([{ metrics: null }, { metrics: [] }, { metrics: [{}, 'not-json'] }])(
+    'rejects malformed metrics: $metrics',
+    ({ metrics }) => {
+      expect(() => planBenchmarkPointBackfill({ offload_mode: 'off', metrics }, backfill)).toThrow(
+        'unexpected JSON shape',
+      );
+    },
+  );
 
   it('rejects a previous patch targeting a different offload identity', () => {
     expect(() =>
