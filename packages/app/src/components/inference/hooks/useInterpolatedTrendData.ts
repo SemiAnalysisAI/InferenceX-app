@@ -32,7 +32,7 @@ import { isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { measuredCacheHitRate } from '@/lib/cache-pricing';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
 
@@ -65,6 +65,7 @@ export function rowToLightweightPoint(
   const point = {
     x: row.metrics.median_intvty ?? 0,
     y: row.metrics.tput_per_gpu ?? 0,
+    hw: row.hardware,
     hwKey,
     precision: row.precision,
     tp: row.decode_tp,
@@ -80,6 +81,7 @@ export function rowToLightweightPoint(
     server_gpu_cache_hit_rate: entry.server_gpu_cache_hit_rate,
     server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
+    theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
 
@@ -248,7 +250,7 @@ export function interpolateMetricAtInteractivity(
     };
     const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
     const inputShares = sorted.map(inputTokenShareForRevenue);
-    const cacheHitRates = sorted.map(measuredCacheHitRate);
+    const cacheHitRates = sorted.map(pricingCacheHitRate);
     const inputShare = inputShares.every((share): share is number => share !== null)
       ? interpolateBounded(inputShares)
       : null;
