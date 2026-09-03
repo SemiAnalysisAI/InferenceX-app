@@ -4,7 +4,9 @@ import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -154,6 +156,9 @@ const STRINGS = {
     deleteShownFailed: (deleted: number, total: number) =>
       `Deleted ${deleted} of ${total} shown runs before the operation failed. Try again.`,
     atLatency: (percentile: string) => `at ${percentile} latency`,
+    chartControlsHeading: 'Chart filters',
+    chartControlsDescription:
+      'Choose the measured slice and display metric for the explorer below.',
   },
   zh: {
     operation: {
@@ -161,23 +166,16 @@ const STRINGS = {
       stage: '中间处理',
       combine: '合并',
       roundtrip: '往返',
-      'isolated-sum': '分项之和',
     },
     operationHeading: {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
       roundtrip: '往返（实测）',
-      'isolated-sum': '分项之和（派生）',
     },
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
     precision: { bf16: 'BF16', fp8: 'FP8' },
-    scale: { log: '对数', linear: '线性' },
-    xAxis: {
-      'tokens-per-rank': '每 rank 源 token 数',
-      'global-tokens': '全局源 token 数',
-    },
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
@@ -185,36 +183,18 @@ const STRINGS = {
       'payload-rate': '所选延迟分位点的载荷带宽（每芯片）',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
-    fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
-    topologyScope: { 'scale-up': '域内（scale-up）', 'scale-out': '跨域（scale-out）' },
-    payloadUnit: { 'token-rank': 'Token-rank 载荷', 'token-expert': 'Token-expert 载荷' },
-    combineSemantics: {
-      'activation-only': '仅激活值合并',
-      'gate-weighted': '门控加权合并',
-    },
-    tabs: {
-      inventory: '矩阵测试用例清单',
-      case: '所选矩阵测试用例',
-      evidence: '证据',
-    },
-    noCases: '该运行没有可查看的矩阵测试用例。',
     all: '全部',
     loading: '正在加载 CollectiveX 运行数据……',
     unavailable: 'CollectiveX 运行暂不可用',
-    sourceUnavailable: 'GitHub Actions 运行来源暂时不可用。',
-    runsErrorMessage: '尚未发布 CollectiveX 运行。',
     loadError: 'CollectiveX 数据集加载失败。',
     retry: '重试',
     description: '对比集合通信库与系统的专家并行（EP）延迟和逻辑载荷速率。',
     source: '源代码',
     methodology: '测试方法',
-    sourceLinkUnavailable: '实测序列来自不同版本，无法提供统一的源代码链接',
     refresh: '刷新',
     seriesCount: '序列数',
     measuredCases: '实测用例',
     terminalCases: '终态用例',
-    retainedAttempts: '保留尝试',
-    allocations: '独立分配',
     publishedUtc: '发布时间（UTC）',
     version: '基准版本',
     runsHeading: '运行记录',
@@ -234,8 +214,6 @@ const STRINGS = {
     modeControl: '模式',
     modeAria: 'CollectiveX 模式',
     epControl: 'EP 并行度',
-    fabricScopeControl: '互联范围',
-    fabricScopeAria: 'CollectiveX 互联范围',
     operationControl: '操作',
     phaseControl: '阶段',
     phaseAria: 'CollectiveX 阶段',
@@ -245,57 +223,14 @@ const STRINGS = {
     percentileAria: 'CollectiveX 延迟分位点',
     sku: 'SKU',
     backend: '后端',
-    routing: '路由',
-    xAxisControl: 'X 轴',
-    xScale: 'X 轴刻度',
-    xScaleAria: 'CollectiveX X 轴刻度',
     yAxisControl: 'Y 轴',
     tokenRateOption: '延迟分位点对应的 token 速率',
     activationRateOption: '延迟分位点对应的激活数据速率',
-    yScale: 'Y 轴刻度',
-    yScaleAria: 'CollectiveX Y 轴刻度',
     noSeries: '没有实测序列符合当前筛选条件。',
-    highContrast: '高对比度',
     resetFilter: '重置筛选',
-    stableOrdering: '排名顺序稳定性已通过',
-    samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
-      `${trials}×${iterations} = 每个分项 ${samples} 个样本 · 同步 warmup ${warmups} 次`,
-    selectedFactorsDiffer: '所选配置存在差异',
-    differenceLabels: {
-      model: '模型',
-      suite: '测试套件',
-      mode: '模式',
-      phase: '阶段',
-      'backend implementation': '后端实现',
-      'implementation build': '实现构建',
-      'system identity': '系统标识',
-      'fabric scope': '互联范围',
-      topology: '拓扑',
-      transport: '传输方式',
-      'world size': '全局 rank 数',
-      'EP degree': 'EP 并行度',
-      placement: '放置方式',
-      workload: '工作负载',
-      'model shape': '模型形状',
-      routing: '路由',
-      'EPLB plan': 'EPLB 方案',
-      dtypes: '数据类型',
-      'resource profile': '资源配置',
-      measurement: '测量协议',
-      'token ladder': 'token 档位',
-      'component availability': '测量分项可用性',
-      correctness: '正确性',
-    },
-    missingComponents: '不可用的测量分项保持为空，并从图表中省略。',
-    isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
       '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
-    provenance: '发布数据溯源',
-    runLabel: '运行',
-    attemptLabel: '尝试',
-    matrixLabel: '矩阵',
-    sourceBundles: '源产物包',
     deleteRun: '删除运行',
     deleteShownRuns: '删除已显示的运行',
     deletingShownRuns: '正在删除已显示的运行……',
@@ -308,6 +243,8 @@ const STRINGS = {
     deleteShownFailed: (deleted: number, total: number) =>
       `操作失败前已删除 ${total} 个已显示运行中的 ${deleted} 个，请重试。`,
     atLatency: (percentile: string) => `${percentile} 延迟分位点`,
+    chartControlsHeading: '图表筛选',
+    chartControlsDescription: '选择下方图表要展示的测量切片和指标。',
   },
 } as const;
 const CONCLUSION_CLASSES: Record<string, string> = {
@@ -320,10 +257,18 @@ const CONCLUSION_FALLBACK_CLASS =
 // rotated secret re-prompts instead of failing silently forever.
 const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 
-function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function ControlGroup({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <Label className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );
@@ -479,7 +424,7 @@ export default function CollectiveXDisplay() {
       ),
     [combinedSeries, epSize, phase],
   );
-  const modeOptions: SegmentedToggleOption<CollectiveXMode>[] = availableModes.map((value) => ({
+  const modeOptions = availableModes.map((value) => ({
     value,
     label: t.mode[value],
   }));
@@ -721,7 +666,9 @@ export default function CollectiveXDisplay() {
   if (runsQuery.error || !runsQuery.data) {
     return (
       <Card data-testid="collectivex-error" className="border-destructive">
-        <h1 className="text-lg font-semibold">{t.unavailable}</h1>
+        <Heading as="h1" level="card">
+          {t.unavailable}
+        </Heading>
         <p className="mt-2 text-sm text-destructive">{t.loadError}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="min-w-32">
@@ -759,7 +706,9 @@ export default function CollectiveXDisplay() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold">CollectiveX</h1>
+              <Heading as="h1" level="card">
+                CollectiveX
+              </Heading>
               <span
                 data-testid="collectivex-run-conclusion"
                 className={`rounded-md border px-2 py-0.5 text-2xs font-medium ${
@@ -771,7 +720,7 @@ export default function CollectiveXDisplay() {
                   : t.shownRunCount(datasets.length)}
               </span>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">{t.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {singleDataset && (
@@ -786,7 +735,7 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
                 >
                   {t.source} <ExternalLink className="size-3.5" />
                 </a>
@@ -800,7 +749,7 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
                 >
                   <BookOpen className="size-3.5" /> {t.methodology}
                 </a>
@@ -829,7 +778,7 @@ export default function CollectiveXDisplay() {
       <Card data-testid="collectivex-runs">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{t.runsHeading}</h2>
+            <Heading level="card">{t.runsHeading}</Heading>
             <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end md:w-auto">
@@ -917,6 +866,134 @@ export default function CollectiveXDisplay() {
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
             </Card>
           )}
+          <Card className="relative z-10 py-4 md:py-5" data-testid="collectivex-chart-filters">
+            <div className="mb-4">
+              <Heading level="card">{t.chartControlsHeading}</Heading>
+              <p className="mt-1 text-sm text-muted-foreground">{t.chartControlsDescription}</p>
+            </div>
+            <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              <SelectControl
+                label={t.epControl}
+                testId="collectivex-ep-select"
+                value={String(epSize)}
+                options={availableEpSizes.map((value) => ({
+                  value: String(value),
+                  label: `EP${value}`,
+                }))}
+                onChange={(value) => {
+                  setEpSize(Number(value));
+                  track('collectivex_ep_changed', { ep: Number(value) });
+                }}
+              />
+              <SelectControl
+                label={t.operationControl}
+                testId="collectivex-operation-select"
+                value={operation}
+                options={operationOptions}
+                onChange={(next) => {
+                  setOperation(next);
+                  if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
+                  track('collectivex_operation_changed', { operation: next });
+                }}
+              />
+              <ControlGroup label={t.phaseControl}>
+                <SegmentedToggle
+                  value={phase}
+                  options={phaseOptions}
+                  onValueChange={(next) => {
+                    setPhase(next);
+                    track('collectivex_phase_changed', { phase: next });
+                  }}
+                  ariaLabel={t.phaseAria}
+                  testId="collectivex-phase-toggle"
+                />
+              </ControlGroup>
+              {availableModes.length > 1 && (
+                <ControlGroup label={t.modeControl} htmlFor="collectivex-mode-select">
+                  <MultiSelect
+                    triggerId="collectivex-mode-select"
+                    triggerTestId="collectivex-mode-select"
+                    ariaLabel={t.modeAria}
+                    options={modeOptions}
+                    value={modes}
+                    onChange={(values) => {
+                      const next = values as CollectiveXMode[];
+                      if (next.length === 0) return;
+                      setModes(next);
+                      track('collectivex_mode_changed', { modes: next });
+                    }}
+                    minSelections={1}
+                    showClearAll={false}
+                    plainSelectedText
+                    searchable={false}
+                  />
+                </ControlGroup>
+              )}
+              <ControlGroup label={t.precisionControl}>
+                <SegmentedToggle
+                  value={precision}
+                  options={precisionOptions}
+                  onValueChange={(next) => {
+                    setPrecision(next);
+                    track('collectivex_precision_changed', { precision: next });
+                  }}
+                  ariaLabel={t.precisionAria}
+                  testId="collectivex-precision-toggle"
+                />
+              </ControlGroup>
+              <ControlGroup label={t.latencyPercentile}>
+                <SegmentedToggle
+                  value={percentile}
+                  options={PERCENTILE_OPTIONS}
+                  onValueChange={(next) => {
+                    setPercentile(next);
+                    track('collectivex_percentile_changed', { percentile: next });
+                  }}
+                  ariaLabel={t.percentileAria}
+                  testId="collectivex-percentile-toggle"
+                  buttonClassName="px-1.5"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.sku}
+                testId="collectivex-sku-select"
+                value={sku}
+                options={selectOptions(skuOptions, t.all, true)}
+                onChange={(next) => {
+                  setSku(next);
+                  track('collectivex_sku_changed', { sku: next });
+                }}
+              />
+              <SelectControl
+                label={t.backend}
+                testId="collectivex-backend-select"
+                value={backend}
+                options={selectOptions(backendOptions, t.all)}
+                onChange={(next) => {
+                  setBackend(next);
+                  track('collectivex_backend_changed', { backend: next });
+                }}
+              />
+              <SelectControl
+                label={t.yAxisControl}
+                testId="collectivex-y-axis-select"
+                value={yAxis}
+                onChange={(next) => {
+                  setYAxis(next);
+                  track('collectivex_y_axis_changed', { y_axis: next });
+                }}
+                options={[
+                  { value: 'latency', label: t.yAxis.latency },
+                  ...(operation === 'roundtrip'
+                    ? ([{ value: 'tokens-per-second', label: t.tokenRateOption }] as const)
+                    : []),
+                  { value: 'activation-rate', label: t.activationRateOption },
+                  { value: 'payload-rate', label: t.yAxis['payload-rate'] },
+                ]}
+                className="sm:col-span-2 lg:col-span-2 xl:col-span-2"
+              />
+            </div>
+          </Card>
           {/* KV-transfer cases lead for kv-only runs: the EP chart below is
               legitimately empty for them and must not bury the selected data. */}
           <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
@@ -931,10 +1008,10 @@ export default function CollectiveXDisplay() {
               yAxis={yAxis}
               caption={
                 <>
-                  <h2 className="text-lg font-semibold">
+                  <Heading level="card">
                     {t.operationHeading[operation]} · {t.phaseValue[phase]} ·{' '}
                     {yAxis === 'latency' ? percentile : t.atLatency(percentile)}
-                  </h2>
+                  </Heading>
                   <p className="text-sm text-muted-foreground">{t.yAxis[yAxis]}</p>
                 </>
               }
@@ -980,154 +1057,6 @@ export default function CollectiveXDisplay() {
               <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
             )}
           </Card>
-          <Card className="py-4 md:py-5">
-            <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              <SelectControl
-                label={t.epControl}
-                testId="collectivex-ep-select"
-                value={String(epSize)}
-                options={availableEpSizes.map((value) => ({
-                  value: String(value),
-                  label: `EP${value}`,
-                }))}
-                onChange={(value) => {
-                  setEpSize(Number(value));
-                  track('collectivex_ep_changed', { ep: Number(value) });
-                }}
-              />
-              <SelectControl
-                label={t.operationControl}
-                testId="collectivex-operation-select"
-                value={operation}
-                options={operationOptions}
-                onChange={(next) => {
-                  setOperation(next);
-                  if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
-                  track('collectivex_operation_changed', { operation: next });
-                }}
-              />
-              <ControlGroup label={t.phaseControl}>
-                <SegmentedToggle
-                  value={phase}
-                  options={phaseOptions}
-                  onValueChange={(next) => {
-                    setPhase(next);
-                    track('collectivex_phase_changed', { phase: next });
-                  }}
-                  ariaLabel={t.phaseAria}
-                  testId="collectivex-phase-toggle"
-                />
-              </ControlGroup>
-              {availableModes.length > 1 && (
-                <ControlGroup label={t.modeControl}>
-                  <div
-                    className="inline-flex items-center gap-0.5 rounded-lg border border-border p-0.5"
-                    role="group"
-                    aria-label={t.modeAria}
-                    data-testid="collectivex-mode-toggle"
-                  >
-                    {modeOptions.map((option) => {
-                      const selected = modes.includes(option.value);
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          aria-pressed={selected}
-                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                            selected
-                              ? 'bg-muted text-foreground'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                          onClick={() => {
-                            const next = selected
-                              ? modes.filter((mode) => mode !== option.value)
-                              : [...modes, option.value];
-                            if (next.length === 0) return;
-                            setModes(next);
-                            track('collectivex_mode_changed', { modes: next });
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </ControlGroup>
-              )}
-              <ControlGroup label={t.precisionControl}>
-                <SegmentedToggle
-                  value={precision}
-                  options={precisionOptions}
-                  onValueChange={(next) => {
-                    setPrecision(next);
-                    track('collectivex_precision_changed', { precision: next });
-                  }}
-                  ariaLabel={t.precisionAria}
-                  testId="collectivex-precision-toggle"
-                />
-              </ControlGroup>
-              <ControlGroup label={t.latencyPercentile}>
-                <SegmentedToggle
-                  value={percentile}
-                  options={PERCENTILE_OPTIONS}
-                  onValueChange={(next) => {
-                    setPercentile(next);
-                    track('collectivex_percentile_changed', { percentile: next });
-                  }}
-                  ariaLabel={t.percentileAria}
-                  testId="collectivex-percentile-toggle"
-                />
-              </ControlGroup>
-              <SelectControl
-                label={t.sku}
-                testId="collectivex-sku-select"
-                value={sku}
-                options={selectOptions(skuOptions, t.all, true)}
-                onChange={(next) => {
-                  setSku(next);
-                  track('collectivex_sku_changed', { sku: next });
-                }}
-              />
-              <SelectControl
-                label={t.backend}
-                testId="collectivex-backend-select"
-                value={backend}
-                options={selectOptions(backendOptions, t.all)}
-                onChange={(next) => {
-                  setBackend(next);
-                  track('collectivex_backend_changed', { backend: next });
-                }}
-              />
-              <SelectControl
-                label={t.yAxisControl}
-                testId="collectivex-y-axis-select"
-                value={yAxis}
-                onChange={(next) => {
-                  setYAxis(next);
-                  track('collectivex_y_axis_changed', { y_axis: next });
-                }}
-                options={[
-                  { value: 'latency', label: t.yAxis.latency },
-                  ...(operation === 'roundtrip'
-                    ? ([
-                        {
-                          value: 'tokens-per-second',
-                          label: t.tokenRateOption,
-                        },
-                      ] as const)
-                    : []),
-                  {
-                    value: 'activation-rate',
-                    label: t.activationRateOption,
-                  },
-                  {
-                    value: 'payload-rate',
-                    label: t.yAxis['payload-rate'],
-                  },
-                ]}
-              />
-            </div>
-          </Card>
         </>
       )}
       {/* The curated support picture is run-independent, so it renders even
@@ -1162,6 +1091,7 @@ function SelectControl<T extends string | number>({
   options,
   onChange,
   placeholder,
+  className,
 }: {
   label: string;
   testId: string;
@@ -1169,29 +1099,32 @@ function SelectControl<T extends string | number>({
   options: SelectOption<T>[];
   onChange: (value: T) => void;
   placeholder?: string;
+  className?: string;
 }) {
   // Radix Select speaks strings; numeric option values (e.g. the release version)
   // round-trip through String() and are recovered from the option list on change.
   return (
-    <ControlGroup label={label}>
-      <Select
-        value={String(value)}
-        onValueChange={(next) => {
-          const match = options.find((item) => String(item.value) === next);
-          if (match) onChange(match.value);
-        }}
-      >
-        <SelectTrigger data-testid={testId} className="min-w-0 w-full">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((item) => (
-            <SelectItem key={String(item.value)} value={String(item.value)}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </ControlGroup>
+    <div className={className}>
+      <ControlGroup label={label} htmlFor={testId}>
+        <Select
+          value={String(value)}
+          onValueChange={(next) => {
+            const match = options.find((item) => String(item.value) === next);
+            if (match) onChange(match.value);
+          }}
+        >
+          <SelectTrigger id={testId} data-testid={testId} className="min-w-0 w-full">
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((item) => (
+              <SelectItem key={String(item.value)} value={String(item.value)}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </ControlGroup>
+    </div>
   );
 }

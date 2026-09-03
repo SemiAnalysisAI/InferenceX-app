@@ -19,4 +19,22 @@ describe('DataTable watermark', () => {
     expect(html).toContain('H100 SXM');
     expect(html).not.toContain('/brand/logo-color.webp');
   });
+
+  it('defaults opted-in tables to key metrics and pins the identifier', () => {
+    const html = renderToString(
+      <DataTable
+        data={[{ name: 'H100 SXM', detail: 'secondary' }]}
+        columns={[
+          { header: 'GPU', cell: (row) => row.name, importance: 'key', pinned: true },
+          { header: 'Detail', cell: (row) => row.detail, importance: 'secondary' },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('Key metrics');
+    expect(html).toContain('data-testid="data-table-preset"');
+    expect(html).toContain('data-testid="data-table-preset-all"');
+    expect(html).toContain('sticky left-0');
+    expect(html).not.toContain('<th>Detail');
+  });
 });

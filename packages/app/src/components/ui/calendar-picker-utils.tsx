@@ -338,7 +338,7 @@ export function CalendarMonthPanel({
               disabled={disabled || isDisabled}
               className={cn(
                 'h-9 w-full rounded-md text-sm transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'focus-visible:outline-none',
                 selected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                 hovered && !selected && 'bg-primary text-primary-foreground',
                 inRange && !selected && !hovered && 'bg-primary/20',

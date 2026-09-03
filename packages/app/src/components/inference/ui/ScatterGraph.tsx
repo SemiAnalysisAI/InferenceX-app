@@ -33,7 +33,6 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
-import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
@@ -115,6 +114,7 @@ import {
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -424,6 +424,7 @@ const ScatterGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
@@ -1099,7 +1100,7 @@ const ScatterGraph = React.memo(
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
-      setQuickFilterSpec([]);
+      if (selectedSequence !== Sequence.AgenticTraces) setQuickFilterSpec([]);
       setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
@@ -1107,6 +1108,7 @@ const ScatterGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      selectedSequence,
     ]);
 
     const pointsTable = useMemo(() => {
@@ -3378,43 +3380,52 @@ const ScatterGraph = React.memo(
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
 
+    // Distinguish only causes supported by the currently available rows. The
+    // official data is already scope-filtered, so an empty array alone cannot
+    // prove which upstream filter removed it. Overlay rows use the same filters.
+    const hasMatchingHiddenPoints =
+      data.some((point) => selectedPrecisions.includes(point.precision)) ||
+      (overlayData?.data ?? []).some(
+        (point) =>
+          selectedPrecisions.includes(point.precision) && matchesQuickFilters(point, quickFilters),
+      );
+    const hasMatchingClippedPoints =
+      clippedData.some(
+        ({ point }) =>
+          selectedPrecisions.includes(point.precision) &&
+          effectiveActiveHwTypes.has(String(point.hwKey)),
+      ) || processedOverlayClippedData.length > 0;
+    const emptyReason = hasMatchingClippedPoints
+      ? 'clipped'
+      : hasMatchingHiddenPoints
+        ? 'hidden'
+        : quickFilterCount > 0
+          ? 'filtered'
+          : 'selection';
+    const emptyState = (
+      <ScatterEmptyState
+        reason={emptyReason}
+        onShowChips={() => {
+          resetUnifiedSelection();
+          track('inference_empty_recovered', { action: 'show_matching_chips' });
+        }}
+        onClearFilters={() => {
+          clearQuickFilters();
+          track('inference_quick_filters_cleared', { source: 'scatter_empty' });
+        }}
+        onEditFilters={() => {
+          setQuickFiltersOpen(true);
+          track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
+        }}
+        onShowTable={onShowTable}
+      />
+    );
+
     // --- Empty state ---
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
-          <div className="flex flex-col items-center justify-center min-h-100 text-center">
-            <div className="text-muted-foreground">
-              <svg
-                className="mx-auto size-12 mb-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
-              <p className="text-xs">{legendT.noDataHint}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-4"
-                data-testid="scatter-empty-quick-filters"
-                onClick={() => {
-                  setQuickFiltersOpen(true);
-                  track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
-                }}
-              >
-                {legendT.quickFilters(quickFilterCount)}
-              </Button>
-            </div>
-          </div>
+          <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
@@ -3455,10 +3466,7 @@ const ScatterGraph = React.memo(
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{ zIndex: 100 }}
               >
-                <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
-                  <p className="text-sm font-medium">{legendT.noData}</p>
-                  <p className="text-xs mt-1">{legendT.noDataHint}</p>
-                </div>
+                {emptyState}
               </div>
             ) : undefined
           }

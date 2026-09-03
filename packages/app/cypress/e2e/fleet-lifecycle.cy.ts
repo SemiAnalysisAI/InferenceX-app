@@ -48,6 +48,28 @@ const showTable = () => cy.get('[data-testid="calculator-lifecycle-table-view-bt
 /** Switch the section back to the chart tab. */
 const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-btn"]').click();
 
+function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
+  for (const [id, label] of [
+    ['fleet-cost', locale === 'zh' ? '成本供应商' : 'Cost Provider'],
+    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
+  ]) {
+    // Clicking the visible label must activate its control, not a wrapper div.
+    cy.get(`label[for="${id}"]`).should('have.text', label).click();
+    cy.get(`button#${id}`).should('have.attr', 'aria-expanded', 'true');
+    cy.get('body').type('{esc}');
+    cy.get(`button#${id}`).should('have.attr', 'aria-expanded', 'false').and('be.focused');
+  }
+  cy.get('label[for="fleet-target"]')
+    .invoke('text')
+    .then((label) => {
+      cy.get('[data-testid="fleet-controls"] input[type="number"]').should(
+        'have.attr',
+        'aria-label',
+        label,
+      );
+    });
+}
+
 /**
  * Put the section back on the chart tab if it has one rendered.
  *
@@ -163,12 +185,27 @@ describe('Fleet — Fleet Lifecycle', () => {
   beforeEach(resetToChart);
 
   it('defaults the power budget to 10 MW and renders the lifecycle', () => {
+    assertFleetControlLabels();
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('be.visible')
       .and('contain.text', 'Fleet Lifecycle');
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
+  });
+
+  it('keeps fleet economics inputs together in the assumptions group', () => {
+    cy.viewport(1280, 900);
+    cy.get('[data-testid="calculator-lifecycle-section"] fieldset').should('have.length', 2);
+    cy.contains(
+      '[data-testid="calculator-lifecycle-section"] fieldset',
+      'Fleet economics & assumptions',
+    ).within(() => {
+      cy.get('[data-testid="calc-lifecycle-price-input"]').should('be.visible');
+      cy.get('[data-testid="calc-lifecycle-output-price-input"]').should('be.visible');
+      cy.get('[data-testid="calc-lifecycle-horizon-input"]').should('be.visible');
+      cy.contains('Fleet economics & assumptions').should('be.visible');
+    });
   });
 
   it('the default MW budget drives the lifecycle table', () => {
@@ -889,9 +926,13 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    // The agentic fixture exposes a single scenario, so the scenario
-    // control disappears entirely — no dropdown, no static readout.
-    cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+    cy.get('button[data-testid="fleet-sequence-selector"]')
+      .should('be.visible')
+      .and('have.text', 'Agentic')
+      .and('be.disabled');
+    cy.get('button[data-testid="fleet-precision-selector"]')
+      .should('have.text', 'FP4')
+      .and('be.disabled');
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.wait('@agenticHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
@@ -900,6 +941,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   });
 
   it('projects a lifecycle from history that has no ISL/OSL to key on', () => {
+    assertFleetControlLabels();
     // The section used to refuse this outright. The endpoint keys agentic
     // history on benchmark_type instead, so there is a real projection here.
     cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
@@ -968,6 +1010,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
   });
 
   it('translates the section, including the table headers and notes', () => {
+    assertFleetControlLabels('zh');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', '集群生命周期')
       .and('contain.text', '设施功率 (MW)');

@@ -30,7 +30,8 @@
     "clean:all": "rimraf .next out cypress/videos cypress/screenshots coverage",
     "cache:invalidate": "bun --env-file=../../.env scripts/invalidate-cache.ts",
     "cache:warmup": "bun --env-file=../../.env scripts/warmup-cache.ts",
-    "capture:fixtures": "bun scripts/capture-cypress-fixtures.ts"
+    "capture:fixtures": "bun scripts/capture-cypress-fixtures.ts",
+    "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
@@ -81,6 +82,7 @@
   },
   "devDependencies": {
     "@bahmutov/cypress-esbuild-preprocessor": "^2.2.8",
+    "@mdx-js/mdx": "^3.1.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/adm-zip": "^0.5.8",
     "@types/d3": "^7.4.3",

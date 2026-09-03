@@ -15,6 +15,15 @@ describe('Reliability Chart', () => {
     cy.get('[data-testid="reliability-date-range"]').should('be.visible');
   });
 
+  it('keeps the date filter scoped and discoverable above the chart', () => {
+    cy.get('[data-testid="reliability-chart-display"]')
+      .contains('h3', 'Chart filters')
+      .should('be.visible');
+    cy.get('[data-testid="reliability-chart-display"]')
+      .contains('Choose a time window')
+      .should('be.visible');
+  });
+
   it('date range selector has options including All time', () => {
     cy.get('[data-testid="reliability-date-range"]').click();
     cy.get('[role="option"]').should('have.length.greaterThan', 0);

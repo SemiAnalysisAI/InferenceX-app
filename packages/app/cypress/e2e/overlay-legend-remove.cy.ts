@@ -9,7 +9,7 @@
  * appeared to do nothing. The legend toggle already had the overlay-aware
  * split (`unifiedToggle`); the X now shares it (`handleRemoveHwType`).
  */
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
   countVisible,
   interceptOverlayRun,
@@ -34,11 +34,8 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       },
     });
     cy.wait('@unofficialRun');
-    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
-    // is the default — clicked anyway so the suite does not depend on that.
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
-      .click()
-      .should('have.attr', 'data-state', 'active');
+    // Explicitly select Interactivity so this suite does not depend on the default.
+    selectXAxisMode('interactivity');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length',
@@ -107,8 +104,11 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
   });
 
   it('keeps the official SKU hidden when chart metrics change', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    ).click({
       force: true,
     });
 
@@ -117,7 +117,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       expect(countVisible($dots), 'visible official points after Y-axis change').to.eq(0);
     });
 
-    cy.get('[data-testid="x-axis-mode-ttft"]').click().should('have.attr', 'data-state', 'active');
+    selectXAxisMode('ttft');
     cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
       expect(countVisible($pts), 'visible overlay points after metric changes').to.be.greaterThan(

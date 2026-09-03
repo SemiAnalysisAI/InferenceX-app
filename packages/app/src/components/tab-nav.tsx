@@ -58,7 +58,7 @@ const tabLinkClass = cn(
   'text-muted-foreground',
   'border-b-2 border-transparent',
   'transition-colors duration-200',
-  'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring',
+  'focus-visible:outline-none',
 );
 
 const currentTabClass = (active: boolean) =>

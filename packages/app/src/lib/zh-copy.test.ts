@@ -14,6 +14,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { findDictionaryParityViolations } from './zh-objective-guard';
+
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..');
 const SCAN_ROOTS = [path.join(APP_DIR, 'src'), path.join(APP_DIR, 'content')];
 const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx', '.json']);
@@ -21,8 +23,13 @@ const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx', '.json']);
 const HAN = String.raw`\p{Script=Han}`;
 const hasHan = new RegExp(HAN, 'u');
 
-/** This file quotes every banned span it looks for, so it must not scan itself. */
+/** Guard sources quote banned spans and mutation fixtures, so they must not scan themselves. */
 const SELF = 'src/lib/zh-copy.test.ts';
+const GUARD_SOURCES = new Set([
+  SELF,
+  'src/lib/zh-objective-guard.ts',
+  'src/lib/zh-objective-guard.test.ts',
+]);
 
 interface Line {
   file: string;
@@ -161,7 +168,7 @@ function chineseLinesFromSource(relative: string, source: string): Line[] {
 
 const chineseLines: Line[] = sourceFiles.flatMap((file) => {
   const relative = path.relative(APP_DIR, file);
-  if (relative === SELF) return [];
+  if (GUARD_SOURCES.has(relative)) return [];
   return chineseLinesFromSource(relative, fs.readFileSync(file, 'utf8'));
 });
 
@@ -179,7 +186,7 @@ function expectClean(violations: Violation[]): void {
 describe('zh copy — the tree obeys every mechanical rule', () => {
   const bilingualLines: Line[] = sourceFiles.flatMap((file) => {
     const relative = path.relative(APP_DIR, file);
-    if (relative === SELF || relative.includes('.test.')) return [];
+    if (GUARD_SOURCES.has(relative) || relative.includes('.test.')) return [];
     const source = fs.readFileSync(file, 'utf8');
     if (!/\bzh:\s*\{/u.test(source)) return [];
     return source.split('\n').map((text, index) => ({ file: relative, line: index + 1, text }));
@@ -267,5 +274,19 @@ describe('zh copy — coverage', () => {
     // A refactor that guts the /zh tree should fail loudly rather than let every
     // rule above pass vacuously.
     expect(chineseLines.length).toBeGreaterThan(1000);
+  });
+});
+
+describe('zh copy — generic bilingual dictionary parity', () => {
+  const dictionaryFiles = sourceFiles.filter((file) => {
+    const relative = path.relative(APP_DIR, file);
+    return /\.tsx?$/u.test(relative) && !relative.includes('.test.');
+  });
+
+  it('keeps every explicit en/zh object key shape aligned', () => {
+    const violations = dictionaryFiles.flatMap((file) =>
+      findDictionaryParityViolations(path.relative(APP_DIR, file), fs.readFileSync(file, 'utf8')),
+    );
+    expect(violations).toEqual([]);
   });
 });

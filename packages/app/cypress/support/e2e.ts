@@ -41,35 +41,41 @@ export function keepAgenticCoachMark(): void {
   suppressAgenticCoachMark = false;
 }
 
+// Skip cross-document view transitions (`@view-transition` in motion.css).
+// Inside the Cypress AUT iframe Chrome starts the transition on every
+// same-origin cy.visit but never finishes it, and while a transition is
+// active the page's real DOM is excluded from hit-testing —
+// `elementFromPoint` returns bare <html>, clicks stall, and the
+// viewport-sized snapshot registers as horizontal overflow. Real top-level
+// windows finish the transition in ~200ms; only the iframe hangs, so skip
+// it here rather than gating the production feature.
+// Both documents own a transition object. Handle the outgoing page too:
+// otherwise cancelling the incoming transition can reject the old page's
+// ready promise during cy.visit, before its next window is installed.
+function skipCrossDocumentTransition(event: Event) {
+  const viewTransition = (
+    event as Event & {
+      viewTransition?: {
+        skipTransition: () => void;
+        ready?: Promise<void>;
+        finished?: Promise<void>;
+        updateCallbackDone?: Promise<void>;
+      };
+    }
+  ).viewTransition;
+  if (!viewTransition) return;
+  // Skipping rejects the transition's promises with
+  // "AbortError: Transition was skipped"; swallow those so Cypress
+  // doesn't fail the test on an unhandled rejection.
+  viewTransition.ready?.catch(() => {});
+  viewTransition.finished?.catch(() => {});
+  viewTransition.updateCallbackDone?.catch(() => {});
+  viewTransition.skipTransition();
+}
+
 Cypress.on('window:before:load', (win) => {
-  // Skip cross-document view transitions (`@view-transition` in motion.css).
-  // Inside the Cypress AUT iframe Chrome starts the transition on every
-  // same-origin cy.visit but never finishes it, and while a transition is
-  // active the page's real DOM is excluded from hit-testing —
-  // `elementFromPoint` returns bare <html>, clicks stall, and the
-  // viewport-sized snapshot registers as horizontal overflow. Real top-level
-  // windows finish the transition in ~200ms; only the iframe hangs, so skip
-  // it here rather than gating the production feature.
-  win.addEventListener('pagereveal', (event) => {
-    const viewTransition = (
-      event as Event & {
-        viewTransition?: {
-          skipTransition: () => void;
-          ready?: Promise<void>;
-          finished?: Promise<void>;
-          updateCallbackDone?: Promise<void>;
-        };
-      }
-    ).viewTransition;
-    if (!viewTransition) return;
-    // Skipping rejects the transition's promises with
-    // "AbortError: Transition was skipped"; swallow those so Cypress
-    // doesn't fail the test on an unhandled rejection.
-    viewTransition.ready?.catch(() => {});
-    viewTransition.finished?.catch(() => {});
-    viewTransition.updateCallbackDone?.catch(() => {});
-    viewTransition.skipTransition();
-  });
+  win.addEventListener('pageswap', skipCrossDocumentTransition);
+  win.addEventListener('pagereveal', skipCrossDocumentTransition);
   try {
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
@@ -144,4 +150,27 @@ export function expectNoPageOverflow(): void {
       win.innerWidth,
     );
   });
+}
+
+/** Open the inference axis menu, expanding its phone-only control section if needed. */
+export function openXAxisMenu(): void {
+  cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
+    if ($toggle.is(':visible') && $toggle.attr('aria-expanded') !== 'true') {
+      cy.wrap($toggle).click();
+    }
+  });
+  cy.get('[data-testid="x-axis-mode-selector"]').click();
+}
+
+/** Select an axis and verify that the single-select menu closes immediately. */
+export function selectXAxisMode(
+  mode: 'interactivity' | 'e2e' | 'ttft' | 'e2e-normalized-interactivity',
+  label?: string,
+): void {
+  openXAxisMenu();
+  cy.get(`[data-testid="x-axis-mode-${mode}"]`).click();
+  cy.get('[data-testid="x-axis-mode-selector"]')
+    .should('have.attr', 'data-value', mode)
+    .and('have.attr', 'aria-expanded', 'false');
+  if (label) cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', label);
 }

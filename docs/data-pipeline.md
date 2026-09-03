@@ -194,6 +194,33 @@ The cluster average is then a mean across those logical engines on the union of 
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
 
+### ATOM Server Metrics
+
+ATOM exports aggregate `atom:` gauges and counters. KV usage and request queues
+map directly to the existing charts; token throughput uses its completed-request
+counters. Prefix-cache hit rates and token-source breakdowns use admitted cached
+tokens and `prefix_cache_full_tokens`, not compressed-index matches,
+checkpoint-eligible tokens, or completion-time prompt counts. The exporter does
+not provide per-rank KV usage or CPU-pool utilization, so those remain absent.
+
+ATOM's nominal KV token capacity is `allocated blocks × resolved block_size × DCP`.
+Startup `Concurrent capacity vs context length` lines supply the resolved block size
+and DCP width. Use `atom:kv_cache_blocks_total` for the allocated count: startup
+`pool_blocks` estimates differ between TP workers, while the metric reflects the
+selected pool and already sums independent DP pools. Do not sum worker estimates
+or multiply by TP. Checkpoints may share this nominal pool with token KV storage.
+Missing or inconsistent capacity metadata stays unset rather than guessed.
+
+Ingestion derives `metrics.kv_cache_pool_tokens` when it links the trace artifact.
+The `db:backfill-atom-kv-capacity --run-id <id> --yes` command applies the same logic
+to stored artifacts. The workflow's `atom-kv-capacity-only` option skips chart and
+aggregate recomputation; no benchmark rerun or raw-artifact replacement is needed.
+
+The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
+rebuild a stored run in an existing child database. It verifies the child and
+connection endpoint before writing; production recomputation still requires
+`master`. Preview environments use branch-scoped database and cache settings.
+
 ### Summed Series and the Canonical Grid
 
 The same "components aren't scraped in lockstep" problem hits the **summed** series — prefill/decode/prefix-hit rates, queue depth, host KV usage, and the prompt-token source breakdown — but it cannot be solved the same way. A mean is scale-free, so `averageAcrossEngines` can evaluate on the union of scrape instants; a sum is not. `cumulativeUniqueInputTokens` turns these rates into token totals with `sum += value` and `rollingAverage` is a sample-count mean, so both only stay correct at **one point per scrape bucket**.

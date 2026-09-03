@@ -31,7 +31,7 @@ export type {
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 4;
+const POINT_META_VERSION = 5;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
 export interface MetricSourceDescriptor {
@@ -104,8 +104,8 @@ export interface TraceServerMetrics {
    */
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
   /**
-   * Total KV-cache pool size in tokens (num_gpu_blocks × block_size, summed
-   * across engines). vLLM only — null for SGLang/TRT or older rows.
+   * Deployment KV-pool capacity in tokens, derived at ingestion for vLLM/ATOM.
+   * Nominal capacity: ATOM checkpoints can share this pool with token KV.
    */
   kvCachePoolTokens: number | null;
   /** Orchestrator-normalized metrics grouped by endpoint/worker. */
@@ -123,7 +123,7 @@ interface RawMetaRow extends PointMeta {
   has_blob: boolean;
   chart_series: Omit<ChartSeries, 'metricSources'> | null;
   metric_sources: KvMetricSource[];
-  /** Derived at server-log ingest from "GPU KV cache size: N tokens" lines. */
+  /** Derived from startup logs, plus allocated block counts for ATOM. */
   kv_cache_pool_tokens: string | null;
 }
 

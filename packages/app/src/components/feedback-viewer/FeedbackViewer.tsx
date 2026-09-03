@@ -72,6 +72,9 @@ const STRINGS = {
     heading: 'User Feedback',
     explanation: 'All user-supplied columns are encrypted server-side. Paste the',
     explanationSuffix: 'to decrypt in your browser. The key never leaves this page.',
+    keySecurity: 'Browser-only key handling · never persisted or sent to the server',
+    encryptedState: 'Encrypted rows',
+    processedState: 'Processed rows',
     relock: 'Re-lock feature gate',
     keyLabel: 'Decryption key (base64, 32 bytes)',
     keyPlaceholder: 'base64-encoded key',
@@ -98,6 +101,9 @@ const STRINGS = {
     heading: '用户反馈',
     explanation: '所有用户提交的字段均在服务端加密。粘贴',
     explanationSuffix: '即可在浏览器中解密。密钥不会离开此页面。',
+    keySecurity: '仅在浏览器中处理密钥 · 不会持久化或发送到服务端',
+    encryptedState: '加密记录',
+    processedState: '已处理记录',
     relock: '重新锁定功能入口',
     keyLabel: '解密密钥（base64，32 字节）',
     keyPlaceholder: 'base64 编码密钥',
@@ -173,7 +179,7 @@ export default function FeedbackViewer() {
 
   return (
     <div data-testid="feedback-viewer" className="flex flex-col gap-4">
-      <Card>
+      <Card className="border-primary/20 bg-primary/[0.02]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
@@ -186,7 +192,7 @@ export default function FeedbackViewer() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 gap-1.5 text-xs text-muted-foreground"
+            className="text-muted-foreground"
             onClick={() => {
               relockFeatureGate();
               track('feedback_viewer_relocked');
@@ -201,10 +207,31 @@ export default function FeedbackViewer() {
       </Card>
 
       <Card>
-        <form onSubmit={handleUnlock} className="flex flex-col gap-2">
-          <label htmlFor="feedback-key" className="text-xs font-medium">
-            {t.keyLabel}
-          </label>
+        <form onSubmit={handleUnlock} className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <label htmlFor="feedback-key" className="text-xs font-medium">
+                {t.keyLabel}
+              </label>
+              <p className="mt-1 text-2xs text-muted-foreground">{t.keySecurity}</p>
+            </div>
+            {data && data.rows.length > 0 && decryptedRows === null && (
+              <span
+                data-testid="feedback-encrypted-state"
+                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-2xs font-medium text-amber-700 dark:text-amber-300"
+              >
+                {t.encryptedState} · {data.rows.length}
+              </span>
+            )}
+            {decryptedRows && decryptedRows.length > 0 && (
+              <span
+                data-testid="feedback-decrypted-state"
+                className="rounded-full border border-border/50 bg-muted/40 px-2 py-1 text-2xs font-medium text-muted-foreground"
+              >
+                {t.processedState} · {decryptedRows.length}
+              </span>
+            )}
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Input
@@ -216,7 +243,7 @@ export default function FeedbackViewer() {
                 spellCheck={false}
                 data-testid="feedback-key-input"
                 placeholder={t.keyPlaceholder}
-                className="pr-9 font-mono text-sm"
+                className="pr-11 font-mono"
               />
               <button
                 type="button"
@@ -225,7 +252,7 @@ export default function FeedbackViewer() {
                   track('feedback_viewer_key_visibility_toggled', { visible: !showKey });
                 }}
                 aria-label={showKey ? t.hideKey : t.showKey}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground sm:size-9"
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>

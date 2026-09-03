@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import ChartLegend from '@/components/ui/chart-legend';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { Label } from '@/components/ui/label';
@@ -439,7 +440,7 @@ export function CollectiveXKvSection({
   ];
   return (
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
-      <h2 className="text-lg font-semibold">{strings.heading}</h2>
+      <Heading level="card">{strings.heading}</Heading>
       <p className="mt-1 text-sm text-muted-foreground">
         {strings.summary(rows.length, measured)}
         {strings.description}

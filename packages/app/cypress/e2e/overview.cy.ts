@@ -1733,6 +1733,14 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
         const wrapper = table.parentElement as HTMLElement;
+        const card = table.closest('[data-slot="card"]')!;
+        const style = getComputedStyle(card);
+        // Clip the cell backgrounds to the card's actual rounded boundary,
+        // without making a scroll container that traps the sticky header.
+        expect(style.overflowX).to.equal('clip');
+        expect(style.overflowY).to.equal('clip');
+        expect(parseFloat(style.borderTopLeftRadius)).to.be.greaterThan(0);
+        expect(parseFloat(style.borderTopRightRadius)).to.be.greaterThan(0);
         expect(wrapper.scrollWidth, `matrix scrolls horizontally at ${width}px`).to.be.at.most(
           wrapper.clientWidth + 1,
         );

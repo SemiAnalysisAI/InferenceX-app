@@ -127,6 +127,39 @@ export function GpuSpecsBarChart({
     [metric],
   );
 
+  const metricSelector = (
+    <div className="mb-4 flex flex-col gap-1.5 px-4 sm:flex-row sm:items-center sm:gap-3 md:px-8">
+      <label
+        htmlFor="gpu-specs-metric-select"
+        className="text-sm font-medium text-muted-foreground"
+      >
+        {t.metric}
+      </label>
+      <Select
+        value={selectedMetric}
+        onValueChange={(value) => {
+          onMetricChange(value);
+          track('gpu_specs_chart_metric_changed', { metric: value });
+        }}
+      >
+        <SelectTrigger
+          id="gpu-specs-metric-select"
+          className="w-full sm:w-[240px]"
+          data-testid="gpu-specs-metric-select"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {GPU_CHART_METRICS.map((m) => (
+            <SelectItem key={m.key} value={m.key}>
+              {locale === 'zh' ? m.labelZh : m.label} ({locale === 'zh' ? m.unitZh : m.unit})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   const maxValue = useMemo(() => Math.max(...chartData.map((d) => d.value), 0) * 1.1, [chartData]);
 
   const barLayer = useMemo(
@@ -261,29 +294,7 @@ export function GpuSpecsBarChart({
   if (chartData.length === 0) {
     return (
       <div data-testid="gpu-specs-bar-chart">
-        <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-          <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-            {t.metric}
-          </label>
-          <Select
-            value={selectedMetric}
-            onValueChange={(value) => {
-              onMetricChange(value);
-              track('gpu_specs_chart_metric_changed', { metric: value });
-            }}
-          >
-            <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {GPU_CHART_METRICS.map((m) => (
-                <SelectItem key={m.key} value={m.key}>
-                  {locale === 'zh' ? m.labelZh : m.label} ({locale === 'zh' ? m.unitZh : m.unit})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {metricSelector}
         <div className="flex items-center justify-center h-60 text-muted-foreground">
           {t.noData}
         </div>
@@ -293,29 +304,7 @@ export function GpuSpecsBarChart({
 
   return (
     <div data-testid="gpu-specs-bar-chart">
-      <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-          {t.metric}
-        </label>
-        <Select
-          value={selectedMetric}
-          onValueChange={(value) => {
-            onMetricChange(value);
-            track('gpu_specs_chart_metric_changed', { metric: value });
-          }}
-        >
-          <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {GPU_CHART_METRICS.map((m) => (
-              <SelectItem key={m.key} value={m.key}>
-                {locale === 'zh' ? m.labelZh : m.label} ({locale === 'zh' ? m.unitZh : m.unit})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {metricSelector}
 
       <D3Chart<ChartDatum>
         chartId="gpu-specs-bar-chart"

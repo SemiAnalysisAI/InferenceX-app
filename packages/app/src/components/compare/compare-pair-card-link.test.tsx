@@ -62,6 +62,15 @@ const cardProps = {
 };
 
 describe('ComparePairCardLink bfcache restore', () => {
+  it('keeps the comparison card focusable with its original destination', () => {
+    renderUi(<ComparePairCardLink {...cardProps} />);
+    const anchor = container.querySelector('a')!;
+
+    anchor.focus();
+    expect(document.activeElement).toBe(anchor);
+    expect(anchor.getAttribute('href')).toBe(cardProps.href);
+  });
+
   it('clears the pending dim when the page is restored from bfcache', () => {
     renderUi(<ComparePairCardLink {...cardProps} />);
     const anchor = container.querySelector('a')!;

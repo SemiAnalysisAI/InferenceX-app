@@ -15,7 +15,7 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
 
 export interface ComparisonScenario {
-  label: 'AgentX' | '8K→1K';
+  label: 'AgentX' | '8K/1K';
   sequence: 'agentic-traces' | '8k/1k';
 }
 
@@ -60,7 +60,7 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {
   return FEATURED_AGENTX_MODEL_SET.has(model.slug)
     ? { label: 'AgentX', sequence: 'agentic-traces' }
-    : { label: '8K→1K', sequence: '8k/1k' };
+    : { label: '8K/1K', sequence: '8k/1k' };
 }
 
 /**

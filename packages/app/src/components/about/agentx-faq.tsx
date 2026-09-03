@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 
 type Locale = 'en' | 'zh';
 
@@ -311,37 +312,43 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
       <Card>
         <h2 className="text-lg font-semibold mb-2">{content.title}</h2>
         {content.intro.map((paragraph) => (
-          <p key={paragraph} className="text-muted-foreground mb-3">
+          <p key={paragraph} className="mb-3 max-w-prose leading-relaxed text-muted-foreground">
             {paragraph}
           </p>
         ))}
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 divide-y divide-border/60">
           {content.sections.map((section) => (
-            <div key={section.title}>
-              <h3 className="font-semibold mb-2">{section.title}</h3>
-              {section.paragraphs?.map((paragraph) => (
-                <p key={paragraph} className="text-sm text-muted-foreground mb-2 last:mb-0">
-                  {paragraph}
-                </p>
-              ))}
-              {section.bullets && (
-                <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
-                  {section.bullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
-                  ))}
-                </ul>
-              )}
-              {section.code && (
-                <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-muted/40 p-4 text-xs">
-                  <code>{section.code}</code>
-                </pre>
-              )}
+            <div
+              key={section.title}
+              data-testid="agentx-faq-section"
+              className="grid gap-3 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
+            >
+              <h3 className="font-semibold">{section.title}</h3>
+              <div className="min-w-0 max-w-prose space-y-3">
+                {section.paragraphs?.map((paragraph) => (
+                  <p key={paragraph} className="text-sm leading-relaxed text-muted-foreground">
+                    {paragraph}
+                  </p>
+                ))}
+                {section.bullets && (
+                  <ul className="ml-5 list-disc space-y-2 text-sm leading-relaxed text-muted-foreground">
+                    {section.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                )}
+                {section.code && (
+                  <CopyableCodeBlock locale={locale} label={section.title}>
+                    {section.code}
+                  </CopyableCodeBlock>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-8 border-t border-border pt-6">
+        <div className="mt-8 max-w-prose border-t border-border pt-6 leading-relaxed">
           <h3 className="font-semibold mb-2">{content.creditsTitle}</h3>
           <p className="text-sm italic text-muted-foreground mb-2">{content.adapted}</p>
           <p className="text-sm text-muted-foreground mb-3">{content.authority}</p>

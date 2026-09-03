@@ -120,7 +120,7 @@ export function GlossaryBrowser({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={labels.searchPlaceholder}
-              className="h-12 w-full rounded-lg border border-border/70 bg-background/60 pr-11 pl-11 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-brand/60 focus:ring-2 focus:ring-brand/15"
+              className="h-12 w-full rounded-lg border border-border/70 bg-background/60 pr-11 pl-11 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground"
             />
             {query && (
               <button
@@ -252,7 +252,7 @@ export function GlossaryBrowser({
                     <Link
                       key={entry.slug}
                       href={`${basePath}/${entry.slug}`}
-                      className="group grid gap-3 px-5 py-6 transition-colors hover:bg-brand/5 md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-8"
+                      className="group grid gap-3 px-5 py-6 transition-[background-color,box-shadow] hover:bg-brand/5 focus-visible:outline-none md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-8"
                     >
                       <div>
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

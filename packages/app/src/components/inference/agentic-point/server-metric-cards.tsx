@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { track } from '@/lib/analytics';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
@@ -24,7 +25,6 @@ import {
   rollingAverage,
   rollingRatioFromComponents,
   timeRollingAverage,
-  toggleThroughputSeries,
   type ThroughputSeriesKey,
 } from './time-series-math';
 
@@ -59,6 +59,7 @@ const SERVER_STRINGS = {
     hitAxis: 'Hit rate (%)',
     throughputSource: (source: string) => `Throughput · ${source}`,
     throughputTitle: 'Throughput (input & decode)',
+    throughputSeriesAria: 'Throughput series',
     input: 'Input',
     decode: 'Decode',
     tokenRate: 'Tokens / sec',
@@ -93,6 +94,7 @@ const SERVER_STRINGS = {
     hitAxis: '命中率 (%)',
     throughputSource: (source: string) => `吞吐量 · ${source}`,
     throughputTitle: '吞吐量（输入与解码）',
+    throughputSeriesAria: '吞吐量序列',
     input: '输入',
     decode: '解码',
     tokenRate: 'token/s',
@@ -418,44 +420,43 @@ export function ThroughputCard({
           : t.throughputTitle
       }
       controls={
-        <div className="flex items-center gap-1" data-testid="throughput-series-toggle">
-          {(
-            [
-              ['input', t.input],
-              ['decode', t.decode],
-            ] as const
-          ).map(([key, label]) => {
-            const active = selected.has(key);
-            const isOnlyActive = active && selected.size === 1;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={active}
-                disabled={isOnlyActive}
-                data-testid={`throughput-series-${key}`}
-                className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                  active
-                    ? key === 'input'
-                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
-                      : 'bg-orange-500/20 text-orange-600 dark:text-orange-300'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                } disabled:cursor-not-allowed disabled:opacity-60`}
-                onClick={() => {
-                  const next = toggleThroughputSeries(selected, key);
-                  if (next === selected) return;
-                  onSelectedChange(next);
-                  track('inference_agentic_throughput_series_toggled', {
-                    series: key,
-                    enabled: next.has(key),
-                  });
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <MultiSelect
+          triggerTestId="throughput-series-select"
+          ariaLabel={t.throughputSeriesAria}
+          options={[
+            {
+              value: 'input',
+              label: t.input,
+              testId: 'throughput-series-input',
+              disabled: selected.has('input') && selected.size === 1,
+              icon: <span className="size-2 rounded-full bg-blue-500" aria-hidden="true" />,
+            },
+            {
+              value: 'decode',
+              label: t.decode,
+              testId: 'throughput-series-decode',
+              disabled: selected.has('decode') && selected.size === 1,
+              icon: <span className="size-2 rounded-full bg-orange-500" aria-hidden="true" />,
+            },
+          ]}
+          value={[...selected]}
+          onChange={(values) => {
+            const next = new Set<ThroughputSeriesKey>(values as ThroughputSeriesKey[]);
+            for (const key of ['input', 'decode'] as const) {
+              if (selected.has(key) !== next.has(key)) {
+                track('inference_agentic_throughput_series_toggled', {
+                  series: key,
+                  enabled: next.has(key),
+                });
+              }
+            }
+            onSelectedChange(next);
+          }}
+          minSelections={1}
+          plainSelectedText
+          showClearAll={false}
+          searchable={false}
+        />
       }
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
@@ -554,7 +555,7 @@ export function InflightUniqueTokensCard({
 }: {
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
-  /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
+  /** Nominal KV-pool capacity in tokens — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
   const t = SERVER_STRINGS[useLocale()];
@@ -585,7 +586,7 @@ export function InflightUniqueTokensCard({
         // so brief turn-handoff dips don't dominate the chart.
         const raw = inflightSeries?.raw ?? [];
         const smoothed = inflightSeries?.smoothed ?? [];
-        // KV-cache pool size (vLLM only) drawn as a constant ceiling so
+        // KV-cache pool size drawn as a constant ceiling so
         // you can see how close the working set gets to eviction
         // pressure. Phase-independent — it's a static config value.
         const pool = kvCachePoolTokens;

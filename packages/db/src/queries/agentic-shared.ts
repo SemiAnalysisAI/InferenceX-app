@@ -48,8 +48,10 @@ import {
  * v8: add p95 and bounded mergeable ISL/OSL sketches. The dashboard merges
  * the sketches for all resident chart points instead of loading request-level
  * timelines or attempting to combine per-point percentiles.
+ *
+ * v9: extract ATOM KV utilization and admitted prefix-cache hit rates.
  */
-export const STATS_VERSION = 8;
+export const STATS_VERSION = 9;
 
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string; was_cancelled?: boolean };

@@ -99,9 +99,7 @@ function OverviewMatrixCard({ children }: { children: ReactNode }) {
   return (
     <Card
       aria-busy={isPending}
-      className={`overflow-hidden p-0 transition-opacity md:p-0 xl:overflow-visible ${
-        isPending ? 'opacity-60' : ''
-      }`}
+      className={`overflow-clip p-0 transition-opacity md:p-0 ${isPending ? 'opacity-60' : ''}`}
     >
       {children}
     </Card>
@@ -166,7 +164,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                     href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
                   >
                     {strings.sourceLinkText}
                     <ExternalLinkIcon />
@@ -367,8 +365,8 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       <OverviewControlRow locale={locale} />
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
-      {/* Clipped on phones for the rounded corners; visible from xl so the
-          desktop matrix header can stick to the page as it scrolls. */}
+      {/* Clip cell backgrounds to the card's corners without creating the
+          scroll container that overflow-hidden would give the sticky header. */}
       <OverviewMatrixCard>
         {/* A deck lays out at a fixed width and is scaled by `zoom`, so the
             viewport no longer decides which surface fits: the matrix is the

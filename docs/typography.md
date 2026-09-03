@@ -28,6 +28,26 @@ Rules of thumb:
 
 Blog/article typography is owned by `@tailwindcss/typography` (`prose`) and is out of scope — don't migrate MDX content styles to these tokens.
 
+### Form controls and panels
+
+Use the shared `Button`, `Input`, `SelectTrigger`, `MultiSelect`, and `SearchableSelect` instead of copying their class strings into page components. `control-styles.ts` owns the common geometry, select surface and focus treatment:
+
+- Regular controls: 44px below `md`, 36px from `md` upward. Compact (`size="sm"`) buttons/selects stay 44px on phones and become 32px on desktop.
+- Control labels and selected values: `text-sm`. Editable inputs/search fields: `text-base md:text-sm` to keep phone input text readable. Helper text and dense table metadata may stay `text-xs`; do not enlarge chart ticks, code, or data rows mechanically.
+- `Label` uses a 20px line height so wrapped labels do not collide. `ControlPanel` supplies a semantic fieldset/legend, common padding, border, background and group-heading typography. Pass layout classes (columns, spans, width) rather than restating its spacing and colors.
+- Segmented controls use the 44px phone hit areas with the original rounded border and inset segment spacing. Use `role="group"` for value filters (`aria-pressed`) and the existing tab semantics for chart/table switches. Use the shared `MultiSelect` combobox for any group that permits multiple selected values and has a long or data-driven option list (for example kernel modes or throughput series). Small fixed groups that are meant to be fast (Quick Filters: two to three options each) render every option as a visible `aria-pressed` toggle instead, so one tap selects without opening a dropdown. Preserve each group’s empty/all or minimum-selection rule; reserve segmented buttons for a single selected value. Chart legends and independent settings are separate controls, not multi-choice filter groups.
+- Avoid local `h-7`, `h-8`, `text-xs` and dark-fill overrides on regular form controls. Compact chart toolbars may use the explicit small variant. Multi-select triggers use **minimum** heights so selected chips can wrap without losing data.
+
+Focus decoration is intentionally neutral by product request: no focus-only rings, outlines, border/fill changes, or opacity accents. Keep hover, selected/checked, validation, and ordinary component borders/shadows independent. Do not suppress `box-shadow` globally: that would erase meaningful non-focus states. Keyboard focus and activation still work, but this policy removes the visible focus-location cue and does not meet the visible-focus accessibility requirement.
+
+Rendered CSS regression tests live in `cypress/component/component-css.cy.tsx`; they check actual geometry, light/dark fills, label association, searchable keyboard selection, and filter actions inside forms.
+
+### Informational help
+
+Use `InfoHelp` for every standalone `(i)` explanation. `LabelWithTooltip`, `SelectedOptionInfo`, and `OptionInfo` reuse it for control labels, closed fields, and dropdown options. Hover and click must keep the same panel: mouse hover does not move focus, crossing into the explanation keeps it open, and click/tap/keyboard activation pins it until outside interaction or Escape. Keep help independent of the control's selection action.
+
+All help surfaces share `HELP_CONTENT_CLASS_NAME`: `text-sm`, relaxed line height, 12px padding, the popover background, border, rounded corners, and shadow. Short hints on links/buttons retain tooltip semantics so clicking still performs the primary action, but use the same visual surface. Do not introduce local font, padding, or color overrides. Chart data readouts retain their separate chart-specific layouts and export behavior.
+
 ## Chart text
 
 Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`useChartExport`) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stacks (`CHART_FONT_SANS`, `CHART_FONT_MINECRAFT`) live in the same module.

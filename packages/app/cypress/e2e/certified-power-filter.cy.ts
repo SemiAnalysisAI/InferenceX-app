@@ -109,8 +109,8 @@ describe('Validated vs historical measured power', () => {
     // Pick "Measured Average Power per Chip" from the y-axis dropdown. The
     // select list is a scroll container and Measured Energy sits below the
     // fold, so scroll before clicking.
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Measured Average Power per Chip')
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
       .scrollIntoView()
       .should('be.visible')
       .click();
@@ -129,7 +129,7 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="legacy-power-key"]').should('be.visible');
     cy.screenshot('legacy-power-rings', { capture: 'viewport' });
 
-    // Quick Filters gains the Measured Power category with both pills enabled.
+    // Quick Filters gains the Measured Power category with both options enabled.
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
@@ -159,12 +159,12 @@ describe('Validated vs historical measured power', () => {
       'aria-pressed',
       'false',
     );
-    cy.contains('button', 'Done').click();
+    cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
     cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
     cy.get('[data-testid="legacy-power-key"]').should('be.visible');
   });
 
-  it('restores a shared i_power=certified link with the pill pre-selected', () => {
+  it('restores a shared i_power=certified link with the toggle pre-selected', () => {
     // Note: filter writes live in the in-memory share-link store (the address
     // bar is deliberately stripped after load — see url-state.ts), so the
     // durable observable behavior is the restore direction tested here.

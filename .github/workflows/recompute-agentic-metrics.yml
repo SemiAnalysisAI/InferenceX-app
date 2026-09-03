@@ -1,24 +1,33 @@
 name: Recompute Agentic Metrics
-run-name: Recompute production metrics for run ${{ inputs.run-id }}
+run-name: Recompute metrics for run ${{ inputs.run-id }} (${{ inputs.neon-branch || 'production' }})
 
 on:
   workflow_dispatch:
     inputs:
       run-id:
-        description: Already-ingested GitHub benchmark run to recompute in production
+        description: Already-ingested GitHub benchmark run to recompute
         required: true
         type: string
+      neon-branch:
+        description: Optional existing Neon child branch; omit for production on master
+        required: false
+        type: string
+      atom-kv-capacity-only:
+        description: Backfill only ATOM KV capacity from stored logs and metrics
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.run-id }}
+  group: ${{ github.workflow }}-${{ inputs.neon-branch || 'production' }}-${{ inputs.run-id }}
   cancel-in-progress: false
 
 jobs:
   recompute:
     name: Recompute stored server metrics
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
     runs-on: blacksmith-16vcpu-ubuntu-2404
     timeout-minutes: 90
     permissions:
@@ -35,14 +44,60 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Recompute chart series and aggregate statistics
+      - name: Select database
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
+        run: |
+          database_url="$PRODUCTION_DATABASE_URL"
+          if [ -n "$NEON_BRANCH_NAME" ]; then
+            if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+              echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
+              exit 1
+            fi
+            api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
+            branches=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" "$api/branches?limit=100")
+            branch=$(jq -c --arg name "$NEON_BRANCH_NAME" '.branches[] | select(.name == $name)' <<<"$branches")
+            if [ -z "$branch" ]; then
+              echo "::error::Neon child branch not found: $NEON_BRANCH_NAME"
+              exit 1
+            fi
+            jq -e '.parent_id != null and .default != true and .protected != true' <<<"$branch" >/dev/null
+            branch_id=$(jq -r '.id' <<<"$branch")
+            database_url=$(npx --yes neonctl connection-string "$branch_id" \
+              --api-key "$NEON_API_KEY" --project-id "$NEON_PROJECT_ID" \
+              --database-name neondb --role-name neondb_owner)
+            echo "::add-mask::$database_url"
+            endpoints=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" "$api/endpoints")
+            database_host=$(CHECK_DATABASE_URL="$database_url" node -e 'console.log(new URL(process.env.CHECK_DATABASE_URL).hostname.replace("-pooler.", "."))')
+            jq -e --arg branch "$branch_id" --arg host "$database_host" \
+              '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null
+            {
+              echo "Child database: $NEON_BRANCH_NAME ($branch_id)"
+              echo "Host: $database_host"
+              echo "Expires: $(jq -r '.expires_at' <<<"$branch")"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
+            echo '::error::Production recomputation requires master'
+            exit 1
+          fi
+          echo "::add-mask::$database_url"
+          echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
+      - name: Recompute chart series and aggregate statistics
+        if: inputs.atom-kv-capacity-only != true
+        env:
           RUN_ID: ${{ inputs.run-id }}
         run: |
           bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --force --yes
           bun run --cwd packages/db db:backfill-aggregate-stats --run-id "$RUN_ID" --force --yes
+      - name: Backfill ATOM KV capacity
+        env:
+          RUN_ID: ${{ inputs.run-id }}
+        run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
       - name: Invalidate production cache
+        if: inputs.neon-branch == ''
         env:
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: bun run admin:cache:invalidate https://inferencex.semianalysis.com

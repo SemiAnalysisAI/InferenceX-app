@@ -300,7 +300,7 @@ export default function CostTargetPanel({
                     value={costCapInput}
                     onChange={handleCostCapChange}
                     onBlur={handleCostCapBlur}
-                    className="w-32 h-9"
+                    className="w-32"
                   />
                 </div>
                 <div className="flex flex-col space-y-1.5 max-w-48">
@@ -319,7 +319,7 @@ export default function CostTargetPanel({
                     value={mwInput}
                     onChange={(e) => onMwInputChange(e.target.value)}
                     onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
-                    className="w-32 h-9"
+                    className="w-32"
                   />
                 </div>
               </div>

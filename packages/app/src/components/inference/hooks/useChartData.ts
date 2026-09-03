@@ -55,7 +55,7 @@ import {
 } from '@/components/inference/utils/quickFilters';
 
 /**
- * Chart x-axis variant selected by the mode buttons above the plot. The
+ * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
  */
 export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';

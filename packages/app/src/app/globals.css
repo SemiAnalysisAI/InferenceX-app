@@ -505,7 +505,7 @@
   button {
     cursor: pointer;
   }
-  :focus:not(:focus-visible) {
+  :focus {
     outline: none;
   }
 }

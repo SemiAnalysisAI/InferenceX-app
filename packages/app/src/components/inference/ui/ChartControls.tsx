@@ -1,5 +1,6 @@
 'use client';
 
+import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -32,7 +33,12 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
+import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import {
+  METRIC_CONTROL_GROUPS,
+  METRIC_REGISTRY,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
   formatTokenPrice,
@@ -40,11 +46,17 @@ import {
 } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
+import { MetricExplanation } from './MetricExplanation';
+import { XAxisModeSelector } from './XAxisModeSelector';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
+    benchmarkControls: 'Configuration',
+    chartControls: 'Chart',
+    compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
       "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
@@ -77,8 +89,13 @@ const STRINGS = {
         ? `Input $${input}/M tok · Output $${output}/M tok`
         : `Uncached input $${input}/M tok · Cached input $${cached}/M tok · Output $${output}/M tok`,
     viewOpenRouter: 'View OpenRouter pricing',
+    secondaryControls: 'More chart controls',
+    changed: 'changed',
   },
   zh: {
+    benchmarkControls: '配置',
+    chartControls: '图表',
+    compareHistory: '对比历史趋势',
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
       '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元 TCO 对应的 token 数以及自定义值。',
@@ -110,6 +127,8 @@ const STRINGS = {
         ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
         : `未缓存输入 $${input}/百万 token · 缓存输入 $${cached}/百万 token · 输出 $${output}/百万 token`,
     viewOpenRouter: '查看 OpenRouter 定价',
+    secondaryControls: '更多图表设置',
+    changed: '项已更改',
   },
 } as const;
 
@@ -126,9 +145,14 @@ const METRIC_TITLE_ZH_MAP = new Map(
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
+  /** Inference-only: historical trends use dates on the horizontal axis. */
+  showXAxisMode?: boolean;
 }
 
-export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+export default function ChartControls({
+  hideGpuComparison = false,
+  showXAxisMode = false,
+}: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   // The percentile selector is rendered conditionally on `selectedSequence`,
@@ -160,6 +184,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     openRouterPricingError,
     selectedPercentile,
     selectedXAxisMetric,
+    selectedXAxisMode,
     scaleType,
   } = useInferenceDisplay();
   const {
@@ -198,6 +223,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             .filter((m) => METRIC_TITLE_MAP.has(m))
             .map((m) => ({
               value: m,
+              help: <MetricExplanation metricKey={m.replace(/^y_/u, '') as MetricKey} />,
               label:
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,
@@ -302,226 +328,271 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     });
   };
 
+  const secondaryCount =
+    (selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
+    (showXAxisMode && selectedXAxisMode !== 'interactivity' ? 1 : 0) +
+    (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
+    (scaleType === 'auto' ? 0 : 1) +
+    (selectedGPUs.length > 0 ? 1 : 0) +
+    (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const showPercentile =
+    mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
+
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <ModelSelector
-            value={selectedModel}
-            onChange={handleModelChange}
-            open={openDropdown === 'model'}
-            onOpenChange={handleDropdownOpenChange('model')}
-            availableModels={availableModels}
-            data-testid="model-selector"
-            trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
-            newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
-          />
-          <ScenarioSelector
-            value={selectedSequence}
-            onChange={handleSequenceChange}
-            open={openDropdown === 'sequence'}
-            onOpenChange={handleDropdownOpenChange('sequence')}
-            availableSequences={availableSequences}
-            model={selectedModel}
-            data-testid="scenario-selector"
-          />
-          {/* AgentX publishes on P90, so the percentile control is an insider
+      <div className="grid min-w-0 items-start gap-3 lg:grid-cols-3">
+        <ControlPanel
+          legend={t.benchmarkControls}
+          className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
+        >
+          <div
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
+          >
+            <div className="min-w-0 col-span-2">
+              <ModelSelector
+                value={selectedModel}
+                onChange={handleModelChange}
+                open={openDropdown === 'model'}
+                onOpenChange={handleDropdownOpenChange('model')}
+                availableModels={availableModels}
+                data-testid="model-selector"
+                trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
+                newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
+              />
+            </div>
+            <ScenarioSelector
+              value={selectedSequence}
+              onChange={handleSequenceChange}
+              open={openDropdown === 'sequence'}
+              onOpenChange={handleDropdownOpenChange('sequence')}
+              availableSequences={availableSequences}
+              model={selectedModel}
+              data-testid="scenario-selector"
+            />
+            <PrecisionSelector
+              value={selectedPrecisions}
+              onChange={handlePrecisionChange}
+              open={openDropdown === 'precision'}
+              onOpenChange={handleDropdownOpenChange('precision')}
+              availablePrecisions={availablePrecisions}
+              data-testid="precision-multiselect"
+            />
+            {/* AgentX publishes on P90, so the percentile control is an insider
               affordance rather than a normal chart filter: it stays behind the
               ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
-          {mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked && (
-            <PercentileSelector
-              value={selectedPercentile}
-              onChange={(p: Percentile) => setSelectedPercentile(p)}
-              data-testid="percentile-selector"
-            />
-          )}
-          <PrecisionSelector
-            value={selectedPrecisions}
-            onChange={handlePrecisionChange}
-            open={openDropdown === 'precision'}
-            onOpenChange={handleDropdownOpenChange('precision')}
-            availablePrecisions={availablePrecisions}
-            data-testid="precision-multiselect"
-          />
-          <div className="flex flex-col space-y-1.5 lg:col-span-2">
-            <LabelWithTooltip
-              htmlFor="y-axis-select"
-              label={t.yAxisMetric}
-              tooltip={t.yAxisMetricTooltip}
-            />
-            <SearchableSelect
-              triggerId="y-axis-select"
-              triggerTestId="yaxis-metric-selector"
-              value={selectedYAxisMetric}
-              onValueChange={handleYAxisMetricChange}
-              placeholder={t.yAxisMetric}
-              trackPrefix="yaxis_metric"
-              groups={groupedYAxisOptions.map((g) => ({
-                label: g.groupLabel,
-                options: g.options,
-              }))}
-              searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-              searchAriaLabel={locale === 'zh' ? '搜索指标选项' : undefined}
-              noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-              clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-            />
+            {showPercentile && (
+              <PercentileSelector
+                value={selectedPercentile}
+                onChange={(p: Percentile) => setSelectedPercentile(p)}
+                data-testid="percentile-selector"
+              />
+            )}
           </div>
+        </ControlPanel>
 
-          {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
-              <LabelWithTooltip
-                htmlFor="token-revenue-price-source"
-                label={t.revenuePriceSource}
-                tooltip={t.revenuePriceSourceTooltip}
-              />
-              <Select
-                value={tokenRevenuePriceSource}
-                onValueChange={(value) => {
-                  setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
-                  track('inference_token_revenue_price_source_selected', { source: value });
-                }}
+        <MobileControlSection
+          label={t.secondaryControls}
+          count={secondaryCount}
+          countLabel={t.changed}
+          testId="inference-secondary-controls"
+        >
+          <ControlPanel
+            legend={t.chartControls}
+            className={showXAxisMode ? 'lg:col-span-2' : undefined}
+          >
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              {showXAxisMode && <XAxisModeSelector />}
+              <div
+                className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
               >
-                <SelectTrigger
-                  id="token-revenue-price-source"
-                  data-testid="token-revenue-price-source"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent portalled={false}>
-                  <SelectItem value="normalized">{t.normalizedPrice}</SelectItem>
-                  <SelectItem value="openrouter">{t.openRouterPrice}</SelectItem>
-                </SelectContent>
-              </Select>
-              {tokenRevenuePriceSource === 'openrouter' && (
-                <p data-testid="openrouter-price-summary" className="text-xs text-muted-foreground">
-                  {openRouterPricingLoading
-                    ? t.openRouterLoading
-                    : openRouterPricingError || !tokenRevenuePricing
-                      ? t.openRouterUnavailable
-                      : t.openRouterSummary(
-                          formatTokenPrice(tokenRevenuePricing.inputPerMillion),
-                          selectedSequence === Sequence.AgenticTraces
-                            ? formatTokenPrice(cachedInputPricePerMillion(tokenRevenuePricing))
-                            : null,
-                          formatTokenPrice(tokenRevenuePricing.outputPerMillion),
-                        )}{' '}
-                  {openRouterModelId && (
-                    <a
-                      href={`https://openrouter.ai/${openRouterModelId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline underline-offset-2"
-                      data-testid="openrouter-pricing-link"
-                      onClick={() => {
-                        track('inference_openrouter_pricing_opened', {
-                          model: selectedModel,
-                          openRouterModelId,
-                        });
-                      }}
-                    >
-                      {t.viewOpenRouter}
-                    </a>
-                  )}
-                </p>
-              )}
-            </div>
-          )}
-
-          {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-            isInputMetric &&
-            selectedSequence !== Sequence.AgenticTraces && (
-              <div className="flex flex-col space-y-1.5 lg:col-span-1">
                 <LabelWithTooltip
-                  htmlFor="x-axis-select"
-                  label={t.xAxisMetric}
-                  tooltip={t.xAxisMetricTooltip}
+                  htmlFor="y-axis-select"
+                  label={t.yAxisMetric}
+                  tooltip={t.yAxisMetricTooltip}
                 />
-                <Select
-                  onValueChange={handleXAxisMetricChange}
-                  value={selectedXAxisMetric ?? 'p90_ttft'}
-                >
-                  <SelectTrigger
-                    id="x-axis-select"
-                    data-testid="xaxis-metric-selector"
-                    className="w-full"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent portalled={false}>
-                    <SelectItem value="p90_ttft">P90 TTFT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-          {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-            isInputMetric && (
-              <div className="flex flex-col space-y-1.5 lg:col-span-1">
-                <LabelWithTooltip
-                  htmlFor="scale-type-select"
-                  label={t.xAxisScale}
-                  tooltip={t.xAxisScaleTooltip}
-                />
-                <Select onValueChange={handleScaleTypeChange} value={scaleType}>
-                  <SelectTrigger
-                    id="scale-type-select"
-                    data-testid="scale-type-selector"
-                    className="w-full"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent portalled={false}>
-                    <SelectItem value="auto">{t.scaleAuto}</SelectItem>
-                    <SelectItem value="linear">{t.scaleLinear}</SelectItem>
-                    <SelectItem value="log">{t.scaleLog}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-          {!hideGpuComparison && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
-              <LabelWithTooltip
-                htmlFor="gpu-config-select"
-                label={t.gpuConfig}
-                tooltip={t.gpuConfigTooltip}
-              />
-              <div data-testid="gpu-multiselect">
-                <MultiSelect
-                  options={availableGPUs}
-                  value={selectedGPUs}
-                  onChange={handleGPUChange}
-                  open={openDropdown === 'gpu'}
-                  onOpenChange={handleDropdownOpenChange('gpu')}
-                  placeholder={t.gpuConfigPlaceholder}
-                  maxSelections={4}
+                <SearchableSelect
+                  triggerId="y-axis-select"
+                  triggerTestId="yaxis-metric-selector"
+                  value={selectedYAxisMetric}
+                  onValueChange={handleYAxisMetricChange}
+                  placeholder={t.yAxisMetric}
+                  trackPrefix="yaxis_metric"
+                  groups={groupedYAxisOptions.map((g) => ({
+                    label: g.groupLabel,
+                    options: g.options,
+                  }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                  searchAriaLabel={locale === 'zh' ? '搜索指标选项' : undefined}
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                  selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
                 />
               </div>
-            </div>
-          )}
 
-          {!hideGpuComparison && selectedGPUs.length > 0 && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
-              <LabelWithTooltip
-                htmlFor="date-picker"
-                label={t.comparisonDateRange}
-                tooltip={t.comparisonDateRangeTooltip}
-              />
-              <DateRangePicker
-                dateRange={selectedDateRange}
-                onChange={handleDateRangeChange}
-                placeholder={t.dateRangePlaceholder}
-                availableDates={dateRangeAvailableDates}
-                isCheckingAvailableDates={isCheckingAvailableDates}
-              />
+              {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
+                  <LabelWithTooltip
+                    htmlFor="token-revenue-price-source"
+                    label={t.revenuePriceSource}
+                    tooltip={t.revenuePriceSourceTooltip}
+                  />
+                  <Select
+                    value={tokenRevenuePriceSource}
+                    onValueChange={(value) => {
+                      setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
+                      track('inference_token_revenue_price_source_selected', { source: value });
+                    }}
+                  >
+                    <SelectTrigger
+                      id="token-revenue-price-source"
+                      data-testid="token-revenue-price-source"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent portalled={false}>
+                      <SelectItem value="normalized">{t.normalizedPrice}</SelectItem>
+                      <SelectItem value="openrouter">{t.openRouterPrice}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {tokenRevenuePriceSource === 'openrouter' && (
+                    <p
+                      data-testid="openrouter-price-summary"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {openRouterPricingLoading
+                        ? t.openRouterLoading
+                        : openRouterPricingError || !tokenRevenuePricing
+                          ? t.openRouterUnavailable
+                          : t.openRouterSummary(
+                              formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                              selectedSequence === Sequence.AgenticTraces
+                                ? formatTokenPrice(cachedInputPricePerMillion(tokenRevenuePricing))
+                                : null,
+                              formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                            )}{' '}
+                      {openRouterModelId && (
+                        <a
+                          href={`https://openrouter.ai/${openRouterModelId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2"
+                          data-testid="openrouter-pricing-link"
+                          onClick={() => {
+                            track('inference_openrouter_pricing_opened', {
+                              model: selectedModel,
+                              openRouterModelId,
+                            });
+                          }}
+                        >
+                          {t.viewOpenRouter}
+                        </a>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!showXAxisMode &&
+                graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
+                isInputMetric &&
+                selectedSequence !== Sequence.AgenticTraces && (
+                  <div className="flex flex-col space-y-1.5 lg:col-span-1">
+                    <LabelWithTooltip
+                      htmlFor="x-axis-select"
+                      label={t.xAxisMetric}
+                      tooltip={t.xAxisMetricTooltip}
+                    />
+                    <Select
+                      onValueChange={handleXAxisMetricChange}
+                      value={selectedXAxisMetric ?? 'p90_ttft'}
+                    >
+                      <SelectTrigger
+                        id="x-axis-select"
+                        data-testid="xaxis-metric-selector"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent portalled={false}>
+                        <SelectItem value="p90_ttft">P90 TTFT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+              {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
+                isInputMetric && (
+                  <div className="flex flex-col space-y-1.5 lg:col-span-1">
+                    <LabelWithTooltip
+                      htmlFor="scale-type-select"
+                      label={t.xAxisScale}
+                      tooltip={t.xAxisScaleTooltip}
+                    />
+                    <Select onValueChange={handleScaleTypeChange} value={scaleType}>
+                      <SelectTrigger
+                        id="scale-type-select"
+                        data-testid="scale-type-selector"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent portalled={false}>
+                        <SelectItem value="auto">{t.scaleAuto}</SelectItem>
+                        <SelectItem value="linear">{t.scaleLinear}</SelectItem>
+                        <SelectItem value="log">{t.scaleLog}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
             </div>
+          </ControlPanel>
+
+          {!hideGpuComparison && (
+            <ControlPanel legend={t.compareHistory}>
+              <div className="grid min-w-0 gap-3">
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="gpu-config-select"
+                    label={t.gpuConfig}
+                    tooltip={t.gpuConfigTooltip}
+                  />
+                  <div data-testid="gpu-multiselect" className="min-w-0">
+                    <MultiSelect
+                      options={availableGPUs}
+                      value={selectedGPUs}
+                      onChange={handleGPUChange}
+                      open={openDropdown === 'gpu'}
+                      onOpenChange={handleDropdownOpenChange('gpu')}
+                      placeholder={t.gpuConfigPlaceholder}
+                      maxSelections={4}
+                      searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                      noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                      clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                      selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                    />
+                  </div>
+                </div>
+
+                {selectedGPUs.length > 0 && (
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="date-picker"
+                      label={t.comparisonDateRange}
+                      tooltip={t.comparisonDateRangeTooltip}
+                    />
+                    <DateRangePicker
+                      dateRange={selectedDateRange}
+                      onChange={handleDateRangeChange}
+                      placeholder={t.dateRangePlaceholder}
+                      availableDates={dateRangeAvailableDates}
+                      isCheckingAvailableDates={isCheckingAvailableDates}
+                    />
+                  </div>
+                )}
+              </div>
+            </ControlPanel>
           )}
-        </div>
+        </MobileControlSection>
       </div>
     </TooltipProvider>
   );
