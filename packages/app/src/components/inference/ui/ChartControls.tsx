@@ -37,6 +37,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  metricOptionTitle,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import {
@@ -59,7 +60,7 @@ const STRINGS = {
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -134,12 +135,20 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
+// Option labels carry the cost tier ("… (Owning - Hyperscaler)") so the three
+// pricing variants read apart in the selector; the chart heading drops it.
 const METRIC_TITLE_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.title]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'en'),
+  ]),
 );
 
 const METRIC_TITLE_ZH_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.titleZh]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'zh'),
+  ]),
 );
 
 interface ChartControlsProps {

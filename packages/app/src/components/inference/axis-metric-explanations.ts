@@ -11,7 +11,7 @@
  * (src/lib/glossary.ts) — they describe how a value is computed, they do not
  * restate assumed constants.
  */
-import { METRIC_REGISTRY, type MetricKey } from './metric-registry';
+import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
   en: string;
@@ -25,7 +25,7 @@ export interface MetricExplanation {
   formula: LocalizedText;
 }
 
-/** Cost-basis flavor shared by the $/¥/cost metric families. */
+/** Cost-basis flavor shared by the $ and cost-per-million metric families. */
 type CostBasis = 'h' | 'n' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
@@ -168,28 +168,6 @@ function tokensPerDollar(basis: CostBasis, tokenType: TokenType): MetricExplanat
   };
 }
 
-function tokensPerRmb(basis: CostBasis, tokenType: TokenType): MetricExplanation {
-  return {
-    description: {
-      en:
-        `How many ${TOKEN_TYPE_EN[tokenType]} one Chinese yuan of infrastructure spend buys, ` +
-        `priced with the ${COST_BASIS_EN[basis]} converted at a fixed USD→CNY exchange rate. ` +
-        'Higher means cheaper.',
-      zh:
-        `1 元人民币基础设施开支能换来多少${TOKEN_TYPE_ZH[tokenType]}，` +
-        `按${COST_BASIS_ZH[basis]}以固定 USD→CNY 汇率折算计价。数值越高越便宜。`,
-    },
-    formula: {
-      en:
-        `tok/¥ = (${TOKEN_RATE_EN[tokenType]} × 3,600) ÷ ` +
-        '(all-in cost per chip-hour ($) × USD→CNY exchange rate)',
-      zh:
-        `tok/¥ =（${TOKEN_RATE_ZH[tokenType]} × 3,600）÷` +
-        '（每芯片小时全包成本（$）× USD→CNY 汇率）',
-    },
-  };
-}
-
 function provisionedJoules(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -302,15 +280,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTokensPerDollarH: tokensPerDollar('h', 'input'),
   inputTokensPerDollarN: tokensPerDollar('n', 'input'),
   inputTokensPerDollarR: tokensPerDollar('r', 'input'),
-  tokensPerRmbH: tokensPerRmb('h', 'total'),
-  tokensPerRmbN: tokensPerRmb('n', 'total'),
-  tokensPerRmbR: tokensPerRmb('r', 'total'),
-  outputTokensPerRmbH: tokensPerRmb('h', 'output'),
-  outputTokensPerRmbN: tokensPerRmb('n', 'output'),
-  outputTokensPerRmbR: tokensPerRmb('r', 'output'),
-  inputTokensPerRmbH: tokensPerRmb('h', 'input'),
-  inputTokensPerRmbN: tokensPerRmb('n', 'input'),
-  inputTokensPerRmbR: tokensPerRmb('r', 'input'),
   costUser: {
     description: {
       en:
@@ -538,8 +507,7 @@ export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
       : pctl.toUpperCase();
 }
 
-/** Locale-aware y-axis row label straight from the metric registry. */
+/** Locale-aware y-axis row label (metric plus cost tier) from the registry. */
 export function metricRowLabel(metricKey: MetricKey, locale: 'en' | 'zh'): string {
-  const metric = METRIC_REGISTRY[metricKey];
-  return locale === 'zh' ? metric.titleZh : metric.title;
+  return metricOptionTitle(metricKey, locale);
 }

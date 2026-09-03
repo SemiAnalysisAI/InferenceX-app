@@ -56,15 +56,40 @@ describe('Inference Chart', () => {
     cy.contains('No data available').should('not.exist');
   });
 
-  it('shows a chart heading with metric title', () => {
-    cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
+  it('leads the chart heading with the model and workload, without the cost tier', () => {
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      // The metric runs straight into the x-axis phrase: no "(Owning - …)" tier
+      // between them. The scenario word varies with the default sequence.
+      .should('contain.text', 'Total Tokens per $1 TCO vs.')
+      .and('contain.text', 'Interactivity')
+      .and('not.contain.text', '(Owning');
+    // The heading names the model, so the caption no longer repeats it.
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .invoke('text')
+      .then((heading) => {
+        cy.get('[data-testid="model-selector"]')
+          .invoke('text')
+          .then((model) => {
+            expect(heading.trim().startsWith(model.trim())).to.equal(true);
+          });
+      });
   });
 
-  it('shows chart caption with model and source info', () => {
+  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('contain', 'SemiAnalysis InferenceX');
+      .should('contain.text', 'Cost Tier: Owning Hyperscaler')
+      .and('contain.text', 'Updated:')
+      .and('contain.text', 'SemiAnalysis InferenceX')
+      .and('not.contain.text', 'Model:')
+      .and('not.contain.text', 'Workload:')
+      .and('not.contain.text', 'Precision:')
+      .and('not.contain.text', 'Metric:');
   });
 
   it('shows the sidebar legend for GPU types', () => {
@@ -184,7 +209,12 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', 'Total Tokens per $1 TCO (Owning - Neocloud Giant)');
+      .should('contain.text', 'Total Tokens per $1 TCO')
+      .and('not.contain.text', '(Owning');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="result-context-cost-tier"]')
+      .should('have.text', 'Owning Neocloud Giant');
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -279,7 +309,12 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      .should('contain.text', '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）');
+      .should('contain.text', '每 1 美元 TCO 对应的总 token 数')
+      .and('not.contain.text', '（自有');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="result-context-cost-tier"]')
+      .should('have.text', '自有（Neocloud Giant）');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,

@@ -1173,7 +1173,7 @@ const entries = [
     slug: 'tokens-per-dollar',
     term: 'Tokens per dollar',
     abbreviation: 'tok/$',
-    aliases: ['tokens per $1 TCO', 'tokens per ¥1 TCO'],
+    aliases: ['tokens per $1 TCO'],
     category: 'Benchmark metrics',
     plainEnglish:
       'Tokens per dollar asks how many tokens one dollar of infrastructure spend can produce under the cost basis named on the chart.',

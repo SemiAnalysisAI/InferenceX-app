@@ -2,10 +2,13 @@ import type { Locale } from '@/lib/i18n';
 
 export interface ResultContextProps {
   locale: Locale;
-  model: string;
-  workload: string;
+  /** Omitted when the chart heading already names the model. */
+  model?: string;
+  workload?: string;
   precision?: string;
-  metric: string;
+  metric?: string;
+  /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning Hyperscaler"). */
+  costTier?: string;
   target?: string;
   date?: string;
   dates?: readonly string[];
@@ -22,6 +25,7 @@ export function ResultContext({
   workload,
   precision,
   metric,
+  costTier,
   target,
   date,
   dates,
@@ -42,6 +46,7 @@ export function ResultContext({
           range: '日期范围',
           source: '来源',
           cost: '成本口径',
+          costTier: '成本层级',
         }
       : {
           model: 'Model',
@@ -53,6 +58,7 @@ export function ResultContext({
           range: 'Date range',
           source: 'Source',
           cost: 'Cost basis',
+          costTier: 'Cost Tier',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
   const selectedDates = dates && dates.length > 1 ? dates.join(', ') : date;
@@ -70,24 +76,38 @@ export function ResultContext({
       data-testid="result-context"
       className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
-      <div>
-        <dt className="inline font-medium text-foreground">{labels.model}:</dt>{' '}
-        <dd className="inline">{model}</dd>
-      </div>
-      <div>
-        <dt className="inline font-medium text-foreground">{labels.workload}:</dt>{' '}
-        <dd className="inline">{workload}</dd>
-      </div>
+      {model && (
+        <div>
+          <dt className="inline font-medium text-foreground">{labels.model}:</dt>{' '}
+          <dd className="inline">{model}</dd>
+        </div>
+      )}
+      {workload && (
+        <div>
+          <dt className="inline font-medium text-foreground">{labels.workload}:</dt>{' '}
+          <dd className="inline">{workload}</dd>
+        </div>
+      )}
       {precision && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.precision}:</dt>{' '}
           <dd className="inline">{precision}</dd>
         </div>
       )}
-      <div>
-        <dt className="inline font-medium text-foreground">{labels.metric}:</dt>{' '}
-        <dd className="inline">{metric}</dd>
-      </div>
+      {metric && (
+        <div>
+          <dt className="inline font-medium text-foreground">{labels.metric}:</dt>{' '}
+          <dd className="inline">{metric}</dd>
+        </div>
+      )}
+      {costTier && (
+        <div>
+          <dt className="inline font-medium text-foreground">{labels.costTier}:</dt>{' '}
+          <dd className="inline" data-testid="result-context-cost-tier">
+            {costTier}
+          </dd>
+        </div>
+      )}
       {target && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.target}:</dt>{' '}

@@ -260,18 +260,6 @@ describe('Inference ChartControls cost metrics', () => {
       '[data-slot="select-item"]',
       'Input Tokens per $1 TCO (Owning - Hyperscaler)',
     ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Total Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Output Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Input Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    ).should('exist');
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 

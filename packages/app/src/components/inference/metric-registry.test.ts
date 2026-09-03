@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chartDefinitions,
+  costTierLabel,
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
@@ -9,6 +10,9 @@ import {
   METRIC_CONFIG_KEYS,
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  metricChartTitle,
+  metricCostTier,
+  metricOptionTitle,
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
 } from './metric-registry';
@@ -74,22 +78,14 @@ describe('metric registry', () => {
       'inputTokensPerDollarH',
       'inputTokensPerDollarN',
       'inputTokensPerDollarR',
-      'tokensPerRmbH',
-      'tokensPerRmbN',
-      'tokensPerRmbR',
-      'outputTokensPerRmbH',
-      'outputTokensPerRmbN',
-      'outputTokensPerRmbR',
-      'inputTokensPerRmbH',
-      'inputTokensPerRmbN',
-      'inputTokensPerRmbR',
       'tokensPerDollarUser',
     ] as const;
 
     for (const metricKey of metricKeys) {
       expect(METRIC_REGISTRY[metricKey].label, metricKey).toContain(' TCO ');
       expect(METRIC_REGISTRY[metricKey].labelZh, metricKey).toContain(' TCO ');
-      expect(METRIC_REGISTRY[metricKey].title, metricKey).toContain(' TCO ');
+      // Chart titles end at the metric (the cost tier is no longer appended).
+      expect(METRIC_REGISTRY[metricKey].title, metricKey).toMatch(/ TCO$/u);
       expect(METRIC_REGISTRY[metricKey].titleZh, metricKey).toContain(' TCO ');
     }
 
@@ -100,11 +96,61 @@ describe('metric registry', () => {
           metricKeys.includes(metric.slice(2) as (typeof metricKeys)[number]),
       ),
     );
-    expect(tcoGroups).toHaveLength(6);
+    expect(tcoGroups).toHaveLength(3);
     for (const group of tcoGroups) {
       expect(group.label).toContain(' TCO');
       expect(group.labelZh).toContain(' TCO ');
     }
+  });
+
+  it('does not offer any ¥-priced axis', () => {
+    for (const key of Object.keys(METRIC_REGISTRY)) {
+      expect(key).not.toMatch(/Rmb/u);
+    }
+    for (const group of METRIC_CONTROL_GROUPS) {
+      expect(group.label).not.toContain('¥');
+      expect(group.labelZh).not.toContain('人民币');
+    }
+    for (const metric of Object.values(METRIC_REGISTRY)) {
+      expect(metric.label).not.toContain('¥');
+      expect(metric.title).not.toContain('¥');
+    }
+  });
+
+  it('keeps the cost tier out of the chart title and appends it to the option label', () => {
+    expect(metricCostTier('tokensPerDollarH')).toBe('hyperscaler');
+    expect(metricCostTier('costn')).toBe('neocloud');
+    expect(metricCostTier('inputTokensPerDollarR')).toBe('rental');
+    expect(metricCostTier('costUser')).toBe('custom');
+    expect(metricCostTier('tpPerGpu')).toBeUndefined();
+    expect(metricCostTier('powerUser')).toBeUndefined();
+
+    expect(metricChartTitle('tokensPerDollarH', 'en')).toBe('Total Tokens per $1 TCO');
+    expect(metricChartTitle('tokensPerDollarH', 'zh')).toBe('每 1 美元 TCO 对应的总 token 数');
+    expect(metricOptionTitle('tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    );
+    expect(metricOptionTitle('tokensPerDollarN', 'en')).toBe(
+      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+    );
+    expect(metricOptionTitle('costr', 'en')).toBe('Cost per Million Total Tokens (3 Year Rental)');
+    expect(metricOptionTitle('costh', 'zh')).toBe('每百万总 token 成本（自有 - 超大规模）');
+    expect(metricOptionTitle('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
+
+    expect(costTierLabel('hyperscaler', 'en')).toBe('Owning Hyperscaler');
+    expect(costTierLabel('neocloud', 'en')).toBe('Owning Neocloud Giant');
+    expect(costTierLabel('rental', 'en')).toBe('3 Year Rental');
+    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模）');
+
+    // Chart definitions carry both spellings so the selector and the heading
+    // read from the same registry entry.
+    const [interactivity] = chartDefinitions;
+    expect(interactivity.y_tokensPerDollarH_title).toBe(
+      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    );
+    expect(interactivity.y_tokensPerDollarH_chartTitle).toBe('Total Tokens per $1 TCO');
+    expect(interactivity.y_tokensPerDollarH_costTier).toBe('hyperscaler');
+    expect(interactivity.y_tpPerGpu_costTier).toBeUndefined();
   });
 
   it('keeps the Measured Energy key list in lockstep with the registry', () => {
@@ -148,6 +194,14 @@ describe('metric compatibility', () => {
 
   it('maps links for the removed API-price metric to Neocloud infrastructure cost', () => {
     expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarN');
+  });
+
+  it('maps links for the removed ¥ axes to the same tokens priced in $', () => {
+    expect(resolveMetricConfigKey('y_tokensPerRmbH')).toBe('y_tokensPerDollarH');
+    expect(resolveMetricConfigKey('y_tokensPerRmbN')).toBe('y_tokensPerDollarN');
+    expect(resolveMetricConfigKey('y_tokensPerRmbR')).toBe('y_tokensPerDollarR');
+    expect(resolveMetricConfigKey('y_outputTokensPerRmbH')).toBe('y_outputTokensPerDollarH');
+    expect(resolveMetricConfigKey('y_inputTokensPerRmbR')).toBe('y_inputTokensPerDollarR');
   });
 
   it('preserves valid benchmark, derived, and custom metric identities', () => {

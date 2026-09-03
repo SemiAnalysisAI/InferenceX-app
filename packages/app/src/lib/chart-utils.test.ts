@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-import { USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
+import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
   generateHighContrastColors,
@@ -17,6 +17,7 @@ import {
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
   paretoFrontUpperLeft,
+  metricChartTitle,
   metricTitle,
   metricLabel,
   xAxisLabel,
@@ -748,17 +749,6 @@ describe('createChartDataPoint', () => {
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
     expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
-  });
-
-  it('prices the same tokens in yuan at the pinned FX rate', () => {
-    const e = entry({ tput_per_gpu: 1000 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    // ¥ metrics are the $ metrics over USD_TO_CNY — the same tokens, priced in
-    // the other currency, so the two must stay in exact proportion.
-    expect(point.tokensPerRmbH!.y).toBeCloseTo(3_600_000 / (2.8 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbN!.y).toBeCloseTo(3_600_000 / (1.4 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbR!.y).toBeCloseTo(3_600_000 / (0.7 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(point.tokensPerDollarH!.y, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {
@@ -1727,5 +1717,40 @@ describe('xAxisLabel', () => {
 
     expect(xAxisLabel(chartDef, 'en')).toBe('End-to-end Latency (s)');
     expect(xAxisLabel(chartDef, 'zh')).toBe('端到端延迟 (s)');
+  });
+});
+
+describe('metricChartTitle', () => {
+  const [interactivity] = chartDefinitions;
+
+  it('reads the tier-free heading while metricTitle keeps the option label', () => {
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO',
+    );
+    expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    );
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数',
+    );
+  });
+
+  it('honors per-graph heading overrides such as the token-revenue price source', () => {
+    const patched = {
+      ...interactivity,
+      y_tokenRevenuePerGpuHour_chartTitle: 'Token Revenue per GPU Hour at OpenRouter Pricing',
+      y_tokenRevenuePerGpuHour_chartTitleZh: '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    };
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'en')).toBe(
+      'Token Revenue per GPU Hour at OpenRouter Pricing',
+    );
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'zh')).toBe(
+      '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    );
+  });
+
+  it('falls back to the option title when a definition has no chart title', () => {
+    const bare = { ...interactivity, y_tpPerGpu_chartTitle: undefined };
+    expect(metricChartTitle(bare, 'y_tpPerGpu', 'en')).toBe('Token Throughput per Chip');
   });
 });

@@ -45,7 +45,12 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/official-preview-notice';
-import { metricLabel, metricTitle } from '@/lib/chart-utils';
+import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
+import {
+  costTierLabel,
+  metricCostTier,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
 const STRINGS = {
@@ -128,7 +133,7 @@ export default function HistoricalTrendsDisplay() {
 
   const currentYTitle = useMemo(() => {
     if (graphs.length === 0) return '';
-    return metricTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+    return metricChartTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
   }, [graphs, locale, selectedYAxisMetric]);
 
   // Interactivity range from current chart data
@@ -416,6 +421,12 @@ export default function HistoricalTrendsDisplay() {
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}
                       metric={currentYLabel}
+                      costTier={(() => {
+                        const tier = metricCostTier(
+                          selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+                        );
+                        return tier ? costTierLabel(tier, locale) : undefined;
+                      })()}
                       target={`${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined

@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
+  costTierLabel,
   isMeasuredEnergyConfigKey,
+  metricCostTier,
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -49,7 +51,7 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
+import { metricChartTitle, metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -62,10 +64,8 @@ import {
 } from '@/components/unofficial-run-provider';
 import {
   type Model,
-  type Precision,
   Sequence,
   getModelLabel,
-  getPrecisionLabel,
   getSequenceLabel,
   sequenceKind,
 } from '@/lib/data-mappings';
@@ -91,6 +91,7 @@ import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegen
 import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
+import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
@@ -952,7 +953,16 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
-                              {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
+                              {/* Model + workload lead the heading; the cost tier that used
+                                  to trail the metric title lives in the caption's Cost Tier
+                                  line instead, so the title reads as one measurement. */}
+                              <ModelLogo
+                                model={graph.model as Model}
+                                className="mr-2 size-6 align-[-0.3em]"
+                              />
+                              {getModelLabel(graph.model as Model)}{' '}
+                              {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
+                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
                                 // For Input metrics with dynamic x-axis, use dynamic heading.
                                 // Classify off the ENGLISH title — the localized one has no
@@ -1025,12 +1035,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            model={getModelLabel(graph.model as Model)}
-                            workload={getSequenceLabel(graph.sequence as Sequence, locale)}
-                            precision={selectedPrecisions
-                              .map((prec) => getPrecisionLabel(prec as Precision))
-                              .join(', ')}
-                            metric={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            costTier={(() => {
+                              const tier = metricCostTier(
+                                selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+                              );
+                              return tier ? costTierLabel(tier, locale) : undefined;
+                            })()}
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={

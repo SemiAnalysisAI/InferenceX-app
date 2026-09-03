@@ -564,6 +564,11 @@ export function useChartData(
                     'Token Revenue per GPU Hour at OpenRouter Pricing',
                   y_tokenRevenuePerGpuHour_titleZh:
                     '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+                  // The heading reads `_chartTitle`; keep the priced source there too.
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
                 }
               : {
                   y_tokenRevenuePerGpuHour_label:
@@ -573,6 +578,9 @@ export function useChartData(
                   y_tokenRevenuePerGpuHour_title:
                     'Token Revenue per GPU Hour at Normalized Pricing',
                   y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
