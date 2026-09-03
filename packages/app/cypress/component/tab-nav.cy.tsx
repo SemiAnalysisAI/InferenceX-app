@@ -186,8 +186,8 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-inference"]').should('exist');
-    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('exist');
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');

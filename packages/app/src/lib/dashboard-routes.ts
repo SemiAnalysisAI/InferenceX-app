@@ -136,7 +136,7 @@ export const DASHBOARD_ROUTES = [
     key: 'gpu-specs',
     path: '/gpu-specs',
     canonicalPath: '/gpu-specs',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
