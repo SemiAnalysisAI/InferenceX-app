@@ -22,6 +22,7 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import {
+  latestRunId,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
@@ -577,18 +578,21 @@ export function InferenceProvider({
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
+  // The latest run for this model on the selected date, by start time. Run ids
+  // are assigned at dispatch and a queued or re-run sweep can start after a
+  // later-dispatched one, so the greatest id is not necessarily the newest run
+  // (see `latestRunId`). The DB side already tiebreaks by `run_started_at`;
+  // this keeps the client's notion of "latest" consistent with it.
+  const latestRunIdForModel = useMemo(
+    () => latestRunId(filteredAvailableRuns),
+    [filteredAvailableRuns],
+  );
+
   const effectiveSelectedRunId = useMemo(() => {
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
-  // The latest run for this model on the selected date. GitHub run ids increase
-  // monotonically with time, so the lexicographically-greatest id is the newest run.
-  const latestRunIdForModel = useMemo(() => {
-    const ids = Object.keys(filteredAvailableRuns);
-    return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
-  }, [filteredAvailableRuns]);
+    return latestRunIdForModel;
+  }, [filteredAvailableRuns, selectedRunId, latestRunIdForModel]);
 
   // Only constrain the base query when an earlier-than-latest run is selected.
   const asOfRunId =
