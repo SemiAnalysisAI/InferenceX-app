@@ -170,14 +170,42 @@ export function resolveEffectiveRunDate(
   return availableDates.at(-1)!;
 }
 
+/**
+ * The run that actually happened last on the selected date.
+ *
+ * GitHub run ids are not a chronological key. A re-run keeps its original id,
+ * and same-day sweeps land with ids out of `created_at` order in production
+ * (2026-09-01 DSV4: 33447526958 at 17:10Z vs 33418433573 at 21:35Z) — so the
+ * lexicographically-greatest id is NOT reliably the newest run. Picking by id
+ * opened a fresh page on "Run 2/3" (an older sweep with a larger id) instead of
+ * the day's last sweep, with that older run's changelog.
+ *
+ * `runDate` is `latest_workflow_runs.created_at`, which the API serializes as
+ * a fixed-width ISO-8601 UTC string, so a plain string compare orders it
+ * chronologically. Ties (and missing timestamps) fall back to API order, which
+ * `getWorkflowRunsByDate` sorts by `created_at ASC` — the same order the run
+ * selector numbers its entries, so "latest" and "Run N/N" agree.
+ */
+export function latestRunId(availableRuns: Readonly<Record<string, RunInfo>>): string {
+  let latest = '';
+  let latestDate = '';
+  for (const [runId, info] of Object.entries(availableRuns)) {
+    const runDate = info.runDate ?? '';
+    if (!latest || runDate >= latestDate) {
+      latest = runId;
+      latestDate = runDate;
+    }
+  }
+  return latest;
+}
+
 export function resolveEffectiveRunId(
   requestedRunId: string,
   availableRuns: Readonly<Record<string, RunInfo>>,
 ): string {
-  const runIds = Object.keys(availableRuns);
-  if (runIds.length === 0) return '';
+  if (Object.keys(availableRuns).length === 0) return '';
   if (requestedRunId && Object.hasOwn(availableRuns, requestedRunId)) return requestedRunId;
-  return runIds.reduce((latest, runId) => (runId > latest ? runId : latest), runIds[0]);
+  return latestRunId(availableRuns);
 }
 
 export function getRequestedRunUrlParams(
@@ -363,11 +391,22 @@ export function GlobalFilterProvider({
         setPrecisionExplicit(true);
       }
     }
-    applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
-      requestedRunDateExplicitRef.current = true;
-      setRequestedRunDate(date);
-    });
-    applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
+    // Same guard again for the run pins. The snapshot retains `g_rundate` /
+    // `g_runid` self-writes from an earlier visit (a manual date pick, or a
+    // blog "live chart" link that pinned a date), and `refreshUrlParams` does
+    // not evict keys the live URL no longer carries. Applying them here would
+    // flip `requestedRunDateExplicitRef` and re-pin a stale date on a page the
+    // user reached without any `g_rundate` — so a fresh dashboard would open
+    // on an old run instead of the latest one. Only the CURRENT URL may pin.
+    if (hasExplicitUrlParam('g_rundate')) {
+      applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
+        requestedRunDateExplicitRef.current = true;
+        setRequestedRunDate(date);
+      });
+    }
+    if (hasExplicitUrlParam('g_runid')) {
+      applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
+    }
     // Re-runs on client-side navigation as well as on mount. Keyed on the
     // pathname, which the Next router owns: the provider's own share-link
     // writes go through `history.replaceState` and never change it, so this

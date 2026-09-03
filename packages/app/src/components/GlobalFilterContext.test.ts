@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRunInfo,
   getRequestedRunUrlParams,
+  latestRunId,
   resolveEffectiveRunDate,
   resolveEffectiveRunId,
 } from '@/components/GlobalFilterContext';
@@ -10,10 +11,10 @@ import workflowFixture from '../../cypress/fixtures/api/workflow-info.json';
 import type { WorkflowInfoResponse } from '@/lib/api';
 import type { RunInfo } from '@/components/inference/types';
 
-function run(runId: string): RunInfo {
+function run(runId: string, runDate = '2026-08-20T00:00:00Z'): RunInfo {
   return {
     runId,
-    runDate: '2026-08-20',
+    runDate,
     runUrl: `https://example.test/${runId}`,
     conclusion: 'success',
   };
@@ -136,10 +137,42 @@ describe('global filter requested and effective selectors', () => {
   });
 
   it('keeps a valid run ID and otherwise selects the newest available run', () => {
-    const runs = { '100': run('100'), '102': run('102'), '101': run('101') };
+    const runs = {
+      '100': run('100', '2026-08-20T01:00:00Z'),
+      '102': run('102', '2026-08-20T03:00:00Z'),
+      '101': run('101', '2026-08-20T02:00:00Z'),
+    };
     expect(resolveEffectiveRunId('101', runs)).toBe('101');
     expect(resolveEffectiveRunId('missing', runs)).toBe('102');
     expect(resolveEffectiveRunId('', runs)).toBe('102');
+  });
+
+  it('picks the newest run by start time, not by the greatest GitHub run id', () => {
+    // Production 2026-09-01 DSV4: the largest id (…526958) was created at 17:10Z
+    // while a smaller id (…433573) is the day's last sweep at 21:35Z. The old
+    // max-id rule opened a fresh page on the older run ("Run 2/3").
+    const runs = {
+      '33145139961': run('33145139961', '2026-09-01T17:04:07Z'),
+      '33447526958': run('33447526958', '2026-09-01T17:10:19Z'),
+      '33418433573': run('33418433573', '2026-09-01T21:35:56Z'),
+    };
+    expect(latestRunId(runs)).toBe('33418433573');
+    expect(resolveEffectiveRunId('', runs)).toBe('33418433573');
+    expect(resolveEffectiveRunId('33447526958', runs)).toBe('33447526958');
+  });
+
+  it('falls back to API order (created_at ASC) when start times tie or are missing', () => {
+    const tied = {
+      '33447526958': run('33447526958', '2026-09-01T17:10:19Z'),
+      '33418433573': run('33418433573', '2026-09-01T17:10:19Z'),
+    };
+    expect(latestRunId(tied)).toBe('33418433573');
+    const missing = {
+      '33447526958': run('33447526958', ''),
+      '33418433573': run('33418433573', ''),
+    };
+    expect(latestRunId(missing)).toBe('33418433573');
+    expect(latestRunId({})).toBe('');
   });
 
   it('clears the effective run ID for a settled empty run map', () => {

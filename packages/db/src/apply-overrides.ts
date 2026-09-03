@@ -12,6 +12,7 @@
  *   bun run db:apply-overrides            # preview + confirm
  *   bun run db:apply-overrides --yes      # skip confirmation
  *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
+ *   bun run db:apply-overrides --run-id 33721476500 --allow-unregistered-run --yes  # ingest
  *
  * Commits to run-overrides.ts are applied to production automatically after merge.
  * Use this command directly only for local preview or manual recovery.
@@ -23,6 +24,7 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { configCacheKey } from './etl/config-cache.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
+import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
 import { selectRunOverrides } from './lib/run-override-selection.js';
 import {
   type BenchmarkPointBackfill,
@@ -194,72 +196,6 @@ interface BenchmarkPointBackfillTarget {
   metrics: Record<string, unknown>;
 }
 
-function asMetricsRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function benchmarkPointMetricsPatch(backfill: BenchmarkPointBackfill): Record<string, unknown> {
-  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-  return {
-    ...backfill.set.metricsMerge,
-    ...(backfill.set.offloadMode === undefined ? {} : { offload_mode: desiredOffloadMode }),
-  };
-}
-
-/**
- * Recognize the exact malformed value written by the first benchmark-point
- * backfill implementation. It concatenated a metrics object with a JSONB
- * string, producing `[originalMetrics, "{...patch}"]`.
- */
-function recoverMalformedBenchmarkPointMetrics(
-  value: unknown,
-  backfill: BenchmarkPointBackfill,
-): Record<string, unknown> | null {
-  if (!Array.isArray(value) || value.length !== 2) return null;
-  const originalMetrics = asMetricsRecord(value[0]);
-  if (!originalMetrics || typeof value[1] !== 'string') return null;
-
-  try {
-    const appendedPatch = JSON.parse(value[1]) as unknown;
-    if (!isDeepStrictEqual(appendedPatch, benchmarkPointMetricsPatch(backfill))) return null;
-  } catch {
-    return null;
-  }
-  return originalMetrics;
-}
-
-function patchedBenchmarkPointMetrics(
-  sourceMetrics: Record<string, unknown>,
-  backfill: BenchmarkPointBackfill,
-): Record<string, unknown> {
-  const metrics = { ...sourceMetrics };
-  for (const key of backfill.set.metricsRemove ?? []) delete metrics[key];
-  Object.assign(metrics, benchmarkPointMetricsPatch(backfill));
-  return metrics;
-}
-
-function benchmarkPointBackfillIsApplied(
-  row: Record<string, unknown>,
-  backfill: BenchmarkPointBackfill,
-): boolean {
-  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-  if (row.offload_mode !== desiredOffloadMode) return false;
-  const metrics = asMetricsRecord(row.metrics);
-  if (!metrics) return false;
-  if (backfill.set.offloadMode !== undefined && metrics.offload_mode !== desiredOffloadMode) {
-    return false;
-  }
-  for (const [key, value] of Object.entries(backfill.set.metricsMerge ?? {})) {
-    if (!isDeepStrictEqual(metrics[key], value)) return false;
-  }
-  for (const key of backfill.set.metricsRemove ?? []) {
-    if (Object.hasOwn(metrics, key)) return false;
-  }
-  return true;
-}
-
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
   return (
     `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
@@ -317,33 +253,23 @@ async function previewBenchmarkPointBackfill(
   const [row] = rows;
   console.log(`    ${backfill.id}: ${benchmarkPointDescription(backfill)}`);
   console.log(`      reason: ${backfill.reason}`);
-  if (benchmarkPointBackfillIsApplied(row, backfill)) {
+  const metrics = planBenchmarkPointBackfill(
+    { offload_mode: row.offload_mode, metrics: row.metrics },
+    backfill,
+  );
+  if (metrics === null) {
     console.log('      already applied.');
     return null;
   }
 
-  const malformedMetrics = recoverMalformedBenchmarkPointMetrics(row.metrics, backfill);
-  if (
-    row.offload_mode === desiredOffloadMode &&
-    desiredOffloadMode !== backfill.offloadMode &&
-    malformedMetrics === null
-  ) {
-    throw new Error(
-      `${backfill.id}: source identity is missing and the desired identity has unexpected data`,
-    );
-  }
-  const sourceMetrics = asMetricsRecord(row.metrics) ?? malformedMetrics;
-  if (!sourceMetrics) {
-    throw new Error(`${backfill.id}: benchmark metrics have an unexpected JSON shape`);
-  }
-  if (malformedMetrics) {
+  if (Array.isArray(row.metrics)) {
     console.log('      repair malformed metrics written by the previous backfill attempt');
   }
   console.log(`      set ${JSON.stringify(backfill.set)}`);
   return {
     backfill,
     resultId: row.id as number,
-    metrics: patchedBenchmarkPointMetrics(sourceMetrics, backfill),
+    metrics,
   };
 }
 

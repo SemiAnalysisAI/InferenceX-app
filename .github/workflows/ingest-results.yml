@@ -81,7 +81,8 @@ jobs:
       - name: Apply run overrides
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-        run: bun run admin:db:apply-overrides --yes
+          OVERRIDE_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
+        run: bun run admin:db:apply-overrides --run-id "$OVERRIDE_RUN_ID" --allow-unregistered-run --yes
 
       - name: Verify database
         env:

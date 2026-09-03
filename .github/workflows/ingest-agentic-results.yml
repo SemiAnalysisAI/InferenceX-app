@@ -292,7 +292,9 @@ jobs:
         run: bun run admin:db:ingest:ci
 
       - name: Apply run overrides
-        run: bun run admin:db:apply-overrides --yes
+        env:
+          OVERRIDE_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
+        run: bun run admin:db:apply-overrides --run-id "$OVERRIDE_RUN_ID" --allow-unregistered-run --yes
 
       - name: Verify database
         run: bun run admin:db:verify
