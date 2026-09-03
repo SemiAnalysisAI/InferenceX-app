@@ -684,6 +684,30 @@ describe('createChartDataPoint', () => {
     expect(point.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
   });
 
+  it('computes normalized revenue and profit per all-in utility MW-year', () => {
+    const e = entry({ tput_per_gpu: 2000 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // Mocked specs: 700 kW all-in per GPU, so 1 MW hosts 1000 / 700 GPUs for 8,760 hours.
+    const gpuHours = (1000 / 700) * 8_760;
+    expect(point.tokenRevenuePerMwYear?.y).toBeCloseTo(7.2 * gpuHours, 6);
+    // Mocked TCO tiers: costh 2.8, costn 1.4, costr 0.7 $/GPU/hr.
+    expect(point.tokenProfitPerMwYearH?.y).toBeCloseTo((7.2 - 2.8) * gpuHours, 6);
+    expect(point.tokenProfitPerMwYearN?.y).toBeCloseTo((7.2 - 1.4) * gpuHours, 6);
+    expect(point.tokenProfitPerMwYearR?.y).toBeCloseTo((7.2 - 0.7) * gpuHours, 6);
+  });
+
+  it('keeps MW-year profit negative when normalized revenue is below TCO', () => {
+    const e = entry({ tput_per_gpu: 100 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // 100 tok/s/GPU is $0.36/GPU/hr at $1/M, under every mocked TCO tier (2.8, 1.4, 0.7).
+    const gpuHours = (1000 / 700) * 8_760;
+    expect(point.tokenProfitPerMwYearH?.y).toBeCloseTo((0.36 - 2.8) * gpuHours, 6);
+    expect(point.tokenProfitPerMwYearR?.y).toBeCloseTo((0.36 - 0.7) * gpuHours, 6);
+    expect(point.tokenProfitPerMwYearH?.y).toBeLessThan(point.tokenProfitPerMwYearN!.y);
+    expect(point.tokenProfitPerMwYearN?.y).toBeLessThan(point.tokenProfitPerMwYearR!.y);
+    expect(point.tokenProfitPerMwYearR?.y).toBeLessThan(0);
+  });
+
   it('sets outputTputPerGpu when output_tput_per_gpu > 0', () => {
     const e = entry({ output_tput_per_gpu: 800 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');

@@ -1262,12 +1262,15 @@ const ScatterGraph = React.memo(
         yMin =
           dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
       } else {
-        yMin = Math.max(0, ext[0] - range * 0.05);
+        // Profit axes (revenue minus TCO) can dip below zero; keep the floor at
+        // zero for every other metric so throughput charts still start at 0.
+        yMin = ext[0] < 0 ? ext[0] - range * 0.05 : Math.max(0, ext[0] - range * 0.05);
       }
+      const yMax = ext[1] >= 0 ? ext[1] * 1.05 : ext[1] + range * 0.05;
 
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
-        domain: [yMin, ext[1] * 1.05] as [number, number],
+        domain: [yMin, yMax] as [number, number],
         nice: niceAxes,
       };
     }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);

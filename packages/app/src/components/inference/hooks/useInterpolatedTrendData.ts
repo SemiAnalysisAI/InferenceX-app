@@ -11,8 +11,10 @@ import type {
 import {
   applyTokenRevenuePricing,
   inputTokenShareForRevenue,
+  isTokenSalePricingMetric,
   NORMALIZED_TOKEN_REVENUE_PRICING,
   tokenRevenueFromRatesPerGpuHour,
+  tokenSalePricingMetricFromRevenuePerGpuHour,
 } from '@/components/inference/token-revenue';
 import {
   isBenchmarkMetricKey,
@@ -83,7 +85,7 @@ export function rowToLightweightPoint(
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
 
-  return requestedMetrics.includes('tokenRevenuePerGpuHour')
+  return requestedMetrics.some(isTokenSalePricingMetric)
     ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]!
     : point;
 }
@@ -121,9 +123,14 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  * constant, interpolation preserves that identity. OpenRouter revenue can use
  * a point-specific input/output mix; in that case multiplier recovery fails
  * safely and the metric itself is splined on the total-throughput frontier.
+ *
+ * The profit-per-MW-year axes are deliberately absent: they are affine in
+ * throughput (revenue minus a fixed TCO), not proportional, so they take the
+ * sale-pricing path below or a direct metric spline when pricing is unavailable.
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokenRevenuePerGpuHour: 'tpPerGpu',
+  tokenRevenuePerMwYear: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
   tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',
@@ -240,7 +247,7 @@ export function interpolateMetricAtInteractivity(
   // operating point. Do the same for Historical Trends instead of splining
   // already-multiplied dollar values. A partly measured cache frontier opts out
   // of the discount as a whole rather than inventing a zero-hit knot.
-  if (metricKey === 'tokenRevenuePerGpuHour' && tokenRevenuePricing) {
+  if (isTokenSalePricingMetric(metricKey) && tokenRevenuePricing) {
     const interpolateBounded = (ys: number[]) => {
       const slopes = monotoneSlopes(xs, ys);
       const raw = hermiteInterpolate(xs, ys, slopes, targetInteractivity);
@@ -257,11 +264,19 @@ export function interpolateMetricAtInteractivity(
       : null;
 
     const throughput = interpolateBounded(throughputYs);
-    return tokenRevenueFromRatesPerGpuHour(
+    const revenuePerGpuHour = tokenRevenueFromRatesPerGpuHour(
       throughput,
       inputShare,
       cacheHitRate,
       tokenRevenuePricing,
+    );
+    if (revenuePerGpuHour === null) return null;
+    // Every point in this frontier comes from one hardware config, so its
+    // all-in power and TCO tiers apply to the interpolated revenue as-is.
+    return tokenSalePricingMetricFromRevenuePerGpuHour(
+      metricKey,
+      revenuePerGpuHour,
+      String(sorted[0]!.hwKey),
     );
   }
 
