@@ -715,7 +715,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'b8b72a37ca7a67a1f234036fcbd9e3edacbd7031e0a68fb793944fc4de7030da',
+    sourceSha256: '8d23f65dfb77565120f23207729ed66e6ce55f53acf6bf0cf51e377c41120d6b',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -819,7 +819,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: 'da987d22521dc63da34dcacf3caaad6adb21aa6e5e7a65d1a4fa495a71e9f1f0',
+    sourceSha256: '4f70c310675c36ce062fe78861925f0a9e99b05396a6d2b5d0afc9221a89edd7',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

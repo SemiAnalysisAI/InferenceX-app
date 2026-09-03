@@ -145,14 +145,13 @@ async function main(): Promise<void> {
             });
 
       let stats: AggregateStats;
-      // v3 onwards → current is a profile-only change (the server-derived
-      // fields haven't changed since v3), so skip re-reading the huge server
-      // blob and carry its KV/prefix distributions forward.
+      // Only carry server distributions from versions with the current parser.
+      // Earlier bundles need a server reparse to populate ATOM metrics.
       const storedVersion = row.aggregate_stats?.version;
       if (
         !flags.force &&
         storedVersion !== undefined &&
-        storedVersion >= 3 &&
+        storedVersion >= 9 &&
         storedVersion < STATS_VERSION
       ) {
         stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);

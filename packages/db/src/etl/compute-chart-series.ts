@@ -129,8 +129,10 @@ import {
  * v16 expected.
  *
  * v18: retain Dynamo's per-DP-rank KV gauges within each TRT-LLM worker.
+ *
+ * v19: extract ATOM's aggregate KV, queue, token and prefix-cache metrics.
  */
-export const CHART_SERIES_VERSION = 18;
+export const CHART_SERIES_VERSION = 19;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -256,6 +258,15 @@ export const CHART_METRIC_KEYS = new Set([
   'sglang:realtime_tokens',
   'sglang:hicache_host_used_tokens',
   'sglang:hicache_host_total_tokens',
+  // ATOM
+  'atom:kv_cache_usage_ratio',
+  'atom:prefix_cache_cached_tokens',
+  'atom:prefix_cache_full_tokens',
+  'atom:prefix_cache_hit_ratio',
+  'atom:requests_running',
+  'atom:requests_waiting',
+  'atom:prompt_tokens',
+  'atom:generation_tokens',
   // TensorRT-LLM
   'dynamo_component_gpu_cache_usage_percent',
   'trtllm_kv_cache_utilization',
@@ -1023,8 +1034,12 @@ function buildSeriesFromMetrics(
     ...nativeTrtKv.filter((s) => !rankedEndpoints.has(s.endpoint_url)),
   ];
   const kvSeries =
-    pickSeries('vllm:kv_cache_usage_perc', 'vllm:gpu_cache_usage_perc', 'sglang:token_usage') ??
-    trtKv;
+    pickSeries(
+      'vllm:kv_cache_usage_perc',
+      'vllm:gpu_cache_usage_perc',
+      'sglang:token_usage',
+      'atom:kv_cache_usage_ratio',
+    ) ?? trtKv;
   // One entry per logical engine (v13) — mirrored API-server frontends and the
   // warmup/profiling phase split are collapsed here rather than showing up as
   // extra "engines".
@@ -1040,6 +1055,7 @@ function buildSeriesFromMetrics(
   const hitsSeries = pickSeries(
     'vllm:prefix_cache_hits',
     'sglang:cached_tokens',
+    'atom:prefix_cache_cached_tokens',
     'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
@@ -1047,6 +1063,8 @@ function buildSeriesFromMetrics(
     'vllm:prefix_cache_queries',
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    // ATOM accounts cache lookups at admission, prompt_tokens at completion.
+    'atom:prefix_cache_full_tokens',
     'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
@@ -1061,7 +1079,10 @@ function buildSeriesFromMetrics(
   if (prefixCacheHitRate.length === 0) {
     prefixCacheHitRate.push(
       ...averageAcrossEngines(
-        resolveLogicalEngines(metrics['trtllm_kv_cache_hit_rate']?.series, tOf),
+        resolveLogicalEngines(
+          pickSeries('trtllm_kv_cache_hit_rate', 'atom:prefix_cache_hit_ratio'),
+          tOf,
+        ),
       ),
     );
   }
@@ -1070,11 +1091,13 @@ function buildSeriesFromMetrics(
   const runSeries = pickSeries(
     'vllm:num_requests_running',
     'sglang:num_running_reqs',
+    'atom:requests_running',
     'trtllm_num_requests_running',
   );
   const waitSeries = pickSeries(
     'vllm:num_requests_waiting',
     'sglang:num_queue_reqs',
+    'atom:requests_waiting',
     'trtllm_num_requests_waiting',
   );
   const runOnGrid = summedSeries(runSeries, tOf, 'avg', tickS);
@@ -1098,12 +1121,14 @@ function buildSeriesFromMetrics(
   const promptCounterTps = counterRate(
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'atom:prompt_tokens',
     'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
   const decodeTps = counterRate(
     'vllm:generation_tokens',
     'sglang:generation_tokens',
+    'atom:generation_tokens',
     'trtllm_generation_tokens',
     'trtllm_generation_tokens_total',
   );
@@ -1112,6 +1137,7 @@ function buildSeriesFromMetrics(
   const prefixCacheHitsTps = counterRate(
     'vllm:prefix_cache_hits',
     'sglang:cached_tokens',
+    'atom:prefix_cache_cached_tokens',
     'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
@@ -1232,7 +1258,10 @@ function buildSeriesFromMetrics(
     const computed =
       trtllmComputedPromptTps.length > 0
         ? trtllmComputedPromptTps.filter((point) => point.value > 0)
-        : promptCounterTps
+        : (metrics['atom:prefix_cache_full_tokens']
+            ? counterRate('atom:prefix_cache_full_tokens')
+            : promptCounterTps
+          )
             .map(({ t, value: prompt }) => ({
               t,
               value: Math.max(0, prompt - (cachedByT.get(t) ?? 0)),
