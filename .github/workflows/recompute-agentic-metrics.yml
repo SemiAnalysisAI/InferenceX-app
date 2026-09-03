@@ -12,6 +12,11 @@ on:
         description: Optional existing Neon child branch; omit for production on master
         required: false
         type: string
+      atom-kv-capacity-only:
+        description: Backfill only ATOM KV capacity from stored logs and metrics
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -81,11 +86,16 @@ jobs:
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
       - name: Recompute chart series and aggregate statistics
+        if: inputs.atom-kv-capacity-only != true
         env:
           RUN_ID: ${{ inputs.run-id }}
         run: |
           bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --force --yes
           bun run --cwd packages/db db:backfill-aggregate-stats --run-id "$RUN_ID" --force --yes
+      - name: Backfill ATOM KV capacity
+        env:
+          RUN_ID: ${{ inputs.run-id }}
+        run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
       - name: Invalidate production cache
         if: inputs.neon-branch == ''
         env:

@@ -554,7 +554,7 @@ export function InflightUniqueTokensCard({
 }: {
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
-  /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
+  /** Nominal KV-pool capacity in tokens — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
   const t = SERVER_STRINGS[useLocale()];
@@ -585,7 +585,7 @@ export function InflightUniqueTokensCard({
         // so brief turn-handoff dips don't dominate the chart.
         const raw = inflightSeries?.raw ?? [];
         const smoothed = inflightSeries?.smoothed ?? [];
-        // KV-cache pool size (vLLM only) drawn as a constant ceiling so
+        // KV-cache pool size drawn as a constant ceiling so
         // you can see how close the working set gets to eviction
         // pressure. Phase-independent — it's a static config value.
         const pool = kvCachePoolTokens;

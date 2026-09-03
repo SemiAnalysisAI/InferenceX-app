@@ -203,6 +203,19 @@ tokens and `prefix_cache_full_tokens`, not compressed-index matches,
 checkpoint-eligible tokens, or completion-time prompt counts. The exporter does
 not provide per-rank KV usage or CPU-pool utilization, so those remain absent.
 
+ATOM's nominal KV token capacity is `allocated blocks × resolved block_size × DCP`.
+Startup `Concurrent capacity vs context length` lines supply the resolved block size
+and DCP width. Use `atom:kv_cache_blocks_total` for the allocated count: startup
+`pool_blocks` estimates differ between TP workers, while the metric reflects the
+selected pool and already sums independent DP pools. Do not sum worker estimates
+or multiply by TP. Checkpoints may share this nominal pool with token KV storage.
+Missing or inconsistent capacity metadata stays unset rather than guessed.
+
+Ingestion derives `metrics.kv_cache_pool_tokens` when it links the trace artifact.
+The `db:backfill-atom-kv-capacity --run-id <id> --yes` command applies the same logic
+to stored artifacts. The workflow's `atom-kv-capacity-only` option skips chart and
+aggregate recomputation; no benchmark rerun or raw-artifact replacement is needed.
+
 The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
 connection endpoint before writing; production recomputation still requires
