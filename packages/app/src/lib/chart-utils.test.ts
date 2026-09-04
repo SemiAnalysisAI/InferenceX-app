@@ -7,6 +7,8 @@ import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
+  reconcileGpuSelection,
+  stripSpecMethodFromHwKey,
   generateHighContrastColors,
   getNestedYValue,
   getHardwareKey,
@@ -217,6 +219,55 @@ describe('buildAvailabilityHwKey', () => {
     expect(buildAvailabilityHwKey('mi355x', 'sglang-disagg', 'mtp', true)).toBe(
       'mi355x_mori-sglang_mtp',
     );
+  });
+});
+
+describe('stripSpecMethodFromHwKey', () => {
+  it('drops the trailing spec-method segment', () => {
+    expect(stripSpecMethodFromHwKey('b200_vllm_mtp')).toBe('b200_vllm');
+    expect(stripSpecMethodFromHwKey('h200_trt_eagle')).toBe('h200_trt');
+    expect(stripSpecMethodFromHwKey('mi355x_mori-sglang_mtp')).toBe('mi355x_mori-sglang');
+  });
+
+  it('never strips the framework segment', () => {
+    expect(stripSpecMethodFromHwKey('b200_vllm')).toBeNull();
+    expect(stripSpecMethodFromHwKey('b200')).toBeNull();
+  });
+});
+
+describe('reconcileGpuSelection', () => {
+  it('keeps keys that match the scope exactly', () => {
+    const valid = new Set(['b200_vllm_mtp', 'b200_vllm', 'h200_sglang']);
+    expect(reconcileGpuSelection(['b200_vllm_mtp', 'h200_sglang'], valid)).toEqual([
+      'b200_vllm_mtp',
+      'h200_sglang',
+    ]);
+  });
+
+  it('remaps a spec-suffixed key to its spec-less agentic key', () => {
+    // /submissions "compare vs prev" builds `b200_vllm_mtp` from a summary row
+    // (no benchmark_type); the agentic scope only offers `b200_vllm`.
+    const agenticScope = new Set(['b200_vllm', 'b300_vllm', 'gb300_dynamo-trt']);
+    expect(reconcileGpuSelection(['b200_vllm_mtp'], agenticScope)).toEqual(['b200_vllm']);
+  });
+
+  it('prefers the exact key when both spec and spec-less variants exist', () => {
+    const fixedScope = new Set(['b200_vllm', 'b200_vllm_mtp']);
+    expect(reconcileGpuSelection(['b200_vllm_mtp'], fixedScope)).toEqual(['b200_vllm_mtp']);
+    expect(reconcileGpuSelection(['b200_vllm'], fixedScope)).toEqual(['b200_vllm']);
+  });
+
+  it('drops keys with neither an exact nor a stripped match', () => {
+    const scope = new Set(['b200_vllm']);
+    expect(reconcileGpuSelection(['mi355x_sglang_mtp', 'b200_vllm_mtp'], scope)).toEqual([
+      'b200_vllm',
+    ]);
+    expect(reconcileGpuSelection(['mi355x_sglang'], scope)).toEqual([]);
+  });
+
+  it('dedupes when two selections collapse onto one scope key', () => {
+    const scope = new Set(['b200_vllm']);
+    expect(reconcileGpuSelection(['b200_vllm_mtp', 'b200_vllm'], scope)).toEqual(['b200_vllm']);
   });
 });
 

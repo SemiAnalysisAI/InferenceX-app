@@ -283,6 +283,48 @@ export function buildAvailabilityHwKey(
   return hwKey;
 }
 
+/**
+ * Drop the trailing spec-method segment from a `{gpu}_{framework}_{spec}` key.
+ * Returns null when the key has no spec segment to strip — the framework
+ * segment is never removed, so `b200_vllm` stays untouched.
+ */
+export function stripSpecMethodFromHwKey(hwKey: string): string | null {
+  const segments = hwKey.split('_');
+  if (segments.length < 3) return null;
+  return segments.slice(0, -1).join('_');
+}
+
+/**
+ * Reconcile a GPU selection (URL-restored or stale) with the keys the current
+ * scope actually offers.
+ *
+ * Fixed-sequence keys carry the spec method (`b200_vllm_mtp`); agentic keys
+ * drop it (`b200_vllm`) because one production curve may mix speculative and
+ * standard decoding. Links built without knowing which scenario the chart will
+ * land on — e.g. the /submissions "compare vs prev" link — can therefore carry
+ * a spec-suffixed key with no exact match under the agentic scope. Rather than
+ * dropping such a key (which also wipes the dependent comparison date range),
+ * fall back to its spec-stripped form when that is what the scope offers.
+ * Keys with neither an exact nor a stripped match are removed as before.
+ */
+export function reconcileGpuSelection(
+  selected: readonly string[],
+  validKeys: ReadonlySet<string>,
+): string[] {
+  const result: string[] = [];
+  for (const key of selected) {
+    let resolved: string | null = null;
+    if (validKeys.has(key)) {
+      resolved = key;
+    } else {
+      const stripped = stripSpecMethodFromHwKey(key);
+      if (stripped !== null && validKeys.has(stripped)) resolved = stripped;
+    }
+    if (resolved !== null && !result.includes(resolved)) result.push(resolved);
+  }
+  return result;
+}
+
 export type DerivedMetricKey = BenchmarkMetricKey;
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
