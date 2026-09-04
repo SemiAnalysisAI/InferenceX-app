@@ -16,14 +16,30 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-historical"]').click();
     cy.url().should('include', '/historical');
 
-    cy.get('[data-testid="tab-trigger-calculator"]').click();
-    cy.url().should('include', '/calculator');
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').click();
+    cy.url().should('include', '/profit-estimator-per-gigawatt');
+
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
+    cy.url().should('include', '/profit-estimator');
+    cy.url().should('not.include', '/profit-estimator-per-gigawatt');
 
     cy.get('[data-testid="tab-trigger-submissions"]').click();
     cy.url().should('include', '/submissions');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.url().should('include', '/inference');
+  });
+
+  it('opens the TCO Calculator and Fleet Lifecycle from the footer links', () => {
+    cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
+    cy.url().should('include', '/calculator');
+    cy.get('[data-testid="calculator-controls"]').should('exist');
+
+    cy.get('[data-testid="footer-link-fleet"]').scrollIntoView().click();
+    cy.url().should('include', '/fleet');
   });
 
   it('opens GPU Reliability from the footer link', () => {

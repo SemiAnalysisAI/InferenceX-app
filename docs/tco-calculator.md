@@ -1010,3 +1010,140 @@ The first two default to
 the comment there. The MW budget is `c_mw`, defaults to 10 MW, and is shared by
 the calculator and Fleet Lifecycle page so a budget set on either seeds the
 other.
+
+## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
+
+> Both hosted by `ProfitEstimatorDisplay.tsx` with the math in `profit-estimator.ts` and
+> the bars in `ProfitEstimatorChart.tsx`; the page passes `basis="chip-hour"` or
+> `basis="gw-year"`. Mirrored at `/zh/profit-estimator` and
+> `/zh/profit-estimator-per-gigawatt`. Per-model routes live at `/<tab>/<slug>` (and
+> `/zh/...`), see below.
+
+Fleet Lifecycle answers "what did a fixed fleet earn over its life". These two tabs
+answer a narrower, present-tense question: at one interactivity operating point, what
+does each chip earn today, and who keeps it? One vertical stacked bar per SKU. The two
+tabs differ only in the denominator (`ProfitBasis`):
+
+- **Profit Estimator** (`/profit-estimator`, `chip-hour`): one GPU for one hour. The
+  bar is the $/GPU/hr the chip sells for at that interactivity; compute expense is the
+  TCO tier's $/chip/hr as published. Figures are dollars and cents (`$2.31`). The y
+  axis reads "Revenue per chip per hour ($ USD)".
+- **Profit Estimator per GW** (`/profit-estimator-per-gigawatt`, `gw-year`): the same
+  per-chip figures multiplied by the GPU-hours one all-in utility gigawatt-year buys
+  for that SKU, so chips with very different power draw compare on the same
+  denominator. Figures are compact (`$135.2B`). The y axis reads "Revenue per all-in
+  provisioned utility GW per year ($ USD)" (a shorter form on phones).
+
+In the nav both sit between Inference Performance and Accuracy Evals. TCO
+Calculator and Fleet Lifecycle moved out of the tab bar into the footer's "More" column
+(`navGroup: 'footer-only'`, `footer-link-calculator` / `footer-link-fleet`); their
+pages, `/zh` mirrors and sitemap entries are unchanged.
+
+### The arithmetic
+
+```
+gpuHours    = 1                                          # chip-hour basis
+gpuHours    = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h   # gw-year basis
+revenue     = $/GPU/hr(sale) × gpuHours × utilization
+tco         = $/GPU/hr(cost) × gpuHours
+grossMargin = revenue − tco
+licenseFee  = revenue × licenseFeePct       # `labCut` in code
+profit      = revenue − tco − licenseFee
+```
+
+`formatProfitUsd(value, basis)` picks the formatter: two fixed decimals per chip-hour,
+`formatUsdCompact` per GW-year. A SKU with no power figure is skipped (`no-power`) on
+the GW-year basis only; per chip-hour power never enters.
+
+`$/GPU/hr(sale)` comes from `tokenRevenueFromRatesPerGpuHour`, so it reuses the
+calculator's input/cached/output token split and the OpenRouter catalog price (or a
+custom price pair). `$/GPU/hr(cost)` is the selected TCO tier from `getGpuSpecs`, or,
+with the **Custom $/GPU/hr** provider, one number per base chip typed by the reader
+(seeded from the hyperscaler tier; an empty box drops that chip as "no cost"), and
+the power figure is the same all-in kW per GPU that `tok/s/MW` uses. This is the same
+GW-year normalization as the Revenue/Profit-per-GW y-metrics on the calculator; the
+helper lives in its own module for now so this page does not depend on that branch,
+and the two can be collapsed into one once both are on master.
+
+### Decisions worth knowing
+
+- **Utilization scales revenue only.** 60% means the fleet bills 60% of the tokens
+  the benchmark says it could produce. Chips are paid for whether or not they are
+  busy, so TCO is untouched. The haircut is not drawn as its own segment; the bar
+  simply tops out at realized revenue, and the caption states the rate.
+- **The model license fee is a share of revenue, not of gross margin.** It is a
+  royalty on every token sold, so it is owed even when compute alone already exceeds
+  revenue. The UI calls it "Model License Fee (%)"; code and test ids keep the older
+  `labCut` name. A loss bar is TCO and license fee above the axis and the shortfall below it, hatched
+  in the SKU colour. The tooltip still shows gross margin (revenue minus TCO) so
+  the two deductions can be read separately.
+- **Every segment is labelled in place.** Name and dollar amount sit inside each
+  rectangle when it is tall enough, amount only when it is shorter, nothing when
+  it would not fit. Revenue and margin (profit ÷ revenue) sit above the bar, with
+  the vendor's full-color mark above those.
+- **Out-of-range reads are excluded, not clamped.** A config the target
+  interactivity falls outside of (H200 on Kimi K3 at 45 tok/s/user, say) is not
+  drawn and not offered in the legend. This matches the fleet page, which drops
+  those points rather than showing an edge value that was never measured.
+- **Agentic traces only.** The page pins the sequence to agentic traces, so there is
+  no scenario selector and no precision selector (precision stays in auto mode, the
+  densest measured run set). The interactivity target is a typed number in the same
+  row as utilization and the license fee.
+- **Kimi K3 only, for now.** The model selector offers the tab's route allow-list
+  (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
+  `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
+  models that have an agentic run. Each bare path opens on Kimi K3
+  (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
+  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, aliases 308 to the
+  canonical slug, and any model outside the allow-list 404s. Widening the pages to
+  more models is one list edit plus fixture rows.
+- **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
+  estimates the widest label against the room per tick. With room, each SKU stands
+  upright as two lines, name over framework and precision (`splitAxisLabel`), and
+  the bottom margin shrinks to match. Otherwise the label rotates -50° as one line
+  and `slantedMargins` grows the left and bottom margins so nothing leaves the SVG.
+- **Vendor mark above each bar, not on the axis.** The full-color logo
+  (`getAxisVendorIcon`) sits above the revenue figure and margin line. NVIDIA's mark
+  is the brand green and is never inverted; AMD publishes no color mark, so its arrow
+  is black and inverts to white in dark mode. The mark scales with the bar:
+  `barMarkHeight(bandwidth)` is 30% of the band width clamped to 14–48px, so desktop
+  bars get a large logo and phone bars the small one. The y domain leaves exactly
+  `stackHeadroomPx(markHeight)` above the tallest stack for those labels
+  (`profitYDomain` takes the plot height and that headroom), and the top margin is
+  12px, so the grid starts right under the selling-price line.
+- **TCO badges track the legend.** The `TCO $/chip/hr:` line lists one badge per base
+  chip whose bar is currently drawn; isolating a SKU in the legend leaves only its badge.
+- **Cost provider names match `/inference`.** The selector reuses `COST_TIER_LABELS[...].option`
+  (Owning - Hyperscaler, Owning - Neocloud Giant, 3 Year Rental) plus Custom $/GPU/hr.
+- **Chart height follows the viewport.** `chartHeightForViewport(window.innerHeight)` is
+  the full 720px only when the window has room; otherwise it is the viewport minus
+  `CHART_VIEWPORT_RESERVE` (260px: sticky nav, card header, padding), never below
+  `CHART_HEIGHT_MIN` (440px). On an 872px laptop viewport the chart is 612px, so the card
+  title and the x labels fit on one screen. The compact chart caps at 560px the same way.
+- **Phone layout.** Below 640px the chart switches to compact margins and height, and
+  segment labels drop the name, then the amount, when the bar is too narrow
+  (`segmentLabelLines` with a width); the margin line keeps only the percentage.
+  Custom token prices always take their own row under the main controls.
+- **Legend is the SKU filter.** Same click semantics as the fleet page (click to
+  isolate, click again to restore), and the same `resolveCalculatorVisibility`
+  intent so the choice survives a model change when the SKU still exists.
+- **Unpriceable SKUs are dropped.** A SKU with no power figure, no TCO for the
+  chosen tier, or no recorded input/output mix is left out of the chart and the
+  legend; the legend is the record of what is priced.
+- **The heading reads like `/inference`.** Model, workload, and target in the title;
+  cost tier, utilization, model license fee, run date, and source beneath it; TCO $/chip/hr badges and
+  the selling prices under that. The TCO source line is omitted when the cost
+  provider is a custom $/GPU/hr, since there is nothing to cite. Segments are
+  labelled in place, so there is no separate key and no hover hint under the chart.
+  The formula sits in a fold under the chart ("Revenue per GigaWatt Formula"),
+  collapsed by default, and the export button (top right of the card) writes PNG
+  and CSV.
+- **Number inputs ignore the mouse wheel.** A wheel event over a focused number
+  input blurs it, so scrolling the page never nudges a percentage.
+
+### Fixtures
+
+The captured API fixtures carry no `agentic_traces` rows, so the Cypress spec
+(`cypress/e2e/profit-estimator.cy.ts`) intercepts availability and benchmarks with
+synthetic Kimi K3 curves from `cypress/support/profit-fixtures.ts`. The H200 curve
+stops below 45 tok/s/user on purpose so the exclusion path stays covered.

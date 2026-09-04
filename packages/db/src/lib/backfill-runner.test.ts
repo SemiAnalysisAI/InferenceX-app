@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gzipSync } from 'node:zlib';
+import { computeChartSeries } from '../etl/compute-chart-series.js';
 
 import {
   parseLimitForceFlags,
   parseRunIdFlag,
   runCandidateIdBackfill,
   runPerIdBackfill,
+  requireBackfillPayload,
+  retainPopulatedFields,
 } from './backfill-runner.js';
 
 describe('parseRunIdFlag', () => {
@@ -26,6 +30,54 @@ describe('parseRunIdFlag', () => {
       expect(() => parseRunIdFlag(argv)).toThrow('--run-id requires a positive integer');
     },
   );
+});
+
+describe('failed chart backfills', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  it.each([Buffer.from('not gzip'), gzipSync('not json')])(
+    'retains existing data and fails the job when the real parser rejects a blob',
+    async (blob) => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const write = vi.fn();
+      await runPerIdBackfill([1162], async () => {
+        const series = requireBackfillPayload(await computeChartSeries(blob), 'chart_series');
+        write(series);
+        return 'ok';
+      });
+      expect(write).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+      expect(vi.mocked(console.error).mock.calls[0]?.[0]).toContain(
+        'existing data was not changed',
+      );
+    },
+  );
+});
+
+describe('retaining previously populated metrics', () => {
+  it('rejects a partial parse before replacing populated data', () => {
+    expect(() =>
+      retainPopulatedFields({ kv: [0.1], stats: { p50: 10 } }, { kv: [], stats: null }, [
+        'kv',
+        'stats',
+      ]),
+    ).toThrow('kv became empty');
+    expect(() => retainPopulatedFields({ stats: { p50: 10 } }, { stats: null }, ['stats'])).toThrow(
+      'stats became empty',
+    );
+  });
+  it('allows new metrics and changed samples without inventing missing metrics', () => {
+    expect(() =>
+      retainPopulatedFields({ kv: [0.1], stats: null }, { kv: [0.2, 0.4], stats: null }, [
+        'kv',
+        'stats',
+      ]),
+    ).not.toThrow();
+  });
 });
 
 describe('parseLimitForceFlags', () => {

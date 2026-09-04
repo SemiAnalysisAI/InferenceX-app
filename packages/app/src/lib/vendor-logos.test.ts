@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { VENDOR_LOGO_ICONS, getLineLabelVendorIcon } from './vendor-logos';
+import { VENDOR_LOGO_ICONS, getAxisVendorIcon, getLineLabelVendorIcon } from './vendor-logos';
 
 describe('vendor logo icons', () => {
   it('maps NVIDIA hardware keys to the full-color NVIDIA mark', () => {
@@ -35,5 +35,21 @@ describe('vendor logo icons', () => {
   it('inlines brand colors in the SVG data URIs', () => {
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.AMD.href)).toContain('#000000');
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.Teacup.href)).toContain('#ffffff');
+  });
+});
+
+describe('getAxisVendorIcon', () => {
+  it('returns the full-color NVIDIA mark that is never inverted', () => {
+    const icon = getAxisVendorIcon('b200');
+    expect(icon?.monochrome).toBe(false);
+    expect(decodeURIComponent(icon?.href ?? '')).toContain('#76B900');
+  });
+
+  it('returns the monochrome AMD arrow so dark mode can invert it', () => {
+    expect(getAxisVendorIcon('mi355x_dsv4')?.monochrome).toBe(true);
+  });
+
+  it('has no mark for unknown hardware', () => {
+    expect(getAxisVendorIcon('tpuv7')).toBeUndefined();
   });
 });
