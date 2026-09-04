@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { extractWorkers, mapBenchmarkRow } from './benchmark-mapper';
+import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  extractWorkers,
+  mapBenchmarkRow,
+  normalizePowerContractMetrics,
+  scrubWithheldPowerMetrics,
+} from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 
 /** Minimal valid v1 benchmark row. */
@@ -58,6 +64,28 @@ function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
     num_decode_gpu: 8,
     tput_per_gpu: 567.8,
     ...overrides,
+  };
+}
+
+function dirtyPowerPayload(): Record<string, any> {
+  return {
+    avg_power_w: 685.5,
+    joules_per_successful_query: 1542.75,
+    joules_per_output_token: 8.4,
+    joules_per_total_token: 0.8,
+    prefill_avg_power_w: 612.3,
+    decode_avg_power_w: 701.5,
+    joules_per_input_token: 1.2,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 5.1,
+    avg_temp_c: 68.4,
+    peak_temp_c: 79.2,
+    avg_util_pct: 88.5,
+    avg_mem_used_mb: 71234.5,
+    workers: [
+      { role: 'prefill', worker_idx: 0, hosts: ['pn0'], num_gpus: 4, avg_power_w: 612.3 },
+      { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+    ],
   };
 }
 
@@ -278,6 +306,135 @@ describe('mapBenchmarkRow', () => {
 
       expect(result!.config.numPrefillGpu).toBe(8); // 4 * 2
       expect(result!.config.numDecodeGpu).toBe(8); // 2 * 4
+    });
+  });
+
+  describe('power_valid=0 measured-power scrub (defense-in-depth)', () => {
+    it('strips every measured key and the workers payload on an explicit invalid verdict', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          median_ttft: 50.2,
+          ...dirtyPowerPayload(),
+        }),
+        tracker,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.power_metric_schema_version).toBe(2);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.workers).toBeUndefined();
+      expect(result!.metrics.tput_per_gpu).toBe(567.8);
+      expect(result!.metrics.median_ttft).toBe(50.2);
+    });
+
+    it('keeps every measured key and the workers payload on a valid verdict', () => {
+      const tracker = createSkipTracker();
+      const dirty = dirtyPowerPayload();
+      const result = mapBenchmarkRow(
+        makeV2Row({ power_valid: 1, power_metric_schema_version: 2, ...dirty }),
+        tracker,
+      );
+
+      expect(result!.metrics.power_valid).toBe(1);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics[key]).toBe(dirty[key]);
+      }
+      expect(result!.workers).toHaveLength(2);
+    });
+
+    it('leaves legacy rows without a verdict untouched (historical measurements kept)', () => {
+      const tracker = createSkipTracker();
+      const dirty = dirtyPowerPayload();
+      const result = mapBenchmarkRow(makeV2Row(dirty), tracker);
+
+      expect(result!.metrics).not.toHaveProperty('power_valid');
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics[key]).toBe(dirty[key]);
+      }
+      expect(result!.workers).toHaveLength(2);
+    });
+
+    it.each([true, 'garbage', 2, Number.NaN])(
+      'scrubs after failing closed on malformed verdict %j',
+      (powerValid) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(
+          makeV2Row({ power_valid: powerValid, ...dirtyPowerPayload() }),
+          tracker,
+        );
+
+        expect(result!.metrics.power_valid).toBe(0);
+        for (const key of MEASURED_POWER_METRIC_KEYS) {
+          expect(result!.metrics).not.toHaveProperty(key);
+        }
+        expect(result!.workers).toBeUndefined();
+      },
+    );
+
+    it('converges a dirty pv=0 artifact to exactly what a clean producer would ship', () => {
+      // Upserts replace metrics and workers wholesale, so re-ingest must
+      // converge to the same row as a producer-clean artifact.
+      const tracker = createSkipTracker();
+      const dirtyResult = mapBenchmarkRow(
+        makeV2Row({ power_valid: 0, power_metric_schema_version: 2, ...dirtyPowerPayload() }),
+        tracker,
+      );
+      const cleanResult = mapBenchmarkRow(
+        makeV2Row({ power_valid: 0, power_metric_schema_version: 2 }),
+        tracker,
+      );
+
+      expect(dirtyResult!.metrics).toEqual(cleanResult!.metrics);
+      expect(dirtyResult!.workers).toBeUndefined();
+      expect(cleanResult!.workers).toBeUndefined();
+    });
+
+    it('scrubs agentic rows after the preferFullResponseMetrics reassignment', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeAgenticRow({
+          power_valid: 0,
+          ...dirtyPowerPayload(),
+          mean_full_response_itl: 0.02,
+        }),
+        tracker,
+      );
+
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.mean_itl).toBe(0.02);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.workers).toBeUndefined();
+    });
+
+    it('keeps structured invalid-verdict companions outside the numeric metrics record', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          ...dirtyPowerPayload(),
+          power_invalid_reasons: ['window_too_short'],
+          power_audit: { window_start_unix: 1, window_end_unix: 2 },
+        }),
+        tracker,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.power_metric_schema_version).toBe(2);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+      expect(result!.metrics).not.toHaveProperty('power_audit');
     });
   });
 
@@ -692,6 +849,44 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('avg_mem_used_mb');
       expect(result!.workers).toBeUndefined();
     });
+  });
+});
+
+describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
+  function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
+    const { workers: _workers, ...measured } = dirtyPowerPayload();
+    return { tput_per_gpu: 567.8, ...measured, ...overrides };
+  }
+
+  it('strips every measured key on power_valid=0 and reports withheld', () => {
+    const metrics = supplementalMetrics({ power_valid: 0, power_metric_schema_version: 2 });
+
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
+    expect(metrics.power_valid).toBe(0);
+    expect(metrics.power_metric_schema_version).toBe(2);
+    expect(metrics.tput_per_gpu).toBe(567.8);
+  });
+
+  it('leaves power_valid=1 and legacy no-verdict records untouched', () => {
+    for (const metrics of [supplementalMetrics({ power_valid: 1 }), supplementalMetrics()]) {
+      const before = { ...metrics };
+      expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+      expect(metrics).toEqual(before);
+    }
+  });
+
+  it('fails closed on a malformed verdict when composed with normalization', () => {
+    const metrics = supplementalMetrics({ power_valid: 2 });
+    normalizePowerContractMetrics(metrics, metrics);
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+
+    expect(metrics.power_valid).toBe(0);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
   });
 });
 

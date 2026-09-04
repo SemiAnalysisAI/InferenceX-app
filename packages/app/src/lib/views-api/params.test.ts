@@ -132,7 +132,7 @@ describe('parseMetricParam', () => {
     expect(parseMetricParam('y_costh')).toBe('y_costh');
     expect(parseMetricParam('costh')).toBe('y_costh');
     expect(parseMetricParam('y')).toBe('y_tpPerGpu');
-    expect(parseMetricParam(null)).toBe('y_tokensPerDollarN');
+    expect(parseMetricParam(null)).toBe('y_tokensPerDollarH');
   });
 
   it('rejects unknown metrics instead of silently falling back', () => {

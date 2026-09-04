@@ -483,6 +483,8 @@ function ModalRenderer({
   const { content } = def;
   const Icon = content.icon;
   const idPrefix = def.id;
+  const titleId = `${idPrefix}-title`;
+  const descriptionId = `${idPrefix}-description`;
   const centered = content.centered;
 
   const dialog = (
@@ -490,8 +492,8 @@ function ModalRenderer({
       data-testid={content.testId}
       role="dialog"
       aria-modal={centered ? 'true' : 'false'}
-      aria-labelledby={`${idPrefix}-title`}
-      aria-describedby={`${idPrefix}-description`}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       className={
         centered
           ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
@@ -501,17 +503,17 @@ function ModalRenderer({
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
         aria-label={rs.close}
       >
         <X className="size-4" />
       </button>
       {content.renderContent ? (
-        content.renderContent({ dismiss: onDismiss })
+        content.renderContent({ dismiss: onDismiss, titleId, descriptionId })
       ) : (
         <div className="flex flex-col gap-4">
           <div className="space-y-1.5 pr-6">
-            <h2 id={`${idPrefix}-title`} className="flex items-center gap-2 text-lg font-semibold">
+            <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold">
               <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
@@ -520,7 +522,7 @@ function ModalRenderer({
                 </NewBadge>
               )}
             </h2>
-            <p id={`${idPrefix}-description`} className="text-sm text-muted-foreground">
+            <p id={descriptionId} className="text-sm text-muted-foreground">
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
@@ -665,7 +667,7 @@ function BannerRenderer({
         <button
           type="button"
           onClick={handleDismiss}
-          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
           aria-label={rs.dismissBanner}
           data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
         >

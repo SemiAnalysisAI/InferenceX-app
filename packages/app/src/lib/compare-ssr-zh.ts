@@ -13,12 +13,7 @@ import {
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
 
-import {
-  type CompareModelSlug,
-  compareDisplayLabel,
-  compareModelDisplayLabel,
-  compareModelSeoName,
-} from '@/lib/compare-slug';
+import { type CompareModelSlug, compareModelSeoName } from '@/lib/compare-slug';
 import {
   type AgenticScenarioIntro,
   bandFor,
@@ -27,7 +22,6 @@ import {
   fmtCost,
   fmtPctDelta,
   type FullBoth,
-  jsonLdEntryFor,
   META_DESCRIPTION_MAX,
   type PairSummary,
   type PerDollarBoth,
@@ -35,15 +29,21 @@ import {
   type SsrInterpolatedRow,
 } from '@/lib/compare-ssr';
 
+/** Format model names for Chinese prose without leaking English conjunctions. */
+export function formatModelListZh(models: CompareModelSlug[]): string {
+  const labels = models.map((model) => model.label);
+  return labels.length === 0 ? '暂无模型' : labels.join('、');
+}
+
 // ---------------------------------------------------------------------------
 // Band phrase — Chinese
 // ---------------------------------------------------------------------------
 
-const BAND_PHRASE_ZH: Record<'low' | 'middle' | 'high', string> = {
-  low: '低端',
-  middle: '中部',
-  high: '高端',
-};
+function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
+  if (band === 'low') return `${target} tok/s/user 接近 ${range} 交互性区间的下限`;
+  if (band === 'high') return `${target} tok/s/user 接近 ${range} 交互性区间的上限`;
+  return `${target} tok/s/user 位于 ${range} 交互性区间的中段`;
+}
 
 // ---------------------------------------------------------------------------
 // /compare-per-dollar variant — both GPUs, no tie, non-zero costs
@@ -51,26 +51,26 @@ const BAND_PHRASE_ZH: Record<'low' | 'middle' | 'high', string> = {
 
 const PER_DOLLAR_BOTH_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.aLabel} 每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}。${i.cheaper} 在此工作点上的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；在这一运行点，${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
   (i) =>
-    `${i.cheaper} 在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时领先于 ${i.pricier}——每百万 token 成本 ${fmtCost(i.cheaperCost)} 对 ${fmtCost(i.pricierCost)}，差距达 ${fmtPctDelta(i.ratio)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.cheaper} 与 ${i.pricier} 的每百万 token 成本分别为 ${fmtCost(i.cheaperCost)} 和 ${fmtCost(i.pricierCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
   (i) =>
-    `将 ${i.modelLabel} 推至 ${i.target} tok/s/user 时，${i.aLabel} 每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}——${i.cheaper} 领先 ${fmtPctDelta(i.ratio)}。`,
+    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
   (i) =>
-    `${i.aLabel}：每百万 token ${fmtCost(i.aCost)}。${i.bLabel}：${fmtCost(i.bCost)}。均在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行，${i.cheaper} 便宜 ${fmtPctDelta(i.ratio)}。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
   (i) =>
-    `在 ${i.range} 交互性区间的${BAND_PHRASE_ZH[i.band]}——即 ${i.target} tok/s/user 处——${i.aLabel} 运行 ${i.modelLabel} 每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}。${i.cheaper} 便宜 ${fmtPctDelta(i.ratio)}。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，每百万 token 成本分别为：${i.aLabel} ${fmtCost(i.aCost)}、${i.bLabel} ${fmtCost(i.bCost)}；${i.cheaper} 每美元多产出 ${fmtPctDelta(i.ratio)} 的 token。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}；${i.cheaper} 每美元可处理的总 token 数多出 ${fmtPctDelta(i.ratio)}。`,
 ];
 
 const PER_DOLLAR_TIED_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.aLabel} 和 ${i.bLabel} 的每百万 token 成本几乎相同（${fmtCost(i.aCost)} 对 ${fmtCost(i.bCost)}），差距在 ~1% 以内。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}；两者相差不到 1%，可视为基本持平。`,
   (i) =>
-    `${i.aLabel} ${fmtCost(i.aCost)}、${i.bLabel} ${fmtCost(i.bCost)} 每百万 token，在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行：成本实质相同。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}；两者相差不到 1%，成本基本持平。`,
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.aLabel}（${fmtCost(i.aCost)}）与 ${i.bLabel}（${fmtCost(i.bCost)}）的每百万 token 成本基本持平。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel}（${fmtCost(i.aCost)}）与 ${i.bLabel}（${fmtCost(i.bCost)}）的每百万 token 成本相差不到 1%，可视为基本持平。`,
 ];
 
 const PER_DOLLAR_ZERO_TEMPLATES_ZH: ((args: {
@@ -82,9 +82,9 @@ const PER_DOLLAR_ZERO_TEMPLATES_ZH: ((args: {
   bCost: number;
 }) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.aLabel} 和 ${i.bLabel} 每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}——其中一方缺少定价或吞吐量数据，无法进行等价比较。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。由于至少一方缺少有效的定价或吞吐量数据，此处无法计算有意义的成本比率。`,
   (i) =>
-    `${i.aLabel}（${fmtCost(i.aCost)}）与 ${i.bLabel}（${fmtCost(i.bCost)}）每百万 token，在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行：至少有一方数据为零，无法计算比率。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。至少一方的输入值为零，因此无法用比率表示差距。`,
 ];
 
 const PER_DOLLAR_SINGLE_TEMPLATES_ZH: ((args: {
@@ -95,11 +95,11 @@ const PER_DOLLAR_SINGLE_TEMPLATES_ZH: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.presentLabel} 每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在此目标点没有基准测试数据。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无基准测试数据。`,
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.presentLabel} 每百万 token 成本为 ${fmtCost(i.presentCost)}。${i.missingLabel} 尚未在此工作点进行基准测试。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.presentLabel} 的每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 尚未在该运行点进行基准测试。`,
   (i) =>
-    `仅 ${i.presentLabel} 在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时有成本数据——每百万 token ${fmtCost(i.presentCost)}。${i.missingLabel} 在此目标点尚未测试。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，仅 ${i.presentLabel} 有成本数据，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
 ];
 
 // ---------------------------------------------------------------------------
@@ -111,29 +111,29 @@ function fullSummaryZh(i: FullBoth): string {
     ? '每 token 成本基本持平'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} 每 token 成本低 ${fmtPctDelta(i.costRatio)}`;
+      : `${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.costRatio)}`;
   const tputPart = i.tputTied
-    ? '每芯片吞吐量基本持平'
+    ? '单芯片吞吐量基本持平'
     : i.tputRatio === null
       ? null
-      : `${i.faster} 每芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
+      : `${i.faster} 的单芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
   const both = [costPart, tputPart].filter(Boolean).join('；');
-  return both.length > 0 ? both : '差距极小，难以判定优劣';
+  return both.length > 0 ? both : '缺少可比较的有效数据';
 }
 
 const FULL_BOTH_TEMPLATES_ZH: ((i: FullBoth) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 交互性运行时，${i.aLabel} 吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本 ${fmtCost(i.aCost)}；${i.bLabel} 吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，成本 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `${i.aLabel} 在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时达到 ${i.aValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.aCost)}）；${i.bLabel} 达到 ${i.bValue.toFixed(0)} tok/s/chip（${fmtCost(i.bCost)}）。${fullSummaryZh(i)}。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `${i.modelLabel} 在 ${i.target} tok/s/user 交互性下的吞吐量：${i.aLabel} 为 ${i.aValue.toFixed(0)} tok/s/chip，${i.bLabel} 为 ${i.bValue.toFixed(0)}。每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${i.aValue.toFixed(0)} 和 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `${i.aLabel} / ${i.bLabel} 在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行：${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/chip，${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} 每百万 token。${fullSummaryZh(i)}。`,
+    `以 ${i.target} tok/s/user 为目标运行 ${i.modelLabel} 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `在 ${i.range} 交互性区间的${BAND_PHRASE_ZH[i.band]}，即 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时：${i.aLabel} 达到 ${i.aValue.toFixed(0)} tok/s/chip（${fmtCost(i.aCost)}/百万 token），${i.bLabel} 达到 ${i.bValue.toFixed(0)}（${fmtCost(i.bCost)}/百万）。${fullSummaryZh(i)}。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `以 ${i.target} tok/s/user 为目标在 ${i.modelLabel} 上运行时，${i.aLabel} 产出 ${i.aValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.aCost)}），${i.bLabel} 产出 ${i.bValue.toFixed(0)}（${fmtCost(i.bCost)}）。${fullSummaryZh(i)}。`,
+    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
 ];
 
 const FULL_SINGLE_TEMPLATES_ZH: ((args: {
@@ -145,11 +145,11 @@ const FULL_SINGLE_TEMPLATES_ZH: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时，${i.presentLabel} 吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本 ${fmtCost(i.presentCost)}；${i.missingLabel} 在此目标点没有基准测试数据。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无基准测试数据。`,
   (i) =>
-    `${i.presentLabel} 在 ${i.modelLabel} 上以 ${i.target} tok/s/user 运行时达到 ${i.presentValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.presentCost)}）。${i.missingLabel} 在此工作点没有数据。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无数据。`,
   (i) =>
-    `${i.presentLabel}：${i.presentValue.toFixed(0)} tok/s/chip，每百万 token ${fmtCost(i.presentCost)}（${i.modelLabel} 上以 ${i.target} tok/s/user 运行）。${i.missingLabel} 在此点尚未测试。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
 ];
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ const FULL_SINGLE_TEMPLATES_ZH: ((args: {
 /** 1:1 port of `AGENTIC_SCENARIO_INTRO` — see the English original for why. */
 export const AGENTIC_SCENARIO_INTRO_ZH: AgenticScenarioIntro = {
   paragraph:
-    'AgentX 回放真实的编码 agent 会话，而不是固定长度的 prompt，因此上下文随轮次不断增长，每个请求的大部分内容由 cache 提供而无需重新计算。这让对比变成一个系统问题：跨节点的 KV 传输、prefix 感知路由与 cache 容量，都会与芯片原始吞吐量一同影响曲线。固定序列负载仍然是衡量 kernel 与芯片性能的干净基线，因此两种场景回答的是关于同一硬件的不同问题。',
+    'AgentX 回放真实的 coding agent 会话，而非定长 prompt。随着会话轮次增加，上下文不断增长；每个请求的大部分内容都可直接从 cache 读取，无需重新计算。因此，这项对比不仅取决于芯片本身的吞吐量，还会受到跨节点 KV 传输、prefix-aware routing 和 cache 容量等系统因素影响。定长序列工作负载仍是衡量 kernel 与芯片性能的清晰基线；两种场景从不同角度回答同一硬件的性能问题。',
   linkLabel: '进一步了解 AgentX',
   href: '/zh/agentx',
 };
@@ -313,13 +313,15 @@ export function compareMetaDescriptionZh(
   ssrRows: SsrInterpolatedRow[],
 ): string {
   const modelName = compareModelSeoName(model);
-  const gpuLabel = compareDisplayLabel(a, b);
+  const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
+  const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  const gpuLabel = `${aLabel} 与 ${bLabel}`;
 
   const fallback =
     firstUnderZh(
       [
-        `${gpuLabel} 在 ${modelName} 上的推理基准测试：来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的经验证、可复现开源结果。对比延迟、吞吐量与成本。`,
-        `${gpuLabel} 在 ${modelName} 上的推理基准测试：来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的开源结果。`,
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试：${AUTHOR_NAME} 发布的 ${SITE_NAME} 提供经过验证、可复现的开源结果，涵盖延迟、吞吐量和成本。`,
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试：${AUTHOR_NAME} 发布的 ${SITE_NAME} 提供经过验证的开源结果。`,
         `${gpuLabel} 在 ${modelName} 上的推理基准测试，来自 ${SITE_NAME}。`,
         `${gpuLabel} 在 ${modelName} 上的推理基准测试。`,
       ],
@@ -330,21 +332,21 @@ export function compareMetaDescriptionZh(
   if (!stat) return fallback;
 
   const tputClause =
-    stat.tputPct > 0 ? `${stat.faster} 每芯片吞吐量比 ${stat.slower} 高 ${stat.tputPct}%` : null;
-  const costClause = stat.costPct > 0 ? `${stat.cheaper} 每 token 成本低 ${stat.costPct}%` : null;
+    stat.tputPct > 0 ? `${stat.faster} 的单芯片吞吐量比 ${stat.slower} 高 ${stat.tputPct}%` : null;
+  const costClause =
+    stat.costPct > 0 ? `${stat.cheaper} 的成本效率比 ${stat.pricier} 高 ${stat.costPct}%` : null;
 
   let core: string;
   if (tputClause && costClause) core = `在 ${modelName} 上，${tputClause}；${costClause}。`;
   else if (tputClause) core = `在 ${modelName} 上，${tputClause}。`;
-  else if (costClause)
-    core = `在 ${modelName} 上，${stat.cheaper} 每 token 成本比 ${stat.pricier} 低 ${stat.costPct}%。`;
+  else if (costClause) core = `在 ${modelName} 上，${costClause}。`;
   else return fallback;
 
   return (
     firstUnderZh(
       [
-        `${core}来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的可验证开源基准测试。`,
-        `${core}来自 ${SITE_NAME} 的开源基准测试。`,
+        `${core}数据来自 ${AUTHOR_NAME} 发布的 ${SITE_NAME} 开源基准测试，结果经过验证。`,
+        `${core}数据来自 ${SITE_NAME} 开源基准测试，结果经过验证。`,
         core,
       ],
       META_DESCRIPTION_MAX,
@@ -375,6 +377,51 @@ export function buildBreadcrumbJsonLdZh(
   };
 }
 
+function jsonLdEntryForZh(key: string, summary: PairSummary, position: number) {
+  const meta = HW_REGISTRY[key];
+  const label = meta?.label ?? key.toUpperCase();
+  const props: { name: string; value: string | number }[] = [{ name: '类别', value: '芯片' }];
+  if (meta) {
+    props.push(
+      { name: '厂商', value: meta.vendor },
+      { name: '架构', value: meta.arch },
+      { name: 'TDP (W)', value: meta.tdp },
+    );
+  }
+  if (summary.bestThroughputPerGpu !== null) {
+    props.push({
+      name: '最高单芯片吞吐量（tok/s）',
+      value: Number(summary.bestThroughputPerGpu.toFixed(2)),
+    });
+  }
+  if (summary.bestMedianTtft !== null) {
+    props.push({
+      name: '最低 TTFT 中位数（s）',
+      value: Number(summary.bestMedianTtft.toFixed(3)),
+    });
+  }
+  if (summary.bestMedianTpot !== null) {
+    props.push({
+      name: '最低 TPOT 中位数（s）',
+      value: Number(summary.bestMedianTpot.toFixed(4)),
+    });
+  }
+  props.push({ name: '基准测试配置数', value: summary.configCount });
+  return {
+    '@type': 'ListItem',
+    position,
+    item: {
+      '@type': 'Thing',
+      name: label,
+      additionalProperty: props.map((property) => ({
+        '@type': 'PropertyValue',
+        name: property.name,
+        value: property.value,
+      })),
+    },
+  };
+}
+
 export function buildJsonLdZh(
   variant: CompareJsonLdVariant,
   model: CompareModelSlug,
@@ -391,49 +438,49 @@ export function buildJsonLdZh(
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
-  const fullLabel = compareModelDisplayLabel(model, a, b);
+  const fullLabel = `${model.label} — ${aLabel} 与 ${bLabel}`;
 
   const itemListName =
     variant === 'per-dollar' ? `${fullLabel} — 每美元性能` : `${fullLabel} 推理基准测试`;
   const itemListDescription =
     variant === 'per-dollar'
-      ? `${aLabel} 与 ${bLabel} 在 ${model.label} 上的每百万 token 成本。基于所属云服务商 TCO 归一化的芯片推理性能。`
-      : `${aLabel} 与 ${bLabel} 在 ${model.label} 上的正面 AI 推理基准测试对比。`;
+      ? `比较 ${aLabel} 与 ${bLabel} 运行 ${model.label} 时的每百万 token 成本；芯片推理性能采用 Hyperscaler 自有设备 TCO 口径归一化，覆盖不同 LLM 工作负载。`
+      : `对比 ${aLabel} 与 ${bLabel} 在不同 LLM 工作负载下运行 ${model.label} 时的 AI 推理基准测试结果。`;
   const datasetName =
     variant === 'per-dollar'
-      ? `${aLabel} vs ${bLabel}（${model.label}）每美元性能对比`
-      : `${aLabel} vs ${bLabel}（${model.label}）插值基准测试对比`;
+      ? `${model.label}：${aLabel} 与 ${bLabel} 每美元性能对比`
+      : `${model.label}：${aLabel} 与 ${bLabel} 基准测试结果插值对比`;
   const datasetDescription =
     variant === 'per-dollar'
-      ? `${aLabel} 与 ${bLabel} 在 ${model.label} 上的所属云服务商每百万 token 成本，在相同交互性水平下对齐——美元归一化推理基准测试。`
-      : `${aLabel} 与 ${bLabel} 在 ${model.label} 上在相同交互性水平下的插值吞吐量、成本、能效及并发数。`;
+      ? `在相同交互性水平下，对比 ${aLabel} 与 ${bLabel} 运行 ${model.label} 时的每百万 token 成本；数据由基准测试结果插值得出，并采用 Hyperscaler 自有设备 TCO 口径。`
+      : `在相同交互性水平下，对比 ${aLabel} 与 ${bLabel} 运行 ${model.label} 时的吞吐量、成本、能效和并发数；数据由基准测试结果插值得出。`;
 
   const comparisonRows = ssrRows
     .filter((row) => row.a || row.b)
     .map((row) => {
       const metrics: { name: string; value: string }[] = [
-        { name: 'Model', value: model.displayName },
-        { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
+        { name: '模型', value: model.displayName },
+        { name: '目标交互性（tok/s/user）', value: String(row.target) },
       ];
       if (row.a) {
         metrics.push(
-          { name: `${aLabel} Throughput (tok/s/chip)`, value: row.a.value.toFixed(1) },
-          { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
-          { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
-          { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
+          { name: `${aLabel} 吞吐量（tok/s/chip）`, value: row.a.value.toFixed(1) },
+          { name: `${aLabel} 成本（$/M tok）`, value: row.a.cost.toFixed(3) },
+          { name: `${aLabel} 能效（tok/s/MW）`, value: row.a.tpPerMw.toFixed(0) },
+          { name: `${aLabel} 并发数`, value: String(Math.round(row.a.concurrency)) },
         );
       }
       if (row.b) {
         metrics.push(
-          { name: `${bLabel} Throughput (tok/s/chip)`, value: row.b.value.toFixed(1) },
-          { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
-          { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
-          { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
+          { name: `${bLabel} 吞吐量（tok/s/chip）`, value: row.b.value.toFixed(1) },
+          { name: `${bLabel} 成本（$/M tok）`, value: row.b.cost.toFixed(3) },
+          { name: `${bLabel} 能效（tok/s/MW）`, value: row.b.tpPerMw.toFixed(0) },
+          { name: `${bLabel} 并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
       return {
         '@type': 'Dataset',
-        name: `${model.label} 在 ${row.target} tok/s/user 交互性下的对比`,
+        name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的对比`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
@@ -454,7 +501,7 @@ export function buildJsonLdZh(
         ...(imageUrl && { image: imageUrl }),
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
         numberOfItems: 2,
-        itemListElement: [jsonLdEntryFor(a, summaryA, 1), jsonLdEntryFor(b, summaryB, 2)],
+        itemListElement: [jsonLdEntryForZh(a, summaryA, 1), jsonLdEntryForZh(b, summaryB, 2)],
       },
       ...(comparisonRows.length > 0
         ? [
@@ -467,14 +514,14 @@ export function buildJsonLdZh(
               license: 'https://www.apache.org/licenses/LICENSE-2.0',
               isAccessibleForFree: true,
               measurementTechnique:
-                'Open-source automated chip CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
+                '通过开源 CI/CD 自动执行的芯片推理基准测试（github.com/SemiAnalysisAI/InferenceX）',
               keywords: [
                 ...new Set(
                   [
-                    'AI inference benchmark',
-                    'Chip comparison',
-                    variant === 'per-dollar' ? 'cost per million tokens' : 'inference latency',
-                    variant === 'per-dollar' ? 'performance per dollar' : 'tokens per second',
+                    'AI 推理基准测试',
+                    '芯片对比',
+                    variant === 'per-dollar' ? '每百万 token 成本' : '推理延迟',
+                    variant === 'per-dollar' ? '每美元性能' : '每秒 token 数',
                     model.label,
                     aLabel,
                     bLabel,
@@ -495,7 +542,7 @@ export function buildJsonLdZh(
                   '@type': 'DataDownload',
                   encodingFormat: 'application/json',
                   contentUrl: `${SITE_URL}/api/v1/benchmarks?model=${encodeURIComponent(modelApiKey)}`,
-                  name: `${model.label} latest benchmark rows (JSON)`,
+                  name: `${model.label} 最新基准测试记录（JSON）`,
                 },
               }),
               ...(imageUrl && {

@@ -288,7 +288,7 @@ export function OverviewPresentToggle({ strings }: { strings: OverviewStrings })
       aria-pressed={presenting}
       aria-label={presenting ? strings.presentExitAria : strings.presentEnterAria}
       title={strings.presentShortcutHint}
-      className="inline-flex min-h-11 items-center gap-x-1.5 rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="inline-flex min-h-11 items-center gap-x-1.5 rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none"
     >
       <svg
         aria-hidden="true"

@@ -22,6 +22,7 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import {
+  latestRunId,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
@@ -35,6 +36,7 @@ import type {
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
@@ -53,11 +55,19 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING, Sequence, sequenceKind } from '@/lib/data-mappings';
+import {
+  getOpenRouterModelId,
+  MODEL_PREFIX_MAPPING,
+  Sequence,
+  sequenceKind,
+} from '@/lib/data-mappings';
+import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
+import { useLocale } from '@/lib/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -87,7 +97,9 @@ import { bestSeriesPerSku } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
+  parsePowerTiers,
   type DeploymentMode,
+  type PowerTier,
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
@@ -96,6 +108,20 @@ const InferenceDataContext = createContext<InferenceDataContextType | undefined>
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
 const InferenceDisplayContext = createContext<InferenceDisplayContextType | undefined>(undefined);
 const InferenceActionsContext = createContext<InferenceActionsContextType | undefined>(undefined);
+
+export const INFERENCE_CONTEXT_STRINGS = {
+  en: {
+    dateRangeResetTitle: 'Date Range Reset',
+    dateRangeResetDescription:
+      'The chip configs are not available in the selected date range. The date range will be reset.',
+    ok: 'OK',
+  },
+  zh: {
+    dateRangeResetTitle: '重置日期范围',
+    dateRangeResetDescription: '所选日期范围内没有这些芯片配置，将重置日期范围。',
+    ok: '确定',
+  },
+} as const;
 
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
@@ -203,8 +229,8 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tokensPerDollarN`. URL param still wins so existing
-   * shared links are unaffected.
+   * the dashboard's default `y_tokensPerDollarH`. URL param still wins so
+   * existing shared links are unaffected.
    */
   initialYAxisMetric?: string;
   /**
@@ -217,6 +243,8 @@ export function InferenceProvider({
    */
   autoSelectAllGpus?: boolean;
 }) {
+  const locale = useLocale();
+  const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
@@ -347,6 +375,26 @@ export function InferenceProvider({
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
+  const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
+    () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
+  );
+  const openRouterModelId = getOpenRouterModelId(selectedModel);
+  const openRouterPricingQuery = useOpenRouterPricing(
+    openRouterModelId,
+    usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePriceSource === 'openrouter',
+  );
+  const tokenRevenuePricing =
+    tokenRevenuePriceSource === 'normalized'
+      ? NORMALIZED_TOKEN_REVENUE_PRICING
+      : (openRouterPricingQuery.data ?? null);
+  const openRouterPricingError =
+    tokenRevenuePriceSource === 'openrouter'
+      ? openRouterModelId
+        ? openRouterPricingQuery.error instanceof Error
+          ? openRouterPricingQuery.error.message
+          : null
+        : 'No OpenRouter model mapping is configured.'
+      : null;
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
   );
@@ -397,7 +445,7 @@ export function InferenceProvider({
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
 
-  // ── Quick filters (vendor / framework / deployment / mtp-stp) ───────────────
+  // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
   // Coarse pre-filters applied to the point set. Empty = no constraint.
   //
   // Initialized empty rather than from the URL so the first client render matches
@@ -410,8 +458,9 @@ export function InferenceProvider({
   const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
+  const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
   useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power') => {
       const v = getUrlParam(key);
       return v ? v.split(',').filter(Boolean) : [];
     };
@@ -421,10 +470,12 @@ export function InferenceProvider({
     // point, so expand it to both aggregate deployment modes.
     const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
+    const power = parsePowerTiers(parse('i_power'));
     if (vendors.length > 0) setQuickFilterVendors(vendors);
     if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
+    if (power.length > 0) setQuickFilterPower(power);
   }, [getUrlParam]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
@@ -432,8 +483,15 @@ export function InferenceProvider({
       frameworks: quickFilterFrameworks,
       deployment: quickFilterDeployment,
       spec: quickFilterSpec,
+      power: quickFilterPower,
     }),
-    [quickFilterVendors, quickFilterFrameworks, quickFilterDeployment, quickFilterSpec],
+    [
+      quickFilterVendors,
+      quickFilterFrameworks,
+      quickFilterDeployment,
+      quickFilterSpec,
+      quickFilterPower,
+    ],
   );
   // Historical Trends hides Quick Filters, so never apply invisible selections there.
   // Agentic charts expose vendor, framework, and deployment filters, but speculative
@@ -520,18 +578,21 @@ export function InferenceProvider({
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
+  // The latest run for this model on the selected date, by start time. Run ids
+  // are assigned at dispatch and a queued or re-run sweep can start after a
+  // later-dispatched one, so the greatest id is not necessarily the newest run
+  // (see `latestRunId`). The DB side already tiebreaks by `run_started_at`;
+  // this keeps the client's notion of "latest" consistent with it.
+  const latestRunIdForModel = useMemo(
+    () => latestRunId(filteredAvailableRuns),
+    [filteredAvailableRuns],
+  );
+
   const effectiveSelectedRunId = useMemo(() => {
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
-  // The latest run for this model on the selected date. GitHub run ids increase
-  // monotonically with time, so the lexicographically-greatest id is the newest run.
-  const latestRunIdForModel = useMemo(() => {
-    const ids = Object.keys(filteredAvailableRuns);
-    return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
-  }, [filteredAvailableRuns]);
+    return latestRunIdForModel;
+  }, [filteredAvailableRuns, selectedRunId, latestRunIdForModel]);
 
   // Only constrain the base query when an earlier-than-latest run is selected.
   const asOfRunId =
@@ -599,6 +660,7 @@ export function InferenceProvider({
     graphs,
     selectionPoints,
     loading: chartDataLoading,
+    refreshing: chartDataRefreshing,
     error: chartDataError,
     hardwareConfig,
     availableQuickFilters,
@@ -614,6 +676,8 @@ export function InferenceProvider({
     selectedDateRange,
     userCosts,
     userPowers,
+    tokenRevenuePricing,
+    tokenRevenuePriceSource,
     effectiveRunDate,
     // Gate benchmark fetching on sequenceResolved: before availability loads we
     // don't yet know the model's real sequence, and the selection (e.g. an
@@ -878,7 +942,12 @@ export function InferenceProvider({
   // the gated benchmark query never produces rows and `chartDataLoading` would
   // pin the chart on its first-load skeleton. Availability errors are terminal:
   // drop the loading flag so ChartDisplay surfaces the error instead.
-  const loading = availabilityError ? false : chartDataLoading;
+  const openRouterPricingLoading =
+    usesTokenSalePricing(selectedYAxisMetric) &&
+    tokenRevenuePriceSource === 'openrouter' &&
+    openRouterPricingQuery.isLoading;
+  const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
+  const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
@@ -1413,6 +1482,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1437,9 +1507,11 @@ export function InferenceProvider({
       i_fw: quickFilterFrameworks.join(','),
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
+      i_power: quickFilterPower.join(','),
     },
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
@@ -1462,6 +1534,7 @@ export function InferenceProvider({
       quickFilterFrameworks,
       quickFilterDeployment,
       quickFilterSpec,
+      quickFilterPower,
     ],
   );
 
@@ -1587,6 +1660,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1603,6 +1677,7 @@ export function InferenceProvider({
       hardwareConfig,
       graphs,
       loading,
+      refreshing,
       error,
       availableQuickFilters,
       availableGPUs,
@@ -1659,6 +1734,11 @@ export function InferenceProvider({
   const displayValue = useMemo<InferenceDisplayContextType>(
     () => ({
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1676,6 +1756,11 @@ export function InferenceProvider({
     }),
     [
       selectedYAxisMetric,
+      tokenRevenuePriceSource,
+      tokenRevenuePricing,
+      openRouterModelId,
+      openRouterPricingLoading,
+      openRouterPricingError,
       selectedPercentile,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1707,6 +1792,7 @@ export function InferenceProvider({
     setSelectedSequence: setSelectedSequenceAndClear,
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+    setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
@@ -1715,6 +1801,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
+    setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
     setShowPointLabels,
@@ -1753,14 +1840,11 @@ export function InferenceProvider({
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Date Range Reset</DialogTitle>
-            <DialogDescription>
-              The chip configs are not available in the selected date range. The date range will be
-              reset.
-            </DialogDescription>
+            <DialogTitle>{localeStrings.dateRangeResetTitle}</DialogTitle>
+            <DialogDescription>{localeStrings.dateRangeResetDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={handleDateRangeDialogOk}>OK</Button>
+            <Button onClick={handleDateRangeDialogOk}>{localeStrings.ok}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,10 +2,11 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 import {
@@ -66,10 +67,39 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
 import {
+  isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
+} from '@/components/inference/metric-registry';
+import {
+  clampIsoX,
+  clearPerfRulers,
+  computeIsoXRulerGeometry,
+  computePerfRulerLabelLayouts,
+  deletePerfRuler,
+  EMPTY_PERF_RULER_STATE,
+  intersectPathAtX,
+  isPerfRulerCurveVisible,
+  movePerfRulerIsoX,
+  nextPerfRulerState,
+  pathXExtent,
+  perfRulerCurveSet,
+  prunePerfRulers,
+  renderPerfRulers,
+  type PerfRulerEndInput,
+  type PerfRulerGeometry,
+  type PerfRulerRenderEntry,
+  type PerfRulerState,
+} from '@/lib/d3-chart/layers/perf-ruler';
+import {
+  countPowerTiers,
+  MeasuredPowerSummary,
+} from '@/components/inference/ui/MeasuredPowerSummary';
+import {
+  keepPointLabelsInPlot,
   parallelismLabelBoxes,
   placeLineLabels,
-  placeEndpointLineLabels,
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
@@ -83,6 +113,23 @@ const FixedSequenceLogDialog = dynamic(() =>
 );
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+
+// Roofline paths in this chart carry the class `roofline-<key>` where key is
+// `${date}_${hwKey}_${precision}` (see `renderRooflines`). The perf ruler
+// identifies curves by that class token.
+const ROOFLINE_CLASS_PREFIX = 'roofline-';
+
+// Scales as currently drawn: the base render scales rescaled through the
+// active zoom transform (identity when the chart is not zoomed).
+const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): RenderContext => {
+  const transform = d3.zoomTransform(svg);
+  if (transform.k === 1 && transform.x === 0 && transform.y === 0) return ctx;
+  return {
+    ...ctx,
+    xScale: transform.rescaleX(ctx.xScale as ContinuousScale),
+    yScale: transform.rescaleY(ctx.yScale as ContinuousScale),
+  };
+};
 
 // Label text combines the hw config (display label) and the date so
 // both dimensions of the GPU comparison view are legible on the chart,
@@ -104,8 +151,16 @@ const GPU_STRINGS = {
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
+    perfRuler: 'Perf Ruler',
+    perfRulerInfo:
+      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
+    clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    noData: 'No data available',
+    noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    noRoleEnergyDataHint:
+      'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
   },
   zh: {
     logScale: '对数缩放',
@@ -115,8 +170,16 @@ const GPU_STRINGS = {
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
+    perfRuler: '性能标尺',
+    perfRulerInfo:
+      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数——既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
+    clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
+    noData: '暂无数据',
+    noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    noRoleEnergyDataHint:
+      '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
   },
 } as const;
 
@@ -169,9 +232,15 @@ const GPUGraph = React.memo(
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
+    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
+    const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+      ? legendT.noRoleEnergyDataHint
+      : legendT.noDataHint;
+    const ephemeralUrlState = useEphemeralUrlState();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
@@ -179,17 +248,20 @@ const GPUGraph = React.memo(
       quickFilters.vendors.length +
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
+      quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
+      setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     ]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
@@ -360,6 +432,16 @@ const GPUGraph = React.memo(
         );
       return pts;
     }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+
+    const powerTierCounts = useMemo(
+      () => ({
+        total: countPowerTiers(
+          data.filter((point) => selectedPrecisions.includes(point.precision)),
+        ),
+        visible: countPowerTiers(filteredData),
+      }),
+      [data, filteredData, selectedPrecisions],
+    );
 
     // GPU comparison currently renders official DB-backed points only. Unofficial
     // overlays have no benchmark_results id or persisted trace, so they cannot
@@ -576,12 +658,13 @@ const GPUGraph = React.memo(
       ) => {
         if (!showLineLabels) return [];
         const series = buildSeries();
-        return chartDefinition.chartType === 'interactivity'
-          ? placeLineLabels(series, xScale, yScale, {
-              collisionWidth: 160,
-              obstacles: parallelismLabelBoxes(zoomGroup.node()),
-            })
-          : placeEndpointLineLabels(series, xScale, yScale);
+        // Both chart types spread labels along their lines with collision
+        // avoidance — endpoint-only placement stacked every label at the
+        // right edge of the e2e latency chart.
+        return placeLineLabels(series, xScale, yScale, {
+          collisionWidth: 160,
+          obstacles: parallelismLabelBoxes(zoomGroup.node()),
+        });
       };
 
       return {
@@ -634,6 +717,399 @@ const GPUGraph = React.memo(
       chartDefinition.chartType,
       runNumbering,
       paletteIdentity,
+    ]);
+
+    // ── Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ──
+    // Same curve-to-curve ISO-X semantics as ScatterGraph, applied to the
+    // date/chip comparison view: each measurement is two rendered roofline
+    // paths (class tokens `roofline-<date>_<hwKey>_<precision>`) plus an
+    // iso-x stored in DATA space so it survives zoom and metric changes.
+    // Any two curves may be paired — two dates of the same chip config, two
+    // chip configs on the same date, or a mix — which is the point of this
+    // view: quantify the multiple between comparison series at a glance.
+    const [perfRulerMode, setPerfRulerMode] = useState(false);
+    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Draw passes read mode/state through refs so toggling off clears the
+    // rulers in the same pre-paint layout pass (no lingering frame).
+    const perfRulerModeRef = useRef(perfRulerMode);
+    perfRulerModeRef.current = perfRulerMode;
+    const perfRulerStateRef = useRef(perfRulerState);
+    perfRulerStateRef.current = perfRulerState;
+    // Live per-ruler iso-x overrides while dragging (committed on drag end).
+    // Cleared in an effect when committed state changes, not per render, so
+    // an unrelated re-render mid-drag cannot snap the dragged ruler back.
+    const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
+    useLayoutEffect(() => {
+      perfRulerLiveIsoXRef.current.clear();
+    }, [perfRulerState]);
+
+    // Scales/group from the most recent draw pass — click and drag handlers
+    // convert between pixel and data space with the exact scales the chart
+    // is currently drawn with.
+    const perfRulerDrawCtxRef = useRef<{
+      zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+      xScale: ContinuousScale;
+      yScale: ContinuousScale;
+      width: number;
+      height: number;
+    } | null>(null);
+    // Forward ref: the drag frame needs to redraw, but drawPerfRuler is
+    // defined below (it also attaches the drag behavior — benign cycle).
+    const drawPerfRulerRef = useRef<
+      | ((
+          zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+          xScale: ContinuousScale,
+          yScale: ContinuousScale,
+          width: number,
+          height: number,
+        ) => void)
+      | null
+    >(null);
+
+    // Completion clamp: the stored iso-x must lie inside the curve pair's
+    // overlapping x range, or the completed ruler could render nowhere (no
+    // line and no drag handle to recover it). Null rejects the measurement
+    // and keeps the draft anchored.
+    const clampPerfRulerIsoXToOverlap = useCallback(
+      (curveA: string, curveB: string, isoX: number): number | null => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return null;
+        const [nodeA, nodeB] = [curveA, curveB].map((cls) =>
+          ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+        );
+        if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return null;
+        const extentA = pathXExtent(nodeA);
+        const extentB = pathXExtent(nodeB);
+        if (!extentA || !extentB) return null;
+        const clamped = clampIsoX(Number(ctx.xScale(isoX)), extentA, extentB);
+        return clamped === null ? null : Number(ctx.xScale.invert(clamped));
+      },
+      [],
+    );
+
+    // Curve click (widened hit strokes): iso-x is the click's x pixel
+    // through the CURRENT rendered x scale, stored in data space.
+    const handlePerfRulerCurveClick = useCallback(
+      (curve: string, pixelX: number) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        track('gpu_timeseries_perf_ruler_curve_clicked', { curve });
+        const isoX = Number(ctx.xScale.invert(pixelX));
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+    const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
+    perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
+
+    // Points sit on curves: a ruler-mode click on a data point behaves like
+    // clicking the point's (date, chip, precision) curve at that point's x.
+    // Ruler-mode clicks measure INSTEAD of pinning the tooltip, so drop the
+    // pin the shared click handler applied just before this callback ran.
+    const handlePerfRulerPointClick = useCallback(
+      (point: InferenceData) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        const curve = `${ROOFLINE_CLASS_PREFIX}${point.date}_${String(point.hwKey)}_${point.precision}`;
+        // Single-point series render no roofline path — nothing to measure.
+        if (ctx.zoomGroup.select(`.${CSS.escape(curve)}`).empty()) return;
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+
+    // Read by the long-lived D3 click closure in the tooltip config, which is
+    // captured at render time — refs over closures.
+    const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
+    perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
+
+    // Turning the toggle off clears ALL rulers and any in-progress selection
+    // (the switch handler also clears synchronously; this covers programmatic
+    // mode changes). `clearPerfRulers` bails out with the same reference
+    // when there is nothing to clear.
+    useEffect(() => {
+      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
+    }, [perfRulerMode]);
+
+    // Invisible widened hit strokes over every rendered roofline path make
+    // the curves themselves clickable in ruler mode. This chart renders
+    // rooflines straight into the zoom group (no `.rooflines-layer` wrapper),
+    // so the hit layer is inserted right after the LAST roofline path: above
+    // the visible strokes, below the dot-groups (which the renderer raises to
+    // the end), so point hover/click behavior is untouched. The layer only
+    // exists while ruler mode is on.
+    const syncPerfRulerHitPaths = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        let hitLayer = zoomGroup.select<SVGGElement>('.perf-ruler-hits');
+        const rooflineNodes = zoomGroup
+          .selectAll<SVGPathElement, unknown>('.roofline-path')
+          .nodes();
+        const lastRoofline = rooflineNodes.at(-1);
+        if (!perfRulerModeRef.current || !lastRoofline) {
+          hitLayer.remove();
+          return;
+        }
+        if (hitLayer.empty()) {
+          const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          node.setAttribute('class', 'perf-ruler-hits');
+          lastRoofline.after(node);
+          hitLayer = d3.select(node) as typeof hitLayer;
+        } else if (hitLayer.node()!.previousElementSibling !== lastRoofline) {
+          // A data re-render may have appended new roofline paths after the
+          // hit layer; keep the hit strokes directly above every roofline.
+          lastRoofline.after(hitLayer.node()!);
+        }
+        interface HitEntry {
+          curve: string;
+          d: string;
+        }
+        const entries: HitEntry[] = [];
+        for (const node of rooflineNodes) {
+          // The identity token is the curve-specific class, e.g.
+          // `roofline-2026-08-31_MI355X_fp4`.
+          const curve = [...node.classList].find((cls) => cls !== 'roofline-path');
+          const d = node.getAttribute('d');
+          // Legend hover dims curves to a small non-zero opacity (still
+          // measurable); anything at opacity 0 must not be clickable.
+          if (!curve || !d || !isPerfRulerCurveVisible(node.style.opacity)) continue;
+          entries.push({ curve, d });
+        }
+        const selected = perfRulerCurveSet(perfRulerStateRef.current);
+        hitLayer
+          .selectAll<SVGPathElement, HitEntry>('.perf-ruler-hit')
+          .data(entries, (e) => e.curve)
+          .join('path')
+          .attr('class', 'perf-ruler-hit')
+          .attr('fill', 'none')
+          .attr('d', (e) => e.d)
+          .attr('stroke', 'var(--primary)')
+          // Selected curves get a faint halo as feedback; unselected hit
+          // strokes are fully transparent (`pointer-events: stroke` still
+          // hit-tests the invisible stroke geometry).
+          .attr('stroke-opacity', (e) => (selected.has(e.curve) ? 0.18 : 0))
+          .attr('stroke-width', 13)
+          .style('pointer-events', 'stroke')
+          .style('cursor', 'crosshair')
+          .on('click', (event: MouseEvent, e: HitEntry) => {
+            event.stopPropagation();
+            const [pixelX] = d3.pointer(event, zoomGroup.node());
+            perfRulerCurveClickRef.current(e.curve, pixelX);
+          });
+      },
+      [],
+    );
+
+    // Horizontal drag on a ruler line fine-tunes that ruler's iso-x.
+    // rAF-throttled: each frame clamps the pointer x to the curve pair's
+    // overlapping x range, updates the live iso-x, and redraws; the value
+    // commits to React state on drag end. d3.drag stops mousedown
+    // propagation itself, so dragging a ruler never pans the chart.
+    const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
+    const perfRulerDragFrameRef = useRef<number | null>(null);
+    const applyPerfRulerDragFrame = useCallback(() => {
+      const ctx = perfRulerDrawCtxRef.current;
+      const target = perfRulerDragTargetRef.current;
+      if (!ctx || !target) return;
+      const ruler = perfRulerStateRef.current.rulers.find((r) => r.id === target.id);
+      if (!ruler) return;
+      const [nodeA, nodeB] = [ruler.curveA, ruler.curveB].map((cls) =>
+        ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+      );
+      if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return;
+      const extentA = pathXExtent(nodeA);
+      const extentB = pathXExtent(nodeB);
+      if (!extentA || !extentB) return;
+      const clamped = clampIsoX(target.pixelX, extentA, extentB);
+      if (clamped === null) return;
+      perfRulerLiveIsoXRef.current.set(target.id, Number(ctx.xScale.invert(clamped)));
+      drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width, ctx.height);
+    }, []);
+    const applyPerfRulerDragFrameRef = useRef(applyPerfRulerDragFrame);
+    applyPerfRulerDragFrameRef.current = applyPerfRulerDragFrame;
+
+    const perfRulerDrag = useMemo(
+      () =>
+        d3
+          .drag<SVGLineElement, PerfRulerRenderEntry>()
+          .on(
+            'drag',
+            (
+              event: d3.D3DragEvent<SVGLineElement, PerfRulerRenderEntry, unknown>,
+              entry: PerfRulerRenderEntry,
+            ) => {
+              perfRulerDragTargetRef.current = { id: entry.id, pixelX: event.x };
+              if (perfRulerDragFrameRef.current === null) {
+                perfRulerDragFrameRef.current = requestAnimationFrame(() => {
+                  perfRulerDragFrameRef.current = null;
+                  applyPerfRulerDragFrameRef.current();
+                });
+              }
+            },
+          )
+          .on('end', () => {
+            // Flush the pending frame, then commit this ruler's iso-x.
+            if (perfRulerDragFrameRef.current !== null) {
+              cancelAnimationFrame(perfRulerDragFrameRef.current);
+              perfRulerDragFrameRef.current = null;
+              applyPerfRulerDragFrameRef.current();
+            }
+            const target = perfRulerDragTargetRef.current;
+            perfRulerDragTargetRef.current = null;
+            if (!target) return;
+            const isoX = perfRulerLiveIsoXRef.current.get(target.id);
+            if (isoX === undefined) return;
+            setPerfRulerState((prev) => movePerfRulerIsoX(prev, target.id, isoX));
+          }),
+      [],
+    );
+
+    // Draw (or clear) the hit strokes and all rulers for the current draw
+    // pass. Stable callback: render/zoom passes read mode, rulers, and live
+    // iso-x values through refs, so the custom layer needs no perf-ruler
+    // dependencies and a ruler interaction never rebuilds the chart.
+    const drawPerfRuler = useCallback(
+      (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+        height: number,
+      ) => {
+        perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
+        syncPerfRulerHitPaths(zoomGroup);
+        const state = perfRulerStateRef.current;
+        const entries: PerfRulerRenderEntry[] = [];
+        if (perfRulerModeRef.current && state.rulers.length > 0) {
+          // Both ends of each ruler are interpolated on the RENDERED paths so
+          // the ruler matches the drawn curves exactly at any zoom level
+          // (rooflines redraw before this layer runs). A ruler whose curve is
+          // missing this frame (legend-hidden series drop their paths in this
+          // chart) or does not span the iso-x draws nothing but KEEPS its
+          // state, so re-showing the series brings it back.
+          const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
+            const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
+            const pixelX = xScale(isoX);
+            const ends: PerfRulerEndInput[] = [];
+            for (const cls of [ruler.curveA, ruler.curveB]) {
+              const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
+              if (!node || typeof node.getPointAtLength !== 'function') break;
+              if (!isPerfRulerCurveVisible(node.style.opacity)) break;
+              const hit = intersectPathAtX(node, pixelX);
+              if (!hit) break;
+              ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
+            }
+            return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
+          });
+          // Lay out all labels together so overlapping labels nudge apart.
+          const layouts = computePerfRulerLabelLayouts(geometries, {
+            chartWidth: width,
+            chartHeight: height,
+          });
+          for (const [index, ruler] of state.rulers.entries()) {
+            const geometry = geometries[index];
+            const layout = layouts[index];
+            if (geometry && layout) entries.push({ id: ruler.id, geometry, layout });
+          }
+        }
+        renderPerfRulers(zoomGroup, entries, {
+          color: 'var(--primary)',
+          halo: 'var(--background)',
+          onDelete: (id) => {
+            track('gpu_timeseries_perf_ruler_deleted');
+            setPerfRulerState((prev) => deletePerfRuler(prev, id));
+          },
+        });
+        // (Re)attach the horizontal drag behavior to the (possibly fresh)
+        // drag handles the render pass just joined — their datum (the
+        // render entry) tells the drag which ruler it moves.
+        const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
+          '.perf-ruler .pr-drag',
+        );
+        if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
+      },
+      [syncPerfRulerHitPaths, perfRulerDrag],
+    );
+    drawPerfRulerRef.current = drawPerfRuler;
+
+    // Custom layer: full renders (data/metric passes) redraw the rulers after
+    // the rooflines, and onZoom keeps them glued to the curves during
+    // pan/zoom. Lives inside the zoom group so it is clipped and PNG-exported
+    // like any other mark. Stable identity — it reads everything via refs.
+    const perfRulerLayer: CustomLayerConfig = useMemo(
+      () => ({
+        type: 'custom',
+        key: 'perf-ruler',
+        render: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+      }),
+      [drawPerfRuler],
+    );
+
+    // Render context from the last D3 render — lets the ruler effect redraw
+    // with the same layout/scales the chart was drawn with.
+    const lastRenderCtxRef = useRef<RenderContext | null>(null);
+    const getDisplaySelection = useCallback(() => {
+      const svg = chartRef.current?.getSvgElement?.();
+      const ctx = lastRenderCtxRef.current;
+      if (!svg || !ctx) return null;
+      const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
+      return zoomGroup.empty() ? null : { svg, ctx, zoomGroup };
+    }, []);
+
+    // Perf-ruler decorations: refresh the curve hit strokes and redraw all
+    // rulers whenever the mode, ruler state, or the plotted data change.
+    // Narrow mutation scope — only the hit layer and the ruler groups are
+    // touched. Rulers are pruned by DATA existence, not DOM presence: a
+    // series hidden via the legend drops its path from this chart but keeps
+    // its roofline entry, so its rulers survive until the series (a date, a
+    // chip config, or a precision) actually leaves the comparison.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const zoomCtx = currentZoomRenderContext(display.svg, display.ctx);
+      drawPerfRuler(
+        display.zoomGroup,
+        zoomCtx.xScale as ContinuousScale,
+        zoomCtx.yScale as ContinuousScale,
+        display.ctx.width,
+        display.ctx.height,
+      );
+      setPerfRulerState((prev) =>
+        prunePerfRulers(prev, (cls) => {
+          if (!cls.startsWith(ROOFLINE_CLASS_PREFIX)) return false;
+          const points = rooflines[cls.slice(ROOFLINE_CLASS_PREFIX.length)];
+          return points !== undefined && points.length >= 2;
+        }),
+      );
+    }, [
+      getDisplaySelection,
+      perfRulerMode,
+      perfRulerState,
+      drawPerfRuler,
+      dataIdentity,
+      rooflines,
     ]);
 
     // Dismiss tooltip when pinned point's combo is hidden
@@ -693,10 +1169,8 @@ const GPUGraph = React.memo(
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <h3 className="text-sm font-medium mb-1">No data available</h3>
-              <p className="text-xs">
-                Please change the model, sequence, precision, date range or chip selection.
-              </p>
+              <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
+              <p className="text-xs">{noDataHint}</p>
               <Button
                 type="button"
                 size="sm"
@@ -729,7 +1203,21 @@ const GPUGraph = React.memo(
         watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
-        caption={caption}
+        caption={
+          isMeasuredEnergyAxis ? (
+            <>
+              {caption}
+              <MeasuredPowerSummary
+                total={powerTierCounts.total}
+                visible={powerTierCounts.visible}
+                bestPerSku={false}
+                optimalOnly={hideNonOptimal}
+              />
+            </>
+          ) : (
+            caption
+          )
+        }
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
@@ -773,6 +1261,7 @@ const GPUGraph = React.memo(
             keyFn: (point) => `${point.date}:${scatterPointConfigId(point)}`,
           },
           lineLabelLayer,
+          perfRulerLayer,
           knownIssueLayer,
         ]}
         zoom={{
@@ -790,6 +1279,8 @@ const GPUGraph = React.memo(
                 d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)) as any,
               );
             }
+            // Zoom moves points toward the plot edges; keep their labels inside.
+            if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
           },
         }}
         tooltip={{
@@ -824,6 +1315,20 @@ const GPUGraph = React.memo(
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onPointClick: (d: InferenceData) => {
+            // Ruler mode: a point click measures its curve instead of pinning
+            // the tooltip (the handler un-pins what the shared click applied).
+            const ruler = perfRulerRef.current;
+            if (ruler.mode) {
+              track('gpu_timeseries_data_point_clicked', {
+                id: d.id,
+                hw: String(d.hwKey),
+                x: d.x,
+                y: d.y,
+                perfRuler: true,
+              });
+              ruler.onPointClick(d);
+              return;
+            }
             track('gpu_timeseries_data_point_clicked', {
               id: d.id,
               hw: String(d.hwKey),
@@ -838,8 +1343,10 @@ const GPUGraph = React.memo(
                 event.stopPropagation();
                 // Full-document navigation: stamp the chart state onto THIS
                 // history entry first, or Back returns to a bare /inference
-                // that rebuilds from defaults.
-                rememberChartStateInUrl();
+                // that rebuilds from defaults. Skipped in ephemeral scopes
+                // (/model embeds): the store holds the primary dashboard's
+                // state there, not this chart's.
+                if (!ephemeralUrlState) rememberChartStateInUrl();
                 track('gpu_timeseries_view_charts_opened', {
                   id: d.id,
                   hwKey: String(d.hwKey),
@@ -878,7 +1385,16 @@ const GPUGraph = React.memo(
           },
           attachToLayer: 1,
         }}
+        onDisplayUpdate={(ctx: RenderContext) => {
+          // Point labels are laid out only while visible (a hidden label has
+          // no measurable box), so re-run the plot-bounds constraint once the
+          // display phase has turned them back on.
+          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+        }}
         onRender={(ctx: RenderContext) => {
+          // Remembered so the perf-ruler effect can redraw against the same
+          // layout and scales the chart was last drawn with.
+          lastRenderCtxRef.current = ctx;
           // Apply log tick format on initial render (needs the built scale)
           if (logScale) {
             const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
@@ -891,6 +1407,9 @@ const GPUGraph = React.memo(
           }
           // Set foreground color on scatter point labels
           ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
+          // Strict plot bounding box: a label that would be sliced by the clip
+          // path flips to the other side of its point or slides inward.
+          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
 
           // CSS transitions for smooth opacity animation on legend hover —
           // the hover handlers write opacity once and let these animate.
@@ -898,12 +1417,18 @@ const GPUGraph = React.memo(
             .selectAll('.dot-group, .roofline-path')
             .style('transition', 'opacity 150ms ease');
 
-          // The halo stays inside the point group, so normal zoom transforms
-          // carry it without a separate update pass.
+          // Decorations stay inside the point group, so normal zoom transforms
+          // carry them without a separate update pass.
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {
               renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
+              renderLegacyPowerRing(
+                d3.select(this),
+                point,
+                isMeasuredEnergyAxis,
+                'var(--foreground)',
+              );
             });
         }}
         legendElement={
@@ -1009,8 +1534,37 @@ const GPUGraph = React.memo(
                   if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
+              {
+                id: 'gpu-perf-ruler',
+                label: legendT.perfRuler,
+                advanced: true,
+                checked: perfRulerMode,
+                infoTooltip: legendT.perfRulerInfo,
+                onCheckedChange: (c) => {
+                  setPerfRulerMode(c);
+                  // Clear synchronously with the mode flip so the rulers vanish
+                  // in the same layout pass (the effect below also clears, for
+                  // programmatic mode changes).
+                  if (!c) setPerfRulerState(clearPerfRulers);
+                  track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                },
+              },
             ]}
             actions={[
+              ...(perfRulerState.rulers.length > 0
+                ? [
+                    {
+                      id: 'gpu-clear-perf-rulers',
+                      label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                      onClick: () => {
+                        track('gpu_timeseries_perf_ruler_cleared', {
+                          count: perfRulerState.rulers.length,
+                        });
+                        setPerfRulerState(clearPerfRulers);
+                      },
+                    },
+                  ]
+                : []),
               {
                 id: 'gpu-reset-filter',
                 label: legendT.resetFilter,
@@ -1029,7 +1583,6 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
-            precisionIndicators={selectedPrecisions}
             hideAtomFootnote
             keyIndicators={
               <>

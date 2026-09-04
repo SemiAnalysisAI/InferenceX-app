@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCompare } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -13,6 +13,8 @@ import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { InfoHelp } from '@/components/ui/option-info';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -21,6 +23,7 @@ import {
 } from '@/components/ui/tooltip';
 
 import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 
 import {
   buildInferenceCompareUrl,
@@ -88,38 +91,42 @@ const STRINGS = {
     maxPrefix: 'max ',
     yes: 'Yes',
     no: 'No',
+    expandRow: 'Expand configuration details',
+    collapseRow: 'Collapse configuration details',
+    changedTo: 'changed to',
+    scrollHint: 'On smaller screens, swipe horizontally to see all columns.',
   },
   zh: {
-    searchPlaceholder: '搜索配置...',
+    searchPlaceholder: '搜索配置……',
     colGpu: '芯片',
     colModel: '模型',
     colPrecision: '精度',
-    colSpecMethod: '推测解码',
+    colSpecMethod: '投机解码',
     colFramework: '框架',
     colDate: '日期',
     colDatapoints: '数据点',
     colCompare: '对比',
     noMatch: '未找到匹配的提交记录。',
     noData: '暂无提交数据。',
-    vsPrev: '对比',
+    vsPrev: '与上次对比',
     vendorLabel: '厂商：',
     vendorTip: '芯片制造商',
-    specMethodLabel: '推测解码方法：',
-    specMethodTip: '推测解码方法（如 MTP、Eagle）',
+    specMethodLabel: '投机解码方法：',
+    specMethodTip: '投机解码方法（如 MTP、EAGLE）',
     disaggLabel: '分离式部署：',
-    disaggTip: 'Prefill 和 Decode 在不同芯片池上运行',
+    disaggTip: '预填充和解码在不同芯片池上运行',
     multinodeLabel: '多节点：',
     multinodeTip: '配置跨多个物理节点',
     totalGpusLabel: '总芯片数：',
-    totalGpusTip: '物理芯片总数。分离式部署时，Prefill 和 Decode 使用不同的芯片池',
-    prefillGpusLabel: 'Prefill 芯片数：',
-    prefillGpusTip: '用于 Prefill（提示处理）阶段的芯片',
-    decodeGpusLabel: 'Decode 芯片数：',
-    decodeGpusTip: '用于 Decode（Token 生成）阶段的芯片',
-    prefillTpEpLabel: 'Prefill TP/EP：',
-    prefillTpEpTip: 'Prefill 的张量并行 / 专家并行',
-    decodeTpEpLabel: 'Decode TP/EP：',
-    decodeTpEpTip: 'Decode 的张量并行 / 专家并行',
+    totalGpusTip: '物理芯片总数。分离式部署时，预填充和解码使用不同的芯片池',
+    prefillGpusLabel: '预填充芯片数：',
+    prefillGpusTip: '用于预填充（提示处理）阶段的芯片',
+    decodeGpusLabel: '解码芯片数：',
+    decodeGpusTip: '用于解码（token 生成）阶段的芯片',
+    prefillTpEpLabel: '预填充 TP/EP：',
+    prefillTpEpTip: '预填充阶段的张量并行 / 专家并行',
+    decodeTpEpLabel: '解码 TP/EP：',
+    decodeTpEpTip: '解码阶段的张量并行 / 专家并行',
     aggregateGpusLabel: '聚合推理芯片数：',
     aggregateGpusTip: '单个聚合推理引擎使用的芯片数',
     aggregateTpEpLabel: '聚合推理 TP/EP：',
@@ -145,6 +152,10 @@ const STRINGS = {
     maxPrefix: '最大 ',
     yes: '是',
     no: '否',
+    expandRow: '展开配置详情',
+    collapseRow: '收起配置详情',
+    changedTo: '更新为',
+    scrollHint: '在较小屏幕上可横向滑动查看全部列。',
   },
 } as const;
 
@@ -162,14 +173,9 @@ function DetailItem({
   return (
     <div className="flex items-center gap-1">
       <span className="text-muted-foreground">{label}</span>
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info className="size-3 text-muted-foreground/50 cursor-help shrink-0" />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
-          <span className="text-xs">{tip}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp label={label} value={`submission-${label}`} triggerClassName="-my-1">
+        {tip}
+      </InfoHelp>
       <span className="font-medium">{children}</span>
     </div>
   );
@@ -211,21 +217,27 @@ function SortHeader({
 }) {
   return (
     <th
-      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
-      onClick={() => onSort(field)}
+      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+      aria-sort={sortKey === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
-      <span className="flex items-center gap-1">
+      <button
+        type="button"
+        className="flex items-center gap-1 hover:text-foreground"
+        onClick={() => onSort(field)}
+      >
         {label}
         {sortKey === field && (
           <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
         )}
-      </span>
+      </button>
     </th>
   );
 }
 
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
@@ -303,7 +315,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <input
+      <Input
         type="text"
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
@@ -311,10 +323,11 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}
         placeholder={t.searchPlaceholder}
-        className="w-full max-w-sm px-3 py-1.5 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        className="max-w-sm"
       />
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-sm">
+      <p className="text-xs text-muted-foreground md:hidden">{t.scrollHint}</p>
+      <div className="overflow-x-auto rounded-md border border-border shadow-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-muted/50">
             <tr>
               <th className="w-8 px-2" />
@@ -358,6 +371,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                   previousImage={previousImages.get(key) ?? null}
                   previousRun={previousRuns.get(key) ?? null}
                   onToggle={() => toggleRow(key)}
+                  locale={locale}
                 />
               );
             })}
@@ -397,7 +411,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         {t.showingOf}
         {filtered.length}
         {filtered.length === 1 ? t.configSingular : t.configPlural} ·{' '}
-        {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()}
+        {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString(numberLocale)}
         {t.totalDatapointsSuffix}
       </p>
     </div>
@@ -410,14 +424,17 @@ function SubmissionRow({
   previousImage,
   previousRun,
   onToggle,
+  locale,
 }: {
   row: SubmissionSummaryRow;
   isExpanded: boolean;
   previousImage: string | null;
   previousRun: SubmissionSummaryRow | null;
   onToggle: () => void;
+  locale: Locale;
 }) {
-  const t = STRINGS[useLocale()];
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const vendor = getVendor(row.hardware);
   const compareUrl = previousRun ? buildInferenceCompareUrl(row, previousRun) : null;
 
@@ -425,7 +442,17 @@ function SubmissionRow({
     <>
       <tr className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={onToggle}>
         <td className="px-2 py-2 text-muted-foreground">
-          {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? t.collapseRow : t.expandRow}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+          >
+            {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          </button>
         </td>
         <td className="px-3 py-2 font-medium">
           <span className="flex items-center gap-1.5">
@@ -445,8 +472,16 @@ function SubmissionRow({
           )}
         </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
-        <td className="px-3 py-2 tabular-nums">{row.date}</td>
-        <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
+        <td className="px-3 py-2 tabular-nums">
+          {locale === 'zh'
+            ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'UTC' }).format(
+                new Date(`${row.date}T00:00:00Z`),
+              )
+            : row.date}
+        </td>
+        <td className="px-3 py-2 tabular-nums">
+          {row.total_datapoints.toLocaleString(numberLocale)}
+        </td>
         <td className="px-3 py-2">
           {compareUrl && previousRun ? (
             <TooltipProvider>
@@ -481,7 +516,7 @@ function SubmissionRow({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" collisionPadding={10}>
-                  <span className="text-xs">
+                  <span>
                     {t.compareTipPre}
                     {previousRun.date} → {row.date}
                     {t.compareTipPost}
@@ -571,7 +606,7 @@ function SubmissionRow({
                         className="font-mono text-xs break-all"
                       >
                         <span className="text-muted-foreground">{previousImage}</span>
-                        <span className="mx-2 text-muted-foreground" aria-label="changed to">
+                        <span className="mx-2 text-muted-foreground" aria-label={t.changedTo}>
                           →
                         </span>
                         <span>{row.image}</span>

@@ -6,6 +6,32 @@ import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+import { Input } from '@/components/ui/input';
+
+const STRINGS = {
+  en: {
+    hint: 'Interpolated from real benchmark data. Edit target interactivity values below to compare at different operating points.',
+    metric: 'Metric',
+    interactivity: 'Interactivity (tok/s/user)',
+    table: 'Interpolated benchmark comparison',
+    target: (n: number) => `Target interactivity ${n} (tok/s/user)`,
+  },
+  zh: {
+    hint: '数据由真实基准测试结果插值得出。调整下方的目标交互性数值，即可比较不同运行点。',
+    metric: '指标',
+    interactivity: '交互性（tok/s/user）',
+    table: '基准测试结果插值对比',
+    target: (n: number) => `目标交互性 ${n}（tok/s/user）`,
+  },
+} as const;
+
+const METRIC_LABELS_ZH: Record<string, string> = {
+  'Throughput (tok/s/chip)': '吞吐量（tok/s/chip）',
+  'Cost ($/M tok)': '成本（$/M tok）',
+  'Dollar per Million Tokens': '每百万 token 成本（美元）',
+  Concurrency: '并发数',
+};
 
 /** True when the field shows a positive finite number strictly outside [min, max]. */
 export function isInteractivityInputOutOfRange(
@@ -101,6 +127,8 @@ export function CompareInterpolatedTable({
   visibleMetricLabels,
   metricLabelOverrides,
 }: CompareInterpolatedTableProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const metricsToRender = (
     visibleMetricLabels ? METRICS.filter((m) => visibleMetricLabels.includes(m.label)) : METRICS
   ).map((m) =>
@@ -108,6 +136,10 @@ export function CompareInterpolatedTable({
       ? { ...m, label: metricLabelOverrides[m.label] }
       : m,
   );
+  const localizedMetrics = metricsToRender.map((metric) => ({
+    ...metric,
+    label: locale === 'zh' ? (METRIC_LABELS_ZH[metric.label] ?? metric.label) : metric.label,
+  }));
   const [columnIntents, setColumnIntents] = useState<ColumnIntent[]>(() =>
     defaultTargets.map((target) => ({
       target,
@@ -231,26 +263,29 @@ export function CompareInterpolatedTable({
   if (columns.length === 0) return null;
 
   return (
-    <div className="border border-border/50 rounded-md overflow-hidden">
-      <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/30 border-b border-border/50">
-        Interpolated from real benchmark data. Edit target interactivity values below to compare at
-        different operating points.
+    <div className="overflow-hidden rounded-md border border-border/50">
+      <div className="border-b border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        {t.hint}
       </div>
-      <div className="overflow-x-auto">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={t.table}
+        className="overflow-x-auto focus-visible:outline-none"
+      >
         <table className="w-full text-sm" data-testid="compare-interpolated-table">
-          <thead>
+          <thead className="bg-muted/30">
             <tr className="border-b border-border/40">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground min-w-[160px]">
-                Metric
+              <th className="sticky left-0 z-10 min-w-36 max-w-44 border-r border-border/40 bg-card px-3 py-2 text-left font-medium text-muted-foreground backdrop-blur-sm">
+                {t.metric}
               </th>
               {columns.map((col, ci) => (
                 <th key={ci} className="px-3 py-2 text-center font-medium min-w-[180px]">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      Interactivity (tok/s/user)
-                    </span>
-                    <input
+                    <span className="text-xs text-muted-foreground">{t.interactivity}</span>
+                    <Input
                       type="text"
+                      aria-label={t.target(ci + 1)}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       value={col.inputValue}
@@ -258,13 +293,12 @@ export function CompareInterpolatedTable({
                       onBlur={() => handleInputBlur(ci)}
                       onKeyDown={(e) => handleKeyDown(ci, e)}
                       className={cn(
-                        'w-20 h-7 rounded-md border border-border bg-background px-2 text-center text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring',
+                        'w-20 text-center tabular-nums',
                         isInteractivityInputOutOfRange(
                           col.inputValue,
                           interactivityRange.min,
                           interactivityRange.max,
-                        ) &&
-                          'border-red-500 ring-4 ring-red-500/40 animate-pulse focus:ring-red-500/50',
+                        ) && 'border-red-500 ring-4 ring-red-500/40 animate-pulse',
                       )}
                       data-testid={`compare-table-target-${ci}`}
                       {...(isInteractivityInputOutOfRange(
@@ -279,7 +313,7 @@ export function CompareInterpolatedTable({
             </tr>
           </thead>
           <tbody>
-            {metricsToRender.map((metric) => (
+            {localizedMetrics.map((metric) => (
               <MetricTableRow
                 key={metric.label}
                 metric={metric}
@@ -333,8 +367,8 @@ function MetricTableRow({
   );
 
   return (
-    <tr className="border-t border-border/40">
-      <td className="px-3 py-2 text-muted-foreground border-r border-border/40 whitespace-nowrap">
+    <tr className="border-t border-border/40 odd:bg-muted/8">
+      <td className="sticky left-0 z-1 min-w-36 max-w-44 whitespace-normal border-r border-border/40 bg-card px-3 py-2 text-muted-foreground backdrop-blur-sm">
         {metric.label}
       </td>
       {cells.map((cell, ci) => (

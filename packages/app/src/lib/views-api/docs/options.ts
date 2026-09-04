@@ -188,7 +188,7 @@ const responseExample = {
   defaults: {
     model: 'DeepSeek-V4-Pro',
     sequence: '8k/1k',
-    metric: 'y_tokensPerDollarN',
+    metric: 'y_tokensPerDollarH',
     percentile: 'p90',
     xmode: 'interactivity',
   },

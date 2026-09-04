@@ -133,6 +133,9 @@ function buildView(rows: readonly BenchmarkRow[], params: InferenceViewParams): 
       frameworks: [...params.frameworks],
       deployment: [...params.deployment] as ('single-node' | 'multi-node' | 'disagg')[],
       spec: [...params.spec] as ('mtp' | 'stp')[],
+      // Measured-power tier pills are a dashboard-only affordance; the API
+      // returns every row regardless of power certification, like the default view.
+      power: [],
     },
     optimal: params.optimal,
     best: params.best,

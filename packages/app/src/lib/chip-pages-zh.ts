@@ -74,7 +74,7 @@ const translations: Readonly<Record<string, ChipPageTranslation>> = {
       'NVIDIA B200 规格、云端价格与实时 LLM 推理基准测试：180 GB HBM3e、8 TB/s 带宽、9,000 稠密 FP4 TFLOP/s 与 NVLink 5.0，每日在 vLLM、SGLang 与 TensorRT-LLM 上持续测量。',
     overview: [
       'NVIDIA B200 是 Blackwell 一代的主力数据中心芯片：180 GB 可用 HBM3e（带宽 8 TB/s）、单芯片 900 GB/s 的 NVLink 5.0，Tensor Core 每时钟吞吐量翻倍于 Hopper 并新增 FP4。稠密算力 9,000 FP4 / 4,500 FP8 TFLOP/s，在主导 LLM decode 的内存带宽受限场景中，单颗 B200 的表现超过两颗 H100。',
-      'NVFP4 推理正是在 B200 上成为主流：前沿开源模型发布 FP4 checkpoint，精度与 FP8 相差无几，单芯片吞吐量却接近翻倍。它 1,000 W 的 TDP 和约 1.7 kW 的整机功耗使小时租价远高于 Hopper，因此升级决策取决于每美元性能而非峰值算力。',
+      'NVFP4 推理正是在 B200 上成为主流：前沿开源模型发布 FP4 checkpoint，精度与 FP8 相差无几，单芯片吞吐量却接近翻倍。它的单芯片 TDP 为 1,000 W，综合功耗约为 1.7 kW，因此小时租价远高于 Hopper；是否值得升级，取决于每美元性能而非峰值算力。',
     ],
     benchmarkContext:
       'B200 是 InferenceX 上测试最密集的芯片之一：每日在 vLLM、SGLang、TensorRT-LLM 和 Dynamo 分离式推理上运行固定序列扫描与 AgentX agentic 编码 trace，每美元性能与精度对比页面持续追踪每个模型上 NVFP4 与 FP8 的差距。',
@@ -93,7 +93,7 @@ const translations: Readonly<Record<string, ChipPageTranslation>> = {
     summary:
       'NVIDIA B300（Blackwell Ultra）规格、云端价格与实时 LLM 推理基准测试：268 GB 可用 HBM3e、13,500 稠密 FP4 TFLOP/s、800 Gbit/s scale-out 网络，每日与 B200、GB300 NVL72 和 MI355X 对比测量。',
     overview: [
-      'NVIDIA B300 是 Blackwell Ultra 的 SXM 形态：268 GB 可用 HBM3e（带宽 8 TB/s），稠密 FP4 算力 13,500 TFLOP/s，比 B200 高 1.5 倍，FP8 与 BF16 则保持 B200 水平。对推理而言更重要的是大 49% 的显存：同样的 8 芯片节点能容纳更大的 KV 工作集和更大的模型。',
+      'NVIDIA B300 是 Blackwell Ultra 的 SXM 型号，配备 268 GB 可用 HBM3e，带宽为 8 TB/s。稠密 FP4 算力达 13,500 TFLOP/s，是 B200 的 1.5 倍；FP8 和 BF16 算力则与 B200 相同。对推理更重要的是显存容量增加了 49%，让同样由 8 颗芯片组成的节点能够容纳更大的 KV 工作集和模型。',
       'B300 还通过 ConnectX-8 将单芯片 scale-out 带宽翻倍至 800 Gbit/s，这对 prefill/decode 分离和 wide expert parallelism 尤为重要。它定位于 B200 与机柜级 GB300 NVL72 之间：NVLink 5.0 域规模同为 8，但拥有 Ultra 级的显存和 FP4 算力。',
     ],
     benchmarkContext:
@@ -174,7 +174,7 @@ const translations: Readonly<Record<string, ChipPageTranslation>> = {
       'AMD Instinct MI325X 规格、云端价格与实时 LLM 推理基准测试：256 GB HBM3e、6 TB/s 带宽、2,615 稠密 FP8 TFLOP/s、全互联 Infinity Fabric，每日在 ROCm 版 vLLM 与 SGLang 上测量。',
     overview: [
       'AMD Instinct MI325X 是 CDNA 3 的大内存版本：稠密 FP8 算力与 MI300X 相同（2,615 TFLOP/s），但配备 256 GB HBM3e，带宽 6 TB/s，是同代产品中最大的显存。一个 8 芯片全互联节点拥有超过 2 TB HBM，足以在节点内部署超大模型。',
-      'MI325X 以容量经济性对标 H200：更大的单芯片显存和更低的小时租价，换取的是 NVIDIA 软件生态的成熟度。对内存受限的 decode 和长上下文服务而言，它的单位价格带宽在 CDNA 4 之前的产品中名列前茅。',
+      '与 H200 相比，MI325X 的优势是单芯片显存更大、小时租价更低，但选择时也需要权衡 NVIDIA 软件生态的优势。对于内存受限的 decode 和长上下文推理，MI325X 的每美元带宽在 CDNA 4 之前的产品中位居前列。',
     ],
     benchmarkContext:
       'InferenceX 在 ROCm vLLM 与 SGLang 上以共享模型集测试 MI325X，对比页面将它与 H200、MI355X 并列，使 NVIDIA 与 AMD 之间、代际之间的差距都处于持续测量之下。',
@@ -259,7 +259,7 @@ export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
     },
     {
       question: `${entry.label} 的功耗是多少？`,
-      answer: `${entry.label} 单芯片 TDP 为 ${hw.tdp.toLocaleString('en-US')} W，计入主机 CPU、网卡与散热分摊后整机约 ${hw.power} kW。InferenceX 的每 token 能耗计算采用整机功耗口径。`,
+      answer: `${entry.label} 的单芯片 TDP 为 ${hw.tdp.toLocaleString('en-US')} W。计入主机 CPU、网卡和散热的分摊功耗后，每颗芯片对应的总功耗约为 ${hw.power} kW。InferenceX 按这一口径计算每 token 能耗。`,
     },
     {
       question: `${entry.label} 支持 FP4 吗？`,

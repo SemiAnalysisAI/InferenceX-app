@@ -57,7 +57,9 @@ const rows = [
 ];
 
 function selectedFrameworks(page: OverviewPageData) {
-  const summary = page.models.find((model) => model.model === Model.Qwen3_5);
+  const summary = page.models.find(
+    (model) => model.model === Model.Qwen3_5 && model.scenario === 'single_turn_8k1k',
+  );
   return {
     candidate: summary?.platforms.find(({ hardware }) => hardware === 'mi355x')?.read.config
       ?.framework,
@@ -202,7 +204,9 @@ describe('getOverviewPageData engine scope forwarding', () => {
 
     const { getOverviewPageData } = await import('./overview-data.server');
     const page = await getOverviewPageData(50, 'community', '30d');
-    const qwen = page.models.find((model) => model.model === Model.Qwen3_5);
+    const qwen = page.models.find(
+      (model) => model.model === Model.Qwen3_5 && model.scenario === 'single_turn_8k1k',
+    );
     const mi355x = qwen?.platforms.find(({ hardware }) => hardware === 'mi355x');
     const b300 = qwen?.platforms.find(({ hardware }) => hardware === 'b300');
 

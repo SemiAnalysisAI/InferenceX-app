@@ -1,7 +1,5 @@
 'use client';
 
-import { CircleHelp } from 'lucide-react';
-
 import { track } from '@/lib/analytics';
 import type { Locale } from '@/lib/i18n';
 
@@ -21,9 +19,9 @@ export function NormalizedInteractivityHelpLink({ locale }: { locale: Locale }) 
       aria-label={label}
       title={label}
       onClick={() => track('interactivity_normalized_faq_opened', { locale })}
-      className="no-export absolute right-1 top-1/2 z-10 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/55 transition-colors hover:bg-muted hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+      className="no-export text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none"
     >
-      <CircleHelp aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+      {label}
     </a>
   );
 }

@@ -31,7 +31,7 @@ export function AgentXTelemetryCallout({ locale }: { locale: Locale }) {
       className="rounded-lg border border-border bg-muted/20"
     >
       <div className="px-4 py-4 sm:px-5 sm:py-5">
-        <p className="mb-2 font-mono text-[11px] font-medium tracking-[0.18em] text-brand uppercase">
+        <p className="mb-2 font-mono text-2xs font-medium tracking-eyebrow text-brand uppercase">
           {guide.eyebrow}
         </p>
         <h2 id="agentx-telemetry-title" className="text-lg font-semibold text-foreground">

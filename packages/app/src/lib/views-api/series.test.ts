@@ -68,7 +68,7 @@ const BASE_OPTIONS: InferenceSeriesOptions = {
   xmode: 'interactivity',
   xmetric: 'p90_ttft',
   gpus: [],
-  quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
+  quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
   optimal: false,
   best: false,
 };

@@ -67,6 +67,146 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills()).not.toThrow();
   });
 
+  it('corrects only the six Qwen metrics-refresh recipes without changing measurements', () => {
+    const backfills = BENCHMARK_POINT_BACKFILLS.filter((b) => b.githubRunId === 33219708211);
+    expect(backfills.map((b) => [b.productionConfigId, b.conc, b.recipeFingerprint])).toEqual([
+      [2360, 7, '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d'],
+      [2361, 96, '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f'],
+      [2362, 704, 'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0'],
+      [2363, 52, '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc'],
+      [2364, 565, '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4'],
+      [2365, 44, '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866'],
+    ]);
+    for (const backfill of backfills) {
+      const point = {
+        configId: backfill.productionConfigId,
+        config: backfill.config,
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: backfill.conc,
+        offloadMode: 'off',
+        recipeFingerprint: backfill.recipeFingerprint,
+        metrics: {
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+          server_gpu_cache_hit_rate: 0.5284,
+          kv_p2p_transfer: 'nixl',
+          allocated_cpu_dram_gb: 0,
+          kv_offloading: 'none',
+        },
+      };
+      const applied = applyBenchmarkPointBackfill(33219708211, 1, point);
+      expect(applied.point).toEqual({
+        ...point,
+        offloadMode: 'on',
+        metrics: {
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+          server_gpu_cache_hit_rate: 0.5284,
+          kv_p2p_transfer: 'nixl',
+          offload_mode: 'on',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'native',
+          kv_offload_backend_version: '1.3.0rc24',
+        },
+      });
+      expect(applyBenchmarkPointBackfill(33219708211, 2, point).backfillId).toBeNull();
+      expect(applyBenchmarkPointBackfill(31927376673, 1, point).backfillId).toBeNull();
+      expect(
+        applyBenchmarkPointBackfill(33219708211, 1, { ...point, recipeFingerprint: null })
+          .backfillId,
+      ).toBeNull();
+      expect(applyBenchmarkPointBackfill(33219708211, 1, applied.point).point).toEqual(
+        applied.point,
+      );
+    }
+  });
+
+  it.each([
+    [128, 4, 'd84f06bb4a4016f9f2fe917feb4f10b960f87ac5f48bfae1b0bca1d66d7c887b'],
+    [256, 4, '1472857d464c0780b5eeb41184ff70290c5f6b9ad6a8c07b2524697e21dd0e07'],
+    [512, 8, '6ab19ba8680ab38b81c0d6a251d252576caafaf660118007c508b1f62df08c39'],
+  ] as const)(
+    'corrects the GB300 Mooncake c%i recipe without changing performance',
+    (conc, prefillSize, recipeFingerprint) => {
+      const point = {
+        configId: prefillSize === 4 ? 2449 : 2448,
+        config: {
+          ...EXAMPLE_CONFIG,
+          prefillTp: prefillSize,
+          prefillEp: prefillSize,
+          numPrefillGpu: prefillSize,
+          decodeTp: 16,
+          decodeEp: 16,
+          numDecodeGpu: 16,
+        },
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        offloadMode: 'off',
+        recipeFingerprint,
+        metrics: {
+          kv_offloading: 'none',
+          allocated_cpu_dram_gb: 0,
+          median_itl: 0.1,
+          output_tput_per_gpu: 123,
+        },
+      };
+      const applied = applyBenchmarkPointBackfill(32809502132, 1, point);
+      expect(applied.point.offloadMode).toBe('on');
+      expect(applied.point.metrics).toMatchObject({
+        offload_mode: 'on',
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+        median_itl: 0.1,
+        output_tput_per_gpu: 123,
+      });
+      expect(applied.point.metrics).not.toHaveProperty('allocated_cpu_dram_gb');
+      expect(applyBenchmarkPointBackfill(32809502132, 2, point).backfillId).toBeNull();
+      expect(
+        applyBenchmarkPointBackfill(32809502132, 1, { ...point, recipeFingerprint: null })
+          .backfillId,
+      ).toBeNull();
+      expect(applyBenchmarkPointBackfill(32809502132, 1, applied.point).point).toEqual(
+        applied.point,
+      );
+      expect(
+        BENCHMARK_POINT_BACKFILLS.find((b) => b.githubRunId === 32809502132 && b.conc === 4)?.set
+          .offloadMode,
+      ).toBeUndefined();
+    },
+  );
+
+  it('limits borrowed prefix-cache hit rates to GB300 dynamo-vllm DeepSeek-V4 AgentX points', () => {
+    const cacheHitKeys = [
+      'server_gpu_cache_hit_rate',
+      'server_external_cache_hit_rate',
+      'server_cpu_cache_hit_rate',
+    ];
+    const borrowed = BENCHMARK_POINT_BACKFILLS.filter((backfill) =>
+      cacheHitKeys.some((key) => key in (backfill.set.metricsMerge ?? {})),
+    );
+
+    // Only the GB300 sweeps missed the backend worker metrics scrape; every
+    // other hardware measured its own hit rate and must never inherit one.
+    expect(borrowed.length).toBe(14);
+    for (const backfill of borrowed) {
+      expect(backfill.config.hardware).toBe('gb300');
+      expect(backfill.config.framework).toBe('dynamo-vllm');
+      expect(backfill.config.model).toBe('dsv4');
+      expect(backfill.benchmarkType).toBe('agentic_traces');
+      for (const key of cacheHitKeys) {
+        const value = backfill.set.metricsMerge?.[key];
+        expect(typeof value).toBe('number');
+        expect(value).toBeGreaterThanOrEqual(0);
+        expect(value).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   it('requires a stable ID, reason, exact selector, and non-empty patch', () => {
     expect(() => validateRunBackfills([], [examplePointBackfill({ id: 'Not Valid' })])).toThrow(
       /kebab-case/u,

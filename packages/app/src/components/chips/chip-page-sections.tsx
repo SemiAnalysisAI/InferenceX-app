@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { getPostBySlug } from '@/lib/blog';
 import {
@@ -34,6 +35,7 @@ import {
 } from '@/lib/chip-pages-zh';
 import { getGlossaryEntry } from '@/lib/glossary';
 import { getZhGlossaryEntry } from '@/lib/glossary-zh';
+import { formatScaleUpTopology } from '@/lib/gpu-specs';
 import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n';
 import {
   ACCELERATOR_MODEL_TITLE,
@@ -98,6 +100,7 @@ const STRINGS = {
     vsRatioNote: 'Ratios are spec-sheet values; see the live compare pages for measured deltas.',
     vsRatioNa: 'n/a',
     vsSpecTableCaption: 'Spec-sheet comparison',
+    specScrollHint: 'Swipe horizontally to view all specification values.',
     overviewHeading: 'Overview',
     benchmarkHeading: 'How InferenceX benchmarks it',
     vsIntroPrefix: 'Spec-sheet and pricing comparison of',
@@ -123,7 +126,7 @@ const STRINGS = {
     liveCtaBody:
       '以上都是静态硬件数据。实际交付的 token 吞吐量、每百万 token 成本和每 token 能耗在仪表板上持续测量：',
     liveLinkInference: '实时推理仪表板',
-    liveLinkCompare: '芯片对芯片模型对比',
+    liveLinkCompare: '对比不同芯片运行同一模型的表现',
     liveLinkPerDollar: '每美元性能',
     liveLinkOverview: '基准测试方法与总览',
     modelsHeading: '通过 SemiAnalysis 行业模型深入研究',
@@ -132,7 +135,7 @@ const STRINGS = {
     modelsAccDesc:
       '按 SKU 跟踪 AI 加速器的出货量、价格与规格，覆盖从晶圆代工投片、HBM 供应到客户级装机量的完整链路，按季度更新并包含多年预测。',
     modelsTcoDesc:
-      '本页每小时费率的数据来源：从服务器资本开支、电力、托管与资金成本自下而上构建 GPU 全含拥有成本，并提供租赁价格情景与完整的集群财务模型。',
+      '本页小时费率来自这一模型。它汇总服务器资本开支、电力、托管和资金成本，计算 GPU 总拥有成本，并提供不同租赁价格情景及完整的集群财务分析功能。',
     pricingSource: '来源：$/芯片/小时 费率取自 SemiAnalysis',
     specLabels: {
       vendor: '厂商',
@@ -149,7 +152,7 @@ const STRINGS = {
       scaleOut: 'Scale-out 网络',
       nic: '网卡',
       tdp: '单芯片 TDP',
-      allInPower: '单芯片整机功耗',
+      allInPower: '单芯片综合功耗',
       costHyperscaler: '超大规模云 $/芯片/小时',
       costNeocloud: 'Neocloud $/芯片/小时',
       costRetail: '零售档 $/芯片/小时',
@@ -159,6 +162,7 @@ const STRINGS = {
     vsRatioNote: '倍数为纸面规格对比；实测差距请见实时对比页面。',
     vsRatioNa: '不适用',
     vsSpecTableCaption: '纸面规格对比',
+    specScrollHint: '左右滑动可查看全部规格参数。',
     overviewHeading: '概览',
     benchmarkHeading: 'InferenceX 如何测试这款芯片',
     vsIntroPrefix: '本页对比',
@@ -299,7 +303,7 @@ const ModelsSection = ({ locale }: { locale: Locale }) => {
   );
 };
 
-const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
+export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
   const t = STRINGS[locale];
   const spec = getChipSpec(entry);
   const hw = getChipHw(entry);
@@ -314,7 +318,7 @@ const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) 
     [t.specLabels.scaleUp, spec.scaleUpTech],
     [t.specLabels.scaleUpBandwidth, spec.scaleUpBandwidth],
     [t.specLabels.worldSize, String(spec.scaleUpWorldSize)],
-    [t.specLabels.scaleUpTopology, spec.scaleUpTopology],
+    [t.specLabels.scaleUpTopology, formatScaleUpTopology(spec.scaleUpTopology, locale)],
     [t.specLabels.scaleOut, spec.scaleOutTech ?? t.none],
     [t.specLabels.nic, spec.nic ?? t.none],
     [t.specLabels.tdp, `${hw.tdp.toLocaleString('en-US')} W`],
@@ -324,19 +328,25 @@ const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) 
     [t.specLabels.costRetail, `$${hw.costr.toFixed(2)}`],
   ];
   return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="w-full text-sm">
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label} className="border-b border-border/40">
-              <th scope="row" className="py-2 pr-4 text-left font-medium text-muted-foreground">
-                {label}
-              </th>
-              <td className="py-2 font-mono">{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="relative mt-4">
+      <div className="overflow-x-auto rounded-lg border border-border/40">
+        <table className="w-full min-w-[36rem] text-sm">
+          <tbody className="divide-y divide-border/40">
+            {rows.map(([label, value], index) => (
+              <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
+                <th
+                  scope="row"
+                  className="w-[52%] py-2.5 pr-4 text-left font-medium text-muted-foreground"
+                >
+                  {label}
+                </th>
+                <td className="whitespace-nowrap py-2.5 text-right font-mono">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground md:hidden">{t.specScrollHint}</p>
       <p className="mt-3 text-sm text-muted-foreground">
         {t.pricingSource}{' '}
         <a
@@ -370,7 +380,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
   return (
     <div className="mt-10 grid gap-8 border-t border-border/50 pt-10 md:grid-cols-3">
       <section aria-label={t.relatedArticles}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedArticles}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -387,7 +397,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedTerms}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedTerms}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -404,7 +414,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedChips}>
-        <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
           {t.relatedChips}
         </h2>
         <ul className="mt-3 space-y-2">
@@ -455,11 +465,11 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
                 {t.backToIndex}
               </Link>
               <div className="mt-8 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-brand uppercase">
+                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
                   {hw.vendor} · {hw.arch}
                 </span>
               </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
                 {entry.title}
               </h1>
             </header>
@@ -531,7 +541,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
                 <span aria-hidden="true">←</span>
                 {t.backToIndex}
               </Link>
-              <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-6xl">
+              <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
                 {title}
               </h1>
               <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">
@@ -620,7 +630,7 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="py-8 md:py-12">
-            <h1 className="text-4xl font-bold tracking-[-0.035em] md:text-5xl">{t.indexTitle}</h1>
+            <h1 className="text-4xl font-bold tracking-heading md:text-5xl">{t.indexTitle}</h1>
             <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">{t.indexIntro}</p>
           </header>
           <section aria-labelledby="chips-list">
@@ -632,14 +642,15 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
                 const translation = locale === 'zh' ? getZhChipTranslation(chip.slug) : undefined;
                 const summary = translation?.summary ?? chip.summary;
                 return (
-                  <Link key={chip.slug} href={localePath(`/chips/${chip.slug}`, locale)}>
-                    <Card className="h-full p-5 transition-colors hover:border-brand/50">
-                      <h3 className="font-semibold">{chip.title}</h3>
-                      <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">
-                        {summary}
-                      </p>
-                    </Card>
-                  </Link>
+                  <CatalogLinkCard
+                    key={chip.slug}
+                    href={localePath(`/chips/${chip.slug}`, locale)}
+                    title={chip.title}
+                    description={summary}
+                    slug={chip.slug}
+                    locale={locale}
+                    event="chip_index_entry_clicked"
+                  />
                 );
               })}
             </div>
@@ -651,12 +662,13 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
             <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {vsPages.map((page) => (
                 <li key={page.slug}>
-                  <Link
+                  <CatalogLinkCard
                     href={localePath(`/chips/${page.slug}`, locale)}
-                    className="text-sm font-medium text-brand hover:underline"
-                  >
-                    {page.a.label} vs {page.b.label} →
-                  </Link>
+                    title={`${page.a.label} vs ${page.b.label}`}
+                    slug={page.slug}
+                    locale={locale}
+                    event="chip_index_entry_clicked"
+                  />
                 </li>
               ))}
             </ul>

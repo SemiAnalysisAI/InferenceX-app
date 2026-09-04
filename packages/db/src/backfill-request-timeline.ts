@@ -26,11 +26,14 @@ import {
 } from './etl/trace-replay-ingest.js';
 import {
   parseLimitForceFlags,
+  parseRunIdFlag,
+  requireBackfillPayload,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
+const githubRunId = parseRunIdFlag();
 
 const PROFILE_DOWNLOAD_CHUNK_BYTES = TRACE_REPLAY_UPLOAD_CHUNK_BYTES;
 
@@ -69,10 +72,7 @@ async function readProfileBlob(id: number): Promise<Buffer | null> {
 
 /** Upload the JSONB through the same bounded protocol used by trace ingest. */
 async function writeRequestTimeline(id: number, timeline: RequestTimeline | null): Promise<void> {
-  if (timeline === null) {
-    await sql`update agentic_trace_replay set request_timeline = null where id = ${id}`;
-    return;
-  }
+  requireBackfillPayload(timeline, 'request_timeline');
 
   const payload = Buffer.from(JSON.stringify(timeline));
   await sql.begin(async (tx) => {
@@ -93,6 +93,7 @@ async function writeRequestTimeline(id: number, timeline: RequestTimeline | null
         where field = 'request_timeline'
       )
       where id = ${id}
+        and coalesce((request_timeline->>'version')::int, -1) <= ${REQUEST_TIMELINE_VERSION}
     `;
   });
 }
@@ -105,6 +106,14 @@ async function main(): Promise<void> {
 
   await runCandidateIdBackfill(
     async () => {
+      const runFilter = githubRunId
+        ? sql`and exists (
+            select 1 from benchmark_results br
+            join workflow_runs wr on wr.id = br.workflow_run_id
+            where br.trace_replay_id = agentic_trace_replay.id
+              and wr.github_run_id = ${githubRunId}
+          )`
+        : sql``;
       // Only rows with a profile_export blob can produce a timeline. Rows
       // without the blob keep `request_timeline` null and the API serves them
       // as "no timeline data".
@@ -113,6 +122,8 @@ async function main(): Promise<void> {
             select id
             from agentic_trace_replay
             where profile_export_jsonl_gz is not null
+              and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
+              ${runFilter}
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `
@@ -120,9 +131,11 @@ async function main(): Promise<void> {
             select id
             from agentic_trace_replay
             where profile_export_jsonl_gz is not null
+              and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
+              ${runFilter}
               and (
                 request_timeline is null
-                or coalesce((request_timeline->>'version')::int, -1) <> ${REQUEST_TIMELINE_VERSION}
+                or coalesce((request_timeline->>'version')::int, -1) < ${REQUEST_TIMELINE_VERSION}
               )
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}

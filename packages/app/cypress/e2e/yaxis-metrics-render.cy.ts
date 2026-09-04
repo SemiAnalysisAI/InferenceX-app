@@ -21,26 +21,17 @@ describe('Y-Axis Metrics All Render Data', () => {
     'Cost per Million Input Tokens (Owning - Hyperscaler)',
     'Cost per Million Input Tokens (Owning - Neocloud Giant)',
     'Cost per Million Input Tokens (3 Year Rental)',
-    'Total Tokens per $1 USD (Owning - Hyperscaler)',
-    'Total Tokens per $1 USD (Owning - Neocloud Giant)',
-    'Total Tokens per $1 USD (3 Year Rental)',
-    'Output Tokens per $1 USD (Owning - Hyperscaler)',
-    'Output Tokens per $1 USD (Owning - Neocloud Giant)',
-    'Output Tokens per $1 USD (3 Year Rental)',
-    'Input Tokens per $1 USD (Owning - Hyperscaler)',
-    'Input Tokens per $1 USD (Owning - Neocloud Giant)',
-    'Input Tokens per $1 USD (3 Year Rental)',
-    'Total Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    'Total Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    'Total Tokens per ¥1 RMB (3 Year Rental)',
-    'Output Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    'Output Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    'Output Tokens per ¥1 RMB (3 Year Rental)',
-    'Input Tokens per ¥1 RMB (Owning - Hyperscaler)',
-    'Input Tokens per ¥1 RMB (Owning - Neocloud Giant)',
-    'Input Tokens per ¥1 RMB (3 Year Rental)',
+    'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+    'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+    'Total Tokens per $1 TCO (3 Year Rental)',
+    'Output Tokens per $1 TCO (Owning - Hyperscaler)',
+    'Output Tokens per $1 TCO (Owning - Neocloud Giant)',
+    'Output Tokens per $1 TCO (3 Year Rental)',
+    'Input Tokens per $1 TCO (Owning - Hyperscaler)',
+    'Input Tokens per $1 TCO (Owning - Neocloud Giant)',
+    'Input Tokens per $1 TCO (3 Year Rental)',
     'Cost per Million Total Tokens (Custom User Values)',
-    'Total Tokens per $1 USD (Custom User Values)',
+    'Total Tokens per $1 TCO (Custom User Values)',
     'Token Throughput per All in Utility MW (Custom User Values)',
     'All-in Provisioned Joules per Total Token',
     'All-in Provisioned Joules per Output Token',
@@ -60,8 +51,8 @@ describe('Y-Axis Metrics All Render Data', () => {
 
   metrics.forEach((label) => {
     it(`"${label}" renders scatter points without extra interaction`, () => {
-      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.get('[role="option"]').contains(label).click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.get('[data-slot="select-item"]').contains(label).click({ force: true });
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')

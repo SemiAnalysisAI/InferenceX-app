@@ -92,7 +92,7 @@ mirrors the `tco-feed` CSV pattern. Default is `format=json`.
   URL-safe forms `8k-1k`, `1k-1k`, `1k-8k`, and `agentic`.
 - `precisions` — comma list of `fp4,fp8,bf16,int4` (share-param form also allows `fp4fp8`).
   Omit for automatic densest-precision resolution.
-- `metric` — metric registry key, e.g. `tokensPerDollarN` (default), `costh`, `costn`, `costr`,
+- `metric` — metric registry key, e.g. `tokensPerDollarH` (default), `costh`, `costn`, `costr`,
   `tpPerGpu`, `tpPerMw`, `jTotal`; the `y_`-prefixed form (`y_costh`) is also accepted.
 - `gpus` — comma list of hardware series keys `<gpu>_<framework>[_<spec>]` (e.g.
   `b200_trt`, `mi355x_sglang`) or bare GPU base keys (`b200`, `mi355x`, `gb200`, `h100`, ...).

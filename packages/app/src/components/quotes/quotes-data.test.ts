@@ -8,7 +8,13 @@ import { CAROUSEL_LABELS, CAROUSEL_ORGS, QUOTES } from './quotes-data';
  * supporter come off the carousel without being dropped from the site, so it is
  * asserted here rather than left implicit.
  */
-const OFF_CAROUSEL_ONLY = ['Together AI', 'Nebius', 'White House', 'UC San Diego'] as const;
+const OFF_CAROUSEL_ONLY = [
+  'Together AI',
+  'Nebius',
+  'White House',
+  'UC San Diego',
+  'TensorWave',
+] as const;
 
 describe('quote carousel membership', () => {
   it('keeps every carousel org backed by a real quote', () => {
@@ -24,6 +30,13 @@ describe('quote carousel membership', () => {
 
   it('features Mooncake in the landing carousel', () => {
     expect(CAROUSEL_ORGS).toContain('Mooncake');
+  });
+
+  it('features AMD and NVIDIA in the landing carousel under CEO labels', () => {
+    expect(CAROUSEL_ORGS).toContain('AMD');
+    expect(CAROUSEL_ORGS).toContain('NVIDIA');
+    expect(CAROUSEL_LABELS['AMD']).toBe('AMD Lisa Su');
+    expect(CAROUSEL_LABELS['NVIDIA']).toBe('NVIDIA Jensen');
   });
 
   it.each(OFF_CAROUSEL_ONLY)('excludes %s from the carousel', (org) => {

@@ -15,9 +15,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
+  const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
   const parsed = parseCompareSlug(slug);
   if (
@@ -56,19 +57,28 @@ export async function GET(
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
 
   try {
-    return renderComparePngChart({
+    return await renderComparePngChart({
       curveRows,
       plottedRows,
       logoSrc,
       aLabel,
       bLabel,
-      eyebrow: 'InferenceX Performance per Dollar',
+      eyebrow: lang === 'zh' ? 'InferenceX 每美元性能' : 'InferenceX Performance per Dollar',
       title: parsed.model.label,
-      subtitle: `${aLabel} vs ${bLabel} | Cost per Million Tokens`,
+      subtitle:
+        lang === 'zh'
+          ? `${aLabel} 与 ${bLabel}｜每百万 token 成本`
+          : `${aLabel} vs ${bLabel} | Cost per Million Tokens`,
       workload,
       rangeNote:
-        "Dashed segments extend to each SKU's operating envelope, where cost rises steeply",
-      footer: 'Owning-hyperscaler TCO | interpolated from benchmark results',
+        lang === 'zh'
+          ? '虚线延伸至各 SKU 的运行区间；接近区间边界时，成本会快速上升'
+          : "Dashed segments extend to each SKU's operating envelope, where cost rises steeply",
+      footer:
+        lang === 'zh'
+          ? 'Hyperscaler 自有设备 TCO｜数据由基准测试结果插值得出'
+          : 'Owning-hyperscaler TCO | interpolated from benchmark results',
+      lang,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

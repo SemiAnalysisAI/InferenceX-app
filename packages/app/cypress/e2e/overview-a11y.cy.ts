@@ -39,6 +39,18 @@ describe('Overview accessibility', () => {
         cy.get('html').should(theme === 'dark' ? 'have.class' : 'not.have.class', 'dark');
         cy.get(OVERVIEW_SURFACE).should('be.visible');
 
+        cy.get('[data-testid="overview-tier-slider"]').should(([slider]) => {
+          const style = getComputedStyle(slider);
+          const primary = style.getPropertyValue('--primary').trim();
+          const channels = primary
+            .replace('#', '')
+            .match(/../g)!
+            .map((hex) => parseInt(hex, 16));
+          const accent = `rgb(${channels.join(', ')})`;
+          expect(style.accentColor, 'same accent token as the TCO range').to.equal(accent);
+          expect(style.backgroundImage, 'filled track uses the accent').to.contain(accent);
+        });
+
         cy.injectAxe();
         cy.checkA11y(OVERVIEW_SURFACE, WCAG_AA_RULES, reportViolations);
       });

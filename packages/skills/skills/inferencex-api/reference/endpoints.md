@@ -29,9 +29,9 @@ Shared value domains (from `/api/v1/views/options`):
   - Cost $/M tok (total): `costh`, `costn`, `costr` (h = Owning-Hyperscaler,
     n = Owning-Neocloud Giant, r = 3-yr rental)
   - Cost $/M tok (output): `costhOutput`, `costnOutput`, `costrOutput`; (input): `costhi`, `costni`, `costri`
-  - Tokens/$ (total): `tokensPerDollarH`, `tokensPerDollarN` (**global default**), `tokensPerDollarR`
+  - Tokens/$ (total): `tokensPerDollarH` (**global default**), `tokensPerDollarN`, `tokensPerDollarR`
     (+ `...Output` / `...Input` variants for H/N/R)
-  - Tokens/RMB: `tokensPerRmbH/N/R` (+ output/input variants; USD→CNY = 6.72)
+  - Token revenue: `tokenRevenuePerGpuHour` ($/GPU/hr at normalized pricing)
   - Energy: `jTotal`, `jOutput`, `jInput` (J/token)
   - Measured power: `measuredAvgPower`, `measuredPrefillAvgPower`, `measuredDecodeAvgPower`,
     `measuredJPerOutputToken`, `measuredJPerInputToken`, `measuredJPerTotalToken`,

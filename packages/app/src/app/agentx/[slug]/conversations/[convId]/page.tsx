@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { ConversationView } from '@/components/datasets/conversation-view';
-import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { enAlternates } from '@/lib/i18n';
 
 interface Props {
   params: Promise<{ slug: string; convId: string }>;
@@ -15,12 +15,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const short = convId.slice(0, 12);
   const title = `Conversation ${short} | ${slug}`;
   const description = `Per-turn token flamegraph (cached prefix vs uncached input vs output) for conversation ${short} in the ${slug} agentic trace dataset.`;
+  const path = `/agentx/${slug}/conversations/${encodeURIComponent(convId)}`;
   return {
     title,
     description,
-    alternates: {
-      canonical: `${SITE_URL}/agentx/${slug}/conversations/${encodeURIComponent(convId)}`,
-    },
+    alternates: enAlternates(path),
     robots: { index: false }, // per-conversation pages are too numerous to index
   };
 }

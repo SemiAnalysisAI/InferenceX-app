@@ -6,7 +6,8 @@ import {
 import { Model, MODEL_OPTIONS } from '@/lib/data-mappings';
 
 // ---------------------------------------------------------------------------
-// Per-model dashboard routes: /calculator/<model> and /historical/<model>
+// Per-model dashboard routes: /calculator/<model>, /historical/<model>,
+// /profit-estimator/<model>, and /profit-estimator-per-gigawatt/<model>
 // ---------------------------------------------------------------------------
 //
 // The bare /calculator and /historical tabs render the DEFAULT model; the
@@ -24,12 +25,19 @@ import { Model, MODEL_OPTIONS } from '@/lib/data-mappings';
 // canonical slug, mirroring compare behavior.
 
 /** Dashboard tabs that expose per-model child routes. */
-export const MODEL_ROUTE_TABS = ['calculator', 'historical'] as const;
+export const MODEL_ROUTE_TABS = [
+  'calculator',
+  'historical',
+  'profit-estimator',
+  'profit-estimator-per-gigawatt',
+] as const;
 export type ModelRouteTab = (typeof MODEL_ROUTE_TABS)[number];
 
 const MODEL_ROUTE_TAB_PATHS: Record<ModelRouteTab, `/${string}`> = {
   calculator: '/calculator',
   historical: '/historical',
+  'profit-estimator': '/profit-estimator',
+  'profit-estimator-per-gigawatt': '/profit-estimator-per-gigawatt',
 };
 
 /**
@@ -40,6 +48,48 @@ const MODEL_ROUTE_TAB_PATHS: Record<ModelRouteTab, `/${string}`> = {
  * URL on plain page loads. `model-routes.test.ts` pins the invariant.
  */
 export const DEFAULT_ROUTE_MODEL: Model = Model.DeepSeek_V4_Pro;
+
+/**
+ * Model each bare tab route renders. Calculator and historical follow the
+ * app-wide default; the profit estimators are pinned to agentic traces and open
+ * on Kimi K3, the model that workload is benchmarked most widely on. The page
+ * component seeds `GlobalFilterProvider` with the same model, and
+ * `model-routes.test.ts` pins that agreement.
+ */
+const MODEL_ROUTE_TAB_DEFAULT_MODEL: Record<ModelRouteTab, Model> = {
+  calculator: DEFAULT_ROUTE_MODEL,
+  historical: DEFAULT_ROUTE_MODEL,
+  'profit-estimator': Model.Kimi_K3,
+  'profit-estimator-per-gigawatt': Model.Kimi_K3,
+};
+
+/** Model the bare `tab` route shows; its slugged page canonicalizes to the bare path. */
+export function defaultRouteModel(tab: ModelRouteTab): Model {
+  return MODEL_ROUTE_TAB_DEFAULT_MODEL[tab];
+}
+
+/**
+ * Tabs that expose only a subset of `MODEL_ROUTES`. The profit estimators
+ * serve the agentic models whose coverage spans every SKU we price: Kimi K3
+ * (the default), GLM 5.2/5.3, and MiniMax M3. Other slugs 404 there and stay
+ * out of the sitemap. Tabs absent from this map offer every model.
+ */
+const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [Model.Kimi_K3, Model.GLM_5_2, Model.MiniMax_M3];
+const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
+  'profit-estimator': PROFIT_ESTIMATOR_MODELS,
+  'profit-estimator-per-gigawatt': PROFIT_ESTIMATOR_MODELS,
+};
+
+/** Routes a tab actually serves, in `MODEL_ROUTES` order. */
+export function modelRoutesForTab(tab: ModelRouteTab): ModelRoute[] {
+  const allowed = MODEL_ROUTE_TAB_MODELS[tab];
+  return allowed ? MODEL_ROUTES.filter((route) => allowed.includes(route.model)) : MODEL_ROUTES;
+}
+
+/** Whether `tab` serves a page for `model`. */
+export function modelRouteAvailableForTab(tab: ModelRouteTab, model: Model): boolean {
+  return MODEL_ROUTE_TAB_MODELS[tab]?.includes(model) ?? true;
+}
 
 export interface ModelRoute {
   /** Canonical URL segment, e.g. 'kimi-k3'. Lowercase, hyphen-separated. */
@@ -182,7 +232,7 @@ export function modelRoutePathnameRewrite(pathname: string, model: Model): strin
   const slug = modelRouteSlug(model);
   if (!slug) return null;
   if (parsed.slug === slug) return null;
-  if (!parsed.slug && model === DEFAULT_ROUTE_MODEL) return null;
+  if (!parsed.slug && model === defaultRouteModel(parsed.tab)) return null;
   const enPath = modelRoutePath(parsed.tab, slug);
   return parsed.zh ? `/zh${enPath}` : enPath;
 }

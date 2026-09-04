@@ -55,7 +55,7 @@ export function FaqQuestionLink({ id, question }: { id: string; question: string
       <a
         href={`#${id}`}
         onClick={() => track('about_faq_link_clicked', { id })}
-        className="min-w-0 flex-1 rounded-sm transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        className="min-w-0 flex-1 rounded-sm transition-colors hover:text-brand focus-visible:outline-none"
       >
         {question}
       </a>
@@ -65,7 +65,7 @@ export function FaqQuestionLink({ id, question }: { id: string; question: string
         aria-label={`${copied ? strings.copied : strings.copyLink}: ${question}`}
         title={copied ? strings.copied : strings.copyLink}
         onClick={() => void handleCopy()}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:border-brand/50 hover:bg-muted hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:border-brand/50 hover:bg-muted hover:text-brand focus-visible:outline-none"
       >
         {copied ? (
           <Check aria-hidden="true" className="size-4" />

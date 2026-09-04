@@ -1,0 +1,199 @@
+name: Recompute Agentic Metrics
+run-name: Recompute metrics for ${{ inputs.run-id || 'all' }} (${{ inputs.neon-branch || 'production' }})
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/recompute-agentic-metrics.yml'
+      - 'packages/db/src/backfill-chart-series.ts'
+      - 'packages/db/src/backfill-aggregate-stats.ts'
+      - 'packages/db/src/backfill-request-timeline.ts'
+      - 'packages/db/src/etl/compute-chart-series.ts'
+      - 'packages/db/src/etl/compute-request-timeline.ts'
+      - 'packages/db/src/queries/agentic-shared.ts'
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: Already-ingested GitHub benchmark run, or all for stale-only bulk repair
+        required: true
+        type: string
+      neon-branch:
+        description: Optional existing Neon child branch; omit for production on master
+        required: false
+        type: string
+      atom-kv-capacity-only:
+        description: Backfill only ATOM KV capacity from stored logs and metrics
+        required: false
+        type: boolean
+        default: false
+      stale-only:
+        description: Skip already-current derived payloads
+        required: false
+        type: boolean
+        default: true
+      restore-missing-trace:
+        description: Restore the registered missing trace artifact for the selected run
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.neon-branch || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  scope:
+    name: Select repair shards
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.scope.outputs.shards }}
+      count: ${{ steps.scope.outputs.count }}
+    steps:
+      - id: scope
+        env:
+          RUN_ID: ${{ inputs.run-id || 'all' }}
+          ATOM_ONLY: ${{ inputs.atom-kv-capacity-only }}
+          RESTORE_TRACE: ${{ inputs.restore-missing-trace }}
+        run: |
+          if [[ "$RUN_ID" == all ]]; then
+            if [[ "$ATOM_ONLY" == true || "$RESTORE_TRACE" == true ]]; then
+              echo '::error::Artifact recovery and ATOM capacity require a specific run'
+              exit 1
+            fi
+            echo 'shards=[0,1,2,3,4,5,6,7]' >> "$GITHUB_OUTPUT"
+            echo 'count=8' >> "$GITHUB_OUTPUT"
+          elif [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'shards=[0]' >> "$GITHUB_OUTPUT"
+            echo 'count=1' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Expected a GitHub run ID or all'
+            exit 1
+          fi
+  recompute:
+    name: Recompute stored metrics (shard ${{ matrix.shard }})
+    needs: scope
+    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.scope.outputs.shards) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Select database
+        timeout-minutes: 8
+        env:
+          PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
+        run: |
+          database_url="$PRODUCTION_DATABASE_URL"
+          if [ -n "$NEON_BRANCH_NAME" ]; then
+            if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+              echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
+              exit 1
+            fi
+            api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
+            curl_args=(--fail --silent --show-error --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors -H "Authorization: Bearer $NEON_API_KEY")
+            branches=$(curl "${curl_args[@]}" "$api/branches?limit=100")
+            branch=$(jq -c --arg name "$NEON_BRANCH_NAME" '.branches[] | select(.name == $name)' <<<"$branches")
+            if [ -z "$branch" ]; then
+              echo "::error::Neon child branch not found: $NEON_BRANCH_NAME"
+              exit 1
+            fi
+            jq -e '.parent_id != null and .default != true and .protected != true' <<<"$branch" >/dev/null
+            branch_id=$(jq -r '.id' <<<"$branch")
+            echo "Resolving connection for child branch $branch_id"
+            database_url=$(curl "${curl_args[@]}" \
+              "$api/connection_uri?branch_id=$branch_id&database_name=neondb&role_name=neondb_owner&pooled=false" | jq -er '.uri')
+            echo "::add-mask::$database_url"
+            endpoints=$(curl "${curl_args[@]}" "$api/endpoints")
+            database_host=$(CHECK_DATABASE_URL="$database_url" node -e 'console.log(new URL(process.env.CHECK_DATABASE_URL).hostname.replace("-pooler.", "."))')
+            jq -e --arg branch "$branch_id" --arg host "$database_host" \
+              '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null
+            {
+              echo "Child database: $NEON_BRANCH_NAME ($branch_id)"
+              echo "Host: $database_host"
+              echo "Expires: $(jq -r '.expires_at' <<<"$branch")"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
+            echo '::error::Production recomputation requires master'
+            exit 1
+          fi
+          echo "::add-mask::$database_url"
+          echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
+      - name: Restore a missing trace from its registered original artifact
+        if: inputs.restore-missing-trace == true
+        env:
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: bun packages/db/src/backfill-missing-agentic-trace.ts --run-id "$RUN_ID" --yes
+      - name: Snapshot, recompute, and verify derived data
+        if: inputs.atom-kv-capacity-only != true
+        env:
+          RUN_ID: ${{ inputs.run-id || 'all' }}
+          STALE_ONLY: ${{ inputs.stale-only }}
+          SHARD_COUNT: ${{ needs.scope.outputs.count }}
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          args=(--yes --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX")
+          if [[ "$RUN_ID" != all ]]; then args+=(--run-id "$RUN_ID"); fi
+          manifest="$RUNNER_TEMP/agentx-integrity.json"
+          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --snapshot "$manifest"
+          rebuild=("${args[@]}")
+          if [[ "$RUN_ID" != all && "$STALE_ONLY" == false ]]; then rebuild+=(--force); fi
+          bun run --cwd packages/db db:backfill-chart-series "${rebuild[@]}"
+          bun run --cwd packages/db db:backfill-aggregate-stats "${rebuild[@]}"
+          bun run --cwd packages/db db:backfill-request-timeline "${args[@]}"
+          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --verify "$manifest"
+      - name: Retain integrity evidence
+        if: ${{ always() && inputs.atom-kv-capacity-only != true }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agentx-integrity-${{ matrix.shard }}
+          path: ${{ runner.temp }}/agentx-integrity.json
+          retention-days: 14
+      - name: Backfill ATOM KV capacity
+        if: inputs.atom-kv-capacity-only == true
+        env:
+          RUN_ID: ${{ inputs.run-id }}
+        run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
+  invalidate:
+    name: Invalidate production cache
+    needs: recompute
+    if: inputs.neon-branch == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Invalidate production cache after all shards pass
+        env:
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com

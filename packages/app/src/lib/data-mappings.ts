@@ -47,6 +47,8 @@ interface ModelConfig {
   label: string;
   prefix: string;
   category: CategoryTag;
+  /** Exact public model id in OpenRouter's `/api/v1/models` catalog. */
+  openRouterModelId?: string;
   /**
    * Filename under `public/logos/` for the model creator's logo, shown beside
    * the model name in UI surfaces such as the inference chart caption. Absent =
@@ -136,6 +138,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
     category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
     logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
   },
@@ -145,6 +148,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
+    openRouterModelId: 'moonshotai/kimi-k3',
     logo: 'kimi-color.svg',
   },
   [Model.Kimi_K2_5]: {
@@ -161,25 +165,29 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
+    openRouterModelId: 'moonshotai/kimi-k2.7-code',
     logo: 'kimi-color.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
     category: 'default',
+    openRouterModelId: 'minimax/minimax-m3',
     logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
     label: 'DeepSeek R1 0528 671B',
     prefix: 'dsr1',
     category: 'maintenance',
+    openRouterModelId: 'deepseek/deepseek-r1-0528',
     logo: 'deepseek-color.svg',
   },
   [Model.GLM_5]: {
     label: 'GLM5/5.1 744B',
     prefix: 'glm5',
     category: 'deprecated',
-    logo: 'zhipu-color.svg',
+    openRouterModelId: 'z-ai/glm-5.1',
+    logo: 'zai-color.svg',
   },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
@@ -187,12 +195,14 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5.2/GLM5.3 744B',
     prefix: 'glm5.2',
     category: 'default',
-    logo: 'zhipu-color.svg',
+    openRouterModelId: 'z-ai/glm-5.3',
+    logo: 'zai-color.svg',
   },
   [Model.Qwen3_5]: {
     label: 'Qwen3.5 397B',
     prefix: 'qwen3.5',
     category: 'default',
+    openRouterModelId: 'qwen/qwen3.5-397b-a17b',
     logo: 'qwen-color.svg',
   },
   // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
@@ -205,12 +215,14 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
     category: 'default',
+    openRouterModelId: 'qwen/qwen3.8-flash',
     logo: 'qwen-color.svg',
   },
   [Model.GptOss]: {
     label: 'gpt-oss 120B',
     prefix: 'gptoss',
     category: 'deprecated',
+    openRouterModelId: 'openai/gpt-oss-120b',
     logo: 'openai.svg',
   },
   [Model.MiniMax_M2_5]: {
@@ -219,18 +231,21 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
     category: 'deprecated',
+    openRouterModelId: 'minimax/minimax-m2.7',
     logo: 'minimax-color.svg',
   },
   [Model.Llama3_3_70B]: {
     label: 'Llama 3.3 70B Instruct',
     prefix: '70b',
     category: 'deprecated',
+    openRouterModelId: 'meta-llama/llama-3.3-70b-instruct',
     logo: 'meta-color.svg',
   },
   [Model.Llama3_1_70B]: {
     label: 'Llama 3.1 70B Instruct',
     prefix: '',
     category: 'hidden',
+    openRouterModelId: 'meta-llama/llama-3.1-70b-instruct',
     logo: 'meta-color.svg',
   },
 };
@@ -271,6 +286,11 @@ export function getModelCategory(model: Model): CategoryTag {
 
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/** Exact OpenRouter catalog model used for live input/output pricing. */
+export function getOpenRouterModelId(model: Model): string | null {
+  return MODEL_CONFIG[model]?.openRouterModelId ?? null;
 }
 
 /**
@@ -476,6 +496,38 @@ export function isSequenceDeprecated(sequence: Sequence): boolean {
 
 export function getSequenceCategory(sequence: Sequence): CategoryTag {
   return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
+}
+
+/**
+ * Scenarios retired for a specific model while staying active for others.
+ * `SEQUENCE_CONFIG` categories are global — 8K/1K is `default` because most
+ * fixed-seq models still sweep it — so a per-model retirement needs its own
+ * table. Listing a scenario here moves it under the Deprecated group in the
+ * scenario selector for that model only; historical rows stay queryable, the
+ * scenario just stops presenting as actively benchmarked.
+ *
+ * MiniMax M3: the Single-turn 8k1k sweep was removed on 2026-08-04
+ * (InferenceX#2493, per MODELS.md "Scenario and precision retirements");
+ * Agentic coding is the model's only active scenario.
+ */
+const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model retired the scenario even though it is globally active. */
+export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Sequence category as seen from one model's point of view: the global
+ * category, overridden to `deprecated` when the model retired the scenario.
+ * Selectors pass the selected model so a per-model retirement (MiniMax M3's
+ * 8K/1K) groups under Deprecated without touching other models.
+ */
+export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
+  if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
+  return getSequenceCategory(sequence);
 }
 
 export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {

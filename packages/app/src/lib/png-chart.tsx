@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 import type { SsrInterpolatedRow } from '@/lib/compare-ssr';
+import { getCjkFonts } from '@/lib/og-assets';
 
 // Render natively at high DPI. Scaling the CSS output would bitmap-upsample
 // Satori's text and SVG paths instead of rasterizing them at the target size.
@@ -42,7 +43,27 @@ interface ComparePngChartOptions {
   workload: string;
   rangeNote: string;
   footer: string;
+  lang?: 'en' | 'zh';
 }
+
+const SHARED_COPY = {
+  en: {
+    defaultWorkload: 'DEFAULT WORKLOAD',
+    defaultComparison: 'Default comparison',
+    lowerCost: 'Lower cost is better',
+    interactivity: 'Interactivity (tok/s/user)',
+    matchedInteractivity: 'Matched Interactivity',
+    noMatchedCostData: 'No matched cost data available.',
+  },
+  zh: {
+    defaultWorkload: '默认工作负载',
+    defaultComparison: '默认对比',
+    lowerCost: '成本越低越好',
+    interactivity: '交互性（tok/s/user）',
+    matchedInteractivity: '相同交互性',
+    noMatchedCostData: '没有可用于相同交互性对比的成本数据。',
+  },
+} as const;
 
 export function money(value: number): string {
   if (value >= 10) return `$${value.toFixed(1)}`;
@@ -130,7 +151,7 @@ export function renderSeriesPath(points: Point[], stroke: string, dashed: boolea
 }
 
 /** Shared Satori shell for all indexed compare PNG routes. */
-export function renderComparePngChart({
+export async function renderComparePngChart({
   curveRows,
   plottedRows,
   logoSrc,
@@ -142,7 +163,10 @@ export function renderComparePngChart({
   workload,
   rangeNote,
   footer,
-}: ComparePngChartOptions): ImageResponse {
+  lang = 'en',
+}: ComparePngChartOptions): Promise<ImageResponse> {
+  const copy = SHARED_COPY[lang];
+  const fonts = lang === 'zh' ? await getCjkFonts() : [];
   const costs = curveRows
     .flatMap((row) => [row.a?.cost, row.b?.cost])
     .filter((cost): cost is number => typeof cost === 'number' && Number.isFinite(cost));
@@ -193,7 +217,7 @@ export function renderComparePngChart({
         padding: `${38 * R}px ${46 * R}px ${26 * R}px`,
         background: COLORS.background,
         color: COLORS.text,
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: lang === 'zh' ? 'Noto Sans SC' : 'Arial, sans-serif',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -226,13 +250,13 @@ export function renderComparePngChart({
           }}
         >
           <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
-            DEFAULT WORKLOAD
+            {copy.defaultWorkload}
           </div>
           <div style={{ display: 'flex', fontSize: 21 * R, fontWeight: 700 }}>
-            {workload || 'Default comparison'}
+            {workload || copy.defaultComparison}
           </div>
           <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
-            Lower cost is better
+            {copy.lowerCost}
           </div>
         </div>
       </div>
@@ -406,7 +430,7 @@ export function renderComparePngChart({
               fontWeight: 600,
             }}
           >
-            Interactivity (tok/s/user)
+            {copy.interactivity}
           </div>
           {showRangeEndpoints && (
             <div
@@ -437,7 +461,7 @@ export function renderComparePngChart({
           }}
         >
           <div style={{ display: 'flex', fontSize: 18 * R, fontWeight: 700 }}>
-            Matched Interactivity
+            {copy.matchedInteractivity}
           </div>
           <div style={{ display: 'flex', gap: 20 * R, fontSize: 15 * R, color: COLORS.muted }}>
             <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
@@ -494,7 +518,7 @@ export function renderComparePngChart({
             ))
           ) : (
             <div style={{ display: 'flex', fontSize: 18 * R, color: COLORS.muted }}>
-              No matched cost data available.
+              {copy.noMatchedCostData}
             </div>
           )}
         </div>
@@ -517,6 +541,7 @@ export function renderComparePngChart({
     </div>,
     {
       ...SIZE,
+      ...(fonts.length > 0 ? { fonts } : {}),
       headers: {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
       },

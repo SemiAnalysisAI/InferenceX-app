@@ -5,7 +5,10 @@ import { useMemo } from 'react';
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { track } from '@/lib/analytics';
+import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 
 import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
@@ -22,7 +25,6 @@ import {
   rollingAverage,
   rollingRatioFromComponents,
   timeRollingAverage,
-  toggleThroughputSeries,
   type ThroughputSeriesKey,
 } from './time-series-math';
 
@@ -34,10 +36,89 @@ type SlicedServerSeries = PhaseSlicedSeries<ServerSeriesLike> | null;
 
 export type RequestActivityView = 'queue' | 'completed';
 
-const REQUEST_ACTIVITY_OPTIONS: SegmentedToggleOption<RequestActivityView>[] = [
-  { value: 'queue', label: 'Queue depth', testId: 'request-activity-queue' },
-  { value: 'completed', label: 'Completed', testId: 'request-activity-completed' },
-];
+const SERVER_STRINGS = {
+  en: {
+    kvTitle: 'KV cache utilization over time',
+    hbmAvg: 'Chip HBM (avg n=50)',
+    avg: 'Avg',
+    chipKv: 'Chip KV cache (avg n=50)',
+    cpuPoolAvg: 'CPU offload pool (avg n=50)',
+    kvAxis: 'KV cache (%)',
+    queueOption: 'Queue depth',
+    completedOption: 'Completed',
+    queueTitle: 'Request queue depth',
+    completedTitle: 'Cumulative completed requests',
+    activityAria: 'Request activity metric',
+    completedSeries: 'Completed requests',
+    requestsAxis: 'Requests',
+    running: 'Running (avg n=50)',
+    waiting: 'Waiting (avg n=50)',
+    total: 'Total (avg n=50)',
+    prefixTitle: 'Prefix cache hit rate per interval',
+    hbmHit: 'Chip (HBM, avg n=50)',
+    hitAxis: 'Hit rate (%)',
+    throughputSource: (source: string) => `Throughput · ${source}`,
+    throughputTitle: 'Throughput (input & decode)',
+    throughputSeriesAria: 'Throughput series',
+    input: 'Input',
+    decode: 'Decode',
+    tokenRate: 'Tokens / sec',
+    promptTitle: 'Cumulative prompt token source breakdown',
+    uniqueTitle: 'Total unique input tokens over time',
+    uniqueSeries: 'Cumulative unique input tokens',
+    tokensAxis: 'Tokens',
+    inflightTitle: 'Unique input tokens in flight',
+    inflightSeries: 'In flight (avg 30s)',
+    cumulativeAvg: 'Cumulative average',
+    cachePool: (value: string) => `KV cache pool · ${value}`,
+  },
+  zh: {
+    kvTitle: 'KV cache 利用率随时间变化',
+    hbmAvg: '芯片 HBM（50 点均值）',
+    avg: '平均值',
+    chipKv: '芯片 KV cache（50 点均值）',
+    cpuPoolAvg: 'CPU offload 池（50 点均值）',
+    kvAxis: 'KV cache 利用率 (%)',
+    queueOption: '队列深度',
+    completedOption: '已完成',
+    queueTitle: '请求队列深度',
+    completedTitle: '累计完成请求数',
+    activityAria: '请求活动指标',
+    completedSeries: '已完成请求',
+    requestsAxis: '请求数',
+    running: '运行中（50 点均值）',
+    waiting: '等待中（50 点均值）',
+    total: '总数（50 点均值）',
+    prefixTitle: '每个采样区间的 prefix cache 命中率',
+    hbmHit: '芯片（HBM，50 点均值）',
+    hitAxis: '命中率 (%)',
+    throughputSource: (source: string) => `吞吐量 · ${source}`,
+    throughputTitle: '吞吐量（输入与解码）',
+    throughputSeriesAria: '吞吐量序列',
+    input: '输入',
+    decode: '解码',
+    tokenRate: 'token/s',
+    promptTitle: '累计提示 token 的来源构成',
+    uniqueTitle: '累计去重输入 token 数',
+    uniqueSeries: '累计去重输入 token',
+    tokensAxis: 'token 数',
+    inflightTitle: '在途请求的去重输入 token 数',
+    inflightSeries: '在途去重输入 token（30 秒均值）',
+    cumulativeAvg: '累计均值',
+    cachePool: (value: string) => `KV cache 池 · ${value}`,
+  },
+} as const;
+
+const ZH_THROUGHPUT_SERIES_NAMES: Record<string, string> = {
+  'Input (avg n=50)': '输入（50 点均值）',
+  'Decode (avg n=50)': '解码（50 点均值）',
+  'Total running avg (60s burn-in)': '总吞吐量平均值（剔除前 60 秒）',
+};
+
+/** Localize display-only series names while preserving the math helper's stable English output. */
+export function localizeThroughputSeriesName(name: string, locale: Locale): string {
+  return locale === 'zh' ? (ZH_THROUGHPUT_SERIES_NAMES[name] ?? name) : name;
+}
 
 /** Compact token count for chart labels: 306808 → "307K tok", 3.2e6 → "3.2M tok". */
 const fmtTokensCompact = (n: number): string => {
@@ -75,9 +156,11 @@ function engineSeriesName(engineLabel: string): string {
 }
 
 export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const locale = useLocale();
+  const t = SERVER_STRINGS[locale];
   return (
     <ExpandableChart
-      title="KV cache utilization over time"
+      title={t.kvTitle}
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
@@ -113,11 +196,7 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
         const series = [
           ...(hasPerEngine ? perEngine : []),
           {
-            name: hasHost
-              ? 'Chip HBM (avg n=50)'
-              : hasPerEngine
-                ? 'Avg'
-                : 'Chip KV cache (avg n=50)',
+            name: hasHost ? t.hbmAvg : hasPerEngine ? t.avg : t.chipKv,
             data: rollingAverage(serverSeries.kvCacheUsage, 50),
             // Skip raw scatter when per-engine overlay is on — the
             // DP-rank lines already convey the spread, dots would be noise.
@@ -131,7 +210,7 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
           ...(hasHost
             ? [
                 {
-                  name: 'CPU offload pool (avg n=50)',
+                  name: t.cpuPoolAvg,
                   data: rollingAverage(serverSeries.hostKvCacheUsage, 50),
                   rawData: serverSeries.hostKvCacheUsage,
                   color: '#f97316',
@@ -146,7 +225,7 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
             durationS={sliced.durationS}
             yMax={1}
             yFmt={(v) => `${(v * 100).toFixed(0)}%`}
-            yAxisLabel="KV cache (%)"
+            yAxisLabel={t.kvAxis}
             {...size}
           />
         );
@@ -159,32 +238,41 @@ export function RequestActivityCard({
   sliced,
   phaseTimeline,
   timelineLoading,
+  timelineError,
   view,
   onViewChange,
 }: {
   sliced: SlicedServerSeries;
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
+  /** Failure message for the Completed view when the timeline query errored. */
+  timelineError?: string;
   view: RequestActivityView;
   onViewChange: (view: RequestActivityView) => void;
 }) {
+  const locale = useLocale();
+  const t = SERVER_STRINGS[locale];
+  const requestActivityOptions: SegmentedToggleOption<RequestActivityView>[] = [
+    { value: 'queue', label: t.queueOption, testId: 'request-activity-queue' },
+    { value: 'completed', label: t.completedOption, testId: 'request-activity-completed' },
+  ];
   const completedRequests = useMemo(
     () => (phaseTimeline ? cumulativeCompletedRequests(phaseTimeline.requests) : null),
     [phaseTimeline],
   );
   return (
     <ExpandableChart
-      title={view === 'queue' ? 'Request queue depth' : 'Cumulative completed requests'}
+      title={view === 'queue' ? t.queueTitle : t.completedTitle}
       testId="request-activity-chart"
       controls={
         <SegmentedToggle
           value={view}
-          options={REQUEST_ACTIVITY_OPTIONS}
+          options={requestActivityOptions}
           onValueChange={(value) => {
             onViewChange(value);
             track('inference_agentic_request_activity_changed', { view: value });
           }}
-          ariaLabel="Request activity metric"
+          ariaLabel={t.activityAria}
           testId="request-activity-toggle"
           buttonClassName="px-2 py-1 text-xs"
         />
@@ -193,20 +281,23 @@ export function RequestActivityCard({
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (view === 'completed') {
           if (!phaseTimeline) {
-            return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
+            if (timelineLoading) return <ChartSkeleton />;
+            // A failed timeline query is not "no data" — surface the failure;
+            // the page-level banner above the cards carries the retry action.
+            return <ChartEmpty message={timelineError} />;
           }
           return (
             <TimeSeriesChart
               series={[
                 {
-                  name: 'Completed requests',
+                  name: t.completedSeries,
                   data: completedRequests ?? [],
                   color: '#3b82f6',
                   strokeWidth: 2.5,
                 },
               ]}
               durationS={phaseTimeline.durationS}
-              yAxisLabel="Requests"
+              yAxisLabel={t.requestsAxis}
               {...size}
             />
           );
@@ -217,7 +308,7 @@ export function RequestActivityCard({
           <TimeSeriesChart
             series={[
               {
-                name: 'Running (avg n=50)',
+                name: t.running,
                 data: rollingAverage(
                   serverSeries.queueDepth.map((p: QueueDepthPoint) => ({
                     t: p.t,
@@ -229,7 +320,7 @@ export function RequestActivityCard({
                 strokeWidth: 2,
               },
               {
-                name: 'Waiting (avg n=50)',
+                name: t.waiting,
                 data: rollingAverage(
                   serverSeries.queueDepth.map((p: QueueDepthPoint) => ({
                     t: p.t,
@@ -241,7 +332,7 @@ export function RequestActivityCard({
                 strokeWidth: 2,
               },
               {
-                name: 'Total (avg n=50)',
+                name: t.total,
                 data: rollingAverage(
                   serverSeries.queueDepth.map((p: QueueDepthPoint) => ({
                     t: p.t,
@@ -254,7 +345,7 @@ export function RequestActivityCard({
               },
             ]}
             durationS={sliced.durationS}
-            yAxisLabel="Requests"
+            yAxisLabel={t.requestsAxis}
             {...size}
           />
         );
@@ -264,6 +355,8 @@ export function RequestActivityCard({
 }
 
 export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const locale = useLocale();
+  const t = SERVER_STRINGS[locale];
   const hitRateData = useMemo(() => {
     if (!sliced) return [];
     const serverSeries = sliced.series;
@@ -280,7 +373,7 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
 
   return (
     <ExpandableChart
-      title="Prefix cache hit rate per interval"
+      title={t.prefixTitle}
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
@@ -288,7 +381,7 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
           <TimeSeriesChart
             series={[
               {
-                name: 'Chip (HBM, avg n=50)',
+                name: t.hbmHit,
                 data: hitRateData,
                 color: '#a855f7',
                 strokeWidth: 2,
@@ -297,7 +390,7 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
             durationS={sliced.durationS}
             yMax={1}
             yFmt={(v) => `${(v * 100).toFixed(0)}%`}
-            yAxisLabel="Hit rate (%)"
+            yAxisLabel={t.hitAxis}
             {...size}
           />
         );
@@ -317,52 +410,53 @@ export function ThroughputCard({
   selected: ReadonlySet<ThroughputSeriesKey>;
   onSelectedChange: (next: ReadonlySet<ThroughputSeriesKey>) => void;
 }) {
+  const locale = useLocale();
+  const t = SERVER_STRINGS[locale];
   return (
     <ExpandableChart
       title={
         selectedSource
-          ? `Throughput · ${metricSourceLabel(selectedSource.source)}`
-          : 'Throughput (input & decode)'
+          ? t.throughputSource(metricSourceLabel(selectedSource.source, locale))
+          : t.throughputTitle
       }
       controls={
-        <div className="flex items-center gap-1" data-testid="throughput-series-toggle">
-          {(
-            [
-              ['input', 'Input'],
-              ['decode', 'Decode'],
-            ] as const
-          ).map(([key, label]) => {
-            const active = selected.has(key);
-            const isOnlyActive = active && selected.size === 1;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={active}
-                disabled={isOnlyActive}
-                data-testid={`throughput-series-${key}`}
-                className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                  active
-                    ? key === 'input'
-                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
-                      : 'bg-orange-500/20 text-orange-600 dark:text-orange-300'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                } disabled:cursor-not-allowed disabled:opacity-60`}
-                onClick={() => {
-                  const next = toggleThroughputSeries(selected, key);
-                  if (next === selected) return;
-                  onSelectedChange(next);
-                  track('inference_agentic_throughput_series_toggled', {
-                    series: key,
-                    enabled: next.has(key),
-                  });
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <MultiSelect
+          triggerTestId="throughput-series-select"
+          ariaLabel={t.throughputSeriesAria}
+          options={[
+            {
+              value: 'input',
+              label: t.input,
+              testId: 'throughput-series-input',
+              disabled: selected.has('input') && selected.size === 1,
+              icon: <span className="size-2 rounded-full bg-blue-500" aria-hidden="true" />,
+            },
+            {
+              value: 'decode',
+              label: t.decode,
+              testId: 'throughput-series-decode',
+              disabled: selected.has('decode') && selected.size === 1,
+              icon: <span className="size-2 rounded-full bg-orange-500" aria-hidden="true" />,
+            },
+          ]}
+          value={[...selected]}
+          onChange={(values) => {
+            const next = new Set<ThroughputSeriesKey>(values as ThroughputSeriesKey[]);
+            for (const key of ['input', 'decode'] as const) {
+              if (selected.has(key) !== next.has(key)) {
+                track('inference_agentic_throughput_series_toggled', {
+                  series: key,
+                  enabled: next.has(key),
+                });
+              }
+            }
+            onSelectedChange(next);
+          }}
+          minSelections={1}
+          plainSelectedText
+          showClearAll={false}
+          searchable={false}
+        />
       }
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
@@ -374,9 +468,12 @@ export function ThroughputCard({
               serverSeries.prefillTps,
               serverSeries.decodeTps,
               selected,
-            )}
+            ).map((series) => ({
+              ...series,
+              name: localizeThroughputSeriesName(series.name, locale),
+            }))}
             durationS={sliced.durationS}
-            yAxisLabel="Tokens / sec"
+            yAxisLabel={t.tokenRate}
             {...size}
           />
         );
@@ -386,9 +483,10 @@ export function ThroughputCard({
 }
 
 export function PromptTokenSourceCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const t = SERVER_STRINGS[useLocale()];
   return (
     <ExpandableChart
-      title="Cumulative prompt token source breakdown"
+      title={t.promptTitle}
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
@@ -405,9 +503,10 @@ export function PromptTokenSourceCard({ sliced }: { sliced: SlicedServerSeries }
 }
 
 export function CumulativeUniqueInputTokensCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const t = SERVER_STRINGS[useLocale()];
   return (
     <ExpandableChart
-      title="Total unique input tokens over time"
+      title={t.uniqueTitle}
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
@@ -433,14 +532,14 @@ export function CumulativeUniqueInputTokensCard({ sliced }: { sliced: SlicedServ
           <TimeSeriesChart
             series={[
               {
-                name: 'Cumulative unique input tokens',
+                name: t.uniqueSeries,
                 data: uniqueData,
                 color: '#3b82f6',
                 strokeWidth: 2,
               },
             ]}
             durationS={sliced.durationS}
-            yAxisLabel="Tokens"
+            yAxisLabel={t.tokensAxis}
             {...size}
           />
         );
@@ -456,9 +555,10 @@ export function InflightUniqueTokensCard({
 }: {
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
-  /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
+  /** Nominal KV-pool capacity in tokens — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
+  const t = SERVER_STRINGS[useLocale()];
   const inflightSeries = useMemo(() => {
     if (!phaseTimeline) return null;
     const raw = inflightUniqueTokens(phaseTimeline.requests);
@@ -470,7 +570,7 @@ export function InflightUniqueTokensCard({
   }, [phaseTimeline]);
   return (
     <ExpandableChart
-      title="Unique input tokens in flight"
+      title={t.inflightTitle}
       testId="unique-input-inflight-chart"
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
@@ -486,7 +586,7 @@ export function InflightUniqueTokensCard({
         // so brief turn-handoff dips don't dominate the chart.
         const raw = inflightSeries?.raw ?? [];
         const smoothed = inflightSeries?.smoothed ?? [];
-        // KV-cache pool size (vLLM only) drawn as a constant ceiling so
+        // KV-cache pool size drawn as a constant ceiling so
         // you can see how close the working set gets to eviction
         // pressure. Phase-independent — it's a static config value.
         const pool = kvCachePoolTokens;
@@ -494,24 +594,24 @@ export function InflightUniqueTokensCard({
           <TimeSeriesChart
             series={[
               {
-                name: 'In flight (avg 30s)',
+                name: t.inflightSeries,
                 data: smoothed,
                 rawData: raw,
                 color: '#a855f7',
                 strokeWidth: 2,
               },
               {
-                name: 'Cumulative average',
+                name: t.cumulativeAvg,
                 data: inflightSeries?.cumulative ?? [],
                 color: '#ef4444',
                 strokeWidth: 3,
               },
             ]}
             durationS={phaseTimeline.durationS}
-            yAxisLabel="Tokens"
+            yAxisLabel={t.tokensAxis}
             refLines={
               pool && pool > 0
-                ? [{ value: pool, label: `KV cache pool · ${fmtTokensCompact(pool)}` }]
+                ? [{ value: pool, label: t.cachePool(fmtTokensCompact(pool)) }]
                 : undefined
             }
             {...size}

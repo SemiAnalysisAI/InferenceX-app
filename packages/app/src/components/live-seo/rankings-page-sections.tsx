@@ -92,11 +92,11 @@ export function RankingsDetailContent({
               {t.backLabel}
             </Link>
             <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-brand uppercase">
+              <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
                 {entry.model.label}
               </span>
             </div>
-            <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {t.heading}
             </h1>
             {lead && <p className="mt-4 max-w-3xl text-lg leading-relaxed">{lead}</p>}
@@ -113,7 +113,7 @@ export function RankingsDetailContent({
                 <table className="w-full min-w-[40rem] text-sm">
                   <caption className="sr-only">{t.tableCaption}</caption>
                   <thead>
-                    <tr className="border-b border-border/50 text-left text-xs tracking-[0.1em] text-muted-foreground uppercase">
+                    <tr className="border-b border-border/50 text-left text-xs tracking-widest text-muted-foreground uppercase">
                       <th scope="col" className="px-4 py-3">
                         {t.colRank}
                       </th>

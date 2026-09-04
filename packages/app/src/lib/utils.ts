@@ -1,10 +1,23 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
-import { FRAMEWORK_LABELS, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
 import { getGpuSpecs } from './constants';
+
+// Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
+// built-in tracking scale (tighter…widest), so without this, e.g.
+// cn('tracking-eyebrow', 'tracking-tight') would keep both classes.
+// (text-2xs/text-3xs need no config: t-shirt sizes are recognized as font sizes.)
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      tracking: ['eyebrow', 'eyebrow-wide', 'heading'],
+    },
+  },
+});
+
 /**
  * Combines Tailwind CSS classes and other class values into a single string.
  * This utility helps in conditionally applying classes and merging them efficiently,
@@ -201,10 +214,7 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
       item.costrOutput &&
       item.outputTokensPerDollarH &&
       item.outputTokensPerDollarN &&
-      item.outputTokensPerDollarR &&
-      item.outputTokensPerRmbH &&
-      item.outputTokensPerRmbN &&
-      item.outputTokensPerRmbR
+      item.outputTokensPerDollarR
     ) {
       return item;
     }
@@ -248,18 +258,6 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
       },
       outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
         y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
-      outputTokensPerRmbH: item.outputTokensPerRmbH ?? {
-        y: specs.costh > 0 ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      outputTokensPerRmbN: item.outputTokensPerRmbN ?? {
-        y: specs.costn > 0 ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      outputTokensPerRmbR: item.outputTokensPerRmbR ?? {
-        y: specs.costr > 0 ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };
@@ -399,10 +397,7 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
       item.costri &&
       item.inputTokensPerDollarH &&
       item.inputTokensPerDollarN &&
-      item.inputTokensPerDollarR &&
-      item.inputTokensPerRmbH &&
-      item.inputTokensPerRmbN &&
-      item.inputTokensPerRmbR
+      item.inputTokensPerDollarR
     ) {
       return item;
     }
@@ -443,18 +438,6 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
       },
       inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
         y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
-      inputTokensPerRmbH: item.inputTokensPerRmbH ?? {
-        y: specs.costh > 0 ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      inputTokensPerRmbN: item.inputTokensPerRmbN ?? {
-        y: specs.costn > 0 ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      inputTokensPerRmbR: item.inputTokensPerRmbR ?? {
-        y: specs.costr > 0 ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };

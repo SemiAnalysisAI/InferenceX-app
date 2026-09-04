@@ -1,8 +1,7 @@
 /**
  * @file axis-metric-explanations.ts
  * @description Bilingual plain-English explanations (and, for y-axis metrics,
- * structural formulas) backing the expandable axis-metric footer rendered
- * below each inference chart. Y-axis entries are keyed by `METRIC_REGISTRY`
+ * structural formulas) backing the info buttons in axis metric dropdowns. Y-axis entries are keyed by `METRIC_REGISTRY`
  * keys; x-axis entries are keyed by the resolved x-axis kind. A unit test
  * asserts completeness against the registry, so adding a metric without an
  * explanation fails CI.
@@ -12,7 +11,7 @@
  * (src/lib/glossary.ts) — they describe how a value is computed, they do not
  * restate assumed constants.
  */
-import { METRIC_REGISTRY, type MetricKey } from './metric-registry';
+import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
   en: string;
@@ -22,11 +21,11 @@ export interface LocalizedText {
 export interface MetricExplanation {
   /** 1–3 sentence plain-language explanation of the metric. */
   description: LocalizedText;
-  /** Structural formula, rendered in monospace in the footer. */
+  /** Structural formula, rendered in monospace in metric help. */
   formula: LocalizedText;
 }
 
-/** Cost-basis flavor shared by the $/¥/cost metric families. */
+/** Cost-basis flavor shared by the $ and cost-per-million metric families. */
 type CostBasis = 'h' | 'n' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
@@ -103,6 +102,37 @@ function throughputPerMw(tokenType: TokenType): MetricExplanation {
   };
 }
 
+function tokenRevenuePerGpuHour(): MetricExplanation {
+  return {
+    description: {
+      en:
+        'Gross token revenue a GPU could earn per hour at this operating point. The normalized ' +
+        'source prices uncached input and output at $1 per million and cached input at $0.10 per ' +
+        'million. The OpenRouter source uses the selected model’s current public prices, with a ' +
+        '10%-of-input fallback when no cache-read price is published. Revenue prices uncached ' +
+        'input, cached input, and output separately. Input share comes from compatible measured ' +
+        'input/output throughput. When disaggregated rates use different GPU denominators, fixed ' +
+        'sequences use ISL:OSL and Agentic traces use measured prompt/generation tokens. Agentic ' +
+        'cache hit combines GPU and external cache when external cache is reported, otherwise GPU ' +
+        'and CPU cache. Historical Trends interpolates total throughput, input share, and cache ' +
+        'hit separately before pricing. A partially measured cache frontier receives no cache ' +
+        'discount. This turns the ' +
+        'throughput/interactivity tradeoff into a business-facing SLA curve.',
+      zh:
+        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式下，未缓存输入和输出均按每百万 1 美元计价，' +
+        '缓存输入按每百万 0.10 美元计价。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。' +
+        '未缓存输入、缓存输入与输出分别计价。输入 token 占比优先采用口径一致的实测输入/输出吞吐量。解耦运行的两类速率使用不同 GPU 分母时，' +
+        '固定序列采用 ISL:OSL，Agentic trace 采用实测 prompt/generation token 构成。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
+        '否则由 GPU 与 CPU cache 相加。Historical Trends 会在计价前分别插值总吞吐量、输入 token 占比和缓存命中率。' +
+        '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
+    },
+    formula: {
+      en: '$/GPU/hr = (uncached input × input price + cached input × cache-read price + output × output price) per GPU-second, scaled to one hour',
+      zh: '$/GPU/hr = 每 GPU 秒的（未缓存输入 × 输入价格 + 缓存输入 × 缓存读取价格 + 输出 × 输出价格），再换算为一小时',
+    },
+  };
+}
+
 function costPerMillion(basis: CostBasis, tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -138,28 +168,6 @@ function tokensPerDollar(basis: CostBasis, tokenType: TokenType): MetricExplanat
   };
 }
 
-function tokensPerRmb(basis: CostBasis, tokenType: TokenType): MetricExplanation {
-  return {
-    description: {
-      en:
-        `How many ${TOKEN_TYPE_EN[tokenType]} one Chinese yuan of infrastructure spend buys, ` +
-        `priced with the ${COST_BASIS_EN[basis]} converted at a fixed USD→CNY exchange rate. ` +
-        'Higher means cheaper.',
-      zh:
-        `1 元人民币基础设施开支能换来多少${TOKEN_TYPE_ZH[tokenType]}，` +
-        `按${COST_BASIS_ZH[basis]}以固定 USD→CNY 汇率折算计价。数值越高越便宜。`,
-    },
-    formula: {
-      en:
-        `tok/¥ = (${TOKEN_RATE_EN[tokenType]} × 3,600) ÷ ` +
-        '(all-in cost per chip-hour ($) × USD→CNY exchange rate)',
-      zh:
-        `tok/¥ =（${TOKEN_RATE_ZH[tokenType]} × 3,600）÷` +
-        '（每芯片小时全包成本（$）× USD→CNY 汇率）',
-    },
-  };
-}
-
 function provisionedJoules(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -177,6 +185,15 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
     },
   };
 }
+
+/** Validation-status note appended to every Measured Energy explanation. */
+const MEASURED_TIER_NOTE_EN =
+  ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
+  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
+  'marks them. Filter either status under Quick Filters → Measured Power.';
+const MEASURED_TIER_NOTE_ZH =
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
+  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
 
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
@@ -197,11 +214,13 @@ function measuredPower(phase: MeasuredPhase): MetricExplanation {
     description: {
       en:
         `Average per-chip accelerator power actually drawn during ${MEASURED_PHASE_EN[phase]}, ` +
-        'read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ' +
-        'measured draw, not the provisioned budget.',
+        `read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ` +
+        `measured draw, not the provisioned budget.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `${MEASURED_PHASE_ZH[phase]}每块加速器芯片的实际平均功耗，来自运行器遥测数据。` +
-        '与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。',
+        `与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
     },
     formula: {
       en: `W = mean of sampled per-chip accelerator power draw over ${MEASURED_PHASE_EN[phase]}`,
@@ -217,14 +236,49 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
         `Measured accelerator energy consumed per ${
           tokenType === 'total' ? 'token (including prompt tokens)' : `${tokenType} token`
         }, from runner power telemetry integrated over the run. Lower means the system converts ` +
-        'electricity into tokens more efficiently.',
+        `electricity into tokens more efficiently.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `每个${TOKEN_TYPE_ZH[tokenType]}消耗的加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。` +
-        '数值越低，说明系统把电能转化为 token 的效率越高。',
+        `数值越低，说明系统把电能转化为 token 的效率越高。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: `J/tok = measured accelerator energy over the run ÷ ${TOKEN_TYPE_EN[tokenType]} processed`,
       zh: `J/tok = 运行期间加速器实测能耗 ÷ 处理的${TOKEN_TYPE_ZH[tokenType]}数`,
+    },
+  };
+}
+
+const MEASURED_ROLE_EN: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: 'input (prompt)', isolates: 'prompt-processing' },
+  decode: { tokens: 'output', isolates: 'token-generation' },
+};
+
+const MEASURED_ROLE_ZH: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: '输入', isolates: '提示词处理' },
+  decode: { tokens: '输出', isolates: 'token 生成' },
+};
+
+function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanation {
+  return {
+    description: {
+      en:
+        `Measured accelerator energy consumed by the ${role} workers per ` +
+        `${MEASURED_ROLE_EN[role].tokens} token, from runner power telemetry integrated over ` +
+        `the run. Unlike the whole-deployment J/tok metrics, only that role's energy is ` +
+        `charged, so it isolates ${MEASURED_ROLE_EN[role].isolates} efficiency in ` +
+        `disaggregated deployments.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个${MEASURED_ROLE_ZH[role].tokens} token 由 ${MEASURED_PHASE_ZH[role]}工作进程消耗的` +
+        `加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。与全部署 J/tok 指标不同，` +
+        `它只计入该角色的能耗，因此可以在分离式部署中单独衡量${
+          MEASURED_ROLE_ZH[role].isolates
+        }效率。${MEASURED_TIER_NOTE_ZH}`,
+    },
+    formula: {
+      en:
+        `J/tok = measured ${role}-worker energy over the run ÷ ` +
+        `${role === 'prefill' ? 'input' : 'output'} tokens processed`,
+      zh: `J/tok = 运行期间 ${role} 工作进程实测能耗 ÷ 处理的${MEASURED_ROLE_ZH[role].tokens} token 数`,
     },
   };
 }
@@ -239,6 +293,7 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
+  tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
@@ -260,15 +315,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTokensPerDollarH: tokensPerDollar('h', 'input'),
   inputTokensPerDollarN: tokensPerDollar('n', 'input'),
   inputTokensPerDollarR: tokensPerDollar('r', 'input'),
-  tokensPerRmbH: tokensPerRmb('h', 'total'),
-  tokensPerRmbN: tokensPerRmb('n', 'total'),
-  tokensPerRmbR: tokensPerRmb('r', 'total'),
-  outputTokensPerRmbH: tokensPerRmb('h', 'output'),
-  outputTokensPerRmbN: tokensPerRmb('n', 'output'),
-  outputTokensPerRmbR: tokensPerRmb('r', 'output'),
-  inputTokensPerRmbH: tokensPerRmb('h', 'input'),
-  inputTokensPerRmbN: tokensPerRmb('n', 'input'),
-  inputTokensPerRmbR: tokensPerRmb('r', 'input'),
   costUser: {
     description: {
       en:
@@ -318,15 +364,17 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredJPerOutputToken: measuredJoulesPerToken('output'),
   measuredJPerInputToken: measuredJoulesPerToken('input'),
   measuredJPerTotalToken: measuredJoulesPerToken('total'),
+  measuredPrefillJPerInputToken: measuredRoleJoulesPerToken('prefill'),
+  measuredDecodeJPerOutputToken: measuredRoleJoulesPerToken('decode'),
   measuredJPerSuccessfulQuery: {
     description: {
       en:
-        'Measured accelerator energy consumed per successfully completed request, from runner ' +
-        'power telemetry. It charges the energy of the whole run only to requests that finished ' +
-        'successfully.',
+        `Measured accelerator energy consumed per successfully completed request, from runner ` +
+        `power telemetry. It charges the energy of the whole run only to requests that finished ` +
+        `successfully.${MEASURED_TIER_NOTE_EN}`,
       zh:
-        '每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。' +
-        '整个运行的能耗只计入成功完成的请求。',
+        `每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。` +
+        `整个运行的能耗只计入成功完成的请求。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'J/query = measured accelerator energy over the run ÷ successfully completed requests',
@@ -336,9 +384,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredWhPerSuccessfulQuery: {
     description: {
       en:
-        'The same measured energy per successful request expressed in watt-hours, a more ' +
-        'familiar household unit (1 Wh = 3,600 J).',
-      zh: '与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。',
+        `The same measured energy per successful request expressed in watt-hours, a more ` +
+        `familiar household unit (1 Wh = 3,600 J).${MEASURED_TIER_NOTE_EN}`,
+      zh: `与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'Wh/query = measured J per successful query ÷ 3,600',
@@ -348,11 +396,13 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredPowerPercentTdp: {
     description: {
       en:
-        'Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ' +
-        'below 100% suggest the workload leaves thermal or power headroom on the table.',
+        `Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ` +
+        `below 100% suggest the workload leaves thermal or power headroom on the table.${
+          MEASURED_TIER_NOTE_EN
+        }`,
       zh:
-        '每芯片实测平均功耗占加速器额定 TDP 的百分比。' +
-        '明显低于 100% 说明该工作负载没有用满散热或供电余量。',
+        `每芯片实测平均功耗占加速器额定 TDP 的百分比。` +
+        `明显低于 100% 说明该工作负载没有用满散热或供电余量。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: '% TDP = measured average power per chip (W) ÷ rated TDP (W) × 100',
@@ -376,7 +426,7 @@ export const X_AXIS_KINDS: readonly XAxisKind[] = [
 ];
 
 export interface XAxisExplanation {
-  /** Display name for the footer row; `pctl` is e.g. 'P90' | 'Median' | null. */
+  /** Full metric name for contextual help; `pctl` is e.g. 'P90' | 'Median' | null. */
   name: {
     en: (pctl: string | null) => string;
     zh: (pctl: string | null) => string;
@@ -455,14 +505,14 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
 /**
  * Resolve which logical x-axis metric a chart is currently plotting.
  * Classifies off the x-axis data field that `resolveXAxisField` actually
- * resolved for the chart's current state, so the footer can never disagree
+ * resolved for the chart's current state, so contextual help can never disagree
  * with the drawn axis — `resolveXAxisField` is the single source of truth for
  * the field, including the input-metric fallback where a metric without a
  * `*_x` config override keeps plotting the chart's natural x. Trace-derived
  * agentic x-axis modes bypass that resolver entirely, so they arrive as an
  * explicit flag. Applies to both the official pipeline and `?unofficialrun=`
  * overlays — the overlay path shares the chart's resolved x-axis, so one
- * footer row describes both.
+ * explanation describes both.
  */
 export function resolveXAxisKind(
   chartType: 'interactivity' | 'e2e',
@@ -494,8 +544,7 @@ export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
       : pctl.toUpperCase();
 }
 
-/** Locale-aware y-axis row label straight from the metric registry. */
+/** Locale-aware y-axis row label (metric plus cost tier) from the registry. */
 export function metricRowLabel(metricKey: MetricKey, locale: 'en' | 'zh'): string {
-  const metric = METRIC_REGISTRY[metricKey];
-  return locale === 'zh' ? metric.titleZh : metric.title;
+  return metricOptionTitle(metricKey, locale);
 }

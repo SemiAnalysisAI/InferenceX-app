@@ -27,6 +27,7 @@ import {
   bulkUpsertAvailability,
   type BenchmarkPersistenceInput,
 } from './etl/benchmark-ingest';
+import { normalizePowerContractMetrics, scrubWithheldPowerMetrics } from './etl/benchmark-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 
 const sql = createAdminSql({
@@ -264,6 +265,12 @@ async function ingestSupplementalBmk(
         numPrefillGpu: entry.tp * entry.ep,
         numDecodeGpu: entry.tp * entry.ep,
       });
+
+      // Supplemental metrics bypass mapBenchmarkRow, so apply the power
+      // publication contract here too: fail-closed verdict normalization,
+      // then strip withheld measurements when power_valid=0.
+      normalizePowerContractMetrics(entry.metrics, entry.metrics);
+      scrubWithheldPowerMetrics(entry.metrics);
 
       rows.push({
         configId,

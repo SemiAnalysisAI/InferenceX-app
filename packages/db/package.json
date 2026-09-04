@@ -23,6 +23,7 @@
     "db:migrate:collectivex": "bun --env-file=../../.env src/migrate-collectivex.ts",
     "db:apply-overrides": "bun --env-file=../../.env src/apply-overrides.ts",
     "db:backfill-aggregate-stats": "bun --env-file=../../.env src/backfill-aggregate-stats.ts",
+    "db:backfill-atom-kv-capacity": "bun --env-file=../../.env src/backfill-atom-kv-capacity.ts",
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",
     "db:backfill-dataset-stats": "bun --env-file=../../.env src/backfill-dataset-stats.ts",
     "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
@@ -36,19 +37,19 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
-    "@noble/ciphers": "^2.3.0",
+    "@noble/ciphers": "^2.4.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "postgres": "^3.4.9",
     "stream-chain": "^4.2.5",
-    "stream-json": "^3.5.0"
+    "stream-json": "^3.6.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/stream-json": "^1.7.8",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "adm-zip": "^0.6.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

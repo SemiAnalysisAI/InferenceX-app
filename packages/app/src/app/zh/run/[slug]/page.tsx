@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  AUTHOR_NAME,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE_ZH,
+} from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -40,7 +45,7 @@ function statLedDescriptionZh(entry: RunPageEntry, data: RunPageData): string {
       ? ''
       : `，按超大规模云价格每百万 token 成本 ${fmtCostPerMtok(read.costPerMtok)}`;
   const chipLabel = entry.chip.label;
-  return `实测数据：${entry.model.seoName} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
+  return `实测数据：运行 ${entry.model.seoName} 时，${chipLabel} 在每用户每秒 ${data.primaryTier} token 的交互速度下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -49,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRunPageData(entry.slug);
   const title = runPageTitleZh(entry);
-  const description = data ? statLedDescriptionZh(entry, data) : runPageDescriptionZh(entry);
+  const description = `${data ? statLedDescriptionZh(entry, data) : runPageDescriptionZh(entry)}${SUPPORTERS_LINE_ZH}`;
   const url = `${SITE_URL}/zh/run/${entry.slug}`;
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
@@ -85,7 +90,7 @@ function buildFaqZh(
     data.bestThroughputPerGpu === null ? '暂无' : fmtThroughput(data.bestThroughputPerGpu);
   const throughputAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `在${workload}、每用户每秒 ${data.primaryTier} token 的交互档位下，${chipLabel} 部署 ${model} 单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值吞吐为单 GPU ${peak} token/s。`
+      ? `在${workload}下运行 ${model}，目标交互速度为每用户每秒 ${data.primaryTier} token 时，${chipLabel} 的单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度为 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值总吞吐量为单 GPU ${peak} token/s。`
       : `InferenceX 集群已为该组合完成 ${data.configCount} 组实测配置，各交互档位的实测结果见上方阶梯表。`;
 
   const costAnswer =
@@ -164,7 +169,7 @@ export default async function ZhRunPage({ params }: Props) {
     : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `${model} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`
+      ? `运行 ${model} 时，${chipLabel} 在每用户每秒 ${data.primaryTier} token 的交互速度下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`
       : `${model} 可在 ${chipLabel} 上运行：目前已有 ${data.configCount} 组实测配置，各档位实测结果见下方阶梯表。`;
 
   const t: RunStrings = {
@@ -206,6 +211,10 @@ export default async function ZhRunPage({ params }: Props) {
       {
         href: `/zh/rankings/cheapest-gpu-for-${entry.model.slug}`,
         label: `运行 ${entry.model.seoName} 最省钱 GPU 完整排行`,
+      },
+      {
+        href: `/zh/model/${entry.model.slug}`,
+        label: `${entry.model.seoName} 详解：架构、评估与性能`,
       },
       { href: `/zh/chips/${entry.chip.slug}`, label: `${chipTitle} 规格与价格` },
       { href: '/zh/inference', label: '交互式推理仪表盘' },

@@ -13,6 +13,7 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
@@ -45,51 +46,6 @@ function getAgenticMetric(
 ): number {
   const value = entry[`${percentile}_${suffix}` as keyof AggDataEntry];
   return typeof value === 'number' ? value : 0;
-}
-
-/**
- * Fraction of a row's input tokens served from cache, or null when the row
- * carries no cache metric at all — which is every fixed-sequence row.
- *
- * Three tiers are reported and they do not all stack. Measured across 326
- * production agentic rows, checked against each row's own
- * `theoretical_cache_hit_rate` ceiling:
- *
- * - **GPU + external are disjoint.** Their sum never exceeds 1 nor the ceiling
- *   on any row carrying both, so they add.
- * - **The CPU-offload tier double-counts external where both are reported.**
- *   `gpu + external + cpu` breaches the ceiling on 56 of the 132 rows with a
- *   non-zero CPU rate, and *every* breach is a row that also reports an
- *   external rate — the router-side external figure already contains the
- *   offload tier there.
- * - **Where no external rate is reported, the CPU tier is real and disjoint.**
- *   On the 26 offload-on rows with no external figure, `gpu + cpu` breaches the
- *   ceiling 0 times, median CPU rate 0.055.
- *
- * Hence the conditional: external when present, CPU only in its absence. Adding
- * CPU unconditionally would overstate the cached share; dropping it entirely —
- * which this did before — understated it by a median 5.54pp on those 26 rows,
- * and an understated cached share bills more input at the fresh-token price and
- * so *overstates* revenue (by a median 27% on the input leg there). That is the
- * direction worth spending a branch to avoid.
- *
- * A reported external `0` suppresses CPU rather than counting as an absence: a
- * router reporting no external hits has still accounted for the offload tier. No
- * production row currently has that shape, so that arm is a deliberate choice
- * about unobserved data, pinned by a test rather than measured.
- *
- * The clamp is not decorative — the GPU figure alone reaches 1.185 on some rows.
- */
-function cacheHitRateOf(m: Record<string, number>): number | null {
-  const gpu = m.server_gpu_cache_hit_rate;
-  const external = m.server_external_cache_hit_rate;
-  const cpu = m.server_cpu_cache_hit_rate;
-  const hasExternal = typeof external === 'number';
-  // Only the tier that is not already counted by `external` is added.
-  const secondary = hasExternal ? external : typeof cpu === 'number' ? cpu : undefined;
-  if (typeof gpu !== 'number' && secondary === undefined) return null;
-  const sum = (typeof gpu === 'number' ? gpu : 0) + (secondary ?? 0);
-  return Math.max(0, Math.min(1, sum));
 }
 
 /**
@@ -188,7 +144,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = cacheHitRateOf(m);
+    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
     const tokenShare = inputTokenShare(row, inputTput, outputTput);
     const specs = getGpuSpecs(hwKey);
     const power = specs.power;

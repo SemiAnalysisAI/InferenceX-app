@@ -15,9 +15,8 @@ interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link>
   /** Which page rendered the hero, so `/compare` and `/` clicks stay separable. */
   analyticsSurface?: string;
   /** Route the click through `navigateInApp`, the way the header nav and the
-   *  landing card already do for `/overview` and `/inference`. The first
-   *  dashboard transition can request the route without committing the URL, so
-   *  those destinations need the retry; content routes do not. */
+   *  landing card already do for `/overview` and `/inference`, keeping the
+   *  transition same-document so the Minecraft music persists. */
   appNavigation?: boolean;
 }
 

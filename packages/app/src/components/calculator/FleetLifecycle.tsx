@@ -18,15 +18,20 @@ import {
   VeraRubinOfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { exportToCsv } from '@/lib/csv-export';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
 import {
   getModelLabel,
@@ -89,6 +94,16 @@ interface FleetLifecycleProps {
 
 type LifecycleView = 'chart' | 'table';
 
+interface CsvAssumptions {
+  priceInput: string;
+  outputPriceInput: string;
+  rampInput: string;
+  mtbiInput: string;
+  recoveryInput: string;
+  horizonInput: string;
+  mw: number | null;
+}
+
 const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
   {
     value: 'chart',
@@ -107,6 +122,8 @@ const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
 const STRINGS = {
   en: {
     title: 'Fleet Lifecycle',
+    fleetSizingGroup: 'Fleet sizing',
+    assumptionsGroup: 'Fleet economics & assumptions',
     viewChart: 'Chart',
     viewTable: 'Table',
     viewAria: 'View mode',
@@ -158,7 +175,19 @@ const STRINGS = {
     colLatest: 'Latest Best',
     colSteps: 'Improvements',
     colGain: 'Gain',
+    inputTokenPrefix: 'input ',
+    outputTokenPrefix: 'output ',
     colTpPerMw: (tokenType: string) => `${tokenType}tok/s/MW now`,
+    csvAssumptions: ({
+      priceInput,
+      outputPriceInput,
+      rampInput,
+      mtbiInput,
+      recoveryInput,
+      horizonInput,
+      mw,
+    }: CsvAssumptions) =>
+      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
     colRevenue: 'Revenue $/day',
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
@@ -221,6 +250,8 @@ const STRINGS = {
   },
   zh: {
     title: '集群生命周期',
+    fleetSizingGroup: '集群规模',
+    assumptionsGroup: '集群经济性与假设',
     viewChart: '图表',
     viewTable: '表格',
     viewAria: '显示模式',
@@ -248,13 +279,14 @@ const STRINGS = {
     priceTooltip:
       'Token 售价，输入与输出分别设定。服务商对输出 token 的计价通常是输入的数倍，而两类 token 的数量极不均衡：固定 8k/1k 序列下每个输出 token 对应 8 个输入 token，agentic traces 下约为 130 个。无论上方成本矩阵选择哪种 token 类型，收入均同时计入两者。二者默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格，即竞争底线。该价格下这款芯片不赚不亏，而所有更贵的芯片均为亏损。初始比例为输出价格是输入价格的 4 倍，与主流厂商的定价大致相当。在双价格下保本点是一条直线而非一个点，因此重置会按你当前设定的比例同时缩放两个价格。高于该线的部分属于你的假设，而非实测值。',
     priceReset: '重置为保本价',
-    mtbiLabel: '平均无故障间隔 (天)',
-    mtbiTooltip: '平均中断间隔时间。与恢复时间共同构成对收入的可用性折损。留空表示不建模中断。',
+    mtbiLabel: '平均中断间隔（MTBI，天）',
+    mtbiTooltip:
+      '两次服务中断之间的平均间隔。与恢复时间一起用于计算可用率，并据此扣减收入。留空表示假设服务不会中断。',
     recoveryLabel: '恢复时间 (小时)',
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
     rampLabel: '爬坡期 (月)',
     rampTooltip:
-      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入，因为机架自通电起即开始计费，而非自满载起。因此首次推广开始时即需承担一整天的成本而收入为零，这正是利润率曲线的全程最低点。这是你的假设而非实测值；设为 0 表示配置立即生效。',
+      '新配置在整个集群中部署完成所需的月数。每次部署新配置时，集群都会从当前运行水平逐步提升至新配置的水平；首次部署则从零开始。整个过程中成本始终按全额计算，因为机柜通电后即开始计费，不会等到负载开始运行才计费。因此，首次部署开始时还没有收入，却已需承担全天成本，此时每日利润处于整个周期的最低点。部署时长由你设定，并非实测数据；设为 0 表示新配置立即生效。',
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变。这代表若优化停止时集群的收益，而非对后续提升的预测。',
@@ -269,7 +301,19 @@ const STRINGS = {
     colLatest: '最新最佳',
     colSteps: '提升次数',
     colGain: '提升倍数',
+    inputTokenPrefix: '输入',
+    outputTokenPrefix: '输出',
     colTpPerMw: (tokenType: string) => `当前${tokenType} tok/s/MW`,
+    csvAssumptions: ({
+      priceInput,
+      outputPriceInput,
+      rampInput,
+      mtbiInput,
+      recoveryInput,
+      horizonInput,
+      mw,
+    }: CsvAssumptions) =>
+      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW`,
     colRevenue: '收入 $/天',
     colCost: '成本 $/天',
     colMargin: '利润 $/天',
@@ -327,7 +371,7 @@ const STRINGS = {
     chartInstructions:
       '悬停可读取该日期下所有芯片的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
-      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = 芯片数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
+      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = 芯片数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均中断间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
     source: '来源：',
   },
 } as const;
@@ -343,7 +387,7 @@ const DEFAULTS = {
    * and Anthropic both publish, and the order of magnitude the others sit at.
    * An assumption like the rest; the cached *fraction* it applies to is measured.
    */
-  cachedInputPct: 10,
+  cachedInputPct: DEFAULT_CACHED_INPUT_PRICE_RATIO * 100,
   /**
    * An output token sells for four times an input one until the user says
    * otherwise — DeepSeek's own published API pricing is $0.27 / $1.10, and the
@@ -843,16 +887,6 @@ export default function FleetLifecycle({
     [t],
   );
 
-  /**
-   * The same options without test ids. The toggle is rendered twice — once in the
-   * button row, once in the caption for narrow screens — and two elements sharing
-   * a test id makes every `cy.click` on it ambiguous.
-   */
-  const mobileViewOptions = useMemo<SegmentedToggleOption<LifecycleView>[]>(
-    () => viewOptions.map(({ testId: _testId, ...option }) => option),
-    [viewOptions],
-  );
-
   const handleViewChange = useCallback((value: LifecycleView) => {
     setView(value);
     track('calculator_lifecycle_view_changed', { view: value });
@@ -891,7 +925,8 @@ export default function FleetLifecycle({
     [rows, colorResolver, anchorMs],
   );
 
-  const tokenTypeLabel = costType === 'input' ? 'input ' : costType === 'output' ? 'output ' : '';
+  const tokenTypeLabel =
+    costType === 'input' ? t.inputTokenPrefix : costType === 'output' ? t.outputTokenPrefix : '';
 
   const handleAssumption = useCallback(
     (
@@ -1000,7 +1035,15 @@ export default function FleetLifecycle({
     exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
       // The assumptions are not in the rows, and a CSV read six months later
       // cannot be reconstructed without them.
-      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
+      t.csvAssumptions({
+        priceInput,
+        outputPriceInput,
+        rampInput,
+        mtbiInput,
+        recoveryInput,
+        horizonInput,
+        mw,
+      }),
     ]);
   }, [
     rows,
@@ -1048,16 +1091,9 @@ export default function FleetLifecycle({
    */
   const caption = (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <h2 className="text-lg font-semibold">{t.title}</h2>
-        <SegmentedToggle
-          value={view}
-          options={mobileViewOptions}
-          onValueChange={handleViewChange}
-          ariaLabel={t.viewAria}
-          className="md:hidden shrink-0"
-        />
-      </div>
+      <Heading as="h2" level="card">
+        {t.title}
+      </Heading>
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
         {t.captionTarget(targetValue)}
@@ -1261,7 +1297,7 @@ export default function FleetLifecycle({
 
     return (
       <>
-        <div className="flex flex-wrap gap-4">
+        <ControlPanel legend={t.assumptionsGroup} className="sm:grid-cols-2 xl:grid-cols-3">
           <div className="flex flex-col space-y-1.5">
             <LabelWithTooltip
               htmlFor="calc-lifecycle-price"
@@ -1278,7 +1314,7 @@ export default function FleetLifecycle({
                 value={priceInput}
                 onChange={handlePriceChange}
                 aria-label={t.priceInputLabel}
-                className="w-24 h-9"
+                className="w-24"
               />
               <Input
                 id="calc-lifecycle-output-price"
@@ -1289,17 +1325,19 @@ export default function FleetLifecycle({
                 value={outputPriceInput}
                 onChange={handleOutputPriceChange}
                 aria-label={t.outputPriceInputLabel}
-                className="w-24 h-9"
+                className="w-24"
               />
               {priceEdited.current && breakEven !== null && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={handlePriceReset}
                   data-testid="calc-lifecycle-price-reset"
-                  className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   {t.priceReset}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -1346,11 +1384,11 @@ export default function FleetLifecycle({
                 step={input.id === 'calc-lifecycle-ramp' ? 0.25 : 'any'}
                 value={input.value}
                 onChange={input.onChange}
-                className="w-32 h-9"
+                className="w-32"
               />
             </div>
           ))}
-        </div>
+        </ControlPanel>
 
         {rows.length > 0 && Number.isFinite(anchorMs) ? (
           <figure data-testid="calculator-lifecycle-figure" className="relative rounded-lg">
@@ -1494,7 +1532,11 @@ export default function FleetLifecycle({
 
         <div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t.assumptions(getCostProviderLabel(costProvider), `${mw} MW`, anchorDate ?? '—')}
+            {t.assumptions(
+              getCostProviderLabel(costProvider, locale),
+              `${mw} MW`,
+              anchorDate ?? '—',
+            )}
           </p>
           <p className="text-muted-foreground mt-1">
             <small>
@@ -1528,28 +1570,27 @@ export default function FleetLifecycle({
       <section data-testid="calculator-lifecycle-section">
         <Card>
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.title}</h2>
-              <p className="text-muted-foreground text-sm">{t.description}</p>
-            </div>
+            <DashboardSectionHeader title={t.title} description={t.description} />
             {/* Outside `body()` on purpose: every other control is only meaningful
                 once a fleet exists, but this is the one that brings it into being,
                 so it has to render in the empty state too. */}
-            <div className="flex flex-col space-y-1.5">
-              <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
-              <Input
-                id="calc-fleet-mw"
-                data-testid="calc-fleet-mw-input"
-                type="number"
-                min={0}
-                step="any"
-                placeholder={t.mwPlaceholder}
-                value={mwInput}
-                onChange={(e) => onMwInputChange(e.target.value)}
-                onBlur={() => track('calculator_fleet_mw_set', { mw: mwInput })}
-                className="w-32 h-9"
-              />
-            </div>
+            <ControlPanel legend={t.fleetSizingGroup} className="sm:max-w-md">
+              <div className="flex min-w-0 flex-col space-y-1.5">
+                <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
+                <Input
+                  id="calc-fleet-mw"
+                  data-testid="calc-fleet-mw-input"
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder={t.mwPlaceholder}
+                  value={mwInput}
+                  onChange={(e) => onMwInputChange(e.target.value)}
+                  onBlur={() => track('calculator_fleet_mw_set', { mw: mwInput })}
+                  className="w-full sm:w-32"
+                />
+              </div>
+            </ControlPanel>
             {body()}
           </div>
         </Card>

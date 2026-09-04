@@ -28,9 +28,11 @@ import {
 } from '@/lib/benchmark-run-selection';
 import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import type { Locale } from '@/lib/i18n';
 
 import {
   buildAiLineData,
+  getAiRadarMetricLabel,
   normalizeAiRadarRows,
   rankAiHardwareKeys,
   readAiMetric,
@@ -77,7 +79,7 @@ interface UseAiChartReturn {
 // LLM response parsing
 // ---------------------------------------------------------------------------
 
-function parseSpecsFromLlm(raw: string): AiChartSpec[] {
+function parseSpecsFromLlm(raw: string, locale: Locale): AiChartSpec[] {
   const cleaned = raw
     .replaceAll(/```json\s*/gu, '')
     .replaceAll('```', '')
@@ -85,7 +87,7 @@ function parseSpecsFromLlm(raw: string): AiChartSpec[] {
   const parsed = JSON.parse(cleaned);
   const arr = Array.isArray(parsed) ? parsed : [parsed];
   // Validate each spec and limit to 2
-  return arr.slice(0, 2).map((s: unknown) => validateSpec(s as Record<string, unknown>));
+  return arr.slice(0, 2).map((s: unknown) => validateSpec(s as Record<string, unknown>, locale));
 }
 
 function sortBars(bars: AiChartBarPoint[], order: AiChartSpec['sortOrder']): void {
@@ -248,19 +250,6 @@ function buildReliabilityBarData(
 // Resolve a single spec into chart data
 // ---------------------------------------------------------------------------
 
-const METRIC_LABELS: Record<string, string> = {
-  y_tpPerGpu: 'Throughput/Chip',
-  y_outputTputPerGpu: 'Output Tput/Chip',
-  y_inputTputPerGpu: 'Input Tput/Chip',
-  y_tpPerMw: 'Tput/MW',
-  y_costh: 'Cost (Hyper)',
-  y_costn: 'Cost (Neo)',
-  y_costr: 'Cost (Rental)',
-  y_jTotal: 'J/Token',
-  y_jOutput: 'J/Output',
-  y_jInput: 'J/Input',
-};
-
 const EMPTY_RESULT: Pick<AiSingleChartResult, 'lineData' | 'radarData' | 'radarAxes'> = {
   lineData: {},
   radarData: [],
@@ -281,6 +270,7 @@ function buildRadarData(
   points: InferenceData[],
   spec: AiChartSpec,
   colorMap: Record<string, string>,
+  locale: Locale,
 ): { items: AiRadarItem[]; axes: { label: string; unit?: string }[] } {
   const metrics = spec.radarMetrics ?? ['y_tpPerGpu', 'y_outputTputPerGpu', 'y_costh', 'y_jTotal'];
   const chartDef = (chartDefinitions as any[])[0];
@@ -320,11 +310,13 @@ function buildRadarData(
     });
   }
 
-  const axes = metrics.map((m) => ({ label: METRIC_LABELS[m] ?? m }));
+  const axes = metrics.map((metric) => ({
+    label: getAiRadarMetricLabel(metric, chartDef, locale),
+  }));
   return { items, axes };
 }
 
-async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
+async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleChartResult> {
   if (spec.dataSource === 'evaluations') {
     const rows = await fetchEvaluations();
     const hwKeys = [
@@ -445,7 +437,9 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
 
   const lineData = spec.chartType === 'line' ? buildLineData(points, spec, colorMap) : {};
   const { items: radarData, axes: radarAxes } =
-    spec.chartType === 'radar' ? buildRadarData(points, spec, colorMap) : { items: [], axes: [] };
+    spec.chartType === 'radar'
+      ? buildRadarData(points, spec, colorMap, locale)
+      : { items: [], axes: [] };
 
   return {
     spec,
@@ -462,79 +456,94 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
 // Main hook
 // ---------------------------------------------------------------------------
 
-export function useAiChart(): UseAiChartReturn {
+const ERROR_STRINGS = {
+  en: {
+    parse: 'Could not parse your request. Try rephrasing.',
+    noData: (models: string) =>
+      `No data found for ${models}. Try a different model or configuration.`,
+    providerFailed: 'The chart request failed. Check the API key and provider, then try again.',
+  },
+  zh: {
+    parse: '无法理解这条请求，请换一种说法。',
+    noData: (models: string) => `没有找到 ${models} 的数据，请尝试其他模型或配置。`,
+    providerFailed: '图表请求失败。请检查 API 密钥和服务商设置后重试。',
+  },
+} as const;
+
+export function useAiChart(locale: Locale = 'en'): UseAiChartReturn {
   const [result, setResult] = useState<AiChartResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = useCallback(async (prompt: string, provider: AiProvider, apiKey: string) => {
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
+  const generate = useCallback(
+    async (prompt: string, provider: AiProvider, apiKey: string) => {
+      setIsLoading(true);
+      setError(null);
+      setResult(null);
 
-    try {
-      // Step 1: Parse prompt into validated spec(s)
-      const rawResponse = await callLlm(provider, apiKey, buildParsePrompt(), prompt);
-      const specs = parseSpecsFromLlm(rawResponse);
-
-      if (specs.length === 0) {
-        setError('Could not parse your request. Try rephrasing.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Step 2: Resolve each spec into chart data (parallel for multi-chart)
-      const charts = await Promise.all(specs.map(resolveSpec));
-
-      // Check if any chart has data
-      const hasData = charts.some(
-        (c) =>
-          c.barData.length > 0 ||
-          c.scatterData.length > 0 ||
-          Object.keys(c.lineData).length > 0 ||
-          c.radarData.length > 0,
-      );
-      if (!hasData) {
-        const models = [...new Set(specs.map((s) => s.model))].join(', ');
-        setError(`No data found for ${models}. Try a different model or configuration.`);
-        setIsLoading(false);
-        return;
-      }
-
-      // Step 3: Generate summary (best-effort)
-      let summary: string | null = null;
       try {
-        const allBars = charts.flatMap((c) => c.barData);
-        const allScatter = charts.flatMap((c) => c.scatterData);
-        const hwKeys = [
-          ...new Set([...allBars.map((b) => b.hwKey), ...allScatter.map((p) => p.hwKey ?? '')]),
-        ].filter(Boolean);
+        // Step 1: Parse prompt into validated spec(s)
+        const rawResponse = await callLlm(provider, apiKey, buildParsePrompt(locale), prompt);
+        const specs = parseSpecsFromLlm(rawResponse, locale);
 
-        const dataDesc =
-          allBars.length > 0
-            ? allBars.map((b) => `${b.label}: ${b.value.toFixed(2)}`).join('\n')
-            : `${allScatter.length} data points across ${hwKeys.length} hardware configs`;
+        if (specs.length === 0) {
+          setError(ERROR_STRINGS[locale].parse);
+          setIsLoading(false);
+          return;
+        }
 
-        const summaryRaw = await callLlm(
-          provider,
-          apiKey,
-          buildSummaryPrompt(specs, dataDesc),
-          'Provide the summary.',
+        // Step 2: Resolve each spec into chart data (parallel for multi-chart)
+        const charts = await Promise.all(specs.map((spec) => resolveSpec(spec, locale)));
+
+        // Check if any chart has data
+        const hasData = charts.some(
+          (c) =>
+            c.barData.length > 0 ||
+            c.scatterData.length > 0 ||
+            Object.keys(c.lineData).length > 0 ||
+            c.radarData.length > 0,
         );
-        summary = summaryRaw.trim();
-      } catch {
-        // Summary generation is non-critical
-      }
+        if (!hasData) {
+          const models = [...new Set(specs.map((s) => s.model))].join(', ');
+          setError(ERROR_STRINGS[locale].noData(models));
+          setIsLoading(false);
+          return;
+        }
 
-      setResult({ charts, summary });
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : 'An unexpected error occurred.',
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        // Step 3: Generate summary (best-effort)
+        let summary: string | null = null;
+        try {
+          const allBars = charts.flatMap((c) => c.barData);
+          const allScatter = charts.flatMap((c) => c.scatterData);
+          const hwKeys = [
+            ...new Set([...allBars.map((b) => b.hwKey), ...allScatter.map((p) => p.hwKey ?? '')]),
+          ].filter(Boolean);
+
+          const dataDesc =
+            allBars.length > 0
+              ? allBars.map((b) => `${b.label}: ${b.value.toFixed(2)}`).join('\n')
+              : `${allScatter.length} data points across ${hwKeys.length} hardware configs`;
+
+          const summaryRaw = await callLlm(
+            provider,
+            apiKey,
+            buildSummaryPrompt(specs, dataDesc, locale),
+            locale === 'zh' ? '请给出总结。' : 'Provide the summary.',
+          );
+          summary = summaryRaw.trim();
+        } catch {
+          // Summary generation is non-critical
+        }
+
+        setResult({ charts, summary });
+      } catch {
+        setError(ERROR_STRINGS[locale].providerFailed);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [locale],
+  );
 
   const reset = useCallback(() => {
     setResult(null);

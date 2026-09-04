@@ -4,16 +4,46 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
+import {
+  CONTROL_HEIGHT,
+  CONTROL_FOCUS,
+  CONTROL_OPTION_STYLE,
+  SELECT_TRIGGER_STYLE,
+  CONTROL_SEARCH_STYLE,
+  CONTROL_SEARCH_CLEAR_STYLE,
+} from './control-styles';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select...',
+    searchPlaceholder: 'Search...',
+    searchAriaLabel: 'Search options',
+    clearSearchLabel: 'Clear search',
+    noResultsLabel: 'No results',
+  },
+  zh: {
+    placeholder: '请选择...',
+    searchPlaceholder: '搜索...',
+    searchAriaLabel: '搜索选项',
+    clearSearchLabel: '清除搜索',
+    noResultsLabel: '没有结果',
+  },
+} as const;
 
 export interface SearchableSelectOption {
   value: string;
   label: string;
+  help?: React.ReactNode;
+  testId?: string;
 }
 
 export interface SearchableSelectGroup {
   label: string;
+  heading?: React.ReactNode;
   options: SearchableSelectOption[];
 }
 
@@ -22,10 +52,16 @@ interface SearchableSelectProps {
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
+  /** Hydration-safe label for selectors with a known server-side default. */
+  initialLabel?: string;
   className?: string;
+  contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
+  size?: 'sm' | 'default';
   disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   searchable?: boolean;
   searchPlaceholder?: string;
   searchAriaLabel?: string;
@@ -39,19 +75,31 @@ export function SearchableSelect({
   groups,
   value,
   onValueChange,
-  placeholder = 'Select...',
+  placeholder: placeholderProp,
+  initialLabel,
   className,
+  contentClassName,
   triggerId,
   triggerTestId,
+  size = 'default',
   disabled = false,
+  open,
+  onOpenChange,
   searchable = true,
-  searchPlaceholder = 'Search...',
-  searchAriaLabel = 'Search options',
-  clearSearchLabel = 'Clear search',
-  noResultsLabel = 'No results',
+  searchPlaceholder: searchPlaceholderProp,
+  searchAriaLabel: searchAriaLabelProp,
+  clearSearchLabel: clearSearchLabelProp,
+  noResultsLabel: noResultsLabelProp,
   trackPrefix,
 }: SearchableSelectProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const t = STRINGS[useLocale()];
+  const placeholder = placeholderProp ?? t.placeholder;
+  const searchPlaceholder = searchPlaceholderProp ?? t.searchPlaceholder;
+  const searchAriaLabel = searchAriaLabelProp ?? t.searchAriaLabel;
+  const clearSearchLabel = clearSearchLabelProp ?? t.clearSearchLabel;
+  const noResultsLabel = noResultsLabelProp ?? t.noResultsLabel;
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isOpen = !disabled && (open ?? internalOpen);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
   // Defer the trigger label until the component has mounted on the client.
@@ -60,8 +108,14 @@ export function SearchableSelect({
   // leave it stale after hydration.
   const [mounted, setMounted] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const listboxRef = React.useRef<HTMLDivElement>(null);
   const searchUsedRef = React.useRef(false);
+  const escapeDismissedRef = React.useRef(false);
+  const tabFocusRef = React.useRef<HTMLElement | null>(null);
+  // A grid gives option selection and help their own cells/buttons. A listbox
+  // option cannot contain another interactive action accessibly.
+  const hasOptionHelp = groups.some((group) => group.options.some((option) => option.help));
 
   React.useEffect(() => {
     setMounted(true);
@@ -69,6 +123,7 @@ export function SearchableSelect({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (disabled) return;
+    if (nextOpen) escapeDismissedRef.current = false;
     if (!nextOpen && isOpen) {
       if (searchUsedRef.current && trackPrefix) {
         track(`${trackPrefix}_searched`, { query: search });
@@ -76,7 +131,8 @@ export function SearchableSelect({
       }
       setSearch('');
     }
-    setIsOpen(nextOpen);
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
 
   const filteredGroups = React.useMemo(() => {
@@ -84,7 +140,7 @@ export function SearchableSelect({
     const lower = search.toLowerCase();
     return groups
       .map((g) => ({
-        label: g.label,
+        ...g,
         options: g.options.filter(
           (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
         ),
@@ -99,6 +155,11 @@ export function SearchableSelect({
     }
     return undefined;
   }, [groups, value]);
+  const triggerLabel = mounted ? (selectedLabel ?? placeholder) : (initialLabel ?? placeholder);
+  const selectedOption = groups
+    .flatMap((group) => group.options)
+    .find((option) => (mounted ? option.value === value : option.label === initialLabel));
+  const selectedHelp = selectedOption?.help;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -106,16 +167,26 @@ export function SearchableSelect({
     handleOpenChange(false);
   };
   const focusOption = (index: number) => {
-    const options = listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]');
+    const options = listboxRef.current?.querySelectorAll<HTMLElement>('[data-select-option]');
     options?.[Math.max(0, Math.min(index, options.length - 1))]?.focus();
   };
-  const handleOptionKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, optionValue: string) => {
+  const handleOptionKeyDown = (event: React.KeyboardEvent<HTMLElement>, optionValue: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleSelect(optionValue);
       return;
     }
-    const options = [...(listboxRef.current?.querySelectorAll('[role="option"]') ?? [])];
+    if (event.key === 'ArrowRight') {
+      const help = event.currentTarget
+        .closest('[role="row"]')
+        ?.querySelector<HTMLElement>('[data-option-help]');
+      if (help) {
+        event.preventDefault();
+        help.focus();
+      }
+      return;
+    }
+    const options = [...(listboxRef.current?.querySelectorAll('[data-select-option]') ?? [])];
     const current = options.indexOf(event.currentTarget);
     const target =
       event.key === 'ArrowDown'
@@ -138,28 +209,42 @@ export function SearchableSelect({
       <div className="relative">
         <PopoverTrigger asChild>
           <button
+            ref={triggerRef}
             type="button"
             id={triggerId}
             data-testid={triggerTestId}
             data-slot="select-trigger"
-            data-size="default"
+            data-size={size}
+            data-value={value}
             role="combobox"
             aria-expanded={isOpen}
-            aria-haspopup="listbox"
+            aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}
             aria-controls={listboxId}
+            aria-label={
+              hasOptionHelp
+                ? triggerLabel === placeholder
+                  ? placeholder
+                  : `${placeholder}: ${triggerLabel}`
+                : undefined
+            }
             disabled={disabled}
             className={cn(
-              "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 min-h-9",
+              SELECT_TRIGGER_STYLE,
+              CONTROL_HEIGHT[size],
+              CONTROL_FOCUS,
+              'w-full',
               className,
             )}
           >
             <span
               className={cn(
                 'flex-1 text-left truncate',
-                (!mounted || !selectedLabel) && 'text-muted-foreground',
+                selectedHelp && 'mr-7',
+                (mounted ? !selectedLabel : !initialLabel) && 'text-muted-foreground',
               )}
+              title={triggerLabel}
             >
-              {mounted ? (selectedLabel ?? placeholder) : placeholder}
+              {triggerLabel}
             </span>
             <ChevronDownIcon
               className={cn(
@@ -169,15 +254,88 @@ export function SearchableSelect({
             />
           </button>
         </PopoverTrigger>
+        {selectedHelp && selectedOption && !isOpen && (
+          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
+            {/* Mirror the label's width so help follows short labels and stays
+                inside long ones. This copy is only a layout spacer; the real
+                label and native select button above own the accessible name. */}
+            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
+              {triggerLabel}
+            </span>
+            <SelectedOptionInfo
+              key={selectedOption.value}
+              label={selectedOption.label}
+              value={selectedOption.value}
+            >
+              {selectedHelp}
+            </SelectedOptionInfo>
+          </div>
+        )}
         <PopoverContent
           data-slot="select-content"
           align="start"
           sideOffset={4}
+          onKeyDown={(event) => {
+            // Grid navigation uses arrows; Tab leaves the field instead of
+            // walking every option/help action or looping in Radix's scope.
+            // A nested help dialog retains its own keyboard behavior.
+            if (
+              hasOptionHelp &&
+              event.key === 'Tab' &&
+              event.currentTarget.contains(event.target as Node)
+            ) {
+              event.preventDefault();
+              const stops = [
+                ...document.querySelectorAll<HTMLElement>(
+                  'button, a[href], input, select, textarea, [tabindex]',
+                ),
+              ].filter(
+                (element) =>
+                  element.tabIndex >= 0 &&
+                  !element.matches(':disabled, [data-radix-focus-guard]') &&
+                  !element.closest('[inert]') &&
+                  !event.currentTarget.contains(element) &&
+                  element.getClientRects().length > 0 &&
+                  getComputedStyle(element).visibility !== 'hidden',
+              );
+              const index = stops.indexOf(triggerRef.current!);
+              tabFocusRef.current = stops[index + (event.shiftKey ? -1 : 1)] ?? triggerRef.current;
+              handleOpenChange(false);
+            }
+          }}
+          onEscapeKeyDown={() => {
+            escapeDismissedRef.current = true;
+          }}
+          onCloseAutoFocus={(event) => {
+            if (tabFocusRef.current) {
+              event.preventDefault();
+              tabFocusRef.current.focus();
+              tabFocusRef.current = null;
+              return;
+            }
+            // Keyboard cancellation returns to the field, even if another
+            // page interaction was recorded while the non-modal menu was open.
+            // Outside clicks retain Radix's normal focus behavior.
+            if (escapeDismissedRef.current) {
+              event.preventDefault();
+              triggerRef.current?.focus({ preventScroll: true });
+            }
+          }}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
-            searchRef.current?.focus();
+            if (searchable) searchRef.current?.focus();
+            else {
+              const options = [
+                ...(listboxRef.current?.querySelectorAll<HTMLElement>('[data-select-option]') ??
+                  []),
+              ];
+              (options.find((option) => option.dataset.value === value) ?? options[0])?.focus();
+            }
           }}
-          className="z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none"
+          className={cn(
+            'z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none',
+            contentClassName,
+          )}
         >
           {/* Search header lives outside the scrollable region so it never picks up
            * `sticky` → `position: fixed` resolution that puts it behind the page
@@ -204,7 +362,7 @@ export function SearchableSelect({
                 }}
                 placeholder={searchPlaceholder}
                 aria-label={searchAriaLabel}
-                className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+                className={CONTROL_SEARCH_STYLE}
               />
               {search && (
                 <button
@@ -213,7 +371,7 @@ export function SearchableSelect({
                     setSearch('');
                     searchRef.current?.focus();
                   }}
-                  className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                  className={cn(CONTROL_SEARCH_CLEAR_STYLE, CONTROL_FOCUS)}
                   aria-label={clearSearchLabel}
                 >
                   <XIcon className="size-3.5" />
@@ -221,24 +379,97 @@ export function SearchableSelect({
               )}
             </div>
           )}
+          {filteredGroups.length === 0 && (
+            <div role="status" className="text-muted-foreground px-2 py-1.5 text-sm text-center">
+              {noResultsLabel}
+            </div>
+          )}
           <div
             ref={listboxRef}
             id={listboxId}
-            role="listbox"
+            role={hasOptionHelp ? 'grid' : 'listbox'}
+            aria-label={placeholder}
             className="p-1 max-h-72 overflow-y-auto custom-scrollbar"
           >
-            {filteredGroups.length === 0 && (
-              <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
-                {noResultsLabel}
-              </div>
-            )}
             {filteredGroups.map((group) => (
-              <div key={group.label} className="mb-1 last:mb-0">
-                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
-                  {group.label}
-                </div>
+              <div
+                key={group.label}
+                role={hasOptionHelp ? 'rowgroup' : undefined}
+                className="mb-1 last:mb-0"
+              >
+                {group.label && (
+                  <div role={hasOptionHelp ? 'row' : undefined}>
+                    <div
+                      data-slot="select-label"
+                      role={hasOptionHelp ? 'columnheader' : undefined}
+                      aria-colspan={hasOptionHelp ? 2 : undefined}
+                      className="text-muted-foreground px-2 py-1.5 text-xs font-medium"
+                    >
+                      {group.heading ?? group.label}
+                    </div>
+                  </div>
+                )}
                 {group.options.map((option) => {
                   const isSelected = option.value === value;
+                  if (hasOptionHelp) {
+                    return (
+                      <div
+                        key={option.value}
+                        role="row"
+                        aria-selected={isSelected}
+                        className={cn(
+                          'flex items-stretch rounded-sm',
+                          isSelected && 'bg-primary/10 font-medium',
+                        )}
+                      >
+                        <div role="gridcell" className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            data-select-option
+                            data-slot="select-item"
+                            data-value={option.value}
+                            data-testid={option.testId}
+                            aria-pressed={isSelected}
+                            onClick={() => handleSelect(option.value)}
+                            onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
+                            className={cn(
+                              'flex size-full cursor-pointer items-start gap-2 rounded-sm px-2 py-3 md:py-1.5 text-left text-sm outline-hidden hover:bg-accent',
+                              CONTROL_OPTION_STYLE,
+                            )}
+                          >
+                            <span className="min-w-0 flex-1">{option.label}</span>
+                            {isSelected && (
+                              <CheckIcon
+                                aria-hidden="true"
+                                className="mt-0.5 size-3.5 shrink-0 text-primary"
+                              />
+                            )}
+                          </button>
+                        </div>
+                        <div role="gridcell" className="flex items-start">
+                          {option.help && (
+                            <OptionInfo
+                              label={option.label}
+                              value={option.value}
+                              tabIndex={-1}
+                              onKeyDown={(event) => {
+                                if (event.key === 'ArrowLeft') {
+                                  event.preventDefault();
+                                  event.currentTarget
+                                    .closest('[role="row"]')
+                                    ?.querySelector<HTMLElement>('[data-select-option]')
+                                    ?.focus();
+                                }
+                              }}
+                            >
+                              {option.help}
+                            </OptionInfo>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={option.value}
@@ -246,12 +477,15 @@ export function SearchableSelect({
                       tabIndex={-1}
                       aria-selected={isSelected}
                       data-slot="select-item"
+                      data-select-option
                       data-value={option.value}
+                      data-testid={option.testId}
                       onClick={() => handleSelect(option.value)}
                       onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(
-                        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
-                        'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
+                        "[&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-[background-color,color,box-shadow] duration-150 ease-in-out",
+                        CONTROL_OPTION_STYLE,
+                        'hover:bg-accent',
                         isSelected && 'bg-primary/10 font-medium',
                       )}
                     >

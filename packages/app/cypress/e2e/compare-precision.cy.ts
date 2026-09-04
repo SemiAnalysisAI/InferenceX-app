@@ -9,7 +9,7 @@ describe('Compare precision index page', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
@@ -24,7 +24,7 @@ describe('Compare precision index page', () => {
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]')
-      .should('contain.text', 'AgentX and 8K→1K results')
+      .should('contain.text', 'AgentX and 8K/1K results')
       .and('contain.text', 'Each card identifies its scenario');
     cy.get('[data-testid="compare-index-precision-link"]')
       .should('have.attr', 'href', '/compare-precision')
@@ -37,18 +37,22 @@ describe('Compare precision index page', () => {
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href')
       .and('match', /\/agentic$/u);
-    cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
+    cy.get('#deepseek-r1 a[data-scenario="8K/1K"]')
       .first()
-      .should('contain.text', '8K→1K')
+      .should('contain.text', '8K/1K')
       .and('have.attr', 'href')
       .and('match', /\/8k-1k$/u);
+    // Vendor logos render beside each hardware label in the pair cards:
+    // NVIDIA uses the full-color green mark, AMD its monochrome brand mark.
+    cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
+    cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
 
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',
@@ -62,11 +66,16 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/zh/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
-    cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K→1K 结果');
+    cy.get('[data-testid="compare-model-catalog"]').should(
+      'contain.text',
+      'AgentX 与 8K/1K 测试结果',
+    );
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')
       .and('match', /^\/zh\/compare\/.+\/agentic$/u);
+    cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
+    cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
 
   it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {

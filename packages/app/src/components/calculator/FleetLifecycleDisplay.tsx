@@ -18,6 +18,8 @@ import {
   useGlobalFilterSelection,
 } from '@/components/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
@@ -89,7 +91,7 @@ const STRINGS = {
   zh: {
     title: '集群生命周期',
     description:
-      '选择模型、工作负载与目标交互性。下方的测算会按设施功率预算确定各芯片固定集群的规模，并在该操作点上读取完整运行历史——各条曲线的含义见板块内说明。',
+      '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '集群成本线采用的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
@@ -353,13 +355,11 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
       <section data-testid="fleet-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">{t.title}</h2>
-                <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-              </div>
-              <ChartShareActions />
-            </div>
+            <DashboardSectionHeader
+              title={t.title}
+              description={t.description}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
               <div
@@ -384,6 +384,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
+                  model={selectedModel}
                 />
                 {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
@@ -409,8 +410,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     label={t.costProviderLabel}
                     tooltip={t.costProviderTooltip}
                   />
-                  <div id="fleet-cost" data-testid="fleet-cost-selector">
+                  <div data-testid="fleet-cost-selector">
                     <MultiSelect
+                      triggerId="fleet-cost"
                       options={COST_PROVIDER_OPTIONS.map((provider) => ({
                         value: provider.value,
                         label: locale === 'zh' ? provider.labelZh : provider.label,
@@ -441,8 +443,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     label={t.tokenTypeLabel}
                     tooltip={t.tokenTypeTooltip}
                   />
-                  <div id="fleet-cost-type" data-testid="fleet-cost-type-selector">
+                  <div data-testid="fleet-cost-type-selector">
                     <MultiSelect
+                      triggerId="fleet-cost-type"
                       options={COST_TYPE_OPTIONS.map((ct) => ({
                         value: ct.value,
                         label: costTypeLabels[ct.value],
@@ -520,6 +523,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     </div>
                     <Input
                       type="number"
+                      aria-label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
                       value={resolveCalculatorTargetInputValue(
                         inputValue,
                         targetValue,
@@ -528,7 +534,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                       onFocus={handleInputFocus}
                       onChange={handleInputChange}
                       onBlur={handleInputBlur}
-                      className="w-24 h-9"
+                      className="w-24"
                       min={0}
                     />
                   </div>
@@ -547,14 +553,16 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   ))}
                 </ul>
                 {visibleHwKeys.size < availableHwKeys.length && (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="sm"
                     data-testid="fleet-reset-filter"
                     onClick={handleResetGpus}
-                    className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {t.resetFilter}
-                  </button>
+                  </Button>
                 )}
                 <div className="flex items-center gap-2">
                   <Switch

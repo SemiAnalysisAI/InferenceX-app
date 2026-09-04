@@ -1,10 +1,11 @@
-import { Profiler, useState } from 'react';
+import { Profiler, useRef, useState } from 'react';
 
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import type { InferenceData } from '@/components/inference/types';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
+import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
 
 const MOCK_ITEMS: CommonLegendItemProps[] = [
   {
@@ -41,13 +42,30 @@ const MOCK_ITEMS: CommonLegendItemProps[] = [
   },
 ];
 
-function ChartLegendWrapper({ items = MOCK_ITEMS }: { items?: CommonLegendItemProps[] }) {
+function ChartLegendWrapper({
+  items = MOCK_ITEMS,
+  inChart = false,
+  grouped = false,
+  onQuickFilters = () => {},
+}: {
+  items?: CommonLegendItemProps[];
+  inChart?: boolean;
+  grouped?: boolean;
+  onQuickFilters?: () => void;
+}) {
   const [expanded, setExpanded] = useState(true);
   const [legendItems, setLegendItems] = useState(items);
+  const [optimal, setOptimal] = useState(true);
+  const [gradientLabels, setGradientLabels] = useState(false);
+  const [logScale, setLogScale] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const handleItemClick = (name: string) => {
     setLegendItems((prev) =>
-      prev.map((item) => (item.name === name ? { ...item, isActive: !item.isActive } : item)),
+      prev.map((item) =>
+        (item.hw || item.name) === name ? { ...item, isActive: !item.isActive } : item,
+      ),
     );
   };
 
@@ -56,18 +74,65 @@ function ChartLegendWrapper({ items = MOCK_ITEMS }: { items?: CommonLegendItemPr
     onClick: handleItemClick,
   }));
 
-  return (
+  const legend = (
     <ChartLegend
       legendItems={itemsWithHandler}
       isLegendExpanded={expanded}
       onExpandedChange={setExpanded}
       variant="sidebar"
-      actions={
-        itemsWithHandler.some((i) => !i.isActive)
-          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
-          : []
+      grouped={grouped}
+      switches={
+        inChart
+          ? [
+              {
+                id: 'optimal',
+                label: 'Optimal Only',
+                checked: optimal,
+                onCheckedChange: setOptimal,
+                infoTooltip: 'Only show the optimal data points.',
+              },
+              {
+                id: 'gradient-labels',
+                label: 'Gradient Labels',
+                checked: gradientLabels,
+                onCheckedChange: setGradientLabels,
+              },
+              {
+                id: 'log-scale',
+                label: 'Log Scale',
+                checked: logScale,
+                onCheckedChange: setLogScale,
+                advanced: true,
+              },
+            ]
+          : undefined
       }
+      actions={[
+        ...(itemsWithHandler.some((i) => !i.isActive)
+          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
+          : []),
+        ...(inChart
+          ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }]
+          : []),
+      ]}
     />
+  );
+
+  return inChart ? (
+    <D3ChartWrapper
+      chartId="legend-layout-chart"
+      svgRef={svgRef}
+      tooltipRef={tooltipRef}
+      setContainerRef={() => {}}
+      dimensions={{ width: 600, height: 575 }}
+      pinnedPoint={null}
+      isPinned={() => false}
+      dismissTooltip={() => {}}
+      hideTooltipElements={() => {}}
+      legendElement={legend}
+    />
+  ) : (
+    legend
   );
 }
 
@@ -120,22 +185,203 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('.sidebar-legend label').first().find('span').first().should('exist');
   });
 
-  it('search input filters legend items by hiding non-matches', () => {
-    cy.get('.sidebar-legend input[placeholder="Search..."]').should('exist');
-    cy.get('.sidebar-legend input[placeholder="Search..."]').clear().type('MI300');
-    // Non-matching items are hidden via overflow-hidden class, not removed from DOM
-    cy.get('.sidebar-legend li.overflow-hidden').should('have.length', 3);
-    cy.get('.sidebar-legend li:not(.overflow-hidden)').should('have.length', 1);
-    cy.get('.sidebar-legend li:not(.overflow-hidden)').should('contain.text', 'AMD MI300X');
+  it('renders no search input (removed from the sidebar panel)', () => {
+    cy.get('.sidebar-legend input[type="text"]').should('not.exist');
   });
 
-  it('search clear button resets search', () => {
-    cy.get('.sidebar-legend input[placeholder="Search..."]').type('test');
-    cy.get('button[aria-label="Clear search"]').should('be.visible');
-    cy.get('button[aria-label="Clear search"]').click();
-    cy.get('.sidebar-legend input[placeholder="Search..."]').should('have.value', '');
-    cy.get('button[aria-label="Clear search"]').should('not.exist');
+  it('fits the longest single-line name with a compact, aligned points-button column', () => {
+    const showPoints = cy.stub().as('showPoints');
+    const items = [
+      { ...MOCK_ITEMS[0], label: 'GB300 NVL72 (Dynamo vLLM)', onShowPoints: showPoints },
+      { ...MOCK_ITEMS[1], label: 'H200 (vLLM)', onShowPoints: showPoints },
+      {
+        ...MOCK_ITEMS[2],
+        name: 'unofficial-run-99',
+        hw: 'overlay-run-99',
+        label: '✕ comparison-run',
+        isRemovable: false,
+        onShowPoints: showPoints,
+      },
+    ];
+    cy.viewport(1280, 900);
+    cy.mount(<ChartLegendWrapper inChart items={items} />);
+    cy.get('[data-testid="chart-legend"]').should(($legend) => {
+      const panel = $legend[0].getBoundingClientRect();
+      const labels = [...$legend[0].querySelectorAll<HTMLLabelElement>('label[for^="checkbox-"]')];
+      const icons = labels.map((label) => label.nextElementSibling!.getBoundingClientRect());
+      const widestLabel = labels[0].getBoundingClientRect();
+      expect(panel.width, 'only panel padding around the name and button').to.be.lessThan(
+        widestLabel.width + icons[0].width + 24,
+      );
+      for (const [index, label] of labels.entries()) {
+        const text = label.lastElementChild as HTMLElement;
+        expect(text.scrollWidth, `${label.textContent} is not truncated`).to.be.at.most(
+          text.clientWidth,
+        );
+        expect(text.getBoundingClientRect().height, 'single-line name').to.equal(20);
+        expect(icons[index].x, 'aligned points buttons').to.be.closeTo(icons[0].x, 1);
+        expect(icons[index].width, 'unchanged click target').to.be.at.least(21);
+      }
+      const range = labels[0].ownerDocument.createRange();
+      range.selectNodeContents(labels[0].lastElementChild!);
+      const glyph = labels[0].nextElementSibling!.querySelector('svg')!.getBoundingClientRect();
+      expect(glyph.left - range.getBoundingClientRect().right, 'name-to-icon gap').to.be.closeTo(
+        8,
+        1,
+      );
+      const optimal = $legend.find('[data-testid="optimal"]')[0].getBoundingClientRect();
+      const gradient = $legend.find('[data-testid="gradient-labels"]')[0].getBoundingClientRect();
+      expect(gradient.top, 'display controls have separate rows').to.be.greaterThan(optimal.bottom);
+    });
+    cy.get('[data-testid="legend-points-h100-sxm"]').click();
+    cy.get('@showPoints').should('have.been.calledWith', 'h100-sxm');
+    cy.get('#checkbox-h100-sxm').should('be.checked');
+    cy.get('[data-testid="legend-points-overlay-run-99"]').click();
+    cy.get('@showPoints').should('have.been.calledWith', 'overlay-run-99');
+    cy.get('[data-testid="gradient-labels"]').click().should('have.attr', 'aria-checked', 'true');
   });
+
+  for (const width of [390, 1280]) {
+    it(`keeps long unofficial names and their points action inside the panel at ${width}px`, () => {
+      const label = '✕ qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+      cy.viewport(width, 900);
+      cy.mount(
+        <ChartLegendWrapper
+          inChart
+          items={[
+            ...MOCK_ITEMS,
+            {
+              ...MOCK_ITEMS[0],
+              name: 'unofficial-run-99',
+              hw: 'overlay-run-99',
+              label,
+              isRemovable: false,
+              onShowPoints: cy.stub().as('overlayPoints'),
+            },
+          ]}
+        />,
+      );
+      cy.get('[data-testid="legend-points-overlay-run-99"]')
+        .should(($button) => {
+          const panel = $button.closest('.sidebar-legend')[0].getBoundingClientRect();
+          expect($button[0].getBoundingClientRect().right).to.be.at.most(panel.right);
+          expect(panel.right).to.be.at.most(width);
+        })
+        .click();
+      cy.get('@overlayPoints').should('have.been.calledWith', 'overlay-run-99');
+      cy.get('label[for="checkbox-overlay-run-99"]')
+        .should('have.attr', 'title', label)
+        .and('contain.text', label);
+    });
+
+    it(`keeps the same toggle and hit area in place across collapse and reopen at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper inChart />);
+      cy.get('[data-testid="legend-close-button"]')
+        .should('have.attr', 'aria-expanded', 'true')
+        .then(($button) => {
+          const button = $button[0];
+          const bounds = button.getBoundingClientRect();
+          const plotWidth = Cypress.$('[data-testid="d3-chart-svg"]')[0].getBoundingClientRect()
+            .width;
+          cy.wrap($button).click({ scrollBehavior: false });
+          cy.get('[data-testid="legend-open-button"]')
+            .should('have.focus')
+            .and('have.attr', 'aria-expanded', 'false')
+            .and('have.attr', 'aria-label', 'Show legend')
+            .should(($toggle) => {
+              expect($toggle[0], 'same focused DOM button').to.equal(button);
+              const collapsed = $toggle[0].getBoundingClientRect();
+              for (const edge of ['x', 'y', 'width', 'height'] as const) {
+                expect(collapsed[edge], `collapsed ${edge}`).to.be.closeTo(bounds[edge], 1);
+              }
+              if (width >= 1024) {
+                expect(
+                  Cypress.$('[data-testid="d3-chart-svg"]')[0].getBoundingClientRect().width,
+                ).to.be.greaterThan(plotWidth);
+              }
+            })
+            .find('svg')
+            .should('have.class', 'lucide-panel-right-open');
+          cy.get('[data-testid="legend-open-button"]').click({ scrollBehavior: false });
+          cy.get('[data-testid="legend-close-button"]')
+            .should('have.focus')
+            .and('have.attr', 'aria-label', 'Hide legend')
+            .should(($toggle) => {
+              expect($toggle[0]).to.equal(button);
+              const reopened = $toggle[0].getBoundingClientRect();
+              expect(reopened.x).to.be.closeTo(bounds.x, 1);
+              expect(reopened.y).to.be.closeTo(bounds.y, 1);
+            })
+            .find('svg')
+            .should('have.class', 'lucide-panel-right-close');
+        });
+    });
+
+    it(`fits a short list and keeps actions with the close button at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
+      cy.get('[data-testid="chart-legend"]')
+        .scrollIntoView()
+        .should(($legend) => {
+          const panel = $legend[0].getBoundingClientRect();
+          const list = $legend.find('ul')[0].getBoundingClientRect();
+          const controls = $legend
+            .find('[data-testid="legend-display-controls"]')[0]
+            .getBoundingClientRect();
+          expect(panel.height).to.be.lessThan(280);
+          expect(controls.top - list.bottom).to.be.lessThan(16);
+          expect(panel.right).to.be.at.most(width);
+        });
+      cy.get('[data-testid="legend-toolbar"]').within(() => {
+        cy.get('[data-testid="quick-filters"]').click();
+        cy.get('[data-testid="legend-close-button"]').should('be.visible');
+      });
+      cy.get('@quickFilters').should('have.been.calledOnce');
+      cy.get('.sidebar-legend label').contains('NVIDIA H100 SXM').click();
+      cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
+      cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
+      cy.get('[data-testid="legend-advanced-toggle"]').click();
+      cy.get('[data-testid="log-scale"]').click().should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-testid="legend-close-button"]').click();
+      cy.get('[data-testid="legend-open-button"]').click();
+      cy.get('[data-testid="log-scale"]').should('have.attr', 'aria-checked', 'true');
+    });
+
+    for (const grouped of [false, true]) {
+      it(`scrolls a long ${grouped ? 'grouped' : 'flat'} list without hiding controls at ${width}px`, () => {
+        const items = Array.from({ length: 40 }, (_, index) => ({
+          ...MOCK_ITEMS[index % MOCK_ITEMS.length],
+          name: `hardware-${Math.floor(index / 5)} run-${index}`,
+          hw: `series-${index}`,
+          label: `Run ${index + 1} — hardware comparison`,
+          title: `Hardware ${Math.floor(index / 5) + 1}`,
+        }));
+        cy.viewport(width, 900);
+        cy.mount(<ChartLegendWrapper inChart grouped={grouped} items={items} />);
+        cy.get('[data-testid="chart-legend"]')
+          .scrollIntoView()
+          .should(($legend) => {
+            const panel = $legend[0].getBoundingClientRect();
+            const scroller = $legend.find('.custom-scrollbar')[0];
+            const controls = $legend
+              .find('[data-testid="legend-display-controls"]')[0]
+              .getBoundingClientRect();
+            expect(panel.height).to.be.at.most(width < 1024 ? 384 : 575);
+            expect(scroller.scrollHeight).to.be.greaterThan(scroller.clientHeight);
+            expect(controls.bottom).to.be.at.most(panel.bottom);
+          });
+        cy.get('.sidebar-legend label').contains('Run 40 —').scrollIntoView().click();
+        cy.get('#checkbox-series-39').should('not.be.checked');
+        cy.get('[data-testid="optimal"]')
+          .should('be.visible')
+          .click()
+          .should('have.attr', 'aria-checked', 'false');
+        cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
+        cy.get('#checkbox-series-39').should('be.checked');
+      });
+    }
+  }
 
   it('clicking a legend item toggles its active state', () => {
     cy.get('.sidebar-legend label').first().click();
@@ -150,13 +396,14 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.contains('Reset filter').should('not.exist');
   });
 
-  it('expand/collapse button toggles legend state', () => {
-    cy.get('.sidebar-legend').should('have.class', 'bg-accent');
-    cy.get('.sidebar-legend button')
-      .filter(':contains("Collapse"), :contains("Expand")')
-      .first()
-      .click();
-    cy.get('.sidebar-legend').should('not.have.class', 'bg-accent');
+  it('close button hides the panel and the reopen button restores it', () => {
+    cy.get('.sidebar-legend').should('exist');
+    cy.get('[data-testid="legend-close-button"]').click();
+    cy.get('.sidebar-legend').should('not.exist');
+    cy.get('[data-testid="legend-open-button"]').should('be.visible');
+    cy.get('[data-testid="legend-open-button"]').click();
+    cy.get('.sidebar-legend').should('exist');
+    cy.get('[data-testid="legend-open-button"]').should('not.exist');
   });
 
   it('renders no points-table icon when items have no onShowPoints handler', () => {

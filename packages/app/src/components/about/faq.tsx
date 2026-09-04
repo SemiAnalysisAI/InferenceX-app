@@ -75,11 +75,15 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
         <h2 className="text-lg font-semibold mb-4">{title}</h2>
         <dl className="divide-y divide-border">
           {items.map((item) => (
-            <div id={item.id} key={item.id} className="scroll-mt-24 py-4 first:pt-0 last:pb-0">
-              <dt className="font-medium mb-2">
+            <div
+              id={item.id}
+              key={item.id}
+              className="grid scroll-mt-24 gap-3 py-5 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
+            >
+              <dt className="min-w-0 font-medium">
                 <FaqQuestionLink id={item.id} question={item.question} />
               </dt>
-              <dd className="text-muted-foreground text-sm">
+              <dd className="min-w-0 max-w-prose text-sm leading-relaxed text-muted-foreground">
                 {item.answer && (
                   <p>
                     {item.answer}
@@ -99,7 +103,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
                   </p>
                 )}
                 {item.list && (
-                  <ul className="mt-1.5 ml-8 list-disc space-y-0.5">
+                  <ul className="mt-2 ml-5 list-disc space-y-1">
                     {item.list.map((listItem) => (
                       <li key={listItem}>{listItem}</li>
                     ))}

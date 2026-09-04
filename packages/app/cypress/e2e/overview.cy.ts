@@ -1,7 +1,8 @@
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 // Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
-// matrix row order.
+// row order within each scenario group — AgentX rows lead the matrix, 8K/1K
+// rows follow.
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 0813 1.6T',
   'Kimi K3 2.8T',
@@ -21,9 +22,11 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Six models: three with both a single-turn and an AgentX row, and three
- *  curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next). */
-const MATRIX_ROWS = 9;
+/** Six models: two with both a single-turn and an AgentX row (DeepSeek,
+ *  Qwen3.5), and four curated AgentX-only (Kimi K3, GLM 5.2,
+ *  Qwen3.8-Flash-Next, and MiniMax M3, whose 8k1k sweep was retired on
+ *  2026-08-04 in InferenceX#2493). */
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -1109,7 +1112,7 @@ describe('Overview page', () => {
         );
       });
     });
-    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
+    desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .should('contain.text', 'SGLang · FP8')
         .and('not.contain.text', 'M3 EAGLE')
@@ -1168,7 +1171,7 @@ describe('Overview page', () => {
 
     // Priced result with no B200 baseline: neutral gray ∞ and a neutral cell —
     // availability, not a good/bad judgment, so no red/green tint.
-    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
+    desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '∞')
@@ -1246,8 +1249,8 @@ describe('Overview page', () => {
             expect(getComputedStyle(header).fontSize).to.equal('14px');
           }
         });
-        // One row per curated (model, scenario) pair: six models, three of
-        // which (DeepSeek, MiniMax, Qwen) carry a second AgentX row.
+        // One row per curated (model, scenario) pair: six models, two of
+        // which (DeepSeek, Qwen3.5) carry a second single-turn row.
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
@@ -1263,12 +1266,12 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['Kimi-K3', 'GLM-5.2']) {
+    for (const model of ['Kimi-K3', 'GLM-5.2', 'MiniMax-M3']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });
     }
-    for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
+    for (const model of ['DeepSeek-V4-Pro', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', '8K/1K');
@@ -1283,9 +1286,10 @@ describe('Overview page', () => {
       'have.length',
       2,
     );
-    // Single-turn first, AgentX directly below it, both under the same label.
+    // The AgentX row sits in the leading AgentX group; the single-turn row
+    // follows in the 8K/1K group below it, both under the same label.
     cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').then(($rows) => {
-      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([SINGLE_TURN, AGENTX]);
+      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([AGENTX, SINGLE_TURN]);
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -1422,7 +1426,7 @@ describe('Overview page', () => {
         .and('include', 'Estimated from validated benchmark runs.');
     });
 
-    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
+    desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
@@ -1729,6 +1733,14 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
         const wrapper = table.parentElement as HTMLElement;
+        const card = table.closest('[data-slot="card"]')!;
+        const style = getComputedStyle(card);
+        // Clip the cell backgrounds to the card's actual rounded boundary,
+        // without making a scroll container that traps the sticky header.
+        expect(style.overflowX).to.equal('clip');
+        expect(style.overflowY).to.equal('clip');
+        expect(parseFloat(style.borderTopLeftRadius)).to.be.greaterThan(0);
+        expect(parseFloat(style.borderTopRightRadius)).to.be.greaterThan(0);
         expect(wrapper.scrollWidth, `matrix scrolls horizontally at ${width}px`).to.be.at.most(
           wrapper.clientWidth + 1,
         );
@@ -1816,7 +1828,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
-    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
+    desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '∞')

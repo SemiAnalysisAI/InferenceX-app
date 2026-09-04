@@ -1,4 +1,4 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
@@ -48,12 +48,13 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
       },
     });
     cy.wait('@unofficialRun');
-    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
-    // is the default — clicked anyway so the suite does not depend on that.
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
-      .click()
-      .should('have.attr', 'data-state', 'active');
+    // Explicitly select Interactivity so this suite does not depend on the default.
+    selectXAxisMode('interactivity');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('exist');
+    cy.get('[data-slot="unofficial-banner"]')
+      .should('have.length', 1)
+      .parents('[data-slot="dashboard-navigation"]')
+      .should('have.length', 1);
   });
 
   it('exports second-based latency headers and only currently visible overlay rows', () => {
@@ -67,6 +68,8 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
     });
 
     cy.get(`[aria-label="Dismiss ${OVERLAY_RUN_BRANCH}"]`).click();
+    cy.get('[data-slot="unofficial-banner"]').should('not.exist');
+    cy.get('[data-slot="dashboard-navigation"]').should('be.visible');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'not.exist',
     );

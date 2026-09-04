@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -329,6 +329,11 @@ export function buildDerivedChartFields(
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
+  if (wants('tokenRevenuePerGpuHour')) {
+    // At $1 per million total tokens, million tokens per GPU hour is
+    // numerically equal to gross token revenue in $/GPU/hr.
+    fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
+  }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
@@ -342,51 +347,44 @@ export function buildDerivedChartFields(
   }
 
   if (wants('costh')) {
-    fields.costh = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costh / millionTokensPerHour : 0,
-    );
+    fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
   if (wants('costn')) {
-    fields.costn = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costn / millionTokensPerHour : 0,
-    );
+    fields.costn = chartMetric(millionTokensPerHour ? specs.costn / millionTokensPerHour : 0);
   }
   if (wants('costr')) {
-    fields.costr = chartMetric(
-      hardwarePower && millionTokensPerHour ? specs.costr / millionTokensPerHour : 0,
-    );
+    fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
   if (wants('costhOutput')) {
     fields.costhOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costnOutput')) {
     fields.costnOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costrOutput')) {
     fields.costrOutput = chartMetric(
-      hardwarePower && millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
+      millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costhi')) {
     fields.costhi = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
   if (wants('costni')) {
     fields.costni = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
     );
   }
   if (wants('costri')) {
     fields.costri = chartMetric(
-      hardwarePower && millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
+      millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
     );
   }
-
   if (wants('tokensPerDollarH')) {
     fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
   }
@@ -419,52 +417,6 @@ export function buildDerivedChartFields(
   }
   if (wants('inputTokensPerDollarR')) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
-  }
-
-  if (wants('tokensPerRmbH')) {
-    fields.tokensPerRmbH = chartMetric(
-      specs.costh ? tokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('tokensPerRmbN')) {
-    fields.tokensPerRmbN = chartMetric(
-      specs.costn ? tokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('tokensPerRmbR')) {
-    fields.tokensPerRmbR = chartMetric(
-      specs.costr ? tokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbH')) {
-    fields.outputTokensPerRmbH = chartMetric(
-      specs.costh ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbN')) {
-    fields.outputTokensPerRmbN = chartMetric(
-      specs.costn ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbR')) {
-    fields.outputTokensPerRmbR = chartMetric(
-      specs.costr ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbH')) {
-    fields.inputTokensPerRmbH = chartMetric(
-      specs.costh ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbN')) {
-    fields.inputTokensPerRmbN = chartMetric(
-      specs.costn ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbR')) {
-    fields.inputTokensPerRmbR = chartMetric(
-      specs.costr ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
   }
 
   if (wants('jTotal')) {
@@ -545,6 +497,8 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredJPerOutputToken'
     | 'measuredJPerTotalToken'
     | 'measuredJPerInputToken'
+    | 'measuredPrefillJPerInputToken'
+    | 'measuredDecodeJPerOutputToken'
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
@@ -575,6 +529,14 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.joules_per_input_token === 'number'
       ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
       : {}),
+    // Role-local energy is not additionally gated on power_valid here —
+    // rowToAggDataEntry already scrubbed it, same as the role-watts fields.
+    ...(typeof entry.prefill_joules_per_input_token === 'number'
+      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
+      : {}),
+    ...(typeof entry.decode_joules_per_output_token === 'number'
+      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
+      : {}),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
           measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),
@@ -598,9 +560,13 @@ export function remapInferencePoint(
 ): InferenceData {
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
+  // Absent TTFT values are zero-filled by the row transform. Neither that
+  // sentinel nor an unrelated fallback coordinate is a latency measurement.
+  const missingTtft =
+    xAxisField.endsWith('_ttft') && (typeof xCandidate !== 'number' || xCandidate <= 0);
   return {
     ...point,
-    x: typeof xCandidate === 'number' ? xCandidate : point.x,
+    x: missingTtft ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
     roof: metric?.roof ?? false,
   };
@@ -776,10 +742,30 @@ export function metricTitle(chartDef: ChartDefinition, metricKey: string, locale
   return (chartDef[`${metricKey}_title`] as string) || '';
 }
 
+/** Heading title for a metric: the metric alone, without its cost tier. */
+export function metricChartTitle(
+  chartDef: ChartDefinition,
+  metricKey: string,
+  locale: Locale,
+): string {
+  if (locale === 'zh') {
+    const zh = chartDef[`${metricKey}_chartTitleZh`];
+    if (typeof zh === 'string' && zh) return zh;
+  }
+  return (
+    (chartDef[`${metricKey}_chartTitle`] as string) || metricTitle(chartDef, metricKey, locale)
+  );
+}
+
 export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale: Locale): string {
   if (locale === 'zh') {
     const zh = chartDef[`${metricKey}_labelZh`];
     if (typeof zh === 'string' && zh) return zh;
   }
   return (chartDef[`${metricKey}_label`] as string) || '';
+}
+
+/** Resolve the rendered x-axis label without mutating the canonical English label. */
+export function xAxisLabel(chartDef: ChartDefinition, locale: Locale): string {
+  return locale === 'zh' && chartDef.x_labelZh ? chartDef.x_labelZh : chartDef.x_label;
 }

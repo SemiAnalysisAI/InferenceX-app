@@ -12,8 +12,14 @@ import type {
   HardwareConfig,
   InferenceData,
   RenderableGraph,
+  TokenRevenuePricing,
+  TokenRevenuePriceSource,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import {
+  applyTokenRevenuePricing,
+  usesTokenSalePricing,
+} from '@/components/inference/token-revenue';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
@@ -31,10 +37,6 @@ import {
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
 
-/**
- * Chart x-axis variant selected by the mode buttons above the plot. The
- * inference provider and ChartDisplay import this single definition.
- */
 import {
   applyAgenticPercentileToXLabel,
   applyScopeFilters,
@@ -75,6 +77,8 @@ export function useChartData(
   selectedDateRange: { startDate: string; endDate: string },
   userCosts: Record<string, number | undefined> | null,
   userPowers: Record<string, number | undefined> | null,
+  tokenRevenuePricing: TokenRevenuePricing | null,
+  tokenRevenuePriceSource: TokenRevenuePriceSource,
   selectedRunDate?: string,
   enabled = true,
   latestAvailableDate?: string,
@@ -91,7 +95,7 @@ export function useChartData(
   comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
-  _selectedXAxisMode: XAxisMode = 'e2e',
+  selectedXAxisMode?: XAxisMode,
   /**
    * GitHub run id for the "as of run" base view. Set only when an
    * earlier-than-latest run is selected.
@@ -132,6 +136,8 @@ export function useChartData(
   const {
     data: baseRows,
     isLoading: baseLoading,
+    isFetching: baseFetching,
+    isPlaceholderData: basePlaceholder,
     error: baseError,
   } = useBenchmarks(
     selectedModel,
@@ -142,6 +148,9 @@ export function useChartData(
     undefined,
     !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
     benchmarkQueryScope,
+    // Same-model key changes (date/run/scope) keep the previous rows rendered
+    // while the new result fetches; `refreshing` below surfaces that window.
+    true,
   );
   const {
     data: runRows,
@@ -190,6 +199,10 @@ export function useChartData(
 
   // Loading = query is fetching OR we haven't received any data yet (waiting for date/filters)
   const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  // Refreshing = data is on screen but a fresh result is on the way: either the
+  // base query is showing previous-key placeholder rows, or a same-key refetch
+  // is in flight. Distinct from `loading`, which means nothing renderable yet.
+  const refreshing = !loading && (basePlaceholder || baseFetching);
   const error = queryError ? queryError.message : null;
 
   // Stable identity for comparison query data — useQueries returns a new array ref every render,
@@ -312,30 +325,37 @@ export function useChartData(
         const resolved = resolveXAxisField(chartDef, selectedYAxisMetric, effectiveXMetric, {
           isAgentic,
           percentile: selectedPercentile,
+          xAxisMode: selectedXAxisMode,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
-        const ttftPctl = isTtftOverride
-          ? (effectiveXMetric as string).replace(/_ttft$/u, '')
-          : 'p90';
+        const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
+        const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
         let xAxisLabel = chartDef.x_label;
+        let xAxisLabelZh = chartDef.x_labelZh;
         if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const labelZhKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
             xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
+            xAxisLabelZh = (chartDef[labelZhKey] as string) || chartDef.x_labelZh;
           } else {
             xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
+            xAxisLabelZh = isTtftOverride ? ttftLabelZh : chartDef.x_labelZh;
           }
         } else if (resolved.branch === 'config-input-override') {
           const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          const xLabelZhOverrideKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
+          xAxisLabelZh = (chartDef[xLabelZhOverrideKey] as string) || chartDef.x_labelZh;
         } else if (resolved.branch === 'e2e-ttft-override') {
           xAxisLabel = ttftLabel;
+          xAxisLabelZh = ttftLabelZh;
         }
 
         // Agentic: relabel to the chosen percentile (the resolver already
@@ -345,10 +365,15 @@ export function useChartData(
         // heading ("vs. <latency>") is also rewritten so the title above the
         // plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
-        let chartHeading = (chartDef[headingKey] as string) || chartDef.heading;
+        let chartHeading = isTtftOverride
+          ? `vs. ${ttftPctlWord} Time To First Token`
+          : selectedXAxisMode === undefined
+            ? (chartDef[headingKey] as string) || chartDef.heading
+            : chartDef.heading;
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
@@ -364,9 +389,6 @@ export function useChartData(
         const xAxisFlipped =
           xAxisField !== naturalX && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
-        const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = chartDef[yLabelKey];
-
         const rooflineOverrides: Partial<ChartDefinition> = {};
         if (xAxisFlipped) {
           for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
@@ -379,12 +401,50 @@ export function useChartData(
           }
         }
 
+        const usesOpenRouterPricing = tokenRevenuePriceSource === 'openrouter';
+        const revenueLabels: Partial<ChartDefinition> =
+          selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
+            ? usesOpenRouterPricing
+              ? {
+                  y_tokenRevenuePerGpuHour_label:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing ($/GPU/hr)',
+                  y_tokenRevenuePerGpuHour_labelZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing',
+                  y_tokenRevenuePerGpuHour_titleZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+                  // The heading reads `_chartTitle`; keep the priced source there too.
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+                }
+              : {
+                  y_tokenRevenuePerGpuHour_label:
+                    'Token Revenue per GPU Hour at Normalized Pricing ($/GPU/hr)',
+                  y_tokenRevenuePerGpuHour_labelZh:
+                    '按标准化价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
+                }
+            : {};
+        const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
+        const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
+
         return {
           chartDefinition: {
             ...chartDef,
             ...rooflineOverrides,
+            ...revenueLabels,
             heading: chartHeading,
+            x_scale_field: xAxisField,
             x_label: xAxisLabel,
+            x_labelZh: xAxisLabelZh,
             y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
           },
           metricKey,
@@ -393,16 +453,27 @@ export function useChartData(
       }),
     [
       selectedYAxisMetric,
+      selectedXAxisMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
       selectedSequence,
+      tokenRevenuePriceSource,
     ],
   );
 
   // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {
-    if (chartData.length === 0) return [];
+    // Once loading finishes, retain resolved axes even without official rows
+    // so unofficial-only charts use the same definitions. Keep initial skeletons.
+    if (chartData.length === 0 && loading) return [];
+    if (
+      usesTokenSalePricing(selectedYAxisMetric) &&
+      tokenRevenuePriceSource === 'openrouter' &&
+      !tokenRevenuePricing
+    ) {
+      return [];
+    }
 
     let dataSource: InferenceData[][] = chartData;
     if (
@@ -413,6 +484,9 @@ export function useChartData(
     }
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {
       dataSource = chartData.map((d) => calculatePowerForGpus(d, userPowers));
+    }
+    if (usesTokenSalePricing(selectedYAxisMetric)) {
+      dataSource = chartData.map((d) => applyTokenRevenuePricing(d, tokenRevenuePricing));
     }
 
     const result = stableChartDefinitions.map(
@@ -461,12 +535,15 @@ export function useChartData(
     return result;
   }, [
     chartData,
+    loading,
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,
     selectedGPUs,
     userCosts,
     userPowers,
+    tokenRevenuePricing,
+    tokenRevenuePriceSource,
     stableChartDefinitions,
     compareGpuPair,
     selectedPercentile,
@@ -489,6 +566,7 @@ export function useChartData(
     graphs,
     selectionPoints,
     loading,
+    refreshing,
     error,
     hardwareConfig,
     availableQuickFilters,

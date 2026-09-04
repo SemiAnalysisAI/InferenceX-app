@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import type { Locale } from '@/lib/i18n';
 
 import {
   type ArchSubBlock,
@@ -15,6 +16,98 @@ import {
   getHybridAttentionSubBlocks,
   sharedExpertCount,
 } from '@/lib/model-architectures';
+
+const ARCHITECTURE_TEXT_ZH: Record<string, string> = {
+  'Token Embedding': 'Token 嵌入',
+  'Dense Transformer Block': '稠密 Transformer 块',
+  'MoE Transformer Block': 'MoE Transformer 块',
+  'Transformer Block': 'Transformer 块',
+  'Output Head (LM Head)': '输出头（LM Head）',
+  Type: '类型',
+  Layers: '层数',
+  Attention: '注意力',
+  Context: '上下文',
+  Experts: '专家',
+  Dense: '稠密',
+  'Dense Feed-Forward': '稠密前馈网络',
+  'Dense FFN': '稠密 FFN',
+  'Feed-Forward Network': '前馈网络',
+  'MoE Router': 'MoE 路由器',
+  'Hash Router': 'Hash 路由器',
+  'Hash-Routed MoE': 'Hash 路由 MoE',
+  'Multi-Head Attention': '多头注意力',
+  'Grouped Query Attention': '分组查询注意力',
+  'Multi-head Latent Attention': '多头潜在注意力',
+  'Linear Attention': '线性注意力',
+  'Hybrid Attention': '混合注意力',
+  'Alternating Sink/Full GQA': '交替 Sink/Full GQA',
+  'Heavily Compressed Attention': '高压缩注意力',
+  'Compressed Sparse Attention': '压缩稀疏注意力',
+  'Sliding Attention + Sink': '滑动窗口注意力 + Sink',
+  'Causal Grouped Query Attention': '因果分组查询注意力',
+  'Gated MLA': '门控 MLA',
+  'Q Projection': 'Q 投影',
+  'K Projection': 'K 投影',
+  'V Projection': 'V 投影',
+  'Output Projection': '输出投影',
+  'Gate Projection': '门控投影',
+  'Up Projection': '升维投影',
+  'Down Projection': '降维投影',
+  'Grouped Attention': '分组注意力',
+  'Rotary Pos Emb': '旋转位置编码',
+  'Query heads': 'Query head',
+  'Shared KV heads': '共享 KV head',
+  'Value heads': 'Value head',
+  'Shared KV groups': '共享 KV 组',
+  'Applied to gate output': '应用于门控输出',
+  'Sliding Window': '滑动窗口',
+  'Token Compression': 'Token 压缩',
+  'Lightning Indexer': 'Lightning Indexer',
+  'Heavy Compression': '高压缩',
+  Local: '局部',
+  Compressed: '压缩',
+  'Shared-KV MQA + Sink': '共享 KV MQA + Sink',
+  'alternating every layer': '逐层交替',
+};
+
+export function localizeArchitectureDiagramText(value: string, locale: Locale): string {
+  if (locale === 'en') return value;
+  let localized = value;
+  for (const [source, target] of Object.entries(ARCHITECTURE_TEXT_ZH).toSorted(
+    ([a], [b]) => b.length - a.length,
+  )) {
+    localized = localized.replaceAll(source, target);
+  }
+  return localized
+    .replaceAll(/(?<count>\d+) KV heads/gu, '$<count> 个 KV head')
+    .replaceAll(/(?<count>\d+) heads/gu, '$<count> 个 attention head')
+    .replace(/\(shared\)$/u, '（共享）')
+    .replace(/^(?<count>\d+)D \+ (?<moe>\d+)M$/u, '$<count> 个稠密层 + $<moe> 个 MoE 层')
+    .replaceAll(/×(?<count>\d+) first layers/gu, '前 $<count> 层')
+    .replaceAll('dense layers', '个稠密层')
+    .replaceAll('MoE layers', '个 MoE 层')
+    .replaceAll('layers', '层')
+    .replaceAll('total', '总参数')
+    .replaceAll('active', '激活参数')
+    .replaceAll('context', '上下文')
+    .replaceAll('vocab =', '词表 =')
+    .replaceAll('intermediate =', '中间维度 =')
+    .replaceAll('Feed-Forward', '前馈网络')
+    .replaceAll('Expert FFN', '专家 FFN')
+    .replaceAll('Details', '详情')
+    .replaceAll('Activation', '激活')
+    .replaceAll('activation', '激活')
+    .replaceAll(' of ', '/')
+    .replaceAll(' routed', ' 个路由 expert')
+    .replaceAll(' shared', ' 个共享 expert')
+    .replaceAll(/last (?<count>\d+) tokens/gu, '最近 $<count> 个 token')
+    .replaceAll('local KV', '局部 KV')
+    .replaceAll(
+      /(?<count>\d+) entry \/ (?<tokens>\d+) tokens/gu,
+      '每 $<tokens> 个 token 压缩为 $<count> 项',
+    )
+    .replaceAll('sparse top-', '稀疏 top-');
+}
 /** Block color definitions for light/dark themes */
 const BLOCK_COLORS = {
   embedding: { light: '#dbeafe', dark: '#1e3a5f', stroke: '#3b82f6' },
@@ -218,6 +311,7 @@ export function renderDiagram(
   isDark: boolean,
   expandedBlocks: Set<string>,
   onBlockClick: (blockId: string) => void,
+  locale: Locale = 'en',
 ) {
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
@@ -231,6 +325,7 @@ export function renderDiagram(
   const borderColor = isDark ? '#374151' : '#d1d5db';
   const bgSubtle = isDark ? '#1f2937' : '#f9fafb';
   const expandedBg = isDark ? '#111827' : '#f1f5f9';
+  const localizedText = (value: string): string => localizeArchitectureDiagramText(value, locale);
 
   // Layout constants
   const pad = { top: 20, right: 16, bottom: 16, left: 16 };
@@ -733,7 +828,7 @@ export function renderDiagram(
       .attr('font-size', '13px')
       .attr('font-weight', 600)
       .attr('font-family', 'inherit')
-      .text(mainText);
+      .text(localizedText(mainText));
 
     if (subText) {
       g.append('text')
@@ -744,7 +839,7 @@ export function renderDiagram(
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
-        .text(subText);
+        .text(localizedText(subText));
     }
   }
 
@@ -780,7 +875,7 @@ export function renderDiagram(
       .attr('font-weight', 600)
       .attr('font-family', 'inherit')
       .style('pointer-events', 'none')
-      .text(mainText);
+      .text(localizedText(mainText));
 
     if (subText) {
       g.append('text')
@@ -792,7 +887,7 @@ export function renderDiagram(
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
         .style('pointer-events', 'none')
-        .text(subText);
+        .text(localizedText(subText));
     }
 
     const iconX = x + w - 22;
@@ -853,7 +948,7 @@ export function renderDiagram(
       .attr('font-size', fontSize.name)
       .attr('font-weight', 500)
       .attr('font-family', 'inherit')
-      .text(block.name);
+      .text(localizedText(block.name));
 
     if (block.detail) {
       g.append('text')
@@ -864,7 +959,7 @@ export function renderDiagram(
         .attr('fill', mutedFg)
         .attr('font-size', fontSize.detail)
         .attr('font-family', 'inherit')
-        .text(block.detail);
+        .text(localizedText(block.detail));
     }
   }
 
@@ -907,7 +1002,7 @@ export function renderDiagram(
         .attr('font-weight', 600)
         .attr('font-family', 'inherit')
         .attr('letter-spacing', '0.5px')
-        .text(label.toUpperCase());
+        .text(locale === 'en' ? label.toUpperCase() : localizedText(label));
       sy += 24;
     }
 
@@ -931,7 +1026,7 @@ export function renderDiagram(
           .attr('font-size', '9px')
           .attr('font-weight', 600)
           .attr('font-family', 'inherit')
-          .text(flow.leftLabel);
+          .text(localizedText(flow.leftLabel));
       }
       if (flow.rightLabel) {
         g.append('text')
@@ -943,7 +1038,7 @@ export function renderDiagram(
           .attr('font-size', '9px')
           .attr('font-weight', 600)
           .attr('font-family', 'inherit')
-          .text(flow.rightLabel);
+          .text(localizedText(flow.rightLabel));
       }
       sy += 16;
     }
@@ -1171,7 +1266,7 @@ export function renderDiagram(
             .attr('font-size', '9px')
             .attr('font-weight', 600)
             .attr('font-family', 'inherit')
-            .text(lbl);
+            .text(localizedText(lbl));
         }
       }
       sy += 16;
@@ -1436,7 +1531,7 @@ export function renderDiagram(
       .attr('font-weight', 600)
       .attr('font-family', 'inherit')
       .style('pointer-events', 'none')
-      .text(label);
+      .text(localizedText(label));
 
     g.append('text')
       .attr('x', x + w / 2 - 8)
@@ -1447,7 +1542,7 @@ export function renderDiagram(
       .attr('font-size', '11px')
       .attr('font-family', 'inherit')
       .style('pointer-events', 'none')
-      .text(subtitle);
+      .text(localizedText(subtitle));
 
     const iconX = x + w - 22;
     const iconY = by + h / 2;
@@ -1478,9 +1573,19 @@ export function renderDiagram(
   // === TITLE ===
   const modelName = arch.developer || '';
   const paramsSummary = [
-    `${formatParamCount(arch.totalParams)} total`,
-    isMoE ? `${formatParamCount(arch.activeParams)} active` : null,
-    arch.contextWindow ? `${formatContextWindow(arch.contextWindow)} context` : null,
+    locale === 'zh'
+      ? `总参数 ${formatParamCount(arch.totalParams)}`
+      : `${formatParamCount(arch.totalParams)} total`,
+    isMoE
+      ? locale === 'zh'
+        ? `激活参数 ${formatParamCount(arch.activeParams)}`
+        : `${formatParamCount(arch.activeParams)} active`
+      : null,
+    arch.contextWindow
+      ? locale === 'zh'
+        ? `上下文 ${formatContextWindow(arch.contextWindow)}`
+        : `${formatContextWindow(arch.contextWindow)} context`
+      : null,
   ]
     .filter(Boolean)
     .join(' \u00B7 ');
@@ -1551,7 +1656,7 @@ export function renderDiagram(
         .attr('stroke-dasharray', '6,3');
 
       // Dense layer badge (clickable to collapse)
-      const denseLabel = `\u2212 \u00D7${denseLayerCount} dense layers`;
+      const denseLabel = localizedText(`\u2212 \u00D7${denseLayerCount} dense layers`);
       const denseBadgeW = denseLabel.length * 7 + 16;
       g.append('rect')
         .attr('x', width - pad.right - denseBadgeW - 4)
@@ -1824,7 +1929,7 @@ export function renderDiagram(
         .attr('stroke-dasharray', '6,3');
 
       // Collapse badge
-      const hashBadge = `− ×${arch.hashRoutedLayers} layers`;
+      const hashBadge = localizedText(`− ×${arch.hashRoutedLayers} layers`);
       const hashBadgeW = hashBadge.length * 7 + 16;
       g.append('rect')
         .attr('x', width - pad.right - hashBadgeW - 4)
@@ -1940,7 +2045,7 @@ export function renderDiagram(
           .attr('stroke-dasharray', '6,3');
 
         // Collapse badge
-        const badgeLabel = `\u2212 \u00D7${spec.count} layers`;
+        const badgeLabel = localizedText(`\u2212 \u00D7${spec.count} layers`);
         const badgeW = badgeLabel.length * 7 + 16;
         g.append('rect')
           .attr('x', width - pad.right - badgeW - 4)
@@ -2053,7 +2158,7 @@ export function renderDiagram(
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
-        const labelText = `\u21C5 ${arch.alternatingNote ?? 'alternating every layer'}`;
+        const labelText = `\u21C5 ${localizedText(arch.alternatingNote ?? 'alternating every layer')}`;
         const labelPadX = 6;
         const labelPadY = 4;
         const labelFontSize = 10;
@@ -2097,7 +2202,7 @@ export function renderDiagram(
       .attr('stroke-dasharray', '6,3');
 
     // Layer badge (clickable to collapse)
-    const collapseBadgeLabel = `\u2212 ${layerLabel}`;
+    const collapseBadgeLabel = localizedText(`\u2212 ${layerLabel}`);
     const badgeW = collapseBadgeLabel.length * 7 + 16;
     g.append('rect')
       .attr('x', width - pad.right - badgeW - 4)
@@ -2291,7 +2396,7 @@ export function renderDiagram(
       .attr('font-size', '10px')
       .attr('font-weight', 500)
       .attr('font-family', 'inherit')
-      .text(spec.label);
+      .text(localizedText(spec.label));
 
     g.append('text')
       .attr('x', sx)
@@ -2301,7 +2406,7 @@ export function renderDiagram(
       .attr('font-size', '14px')
       .attr('font-weight', 700)
       .attr('font-family', 'inherit')
-      .text(spec.value);
+      .text(localizedText(spec.value));
 
     if (i < specItems.length - 1) {
       g.append('line')

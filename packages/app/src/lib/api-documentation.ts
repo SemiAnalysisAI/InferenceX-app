@@ -1,7 +1,8 @@
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
 import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from './api-documentation-base';
+import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 import { operations as viewsCalculatorOperations } from './views-api/docs/calculator';
 import { operations as viewsCompareOperations } from './views-api/docs/compare';
@@ -202,6 +203,59 @@ const errorResponse = (
   mediaType: 'application/json',
 });
 
+const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number], string>> = {
+  power_valid:
+    'Publication verdict: 1 = validated measurement window; 0 = failed validation — measured power/energy values are withheld from this row end-to-end, so treat any that remain as unreliable; absent = legacy row predating validation.',
+  power_metric_schema_version:
+    'Power schema version. Version 2 defines every unprefixed joules_per_* field as whole-deployment energy, including on disaggregated runs.',
+  avg_power_w: 'Mean per-GPU power draw in watts during the measured load window.',
+  joules_per_successful_query: 'Whole-deployment energy in joules divided by successful requests.',
+  joules_per_output_token:
+    'Energy per generated output token in joules; cluster-wide on schema-version-2 rows, including disaggregated runs.',
+  joules_per_total_token:
+    'Total system energy divided by input plus output tokens; a workload-shape-fair view that does not treat prompt tokens as free.',
+  prefill_avg_power_w:
+    'Mean per-GPU power draw in watts across prefill workers; emitted only for deployments with distinct prefill and decode roles.',
+  decode_avg_power_w:
+    'Mean per-GPU power draw in watts across decode workers; emitted only for deployments with distinct prefill and decode roles.',
+  joules_per_input_token:
+    'Energy per input token in joules; cluster-wide on schema-version-2 rows.',
+  prefill_joules_per_input_token: 'Role-local prefill energy per input token in joules.',
+  decode_joules_per_output_token: 'Role-local decode energy per generated output token in joules.',
+  avg_temp_c: 'Mean per-GPU temperature in degrees Celsius during the load window.',
+  peak_temp_c:
+    'Maximum instantaneous per-GPU temperature in degrees Celsius during the load window.',
+  avg_util_pct: 'Mean per-GPU utilization percentage (0-100) during the load window.',
+  avg_mem_used_mb: 'Mean per-GPU memory used in MB during the load window.',
+};
+const benchmarkMetricsSchema: ApiSchema = {
+  type: 'object',
+  additionalProperties: numberSchema,
+  description:
+    'Scalar metric map. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+  properties: Object.fromEntries(
+    POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
+      key,
+      { type: 'number', description: powerMetricDescriptions[key] },
+    ]),
+  ),
+};
+const powerAuditSchema: ApiSchema = {
+  type: 'object',
+  properties: {
+    window_start_unix: numberSchema,
+    window_end_unix: numberSchema,
+    expected_gpu_count: integerSchema,
+    observed_gpu_count: integerSchema,
+    sample_count: integerSchema,
+    max_sample_gap_s: numberSchema,
+    producer_sha: nullableStringSchema,
+    exporter_image_sha256: nullableStringSchema,
+  },
+  additionalProperties: true,
+  description:
+    'Optional power measurement-window audit. Individual fields may be absent; legacy rows omit the object.',
+};
 const workerPowerSchema = objectSchemaWithOptional(
   {
     role: stringSchema,
@@ -244,14 +298,20 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     offload_mode: stringSchema,
     image: nullableStringSchema,
     recipe_fingerprint: nullableStringSchema,
-    metrics: metricMapSchema,
+    metrics: benchmarkMetricsSchema,
     workers: arraySchema(workerPowerSchema),
+    power_invalid_reasons: {
+      ...arraySchema(stringSchema),
+      description:
+        'Optional snake_case validation reason codes when metrics.power_valid == 0. Absent on legacy rows.',
+    },
+    power_audit: powerAuditSchema,
     date: { type: 'string', format: 'date' },
     workflow_run_id: integerSchema,
     run_started_at: { type: ['string', 'null'], format: 'date-time' },
     run_url: nullableStringSchema,
   },
-  ['workers', 'workflow_run_id', 'run_started_at'],
+  ['workers', 'power_invalid_reasons', 'power_audit', 'workflow_run_id', 'run_started_at'],
 );
 const benchmarkRowsSchema = arraySchema(benchmarkRowSchema);
 const benchmarkExample = [
@@ -281,7 +341,17 @@ const benchmarkExample = [
     offload_mode: 'off',
     image: 'vllm/vllm-openai:v0.10.2',
     recipe_fingerprint: '7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d',
-    metrics: { median_ttft: 0.42, median_tpot: 0.018, tput_per_gpu: 128.4 },
+    metrics: {
+      median_ttft: 0.42,
+      median_tpot: 0.018,
+      tput_per_gpu: 128.4,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 678.5,
+      joules_per_output_token: 5.3,
+      joules_per_total_token: 2.65,
+      avg_temp_c: 61.2,
+    },
     date: '2026-08-08',
     run_url: 'https://github.com/semianalysis/inference-benchmarks/actions/runs/123456789',
   },
@@ -417,8 +487,9 @@ const latestImagesSchema = arraySchema(
     precision: stringSchema,
     spec_method: stringSchema,
     disagg: booleanSchema,
-    isl: integerSchema,
-    osl: integerSchema,
+    isl: nullableNumberSchema,
+    osl: nullableNumberSchema,
+    benchmark_type: stringSchema,
     image: stringSchema,
     date: { type: 'string', format: 'date' },
   }),
@@ -516,7 +587,7 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     title: text('Core benchmark data', '核心基准数据'),
     description: text(
       'Benchmark results, availability, workflow provenance, evaluations, and reliability.',
-      '基准结果、可用配置、工作流来源、评测与可靠性数据。',
+      '基准结果、可用配置、工作流来源、评估与可靠性数据。',
     ),
   },
   {
@@ -570,7 +641,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('List available benchmark configurations', '列出可用的基准配置'),
     description: text(
       'Returns model, sequence, precision, hardware, framework, speculative method, benchmark type, and date combinations that have benchmark data.',
-      '返回已有基准数据的模型、序列、精度、硬件、框架、推测方法、基准类型和日期组合。',
+      '返回已有基准数据的模型、序列、精度、硬件、框架、投机解码方式、基准类型和日期组合。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -607,8 +678,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. The page-owned calculator view is not part of this public contract.',
-      '按展示模型返回原始基准行。可用 date 获取截至该日的快照，exact=true 限定该日，runId 约束最新查询，或将 exactRun=true 与数字 runId 组合以仅返回该工作流运行。页面专用的计算器视图不属于此公开契约。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，则只返回该工作流运行的数据。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -663,6 +734,36 @@ export const apiOperations: readonly ApiOperation[] = [
         { type: 'boolean', default: false },
         false,
       ),
+      parameter(
+        'view',
+        'query',
+        false,
+        'enum',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        { type: 'string', enum: ['calculator'] },
+        'calculator',
+      ),
+      parameter(
+        'sequence',
+        'query',
+        false,
+        'enum',
+        'Required when view=calculator and ignored otherwise. Unknown values yield 400 Unknown calculator sequence.',
+        '当 view=calculator 时必填，其余情况会被忽略。未知值返回 400 Unknown calculator sequence。',
+        { type: 'string', enum: ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] },
+        '1k/1k',
+      ),
+      parameter(
+        'powerValid',
+        'query',
+        false,
+        'enum',
+        'Only strictV2 is accepted. It keeps rows whose metrics.power_valid is the number 1 and metrics.power_metric_schema_version is the number 2 (whole-deployment energy semantics). Omit this parameter to apply no power filter, preserving throughput and latency results even when power is missing or invalid. Other values, including an empty value, yield 400 Unknown powerValid filter. Cannot be combined with view=calculator.',
+        '仅接受 strictV2：保留 metrics.power_valid 为数字 1、且 metrics.power_metric_schema_version 为数字 2 的数据行，其能耗指标采用整个部署的统计口径。省略此参数则不按功率筛选，即使功率缺失或无效，也会保留吞吐量和延迟结果。其他取值（包括空值）返回 400 Unknown powerValid filter。不能与 view=calculator 组合使用。',
+        { type: 'string', enum: POWER_VALIDITY_FILTERS },
+        'strictV2',
+      ),
     ],
     responses: [
       success(
@@ -673,8 +774,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported.',
-        '模型缺失或不受支持。',
+        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
+        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -695,7 +796,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Read benchmark history', '读取基准历史'),
     description: text(
       'Returns every dated benchmark row for one model and either a fixed input/output token pair or Agentic Traces.',
-      '返回某个模型以及固定输入/输出 token 组合或 Agentic Traces 的全部历史基准行。',
+      '返回指定模型在固定输入/输出 token 组合或 Agentic Traces 条件下的全部历史基准测试数据行。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -774,10 +875,10 @@ export const apiOperations: readonly ApiOperation[] = [
     group: 'core',
     method: 'GET',
     path: '/api/v1/workflow-info',
-    summary: text('Read workflow provenance', '读取工作流来源'),
+    summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
       'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置以及每次运行的配置覆盖。省略 date 可读取全部日期。',
+      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -806,7 +907,7 @@ export const apiOperations: readonly ApiOperation[] = [
     responses: [
       success(
         'Workflow provenance grouped into four arrays.',
-        '按四个数组组织的工作流来源数据。',
+        '工作流溯源信息，分为四个数组。',
         workflowInfoSchema,
         {
           runs: [
@@ -847,16 +948,16 @@ export const apiOperations: readonly ApiOperation[] = [
     group: 'core',
     method: 'GET',
     path: '/api/v1/evaluations',
-    summary: text('List evaluation aggregates', '列出评测汇总'),
+    summary: text('List evaluation aggregates', '列出评估汇总'),
     description: text(
       'Returns latest-attempt evaluation results with configuration, task, provenance, and metric values.',
-      '返回最新尝试的评测结果，包含配置、任务、来源和指标值。',
+      '返回最新尝试的评估结果，包含配置、任务、来源和指标值。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
-      success('Evaluation result rows.', '评测结果行。', evaluationsSchema, [
+      success('Evaluation result rows.', '评估结果行。', evaluationsSchema, [
         {
           id: 72,
           config_id: 11,
@@ -888,7 +989,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '500',
         'The evaluation query failed.',
-        '评测查询失败。',
+        '评估查询失败。',
         'Internal server error',
       ),
     ],
@@ -930,7 +1031,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Compute a TCO feed', '计算 TCO 数据源'),
     description: text(
       'Computes Pareto-frontier throughput points or weighted scores for spreadsheet TCO models. Every scoring assumption is encoded in the URL. CSV returns the same selected view as a flat table.',
-      '为电子表格 TCO 模型计算帕累托前沿吞吐点或加权分数。所有评分假设都编码在 URL 中。CSV 会将同一所选视图返回为平面表格。',
+      '为电子表格中的 TCO 模型计算帕累托前沿上的吞吐量数据点或加权分数。所有评分假设都编码在 URL 中。CSV 会以扁平表格形式返回当前所选视图中的相同数据。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -991,7 +1092,7 @@ export const apiOperations: readonly ApiOperation[] = [
         false,
         'enum',
         'points returns one row per hardware, workload, and tier. scores returns one row per hardware.',
-        'points 为每个硬件、负载和档位返回一行。scores 为每个硬件返回一行。',
+        'points 针对每个硬件、工作负载与档位的组合返回一行；scores 针对每个硬件返回一行。',
         { type: 'string', enum: ['points', 'scores'], default: 'points' },
         'points',
       ),
@@ -1011,7 +1112,7 @@ export const apiOperations: readonly ApiOperation[] = [
         false,
         'CSV number list',
         'scores only. One non-negative weight per workload, normalized to sum to 1. Defaults to equal weights.',
-        '仅用于 scores。每个负载一个非负权重，并归一化为总和 1。默认等权。',
+        '仅用于 scores。每个工作负载对应一个非负权重；所有权重归一化后总和为 1，默认使用等权重。',
         { type: 'string' },
         '0.5,0.5',
       ),
@@ -1029,7 +1130,7 @@ export const apiOperations: readonly ApiOperation[] = [
     responses: [
       success(
         'The selected points or scores envelope.',
-        '所选 points 或 scores 数据包。',
+        '所选 points 或 scores 视图的响应对象。',
         tcoFeedSchema,
         {
           model: 'dsv4',
@@ -1170,6 +1271,20 @@ export const apiOperations: readonly ApiOperation[] = [
           disagg: false,
           isl: 1024,
           osl: 1024,
+          benchmark_type: 'single_turn',
+          image: 'vllm/vllm-openai:v0.10.2',
+          date: '2026-08-08',
+        },
+        {
+          model: 'dsr1',
+          hardware: 'h200_sxm',
+          framework: 'vllm',
+          precision: 'fp8',
+          spec_method: 'none',
+          disagg: false,
+          isl: null,
+          osl: null,
+          benchmark_type: 'agentic_traces',
           image: 'vllm/vllm-openai:v0.10.2',
           date: '2026-08-08',
         },
@@ -1310,7 +1425,7 @@ export const apiOperations: readonly ApiOperation[] = [
         false,
         'integer',
         'Page size, clamped to 1 through 200.',
-        '每页数量，限制在 1 到 200。',
+        '每页数量；小于 1 时按 1 处理，大于 200 时按 200 处理。',
         { type: 'integer', minimum: 1, maximum: 200, default: 50 },
         50,
       ),
@@ -1401,7 +1516,7 @@ export const apiOperations: readonly ApiOperation[] = [
         true,
         'string',
         'Conversation ID exactly as listed by the conversation index.',
-        '会话索引中列出的原始会话 ID。',
+        '会话 ID，必须与会话索引中列出的值完全一致。',
         { type: 'string', minLength: 1 },
         'trace-018',
       ),
@@ -1465,7 +1580,7 @@ export const apiOperations: readonly ApiOperation[] = [
     responses: [
       success(
         'Latest CollectiveX run, coverage, series, and optional KV cases.',
-        '最新 CollectiveX 运行、覆盖、序列和可选 KV 案例。',
+        '最新的 CollectiveX 运行记录、覆盖情况、序列，以及可能存在的 KV 测试用例。',
         collectiveXDatasetSchema,
         {
           version: 1,
@@ -1921,7 +2036,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
       'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing.',
-      '返回带版本的基准窗口，以及每个请求的重放标识、来源溯源、调度、确认、完成、token、阶段、worker 和取消时间。',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2029,7 +2144,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
       'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment.',
-      '返回某个基准结果 ID 已存储的一个 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit 读取有界分块；添加 download=1 可将完整的当前文件作为文本附件流式下载。',
+      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2080,7 +2195,7 @@ export const apiOperations: readonly ApiOperation[] = [
         false,
         'integer',
         'Set to 1 to stream the complete selected file as a text attachment. Cannot be combined with offset or limit.',
-        '设为 1 时，将完整的当前文件作为文本附件流式下载。不能与 offset 或 limit 同时使用。',
+        '设为 1 时，将完整的所选文件作为文本附件流式下载；不能与 offset 或 limit 同时使用。',
         { type: 'integer', enum: [1] },
         1,
       ),
@@ -2139,7 +2254,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
       'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files.',
-      '对某个基准结果已存储的全部 .log/.out 文件执行不区分大小写的文本搜索。响应数量有上限，并返回上下文片段，无需传输完整日志文件。',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2160,7 +2275,7 @@ export const apiOperations: readonly ApiOperation[] = [
         true,
         'string',
         'Literal search text, from 1 to 256 characters.',
-        '搜索文本，长度为 1 到 256 个字符，按原文匹配。',
+        '按字面值匹配的搜索文本，长度为 1 到 256 个字符。',
         { type: 'string', minLength: 1, maxLength: 256 },
         'router ready',
       ),
@@ -2427,7 +2542,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
       'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回点元数据，以及缓存使用率、队列深度、预填充和解码吞吐、提示 token 来源的图表聚合时间序列。metricSources 仅包含来源描述信息；详情页只会在用户选中某个来源时加载其专属数组。',
+      '返回数据点元数据，以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2531,7 +2646,7 @@ const overview = {
   eyebrow: text('Public data API', '公开数据 API'),
   description: text(
     'Read benchmark, provenance, dataset, CollectiveX, and diagnostic data from the same sources that power InferenceX.',
-    '读取为 InferenceX 提供数据的基准、来源、数据集、CollectiveX 和诊断信息。',
+    '从 InferenceX 使用的同一组数据源中，读取基准测试数据、溯源信息、数据集、CollectiveX 数据和诊断数据。',
   ),
   auth: {
     title: text('Authentication', '身份验证'),
@@ -2579,10 +2694,25 @@ const overview = {
       title: text('BenchmarkRow', 'BenchmarkRow'),
       description: text(
         'Configuration fields sit beside a metrics map. Metric keys evolve independently; values are numbers, time metrics are seconds, and throughput metrics use tokens per second per GPU unless their name states otherwise.',
-        '配置字段与 metrics 映射并列。指标键可独立演进；值为数字，时间指标单位为秒，吞吐指标默认为每 GPU 每秒 token，除非名称另有说明。',
+        '配置字段与 metrics 映射位于同一层级。metrics 的键可独立扩展，各项指标值均为数字；时间指标以秒为单位。除非指标名另有说明，吞吐量指标均以 token/s/GPU 为单位。',
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],
+    },
+    {
+      id: 'measured-power',
+      title: text('Measured power', '实测功率'),
+      description: text(
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons and power_audit provide optional producer validation details. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示该数据行早于验证机制。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 与 power_audit 可包含生产端的验证详情。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
+      ),
+      shape: 'BenchmarkRows',
+      example: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 678.5,
+        joules_per_output_token: 5.3,
+      },
     },
     {
       id: 'metric-maps',
@@ -2609,10 +2739,10 @@ const overview = {
 const quickstartOperationIds = ['get-availability', 'list-benchmarks'] as const;
 const quickstartText = {
   'get-availability': {
-    title: text('Discover configurations', '发现可用配置'),
+    title: text('Discover configurations', '查询可用配置'),
     description: text(
       'Start with availability to choose real model, hardware, framework, and sequence values.',
-      '先读取可用配置，以选择真实的模型、硬件、框架和序列值。',
+      '先查询 availability，选择实际可用的模型、硬件、框架和序列取值。',
     ),
   },
   'list-benchmarks': {

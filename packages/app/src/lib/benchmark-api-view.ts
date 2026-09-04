@@ -13,8 +13,11 @@ const CALCULATOR_METRIC_KEYS = new Set([
   'server_external_cache_hit_rate',
   // Read only when no external rate is reported, but the trim cannot know that
   // per row — so it has to survive the allowlist either way. See
-  // `cacheHitRateOf` for why the two are not simply summed.
+  // `measuredCacheHitRate` for why the two are not simply summed.
   'server_cpu_cache_hit_rate',
+  // GB300 AgentX rows without a server measurement price cached input from the
+  // trace's theoretical ceiling instead. See `pricingCacheHitRate`.
+  'theoretical_cache_hit_rate',
   ...['median', 'p75', 'p90'].flatMap((percentile) =>
     ['intvty', 'itl', 'full_response_itl', 'e2el', 'ttlt'].map(
       (metric) => `${percentile}_${metric}`,

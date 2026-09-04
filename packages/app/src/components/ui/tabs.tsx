@@ -55,8 +55,6 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         'dark:data-[state=active]:border-primary',
         'transition-colors duration-200',
         'focus-visible:outline-none',
-        'focus-visible:ring-[3px]',
-        'focus-visible:ring-ring',
         'disabled:pointer-events-none',
         'disabled:opacity-50',
         '[&_svg]:pointer-events-none',

@@ -3,6 +3,7 @@ import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmar
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
+import type { PowerTier } from '@/lib/power-tier';
 import type { MetricKey } from './metric-registry';
 
 export type { WorkerPower };
@@ -115,6 +116,14 @@ export interface AggDataEntry {
   // Optional because historical runs predate the fields.
   power_valid?: number;
   power_metric_schema_version?: number;
+  /**
+   * Certification tier for the measured power telemetry, derived by
+   * `resolvePowerTier` in the transform: `certified` for producer-validated
+   * rows (with whole-deployment energy semantics where applicable), `legacy`
+   * for telemetry that predates the validation contract, absent when no
+   * measured telemetry survives gating.
+   */
+  power_tier?: PowerTier;
   avg_power_w?: number;
   joules_per_successful_query?: number;
   joules_per_output_token?: number;
@@ -207,6 +216,8 @@ export interface AggDataEntry {
   router_version?: string;
   /** Actual server-observed GPU prefix-cache hit rate (0..1). */
   server_gpu_cache_hit_rate?: number;
+  /** Actual server-observed external/router prefix-cache hit rate (0..1). */
+  server_external_cache_hit_rate?: number;
   /** Actual server-observed CPU prefix-cache hit rate (0..1). */
   server_cpu_cache_hit_rate?: number;
   /** Infinite-cache theoretical hit rate (0..1) computed from trace. */
@@ -274,6 +285,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerGpu: { y: number; roof: boolean };
   outputTputPerGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
+  /** Cache-aware gross token revenue using normalized or OpenRouter prices. */
+  tokenRevenuePerGpuHour?: { y: number; roof: boolean };
+  /** Total tokens produced per dollar of modeled infrastructure spend. */
+  tokensPerDollarH?: { y: number; roof: boolean };
+  tokensPerDollarN?: { y: number; roof: boolean };
+  tokensPerDollarR?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
@@ -289,25 +306,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
   // Tokens purchasable per $1.
-  tokensPerDollarH?: { y: number; roof: boolean };
-  tokensPerDollarN?: { y: number; roof: boolean };
-  tokensPerDollarR?: { y: number; roof: boolean };
   outputTokensPerDollarH?: { y: number; roof: boolean };
   outputTokensPerDollarN?: { y: number; roof: boolean };
   outputTokensPerDollarR?: { y: number; roof: boolean };
   inputTokensPerDollarH?: { y: number; roof: boolean };
   inputTokensPerDollarN?: { y: number; roof: boolean };
   inputTokensPerDollarR?: { y: number; roof: boolean };
-  // Tokens purchasable per ¥1 — the $ metrics converted at USD_TO_CNY.
-  tokensPerRmbH?: { y: number; roof: boolean };
-  tokensPerRmbN?: { y: number; roof: boolean };
-  tokensPerRmbR?: { y: number; roof: boolean };
-  outputTokensPerRmbH?: { y: number; roof: boolean };
-  outputTokensPerRmbN?: { y: number; roof: boolean };
-  outputTokensPerRmbR?: { y: number; roof: boolean };
-  inputTokensPerRmbH?: { y: number; roof: boolean };
-  inputTokensPerRmbN?: { y: number; roof: boolean };
-  inputTokensPerRmbR?: { y: number; roof: boolean };
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
@@ -325,6 +329,9 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
   measuredJPerInputToken?: { y: number; roof: boolean };
+  // Role-local energy (prefill/decode workers only) — disagg-only in practice.
+  measuredPrefillJPerInputToken?: { y: number; roof: boolean };
+  measuredDecodeJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };
@@ -347,6 +354,20 @@ export interface ClippedInferenceData {
  */
 export type YAxisMetricKey = MetricKey;
 
+export type TokenRevenuePriceSource = 'normalized' | 'openrouter';
+
+export interface TokenRevenuePricing {
+  source: TokenRevenuePriceSource;
+  /** Published or assumed fresh input-token sale price, $/M tok. */
+  inputPerMillion: number;
+  /** Published or assumed cached input-token sale price, $/M tok. */
+  cachedInputPerMillion?: number;
+  /** Published or assumed output-token sale price, $/M tok. */
+  outputPerMillion: number;
+  /** Exact OpenRouter catalog id when `source` is `openrouter`. */
+  openRouterModelId?: string;
+}
+
 /**
  * Defines the configuration and labels for a specific chart.
  * @interface ChartDefinition
@@ -365,7 +386,10 @@ export interface ChartDefinition {
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
+  /** Resolved field represented by `InferenceData.x`; stable across locales. */
+  x_scale_field: string;
   x_label: string;
+  x_labelZh: string;
   y: keyof AggDataEntry;
   y_label?: string;
 
@@ -430,6 +454,8 @@ export interface ScatterGraphProps {
   yLabel: string;
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
+  /** Opens the complete table when all matching measurements are clipped. */
+  onShowTable?: () => void;
   /**
    * When true, show all hardware types from the data without filtering by activeHwTypes.
    * Used for unofficial run visualization where hardware types may differ from official data.
@@ -541,6 +567,8 @@ export interface QuickFilters {
   frameworks: string[];
   deployment: DeploymentMode[];
   spec: SpecMode[];
+  /** Measured-power certification tiers (see `@/lib/power-tier`). */
+  power: PowerTier[];
 }
 
 /**
@@ -556,6 +584,9 @@ export interface InferenceDataContextType {
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   loading: boolean;
+  /** True while `graphs` shows previous-key data (placeholder) or a background
+   *  refetch is in flight — i.e. content is visible but about to update. */
+  refreshing: boolean;
   error: string | null;
   availableQuickFilters: AvailableQuickFilters;
   availableGPUs: { value: string; label: string }[];
@@ -592,6 +623,11 @@ export interface InferenceFiltersContextType {
 /** Axis choices and visual presentation state. */
 export interface InferenceDisplayContextType {
   selectedYAxisMetric: string;
+  tokenRevenuePriceSource: TokenRevenuePriceSource;
+  tokenRevenuePricing: TokenRevenuePricing | null;
+  openRouterModelId: string | null;
+  openRouterPricingLoading: boolean;
+  openRouterPricingError: string | null;
   selectedPercentile: string;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
@@ -630,6 +666,7 @@ export interface InferenceActionsContextType {
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
+  setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setSelectedPercentile: (percentile: string) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (
@@ -640,6 +677,7 @@ export interface InferenceActionsContextType {
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
+  setQuickFilterPower: (tiers: PowerTier[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
   setShowPointLabels: (show: boolean) => void;

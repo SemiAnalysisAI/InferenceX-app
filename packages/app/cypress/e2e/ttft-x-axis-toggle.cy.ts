@@ -1,5 +1,10 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
-import { agenticMetrics } from '../support/agentic-fixtures';
+import {
+  interceptDerivedAgenticMetrics,
+  unlockAgenticGate,
+  openXAxisMenu,
+  selectXAxisMode,
+} from '../support/e2e';
+import { agenticMetrics, measuredPowerMetrics } from '../support/agentic-fixtures';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
@@ -109,19 +114,6 @@ const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
-/**
- * Every x-axis metric is a top-level tab, on agentic charts as well as fixed
- * sequences — #736 removed the "Advanced" popover that used to hide
- * Interactivity / E2E Latency / TTFT behind a trigger. The tab itself now
- * carries both the selected state and the metric's label.
- */
-function selectXAxisMode(mode: 'interactivity' | 'e2e' | 'ttft', label: string) {
-  cy.get(`[data-testid="x-axis-mode-${mode}"]`).click();
-  cy.get(`[data-testid="x-axis-mode-${mode}"]`)
-    .should('have.attr', 'aria-selected', 'true')
-    .and('contain.text', label);
-}
-
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
@@ -134,7 +126,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         unlockAgenticGate(win);
       },
     });
-    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('be.visible');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
@@ -148,24 +140,18 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     interceptDerivedAgenticMetrics();
   });
 
-  it('defaults the agentic view to Interactivity, with all four modes as flat tabs', () => {
+  it('defaults to Interactivity and offers all four full names in one axis dropdown', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    // #736 made every latency mode a top-level tab and moved the default off E2E
-    // Normalized Interactivity, which still leads the strip without being selected.
-    cy.get('[data-testid="x-axis-mode-advanced"]').should('not.exist');
-    for (const mode of ['e2e-normalized-interactivity', 'interactivity', 'e2e', 'ttft']) {
-      cy.get(`[data-testid="x-axis-mode-${mode}"]`).should('be.visible');
-    }
-    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]').should('have.length', 4);
-    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]')
-      .first()
-      .should('have.attr', 'data-testid', 'x-axis-mode-e2e-normalized-interactivity')
-      .and('have.attr', 'aria-selected', 'false');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', 'Interactivity');
+    cy.get('[data-testid="x-axis-mode-buttons"]').should('not.exist');
+    openXAxisMenu();
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
+      .should('have.text', 'E2E Normalized Interactivity')
+      .and('have.attr', 'aria-pressed', 'false');
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
+      .should('have.attr', 'aria-pressed', 'true')
+      .click();
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
@@ -173,24 +159,29 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('offers unobtrusive FAQ help beside E2E Normalized Interactivity', () => {
-    cy.get('[data-testid="normalized-interactivity-faq-link"]')
+  it('explains normalized interactivity inside its option without changing the axis', () => {
+    openXAxisMenu();
+    cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').click();
+    cy.get('[role="dialog"] [data-testid="normalized-interactivity-faq-link"]')
       .should('be.visible')
       .and('have.attr', 'href', '/about#faq-normalized-interactivity')
-      .and('have.attr', 'title', 'What does E2E Normalized Interactivity mean?')
-      .and('have.class', 'no-export')
-      .find('svg[aria-hidden="true"]')
-      .should('be.visible');
-
-    // The metric tabs sit outside the chart capture root, and no-export is a
-    // second guard if this control moves into that tree in the future.
+      .and('have.text', 'What does E2E Normalized Interactivity mean?');
+    cy.get('[data-testid="option-help-content-e2e-normalized-interactivity"]')
+      .should('contain.text', 'output tokens divided by end-to-end latency')
+      .type('{esc}');
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').type('{esc}');
     cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
   });
 
   it('switches to E2E Normalized Interactivity and updates the heading', () => {
     // The first entry into this mode fetches the trace-derived metrics, which the
     // suite's intercept stubs; the default no longer fetches them on load.
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').click();
+    selectXAxisMode('e2e-normalized-interactivity');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
       'P90 E2E Normalized Interactivity',
@@ -200,7 +191,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
     cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
@@ -215,7 +206,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // The key lives in the axis-metric info footer (a `no-export` sibling of
     // the chart), so the PNG export clone — built from #chart-0 — carries the
     // halo decoration itself but not the textual key.
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]').should(
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
       'be.visible',
     );
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
@@ -253,7 +244,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    expandLegendAdvanced();
+    cy.get('[data-testid="legend-advanced-toggle"]').first().click({ scrollBehavior: 'center' });
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
@@ -274,12 +265,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // No cy.wait here: the derived metrics were fetched (and stubbed) on the
     // initial default-mode load and are still fresh in the React Query cache
     // (staleTime 5 min), so re-entering the mode fires no new request.
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    selectXAxisMode('e2e-normalized-interactivity');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
       'P90 E2E Normalized Interactivity',
@@ -306,23 +292,15 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  // Tabs are manually activated: moving focus along the strip must not change
-  // the x-axis. The load-bearing guard is the 8K/1K test below, where the same
-  // behaviour is asserted on the fixed-sequence strip; this one states the
-  // agentic-side expectation, across the agentic-only mode.
-  it('keeps the selected mode when another tab is focused', () => {
+  it('does not change the chart while browsing options, and Escape cancels', () => {
     selectXAxisMode('ttft', 'TTFT');
-
+    openXAxisMenu();
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').focus();
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('have.focus');
-
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'false',
-    );
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').type('{esc}');
+    cy.get('[data-testid="x-axis-mode-selector"]')
+      .should('have.attr', 'data-value', 'ttft')
+      .and('have.focus');
   });
 
   it('switches back to Interactivity', () => {
@@ -366,17 +344,12 @@ describe('X-axis mode URL param', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="x-axis-mode-ttft"]')
-      .should('have.attr', 'aria-selected', 'true')
+    cy.get('[data-testid="x-axis-mode-selector"]')
+      .should('have.attr', 'data-value', 'ttft')
       .and('contain.text', 'TTFT');
     // Assert on the rendered chart too: the clobber happened one tick after
     // the buttons first painted, so a button-only check could pass too early.
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'false',
-    );
   });
 
   // AgentX publishes on P90, so the percentile control is insider-only. With
@@ -410,7 +383,7 @@ describe('Default scenario', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     // The explainer sits beside the trigger, linking out to the dataset page.
-    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
@@ -424,7 +397,7 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
@@ -444,7 +417,7 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
   });
 });
 
@@ -463,52 +436,26 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
-  // Radix Tabs activates on focus by default, which would switch the x-axis
-  // (and redraw the chart) just from tabbing through the strip. The Tabs root
-  // sets activationMode="manual" to prevent that. Pins the intended behavior;
-  // note that focus-activation proved timing-dependent to reproduce, so treat
-  // this as a behavioral assertion rather than a proven pre-fix reproduction.
-  it('does not switch the x-axis merely by focusing another tab', () => {
+  it('keeps the fixed-sequence chart unchanged while keyboard-browsing other options', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-
-    cy.get('[data-testid="x-axis-mode-ttft"]').click();
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
-
-    cy.get('[data-testid="x-axis-mode-interactivity"]').focus();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should('have.focus');
-
-    // Focus moved, selection did not.
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'false',
-    );
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+    cy.visit('/inference?i_seq=8k%2F1k');
+    selectXAxisMode('ttft', 'TTFT');
+    openXAxisMenu();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').focus().type('{esc}');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  // The strip is flat everywhere since #736; what is still specific to a fixed
-  // sequence is that E2E Normalized Interactivity is agentic-only, so this strip
-  // carries three tabs rather than four.
-  it('keeps the flat x-axis strip with no Advanced menu', () => {
+  it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-
-    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.visit('/inference?i_seq=8k%2F1k');
+    openXAxisMenu();
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-advanced"]').should('not.exist');
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('not.exist');
-    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]').should('have.length', 3);
+    cy.get('[data-testid="x-axis-mode-interactivity"]').type('{esc}');
   });
 
   it('honors explicit label URL overrides', () => {
@@ -591,6 +538,125 @@ const interceptAgenticDataWithOverlay = () => {
   }).as('unofficialRun');
 };
 
+const expectCoordinates = (selector: string, expected: number[]) => {
+  cy.get<SVGGElement & { __data__: { x: number } }>(`#chart-0 ${selector}`).should(($points) => {
+    expect($points.length).to.equal(expected.length);
+    expect(Array.from($points, (point) => point.__data__.x).sort((a, b) => a - b)).to.deep.equal(
+      [...expected].sort((a, b) => a - b),
+    );
+    const renderedXs = Array.from($points, (point) => {
+      const transform = point.getAttribute('transform');
+      return Number(transform?.match(/translate\((?<x>[^,]+),/u)?.groups?.x);
+    });
+    expect(renderedXs.every(Number.isFinite), 'finite rendered coordinates').to.equal(true);
+    expect(new Set(renderedXs).size, 'points spread across x-axis').to.equal(expected.length);
+  });
+};
+const expectInteractivity = () => {
+  cy.get('#chart-0 .x-axis-label').should('have.text', 'Interactivity (tok/s/user)');
+  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Interactivity');
+  expectCoordinates('.dot-group', [80, 40, 20]);
+  expectCoordinates('.unofficial-overlay-pt', [60, 30]);
+};
+
+describe('Measured prefill metrics preserve the selected x-axis', () => {
+  it('keeps real interactivity and median TTFT coordinates for official and overlay points', () => {
+    const powerRows = fixedSequenceBenchmarks.slice(0, 3).map((row, index) => ({
+      ...row,
+      framework: 'dynamo-sglang',
+      disagg: true,
+      // Fixed-sequence telemetry has medians but no P90 latency fields.
+      metrics: {
+        ...measuredPowerMetrics(row.conc, { disagg: true }),
+        median_intvty: [80, 40, 20][index],
+        median_ttft: [0.5, 2, 8][index],
+        prefill_avg_power_w: 600 + index * 50,
+      },
+    }));
+    const overlayRows = powerRows.slice(0, 2).map((row, index) => ({
+      ...row,
+      id: 930000 + index,
+      run_url: OVERLAY_RUN_URL,
+      metrics: {
+        ...row.metrics,
+        median_intvty: [60, 30][index],
+        median_ttft: [1, 4][index],
+      },
+    }));
+    cy.intercept('GET', '/api/v1/availability', {
+      body: [{ ...agenticAvailability[2], framework: 'dynamo-sglang', disagg: true }],
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: powerRows });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            url: OVERLAY_RUN_URL,
+            name: 'Prefill axis regression',
+            branch: 'test/prefill-axis',
+            sha: 'abc000',
+            createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: overlayRows,
+        evaluations: [],
+      },
+    }).as('prefillOverlay');
+    cy.visit(
+      `/inference?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_measuredPrefillAvgPower&i_xmode=interactivity&i_best=0&i_optimal=0&i_active=b200_dynamo-sglang&unofficialrun=${OVERLAY_RUN_ID}`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      },
+    );
+    cy.wait('@prefillOverlay');
+
+    expectInteractivity();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-select-option]', 'Measured Prefill Joules per Input Token')
+      .scrollIntoView()
+      .click();
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'Measured Prefill Joules per Input Token',
+    );
+    expectInteractivity();
+
+    selectXAxisMode('ttft', 'TTFT');
+    cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Time To First Token (s)');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'vs. Median Time To First Token',
+    );
+    expectCoordinates('.dot-group', [0.5, 2, 8]);
+    expectCoordinates('.unofficial-overlay-pt', [1, 4]);
+
+    selectXAxisMode('interactivity', 'Interactivity');
+    expectInteractivity();
+
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: [] }).as('emptyOfficialBenchmarks');
+    cy.location('href').then((href) => {
+      const url = new URL(href);
+      url.searchParams.set('i_xmode', 'ttft');
+      url.searchParams.set('i_metric', 'y_measuredPrefillJPerInputToken');
+      cy.visit(url.toString());
+    });
+    cy.wait(['@emptyOfficialBenchmarks', '@prefillOverlay']);
+    cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Time To First Token (s)');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'vs. Median Time To First Token',
+    );
+    cy.get('#chart-0 .dot-group').should('not.exist');
+    expectCoordinates('.unofficial-overlay-pt', [1, 4]);
+  });
+});
+
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
@@ -603,7 +669,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       },
     });
     cy.wait('@unofficialRun');
-    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('be.visible');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
@@ -629,7 +695,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
   });
@@ -650,12 +716,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
 
   it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {
     // Derived metrics are cached from the initial default-mode load.
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    selectXAxisMode('e2e-normalized-interactivity');
     // The suppression message appears because isUnofficialRun is true and the
     // mode is 'e2e-normalized-interactivity' (documented in ChartDisplay.tsx).
     cy.contains(

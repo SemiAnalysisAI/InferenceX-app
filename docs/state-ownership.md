@@ -113,6 +113,7 @@ them.
 Axis and presentation state:
 
 - selected x-axis and y-axis metrics, percentile, and effective x-axis mode
+- token-revenue price source (`i_revenue`): normalized uncached/cached/output pricing or the selected model's live OpenRouter catalog prices
 - scale, optimal-point, label, contrast, legend, and overlay controls
 
 Display changes stay in this domain. A contrast or label toggle therefore does not

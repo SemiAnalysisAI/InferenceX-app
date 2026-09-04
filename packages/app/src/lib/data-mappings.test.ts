@@ -4,6 +4,8 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getOpenRouterModelId,
+  MODEL_OPTIONS,
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
@@ -15,6 +17,8 @@ import {
   isModelDeprecated,
   isModelMaintenance,
   isSequenceDeprecated,
+  isSequenceDeprecatedForModel,
+  getSequenceCategoryForModel,
   Model,
   Sequence,
   Precision,
@@ -223,6 +227,40 @@ describe('isSequenceDeprecated', () => {
   });
 });
 
+// ===========================================================================
+// per-model sequence retirement
+// ===========================================================================
+describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
+  it('marks 8K/1K deprecated for MiniMax M3 (retired 2026-08-04, InferenceX#2493)', () => {
+    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+  });
+
+  it('keeps 8K/1K default for models still sweeping it', () => {
+    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+      'default',
+    );
+  });
+
+  it('does not un-deprecate globally deprecated sequences', () => {
+    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+      'deprecated',
+    );
+  });
+
+  it('falls back to the global category when no model is given', () => {
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK)).toBe('default');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, null)).toBe('default');
+  });
+
+  it('leaves MiniMax M3 agentic traces active', () => {
+    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.AgenticTraces)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.MiniMax_M3)).toBe('default');
+  });
+});
+
 describe('comparison exclusions', () => {
   it('keeps the existing DeepSeek V4 MTP rule model-scoped', () => {
     expect(getModelExclusion(Model.DeepSeek_V4_Pro).map((spec) => spec.suffix)).toEqual(['_mtp']);
@@ -284,6 +322,15 @@ describe('getModelLabel', () => {
   it('falls back to the model value for unknown model', () => {
     const result = getModelLabel('NewModel-XYZ' as Model);
     expect(result).toBe('NewModel-XYZ');
+  });
+});
+
+describe('getOpenRouterModelId', () => {
+  it('maps every selectable dashboard model to an exact OpenRouter catalog id', () => {
+    for (const model of MODEL_OPTIONS) {
+      expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
+    }
+    expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
   });
 });
 

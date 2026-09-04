@@ -52,7 +52,7 @@ export function OverviewReferenceSelect({
         data-testid="overview-reference-select"
         aria-label={ariaLabel}
         size="sm"
-        className="h-8 border-0 bg-transparent px-1.5 text-sm font-semibold shadow-none hover:bg-muted/60 focus-visible:ring-2"
+        className="h-8 border-0 bg-transparent px-1.5 text-sm font-semibold shadow-none hover:bg-muted/60"
       >
         <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>
       </SelectTrigger>

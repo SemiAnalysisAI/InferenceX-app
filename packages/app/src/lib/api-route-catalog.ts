@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c6a5b78108b7e0d523b11590e1e34ef2e8c2d5457673eb41338d93d3d8f04909',
+    sourceSha256: '7b251598bf9e4e181834311a554aa8ef7a9bc39d605eed243364ce5c3f5cc43e',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -270,7 +270,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-latest-images',
-    sourceSha256: 'ae0d5535af9f5bf8d287c04f915067c0e470ec907efb2a848cb6c35660770d2d',
+    sourceSha256: 'a72e44393ff478d18973a050b009bdbaa9e5e5929837dac3781970d162b4de77',
   },
   {
     source: 'src/app/api/v1/log-availability/route.ts',
@@ -426,7 +426,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'cde99d3239593d545a3b0519ce0cb2d6eff6716c27d4d21dbd32fdeffe0eb603',
+    sourceSha256: 'bcac9dc0bccdf853768a656c00878628558dfde12b5d15553b29a89fd31e6c3a',
   },
   {
     source: 'src/app/api/v1/views/historical/route.ts',
@@ -531,7 +531,7 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmarks',
-    parameters: ['model', 'date', 'exact', 'runId', 'exactRun'],
+    parameters: ['model', 'date', 'exact', 'runId', 'exactRun', 'view', 'sequence', 'powerValid'],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',
@@ -748,7 +748,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '54e398a2041040ed7b66bd5c813041db26287111774dafd13a70d5e545fb24f3',
+    sourceSha256: 'd80b18da9bae84079764238fb586090b26aff5eeddfea1a152ef735889bd3357',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -756,7 +756,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: '02ea8d9b72210c7dec8380ec3a4ff30a41254901e4d63a230cba893fc0473811',
+    // Reviewed for the MiniMax M3 8k1k retirement (InferenceX#2493): only the
+    // curated OVERVIEW_MODEL_SCENARIOS list and the no-rows scenario fallback
+    // changed — no parameter or OverviewPageData shape change, so the docs
+    // stand.
+    sourceSha256: 'e80e92dc4c87fd4cbdd7194877b91cedab0e8a3267bfe5ec63731388be82b692',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -783,7 +787,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: '40079de1a9b1faef47cc72090331b9d2987f2895da34a77292f3bfcdf1dc5a64',
+    sourceSha256: 'd988f0c348d187667aedaba63848bf5c0afd038c7fee6bcaf830747ee6c0dc61',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -799,7 +803,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'fae8d19971730132cb30cd781f677562bfc6328b1f4e35a8268a8391ad187c18',
+    sourceSha256: '8d23f65dfb77565120f23207729ed66e6ce55f53acf6bf0cf51e377c41120d6b',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -847,7 +851,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '80c69b9e9ed34e4279c6b95d8418c9535fcee1919ccb4883066d27954588c977',
+    sourceSha256: '98659d61fdfb73d955fd84ead82deaa51076b792ad73b0c111af4d7e512749f5',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',
@@ -903,7 +907,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: 'da987d22521dc63da34dcacf3caaad6adb21aa6e5e7a65d1a4fa495a71e9f1f0',
+    sourceSha256: '4f70c310675c36ce062fe78861925f0a9e99b05396a6d2b5d0afc9221a89edd7',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

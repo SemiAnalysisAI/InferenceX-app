@@ -5,12 +5,27 @@
  * describe block.
  */
 
+const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
+
+function dismissStarModal(win: Window): void {
+  win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+}
+
+function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
+}
+
 /** Visit a model deep-dive page and wait for the inline diagram to render. */
 function visitModelPage(slug: string) {
   cy.viewport(1280, 800);
   cy.visit(`/model/${slug}`, {
     onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      dismissStarModal(win);
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
@@ -450,7 +465,7 @@ describe('Model Architecture Diagram', () => {
       cy.viewport(1280, 800);
       cy.visit('/model', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
     });
@@ -465,7 +480,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', '2.8T')
         .and('have.attr', 'href', '/model/kimi-k3');
       // Models without a MODEL_ARCHITECTURES entry still get a card (no badges).
-      cy.get('[data-testid="model-index-link-glm-5-2"]').should('contain.text', 'GLM-5.2');
+      cy.get('[data-testid="model-index-link-glm-5-3"]').should('contain.text', 'GLM-5.3');
     });
 
     it('navigates to a model deep-dive page', () => {
@@ -481,13 +496,111 @@ describe('Model Architecture Diagram', () => {
     });
   });
 
+  describe('Chinese model index and detail journey', () => {
+    const viewports = [
+      { label: 'desktop', width: 1440, height: 900 },
+      { label: '375px mobile', width: 375, height: 812 },
+      { label: '390px mobile', width: 390, height: 844 },
+    ] as const;
+
+    for (const viewport of viewports) {
+      it(`keeps Chinese chrome, metadata, and navigation at ${viewport.label}`, () => {
+        cy.viewport(viewport.width, viewport.height);
+        cy.visit('/zh/model', { onBeforeLoad: dismissStarModal });
+
+        cy.get('[data-testid="model-index-page"]').should('be.visible');
+        cy.get('h1').should('have.text', '模型架构');
+        cy.get('[data-testid="model-index-link-deepseek-r1"]')
+          .should('contain.text', 'DeepSeek R1 0528')
+          .and('contain.text', '总参数量 671B')
+          .and('contain.text', 'MLA')
+          .and('contain.text', '发布日期 2025 年 5 月 28 日')
+          .and('have.attr', 'href', '/zh/model/deepseek-r1');
+        cy.get('[data-testid="model-index-link-deepseek-r1"] img').should(
+          'have.attr',
+          'alt',
+          'DeepSeek 标志',
+        );
+        cy.get('[data-testid="footer-link-model-architectures"]')
+          .should('have.attr', 'href', '/zh/model')
+          .and('contain.text', '模型架构');
+        cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model');
+        cy.get('link[rel="canonical"]').should('have.attr', 'href', `${MODEL_SITE_URL}/zh/model`);
+        cy.get('link[rel="alternate"][hreflang="en"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/model`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model`,
+        );
+        expectNoPageOverflow();
+
+        cy.get('[data-testid="model-index-link-deepseek-r1"]').scrollIntoView().click();
+        cy.location('pathname').should('eq', '/zh/model/deepseek-r1');
+        cy.get('[data-testid="model-detail-page"]').should('be.visible');
+        cy.get('h1').should('have.text', 'DeepSeek R1 0528');
+        cy.get('[data-testid="model-detail-page"]').should(
+          'contain.text',
+          '发布日期 2025 年 5 月 28 日',
+        );
+        cy.get('[data-testid="model-english-article-notice"]')
+          .should('contain.text', '模型深度解析正文目前仅提供英文版')
+          .find('a')
+          .should('have.attr', 'href', '/model/deepseek-r1')
+          .and('have.text', '查看英文原文');
+        cy.get('[data-testid="model-page-article"]').should('have.attr', 'lang', 'en');
+        cy.get('[data-testid="model-page-dashboard"]')
+          .should('contain.text', 'DeepSeek R1 0528 推理性能')
+          .find('a[href^="/zh/inference?"]')
+          .should('contain.text', '在完整仪表板中查看');
+        cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
+
+        // The click assertions above cover the client transition. Canonical and
+        // hreflang are SSR contracts, so verify them from a fresh document rather
+        // than racing streamed App Router head updates after the soft navigation.
+        cy.reload();
+        cy.get('[data-testid="model-detail-page"]').should('be.visible');
+        cy.get('link[rel="canonical"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model/deepseek-r1`,
+        );
+        cy.get('link[rel="alternate"][hreflang="en"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/model/deepseek-r1`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+          'have.attr',
+          'href',
+          `${MODEL_SITE_URL}/zh/model/deepseek-r1`,
+        );
+        expectNoPageOverflow();
+      });
+    }
+
+    it('keeps the dashboard architecture link inside the Chinese route tree', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+        onBeforeLoad: dismissStarModal,
+      });
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+      cy.get('[data-testid="model-architecture-link"]')
+        .should('have.attr', 'href', '/zh/model/deepseek-r1')
+        .and('have.attr', 'aria-label', '了解 DeepSeek R1 0528 671B 模型架构');
+    });
+  });
+
   describe('Embedded dashboard changelog starts collapsed', () => {
     before(() => {
       cy.viewport(1280, 800);
       // deepseek-r1 has fixture benchmark data, so the changelog renders.
       cy.visit('/model/deepseek-r1', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
     });
@@ -502,32 +615,63 @@ describe('Model Architecture Diagram', () => {
       cy.contains('button', 'Config Changelog').click();
       cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
     });
+
+    it('retains the axis selector even though the full filter panel is hidden', () => {
+      cy.get('[data-testid="chart-figure"] [data-testid^="option-help-y_"]')
+        .first()
+        .should('have.class', 'no-export')
+        .click();
+      cy.get('[data-testid^="option-help-content-y_"]')
+        .should('contain.text', 'infrastructure spend')
+        .and('contain.text', 'Formula')
+        .type('{esc}');
+      cy.get('[data-testid^="axis-metric-row-"]').should('not.exist');
+      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-ttft"]').click();
+      cy.get('[data-testid="x-axis-mode-selector"]')
+        .should('contain.text', 'TTFT')
+        .and('have.attr', 'aria-expanded', 'false');
+      cy.get('[data-testid="chart-figure"] h2')
+        .first()
+        .should('contain.text', 'Time To First Token');
+      cy.get('[data-testid="model-selector"]').should('not.exist');
+    });
   });
 
-  describe('Dashboard architecture link (replaces the drawer)', () => {
+  describe('Dashboard architecture icon link (replaces the banner row)', () => {
     before(() => {
       cy.viewport(1280, 800);
       cy.visit('/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          dismissStarModal(win);
         },
       });
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
     });
 
-    it('renders a link row with architecture badges instead of the drawer', () => {
+    it('renders an icon link beside the model selector instead of a banner row', () => {
       cy.get('[data-testid="model-architecture-toggle"]').should('not.exist');
       cy.get('[data-testid="model-architecture-link"]').should('be.visible');
       cy.get('[data-testid="model-architecture-link"]').should(
-        'contain.text',
+        'have.attr',
+        'aria-label',
         'Learn more about the DeepSeek R1 0528 671B architecture',
       );
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MLA');
-      cy.get('[data-testid="model-architecture-link"]').should('contain.text', '671B');
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
+      // The former banner copy and badges now live in the tooltip; Radix
+      // tooltips open on keyboard focus, which is more reliable in Cypress
+      // than synthetic hover.
+      cy.get('[data-testid="model-architecture-link"]').focus();
+      cy.get('[data-testid="model-architecture-tooltip"]')
+        .should('be.visible')
+        .and('contain.text', 'Learn more about the DeepSeek R1 0528 671B architecture')
+        .and('contain.text', 'MoE')
+        .and('contain.text', 'MLA')
+        .and('contain.text', '671B');
+      // Dismiss the tooltip so it doesn't cover the link for the next test.
+      cy.get('body').type('{esc}');
     });
 
     it('navigates to the model deep-dive page', () => {

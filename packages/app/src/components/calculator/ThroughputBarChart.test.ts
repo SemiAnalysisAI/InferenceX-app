@@ -178,6 +178,18 @@ describe('getMetricValue', () => {
 // =========================================================================
 
 describe('getMetricLabel', () => {
+  it('returns localized Chinese axis labels while preserving protected units', () => {
+    expect(getMetricLabel('throughput', 'interactivity_to_throughput', 'output', 'zh')).toBe(
+      '每芯片输出吞吐量 (tok/s/chip)',
+    );
+    expect(getMetricLabel('cost', 'interactivity_to_throughput', 'input', 'zh')).toBe(
+      '成本 ($/M input tok)',
+    );
+    expect(getMetricLabel('power', 'interactivity_to_throughput', 'input', 'zh')).toBe(
+      '每全电源配置兆瓦输入 token 吞吐量 (tok/s/MW)',
+    );
+  });
+
   it('returns power label for power metric with total type', () => {
     expect(getMetricLabel('power', 'interactivity_to_throughput', 'total')).toBe(
       'Tokens per Provisioned All-in Megawatt (tok/s/MW)',
@@ -311,6 +323,12 @@ describe('getValueLabel', () => {
 // =========================================================================
 
 describe('getCostProviderLabel', () => {
+  it('returns natural Chinese ownership labels', () => {
+    expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · Hyperscaler');
+    expect(getCostProviderLabel('costn', 'zh')).toBe('自有设备 · Neocloud');
+    expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年期');
+  });
+
   it('returns "Owning - Hyperscaler" for costh', () => {
     expect(getCostProviderLabel('costh')).toBe('Owning - Hyperscaler');
   });
@@ -640,6 +658,69 @@ describe('generateTooltipHTML overlay treatment', () => {
     expect(html).toContain('分支：');
     expect(html).toContain('查看工作流运行');
     expect(html).not.toContain('UNOFFICIAL RUN');
+  });
+
+  it('localizes the complete Chinese tooltip including raw link and parallelism values', () => {
+    const html = generateTooltipHTML(
+      makeResult({
+        hwKey: 'b300',
+        nearestPoints: [
+          {
+            tp: 4,
+            ep: 2,
+            dp_attention: true,
+            precision: 'fp8',
+          } as InterpolatedResult['nearestPoints'][number],
+        ],
+      }),
+      {},
+      'interactivity_to_throughput',
+      'throughput',
+      'total',
+      officialRunUrl,
+      false,
+      {
+        unofficialRun: '非官方运行',
+        branch: '分支：',
+        dismiss: '点击其他区域关闭',
+        viewRun: '查看工作流运行',
+        clamped: '超出实测范围——显示最接近的数据点',
+        parallelism: '并行策略：',
+        cost: '成本：',
+        concurrency: '并发数：',
+        precision: '精度：',
+        disaggregated: '分离式：',
+        yes: '是',
+      },
+      'zh',
+    );
+    expect(html).toContain('<strong>吞吐量：</strong>');
+    expect(html).toContain('<strong>DPA：</strong> 是');
+    expect(html).toContain('在 GitHub 查看原始结果');
+    expect(html).not.toContain('View raw result on GitHub');
+  });
+
+  it('preserves the existing English DPA value in official tooltips', () => {
+    const html = generateTooltipHTML(
+      makeResult({
+        nearestPoints: [
+          {
+            tp: 4,
+            ep: 2,
+            dp_attention: true,
+            precision: 'fp8',
+          } as InterpolatedResult['nearestPoints'][number],
+        ],
+      }),
+      {},
+      'interactivity_to_throughput',
+      'throughput',
+      'total',
+      officialRunUrl,
+    );
+
+    expect(html).toContain('<strong>DPA:</strong> True');
+    expect(html).not.toContain('<strong>DPA:</strong> Yes');
   });
 });
 

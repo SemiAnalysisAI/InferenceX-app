@@ -10,11 +10,8 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
-
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
 import { isZhPathname, localePath } from '@/lib/i18n';
 import {
   AGENTIC_COACH_MARK_STORAGE_KEY,
@@ -26,13 +23,8 @@ import {
 } from '@/lib/nudges/agentic-point-coach-mark';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
-// Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
-const FeedbackForm = dynamic(
-  () => import('@/components/feedback-modal').then((m) => m.FeedbackForm),
-  { ssr: false },
-);
 import { GitHubIcon } from '@/components/ui/github-icon';
-import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
+import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -319,128 +311,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Dashboard modals
-  // -------------------------------------------------------------------------
-  {
-    id: 'feedback-modal',
-    type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: {
-      type: 'timed',
-      durationMs: 3 * 24 * 60 * 60 * 1000,
-      cooldownStartsOnShow: true,
-    },
-    storageKey: 'inferencex-feedback-modal-snoozed',
-    permanentSuppressKey: 'inferencex-feedback-modal-submitted',
-    permanentSuppressEvent: FEEDBACK_SUBMITTED_EVENT,
-    priority: 5,
-    scope: 'dashboard',
-    content: {
-      icon: MessageSquareText,
-      iconClassName: 'text-brand',
-      title: 'Help us improve InferenceX',
-      titleZh: '帮助我们改进 InferenceX',
-      description: "We'd love to hear what's working and what isn't.",
-      descriptionZh: '我们非常希望了解哪些方面做得好，哪些方面需要改进。',
-      testId: 'feedback-modal',
-      centered: true,
-      renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
-    },
-    analytics: {
-      shown: 'feedback_modal_shown',
-      dismissed: 'feedback_modal_dismissed',
-    },
-  },
-
-  // -------------------------------------------------------------------------
-  // Landing modals
-  // -------------------------------------------------------------------------
-  {
-    id: 'agentic-results-launch-modal',
-    type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-agentic-results-modal-dismissed',
-    priority: 50,
-    scope: 'landing',
-    content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
-      title: 'Real-world agentic inference benchmark results are live',
-      titleZh: '真实场景智能体推理基准测试结果已上线',
-      description:
-        'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
-      descriptionZh:
-        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持芯片和推理服务栈上的 AgentX 结果。',
-      // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
-      // V4-Pro April preview and the 0813 GA); name the newer one, as the
-      // model selector does for GLM.
-      testId: 'launch-modal',
-      containerClassName: 'border-brand/40',
-      // Launch announcement — centered with a backdrop so it reads as the
-      // page's headline moment instead of a bottom-right corner card.
-      centered: true,
-      badge: 'New',
-      badgeZh: '最新',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
-      primaryAction: {
-        label: 'View results',
-        labelZh: '查看结果',
-        icon: <ArrowRight className="size-4" />,
-        onClick: () => {
-          window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
-        },
-      },
-    },
-    analytics: {
-      shown: 'agentic_results_modal_shown',
-      dismissed: 'agentic_results_modal_dismissed',
-      action: 'agentic_results_modal_viewed',
-    },
-  },
-  {
-    id: 'github-star-modal',
-    type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: { type: 'timed', durationMs: 7 * 24 * 60 * 60 * 1000 },
-    storageKey: 'inferencex-star-modal-dismissed',
-    permanentSuppressKey: STARRED_KEY,
-    permanentSuppressEvent: STARRED_EVENT,
-    priority: 40,
-    scope: 'landing',
-    content: {
-      icon: Star,
-      iconClassName: 'text-yellow-500 fill-yellow-500',
-      title: 'Star InferenceX on GitHub',
-      titleZh: '在 GitHub 上为 InferenceX 加星',
-      description:
-        'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update chip performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
-      descriptionZh:
-        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新芯片性能对比——加星是保持关注并帮助项目成长的最简单方式。',
-      testId: 'github-star-modal',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
-      primaryAction: {
-        label: 'Star on GitHub',
-        labelZh: '在 GitHub 上加星',
-        icon: <GitHubIcon className="size-4" />,
-        onClick: () => {
-          window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
-          saveStarred();
-        },
-      },
-      actionClassName: 'star-button-glow',
-    },
-    analytics: {
-      shown: 'star_modal_shown',
-      dismissed: 'star_modal_dismissed',
-      action: 'star_modal_starred',
-    },
-  },
-
-  // -------------------------------------------------------------------------
   // Landing banner
+  //
+  // Note: the landing scope deliberately has no GitHub star nudge. The footer
+  // grid already carries the persistent star CTA (footer-star-cta) and the
+  // header carries another, so a fixed bottom card here duplicated the control
+  // and covered the footer. The engagement-triggered star-nudge toast on the
+  // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
     id: 'openai-rubin-comparison-banner',

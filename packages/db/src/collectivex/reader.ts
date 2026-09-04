@@ -59,6 +59,17 @@ interface RawRow {
   token_rate_at_latency_percentile: CollectiveXPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
+  /**
+   * Bytes the kernels actually move: per-(token, expert) for the low-latency layouts
+   * that do not rank-deduplicate (DeepEP/UCCL/NCCL LL), identical to `byte_provenance`
+   * everywhere else. Absent on artifacts written before the wire basis shipped —
+   * for those, LL rates derived from `byte_provenance` are a lower bound (~34% low
+   * on nccl-ep LL EP8 at T=128), never an overstatement.
+   */
+  wire_byte_provenance?: Record<
+    string,
+    { activation_data_bytes: number; total_logical_bytes?: number }
+  >;
 }
 
 // KV shards report per-burst rows instead of per-ladder-token rows; the two
@@ -73,7 +84,9 @@ interface RawKvRow {
   req_bytes: number;
   prep_ms?: number;
   latency_ms: CollectiveXKvLatency;
+  request_ms?: CollectiveXKvLatency;
   gbps_p50: number;
+  gbps_p50_incl_prep?: number;
   verify?: { passed: boolean; detail?: string };
 }
 
@@ -200,8 +213,11 @@ function mapComponent(
 }
 
 function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
-  const component = (name: string) =>
-    mapComponent(row.components[name], row.byte_provenance[name], ep);
+  // Divide rates from the wire basis when the artifact carries it: for the LL layouts
+  // that move one copy per (token, expert), `byte_provenance` is rank-deduplicated and
+  // publishing a rate from it presented a lower bound as the wire bandwidth.
+  const provenance = row.wire_byte_provenance ?? row.byte_provenance;
+  const component = (name: string) => mapComponent(row.components[name], provenance[name], ep);
   return {
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
@@ -319,7 +335,12 @@ function mapKvRow(row: RawKvRow): CollectiveXKvRow {
     req_bytes: row.req_bytes,
     prep_ms: row.prep_ms ?? 0,
     latency_ms: row.latency_ms,
+    // Absent on rows measured before the harness recorded per-request marks.
+    ...(row.request_ms ? { request_ms: row.request_ms } : {}),
     gbps_p50: row.gbps_p50,
+    ...(typeof row.gbps_p50_incl_prep === 'number'
+      ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
+      : {}),
     verify_passed: row.verify?.passed ?? true,
   };
 }

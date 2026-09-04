@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { Model, MODEL_OPTIONS } from './data-mappings';
 import {
   DEFAULT_ROUTE_MODEL,
+  defaultRouteModel,
   MODEL_ROUTE_TABS,
   MODEL_ROUTES,
   modelRoutePath,
   modelRoutePathnameRewrite,
+  modelRouteAvailableForTab,
+  modelRoutesForTab,
   pathWithSearchParams,
   modelRouteSlug,
   parseModelRoutePathname,
@@ -33,6 +36,25 @@ describe('MODEL_ROUTES registry', () => {
     // DEFAULT_ROUTE_MODEL; if the app-wide default drifted, plain page loads
     // would rewrite the URL.
     expect(PARAM_DEFAULTS.g_model).toBe(DEFAULT_ROUTE_MODEL);
+  });
+
+  it('gives every tab a default model, with the profit estimator pinned to Kimi K3', () => {
+    expect(MODEL_ROUTE_TABS).toEqual([
+      'calculator',
+      'historical',
+      'profit-estimator',
+      'profit-estimator-per-gigawatt',
+    ]);
+    expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
+    expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
+    // The estimator only plots agentic traces, and Kimi K3 is the model with
+    // the widest agentic hardware coverage; the page seeds its provider from
+    // this same helper.
+    expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
+    expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
+    for (const tab of MODEL_ROUTE_TABS) {
+      expect(MODEL_ROUTES.some((route) => route.model === defaultRouteModel(tab))).toBe(true);
+    }
   });
 });
 
@@ -125,6 +147,19 @@ describe('modelRoutePathnameRewrite', () => {
   it('rewrites bare paths only for non-default models', () => {
     expect(modelRoutePathnameRewrite('/calculator', DEFAULT_ROUTE_MODEL)).toBeNull();
     expect(modelRoutePathnameRewrite('/calculator', Model.Kimi_K3)).toBe('/calculator/kimi-k3');
+    // Per-tab default: the profit estimator's bare path means Kimi K3, so the
+    // app-wide default model is the one that gets a slug there.
+    expect(modelRoutePathnameRewrite('/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/zh/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/profit-estimator', DEFAULT_ROUTE_MODEL)).toBe(
+      `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+    );
+    expect(
+      modelRoutePathnameRewrite(
+        `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+        Model.Kimi_K3,
+      ),
+    ).toBe('/profit-estimator/kimi-k3');
     expect(modelRoutePathnameRewrite('/zh/historical', Model.Kimi_K3)).toBe(
       '/zh/historical/kimi-k3',
     );
@@ -144,6 +179,41 @@ describe('modelRoutePathnameRewrite', () => {
     expect(modelRoutePathnameRewrite('/inference', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/historical/not-a-model', Model.Kimi_K3)).toBeNull();
+  });
+});
+
+describe('modelRoutesForTab', () => {
+  it('serves Kimi K3, GLM 5.2/5.3 and MiniMax M3 on the profit estimators and every model elsewhere', () => {
+    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
+      // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
+      expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
+        Model.Kimi_K3,
+        Model.MiniMax_M3,
+        Model.GLM_5_2,
+      ]);
+      expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
+      expect(modelRouteAvailableForTab(tab, Model.MiniMax_M3)).toBe(true);
+      expect(modelRoutesForTab(tab).find((route) => route.model === Model.MiniMax_M3)?.slug).toBe(
+        'minimax-m3',
+      );
+      // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
+      // release, as on the rest of the site, and `glm-5-2` 308s to it.
+      expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
+        'glm-5-3',
+      );
+      expect(resolveModelRouteSlug('glm-5-2')).toEqual(
+        expect.objectContaining({
+          isAlias: true,
+          route: expect.objectContaining({ slug: 'glm-5-3' }),
+        }),
+      );
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(false);
+      expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
+    }
+    for (const tab of ['calculator', 'historical'] as const) {
+      expect(modelRoutesForTab(tab)).toEqual(MODEL_ROUTES);
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
+    }
   });
 });
 

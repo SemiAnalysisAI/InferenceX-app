@@ -19,6 +19,7 @@ import {
 } from '@/lib/chart-utils';
 import { getHardwareConfig } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { resolvePowerTier } from '@/lib/power-tier';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
@@ -118,6 +119,29 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   // failure that made versioning necessary in the first place.
   const hasWholeDeploymentEnergySemantics =
     !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
+  // Tier derivation must see exactly the measured values the chart can render.
+  const avgPowerW = measuredPowerValid ? m.avg_power_w : undefined;
+  const prefillAvgPowerW = measuredPowerValid ? m.prefill_avg_power_w : undefined;
+  const decodeAvgPowerW = measuredPowerValid ? m.decode_avg_power_w : undefined;
+  const joulesPerSuccessfulQuery =
+    measuredPowerValid && hasWholeDeploymentEnergySemantics
+      ? m.joules_per_successful_query
+      : undefined;
+  const joulesPerOutputToken =
+    measuredPowerValid && hasWholeDeploymentEnergySemantics ? m.joules_per_output_token : undefined;
+  const joulesPerTotalToken =
+    measuredPowerValid && hasWholeDeploymentEnergySemantics ? m.joules_per_total_token : undefined;
+  const joulesPerInputToken =
+    measuredPowerValid && hasWholeDeploymentEnergySemantics ? m.joules_per_input_token : undefined;
+  const hasMeasuredTelemetry = [
+    avgPowerW,
+    prefillAvgPowerW,
+    decodeAvgPowerW,
+    joulesPerSuccessfulQuery,
+    joulesPerOutputToken,
+    joulesPerTotalToken,
+    joulesPerInputToken,
+  ].some((value) => typeof value === 'number');
   // Prefer the dedicated column (added in migration 004); fall back to the
   // legacy stash inside `metrics` for any rows ingested before that column
   // existed.
@@ -194,27 +218,20 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     power_valid: m.power_valid,
     power_metric_schema_version: m.power_metric_schema_version,
-    avg_power_w: measuredPowerValid ? m.avg_power_w : undefined,
-    joules_per_successful_query:
-      measuredPowerValid && hasWholeDeploymentEnergySemantics
-        ? m.joules_per_successful_query
-        : undefined,
-    joules_per_output_token:
-      measuredPowerValid && hasWholeDeploymentEnergySemantics
-        ? m.joules_per_output_token
-        : undefined,
-    joules_per_total_token:
-      measuredPowerValid && hasWholeDeploymentEnergySemantics
-        ? m.joules_per_total_token
-        : undefined,
+    power_tier: resolvePowerTier({
+      powerValid: m.power_valid,
+      wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,
+      hasMeasuredTelemetry,
+    }),
+    avg_power_w: avgPowerW,
+    joules_per_successful_query: joulesPerSuccessfulQuery,
+    joules_per_output_token: joulesPerOutputToken,
+    joules_per_total_token: joulesPerTotalToken,
     // Role power remains unambiguous across schema versions. Version 2 also
     // publishes explicit role energy alongside whole-deployment joules.
-    prefill_avg_power_w: measuredPowerValid ? m.prefill_avg_power_w : undefined,
-    decode_avg_power_w: measuredPowerValid ? m.decode_avg_power_w : undefined,
-    joules_per_input_token:
-      measuredPowerValid && hasWholeDeploymentEnergySemantics
-        ? m.joules_per_input_token
-        : undefined,
+    prefill_avg_power_w: prefillAvgPowerW,
+    decode_avg_power_w: decodeAvgPowerW,
+    joules_per_input_token: joulesPerInputToken,
     prefill_joules_per_input_token: measuredPowerValid
       ? m.prefill_joules_per_input_token
       : undefined,
@@ -277,6 +294,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     router_name: stringMetric('router_name'),
     router_version: stringMetric('router_version'),
     server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+    server_external_cache_hit_rate: m.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
     num_requests_total: m.num_requests_total,

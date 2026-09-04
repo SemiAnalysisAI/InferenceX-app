@@ -15,6 +15,7 @@
 import { withPercentile } from '@/lib/benchmark-transform';
 
 import type { AggDataEntry, ChartDefinition } from '../types';
+import type { XAxisMode } from '../hooks/useChartData';
 
 /** Which rung of the branch ladder chose the x field (drives label choice). */
 export type XAxisBranch =
@@ -37,11 +38,12 @@ export interface ResolvedXAxis {
  * Resolve the x-axis data field for a chart definition + metric selection.
  *
  * Rules, in order:
+ * - The global x-axis mode takes precedence over legacy per-input-metric
+ *   overrides. TTFT uses median for fixed-sequence runs.
  * - Natural x = the chart's latency metric at the selected percentile for
- *   agentic, forced to median for fixed-seq (whose p90_/p99_ columns don't
- *   exist — a stale 'p90' from a previous agentic view would resolve to a
- *   null column and drop every point).
- * - Input metrics on the interactivity chart override x to a TTFT column:
+ *   agentic, forced to median for fixed-seq, where percentile-specific
+ *   columns are not guaranteed to exist.
+ * - Without a global mode, input metrics on the interactivity chart override x to a TTFT column:
  *   the user-picked metric for fixed-seq (the manual dropdown is hidden in
  *   agentic mode), else the config default.
  * - Any *_ttft `effectiveXMetric` overrides the e2e chart's x (the 'ttft'
@@ -56,9 +58,9 @@ export function resolveXAxisField(
   chartDef: ChartDefinition,
   selectedYAxisMetric: string,
   effectiveXMetric: string | null,
-  opts: { isAgentic: boolean; percentile: string },
+  opts: { isAgentic: boolean; percentile: string; xAxisMode?: XAxisMode },
 ): ResolvedXAxis {
-  const { isAgentic, percentile } = opts;
+  const { isAgentic, percentile, xAxisMode } = opts;
   const naturalX = withPercentile(
     chartDef.x,
     isAgentic ? percentile : 'median',
@@ -69,18 +71,32 @@ export function resolveXAxisField(
   const isInputMetric = metricTitle.toLowerCase().includes('input');
   // Any *_ttft metric counts — the x-axis-mode picker can select any
   // percentile (median/p75/p90/p99) depending on sequence kind.
-  const isTtftOverride = typeof effectiveXMetric === 'string' && effectiveXMetric.endsWith('_ttft');
+  const hasTtftOverride =
+    typeof effectiveXMetric === 'string' && effectiveXMetric.endsWith('_ttft');
 
   let xAxisField: keyof AggDataEntry = naturalX;
   let branch: XAxisBranch = 'natural';
-  if (effectiveXMetric && chartDef.chartType === 'interactivity' && isInputMetric && !isAgentic) {
+  if (xAxisMode !== undefined) {
+    if (xAxisMode === 'ttft' && chartDef.chartType === 'e2e') {
+      xAxisField = withPercentile(
+        'median_ttft',
+        isAgentic ? percentile : 'median',
+      ) as keyof AggDataEntry;
+      branch = 'e2e-ttft-override';
+    }
+  } else if (
+    effectiveXMetric &&
+    chartDef.chartType === 'interactivity' &&
+    isInputMetric &&
+    !isAgentic
+  ) {
     xAxisField = effectiveXMetric as keyof AggDataEntry;
     branch = 'user-input-override';
   } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
     const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
     xAxisField = ((chartDef[xOverrideKey] as string) || chartDef.x) as keyof AggDataEntry;
     branch = 'config-input-override';
-  } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
+  } else if (chartDef.chartType === 'e2e' && hasTtftOverride) {
     xAxisField = effectiveXMetric as keyof AggDataEntry;
     branch = 'e2e-ttft-override';
   }
@@ -89,5 +105,11 @@ export function resolveXAxisField(
     xAxisField = withPercentile(xAxisField, percentile) as keyof AggDataEntry;
   }
 
-  return { xAxisField, naturalX, isInputMetric, isTtftOverride, branch };
+  return {
+    xAxisField,
+    naturalX,
+    isInputMetric,
+    isTtftOverride: xAxisField.endsWith('_ttft'),
+    branch,
+  };
 }

@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import type { TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
+import type {
+  TokenRevenuePricing,
+  TrendDataPoint,
+  YAxisMetricKey,
+} from '@/components/inference/types';
+import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import {
   buildTrendLines,
@@ -29,6 +34,7 @@ interface UseInterpolatedTrendDataParams {
   selectedYAxisMetric: string;
   targetInteractivity: number;
   availableDates: string[];
+  tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
 }
 
@@ -37,6 +43,8 @@ interface UseInterpolatedTrendDataResult {
   hwKeysWithData: string[];
   loading: boolean;
   progress: number;
+  error: Error | null;
+  refetch: () => Promise<unknown>;
 }
 
 /**
@@ -52,11 +60,17 @@ export function useInterpolatedTrendData({
   selectedPrecisions,
   selectedYAxisMetric,
   targetInteractivity,
+  tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
-  const { data: allRows, isLoading } = useBenchmarkHistory(
+  const {
+    data: allRows,
+    isLoading,
+    error,
+    refetch,
+  } = useBenchmarkHistory(
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
@@ -72,8 +86,9 @@ export function useInterpolatedTrendData({
         selectedPrecisions,
         selectedYAxisMetric,
         requestedMetrics,
+        tokenRevenuePricing,
       }),
-    [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric],
+    [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric, tokenRevenuePricing],
   );
 
   // Interpolation memo — instant when slider moves or metric changes.
@@ -84,8 +99,9 @@ export function useInterpolatedTrendData({
         targetInteractivity,
         trendMetricKey,
         extendToDate: new Date().toISOString().split('T')[0],
+        tokenRevenuePricing,
       }),
-    [dateGroupedData, targetInteractivity, trendMetricKey],
+    [dateGroupedData, targetInteractivity, trendMetricKey, tokenRevenuePricing],
   );
 
   // Artificial progress that ramps up while the API call is in flight
@@ -113,8 +129,10 @@ export function useInterpolatedTrendData({
       hwKeysWithData: [],
       loading: false,
       progress: 0,
+      error: null,
+      refetch,
     };
   }
 
-  return { trendLines, hwKeysWithData, loading: isLoading, progress };
+  return { trendLines, hwKeysWithData, loading: isLoading, progress, error, refetch };
 }

@@ -364,7 +364,13 @@ async function fetchUnofficialRuns(
   );
 }
 
-export function UnofficialRunProvider({ children }: { children: ReactNode }) {
+export function UnofficialRunProvider({
+  children,
+  showBanner = true,
+}: {
+  children: ReactNode;
+  showBanner?: boolean;
+}) {
   const queryClient = useQueryClient();
   const search = useClientSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
@@ -521,14 +527,21 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
 
   return (
     <UnofficialRunContext.Provider value={contextValue}>
-      {unofficialRunInfos.length > 0 && (
-        <UnofficialBanner
-          runs={unofficialRunInfos}
-          onDismissRun={dismissRun}
-          onDismissAll={clearUnofficialRun}
-        />
-      )}
+      {showBanner && <UnofficialRunBanner />}
       {children}
     </UnofficialRunContext.Provider>
+  );
+}
+
+/** Allows dashboard navigation to own banner placement while the provider owns its state. */
+export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
+  const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
+  return (
+    <UnofficialBanner
+      runs={unofficialRunInfos}
+      attached={attached}
+      onDismissRun={dismissRun}
+      onDismissAll={clearUnofficialRun}
+    />
   );
 }

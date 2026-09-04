@@ -90,6 +90,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   30346826643, // 2026-07-28 | Initial AMD submission for MiniMax M3 used incorrect AgentX harness; MTP/spec decode is AgentX-only. Will update after harness updates.
   30405836523, // 2026-07-28 | Reason: No non-DSpark — kimik3-fp4-b300-vllm-agentic AgentX points run without speculative decoding, and Kimi-K3 agentic coding is published DSpark-only (source run of the PR #2397 sweep-reuse ingest)
   32695861783, // 2026-08-24 | Reason: dev image — the dsv4-fp4-b300-sglang-agentic-hicache-mtp AgentX sweep ran on lmsysorg/sglang-staging:dev-cu13-pr-35880, built from the unmerged SGLang draft PR sgl-project/sglang#35880 (source run of the PR #2701 sweep-reuse ingest)
+  32863999669, // 2026-08-25 | Reason: incomplete failing run — Run Sweep on main for #2687 ([Power] Require GB multinode telemetry) failed 30 of 125 jobs (GB200/GB300 multi-node dyn-sgl arms), leaving partial data
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
@@ -295,6 +296,8 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   offloadMode: string;
   /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
+  /** Previously applied patch accepted when extending an identity-changing backfill. */
+  previousSet?: BenchmarkPointBackfill['set'];
   set: {
     /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
@@ -389,6 +392,74 @@ const DSV4_GB200_DYNAMO_VLLM = {
   specMethod: 'mtp',
 } as const;
 
+const DSV4_GB300_DYNAMO_VLLM = {
+  hardware: 'gb300',
+  framework: 'dynamo-vllm',
+  model: 'dsv4',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
+/** Aggregated multi-node config where prefill and decode share one TP-only worker. */
+function aggregatedMultinodeConfig(
+  base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
+  tp: number,
+): ConfigParams {
+  return {
+    ...base,
+    disagg: false,
+    isMultinode: true,
+    prefillTp: tp,
+    prefillEp: 1,
+    prefillDpAttn: false,
+    prefillNumWorkers: 1,
+    decodeTp: tp,
+    decodeEp: 1,
+    decodeDpAttn: false,
+    decodeNumWorkers: 1,
+    numPrefillGpu: tp,
+    numDecodeGpu: tp,
+  };
+}
+
+/**
+ * Measured Dynamo + vLLM prefix-cache hit rates from the GB200 DeepSeek-V4 AgentX
+ * sweep in run 31965016666 (attempt 2), keyed by concurrency.
+ *
+ * The GB300 launcher has no dedicated dsv4 dynamo-vllm AgentX branch, so those
+ * sweeps fall through to the generic srt-slurm v1.0.36 pin, which predates the
+ * logical-worker metrics discovery that GB200 gets from v1.0.45. Without
+ * `AIPERF_SERVER_METRICS_URLS`, AIPerf scraped only the Dynamo frontend, which
+ * exposes no `vllm:prefix_cache_*` counters, so every
+ * `server_metrics.cache.*_cache_hit_rate` landed as null. Cache-aware pricing
+ * treats a missing hit rate as 0 and bills ~97% cache hits at the full input
+ * price. Until the GB300 sweeps are re-run with worker scraping, each point
+ * borrows the nearest-concurrency GB200 measurement.
+ */
+const GB200_DYNAMO_VLLM_CACHE_HIT_RATES = {
+  1: { gpu: 0.9631118724591531, external: 0, cpu: 0 },
+  4: { gpu: 0.9564614718743584, external: 0, cpu: 0 },
+  8: { gpu: 0.9490932531502648, external: 0, cpu: 0 },
+  128: { gpu: 0.21230551115259855, external: 0.75003, cpu: 0.7536240046010246 },
+  256: { gpu: 0.11829426868903234, external: 0.84522, cpu: 0.8500825947463053 },
+  512: { gpu: 0.21678884556039354, external: 0.73111, cpu: 0.7382413630407794 },
+  576: { gpu: 0.17858801070890962, external: 0.77599, cpu: 0.7815028871123451 },
+} as const;
+
+type Gb200CacheHitRateConc = keyof typeof GB200_DYNAMO_VLLM_CACHE_HIT_RATES;
+
+function gb200CacheHitRateMerge(donorConc: Gb200CacheHitRateConc) {
+  const rates = GB200_DYNAMO_VLLM_CACHE_HIT_RATES[donorConc];
+  return {
+    server_gpu_cache_hit_rate: rates.gpu,
+    server_external_cache_hit_rate: rates.external,
+    server_cpu_cache_hit_rate: rates.cpu,
+  };
+}
+
+const GB300_CACHE_HIT_RATE_REASON =
+  'The GB300 dynamo-vllm recipe scraped only the Dynamo frontend, so AIPerf reported no prefix-cache hit rate; borrow the nearest-concurrency GB200 dynamo-vllm measurement so cache-aware pricing does not bill cached input at full price.';
+
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   // The source recipes in run 31633154542 attach MooncakeStoreConnector to
   // every disaggregated worker and allocate a 180 GB Mooncake segment per
@@ -397,6 +468,7 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     [
       [
         2106,
+        256,
         256,
         null,
         disaggregatedConfig(
@@ -414,6 +486,7 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
       [
         2334,
         1152,
+        576,
         null,
         disaggregatedConfig(
           {
@@ -430,6 +503,7 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
       [
         2336,
         1024,
+        512,
         null,
         disaggregatedConfig(
           {
@@ -444,10 +518,9 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
         ),
       ],
     ] as const
-  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+  ).map(([productionConfigId, conc, donorConc, recipeFingerprint, config]) => ({
     id: `run-31633154542-config-${productionConfigId}-conc-${conc}-mooncake-offload`,
-    reason:
-      'The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded.',
+    reason: `The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded. ${GB300_CACHE_HIT_RATE_REASON}`,
     githubRunId: 31633154542,
     runAttempt: 2,
     productionConfigId,
@@ -458,7 +531,8 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     conc,
     offloadMode: 'off',
     recipeFingerprint,
-    set: {
+    // The offload-only version was applied before PR #975 added cache-hit fields.
+    previousSet: {
       offloadMode: 'on' as const,
       metricsRemove: ['allocated_cpu_dram_gb'],
       metricsMerge: {
@@ -467,7 +541,153 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
         kv_offload_backend_version: '0.3.11.post1',
       },
     },
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+        ...gb200CacheHitRateMerge(donorConc),
+      },
+    },
   })),
+
+  // The remaining GB300 dynamo-vllm DeepSeek-V4 AgentX points share the
+  // frontend-only scrape described on GB200_DYNAMO_VLLM_CACHE_HIT_RATES. The
+  // three run-31633154542 offload points above carry the same merge.
+  ...(
+    [
+      [31633154542, 2, 2337, 1, 1, null, aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 8)],
+      [31633154542, 2, 2337, 4, 4, null, aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 8)],
+      [31633154542, 2, 2335, 8, 8, null, aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 4)],
+      [
+        32242794988,
+        3,
+        2335,
+        1,
+        1,
+        '8f36ba74ab8eb938802ec15a55f6d316f86e4d3ef2dcd38ff71e566dfa04cb9c',
+        aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 4),
+      ],
+      [
+        32242794988,
+        3,
+        2335,
+        2,
+        1,
+        '8f36ba74ab8eb938802ec15a55f6d316f86e4d3ef2dcd38ff71e566dfa04cb9c',
+        aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 4),
+      ],
+      [
+        32242794988,
+        3,
+        2335,
+        4,
+        4,
+        '8f36ba74ab8eb938802ec15a55f6d316f86e4d3ef2dcd38ff71e566dfa04cb9c',
+        aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 4),
+      ],
+      [
+        32242794988,
+        3,
+        2335,
+        6,
+        4,
+        '8f36ba74ab8eb938802ec15a55f6d316f86e4d3ef2dcd38ff71e566dfa04cb9c',
+        aggregatedMultinodeConfig(DSV4_GB300_DYNAMO_VLLM, 4),
+      ],
+      [
+        32809502132,
+        1,
+        2450,
+        4,
+        4,
+        'ccc45769efa2ef8b519dd47ab99f77ae033bbfba26f499b14d97253a8badce74',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_VLLM,
+          { tp: 1, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 1, dpAttn: false, numWorkers: 4 },
+        ),
+      ],
+      [
+        32809502132,
+        1,
+        2449,
+        128,
+        128,
+        'd84f06bb4a4016f9f2fe917feb4f10b960f87ac5f48bfae1b0bca1d66d7c887b',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_VLLM,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        32809502132,
+        1,
+        2449,
+        256,
+        256,
+        '1472857d464c0780b5eeb41184ff70290c5f6b9ad6a8c07b2524697e21dd0e07',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_VLLM,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        32809502132,
+        1,
+        2448,
+        512,
+        512,
+        '6ab19ba8680ab38b81c0d6a251d252576caafaf660118007c508b1f62df08c39',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_VLLM,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(
+    ([githubRunId, runAttempt, productionConfigId, conc, donorConc, recipeFingerprint, config]) => {
+      const usesMooncake = githubRunId === 32809502132 && conc !== 4;
+      return {
+        id: `run-${githubRunId}-config-${productionConfigId}-conc-${conc}-gb200-cache-hit-rate`,
+        reason:
+          GB300_CACHE_HIT_RATE_REASON +
+          (usesMooncake
+            ? ' The runtime also enabled Mooncake DRAM caching, which the artifact mislabeled as non-offloaded.'
+            : ''),
+        githubRunId,
+        runAttempt,
+        productionConfigId,
+        config,
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        offloadMode: 'off',
+        recipeFingerprint,
+        set: {
+          ...(usesMooncake
+            ? { offloadMode: 'on' as const, metricsRemove: ['allocated_cpu_dram_gb'] }
+            : {}),
+          metricsMerge: {
+            ...gb200CacheHitRateMerge(donorConc),
+            ...(usesMooncake
+              ? {
+                  kv_offloading: 'dram',
+                  kv_offload_backend: 'mooncake',
+                  kv_offload_backend_version: '0.3.11.post1',
+                }
+              : {}),
+          },
+        },
+      };
+    },
+  ),
 
   // Every TensorRT-LLM recipe in run 31927376673 configures a 128 GiB native
   // host KV cache on both prefill and decode workers. The master matrix only
@@ -540,6 +760,96 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     reason:
       'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
     githubRunId: 31927376673,
+    runAttempt: 1,
+    productionConfigId,
+    config,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
+  // The Qwen metrics refresh retained the same 128 GiB host KV cache on
+  // prefill and decode, but its artifacts again reported offloading as disabled.
+  ...(
+    [
+      [
+        2360,
+        7,
+        '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 7 },
+        ),
+      ],
+      [
+        2361,
+        96,
+        '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 3 },
+        ),
+      ],
+      [
+        2362,
+        704,
+        'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 2 },
+        ),
+      ],
+      [
+        2363,
+        52,
+        '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 2 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+        ),
+      ],
+      [
+        2364,
+        565,
+        '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2365,
+        44,
+        '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 1 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-33219708211-config-${productionConfigId}-conc-${conc}-native-offload`,
+    reason:
+      'The Qwen TRT-LLM metrics refresh retained native host KV caching, but its offload metadata incorrectly placed it on a separate frontier from the original run.',
+    githubRunId: 33219708211,
     runAttempt: 1,
     productionConfigId,
     config,
@@ -966,6 +1276,18 @@ export function validateRunBackfills(
       throw new Error(`${backfill.id}: recipeFingerprint must be null or non-empty`);
     }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
+    if (backfill.previousSet) {
+      const previous = backfill.previousSet;
+      if (
+        previous.offloadMode === undefined ||
+        previous.offloadMode !== backfill.set.offloadMode ||
+        previous.offloadMode === backfill.offloadMode ||
+        Object.keys(previous.metricsMerge ?? {}).length === 0
+      ) {
+        throw new Error(`${backfill.id}: previousSet must identify the prior destination patch`);
+      }
+      validateRunBackfills([], [{ ...backfill, previousSet: undefined, set: previous }]);
+    }
     const removeKeys = backfill.set.metricsRemove ?? [];
     if (
       backfill.set.offloadMode === undefined &&

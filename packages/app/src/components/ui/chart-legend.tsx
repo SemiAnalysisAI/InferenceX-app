@@ -1,36 +1,16 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import {
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Diamond,
-  Info,
-  Square,
-  Triangle,
-  X,
-} from 'lucide-react';
-import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
-import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
-const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; className?: string }>> = {
-  circle: Circle,
-  square: Square,
-  triangle: Triangle,
-  diamond: Diamond,
-};
-
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
+import { InfoHelp } from './option-info';
 import { Switch } from './switch';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
 
@@ -39,27 +19,17 @@ export type { CommonLegendItemProps } from './chart-legend-item';
 const STRINGS = {
   en: {
     advanced: 'Advanced',
-    collapse: 'Collapse',
-    expand: 'Expand',
-    searchPlaceholder: 'Search...',
-    searchAria: 'Search legend',
-    clearSearch: 'Clear search',
     moreInfo: (label: string) => `More info about ${label}`,
-    collapseLegend: 'Collapse legend',
-    expandLegend: 'Expand legend',
+    hideLegend: 'Hide legend',
+    showLegend: 'Show legend',
     hide: (label: string) => `Hide ${label}`,
     showPoints: (label: string) => `Show all ${label} data points`,
   },
   zh: {
     advanced: '高级',
-    collapse: '收起',
-    expand: '展开',
-    searchPlaceholder: '搜索…',
-    searchAria: '搜索图例',
-    clearSearch: '清除搜索',
     moreInfo: (label: string) => `查看${label}的更多信息`,
-    collapseLegend: '收起图例',
-    expandLegend: '展开图例',
+    hideLegend: '隐藏图例',
+    showLegend: '显示图例',
     hide: (label: string) => `隐藏${label}`,
     showPoints: (label: string) => `显示${label}的全部数据点`,
   },
@@ -88,14 +58,7 @@ export interface ChartLegendProps {
   switches?: LegendSwitchConfig[];
   actions?: LegendActionConfig[];
   grouped?: boolean;
-  /**
-   * Selected precisions, in selection order. When 2+ are provided, the legend
-   * renders a shape key: first precision → circle, second → square, third →
-   * triangle, fourth → diamond. Only the selected precisions are listed.
-   * A single precision (or none) hides the shape key entirely.
-   */
-  precisionIndicators?: readonly string[];
-  /** Optional extra key/legend explanation rendered alongside the FP indicators. */
+  /** Optional extra key/legend explanation rendered below the display switches. */
   keyIndicators?: React.ReactNode;
   enableTooltips?: boolean;
   maxHeight?: number;
@@ -122,7 +85,6 @@ export default function ChartLegend({
   switches,
   actions,
   grouped = false,
-  precisionIndicators,
   keyIndicators,
   enableTooltips = false,
   maxHeight,
@@ -138,14 +100,14 @@ export default function ChartLegend({
   const locale = useLocale();
   const t = STRINGS[locale];
   const isSidebar = variant === 'sidebar';
-  const hasLongText = legendItems.some((item) => item.label && item.label.length > 8);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
-  const effectiveExpanded = isLegendExpanded;
+  // Sidebar items stay on one line. The in-flow panel fits their content up to
+  // the wrapper's width cap; unusually long names retain a title tooltip.
+  const itemsExpanded = isSidebar ? false : isLegendExpanded;
   // Counts only removable series: the guard below exists to stop the user
   // emptying the chart, and label-only entries (unofficial runs) are not
   // something removing leaves you without.
@@ -173,22 +135,6 @@ export default function ChartLegend({
     return filterAndSortLegendItems(legendItems, '', !disableActiveSort);
   }, [legendItems, isSidebar, disableActiveSort]);
 
-  // Compute which items match the search query (used to hide non-matching via CSS)
-  const hiddenNames = useMemo(() => {
-    if (!isSidebar) return new Set<string>();
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return new Set<string>();
-    return new Set(
-      legendItems
-        .filter(
-          (item) =>
-            !item.label.toLowerCase().includes(query) &&
-            !(item.title && item.title.toLowerCase().includes(query)),
-        )
-        .map((item) => item.name),
-    );
-  }, [legendItems, searchQuery, isSidebar]);
-
   const rows = useMemo(() => {
     if (!grouped) return null;
     const items = isSidebar ? sortedItems : legendItems;
@@ -208,16 +154,19 @@ export default function ChartLegend({
     return result.filter((row) => row.length > 0);
   }, [grouped, legendItems, sortedItems, isSidebar]);
 
-  const handleLegendExpand = () => {
+  const toggleLegendOpen = () => {
     onExpandedChange(!isLegendExpanded);
   };
 
+  // Sidebar: a fixed in-flow panel that takes layout space next to the plot
+  // It never overlays the chart. Collapsing removes the panel contents while
+  // preserving the toggle's inset, so the chart reclaims the remaining width.
   const outerClasses = isSidebar
     ? cn(
-        'p-2 rounded-sm text-sm flex flex-col h-full legend-container sidebar-legend transition-all',
+        'px-2 py-3 rounded-md border bg-background text-sm flex flex-col w-full',
         isLegendExpanded
-          ? 'absolute right-0 top-0 z-10 w-auto min-w-fit border bg-accent'
-          : 'w-full',
+          ? 'border-border/60 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
+          : 'border-transparent no-export',
       )
     : grouped
       ? cn(
@@ -245,72 +194,77 @@ export default function ChartLegend({
     [legendItems, hideAtomFootnote],
   );
 
-  const shapeIndicators = useMemo(() => {
-    if (!precisionIndicators || precisionIndicators.length < 2) return null;
-    return precisionIndicators.slice(0, SHAPE_ORDER.length).map((precision) => ({
-      precision,
-      shapeKey: getShapeKeyForPrecision(precision, precisionIndicators),
-    }));
-  }, [precisionIndicators]);
-
   const hasSidebarControls =
-    isSidebar &&
-    (shapeIndicators !== null ||
-      keyIndicators ||
-      (switches && switches.length > 0) ||
-      (actions && actions.length > 0) ||
-      hasLongText);
+    isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
   const scrollClasses = isSidebar
     ? cn(
-        'overflow-y-auto flex-1 min-h-0 space-y-0.5',
+        'overflow-y-auto flex-initial min-h-0 space-y-0.5',
         hasSidebarControls && 'border-b border-border pb-2',
       )
     : grouped
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
 
-  const trackSearchOnBlur = useCallback(() => {
-    if (searchQuery.trim()) {
-      track('inference_legend_searched', { query: searchQuery.trim() });
-    }
-  }, [searchQuery]);
-
-  const searchInput =
-    isSidebar && isLegendExpanded ? (
-      <div className="pb-1.5 no-export">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onBlur={trackSearchOnBlur}
-            placeholder={t.searchPlaceholder}
-            aria-label={t.searchAria}
-            className="w-full px-2 py-1 pr-6 rounded-md border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                track('inference_legend_search_cleared');
-                setSearchQuery('');
-              }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={t.clearSearch}
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
+  const actionElements =
+    actions && actions.length > 0 ? (
+      <div
+        className={cn(
+          'no-export flex flex-wrap gap-y-1',
+          isSidebar ? 'min-w-0 gap-x-1' : 'w-full gap-x-3',
+        )}
+      >
+        {actions.map((action) => (
+          <button
+            type="button"
+            key={action.id}
+            data-testid={action.id}
+            onClick={action.onClick}
+            className={cn(
+              'text-xs text-muted-foreground hover:text-foreground cursor-pointer',
+              isSidebar
+                ? 'min-h-8 rounded-md px-2 hover:bg-muted transition-colors'
+                : 'mt-2 underline',
+            )}
+          >
+            {action.label}
+          </button>
+        ))}
       </div>
     ) : null;
+
+  // Keep the same button mounted in the same padded header in both states.
+  // Only its arrow and accessible label change; focus and pointer position stay put.
+  const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
+  const panelHeader = isSidebar ? (
+    <div
+      data-testid="legend-toolbar"
+      className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
+    >
+      <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
+      <button
+        type="button"
+        data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
+        onClick={toggleLegendOpen}
+        aria-expanded={isLegendExpanded}
+        aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+        title={isLegendExpanded ? t.hideLegend : t.showLegend}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+      >
+        <LegendToggleIcon size={16} aria-hidden="true" />
+      </button>
+    </div>
+  ) : null;
 
   const standardSwitches = switches?.filter((sw) => !sw.advanced) ?? [];
   const advancedSwitches = switches?.filter((sw) => sw.advanced) ?? [];
 
   const renderSwitches = (items: LegendSwitchConfig[]) =>
     items.length > 0 ? (
-      <div className={cn(grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2')}>
+      <div
+        className={cn(
+          isSidebar || grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
+        )}
+      >
         {items.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
             <Switch
@@ -326,27 +280,15 @@ export default function ChartLegend({
               {sw.label}
             </Label>
             {sw.infoTooltip && (
-              <TooltipProvider delayDuration={100}>
-                <TooltipRoot>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      data-testid={`${sw.id}-info`}
-                      aria-label={t.moreInfo(sw.label)}
-                      className="text-muted-foreground hover:text-foreground cursor-help -m-1.5 p-1.5 inline-flex items-center"
-                    >
-                      <Info size={14} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    sideOffset={6}
-                    className="max-w-[260px] text-xs leading-snug"
-                  >
-                    {sw.infoTooltip}
-                  </TooltipContent>
-                </TooltipRoot>
-              </TooltipProvider>
+              <InfoHelp
+                label={sw.label}
+                value={sw.id}
+                triggerTestId={`${sw.id}-info`}
+                ariaLabel={t.moreInfo(sw.label)}
+                triggerClassName="-my-1"
+              >
+                {sw.infoTooltip}
+              </InfoHelp>
             )}
           </div>
         ))}
@@ -388,60 +330,8 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const actionElements =
-    actions && actions.length > 0 ? (
-      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
-        {actions.map((action) => (
-          <button
-            type="button"
-            key={action.id}
-            data-testid={action.id}
-            onClick={action.onClick}
-            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
-  const fpIndicators = shapeIndicators ? (
-    <div
-      className={cn(
-        'w-full md:w-auto mt-2 px-1 pr-2 gap-x-4 gap-y-1',
-        effectiveExpanded ? 'flex flex-wrap' : 'grid grid-cols-2',
-      )}
-    >
-      {shapeIndicators.map(({ precision, shapeKey }) => {
-        const Icon = SHAPE_ICON[shapeKey];
-        return (
-          <div key={precision} className="flex items-center gap-2">
-            <Icon size={12} className="inline-block fill-gray-500" />
-            <span className="text-xs text-muted-foreground">
-              {getPrecisionLabel(precision as Precision)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  ) : null;
-
-  const expandButton = hasLongText ? (
-    <div className="hidden lg:block mt-2 no-export">
-      <button
-        type="button"
-        onClick={handleLegendExpand}
-        className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
-        aria-label={isLegendExpanded ? t.collapseLegend : t.expandLegend}
-      >
-        {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
-        {isLegendExpanded ? t.collapse : t.expand}
-      </button>
-    </div>
-  ) : null;
-
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
-  const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>
+  const itemClassName = (item: CommonLegendItemProps) =>
     cn(
       'transition-opacity duration-300',
       isSidebar
@@ -451,12 +341,11 @@ export default function ChartLegend({
         : item.isActive
           ? 'opacity-100'
           : 'opacity-50 no-export',
-      effectiveExpanded && 'md:w-full md:block',
-      isHidden && 'h-0 m-0! p-0! overflow-hidden',
+      itemsExpanded && 'md:w-full md:block',
     );
 
   // Render a single legend item, optionally wrapped with a tooltip
-  const renderItem = (item: CommonLegendItemProps, isHidden: boolean) => {
+  const renderItem = (item: CommonLegendItemProps) => {
     const legendItem = (
       <ChartLegendItem
         name={item.name}
@@ -475,19 +364,19 @@ export default function ChartLegend({
         hideAriaLabel={t.hide(item.label)}
         showPointsAriaLabel={t.showPoints(item.label)}
         asFragment
-        isLegendExpanded={effectiveExpanded}
+        isLegendExpanded={itemsExpanded}
         sidebarMode={isSidebar}
       />
     );
 
     return (
-      <li key={item.name} className={itemClassName(item, isHidden)}>
+      <li key={item.name} className={itemClassName(item)}>
         {enableTooltips ? (
           <TooltipRoot>
             <TooltipTrigger asChild>
               {/* Full width when the row carries a points-table icon so the
                   ml-auto icon pins to a consistent right-edge column. */}
-              <div className={item.onShowPoints ? 'w-full' : 'w-fit'}>{legendItem}</div>
+              <div className={item.onShowPoints ? 'w-full' : 'w-fit max-w-full'}>{legendItem}</div>
             </TooltipTrigger>
             {item.isHighlighted && item.tooltip && (
               <TooltipContent side="bottom" collisionPadding={10}>
@@ -502,21 +391,19 @@ export default function ChartLegend({
     );
   };
 
-  // Bottom controls (switches, FP indicators, expand button, actions)
+  // Display controls stay immediately below the series instead of being
+  // pushed to the bottom of a chart-height panel. Overlay actions stay here.
   const hasBottomControls =
-    switchElements ||
-    actionElements ||
-    fpIndicators ||
-    keyIndicators ||
-    expandButton ||
-    hasAtomFootnote;
+    switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
-    <div className="shrink-0 grow-0">
-      {actionElements}
+    <div
+      data-testid="legend-display-controls"
+      // Display options wrap within the label-sized panel rather than widening it.
+      className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
+    >
+      {!isSidebar && actionElements}
       {switchElements}
-      {fpIndicators}
       {keyIndicators}
-      {expandButton}
       {hasAtomFootnote && <AtomEngineFootnote className="mt-2 no-export" />}
     </div>
   ) : null;
@@ -526,78 +413,67 @@ export default function ChartLegend({
     grouped && rows ? (
       <div
         ref={scrollRef}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {rows.map((row, i) => {
-          const allHidden =
-            isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
-          return (
-            <div
-              key={i}
+        {rows.map((row, i) => (
+          <div key={i} className={cn('p-1 rounded-sm shrink-0', i > 0 && 'mt-2')}>
+            <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
+              {row[0].title}
+            </div>
+            <ul
               className={cn(
-                'p-1 rounded-sm shrink-0',
-                i > 0 && 'mt-2',
-                allHidden && 'h-0 m-0! p-0! overflow-hidden',
+                'flex flex-wrap gap-x-2 gap-y-1',
+                itemsExpanded && 'md:block md:space-y-1',
               )}
             >
-              <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
-                {row[0].title}
-              </div>
-              <ul
-                className={cn(
-                  'flex flex-wrap gap-x-2 gap-y-1',
-                  effectiveExpanded && 'md:block md:space-y-1',
-                )}
-              >
-                {row.map((item: CommonLegendItemProps) => {
-                  const isHidden = isSidebar && hiddenNames.has(item.name);
-                  return (
-                    <li key={item.name} className={cn(isHidden && 'h-0 m-0! p-0! overflow-hidden')}>
-                      <ChartLegendItem
-                        name={item.name}
-                        hw={item.hw}
-                        label={item.label}
-                        color={item.color}
-                        lineDasharray={item.lineDasharray}
-                        title={item.title}
-                        isActive={item.isActive}
-                        onClick={item.onClick}
-                        onHover={onItemHover}
-                        onHoverEnd={onItemHoverEnd}
-                        onRemove={removeFor(item)}
-                        onShowPoints={item.onShowPoints}
-                        hideAriaLabel={t.hide(item.label)}
-                        showPointsAriaLabel={t.showPoints(item.label)}
-                        sidebarMode={isSidebar}
-                        asFragment
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
+              {row.map((item: CommonLegendItemProps) => (
+                <li key={item.name}>
+                  <ChartLegendItem
+                    name={item.name}
+                    hw={item.hw}
+                    label={item.label}
+                    color={item.color}
+                    lineDasharray={item.lineDasharray}
+                    title={item.title}
+                    isActive={item.isActive}
+                    onClick={item.onClick}
+                    onHover={onItemHover}
+                    onHoverEnd={onItemHoverEnd}
+                    onRemove={removeFor(item)}
+                    onShowPoints={item.onShowPoints}
+                    hideAriaLabel={t.hide(item.label)}
+                    showPointsAriaLabel={t.showPoints(item.label)}
+                    isLegendExpanded={itemsExpanded}
+                    sidebarMode={isSidebar}
+                    asFragment
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     ) : (
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {(isSidebar ? sortedItems : legendItems).map((item) =>
-          renderItem(item, isSidebar && hiddenNames.has(item.name)),
-        )}
+        {(isSidebar ? sortedItems : legendItems).map((item) => renderItem(item))}
       </ul>
     );
 
   const content = (
-    <div className={isSidebar ? 'h-full' : 'relative'}>
-      <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
-        {searchInput}
-        {scrollContent}
-        {bottomControls}
+    <div className={isSidebar ? 'min-w-0' : 'relative'}>
+      <div
+        data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
+        className={outerClasses}
+        style={outerStyle}
+      >
+        {panelHeader}
+        {(!isSidebar || isLegendExpanded) && scrollContent}
+        {(!isSidebar || isLegendExpanded) && bottomControls}
       </div>
     </div>
   );

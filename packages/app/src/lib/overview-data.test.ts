@@ -179,7 +179,7 @@ describe('overview engine scope and scenario selection', () => {
     expect(overviewScenarioForModel(Model.GLM_5_2)).toBe('agentx');
     expect(overviewScenarioForModel(Model.DeepSeek_V4_Pro)).toBe('single_turn_8k1k');
     expect(overviewScenarioForModel(Model.Kimi_K2_5)).toBe('single_turn_8k1k');
-    expect(overviewScenarioForModel(Model.MiniMax_M3)).toBe('single_turn_8k1k');
+    expect(overviewScenarioForModel(Model.MiniMax_M3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.Qwen3_5)).toBe('single_turn_8k1k');
   });
 
@@ -1259,7 +1259,7 @@ describe('tier-parameterized overview', () => {
     );
 
     const pair = headlinePairOf(
-      page.models.find((m) => m.model === Model.Qwen3_5)!,
+      page.models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!,
       'mi355x-vs-b200',
     );
     expect(pair?.candidate.read).toMatchObject({ tier: 100, value: 3600 });
@@ -1282,7 +1282,7 @@ describe('tier-parameterized overview', () => {
 
     const at50 = headlinePairOf(
       assembleOverviewPageData({ [Model.Qwen3_5]: rows }).models.find(
-        (m) => m.model === Model.Qwen3_5,
+        (m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k',
       )!,
       'mi355x-vs-b200',
     );
@@ -1290,7 +1290,7 @@ describe('tier-parameterized overview', () => {
 
     const at30 = headlinePairOf(
       assembleOverviewPageData({ [Model.Qwen3_5]: rows }, 30).models.find(
-        (m) => m.model === Model.Qwen3_5,
+        (m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k',
       )!,
       'mi355x-vs-b200',
     );
@@ -1312,7 +1312,7 @@ describe('tier-parameterized overview', () => {
           ],
         },
         tier,
-      ).models.find((m) => m.model === Model.Qwen3_5)!;
+      ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
 
     const at50 = headlinePairOf(page(), 'mi355x-vs-b200');
     expect(at50?.candidate.precision).toBe(Precision.FP4);
@@ -1336,22 +1336,25 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    // Curated scenarios: DeepSeek, MiniMax and Qwen3.5 each get both rows, Kimi
-    // K3 and GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are
-    // not default models, and the matrix is built from DEFAULT_MODELS.
+    // Curated scenarios: DeepSeek and Qwen3.5 each get both rows, Kimi K3 and
+    // GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are not
+    // default models, and the matrix is built from DEFAULT_MODELS.
     // Qwen3.8-Flash-Next is curated AgentX-only, like Kimi K3 and GLM: the
     // model is benchmarked on agentic traces, so it must not claim a
-    // fixed-sequence row it will never fill.
+    // fixed-sequence row it will never fill. MiniMax M3 is AgentX-only too,
+    // but by retirement: its single-turn 8k1k sweep stopped on 2026-08-04
+    // (InferenceX#2493), so the matrix must not keep a row that never
+    // refreshes. AgentX rows group above the 8K/1K rows, each group in
+    // MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
-      `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.Kimi_K3}/agentx`,
-      `${Model.MiniMax_M3}/single_turn_8k1k`,
       `${Model.MiniMax_M3}/agentx`,
       `${Model.GLM_5_2}/agentx`,
-      `${Model.Qwen3_5}/single_turn_8k1k`,
       `${Model.Qwen3_5}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
+      `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
+      `${Model.Qwen3_5}/single_turn_8k1k`,
     ]);
     expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
     expect(page).not.toHaveProperty('datasetThroughDate');
@@ -1361,7 +1364,9 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     // therefore have no exact @50 read; GB200's independent FP8 remains visible.
     // GB300's points are single-node and multi-node aggregate deployments, so
     // they must not be interpolated into one synthetic serving curve.
-    const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro)!;
+    const deepseek = page.models.find(
+      (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'single_turn_8k1k',
+    )!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
     expect(dsB300.baseline.read.value).toBeCloseTo(8101.968);
     expect(dsB300.baseline.costPerMtok).toBeCloseTo(
@@ -1416,9 +1421,11 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
         .map((p) => p.missingReason),
     ).toEqual(['no_scenario_data', 'no_scenario_data', 'no_scenario_data']);
 
-    // MiniMax: the platform result remains visible when B200 has no 8K/1K data
-    // — priced, but with no percentage baseline (the UI's ∞ badge state).
-    const minimax = page.models.find((m) => m.model === Model.MiniMax_M3)!;
+    // MiniMax: the platform result remains visible when B200 has no AgentX
+    // data — priced, but with no percentage baseline (the UI's ∞ badge state).
+    const minimax = page.models.find(
+      (m) => m.model === Model.MiniMax_M3 && m.scenario === 'agentx',
+    )!;
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
     expect(mmGb300.baseline.missingReason).toBe('no_scenario_data');
     expect(mmGb300.candidate.read.value).toBe(6510);
@@ -1429,7 +1436,9 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(mmGb300.candidate.costVsReferencePct).toBeNull();
 
     // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
-    const qwen = page.models.find((m) => m.model === Model.Qwen3_5)!;
+    const qwen = page.models.find(
+      (m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k',
+    )!;
     const qwenMi = headlinePairOf(qwen, 'mi355x-vs-b200')!;
     expect(qwenMi.candidate.precision).toBe(Precision.FP8);
     expect(qwenMi.candidate.read.value).toBe(6688);

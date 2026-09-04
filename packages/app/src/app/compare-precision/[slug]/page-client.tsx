@@ -40,7 +40,7 @@ const STRINGS = {
     dashboardLinkText: '打开完整仪表板 →',
     caveatSeqFallback: '序列',
     emptyState:
-      '当前精度组合没有可用的插值对比数据。请使用下方图表控件选择一个两种精度均有基准测试数据的序列。',
+      '这组精度暂时没有可用于插值对比的数据。请在下方图表控件中选择一个两种精度都有基准测试数据的序列长度。',
   },
 } as const;
 
@@ -116,14 +116,16 @@ export default function ComparePrecisionPageClient({
                 {modelLabel} · {gpuLabel} · {t.eyebrowSuffix}
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {gpuLabel}: {aLabel} vs {bLabel} {t.h1Prefix}
+                {isZh
+                  ? `${gpuLabel}：${aLabel} 与 ${bLabel} ${t.h1Prefix}`
+                  : `${gpuLabel}: ${aLabel} vs ${bLabel} ${t.h1Prefix}`}
               </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  在 <strong>{gpuLabel}</strong>（{gpuVendor} {gpuArch}）上对比{' '}
-                  <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 精度对{' '}
-                  <strong>{modelLabel}</strong> 推理的影响。涵盖各类 LLM
-                  工作负载的吞吐量、延迟与成本。使用下方图表控件切换序列和指标——交互方式与
+                  在 <strong>{gpuLabel}</strong>（{gpuVendor} {gpuArch}）上，比较{' '}
+                  <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 两种量化精度对{' '}
+                  <strong>{modelLabel}</strong> 推理的影响，涵盖不同 LLM
+                  工作负载下的吞吐量、延迟和成本。可通过下方图表控件切换序列长度和指标，操作方式与
                   <Link href="/zh" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -169,7 +171,7 @@ export default function ComparePrecisionPageClient({
                           {' '}
                           <span className="text-muted-foreground italic">
                             {isZh
-                              ? `（数据反映此 URL 的默认 ${defaultSequence ?? t.caveatSeqFallback} 选择——如果您在控件中更改序列或模型，下方表格和图表会自动更新。每一侧取该精度下的最优可用推理配置，可能包含投机解码（如 MTP）——与其他对比页面的口径一致。）`
+                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} 配置；在控件中切换序列长度或模型后，下方表格和图表会同步更新。两侧均采用各自精度下可用的最优推理配置；只有存在相应测试配置时，才可能纳入 MTP 等投机解码方法。该口径与其他对比页面一致。）`
                               : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls. Each side uses the best available serving configuration for that precision, which may include speculative decoding such as MTP where recipes exist — the same convention as the other comparison pages.)`}
                           </span>
                         </>

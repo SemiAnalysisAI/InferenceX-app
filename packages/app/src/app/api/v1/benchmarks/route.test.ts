@@ -242,4 +242,130 @@ describe('GET /api/v1/benchmarks', () => {
     const body = await res.json();
     expect(body).toEqual([]);
   });
+
+  describe('powerValid filter', () => {
+    const validatedV2 = {
+      id: 1,
+      benchmark_type: 'single_turn',
+      metrics: { power_valid: 1, power_metric_schema_version: 2, avg_power_w: 700 },
+    };
+    const validatedUnversioned = {
+      id: 2,
+      benchmark_type: 'single_turn',
+      metrics: { power_valid: 1, avg_power_w: 650 },
+    };
+    const invalidated = {
+      id: 3,
+      benchmark_type: 'single_turn',
+      metrics: { power_valid: 0 },
+    };
+    const legacy = {
+      id: 4,
+      benchmark_type: 'single_turn',
+      metrics: { tput_per_gpu: 100 },
+    };
+    const powerRows = [validatedV2, validatedUnversioned, invalidated, legacy];
+
+    it('powerValid=strictV2 requires a validated verdict plus schema version 2', async () => {
+      mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
+
+      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=strictV2'));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([validatedV2]);
+    });
+
+    it('keeps every general benchmark row when powerValid is omitted', async () => {
+      mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
+      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(powerRows);
+    });
+
+    it.each(['1', '0', 'any', 'certified', 'garbage', '', 'strictv2'])(
+      'rejects unsupported powerValid=%s without querying',
+      async (value) => {
+        const res = await GET(req(`/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=${value}`));
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: 'Unknown powerValid filter' });
+        expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+        expect(mockGetBenchmarksForRun).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects powerValid combined with view=calculator without querying', async () => {
+      const res = await GET(
+        req(
+          '/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=strictV2&view=calculator&sequence=1k%2F1k',
+        ),
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: 'powerValid cannot be combined with view=calculator',
+      });
+      expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+    });
+
+    it('keeps calculator requests working when powerValid is omitted', async () => {
+      mockGetLatestBenchmarks.mockResolvedValueOnce([
+        {
+          benchmark_type: 'single_turn',
+          isl: 1024,
+          osl: 1024,
+          metrics: { tput_per_gpu: 100, avg_power_w: 700 },
+        },
+      ]);
+
+      const res = await GET(
+        req('/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=1k%2F1k'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([
+        { benchmark_type: 'single_turn', isl: 1024, osl: 1024, metrics: { tput_per_gpu: 100 } },
+      ]);
+    });
+
+    it('composes with the agentic workflow-metadata trim', async () => {
+      mockGetLatestBenchmarks.mockResolvedValueOnce([
+        {
+          id: 1,
+          benchmark_type: 'agentic_traces',
+          workflow_run_id: 42,
+          run_started_at: '2026-08-12T10:00:00Z',
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
+        },
+        {
+          id: 2,
+          benchmark_type: 'single_turn',
+          workflow_run_id: 43,
+          run_started_at: '2026-08-12T10:00:00Z',
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
+        },
+        {
+          id: 3,
+          benchmark_type: 'agentic_traces',
+          workflow_run_id: 44,
+          run_started_at: '2026-08-12T10:00:00Z',
+          metrics: { power_valid: 0 },
+        },
+      ]);
+
+      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=strictV2'));
+      expect(await res.json()).toEqual([
+        {
+          id: 1,
+          benchmark_type: 'agentic_traces',
+          workflow_run_id: 42,
+          run_started_at: '2026-08-12T10:00:00Z',
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
+        },
+        {
+          id: 2,
+          benchmark_type: 'single_turn',
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
+        },
+      ]);
+    });
+  });
 });

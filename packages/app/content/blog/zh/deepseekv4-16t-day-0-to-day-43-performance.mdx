@@ -19,6 +19,7 @@ tags:
   - sglang
   - vllm
   - trtllm
+  - cann
 ---
 
 _本文最初于 2026 年 6 月 9 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/deepseekv4-16t-day-0-to-day-43-performance)。_
@@ -179,7 +180,7 @@ ATOM 的几乎每条热路径也都走了 fallback：FP4 MoE 被迫使用 Triton
 
 ### NVIDIA TensorRT-LLM 的 Bug 及缺乏第 0 天 DeepSeekV4 Pro 支持
 
-TensorRT 无法开箱即用地支持 DeepSeek v4，因为 `mhcFusedHcKernel.cu` 中有一个硬编码的 `FHC_HIDDEN = 4096` 常量。问题在于 SHAPE_K、residual/x TMA 描述符以及 MMA kernel 模板实例化都绑定在该隐藏维度大小上。所有之前的 DeepSeek 模型和 DeepSeek v4 flash 的隐藏维度均为 4096，因此暂时不出问题。但尝试对 DeepSeek v4 Pro 进行推理时，会触发 `"mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)"` 的保护错误。
+TensorRT 无法直接支持 DeepSeek v4，原因是 `mhcFusedHcKernel.cu` 中硬编码了 `FHC_HIDDEN = 4096`。SHAPE_K、residual/x TMA 描述符和 MMA kernel 的模板实例化都绑定到这一隐藏维度。此前所有 DeepSeek 模型及 DeepSeek v4 Flash 的隐藏维度均为 4096，因此问题一直没有暴露；但在 DeepSeek v4 Pro 上运行推理时，会触发以下保护性检查报错：`“mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)”`。
 
 Nvidia 工程师也遇到了这个保护错误，但他们没有添加代码来支持 DeepSeek v4 Pro 的 7168 隐藏维度，而是直接[移除了保护检查](https://github.com/NVIDIA/TensorRT-LLM/commit/b3f45bb608aecca666a451ca5138b81470487f05)。毫不意外，错误确实消失了。
 

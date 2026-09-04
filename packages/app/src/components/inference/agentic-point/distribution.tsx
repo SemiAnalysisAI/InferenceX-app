@@ -5,7 +5,16 @@ import { useMemo } from 'react';
 import { useLocale } from '@/lib/use-locale';
 
 import { ChartHover, type HoverItem } from './chart-hover';
-import { CHART_PAD, ChartEmpty, PERCENTILE_COLORS, fmtCount } from './chart-shared';
+import {
+  CHART_PAD,
+  ChartEmpty,
+  ChartLegend,
+  LEGEND_BASELINE_OFFSET,
+  PERCENTILE_COLORS,
+  fmtCount,
+  type ChartLegendEntry,
+} from './chart-shared';
+import { layoutChartLegend } from './chart-legend';
 import { logHistogram, logTicks, positiveValues } from './lognormal';
 import { quantile } from './time-series-math';
 
@@ -69,7 +78,6 @@ export function Distribution({
 }) {
   const t = STRINGS[useLocale()];
   const W = width;
-  const H = height;
 
   const computed = useMemo(() => {
     const positive = positiveValues(values);
@@ -83,16 +91,31 @@ export function Distribution({
       // Zero-token requests are real but unplottable on a log axis; they are
       // reported under the chart rather than silently folded into bin one.
       excluded: values.length - positive.length,
-      innerW: W - PAD.left - PAD.right,
-      innerH: H - PAD.top - PAD.bottom,
     };
-  }, [values, W, H]);
+  }, [values]);
 
   if (!computed) {
-    return <ChartEmpty height={H} />;
+    return <ChartEmpty height={height} />;
   }
-  const { sorted, histogram, excluded, innerW, innerH } = computed;
+  const { sorted, histogram, excluded } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;
+
+  // Wrap the legend, then grow the viewBox and bottom padding by the same
+  // amount so the plot area is untouched (see TimeSeriesChart).
+  const legendEntries: ChartLegendEntry[] = GUIDES.map(({ label, q, color }) => ({
+    label: `${label} ${fmtCount(quantile(sorted, q))}`,
+    color,
+    swatch: 'dashed-line',
+  }));
+  const innerW = W - PAD.left - PAD.right;
+  const legend = layoutChartLegend(
+    legendEntries.map((e) => e.label),
+    innerW,
+  );
+  const H = height + legend.extraHeight;
+  const padBottom = PAD.bottom + legend.extraHeight;
+  const pad = { ...PAD, bottom: padBottom };
+  const innerH = H - PAD.top - padBottom;
   const min = edges[0]!;
   const max = edges.at(-1)!;
   const nBins = counts.length;
@@ -135,7 +158,7 @@ export function Distribution({
         {sorted.length.toLocaleString()} {t.requests} · {t.range} {fmt(min)}–{fmt(max)} {unit} ·{' '}
         {t.logScale}
       </div>
-      <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
+      <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
         {/* y-axis gridlines + labels */}
         {yTickVals.map((v, i) => {
           const y = yScale(v);
@@ -227,7 +250,7 @@ export function Distribution({
         })}
         <text
           x={W / 2}
-          y={H - 22}
+          y={H - legend.extraHeight - 22}
           fontSize={11}
           fill="currentColor"
           opacity={0.55}
@@ -237,40 +260,23 @@ export function Distribution({
         </text>
         <text
           x={10}
-          y={H / 2}
+          y={(H - legend.extraHeight) / 2}
           fontSize={11}
           fill="currentColor"
           opacity={0.55}
           textAnchor="middle"
-          transform={`rotate(-90 10 ${H / 2})`}
+          transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
         >
           {t.countAxis}
         </text>
 
         {/* Percentile legend chips */}
-        {(() => {
-          const chipY = H - 8;
-          const chipW = innerW / GUIDES.length;
-          return GUIDES.map(({ label: ql, q, color }, i) => {
-            const x = PAD.left + i * chipW;
-            return (
-              <g key={ql}>
-                <line
-                  x1={x + 2}
-                  x2={x + 14}
-                  y1={chipY - 4}
-                  y2={chipY - 4}
-                  stroke={color}
-                  strokeWidth={2}
-                  strokeDasharray="5 3"
-                />
-                <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                  {ql} {fmt(quantile(sorted, q))}
-                </text>
-              </g>
-            );
-          });
-        })()}
+        <ChartLegend
+          entries={legendEntries}
+          layout={legend}
+          left={PAD.left}
+          baselineY={H - LEGEND_BASELINE_OFFSET}
+        />
       </ChartHover>
       {excluded > 0 && (
         <div className="mt-1 text-xs text-muted-foreground">

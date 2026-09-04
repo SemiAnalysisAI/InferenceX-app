@@ -15,6 +15,15 @@ describe('Reliability Chart', () => {
     cy.get('[data-testid="reliability-date-range"]').should('be.visible');
   });
 
+  it('keeps the date filter scoped and discoverable above the chart', () => {
+    cy.get('[data-testid="reliability-chart-display"]')
+      .contains('h3', 'Chart filters')
+      .should('be.visible');
+    cy.get('[data-testid="reliability-chart-display"]')
+      .contains('Choose a time window')
+      .should('be.visible');
+  });
+
   it('date range selector has options including All time', () => {
     cy.get('[data-testid="reliability-date-range"]').click();
     cy.get('[role="option"]').should('have.length.greaterThan', 0);
@@ -154,5 +163,71 @@ describe('Reliability Chart — Content & Interactions', () => {
           .find('input[type="checkbox"]')
           .should('be.checked');
       });
+  });
+});
+
+describe('Reliability Chart — Chinese route and settled states', () => {
+  it('localizes chart chrome, SVG labels, and accessibility text', () => {
+    cy.viewport(1440, 900);
+    cy.visit('/zh/reliability');
+    cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
+    cy.contains('h2', '芯片可靠性').should('be.visible');
+    cy.get('#reliability-chart svg').should('contain.text', '成功率（%）');
+    cy.get('#reliability-chart svg .overlay-label').first().should('contain.text', '次运行');
+    cy.get('#reliability-chart').closest('figure').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('#reliability-chart svg rect.bar').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '点击其他区域关闭')
+      .and('contain.text', '成功率：')
+      .and('contain.text', '成功次数：')
+      .and('contain.text', '总运行次数：');
+  });
+
+  it('shows a Chinese empty state only after an empty response settles', () => {
+    cy.intercept('GET', '**/api/v1/reliability', []).as('emptyReliability');
+    cy.visit('/zh/reliability');
+    cy.wait('@emptyReliability');
+    cy.contains('所选时间范围内暂无可靠性数据。').should('be.visible');
+    cy.contains('正在加载可靠性数据……').should('not.exist');
+  });
+
+  it('shows a safe Chinese error and recovers through the tracked retry control', () => {
+    // Keep every automatic query attempt failing until the retry button is
+    // clicked. Counting attempts is race-prone because a remount can consume
+    // the first healthy response before the error UI is asserted.
+    let failRequests = true;
+    cy.fixture('api/reliability.json').then((fixture) => {
+      cy.intercept('GET', '**/api/v1/reliability', (req) => {
+        req.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'database-internal-detail' } }
+            : { statusCode: 200, body: fixture },
+        );
+      }).as('retryReliability');
+    });
+    cy.visit('/zh/reliability');
+    cy.wait('@retryReliability');
+    cy.wait('@retryReliability');
+    cy.get('[data-testid="reliability-error"]')
+      .should('be.visible')
+      .and('contain.text', '可靠性数据加载失败。');
+    cy.contains('database-internal-detail').should('not.exist');
+    cy.contains('[data-testid="reliability-error"] button', '重试')
+      .then(() => {
+        failRequests = false;
+      })
+      .click();
+    cy.wait('@retryReliability');
+    cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
+  });
+
+  it('keeps controls reachable without body overflow at 375px', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/reliability');
+    cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
+    cy.contains('[role="option"]', '全部时间').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+    });
   });
 });

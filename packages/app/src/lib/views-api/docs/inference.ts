@@ -84,7 +84,7 @@ const parameters: readonly ApiParameter[] = [
       'Y-axis metric key or config key, e.g. tpPerGpu or y_tokensPerDollarN (see options → metrics).',
       'Y 轴指标键或配置键，如 tpPerGpu 或 y_tokensPerDollarN（见 options → metrics）。',
     ),
-    schema: { type: 'string', default: 'y_tokensPerDollarN' },
+    schema: { type: 'string', default: 'y_tokensPerDollarH' },
     example: 'y_tpPerGpu',
   },
   {
