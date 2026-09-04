@@ -1,15 +1,25 @@
-import {
-  DB_MODEL_TO_DISPLAY,
-  DISPLAY_MODEL_TO_DB,
-  POWER_METRIC_KEYS,
-} from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
+import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from './api-documentation-base';
 import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { operations as viewsCalculatorOperations } from './views-api/docs/calculator';
+import { operations as viewsCompareOperations } from './views-api/docs/compare';
+import { operations as viewsEvaluationOperations } from './views-api/docs/evaluation';
+import { operations as viewsFleetOperations } from './views-api/docs/fleet';
+import { operations as viewsGpuSpecsOperations } from './views-api/docs/gpu-specs';
+import { operations as viewsHistoricalOperations } from './views-api/docs/historical';
+import { operations as viewsInferenceOperations } from './views-api/docs/inference';
+import { operations as viewsOptionsOperations } from './views-api/docs/options';
+import { operations as viewsOverviewOperations } from './views-api/docs/overview';
+import { operations as viewsRankingsOperations } from './views-api/docs/rankings';
+import { operations as viewsReliabilityOperations } from './views-api/docs/reliability';
+
+export { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from './api-documentation-base';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
-export type ApiGroupId = 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics';
+export type ApiGroupId = 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics' | 'views';
 export type ApiHttpMethod = 'GET';
 export type ApiParameterLocation = 'path' | 'query';
 export type ApiAudience = 'public';
@@ -110,16 +120,12 @@ export interface OpenApiDocument {
   readonly components: Readonly<{ schemas: Readonly<Record<string, ApiSchema>> }>;
 }
 
-export const API_BASE_URL = 'https://inferencex.semianalysis.com' as const;
 export const API_VERSION = 'v1' as const;
 export const OPENAPI_VERSION = '3.1.0' as const;
 export const API_DOCUMENT_VERSION = '1.0.0' as const;
 export const OPENAPI_DISPLAY_VERSION = 'OpenAPI 3.1' as const;
 export const OPENAPI_DOCUMENT_URL = '/api/openapi.json' as const;
 
-export const SUPPORTED_BENCHMARK_MODELS = Object.freeze(
-  Object.keys(DISPLAY_MODEL_TO_DB).toSorted(),
-);
 export const SUPPORTED_TCO_MODELS = Object.freeze(
   [...new Set([...Object.keys(DB_MODEL_TO_DISPLAY), ...SUPPORTED_BENCHMARK_MODELS])].toSorted(),
 );
@@ -614,6 +620,14 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     description: text(
       'Per-result trace, cache, request, sibling, and server metric diagnostics.',
       '按结果提供跟踪、缓存、请求、同组结果和服务器指标诊断。',
+    ),
+  },
+  {
+    id: 'views',
+    title: text('Chart views', '图表视图'),
+    description: text(
+      'Chart-ready projections of every dashboard view: inference series, historical trends, calculator and fleet economics, reliability, evaluations, GPU specs, overview, rankings, and comparisons.',
+      '面向图表的仪表盘视图投影：推理序列、历史趋势、计算器与集群经济性、可靠性、评测、GPU 规格、总览、排名与对比。',
     ),
   },
 ];
@@ -2614,6 +2628,17 @@ export const apiOperations: readonly ApiOperation[] = [
     responseShapeName: 'TraceServerMetrics',
     curlUrl: `${API_BASE_URL}/api/v1/trace-server-metrics?id=421`,
   },
+  ...viewsOptionsOperations,
+  ...viewsInferenceOperations,
+  ...viewsHistoricalOperations,
+  ...viewsCalculatorOperations,
+  ...viewsFleetOperations,
+  ...viewsReliabilityOperations,
+  ...viewsEvaluationOperations,
+  ...viewsGpuSpecsOperations,
+  ...viewsOverviewOperations,
+  ...viewsRankingsOperations,
+  ...viewsCompareOperations,
 ];
 
 const overview = {

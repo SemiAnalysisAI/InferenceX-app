@@ -1,0 +1,42 @@
+{
+  "name": "@semianalysisai/inferencex-skills",
+  "version": "0.1.0",
+  "description": "Agent Skills for the InferenceX public REST API — endpoint reference plus matplotlib, React, and zero-build HTML visualization recipes. Install into .claude/skills (or any agent skills directory) via npx.",
+  "keywords": [
+    "agent-skills",
+    "api",
+    "benchmarks",
+    "chartjs",
+    "claude",
+    "gpu",
+    "inferencex",
+    "llm-inference",
+    "matplotlib",
+    "react",
+    "semianalysis",
+    "skills",
+    "visualization"
+  ],
+  "homepage": "https://inferencex.semianalysis.com",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SemiAnalysisAI/InferenceX-app",
+    "directory": "packages/skills"
+  },
+  "bin": {
+    "inferencex-skills": "bin/install.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "README.md"
+  ],
+  "type": "module",
+  "scripts": {
+    "list": "node bin/install.mjs list"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

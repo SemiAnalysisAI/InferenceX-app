@@ -32,7 +32,7 @@ import type { BenchmarkRow } from '@/lib/api';
 import { Percentile, type Sequence } from '@/lib/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
-import { buildGpuGroups, type GroupMeta } from './useThroughputData';
+import { buildGpuGroups, type GroupMeta } from './throughput-data';
 import type {
   CalculatorMode,
   CostProvider,

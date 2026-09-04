@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InferenceX — GPU Rankings</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 24px;
+        color: #212121;
+      }
+      #controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      #controls label {
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #status {
+        color: #b71c1c;
+        font-size: 14px;
+      }
+      #meta {
+        color: #757575;
+        font-size: 11px;
+        margin-top: 8px;
+        word-break: break-all;
+      }
+      section {
+        margin-bottom: 28px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 6px;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 13px;
+        width: 100%;
+        max-width: 900px;
+      }
+      th {
+        text-align: left;
+        padding: 5px 10px;
+        border-bottom: 2px solid #e0e0e0;
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+      td {
+        padding: 5px 10px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      td.num {
+        font-variant-numeric: tabular-nums;
+      }
+      .chip {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>InferenceX — GPU rankings</h1>
+    <div id="controls">
+      <label
+        >Kind
+        <select id="kind">
+          <option value="cheapest-gpu" selected>cheapest-gpu</option>
+          <option value="fastest-gpu">fastest-gpu</option>
+        </select>
+      </label>
+      <label
+        >Scenario
+        <select id="scenario">
+          <option value="">both</option>
+          <option value="single_turn_8k1k">single_turn_8k1k</option>
+          <option value="agentx">agentx</option>
+        </select>
+      </label>
+      <label
+        >Model (optional)
+        <select id="model">
+          <option value="">all models</option>
+        </select></label
+      >
+    </div>
+    <p id="status"></p>
+    <div id="tables"></div>
+    <p id="meta"></p>
+
+    <script>
+      const BASE = 'https://inferencex.semianalysis.com';
+      const GPU_COLORS = {
+        h100: '#8bc34a',
+        h200: '#4caf50',
+        b200: '#009688',
+        b300: '#00bcd4',
+        gb200: '#3f51b5',
+        gb300: '#673ab7',
+        vr200: '#2196f3',
+        rtx6000pro: '#607d8b',
+        mi300x: '#ff9800',
+        mi325x: '#f44336',
+        mi355x: '#e91e63',
+        jalapeno: '#795548',
+      };
+      const colorFor = (k) => GPU_COLORS[String(k).split('_')[0].toLowerCase()] || '#9e9e9e';
+
+      async function getView(name, params = {}) {
+        const url = new URL(`${BASE}/api/v1/views/${name}`);
+        for (const [k, v] of Object.entries(params))
+          if (v !== undefined && v !== '') url.searchParams.set(k, v);
+        const res = await fetch(url);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            res.status === 404
+              ? 'views API (beta) not available at this base URL yet'
+              : `${res.status}: ${body.error || 'request failed'}${body.allowed ? ` — allowed: ${body.allowed.join(', ')}` : ''}`,
+          );
+        }
+        return res.json();
+      }
+
+      const COLS = [
+        ['rank', '#'],
+        ['hardware', 'Hardware'],
+        ['chip', 'Chip'],
+        ['value', 'Value'],
+        ['framework', 'Framework'],
+        ['precision', 'Precision'],
+      ];
+
+      function renderTable(entry) {
+        const section = document.createElement('section');
+        const h = document.createElement('h2');
+        h.textContent = `${entry.model} · ${entry.scenario}`;
+        section.appendChild(h);
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const tr = document.createElement('tr');
+        let sortKey = 'rank';
+        let asc = true;
+
+        const tbody = document.createElement('tbody');
+        const rows = [...entry.rows];
+
+        function paint() {
+          rows.sort((a, b) => {
+            const av = a[sortKey],
+              bv = b[sortKey];
+            const cmp =
+              typeof av === 'number' && typeof bv === 'number'
+                ? av - bv
+                : String(av).localeCompare(String(bv));
+            return asc ? cmp : -cmp;
+          });
+          tbody.innerHTML = '';
+          for (const r of rows) {
+            const trb = document.createElement('tr');
+            for (const [key] of COLS) {
+              const td = document.createElement('td');
+              if (key === 'value') {
+                td.className = 'num';
+                td.textContent = `${Number(r.value).toLocaleString(undefined, { maximumSignificantDigits: 4 })} ${r.unit || ''}`;
+              } else if (key === 'chip') {
+                const dot = document.createElement('span');
+                dot.className = 'chip';
+                dot.style.background = colorFor(r.chip);
+                td.appendChild(dot);
+                td.appendChild(document.createTextNode(r.chip));
+              } else {
+                td.textContent = r[key];
+              }
+              trb.appendChild(td);
+            }
+            tbody.appendChild(trb);
+          }
+          for (const th of tr.children) {
+            const key = th.dataset.key;
+            th.textContent = `${th.dataset.title}${key === sortKey ? (asc ? ' ▲' : ' ▼') : ''}`;
+          }
+        }
+
+        for (const [key, title] of COLS) {
+          const th = document.createElement('th');
+          th.dataset.key = key;
+          th.dataset.title = title;
+          th.textContent = title;
+          th.addEventListener('click', () => {
+            if (sortKey === key) asc = !asc;
+            else {
+              sortKey = key;
+              asc = true;
+            }
+            paint();
+          });
+          tr.appendChild(th);
+        }
+        thead.appendChild(tr);
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        paint();
+        section.appendChild(table);
+        return section;
+      }
+
+      async function draw() {
+        const status = document.getElementById('status');
+        const container = document.getElementById('tables');
+        status.textContent = 'Loading…';
+        try {
+          const view = await getView('rankings', {
+            kind: document.getElementById('kind').value,
+            scenario: document.getElementById('scenario').value || undefined,
+            model: document.getElementById('model').value || undefined,
+          });
+          status.textContent = '';
+          container.innerHTML = '';
+          for (const entry of view.entries) container.appendChild(renderTable(entry));
+          document.getElementById('meta').textContent =
+            `InferenceX views API · generatedAt=${view.generatedAt} · params=${JSON.stringify(view.params)}`;
+        } catch (err) {
+          status.textContent = `Error: ${err.message}`;
+        }
+      }
+
+      async function init() {
+        try {
+          const opts = await getView('options');
+          const sel = document.getElementById('model');
+          for (const m of opts.models) {
+            const o = document.createElement('option');
+            o.value = m.name;
+            o.textContent = m.name;
+            sel.appendChild(o);
+          }
+        } catch {
+          /* model select stays "all models" */
+        }
+        for (const id of ['kind', 'scenario', 'model']) {
+          document.getElementById(id).addEventListener('change', draw);
+        }
+        draw();
+      }
+
+      init();
+    </script>
+  </body>
+</html>
