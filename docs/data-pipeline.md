@@ -230,6 +230,22 @@ rebuild a stored run in an existing child database. It verifies the child and
 connection endpoint before writing; production recomputation still requires
 `master`. Preview environments use branch-scoped database and cache settings.
 
+Use `run-id: all` for a stale-only repair across historical and current AgentX
+points. Eight independent shards recompute charts, aggregates, and request
+timelines using the checked-out code's versions. Each shard records database-side
+fingerprints before writing and verifies that benchmark rows, raw artifacts, and
+already-current timelines are unchanged afterward. Previously populated metrics
+cannot be replaced with empty output; parsing failures fail the job and preserve
+the old payload. Integrity manifests are retained as workflow artifacts.
+
+Relevant backfill/parser changes merged to `master` run this stale-only repair
+against production and invalidate the cache only after every shard passes.
+Test on a snapshot branch first, then staging using the preview's parser version.
+Production must use its own deployed parser version, not an unmerged preview's.
+Runs without original metrics or trace artifacts are reported separately: a
+version upgrade cannot reconstruct data that was never captured. To deliberately
+rebuild an already-current run, set `stale-only: false` with its numeric run ID.
+
 ### Summed Series and the Canonical Grid
 
 The same "components aren't scraped in lockstep" problem hits the **summed** series — prefill/decode/prefix-hit rates, queue depth, host KV usage, and the prompt-token source breakdown — but it cannot be solved the same way. A mean is scale-free, so `averageAcrossEngines` can evaluate on the union of scrape instants; a sum is not. `cumulativeUniqueInputTokens` turns these rates into token totals with `sum += value` and `rollingAverage` is a sample-count mean, so both only stay correct at **one point per scrape bucket**.
