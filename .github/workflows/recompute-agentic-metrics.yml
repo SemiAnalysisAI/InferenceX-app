@@ -22,10 +22,6 @@ on:
         description: Optional existing Neon child branch; omit for production on master
         required: false
         type: string
-      preview-url:
-        description: Optional deployment with an isolated cache namespace for the child database
-        required: false
-        type: string
       atom-kv-capacity-only:
         description: Backfill only ATOM KV capacity from stored logs and metrics
         required: false
@@ -180,9 +176,9 @@ jobs:
           RUN_ID: ${{ inputs.run-id }}
         run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
   invalidate:
-    name: Invalidate repaired database cache
+    name: Invalidate production cache
     needs: recompute
-    if: inputs.neon-branch == '' || inputs.preview-url != ''
+    if: inputs.neon-branch == ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -198,27 +194,6 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Invalidate production cache after all shards pass
-        if: inputs.neon-branch == ''
         env:
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
-      - name: Invalidate isolated preview cache after all shards pass
-        if: inputs.neon-branch != ''
-        env:
-          PREVIEW_URL: ${{ inputs.preview-url }}
-          INVALIDATE_SECRET: ${{ secrets.VERCEL_STAGING_INVALIDATE_SECRET }}
-          PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
-        run: |
-          node -e '
-            const url = new URL(process.env.PREVIEW_URL);
-            if (url.protocol !== "https:" || url.username || url.password ||
-                !url.hostname.startsWith("inferencemax-app-") ||
-                !url.hostname.endsWith("-semianalysisai.vercel.app") ||
-                url.hostname.includes("-git-master-") || url.hostname.includes("-git-main-")) {
-              throw new Error("Expected an InferenceX preview deployment URL");
-            }
-          '
-          curl --fail-with-body --silent --show-error --max-time 180 --request POST \
-            "${PREVIEW_URL%/}/api/v1/invalidate" \
-            -H "Authorization: Bearer $INVALIDATE_SECRET" \
-            -H "x-vercel-protection-bypass: $PROTECTION_BYPASS_SECRET"
