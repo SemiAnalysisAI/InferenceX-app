@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
@@ -49,11 +49,43 @@ export interface ProfitSegment {
 const CHART_MARGIN = { top: 12, right: 24, bottom: 172, left: 116 };
 /** Bottom margin when the x labels stand upright on two lines (name / framework). */
 const X_LABEL_STACKED_BOTTOM = 64;
-const CHART_HEIGHT = 720;
+/** Tallest the chart gets, on a viewport with room to spare. */
+export const CHART_HEIGHT = 720;
+/** Shortest the chart gets; below this the in-bar labels start colliding. */
+export const CHART_HEIGHT_MIN = 440;
+/**
+ * Viewport height not available to the chart: the sticky site nav (~56px),
+ * the card header above the plot (title, subtitle, TCO badges and selling
+ * price, ~170px) and card padding. The chart shrinks to fit what is left so
+ * the title and the x labels share one laptop screen without scrolling.
+ */
+export const CHART_VIEWPORT_RESERVE = 260;
 /** Below this container width the chart uses the compact margins and height. */
 export const COMPACT_CHART_MAX_WIDTH = 640;
 const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 140, left: 64 };
-const CHART_HEIGHT_COMPACT = 560;
+export const CHART_HEIGHT_COMPACT = 560;
+
+/** Chart height for a viewport: as tall as `maxHeight`, but never taller than the space under the card header. */
+export function chartHeightForViewport(
+  viewportHeightPx: number | undefined,
+  maxHeight: number = CHART_HEIGHT,
+): number {
+  if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return maxHeight;
+  const available = Math.floor((viewportHeightPx as number) - CHART_VIEWPORT_RESERVE);
+  return Math.min(maxHeight, Math.max(CHART_HEIGHT_MIN, available));
+}
+
+/** Window inner height, tracked across resizes; undefined before mount so SSR and first paint agree. */
+function useViewportHeight(): number | undefined {
+  const [height, setHeight] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const update = () => setHeight(window.innerHeight);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return height;
+}
 /** Average glyph advance as a share of font size; used to test whether a label fits a bar. */
 const GLYPH_WIDTH_EM = 0.55;
 /** Horizontal breathing room a label needs inside its bar, in px. */
@@ -428,6 +460,11 @@ export default function ProfitEstimatorChart({
   const chartRef = useRef<D3ChartHandle>(null);
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
   const compact = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
+  const viewportHeight = useViewportHeight();
+  const chartHeight = chartHeightForViewport(
+    viewportHeight,
+    compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT,
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const strings = t;
@@ -748,7 +785,7 @@ export default function ProfitEstimatorChart({
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
   }, [baseMargin, labelLayout, dimensions.width, rows.length, labelMap]);
-  const plotHeight = (compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT) - margin.top - margin.bottom;
+  const plotHeight = chartHeight - margin.top - margin.bottom;
   // The vendor mark grows with the bar, so the headroom above the tallest stack
   // has to be sized from the same band width the renderer will see.
   const bandwidth = useMemo(() => {
@@ -852,7 +889,7 @@ export default function ProfitEstimatorChart({
         data={segments}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        height={compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT}
+        height={chartHeight}
         margin={margin}
         watermark={getChartWatermark()}
         testId="profit-estimator-chart"

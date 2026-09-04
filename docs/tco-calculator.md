@@ -1111,6 +1111,11 @@ and the two can be collapsed into one once both are on master.
   `stackHeadroomPx(markHeight)` above the tallest stack for those labels
   (`profitYDomain` takes the plot height and that headroom), and the top margin is
   12px, so the grid starts right under the selling-price line.
+- **Chart height follows the viewport.** `chartHeightForViewport(window.innerHeight)` is
+  the full 720px only when the window has room; otherwise it is the viewport minus
+  `CHART_VIEWPORT_RESERVE` (260px: sticky nav, card header, padding), never below
+  `CHART_HEIGHT_MIN` (440px). On an 872px laptop viewport the chart is 612px, so the card
+  title and the x labels fit on one screen. The compact chart caps at 560px the same way.
 - **Phone layout.** Below 640px the chart switches to compact margins and height, and
   segment labels drop the name, then the amount, when the bar is too narrow
   (`segmentLabelLines` with a width); the margin line keeps only the percentage.

@@ -44,6 +44,8 @@ function suppressNudges(win: Cypress.AUTWindow): void {
 }
 
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
+/** The plot SVG itself, not the icon SVGs inside the export button. */
+const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 // The formula fold is collapsed by default; open it (if it is not already) before
 // reading the text. Tests share one page, so a previous test may have opened it.
@@ -305,6 +307,25 @@ describe('Profit Estimator per GW', () => {
   });
 });
 
+describe('Profit Estimator per GW — chart height follows the viewport', () => {
+  beforeEach(stubOpenRouter);
+
+  it('shrinks on a laptop-height viewport and grows back on a tall one', () => {
+    // 720px tall (the Cypress default): 720 - 260 reserved = 460px chart, so the
+    // card title and the x labels share one screen.
+    cy.viewport(1280, 720);
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    chartSvg().should('have.attr', 'height', '460');
+    // Plenty of room: the chart takes its full 720px.
+    cy.viewport(1440, 1200);
+    chartSvg().should('have.attr', 'height', '720');
+    // Very short viewports stop at the minimum where in-bar labels collide.
+    cy.viewport(1280, 600);
+    chartSvg().should('have.attr', 'height', '440');
+  });
+});
+
 describe('Profit Estimator per GW — per-model route', () => {
   it('serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug', () => {
     stubOpenRouter();
@@ -350,11 +371,17 @@ describe('Profit Estimator per GW — Chinese mirror', () => {
 describe('Profit Estimator (per chip-hour)', () => {
   before(() => {
     stubOpenRouter();
+    // Tall enough for the 720px chart, so the thin compute-expense segment
+    // ($2.31 of $32.72) still has room for its name.
+    cy.viewport(1280, 1000);
     cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
     chart().should('exist');
   });
 
-  beforeEach(stubOpenRouter);
+  beforeEach(() => {
+    stubOpenRouter();
+    cy.viewport(1280, 1000);
+  });
 
   it('prices one chip-hour with the same defaults and TCO $/chip/hr as the expense', () => {
     cy.location('pathname').should('eq', '/profit-estimator');

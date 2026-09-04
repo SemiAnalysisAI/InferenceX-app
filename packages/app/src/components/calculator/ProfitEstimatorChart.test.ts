@@ -16,6 +16,11 @@ import {
   BAR_ICON_MAX_HEIGHT,
   BAR_ICON_MIN_HEIGHT,
   barMarkHeight,
+  CHART_HEIGHT,
+  CHART_HEIGHT_COMPACT,
+  CHART_HEIGHT_MIN,
+  CHART_VIEWPORT_RESERVE,
+  chartHeightForViewport,
   STACK_HEADROOM_PX,
   stackHeadroomPx,
   rowLabel,
@@ -311,5 +316,29 @@ describe('operatorMarginLabel', () => {
   it('keeps only the percentage when the bar is too narrow for the word', () => {
     expect(operatorMarginLabel(row(), 'margin', 40)).toBe('42.0%');
     expect(operatorMarginLabel(row(), 'margin', 200)).toBe('42.0% margin');
+  });
+});
+
+describe('chartHeightForViewport', () => {
+  it('uses the full height when the viewport has room', () => {
+    expect(chartHeightForViewport(1200)).toBe(CHART_HEIGHT);
+    expect(chartHeightForViewport(CHART_HEIGHT + CHART_VIEWPORT_RESERVE)).toBe(CHART_HEIGHT);
+  });
+
+  it('shrinks to fit a laptop viewport so title and x labels share the screen', () => {
+    // A 13-inch MacBook browser viewport is roughly 870px tall.
+    expect(chartHeightForViewport(872)).toBe(872 - CHART_VIEWPORT_RESERVE);
+    expect(chartHeightForViewport(872)).toBeLessThan(CHART_HEIGHT);
+  });
+
+  it('never goes below the minimum where in-bar labels collide', () => {
+    expect(chartHeightForViewport(500)).toBe(CHART_HEIGHT_MIN);
+    expect(chartHeightForViewport(100)).toBe(CHART_HEIGHT_MIN);
+  });
+
+  it('respects the compact maximum and falls back to the maximum before mount', () => {
+    expect(chartHeightForViewport(2000, CHART_HEIGHT_COMPACT)).toBe(CHART_HEIGHT_COMPACT);
+    expect(chartHeightForViewport(undefined)).toBe(CHART_HEIGHT);
+    expect(chartHeightForViewport(Number.NaN, CHART_HEIGHT_COMPACT)).toBe(CHART_HEIGHT_COMPACT);
   });
 });
