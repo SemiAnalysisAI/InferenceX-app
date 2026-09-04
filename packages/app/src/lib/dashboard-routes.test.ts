@@ -42,15 +42,15 @@ describe('dashboard route registry', () => {
     expect(getDashboardRoute('fleet').indexable).toBe(true);
   });
 
-  it('puts both profit estimators in the primary nav right after the benchmark tabs', () => {
+  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
     );
     expect(primary.slice(0, 4)).toEqual([
       'inference',
-      'evaluation',
       'profit-estimator-per-gigawatt',
       'profit-estimator',
+      'evaluation',
     ]);
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');

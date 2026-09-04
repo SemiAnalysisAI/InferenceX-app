@@ -121,15 +121,15 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="export-button"]').should('exist');
     cy.get('[data-testid="profit-scenario"]').should('not.exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
-    // Both profit tabs follow Accuracy Evals; the TCO calculator and fleet
-    // lifecycle left the nav for the footer.
+    // Both profit tabs sit between Inference Performance and Accuracy Evals;
+    // the TCO calculator and fleet lifecycle left the nav for the footer.
     cy.get('[data-testid^="tab-trigger-"]').then(($tabs) => {
       const keys = [...$tabs].map((el) => (el as HTMLElement).dataset.testid);
       expect(keys.slice(0, 4)).to.deep.equal([
         'tab-trigger-inference',
-        'tab-trigger-evaluation',
         'tab-trigger-profit-estimator-per-gigawatt',
         'tab-trigger-profit-estimator',
+        'tab-trigger-evaluation',
       ]);
       expect(keys).to.not.include('tab-trigger-calculator');
       expect(keys).to.not.include('tab-trigger-fleet');

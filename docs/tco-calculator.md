@@ -1034,7 +1034,7 @@ tabs differ only in the denominator (`ProfitBasis`):
   denominator. Figures are compact (`$135.2B`). The y axis reads "Revenue per all-in
   provisioned utility GW per year ($ USD)" (a shorter form on phones).
 
-In the nav both sit right after Inference Performance and Accuracy Evals. TCO
+In the nav both sit between Inference Performance and Accuracy Evals. TCO
 Calculator and Fleet Lifecycle moved out of the tab bar into the footer's "More" column
 (`navGroup: 'footer-only'`, `footer-link-calculator` / `footer-link-fleet`); their
 pages, `/zh` mirrors and sitemap entries are unchanged.

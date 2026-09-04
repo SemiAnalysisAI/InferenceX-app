@@ -82,18 +82,9 @@ export const DASHBOARD_ROUTES = [
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
-  {
-    key: 'evaluation',
-    path: '/evaluation',
-    canonicalPath: '/evaluation',
-    navGroup: 'primary',
-    indexable: true,
-    localeMirrored: true,
-    providers: FILTERED_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['g_', 'e_'],
-  },
-  // The two profit views sit right after the benchmark tabs; the TCO
-  // calculator and fleet lifecycle moved to the footer's "More" column.
+  // The two profit views sit between Inference Performance and Accuracy
+  // Evals; the TCO calculator and fleet lifecycle moved to the footer's
+  // "More" column.
   {
     key: 'profit-estimator-per-gigawatt',
     path: '/profit-estimator-per-gigawatt',
@@ -113,6 +104,16 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
+    key: 'evaluation',
+    path: '/evaluation',
+    canonicalPath: '/evaluation',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: FILTERED_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'e_'],
   },
   {
     key: 'historical',
