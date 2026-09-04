@@ -1,11 +1,21 @@
 name: Recompute Agentic Metrics
-run-name: Recompute metrics for run ${{ inputs.run-id }} (${{ inputs.neon-branch || 'production' }})
+run-name: Recompute metrics for ${{ inputs.run-id || 'all' }} (${{ inputs.neon-branch || 'production' }})
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/recompute-agentic-metrics.yml'
+      - 'packages/db/src/backfill-chart-series.ts'
+      - 'packages/db/src/backfill-aggregate-stats.ts'
+      - 'packages/db/src/backfill-request-timeline.ts'
+      - 'packages/db/src/etl/compute-chart-series.ts'
+      - 'packages/db/src/etl/compute-request-timeline.ts'
+      - 'packages/db/src/queries/agentic-shared.ts'
   workflow_dispatch:
     inputs:
       run-id:
-        description: Already-ingested GitHub benchmark run to recompute
+        description: Already-ingested GitHub benchmark run, or all for stale-only bulk repair
         required: true
         type: string
       neon-branch:
@@ -17,19 +27,54 @@ on:
         required: false
         type: boolean
         default: false
+      stale-only:
+        description: Skip already-current derived payloads
+        required: false
+        type: boolean
+        default: true
 
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.neon-branch || 'production' }}-${{ inputs.run-id }}
+  group: ${{ github.workflow }}-${{ inputs.neon-branch || 'production' }}
   cancel-in-progress: false
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.scope.outputs.shards }}
+      count: ${{ steps.scope.outputs.count }}
+    steps:
+      - id: scope
+        env:
+          RUN_ID: ${{ inputs.run-id || 'all' }}
+          ATOM_ONLY: ${{ inputs.atom-kv-capacity-only }}
+        run: |
+          if [[ "$RUN_ID" == all ]]; then
+            if [[ "$ATOM_ONLY" == true ]]; then
+              echo '::error::ATOM capacity backfill requires a specific run'
+              exit 1
+            fi
+            echo 'shards=[0,1,2,3,4,5,6,7]' >> "$GITHUB_OUTPUT"
+            echo 'count=8' >> "$GITHUB_OUTPUT"
+          elif [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'shards=[0]' >> "$GITHUB_OUTPUT"
+            echo 'count=1' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Expected a GitHub run ID or all'
+            exit 1
+          fi
   recompute:
-    name: Recompute stored server metrics
+    name: Recompute stored metrics (shard ${{ matrix.shard }})
+    needs: scope
     if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
     runs-on: blacksmith-16vcpu-ubuntu-2404
-    timeout-minutes: 90
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.scope.outputs.shards) }}
     permissions:
       contents: read
     steps:
@@ -85,19 +130,54 @@ jobs:
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
-      - name: Recompute chart series and aggregate statistics
+      - name: Snapshot, recompute, and verify derived data
         if: inputs.atom-kv-capacity-only != true
         env:
-          RUN_ID: ${{ inputs.run-id }}
+          RUN_ID: ${{ inputs.run-id || 'all' }}
+          STALE_ONLY: ${{ inputs.stale-only }}
+          SHARD_COUNT: ${{ needs.scope.outputs.count }}
+          SHARD_INDEX: ${{ matrix.shard }}
         run: |
-          bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --force --yes
-          bun run --cwd packages/db db:backfill-aggregate-stats --run-id "$RUN_ID" --force --yes
+          args=(--yes --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX")
+          if [[ "$RUN_ID" != all ]]; then args+=(--run-id "$RUN_ID"); fi
+          manifest="$RUNNER_TEMP/agentx-integrity.json"
+          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --snapshot "$manifest"
+          rebuild=("${args[@]}")
+          if [[ "$RUN_ID" != all && "$STALE_ONLY" == false ]]; then rebuild+=(--force); fi
+          bun run --cwd packages/db db:backfill-chart-series "${rebuild[@]}"
+          bun run --cwd packages/db db:backfill-aggregate-stats "${rebuild[@]}"
+          bun run --cwd packages/db db:backfill-request-timeline "${args[@]}"
+          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --verify "$manifest"
+      - name: Retain integrity evidence
+        if: ${{ always() && inputs.atom-kv-capacity-only != true }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agentx-integrity-${{ matrix.shard }}
+          path: ${{ runner.temp }}/agentx-integrity.json
+          retention-days: 14
       - name: Backfill ATOM KV capacity
+        if: inputs.atom-kv-capacity-only == true
         env:
           RUN_ID: ${{ inputs.run-id }}
         run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
-      - name: Invalidate production cache
-        if: inputs.neon-branch == ''
+  invalidate:
+    needs: recompute
+    if: inputs.neon-branch == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Invalidate production cache after all shards pass
         env:
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
