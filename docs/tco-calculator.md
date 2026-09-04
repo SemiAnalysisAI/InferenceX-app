@@ -1077,11 +1077,15 @@ and the two can be collapsed into one once both are on master.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and
-  the bottom margin shrinks to match. Otherwise the label rotates -50° as one line.
-  Either way the vendor logo (`getAxisVendorIcon`) leads the first line and follows
-  its slant; the same mark sits above the revenue figure. NVIDIA's mark is the brand
-  green and is never inverted; AMD publishes no color mark, so its arrow is black
-  and inverts to white in dark mode.
+  the bottom margin shrinks to match. Otherwise the label rotates -50° as one line
+  and `slantedMargins` grows the left and bottom margins so nothing leaves the SVG.
+- **Vendor mark above each bar, not on the axis.** The full-color logo
+  (`getAxisVendorIcon`) sits above the revenue figure and margin line. NVIDIA's mark
+  is the brand green and is never inverted; AMD publishes no color mark, so its arrow
+  is black and inverts to white in dark mode. The y domain leaves exactly
+  `STACK_HEADROOM_PX` above the tallest stack for those labels (`profitYDomain` takes
+  the plot height), and the top margin is 12px, so the grid starts right under the
+  selling-price line.
 - **Phone layout.** Below 640px the chart switches to compact margins and height, and
   segment labels drop the name, then the amount, when the bar is too narrow
   (`segmentLabelLines` with a width); the margin line keeps only the percentage.
@@ -1093,7 +1097,7 @@ and the two can be collapsed into one once both are on master.
   chosen tier, or no recorded input/output mix is left out of the chart and the
   legend; the legend is the record of what is priced.
 - **The heading reads like `/inference`.** Model, workload, and target in the title;
-  cost tier, utilization, run date, and source beneath it; TCO $/chip/hr badges and
+  cost tier, utilization, model license fee, run date, and source beneath it; TCO $/chip/hr badges and
   the selling prices under that. The TCO source line is omitted when the cost
   provider is a custom $/GPU/hr, since there is nothing to cite. Segments are
   labelled in place, so there is no separate key and no hover hint under the chart.

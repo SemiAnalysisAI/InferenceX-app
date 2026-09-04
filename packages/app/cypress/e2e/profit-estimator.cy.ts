@@ -84,6 +84,7 @@ describe('Profit Estimator', () => {
     );
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '30%');
     cy.get('[data-testid="profit-caption"]').should('contain.text', 'TCO $/chip/hr');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
     cy.get('[data-testid="profit-selling-prices"]')
@@ -100,7 +101,7 @@ describe('Profit Estimator', () => {
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     // Each x label carries its vendor mark; the H200 curve stops short of 45
     // tok/s/user, so it is absent from the chart rather than extrapolated.
-    chart().find('.tick image.vendor-mark').should('have.length', 4);
+    chart().find('.tick image.vendor-mark').should('not.exist');
     // Desktop width: upright two-line labels, SKU name then framework.
     chart().find('.tick text tspan').should('have.length', 8);
     chart().find('.tick text').first().should('not.have.attr', 'transform');
@@ -180,6 +181,7 @@ describe('Profit Estimator', () => {
     openFormulaNotes();
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('250').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '100');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '100%');
     cy.get('[data-testid="profit-formula-notes"]').should(
       'contain.text',
       'Model license fee = 100%',

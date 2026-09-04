@@ -8,10 +8,12 @@ import {
   contrastingTextColor,
   generateProfitTooltipHTML,
   estimateTextWidth,
+  slantedMargins,
   splitAxisLabel,
   xLabelLayout,
   operatorMarginLabel,
   profitYDomain,
+  STACK_HEADROOM_PX,
   rowLabel,
   segmentLabelLines,
 } from './ProfitEstimatorChart';
@@ -75,6 +77,16 @@ describe('profitYDomain', () => {
     const [bottom, top] = profitYDomain([row()]);
     expect(bottom).toBe(0);
     expect(top).toBeGreaterThan(1000);
+  });
+
+  it('sizes the headroom to the label stack in pixels once the plot height is known', () => {
+    // 1000 of data in (500 - headroom) px; the headroom is then exactly STACK_HEADROOM_PX tall.
+    const [, top] = profitYDomain([row()], 500);
+    const pxPerUnit = 500 / top;
+    expect((top - 1000) * pxPerUnit).toBeCloseTo(STACK_HEADROOM_PX, 5);
+    // A taller plot needs proportionally less data-space headroom.
+    expect(profitYDomain([row()], 1000)[1]).toBeLessThan(top);
+    expect(top).toBeLessThan(1300);
   });
 
   it('extends below zero when any SKU loses money, and covers TCO when it exceeds revenue', () => {
@@ -208,6 +220,21 @@ describe('xLabelLayout', () => {
     expect(xLabelLayout(labels, 80, 10)).toBe('slanted');
     expect(xLabelLayout([], 200, 10)).toBe('slanted');
     expect(xLabelLayout(labels, 0, 10)).toBe('slanted');
+  });
+});
+
+describe('slantedMargins', () => {
+  const base = { top: 44, right: 8, bottom: 140, left: 64 };
+  it('widens the left and bottom margins so a long slanted label stays inside the SVG', () => {
+    const m = slantedMargins(['GB300 NVL72 (Dynamo vLLM) (FP4)'], 40, 10, base);
+    expect(m.left).toBeGreaterThan(base.left);
+    expect(m.bottom).toBeGreaterThan(base.bottom);
+    expect(m.top).toBe(base.top);
+    expect(m.right).toBe(base.right);
+  });
+  it('never shrinks below the base margins', () => {
+    expect(slantedMargins(['B200'], 200, 10, base)).toEqual(base);
+    expect(slantedMargins([], 200, 10, base)).toEqual(base);
   });
 });
 

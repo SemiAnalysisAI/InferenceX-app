@@ -41,13 +41,13 @@ export interface ProfitSegment {
  * of height below the axis and 190·cos50° ≈ 122px of reach left of the first
  * tick.
  */
-const CHART_MARGIN = { top: 44, right: 24, bottom: 172, left: 116 };
+const CHART_MARGIN = { top: 12, right: 24, bottom: 172, left: 116 };
 /** Bottom margin when the x labels stand upright on two lines (name / framework). */
 const X_LABEL_STACKED_BOTTOM = 64;
 const CHART_HEIGHT = 720;
 /** Below this container width the chart uses the compact margins and height. */
 export const COMPACT_CHART_MAX_WIDTH = 640;
-const CHART_MARGIN_COMPACT = { top: 44, right: 8, bottom: 140, left: 64 };
+const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 140, left: 64 };
 const CHART_HEIGHT_COMPACT = 560;
 /** Average glyph advance as a share of font size; used to test whether a label fits a bar. */
 const GLYPH_WIDTH_EM = 0.55;
@@ -61,8 +61,6 @@ export function estimateTextWidth(text: string, fontPx: number): number {
   return text.length * GLYPH_WIDTH_EM * fontPx;
 }
 const X_LABEL_ROTATION = -50;
-/** Widest vendor mark (NVIDIA eye, 1.6:1) at the axis mark height, px; used before anything is drawn. */
-const X_LABEL_ICON_MAX_WIDTH = 20;
 
 export type XLabelLayout = 'stacked' | 'slanted';
 
@@ -78,27 +76,49 @@ export function splitAxisLabel(label: string): [string, string] {
 }
 
 /**
- * Upright two-line labels when every SKU fits in its own slot (the mark leads
- * the first line); otherwise the classic slanted single line. `slotPx` is the
- * horizontal room per tick, `fontPx` the label size.
+ * Upright two-line labels when every SKU fits in its own slot; otherwise the
+ * classic slanted single line. `slotPx` is the horizontal room per tick,
+ * `fontPx` the label size.
  */
 export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): XLabelLayout {
   if (labels.length === 0 || slotPx <= 0) return 'slanted';
   const widest = Math.max(
     ...labels.map((label) => {
       const [name, detail] = splitAxisLabel(label);
-      return Math.max(
-        estimateTextWidth(name, fontPx) + X_LABEL_ICON_MAX_WIDTH + X_LABEL_ICON_GAP,
-        estimateTextWidth(detail, fontPx),
-      );
+      return Math.max(estimateTextWidth(name, fontPx), estimateTextWidth(detail, fontPx));
     }),
   );
   return widest + LABEL_SIDE_PAD_PX * 2 <= slotPx ? 'stacked' : 'slanted';
 }
-/** Height of the vendor mark before each x label, in px; width follows the mark's aspect. */
-const X_LABEL_ICON_HEIGHT = CHART_TYPE.axisLabel;
-/** Gap between the vendor mark and the label text, px. */
-const X_LABEL_ICON_GAP = 4;
+
+/** Tick length plus padding: where d3 starts the label text below the axis, px. */
+const X_TICK_TEXT_OFFSET = 9;
+
+/**
+ * Margins a slanted label set needs so no glyph leaves the SVG. The widest
+ * label projects `cos` of its length left of the first tick and `sin` below
+ * the axis; `slotPx / 2` of the reach is already inside the plot because the
+ * first tick sits half a slot in. Never smaller than `base`.
+ */
+export function slantedMargins(
+  labels: string[],
+  slotPx: number,
+  fontPx: number,
+  base: { top: number; right: number; bottom: number; left: number },
+): { top: number; right: number; bottom: number; left: number } {
+  const widest = Math.max(
+    0,
+    ...labels.map((label) => estimateTextWidth(label, fontPx) + X_LABEL_DX_EM * fontPx),
+  );
+  const rad = (Math.abs(X_LABEL_ROTATION) * Math.PI) / 180;
+  const reach = widest * Math.cos(rad) - Math.max(0, slotPx) / 2 + LABEL_SIDE_PAD_PX;
+  const drop = widest * Math.sin(rad) + X_TICK_TEXT_OFFSET + fontPx;
+  return {
+    ...base,
+    left: Math.max(base.left, Math.ceil(reach)),
+    bottom: Math.max(base.bottom, Math.ceil(drop)),
+  };
+}
 /** Distance from the tick to the label's end, in em (the d3 default is 0). */
 const X_LABEL_DX_EM = 0.4;
 /** Gap between the top of the stack and the revenue figure's baseline, in px. */
@@ -110,21 +130,6 @@ const BAR_ICON_GAP = 4;
 
 function barMarkWidth(icon: { width: number; height: number } | undefined): number {
   return icon ? (icon.width / icon.height) * BAR_ICON_HEIGHT : 0;
-}
-
-/** Average glyph advance as a fraction of font size, for environments without text metrics. */
-const X_LABEL_CHAR_WIDTH_EM = 0.55;
-
-/**
- * Rendered length of an axis label in px. Uses the browser's text metrics when
- * available and falls back to a per-character estimate (test DOMs, SSR).
- */
-export function axisLabelLength(node: SVGTextElement | null, fontPx: number): number {
-  if (node && typeof node.getComputedTextLength === 'function') {
-    const measured = node.getComputedTextLength();
-    if (Number.isFinite(measured) && measured > 0) return measured;
-  }
-  return (node?.textContent?.length ?? 0) * X_LABEL_CHAR_WIDTH_EM * fontPx;
 }
 
 /** Opacity of the license-fee segment relative to the SKU's profit colour. */
@@ -277,14 +282,33 @@ export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): Profit
 }
 
 /** Y domain that always includes zero, with headroom for the revenue label. */
-export function profitYDomain(rows: readonly ProfitEstimatorRow[]): [number, number] {
+/**
+ * Pixels the tallest stack needs above it: the revenue figure and margin line
+ * (REVENUE_LABEL_GAP covers both), then the vendor mark and its gap.
+ */
+export const STACK_HEADROOM_PX =
+  REVENUE_LABEL_GAP + CHART_TYPE.axisLabel + BAR_ICON_GAP + BAR_ICON_HEIGHT + 8;
+
+/**
+ * Y domain for the bars. The top is the tallest positive stack plus exactly the
+ * pixel headroom its labels need, converted to data units through `plotHeightPx`
+ * (a proportional 30% fallback when the plot has not been measured yet).
+ */
+export function profitYDomain(
+  rows: readonly ProfitEstimatorRow[],
+  plotHeightPx = 0,
+): [number, number] {
   if (rows.length === 0) return [0, 1];
   // A loss bar stacks TCO and the license fee above the axis, and that sum can
   // exceed both revenue and TCO, so size the top to the tallest positive stack.
   const top = Math.max(0, ...rows.map((row) => Math.max(row.revenue, row.tco + row.labCut)));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
-  // Headroom above the tallest stack holds the revenue figure, margin, and vendor mark.
-  return [bottom * 1.12, top === 0 ? 1 : top * 1.3];
+  const span = top - bottom;
+  const headroom =
+    plotHeightPx > STACK_HEADROOM_PX * 2
+      ? (span * STACK_HEADROOM_PX) / (plotHeightPx - STACK_HEADROOM_PX)
+      : span * 0.3;
+  return [bottom * 1.12, top === 0 ? 1 : top + headroom];
 }
 
 export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig): string {
@@ -368,24 +392,14 @@ export default function ProfitEstimatorChart({
   const strings = t;
 
   const segments = useMemo(() => buildProfitSegments(rows), [rows]);
-  const yDomain = useMemo(() => profitYDomain(rows), [rows]);
 
   const xScaleConfig = useMemo<ScaleConfig>(
     () => ({ type: 'band', domain: rows.map((row) => row.resultKey), padding: 0.3 }),
     [rows],
   );
-  const yScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'linear', domain: yDomain, nice: true }),
-    [yDomain],
-  );
-
   const labelMap = useMemo(
     () => new Map(rows.map((row) => [row.resultKey, rowLabel(row, hardwareConfig)])),
     [rows, hardwareConfig],
-  );
-  const hwKeyByResultKey = useMemo(
-    () => new Map(rows.map((row) => [row.resultKey, row.hwKey])),
-    [rows],
   );
 
   const fillFor = useCallback(
@@ -687,10 +701,17 @@ export default function ProfitEstimatorChart({
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
   }, [dimensions.width, baseMargin, rows.length, labelMap]);
-  const margin = useMemo(
-    () =>
-      labelLayout === 'stacked' ? { ...baseMargin, bottom: X_LABEL_STACKED_BOTTOM } : baseMargin,
-    [baseMargin, labelLayout],
+  const margin = useMemo(() => {
+    if (labelLayout === 'stacked') return { ...baseMargin, bottom: X_LABEL_STACKED_BOTTOM };
+    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const slot = rows.length > 0 ? plotWidth / rows.length : 0;
+    return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
+  }, [baseMargin, labelLayout, dimensions.width, rows.length, labelMap]);
+  const plotHeight = (compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT) - margin.top - margin.bottom;
+  const yDomain = useMemo(() => profitYDomain(rows, plotHeight), [rows, plotHeight]);
+  const yScaleConfig = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: yDomain, nice: true }),
+    [yDomain],
   );
 
   const xAxisConfig = useMemo(
@@ -698,89 +719,37 @@ export default function ProfitEstimatorChart({
       tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
       customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         const fontPx = CHART_TYPE.axisLabelSub;
-        const ticks = axisGroup.selectAll<SVGGElement, d3.AxisDomain>('.tick');
-        ticks.each(function (d) {
-          const tick = d3.select(this);
-          const icon = getAxisVendorIcon(hwKeyByResultKey.get(String(d)) ?? '');
-          tick.selectAll('image.vendor-mark').remove();
+        axisGroup.selectAll<SVGGElement, d3.AxisDomain>('.tick').each(function (d) {
+          const text = d3
+            .select(this)
+            .select<SVGTextElement>('text')
+            .attr('font-size', px(fontPx))
+            .style('fill', 'var(--foreground)');
           if (labelLayout === 'stacked') {
-            // Two upright lines: SKU name, then the framework in parentheses.
-            // The vendor mark leads the first line; the pair is centred on the tick.
+            // Two upright lines centred on the tick: SKU name, then the
+            // framework and precision in parentheses.
             const [name, detail] = splitAxisLabel(labelMap.get(String(d)) ?? String(d));
-            const scale = icon ? X_LABEL_ICON_HEIGHT / icon.height : 0;
-            const iconW = icon ? icon.width * scale : 0;
-            const iconH = icon ? icon.height * scale : 0;
-            const lead = icon ? iconW + X_LABEL_ICON_GAP : 0;
-            const text = tick
-              .select<SVGTextElement>('text')
+            text
               .attr('transform', null)
               .attr('text-anchor', 'middle')
               .attr('dx', null)
               .attr('dy', '0.9em')
-              .attr('font-size', px(fontPx))
-              .style('fill', 'var(--foreground)')
               .text(null);
-            const first = text
-              .append('tspan')
-              .attr('x', lead / 2)
-              .text(name);
-            if (detail) {
-              text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(detail);
-            }
-            if (!icon) return;
-            const nameW = axisLabelLength(first.node() as SVGTextElement | null, fontPx);
-            // d3 offsets the tick text by tick size + padding; the mark shares that offset.
-            const textY = Number(text.attr('y')) || 0;
-            tick
-              .append('image')
-              .attr('class', icon.monochrome ? 'vendor-mark dark:invert' : 'vendor-mark')
-              .attr('aria-hidden', 'true')
-              .attr('href', icon.href)
-              .attr('width', iconW)
-              .attr('height', iconH)
-              .attr('x', lead / 2 - nameW / 2 - X_LABEL_ICON_GAP - iconW)
-              // Centre the mark on the first line's x-height (baseline at y + 0.9em).
-              .attr('y', textY + 0.9 * fontPx - fontPx * 0.35 - iconH / 2)
-              .style('pointer-events', 'none');
+            text.append('tspan').attr('x', 0).text(name);
+            if (detail) text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(detail);
             return;
           }
-          // The label is rotated about the tick and anchored at its end, so
-          // the text runs away from the axis towards the lower left. The
-          // vendor mark leads the label: it sits just before the first
-          // character and shares the label's rotation, so it slants with the text.
-          const text = tick
-            .select<SVGTextElement>('text')
+          // One line rotated about the tick and anchored at its end, so the
+          // text runs away from the axis towards the lower left.
+          text
             .attr('transform', `rotate(${X_LABEL_ROTATION})`)
             .attr('text-anchor', 'end')
             .attr('dx', `${-(X_LABEL_DX_EM * fontPx)}px`)
-            .attr('dy', '0.6em')
-            .attr('font-size', px(fontPx))
-            .style('fill', 'var(--foreground)');
-          if (!icon) return;
-          const textNode = text.node();
-          const textLength = axisLabelLength(textNode, fontPx);
-          const scale = X_LABEL_ICON_HEIGHT / icon.height;
-          const w = icon.width * scale;
-          const h = icon.height * scale;
-          // Centre of the mark in the label's rotated frame: before the start
-          // of the text, vertically on the x-height (the baseline sits at dy=0.6em).
-          const cx = -(X_LABEL_DX_EM * fontPx) - textLength - X_LABEL_ICON_GAP - w / 2;
-          const cy = 0.6 * fontPx - h / 2 + fontPx * 0.15;
-          tick
-            .append('image')
-            .attr('class', icon.monochrome ? 'vendor-mark dark:invert' : 'vendor-mark')
-            .attr('aria-hidden', 'true')
-            .attr('href', icon.href)
-            .attr('transform', `rotate(${X_LABEL_ROTATION})`)
-            .attr('width', w)
-            .attr('height', h)
-            .attr('x', cx - w / 2)
-            .attr('y', cy - h / 2)
-            .style('pointer-events', 'none');
+            .attr('dy', '0.6em');
         });
       },
     }),
-    [labelMap, hwKeyByResultKey, labelLayout],
+    [labelMap, labelLayout],
   );
 
   // The full axis label is longer than a phone-height plot; the compact

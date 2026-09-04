@@ -640,6 +640,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
           locale={locale}
           costTier={costTier}
           utilization={`${assumptions.utilizationPct}%`}
+          licenseFee={`${assumptions.labCutPct}%`}
           date={selectedRunDate}
           source="SemiAnalysis InferenceX™"
         />
