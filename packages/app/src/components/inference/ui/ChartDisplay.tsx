@@ -51,7 +51,7 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricChartTitle, metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
+import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -422,6 +422,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          selectedXAxisMode,
         },
       );
 
@@ -966,26 +967,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
-                                // For Input metrics with dynamic x-axis, use dynamic heading.
-                                // Classify off the ENGLISH title — the localized one has no
-                                // 'input' substring to match on zh pages.
-                                const isInputMetric = metricTitle(
-                                  graph.chartDefinition,
-                                  selectedYAxisMetric,
-                                  'en',
-                                )
-                                  .toLowerCase()
-                                  .includes('input');
-                                if (
-                                  graph.chartDefinition.chartType === 'interactivity' &&
-                                  isInputMetric &&
-                                  selectedXAxisMetric
-                                ) {
-                                  if (selectedXAxisMetric === 'p99_ttft') {
-                                    return t.vsTtft('P99');
-                                  } else if (selectedXAxisMetric === 'median_ttft') {
-                                    return t.vsTtft('Median');
-                                  }
+                                const xField = graph.chartDefinition.x_scale_field;
+                                if (xField?.endsWith('_ttft')) {
+                                  const percentile = xField.replace(/_ttft$/u, '');
+                                  return t.vsTtft(
+                                    percentile === 'median' ? 'Median' : percentile.toUpperCase(),
+                                  );
                                 }
 
                                 // The e2e chart heading follows the branch-level x-axis
@@ -999,25 +986,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                         : modeSpec.heading;
                                     return heading(selectedPercentile.toUpperCase());
                                   }
-                                  if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
-                                    const percentile = selectedE2eXAxisMetric.replace(
-                                      /_ttft$/u,
-                                      '',
-                                    );
-                                    const word =
-                                      percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                    return t.vsTtft(word);
-                                  }
                                   return isAgenticSequence
                                     ? t.vsE2eLatency(selectedPercentile.toUpperCase())
                                     : t.vsE2eLatency();
                                 }
 
                                 // Fall back to configured heading
-                                const configured =
-                                  graph.chartDefinition[
-                                    `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                                  ] || graph.chartDefinition.heading;
+                                const configured = graph.chartDefinition.heading;
                                 return locale === 'zh' ? zhHeading(String(configured)) : configured;
                               })()}
                             </Heading>

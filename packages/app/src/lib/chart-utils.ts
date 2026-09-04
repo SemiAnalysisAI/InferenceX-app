@@ -560,9 +560,13 @@ export function remapInferencePoint(
 ): InferenceData {
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
+  // Absent TTFT values are zero-filled by the row transform. Neither that
+  // sentinel nor an unrelated fallback coordinate is a latency measurement.
+  const missingTtft =
+    xAxisField.endsWith('_ttft') && (typeof xCandidate !== 'number' || xCandidate <= 0);
   return {
     ...point,
-    x: typeof xCandidate === 'number' ? xCandidate : point.x,
+    x: missingTtft ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
     roof: metric?.roof ?? false,
   };

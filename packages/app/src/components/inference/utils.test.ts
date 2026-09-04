@@ -194,6 +194,76 @@ describe('partitionChartDataByLimits', () => {
 // processOverlayChartData
 // ===========================================================================
 describe('processOverlayChartData', () => {
+  const prefillEnergyPoint = (interactivity: number, medianTtft?: number) =>
+    pt({
+      date: '2026-09-01',
+      hw: 'b200',
+      hwKey: 'b200_dynamo-sglang',
+      framework: 'dynamo-sglang',
+      precision: 'fp4',
+      disagg: true,
+      power_valid: 1,
+      // These are the post-transform coordinates for a fixed-sequence row
+      // without P90 measurements. The stored median measurements survive.
+      x: 0,
+      p90_ttft: 0,
+      median_ttft: medianTtft ?? 0,
+      median_intvty: interactivity,
+      median_e2el: 12,
+      rawMetricKeys: [
+        'median_intvty',
+        'median_e2el',
+        'prefill_joules_per_input_token',
+        ...(medianTtft === undefined ? [] : ['median_ttft']),
+      ],
+      measuredPrefillJPerInputToken: { y: 0.2, roof: false },
+    });
+
+  it('keeps prefill-energy overlays on Interactivity despite a stale legacy P90 override', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55, 2)],
+      'interactivity',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'interactivity' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([
+      [68, 0.2],
+      [55, 0.2],
+    ]);
+    expect(result.clippedData).toEqual([]);
+  });
+
+  it('uses median TTFT for fixed-sequence overlays in TTFT mode and omits missing measurements', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55)],
+      'e2e',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'ttft' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([[1.5, 0.2]]);
+    expect(result.clippedData).toEqual([]);
+  });
+
+  it('uses natural E2E latency for overlays when E2E mode supersedes the legacy P90 override', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55)],
+      'e2e',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'e2e' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([
+      [12, 0.2],
+      [12, 0.2],
+    ]);
+    expect(result.clippedData).toEqual([]);
+  });
+
   it('remaps y to the selected metric value', () => {
     const data = [pt({ y: 999, tpPerGpu: { y: 42, roof: false }, median_intvty: 10 } as any)];
     const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null);
@@ -202,10 +272,9 @@ describe('processOverlayChartData', () => {
   });
 
   it('filters out points missing the selected metric', () => {
-    // Point without inputTputPerGpu field — should be excluded
-    const withMetric = pt({ inputTputPerGpu: { y: 5, roof: false } } as any);
-    const withoutMetric = pt();
-    delete (withoutMetric as any).inputTputPerGpu;
+    // Both points have the selected latency; only one has the selected Y metric.
+    const withMetric = pt({ inputTputPerGpu: { y: 5, roof: false }, p90_ttft: 0.25 });
+    const withoutMetric = pt({ p90_ttft: 0.25 });
     const result = processOverlayChartData(
       [withMetric, withoutMetric],
       'interactivity',
