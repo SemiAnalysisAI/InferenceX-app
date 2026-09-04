@@ -32,6 +32,11 @@ on:
         required: false
         type: boolean
         default: true
+      restore-missing-trace:
+        description: Restore the registered missing trace artifact for the selected run
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -51,10 +56,11 @@ jobs:
         env:
           RUN_ID: ${{ inputs.run-id || 'all' }}
           ATOM_ONLY: ${{ inputs.atom-kv-capacity-only }}
+          RESTORE_TRACE: ${{ inputs.restore-missing-trace }}
         run: |
           if [[ "$RUN_ID" == all ]]; then
-            if [[ "$ATOM_ONLY" == true ]]; then
-              echo '::error::ATOM capacity backfill requires a specific run'
+            if [[ "$ATOM_ONLY" == true || "$RESTORE_TRACE" == true ]]; then
+              echo '::error::Artifact recovery and ATOM capacity require a specific run'
               exit 1
             fi
             echo 'shards=[0,1,2,3,4,5,6,7]' >> "$GITHUB_OUTPUT"
@@ -131,6 +137,12 @@ jobs:
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
+      - name: Restore a missing trace from its registered original artifact
+        if: inputs.restore-missing-trace == true
+        env:
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: bun packages/db/src/backfill-missing-agentic-trace.ts --run-id "$RUN_ID" --yes
       - name: Snapshot, recompute, and verify derived data
         if: inputs.atom-kv-capacity-only != true
         env:
