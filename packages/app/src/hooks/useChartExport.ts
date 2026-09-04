@@ -257,7 +257,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
     document.documentElement.classList.contains('minecraft') ||
     bgColor.includes('0 0%');
 
-  const WATERMARK_HEIGHT = 240;
+  const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height + WATERMARK_HEIGHT;
@@ -291,7 +291,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
 
   // Draw watermark text (shrink to fit on narrow exports)
   const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
-  let fontSize = 80;
+  let fontSize = 40;
   ctx.font = watermarkFont(fontSize);
   const maxTextWidth = canvas.width - 48;
   const textWidth = ctx.measureText(WATERMARK_TEXT).width;
