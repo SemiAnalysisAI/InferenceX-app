@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'b736b302cdb294bb316ff4666a64b47432655772f442aa8f5c95fe1f3cc9ed38',
+    sourceSha256: '7b251598bf9e4e181834311a554aa8ef7a9bc39d605eed243364ce5c3f5cc43e',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',

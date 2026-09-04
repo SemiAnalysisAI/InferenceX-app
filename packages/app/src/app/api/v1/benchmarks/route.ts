@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
   }
   // The calculator cache stores rows already trimmed to an allowlist that
   // excludes power_valid, so post-cache filtering cannot work there.
-  if (view === 'calculator' && powerValidFilter !== 'any') {
+  if (view === 'calculator' && powerValidFilter !== null) {
     return NextResponse.json(
       { error: 'powerValid cannot be combined with view=calculator' },
       { status: 400 },

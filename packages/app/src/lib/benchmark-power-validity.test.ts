@@ -1,33 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  filterByPowerValidity,
-  parsePowerValidityFilter,
-  POWER_VALIDITY_FILTERS,
-} from './benchmark-power-validity';
+import { filterByPowerValidity, parsePowerValidityFilter } from './benchmark-power-validity';
 
 describe('parsePowerValidityFilter', () => {
-  it('treats an absent param as any', () => {
-    expect(parsePowerValidityFilter(null)).toBe('any');
+  it('preserves an absent param as no filtering', () => {
+    expect(parsePowerValidityFilter(null)).toBeNull();
   });
 
-  it('accepts every listed filter value', () => {
-    for (const filter of POWER_VALIDITY_FILTERS) {
-      expect(parsePowerValidityFilter(filter)).toBe(filter);
-    }
+  it('accepts strictV2', () => {
+    expect(parsePowerValidityFilter('strictV2')).toBe('strictV2');
   });
 
-  it('rejects unknown values', () => {
-    expect(parsePowerValidityFilter('garbage')).toBeUndefined();
-    expect(parsePowerValidityFilter('')).toBeUndefined();
-    // `certified` is a UI display tier, not an API filter value.
-    expect(parsePowerValidityFilter('certified')).toBeUndefined();
-  });
-
-  it('is case-sensitive', () => {
-    expect(parsePowerValidityFilter('ANY')).toBeUndefined();
-    expect(parsePowerValidityFilter('strictv2')).toBeUndefined();
-  });
+  it.each(['1', '0', 'any', 'certified', 'garbage', '', 'strictv2', 'strictV2 '])(
+    'rejects unsupported value %j',
+    (value) => {
+      expect(parsePowerValidityFilter(value)).toBeUndefined();
+    },
+  );
 });
 
 describe('filterByPowerValidity', () => {
@@ -35,31 +24,27 @@ describe('filterByPowerValidity', () => {
   const validatedUnversioned = { id: 2, metrics: { power_valid: 1 } };
   const invalidated = { id: 3, metrics: { power_valid: 0, power_metric_schema_version: 2 } };
   const legacy = { id: 4, metrics: { tput_per_gpu: 100 } };
-  const noMetrics = { id: 5 } as { id: number; metrics?: Record<string, unknown> };
+  const noMetrics: { id: number; metrics?: Record<string, unknown> } = { id: 5 };
   const rows = [validatedV2, validatedUnversioned, invalidated, legacy, noMetrics];
 
-  it('returns every row unchanged for any', () => {
-    const result = filterByPowerValidity(rows, 'any');
+  it('preserves all general benchmark rows when the parameter is omitted', () => {
+    const result = filterByPowerValidity(rows, null);
     expect(result).toEqual(rows);
     expect(result).not.toBe(rows);
-  });
-
-  it('keeps only explicitly validated rows for 1', () => {
-    expect(filterByPowerValidity(rows, '1')).toEqual([validatedV2, validatedUnversioned]);
-  });
-
-  it('keeps only explicitly invalidated rows for 0', () => {
-    expect(filterByPowerValidity(rows, '0')).toEqual([invalidated]);
   });
 
   it('requires a validated verdict and schema version 2 for strictV2', () => {
     expect(filterByPowerValidity(rows, 'strictV2')).toEqual([validatedV2]);
   });
 
-  it('excludes legacy and metric-less rows from every filter except any', () => {
-    for (const filter of ['1', '0', 'strictV2'] as const) {
-      const surviving = filterByPowerValidity([legacy, noMetrics], filter);
-      expect(surviving).toEqual([]);
-    }
+  it('excludes unsupported versions and malformed verdicts from strictV2', () => {
+    const unsupported = [
+      { metrics: { power_valid: 1, power_metric_schema_version: 1 } },
+      { metrics: { power_valid: 1, power_metric_schema_version: 3 } },
+      { metrics: { power_valid: '1', power_metric_schema_version: 2 } },
+      { metrics: { power_valid: 1, power_metric_schema_version: '2' } },
+      { metrics: { power_valid: true, power_metric_schema_version: 2 } },
+    ];
+    expect(filterByPowerValidity(unsupported, 'strictV2')).toEqual([]);
   });
 });

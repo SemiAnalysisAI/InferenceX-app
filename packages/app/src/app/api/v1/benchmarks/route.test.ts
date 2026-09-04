@@ -266,22 +266,6 @@ describe('GET /api/v1/benchmarks', () => {
     };
     const powerRows = [validatedV2, validatedUnversioned, invalidated, legacy];
 
-    it('powerValid=1 keeps only rows with a validated verdict', async () => {
-      mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
-
-      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=1'));
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([validatedV2, validatedUnversioned]);
-    });
-
-    it('powerValid=0 keeps only explicitly invalidated rows', async () => {
-      mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
-
-      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=0'));
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([invalidated]);
-    });
-
     it('powerValid=strictV2 requires a validated verdict plus schema version 2', async () => {
       mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
 
@@ -290,32 +274,28 @@ describe('GET /api/v1/benchmarks', () => {
       expect(await res.json()).toEqual([validatedV2]);
     });
 
-    it('powerValid=any matches the response with the param absent (backward compat)', async () => {
+    it('keeps every general benchmark row when powerValid is omitted', async () => {
       mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
-      const withParam = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=any'));
-
-      mockGetLatestBenchmarks.mockResolvedValueOnce(powerRows);
-      const withoutParam = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
-
-      expect(withParam.status).toBe(200);
-      expect(withoutParam.status).toBe(200);
-      const bodyWithParam = await withParam.json();
-      expect(bodyWithParam).toEqual(await withoutParam.json());
-      expect(bodyWithParam).toEqual(powerRows);
+      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(powerRows);
     });
 
-    it('rejects an unknown powerValid value without querying', async () => {
-      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=garbage'));
-
-      expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: 'Unknown powerValid filter' });
-      expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
-    });
+    it.each(['1', '0', 'any', 'certified', 'garbage', '', 'strictv2'])(
+      'rejects unsupported powerValid=%s without querying',
+      async (value) => {
+        const res = await GET(req(`/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=${value}`));
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: 'Unknown powerValid filter' });
+        expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+        expect(mockGetBenchmarksForRun).not.toHaveBeenCalled();
+      },
+    );
 
     it('rejects powerValid combined with view=calculator without querying', async () => {
       const res = await GET(
         req(
-          '/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=1&view=calculator&sequence=1k%2F1k',
+          '/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=strictV2&view=calculator&sequence=1k%2F1k',
         ),
       );
 
@@ -326,7 +306,7 @@ describe('GET /api/v1/benchmarks', () => {
       expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
     });
 
-    it('allows powerValid=any with view=calculator (no-op filter)', async () => {
+    it('keeps calculator requests working when powerValid is omitted', async () => {
       mockGetLatestBenchmarks.mockResolvedValueOnce([
         {
           benchmark_type: 'single_turn',
@@ -337,9 +317,7 @@ describe('GET /api/v1/benchmarks', () => {
       ]);
 
       const res = await GET(
-        req(
-          '/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=any&view=calculator&sequence=1k%2F1k',
-        ),
+        req('/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=1k%2F1k'),
       );
 
       expect(res.status).toBe(200);
@@ -355,14 +333,14 @@ describe('GET /api/v1/benchmarks', () => {
           benchmark_type: 'agentic_traces',
           workflow_run_id: 42,
           run_started_at: '2026-08-12T10:00:00Z',
-          metrics: { power_valid: 1 },
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
         },
         {
           id: 2,
           benchmark_type: 'single_turn',
           workflow_run_id: 43,
           run_started_at: '2026-08-12T10:00:00Z',
-          metrics: { power_valid: 1 },
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
         },
         {
           id: 3,
@@ -373,16 +351,20 @@ describe('GET /api/v1/benchmarks', () => {
         },
       ]);
 
-      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=1'));
+      const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&powerValid=strictV2'));
       expect(await res.json()).toEqual([
         {
           id: 1,
           benchmark_type: 'agentic_traces',
           workflow_run_id: 42,
           run_started_at: '2026-08-12T10:00:00Z',
-          metrics: { power_valid: 1 },
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
         },
-        { id: 2, benchmark_type: 'single_turn', metrics: { power_valid: 1 } },
+        {
+          id: 2,
+          benchmark_type: 'single_turn',
+          metrics: { power_valid: 1, power_metric_schema_version: 2 },
+        },
       ]);
     });
   });

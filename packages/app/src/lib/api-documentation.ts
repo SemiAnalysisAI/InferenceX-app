@@ -664,8 +664,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change), and powerValid filters rows by measured-power validity and cannot be combined with view=calculator (except powerValid=any, which is a no-op).',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，则只返回该工作流运行的数据。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）；powerValid 按实测功率有效性筛选行，且不能与 view=calculator 组合使用（powerValid=any 除外，等同于不筛选）。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，则只返回该工作流运行的数据。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -745,9 +745,9 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        '1 keeps only rows with a validated power measurement (metrics.power_valid == 1); 0 keeps only explicitly invalidated rows; any applies no filter (default; includes legacy rows without a verdict); strictV2 keeps rows with power_valid == 1 and power_metric_schema_version == 2 (whole-deployment energy semantics) — stricter than the InferenceX UI, which also displays validated rows that predate schema versioning. Unknown values yield 400 Unknown powerValid filter; cannot be combined with view=calculator (except any, which is a no-op).',
-        '1 仅保留具有已验证功率测量的行（metrics.power_valid == 1）；0 仅保留被明确判定无效的行；any 不做筛选（默认值；包含没有判定结果的旧数据行）；strictV2 保留 power_valid == 1 且 power_metric_schema_version == 2（全部署能耗语义）的行——比 InferenceX 界面更严格，界面还会展示早于版本标注机制的已验证行。未知值返回 400 Unknown powerValid filter；不能与 view=calculator 组合使用（any 除外，等同于不筛选）。',
-        { type: 'string', enum: POWER_VALIDITY_FILTERS, default: 'any' },
+        'Only strictV2 is accepted. It keeps rows whose metrics.power_valid is the number 1 and metrics.power_metric_schema_version is the number 2 (whole-deployment energy semantics). Omit this parameter to apply no power filter, preserving throughput and latency results even when power is missing or invalid. Other values, including an empty value, yield 400 Unknown powerValid filter. Cannot be combined with view=calculator.',
+        '仅接受 strictV2：保留 metrics.power_valid 为数字 1、且 metrics.power_metric_schema_version 为数字 2 的数据行，其能耗指标采用整个部署的统计口径。省略此参数则不按功率筛选，即使功率缺失或无效，也会保留吞吐量和延迟结果。其他取值（包括空值）返回 400 Unknown powerValid filter。不能与 view=calculator 组合使用。',
+        { type: 'string', enum: POWER_VALIDITY_FILTERS },
         'strictV2',
       ),
     ],
@@ -760,8 +760,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported, the calculator sequence is unknown, the powerValid filter is unknown, or a non-any powerValid is combined with view=calculator.',
-        '模型缺失或不受支持、计算器序列未知、powerValid 筛选值未知，或非 any 的 powerValid 与 view=calculator 组合使用。',
+        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
+        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -2678,8 +2678,8 @@ const overview = {
       id: 'measured-power',
       title: text('Measured power', '实测功率'),
       description: text(
-        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons and power_audit provide optional producer validation details. Filter rows with the powerValid request parameter; its strict value is named strictV2 (power_valid == 1 and power_metric_schema_version == 2) rather than "certified" because it is stricter than the InferenceX UI, which also displays validated rows that predate schema versioning.',
-        '基准行可能携带实测功率、能耗和 GPU 遥测指标键（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 为三态：1 表示测量窗口已通过验证；0 表示验证失败，实测值会被全链路扣留（生产端剥离、摄取端再次清除——若仍残留请视为不可靠）；缺失表示早于验证机制的旧数据行。power_metric_schema_version == 2 将所有无前缀的 joules_per_* 字段定义为全部署能耗——未标注版本的分离式 joules 含义不明确，因为这些字段曾承载角色本地值。多节点和分离式运行的每 worker 功率/遥测明细位于 workers[]。power_invalid_reasons 与 power_audit 可提供生产端的可选验证详情。可使用 powerValid 请求参数筛选行；其严格取值命名为 strictV2（power_valid == 1 且 power_metric_schema_version == 2）而非 "certified"，因为它比 InferenceX 界面更严格——界面还会展示早于版本标注机制的已验证行。',
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons and power_audit provide optional producer validation details. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示该数据行早于验证机制。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 与 power_audit 可包含生产端的验证详情。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
       ),
       shape: 'BenchmarkRows',
       example: {

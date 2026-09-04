@@ -48,10 +48,10 @@ describe('measured-power API documentation', () => {
     expect(benchmarkRowSchema?.required).not.toContain('power_audit');
   });
 
-  it('projects the view, sequence, and powerValid parameters into OpenAPI', () => {
+  it('documents strictV2 as the only optional power filter without changing ordinary requests', () => {
     const document = buildOpenApiDocument('https://api-docs.test');
     const operation = (document.paths['/api/v1/benchmarks'] as Record<string, unknown>).get as {
-      parameters: readonly { name: string; schema: unknown }[];
+      parameters: readonly { name: string; required: boolean; schema: unknown }[];
     };
     const names = operation.parameters.map((parameter) => parameter.name);
     expect(names).toContain('view');
@@ -60,10 +60,13 @@ describe('measured-power API documentation', () => {
     const powerValid = operation.parameters.find((parameter) => parameter.name === 'powerValid');
     expect(powerValid?.schema).toEqual({
       type: 'string',
-      enum: ['1', '0', 'any', 'strictV2'],
-      default: 'any',
+      enum: ['strictV2'],
     });
-    expect([...POWER_VALIDITY_FILTERS]).toEqual(['1', '0', 'any', 'strictV2']);
+    expect(powerValid?.required).toBe(false);
+    expect([...POWER_VALIDITY_FILTERS]).toEqual(['strictV2']);
+    expect(listBenchmarks?.curlUrl).toBe(
+      'https://inferencex.semianalysis.com/api/v1/benchmarks?model=DeepSeek-R1-0528',
+    );
   });
 
   it('renders a bilingual measured-power schema note', () => {
@@ -74,6 +77,9 @@ describe('measured-power API documentation', () => {
       expect(note, `${locale} must expose a measured-power schema note`).toBeDefined();
       expect(note?.title.trim()).toBeTruthy();
       expect(note?.description.trim()).toBeTruthy();
+      expect(note?.description).toContain('powerValid=strictV2');
+      expect(note?.description).toContain('power_valid == 1');
+      expect(note?.description).toContain('power_metric_schema_version == 2');
     }
     const zhNote = getApiDocumentation('zh').schemaNotes.find(
       (candidate) => candidate.id === 'measured-power',
