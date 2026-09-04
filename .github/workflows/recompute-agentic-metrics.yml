@@ -41,6 +41,7 @@ concurrency:
 
 jobs:
   scope:
+    name: Select repair shards
     runs-on: ubuntu-latest
     outputs:
       shards: ${{ steps.scope.outputs.shards }}
@@ -161,6 +162,7 @@ jobs:
           RUN_ID: ${{ inputs.run-id }}
         run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
   invalidate:
+    name: Invalidate production cache
     needs: recompute
     if: inputs.neon-branch == ''
     runs-on: ubuntu-latest
