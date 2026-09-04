@@ -497,6 +497,8 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredJPerOutputToken'
     | 'measuredJPerTotalToken'
     | 'measuredJPerInputToken'
+    | 'measuredPrefillJPerInputToken'
+    | 'measuredDecodeJPerOutputToken'
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
@@ -527,6 +529,14 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.joules_per_input_token === 'number'
       ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
       : {}),
+    // Role-local energy is not additionally gated on power_valid here —
+    // rowToAggDataEntry already scrubbed it, same as the role-watts fields.
+    ...(typeof entry.prefill_joules_per_input_token === 'number'
+      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
+      : {}),
+    ...(typeof entry.decode_joules_per_output_token === 'number'
+      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
+      : {}),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
           measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),
@@ -550,9 +560,13 @@ export function remapInferencePoint(
 ): InferenceData {
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
+  // Absent TTFT values are zero-filled by the row transform. Neither that
+  // sentinel nor an unrelated fallback coordinate is a latency measurement.
+  const missingTtft =
+    xAxisField.endsWith('_ttft') && (typeof xCandidate !== 'number' || xCandidate <= 0);
   return {
     ...point,
-    x: typeof xCandidate === 'number' ? xCandidate : point.x,
+    x: missingTtft ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
     roof: metric?.roof ?? false,
   };

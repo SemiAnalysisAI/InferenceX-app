@@ -248,7 +248,7 @@ export function useChartData(
   comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
-  _selectedXAxisMode: XAxisMode = 'e2e',
+  selectedXAxisMode?: XAxisMode,
   /**
    * GitHub run id for the "as of run" base view. Set only when an
    * earlier-than-latest run is selected.
@@ -478,14 +478,13 @@ export function useChartData(
         const resolved = resolveXAxisField(chartDef, selectedYAxisMetric, effectiveXMetric, {
           isAgentic,
           percentile: selectedPercentile,
+          xAxisMode: selectedXAxisMode,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
-        const ttftPctl = isTtftOverride
-          ? (effectiveXMetric as string).replace(/_ttft$/u, '')
-          : 'p90';
+        const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
         const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
@@ -519,7 +518,11 @@ export function useChartData(
         // heading ("vs. <latency>") is also rewritten so the title above the
         // plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
-        let chartHeading = (chartDef[headingKey] as string) || chartDef.heading;
+        let chartHeading = isTtftOverride
+          ? `vs. ${ttftPctlWord} Time To First Token`
+          : selectedXAxisMode === undefined
+            ? (chartDef[headingKey] as string) || chartDef.heading
+            : chartDef.heading;
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
@@ -603,6 +606,7 @@ export function useChartData(
       }),
     [
       selectedYAxisMetric,
+      selectedXAxisMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
@@ -613,7 +617,9 @@ export function useChartData(
 
   // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {
-    if (chartData.length === 0) return [];
+    // Once loading finishes, retain resolved axes even without official rows
+    // so unofficial-only charts use the same definitions. Keep initial skeletons.
+    if (chartData.length === 0 && loading) return [];
     if (
       usesTokenSalePricing(selectedYAxisMetric) &&
       tokenRevenuePriceSource === 'openrouter' &&
@@ -682,6 +688,7 @@ export function useChartData(
     return result;
   }, [
     chartData,
+    loading,
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,

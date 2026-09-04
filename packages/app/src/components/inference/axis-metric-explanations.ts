@@ -248,6 +248,41 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
   };
 }
 
+const MEASURED_ROLE_EN: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: 'input (prompt)', isolates: 'prompt-processing' },
+  decode: { tokens: 'output', isolates: 'token-generation' },
+};
+
+const MEASURED_ROLE_ZH: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: '输入', isolates: '提示词处理' },
+  decode: { tokens: '输出', isolates: 'token 生成' },
+};
+
+function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanation {
+  return {
+    description: {
+      en:
+        `Measured accelerator energy consumed by the ${role} workers per ` +
+        `${MEASURED_ROLE_EN[role].tokens} token, from runner power telemetry integrated over ` +
+        `the run. Unlike the whole-deployment J/tok metrics, only that role's energy is ` +
+        `charged, so it isolates ${MEASURED_ROLE_EN[role].isolates} efficiency in ` +
+        `disaggregated deployments.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个${MEASURED_ROLE_ZH[role].tokens} token 由 ${MEASURED_PHASE_ZH[role]}工作进程消耗的` +
+        `加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。与全部署 J/tok 指标不同，` +
+        `它只计入该角色的能耗，因此可以在分离式部署中单独衡量${
+          MEASURED_ROLE_ZH[role].isolates
+        }效率。${MEASURED_TIER_NOTE_ZH}`,
+    },
+    formula: {
+      en:
+        `J/tok = measured ${role}-worker energy over the run ÷ ` +
+        `${role === 'prefill' ? 'input' : 'output'} tokens processed`,
+      zh: `J/tok = 运行期间 ${role} 工作进程实测能耗 ÷ 处理的${MEASURED_ROLE_ZH[role].tokens} token 数`,
+    },
+  };
+}
+
 /**
  * Every `METRIC_REGISTRY` key gets a bilingual explanation and a structural
  * formula. Grounded in `buildDerivedChartFields` (src/lib/chart-utils.ts) and
@@ -329,6 +364,8 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredJPerOutputToken: measuredJoulesPerToken('output'),
   measuredJPerInputToken: measuredJoulesPerToken('input'),
   measuredJPerTotalToken: measuredJoulesPerToken('total'),
+  measuredPrefillJPerInputToken: measuredRoleJoulesPerToken('prefill'),
+  measuredDecodeJPerOutputToken: measuredRoleJoulesPerToken('decode'),
   measuredJPerSuccessfulQuery: {
     description: {
       en:

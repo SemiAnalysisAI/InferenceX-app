@@ -34,12 +34,14 @@ const STRINGS = {
 
 export function ScatterEmptyState({
   reason,
+  description,
   onShowChips,
   onClearFilters,
   onEditFilters,
   onShowTable,
 }: {
   reason: 'hidden' | 'filtered' | 'clipped' | 'selection';
+  description?: string;
   onShowChips: () => void;
   onClearFilters: () => void;
   onEditFilters: () => void;
@@ -56,7 +58,7 @@ export function ScatterEmptyState({
       <div className="space-y-1.5">
         <h3 className="text-sm font-semibold">{t.title}</h3>
         <p className="text-sm text-muted-foreground">
-          {reason === 'selection' ? t.hint : t[reason]}
+          {description ?? (reason === 'selection' ? t.hint : t[reason])}
         </p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">

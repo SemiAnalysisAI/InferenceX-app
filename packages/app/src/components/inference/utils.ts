@@ -9,6 +9,7 @@ import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisFiel
 import { remapInferencePoint } from '@/lib/chart-utils';
 
 import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+import type { XAxisMode } from './hooks/useChartData';
 
 /**
  * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
@@ -108,6 +109,7 @@ export function partitionChartDataByLimits(
   const clippedData: ClippedInferenceData[] = [];
 
   for (const point of data) {
+    if (!Number.isFinite(point.x)) continue;
     const reasons: ClippedInferenceData['reasons'] = [];
     if (costLimitApplies && point.y > chartDefinition.y_cost_limit!) reasons.push('cost');
     if (latencyLimitApplies && point.x > chartDefinition.y_latency_limit!) {
@@ -142,6 +144,7 @@ export function processOverlayChartData(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
+    selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
   },
 ): InferenceData[] {
@@ -166,6 +169,7 @@ export function processOverlayChartDataWithClipping(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
+    selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
   },
 ): ProcessedChartData {
@@ -181,6 +185,7 @@ export function processOverlayChartDataWithClipping(
   const { xAxisField } = resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric, {
     isAgentic,
     percentile: selectedPercentile,
+    xAxisMode: options?.selectedXAxisMode,
   });
 
   // The latency limit targets overload outliers on the TTFT axis only; skip it

@@ -6,6 +6,7 @@ import {
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
   METRIC_CONTROL_GROUPS,
@@ -65,6 +66,13 @@ describe('metric registry', () => {
 
     expect(new Set(controlMetrics).size).toBe(controlMetrics.length);
     expect(controlMetrics.toSorted()).toEqual(METRIC_CONFIG_KEYS.toSorted());
+  });
+
+  it('identifies only the role-local prefill and decode energy axes', () => {
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredPrefillJPerInputToken')).toBe(true);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredDecodeJPerOutputToken')).toBe(true);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredJPerOutputToken')).toBe(false);
+    expect(isRoleLocalMeasuredEnergyConfigKey('y_measuredPrefillAvgPower')).toBe(false);
   });
 
   it('labels every infrastructure purchasing-power metric as TCO', () => {
@@ -215,6 +223,12 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_measuredJPerSuccessfulQuery')).toBe(
       'y_measuredJPerSuccessfulQuery',
     );
+    expect(resolveMetricConfigKey('y_measuredPrefillJPerInputToken')).toBe(
+      'y_measuredPrefillJPerInputToken',
+    );
+    expect(resolveMetricConfigKey('y_measuredDecodeJPerOutputToken')).toBe(
+      'y_measuredDecodeJPerOutputToken',
+    );
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
@@ -231,5 +245,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokensPerDollarN')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_measuredPrefillJPerInputToken')).toBe('input');
+    expect(tokenMetricTypeForConfigKey('y_measuredDecodeJPerOutputToken')).toBe('output');
   });
 });

@@ -124,6 +124,6 @@ Both charts share the same Y-axis options. The `y` field is the default `AggData
 - `title` / `titleZh`: bilingual dropdown and chart titles.
 - `polarity`: whether higher or lower values are preferable. The derived chart definitions combine this with x-axis polarity to produce the concrete Pareto corner.
 
-**Input-metric x-axis override** switches the interactivity chart to TTFT when the selected Y metric is input-related. `inputTputPerGpu` declares `p90_ttft` and its label in the registry; a user-selected TTFT metric may override it.
+**X-axis selection** takes precedence over the Y metric: selecting an input-energy metric keeps the chosen Interactivity, TTFT, or E2E axis. Fixed-sequence TTFT uses the measured median; agentic TTFT uses the selected percentile. Official data, unofficial overlays, and Replay share the resolved axis. Missing or zero-filled TTFT values are omitted instead of becoming plotted latency measurements. The legacy input-metric override (`inputTputPerGpu` declares `p90_ttft`) applies only to callers without a global x-axis mode.
 
 **Limits** — both charts include `y_cost_limit: 5` (clip cost-per-million metrics above $5/M tokens) and `y_latency_limit: 60` (clip x-axis outliers beyond 60s when TTFT is on x). Tokens-per-dollar metrics are not cost-clipped; clipped cost points remain available to the dashed continuation layer.

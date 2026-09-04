@@ -98,7 +98,6 @@ describe('computeAvailableQuickFilters', () => {
     const certified = point({ power_tier: 'certified' });
     expect(computeAvailableQuickFilters([legacy]).power).toEqual(['legacy']);
     expect(computeAvailableQuickFilters([certified]).power).toEqual(['certified']);
-    // Display order stays certified-first even when legacy points come first.
     expect(computeAvailableQuickFilters([legacy, certified]).power).toEqual([
       'certified',
       'legacy',
@@ -198,11 +197,9 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(certified, certifiedOnly)).toBe(true);
     expect(matchesQuickFilters(legacy, certifiedOnly)).toBe(false);
     expect(matchesQuickFilters(tierless, certifiedOnly)).toBe(false);
-    // Both tiers still exclude points with no measured telemetry at all.
     expect(matchesQuickFilters(certified, bothTiers)).toBe(true);
     expect(matchesQuickFilters(legacy, bothTiers)).toBe(true);
     expect(matchesQuickFilters(tierless, bothTiers)).toBe(false);
-    // No power constraint keeps tier-less points.
     expect(matchesQuickFilters(tierless, EMPTY_QUICK_FILTERS)).toBe(true);
   });
 

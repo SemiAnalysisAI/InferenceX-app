@@ -122,8 +122,11 @@ export default function HistoricalTrendsDisplay() {
     setHighContrast,
   } = useInferenceActions();
 
-  // Check if interactivity chart data exists
-  const hasInteractivityChart = graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
+  // Graph definitions can outlive empty results; hardware metadata is built
+  // from source rows before selected-metric coverage and clipping filters.
+  const hasInteractivityChart =
+    Object.keys(hardwareConfig).length > 0 &&
+    graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
 
   // Get Y-axis label and title from chart definition
   const currentYLabel = useMemo(() => {

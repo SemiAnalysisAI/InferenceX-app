@@ -2,6 +2,8 @@
  * Tests for the "Historical Trends" tab.
  * Shows interpolated GPU performance over time at a user-selected interactivity level.
  */
+import type { BenchmarkRow } from '@/lib/api';
+
 const visitHistoricalWithSetup = () => {
   cy.visit('/historical', {
     onBeforeLoad(win) {
@@ -56,6 +58,31 @@ describe('Historical Trends — Content & Interactions', () => {
 
   it('renders data point circles on trend lines', () => {
     cy.get('[data-testid="trend-chart-svg"] circle').should('have.length.greaterThan', 0);
+  });
+
+  it('loads history when the current snapshot lacks the selected energy metric', () => {
+    cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
+      const withoutRoleEnergy = rows.map((row) => ({
+        ...row,
+        metrics: { ...row.metrics, prefill_joules_per_input_token: undefined },
+      }));
+      cy.intercept('GET', '**/api/v1/benchmarks?*', withoutRoleEnergy).as('benchmarks');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*').as('history');
+      cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
+      cy.wait('@benchmarks');
+      cy.wait('@history');
+      cy.get('[data-testid="yaxis-metric-selector"]').should(
+        'contain.text',
+        'Measured Prefill Joules per Input Token',
+      );
+      cy.get('[data-testid="historical-target-slider"]').should('be.visible');
+      cy.get('[data-testid="historical-trend-figure"]')
+        .should('be.visible')
+        .and('contain.text', 'No historical data found for the tracked configurations.');
+      cy.contains(
+        'No interactivity chart data available for the selected model and sequence.',
+      ).should('not.exist');
+    });
   });
 
   it('target interactivity slider value updates when the number input is changed', () => {
@@ -246,6 +273,8 @@ describe('Historical Trends — Chinese route', () => {
     cy.wait('@emptyBenchmarks');
     cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
     cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
+    cy.get('[data-testid="historical-target-slider"]').should('not.exist');
+    cy.get('[data-testid="historical-trend-figure"]').should('not.exist');
   });
 
   it('shows a safe Chinese primary error and recovers through the reload control', () => {

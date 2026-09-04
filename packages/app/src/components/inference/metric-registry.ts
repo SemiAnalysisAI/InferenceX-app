@@ -365,12 +365,28 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token 实测焦耳能耗',
     polarity: 'lower',
   },
+  measuredDecodeJPerOutputToken: {
+    field: 'measuredDecodeJPerOutputToken.y',
+    label: 'Measured Decode J per Output Token (J/tok)',
+    labelZh: '每输出 token 实测 Decode 能耗（J/tok）',
+    title: 'Measured Decode Joules per Output Token',
+    titleZh: '每输出 token 实测 Decode 焦耳能耗',
+    polarity: 'lower',
+  },
   measuredJPerInputToken: {
     field: 'measuredJPerInputToken.y',
     label: 'Measured J per Input Token (J/tok)',
     labelZh: '每输入 token 实测能耗（J/tok）',
     title: 'Measured Joules per Input Token',
     titleZh: '每输入 token 实测焦耳能耗',
+    polarity: 'lower',
+  },
+  measuredPrefillJPerInputToken: {
+    field: 'measuredPrefillJPerInputToken.y',
+    label: 'Measured Prefill J per Input Token (J/tok)',
+    labelZh: '每输入 token 实测 Prefill 能耗（J/tok）',
+    title: 'Measured Prefill Joules per Input Token',
+    titleZh: '每输入 token 实测 Prefill 焦耳能耗',
     polarity: 'lower',
   },
   measuredJPerTotalToken: {
@@ -520,7 +536,7 @@ export interface MetricControlGroup {
 }
 
 /**
- * The nine runner-telemetry y-axes in the "Measured Energy" control group.
+ * The runner-telemetry y-axes in the "Measured Energy" control group.
  * Exported (and referenced by the group below, so the two cannot drift) for
  * consumers that treat measured axes specially — the legacy-power point ring,
  * tooltip tier line, and footer legend key.
@@ -530,7 +546,9 @@ export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredDecodeAvgPower',
   'y_measuredAvgPower',
   'y_measuredJPerInputToken',
+  'y_measuredPrefillJPerInputToken',
   'y_measuredJPerOutputToken',
+  'y_measuredDecodeJPerOutputToken',
   'y_measuredJPerTotalToken',
   'y_measuredJPerSuccessfulQuery',
   'y_measuredWhPerSuccessfulQuery',
@@ -541,9 +559,19 @@ const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
 );
 
+const ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set([
+  'y_measuredPrefillJPerInputToken',
+  'y_measuredDecodeJPerOutputToken',
+]);
+
 /** Whether a y-axis config key plots one of the Measured Energy metrics. */
 export function isMeasuredEnergyConfigKey(configKey: string): boolean {
   return MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
+/** Whether a y-axis requires the explicit prefill/decode energy breakdown. */
+export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
+  return ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
