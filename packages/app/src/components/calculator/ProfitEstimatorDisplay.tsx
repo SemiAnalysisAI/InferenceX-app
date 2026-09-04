@@ -153,7 +153,7 @@ const STRINGS = {
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
-      'Share of benchmarked throughput that is actually sold. 60% means the fleet bills 60% of the tokens it could produce. Revenue scales with it; compute expense does not, since the chips are paid for whether or not they are busy.',
+      'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
     labCutLabel: 'Model License Fee (%)',
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
@@ -241,7 +241,7 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
-      '实际售出的基准吞吐量比例。60% 表示集群只计费其可产出 token 的 60%。收入随之缩放；算力支出不变，因为芯片无论忙闲都要付费。',
+      '利用率 % 考虑了 token 流量在昼夜间的起伏波动，以及大规模部署横向扩展时的效率损失。',
     labCutLabel: '模型许可费（%）',
     labCutTooltip:
       '每售出一个 token 以许可费形式支付给模型实验室的收入比例。即使算力支出已超过收入也需支付，因此运营方可能亏损。',
