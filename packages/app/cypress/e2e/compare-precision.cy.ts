@@ -66,7 +66,10 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/zh/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
-    cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K/1K 结果');
+    cy.get('[data-testid="compare-model-catalog"]').should(
+      'contain.text',
+      'AgentX 与 8K/1K 测试结果',
+    );
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')

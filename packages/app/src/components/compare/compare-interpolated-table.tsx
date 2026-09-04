@@ -18,18 +18,18 @@ const STRINGS = {
     target: (n: number) => `Target interactivity ${n} (tok/s/user)`,
   },
   zh: {
-    hint: '基于实测基准测试数据插值。修改下方目标交互速度，可比较不同运行点的表现。',
+    hint: '数据由真实基准测试结果插值得出。调整下方的目标交互性数值，即可比较不同运行点。',
     metric: '指标',
-    interactivity: '交互速度 (tok/s/user)',
-    table: '基准测试插值对比',
-    target: (n: number) => `目标交互速度 ${n} (tok/s/user)`,
+    interactivity: '交互性（tok/s/user）',
+    table: '基准测试结果插值对比',
+    target: (n: number) => `目标交互性 ${n}（tok/s/user）`,
   },
 } as const;
 
 const METRIC_LABELS_ZH: Record<string, string> = {
-  'Throughput (tok/s/chip)': '吞吐量 (tok/s/chip)',
-  'Cost ($/M tok)': '成本 ($/M tok)',
-  'Dollar per Million Tokens': '每百万 token 成本',
+  'Throughput (tok/s/chip)': '吞吐量（tok/s/chip）',
+  'Cost ($/M tok)': '成本（$/M tok）',
+  'Dollar per Million Tokens': '每百万 token 成本（美元）',
   Concurrency: '并发数',
 };
 

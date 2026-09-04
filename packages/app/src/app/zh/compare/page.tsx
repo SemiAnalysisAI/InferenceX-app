@@ -13,7 +13,8 @@ import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { bucketComparePairsByVendor } from '@/lib/compare-ssr';
+import { formatModelListZh } from '@/lib/compare-ssr-zh';
 import { type Model } from '@/lib/data-mappings';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
@@ -54,21 +55,21 @@ function groupPairsByVendorForModel(
   const groups: VendorGroup[] = [];
   if (cross.length > 0) {
     groups.push({
-      heading: 'NVIDIA vs AMD',
+      heading: 'NVIDIA 与 AMD',
       description: '跨厂商的不同架构代际对比。',
       pairs: cross,
     });
   }
   if (nvidia.length > 0) {
     groups.push({
-      heading: 'NVIDIA vs NVIDIA',
+      heading: 'NVIDIA 芯片对比',
       description: 'Hopper 与 Blackwell 代际对比。',
       pairs: nvidia,
     });
   }
   if (amd.length > 0) {
     groups.push({
-      heading: 'AMD vs AMD',
+      heading: 'AMD 芯片对比',
       description: 'CDNA 3 与 CDNA 4 代际对比。',
       pairs: amd,
     });
@@ -110,16 +111,16 @@ async function CompareCatalogZh() {
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-            对比结果目录
+            对比目录
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
-            AgentX 与 8K/1K 结果
+            AgentX 与 8K/1K 测试结果
           </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
-            {totalUrls.toLocaleString()} 组推理基准测试的正面对比，涵盖{' '}
-            {formatModelList(modelsWithPairs)}
-            。已有 AgentX 数据的模型默认打开长上下文、多轮 trace replay 结果；尚未纳入 AgentX
-            的模型默认打开受控的 8K/1K 工作负载。每张卡片均标明对应场景。
+            共 {totalUrls.toLocaleString()} 组推理基准测试对比，涵盖{' '}
+            {formatModelListZh(modelsWithPairs)}
+            。已有 AgentX 数据的模型会默认展示长上下文、多轮 trace 回放结果；尚无 AgentX
+            数据的模型则默认展示受控的 8K/1K 工作负载。每张卡片都会标明测试场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -137,7 +138,7 @@ async function CompareCatalogZh() {
               href="/zh/compare-precision"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              {'精度对比（FP8 vs BF16 等）'}
+              量化精度对比（FP8 与 BF16 等）
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -147,7 +148,7 @@ async function CompareCatalogZh() {
               href="/zh/compare-spec-decode"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              {'投机解码对比（MTP vs 关闭）'}
+              投机解码对比（启用 MTP 与关闭投机解码）
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -173,7 +174,7 @@ async function CompareCatalogZh() {
                   {model.label}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组芯片对比具有 {model.label} 的基准测试数据。
+                  在 {model.label} 上共有 {pairs.length} 组芯片对比，均有基准测试数据。
                 </p>
               </div>
               {groups.map((group) => (
@@ -195,6 +196,7 @@ async function CompareCatalogZh() {
                           label={label}
                           archLine={archLine}
                           scenarioLabel={scenario.label}
+                          locale="zh"
                           hardwareA={{
                             label: aMeta?.label ?? a.toUpperCase(),
                             vendor: aMeta?.vendor,

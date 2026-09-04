@@ -46,10 +46,10 @@ const STRINGS = {
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
     emptyState:
-      '当前默认工作负载在此配置上没有可用的插值数据。请使用下方图表控件选择一个两种配置均有基准测试数据的序列和精度。',
-    mtpCaveatTitle: 'MTP 接受率可比性',
+      '默认工作负载在这两种配置下暂时没有可用于插值的数据。请在下方图表控件中选择一个两种配置都有基准测试数据的序列长度和精度。',
+    mtpCaveatTitle: 'MTP 接受率不宜跨引擎直接比较',
     mtpCaveat:
-      'MTP 接受率实现在不同推理引擎间存在差异。不同引擎的数据点在同一曲线上不可直接比较——在相同交互性水平下的吞吐量和成本差异可能反映的是引擎层面的差异，而非纯投机解码收益。请谨慎解读跨引擎对比。',
+      '不同推理引擎对 MTP 接受率的实现并不相同，因此不同引擎的数据点不能直接放在同一条曲线上比较。在相同交互性下，吞吐量和成本的差异可能来自引擎本身，而不完全是投机解码带来的收益。跨引擎对比时需谨慎解读。',
   },
 } as const;
 
@@ -129,14 +129,16 @@ export default function CompareSpecDecodePageClient({
                 {modelLabel} · {t.eyebrowSuffix}
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {gpuLabel} {precisionLabel}: {aLabel} vs {bLabel} {t.h1Suffix}
+                {isZh
+                  ? `${gpuLabel} ${precisionLabel}：启用 ${aLabel} 与关闭投机解码的对比`
+                  : `${gpuLabel} ${precisionLabel}: ${aLabel} vs ${bLabel} ${t.h1Suffix}`}
               </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 在{' '}
-                  <strong>{gpuLabel}</strong> {precisionLabel}（{gpuVendor} {gpuArch}）上运行{' '}
-                  <strong>{modelLabel}</strong> 的投机解码对比。在各类 LLM
-                  工作负载下的吞吐量、成本和交互性差异。使用下方图表控件切换序列和指标——交互方式与
+                  在 <strong>{gpuLabel}</strong> {precisionLabel}（{gpuVendor} {gpuArch}）上运行{' '}
+                  <strong>{modelLabel}</strong> 时，对比启用 <strong>{aLabel}</strong>
+                  和关闭投机解码两种配置的表现，涵盖不同 LLM
+                  工作负载下的吞吐量、成本和交互性。可通过下方图表控件切换序列长度和指标，操作方式与
                   <Link href="/zh" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -197,7 +199,7 @@ export default function CompareSpecDecodePageClient({
                           {' '}
                           <span className="text-muted-foreground italic">
                             {isZh
-                              ? `（数据反映此 URL 固定的 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载——更改序列或模型时表格和图表都会更新；本页表格始终锁定该精度，图表中的精度切换仅影响图表。）`
+                              ? `（以上数据基于此 URL 固定的 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载；切换序列长度或模型后，表格和图表会同步更新。表格始终使用本页指定的精度，控件中的精度选项只影响图表。）`
                               : `(Numbers reflect this URL's pinned ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} workload — changing sequence or model updates both the table and chart; the table stays pinned to this page's precision, so precision toggles in the controls affect the chart only.)`}
                           </span>
                         </>
@@ -231,7 +233,7 @@ export default function CompareSpecDecodePageClient({
                 src={heroImageSrc}
                 alt={
                   isZh
-                    ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的投机解码对比`
+                    ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）在相同交互性水平下的对比`
                     : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
                 }
                 width={1200}
@@ -242,7 +244,7 @@ export default function CompareSpecDecodePageClient({
               />
               <figcaption className="text-xs text-muted-foreground">
                 {isZh
-                  ? `${gpuLabel} ${precisionLabel} 上 ${aLabel} 与 ${bLabel} 的投机解码对比（默认工作负载）。`
+                  ? `${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）的对比（默认工作负载）。`
                   : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload.`}
               </figcaption>
             </figure>
@@ -250,8 +252,8 @@ export default function CompareSpecDecodePageClient({
               gpu={gpu}
               method={method}
               precision={defaultPrecision}
-              aLabel={aLabel}
-              bLabel={bLabel}
+              aLabel={isZh ? `启用 ${aLabel}` : aLabel}
+              bLabel={isZh ? '关闭投机解码' : bLabel}
               ssrTableData={ssrTableData}
               emptyStateText={t.emptyState}
             />

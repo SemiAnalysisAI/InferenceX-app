@@ -53,6 +53,7 @@ interface ComparePairCardLinkProps {
   slug: string;
   label: string;
   archLine: string;
+  locale?: 'en' | 'zh';
   scenarioLabel?: 'AgentX' | '8K/1K';
   /** When both sides are provided, the title renders each hardware label with
    *  its vendor logo beside it instead of the plain `label` string. */
@@ -65,6 +66,7 @@ export function ComparePairCardLink({
   slug,
   label,
   archLine,
+  locale = 'en',
   scenarioLabel,
   hardwareA,
   hardwareB,
@@ -119,7 +121,9 @@ export function ComparePairCardLink({
                     <HwVendorLogo vendor={hardwareA.vendor} />
                     {hardwareA.label}
                   </span>{' '}
-                  <span className="font-normal text-muted-foreground">vs</span>{' '}
+                  <span className="font-normal text-muted-foreground">
+                    {locale === 'zh' ? '与' : 'vs'}
+                  </span>{' '}
                   <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <HwVendorLogo vendor={hardwareB.vendor} />
                     {hardwareB.label}

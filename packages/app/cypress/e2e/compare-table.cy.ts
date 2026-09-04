@@ -148,13 +148,13 @@ describe('Compare Interpolated Table', () => {
   it('localizes the comparison reader and target input names', () => {
     cy.visit('/zh/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]')
-      .should('contain.text', '吞吐量 (tok/s/chip)')
-      .and('contain.text', '成本 ($/M tok)')
+      .should('contain.text', '吞吐量（tok/s/chip）')
+      .and('contain.text', '成本（$/M tok）')
       .and('contain.text', '并发数');
     cy.get('[data-testid="compare-table-target-0"]').should(
       'have.attr',
       'aria-label',
-      '目标交互速度 1 (tok/s/user)',
+      '目标交互性 1（tok/s/user）',
     );
   });
 });
