@@ -309,7 +309,7 @@ const STRINGS = {
   },
 } as const;
 
-/** A bordered note under the chart that folds behind its title, like the metric notes on /inference. */
+/** A plain note under the chart that folds behind its title, like the metric notes on /inference. */
 function InfoFold({
   title,
   toggleLabel,
@@ -324,7 +324,7 @@ function InfoFold({
   // Collapsed by default; the formula is reference material, not the result.
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-md border border-border px-3 py-2 text-xs" data-testid={testId}>
+    <div className="py-1 text-xs" data-testid={testId}>
       <button
         type="button"
         aria-expanded={open}
@@ -1160,7 +1160,7 @@ function ProfitEstimatorInner({
                 assumptions={assumptions}
                 caption={caption}
               />
-              <div className="mt-3">
+              <div className="mt-1">
                 <InfoFold
                   title={t.formulaTitle[basis]}
                   toggleLabel={t.formulaToggle}
