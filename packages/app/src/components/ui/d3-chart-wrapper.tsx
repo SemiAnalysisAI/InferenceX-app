@@ -135,9 +135,11 @@ export function D3ChartWrapper({
             />
             {noDataOverlay}
           </div>
-          <p className="no-export text-xs text-muted-foreground text-center mt-2">
-            {resolvedInstructions}
-          </p>
+          {resolvedInstructions && (
+            <p className="no-export text-xs text-muted-foreground text-center mt-2">
+              {resolvedInstructions}
+            </p>
+          )}
           <div className="overflow-hidden max-h-0">
             <div id={`${chartId}-export`} className="p-4"></div>
           </div>

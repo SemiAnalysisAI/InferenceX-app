@@ -3,6 +3,8 @@
 import * as d3 from 'd3';
 import { useCallback, useMemo, useRef } from 'react';
 
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+
 import type { HardwareConfig } from '@/components/inference/types';
 import { track } from '@/lib/analytics';
 import { getHardwareConfig } from '@/lib/constants';
@@ -40,8 +42,59 @@ export interface ProfitSegment {
  * tick.
  */
 const CHART_MARGIN = { top: 44, right: 24, bottom: 172, left: 116 };
+/** Bottom margin when the x labels stand upright on two lines (name / framework). */
+const X_LABEL_STACKED_BOTTOM = 64;
 const CHART_HEIGHT = 720;
+/** Below this container width the chart uses the compact margins and height. */
+export const COMPACT_CHART_MAX_WIDTH = 640;
+const CHART_MARGIN_COMPACT = { top: 44, right: 8, bottom: 140, left: 64 };
+const CHART_HEIGHT_COMPACT = 560;
+/** Average glyph advance as a share of font size; used to test whether a label fits a bar. */
+const GLYPH_WIDTH_EM = 0.55;
+/** Horizontal breathing room a label needs inside its bar, in px. */
+const LABEL_SIDE_PAD_PX = 4;
+/** The margin line above a bar may borrow this much of the gap to each neighbour, in px. */
+const X_GAP_ALLOWANCE = 12;
+
+/** Rough rendered width of `text` at `fontPx`, for fit tests before anything is drawn. */
+export function estimateTextWidth(text: string, fontPx: number): number {
+  return text.length * GLYPH_WIDTH_EM * fontPx;
+}
 const X_LABEL_ROTATION = -50;
+/** Widest vendor mark (NVIDIA eye, 1.6:1) at the axis mark height, px; used before anything is drawn. */
+const X_LABEL_ICON_MAX_WIDTH = 20;
+
+export type XLabelLayout = 'stacked' | 'slanted';
+
+/**
+ * Split "GB300 NVL72 (Dynamo vLLM) (FP4)" into ["GB300 NVL72", "(Dynamo vLLM) (FP4)"]
+ * so the SKU name and its framework can sit on two lines under the tick.
+ * A label with no parenthesis stays on one line.
+ */
+export function splitAxisLabel(label: string): [string, string] {
+  const at = label.indexOf(' (');
+  if (at === -1) return [label, ''];
+  return [label.slice(0, at), label.slice(at + 1)];
+}
+
+/**
+ * Upright two-line labels when every SKU fits in its own slot (the mark leads
+ * the first line); otherwise the classic slanted single line. `slotPx` is the
+ * horizontal room per tick, `fontPx` the label size.
+ */
+export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): XLabelLayout {
+  if (labels.length === 0 || slotPx <= 0) return 'slanted';
+  const widest = Math.max(
+    ...labels.map((label) => {
+      const [name, detail] = splitAxisLabel(label);
+      return Math.max(
+        estimateTextWidth(name, fontPx) + X_LABEL_ICON_MAX_WIDTH + X_LABEL_ICON_GAP,
+        estimateTextWidth(detail, fontPx),
+      );
+    }),
+  );
+  return widest + LABEL_SIDE_PAD_PX * 2 <= slotPx ? 'stacked' : 'slanted';
+}
 /** Height of the vendor mark before each x label, in px; width follows the mark's aspect. */
 const X_LABEL_ICON_HEIGHT = CHART_TYPE.axisLabel;
 /** Gap between the vendor mark and the label text, px. */
@@ -94,7 +147,8 @@ export function lossPatternId(resultKey: string): string {
 
 const STRINGS = {
   en: {
-    yAxis: 'US$ per all-in utility GW per year',
+    yAxis: 'Revenue per all-in provisioned utility GW per year ($ USD)',
+    yAxisCompact: 'Revenue per provisioned GW-year ($ USD)',
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
     gpuHours: 'GPU-hours per GW-year',
@@ -109,11 +163,11 @@ const STRINGS = {
     labCutShare: 'License fee share',
     ofRevenue: 'of revenue',
     dismiss: 'Click anywhere to dismiss',
-    instructions: 'Hover a bar for the breakdown · Click to pin',
     noData: 'No SKU can be priced for the current selection.',
   },
   zh: {
-    yAxis: '每全电源配置吉瓦每年（美元）',
+    yAxis: '每全电源配置吉瓦每年收入（美元）',
+    yAxisCompact: '每吉瓦每年收入（美元）',
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
     gpuHours: '每吉瓦年 GPU 小时数',
@@ -128,7 +182,6 @@ const STRINGS = {
     labCutShare: '许可费比例',
     ofRevenue: '（占收入）',
     dismiss: '点击任意位置关闭',
-    instructions: '悬停柱形查看拆分 · 点击固定',
     noData: '当前选择下没有可定价的 SKU。',
   },
 } as const;
@@ -143,13 +196,20 @@ export function segmentLabelLines(
   row: ProfitEstimatorRow,
   heightPx: number,
   t: { tco: string; labCut: string; profit: string; loss: string },
+  widthPx: number = Number.POSITIVE_INFINITY,
 ): string[] {
   // Profit and loss both read `row.profit`; the loss kind only changes the word.
   const amount = kind === 'tco' ? row.tco : kind === 'labCut' ? row.labCut : row.profit;
   const name =
     kind === 'tco' ? t.tco : kind === 'labCut' ? t.labCut : kind === 'profit' ? t.profit : t.loss;
-  if (heightPx >= SEGMENT_TWO_LINE_MIN_PX) return [name, formatUsdCompact(amount)];
-  if (heightPx >= SEGMENT_ONE_LINE_MIN_PX) return [formatUsdCompact(amount)];
+  const amountText = formatUsdCompact(amount);
+  const fits = (text: string) =>
+    estimateTextWidth(text, CHART_TYPE.annotation) + LABEL_SIDE_PAD_PX <= widthPx;
+  // A narrow bar (phones) drops the name first, then the amount, so text
+  // never spills into the neighbouring bar.
+  if (!fits(amountText)) return [];
+  if (heightPx >= SEGMENT_TWO_LINE_MIN_PX && fits(name)) return [name, amountText];
+  if (heightPx >= SEGMENT_ONE_LINE_MIN_PX) return [amountText];
   return [];
 }
 
@@ -171,10 +231,19 @@ export function contrastingTextColor(fill: string): string {
   return luminance > 0.45 ? '#111111' : '#ffffff';
 }
 
-/** Operator margin as a share of revenue, formatted for the label above the bar. */
-export function operatorMarginLabel(row: ProfitEstimatorRow, marginWord: string): string {
+/**
+ * Margin as a share of revenue, formatted for the label above the bar. When
+ * the bar is too narrow for the word, only the percentage is shown.
+ */
+export function operatorMarginLabel(
+  row: ProfitEstimatorRow,
+  marginWord: string,
+  widthPx: number = Number.POSITIVE_INFINITY,
+): string {
   if (!(row.revenue > 0)) return '';
-  return `${formatPct(row.profit / row.revenue)} ${marginWord}`;
+  const pct = formatPct(row.profit / row.revenue);
+  const full = `${pct} ${marginWord}`;
+  return estimateTextWidth(full, CHART_TYPE.annotation) <= widthPx ? full : pct;
 }
 
 /** Turn a priced row into its stacked rectangles. Pure, so it is unit-tested. */
@@ -292,6 +361,8 @@ export default function ProfitEstimatorChart({
   caption,
 }: ProfitEstimatorChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
+  const compact = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
   const locale = useLocale();
   const t = STRINGS[locale];
   const strings = t;
@@ -439,7 +510,11 @@ export default function ProfitEstimatorChart({
         };
         const segmentLabels = segments.map((d) => {
           const height = Math.max(0, yScale(d.y0) - yScale(d.y1));
-          return { segment: d, lines: segmentLabelLines(d.kind, d.row, height, labelText), height };
+          return {
+            segment: d,
+            lines: segmentLabelLines(d.kind, d.row, height, labelText, bandwidth),
+            height,
+          };
         });
         const segmentText = group
           .selectAll<SVGTextElement, (typeof segmentLabels)[number]>('.segment-label')
@@ -513,7 +588,11 @@ export default function ProfitEstimatorChart({
           .selectAll<SVGTSpanElement, ProfitSegment>('tspan')
           .data((d) => [
             { row: d.row, text: formatUsdCompact(d.row.revenue), sub: false },
-            { row: d.row, text: operatorMarginLabel(d.row, strings.marginShort), sub: true },
+            {
+              row: d.row,
+              text: operatorMarginLabel(d.row, strings.marginShort, bandwidth + X_GAP_ALLOWANCE),
+              sub: true,
+            },
           ])
           .join('tspan')
           .attr('class', (d) => (d.sub ? 'revenue-margin' : 'revenue-amount'))
@@ -601,6 +680,19 @@ export default function ProfitEstimatorChart({
     [outlineFor, colorResolver],
   );
 
+  const baseMargin = compact ? CHART_MARGIN_COMPACT : CHART_MARGIN;
+  // Upright two-line labels when each SKU has room for them; slanted otherwise.
+  const labelLayout = useMemo<XLabelLayout>(() => {
+    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const slot = rows.length > 0 ? plotWidth / rows.length : 0;
+    return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
+  }, [dimensions.width, baseMargin, rows.length, labelMap]);
+  const margin = useMemo(
+    () =>
+      labelLayout === 'stacked' ? { ...baseMargin, bottom: X_LABEL_STACKED_BOTTOM } : baseMargin,
+    [baseMargin, labelLayout],
+  );
+
   const xAxisConfig = useMemo(
     () => ({
       tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
@@ -610,10 +702,52 @@ export default function ProfitEstimatorChart({
         ticks.each(function (d) {
           const tick = d3.select(this);
           const icon = getAxisVendorIcon(hwKeyByResultKey.get(String(d)) ?? '');
+          tick.selectAll('image.vendor-mark').remove();
+          if (labelLayout === 'stacked') {
+            // Two upright lines: SKU name, then the framework in parentheses.
+            // The vendor mark leads the first line; the pair is centred on the tick.
+            const [name, detail] = splitAxisLabel(labelMap.get(String(d)) ?? String(d));
+            const scale = icon ? X_LABEL_ICON_HEIGHT / icon.height : 0;
+            const iconW = icon ? icon.width * scale : 0;
+            const iconH = icon ? icon.height * scale : 0;
+            const lead = icon ? iconW + X_LABEL_ICON_GAP : 0;
+            const text = tick
+              .select<SVGTextElement>('text')
+              .attr('transform', null)
+              .attr('text-anchor', 'middle')
+              .attr('dx', null)
+              .attr('dy', '0.9em')
+              .attr('font-size', px(fontPx))
+              .style('fill', 'var(--foreground)')
+              .text(null);
+            const first = text
+              .append('tspan')
+              .attr('x', lead / 2)
+              .text(name);
+            if (detail) {
+              text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(detail);
+            }
+            if (!icon) return;
+            const nameW = axisLabelLength(first.node() as SVGTextElement | null, fontPx);
+            // d3 offsets the tick text by tick size + padding; the mark shares that offset.
+            const textY = Number(text.attr('y')) || 0;
+            tick
+              .append('image')
+              .attr('class', icon.monochrome ? 'vendor-mark dark:invert' : 'vendor-mark')
+              .attr('aria-hidden', 'true')
+              .attr('href', icon.href)
+              .attr('width', iconW)
+              .attr('height', iconH)
+              .attr('x', lead / 2 - nameW / 2 - X_LABEL_ICON_GAP - iconW)
+              // Centre the mark on the first line's x-height (baseline at y + 0.9em).
+              .attr('y', textY + 0.9 * fontPx - fontPx * 0.35 - iconH / 2)
+              .style('pointer-events', 'none');
+            return;
+          }
           // The label is rotated about the tick and anchored at its end, so
           // the text runs away from the axis towards the lower left. The
           // vendor mark leads the label: it sits just before the first
-          // character, on the same rotated baseline, upright.
+          // character and shares the label's rotation, so it slants with the text.
           const text = tick
             .select<SVGTextElement>('text')
             .attr('transform', `rotate(${X_LABEL_ROTATION})`)
@@ -622,7 +756,6 @@ export default function ProfitEstimatorChart({
             .attr('dy', '0.6em')
             .attr('font-size', px(fontPx))
             .style('fill', 'var(--foreground)');
-          tick.selectAll('image.vendor-mark').remove();
           if (!icon) return;
           const textNode = text.node();
           const textLength = axisLabelLength(textNode, fontPx);
@@ -633,33 +766,32 @@ export default function ProfitEstimatorChart({
           // of the text, vertically on the x-height (the baseline sits at dy=0.6em).
           const cx = -(X_LABEL_DX_EM * fontPx) - textLength - X_LABEL_ICON_GAP - w / 2;
           const cy = 0.6 * fontPx - h / 2 + fontPx * 0.15;
-          // Map back to the tick's frame so the mark itself stays upright.
-          const theta = (X_LABEL_ROTATION * Math.PI) / 180;
-          const px0 = cx * Math.cos(theta) - cy * Math.sin(theta);
-          const py0 = cx * Math.sin(theta) + cy * Math.cos(theta);
           tick
             .append('image')
             .attr('class', icon.monochrome ? 'vendor-mark dark:invert' : 'vendor-mark')
             .attr('aria-hidden', 'true')
             .attr('href', icon.href)
+            .attr('transform', `rotate(${X_LABEL_ROTATION})`)
             .attr('width', w)
             .attr('height', h)
-            .attr('x', px0 - w / 2)
-            .attr('y', py0 - h / 2)
+            .attr('x', cx - w / 2)
+            .attr('y', cy - h / 2)
             .style('pointer-events', 'none');
         });
       },
     }),
-    [labelMap, hwKeyByResultKey],
+    [labelMap, hwKeyByResultKey, labelLayout],
   );
 
+  // The full axis label is longer than a phone-height plot; the compact
+  // chart uses the short form.
   const yAxisConfig = useMemo(
     () => ({
-      label: t.yAxis,
+      label: compact ? t.yAxisCompact : t.yAxis,
       tickFormat: (d: d3.AxisDomain) => formatUsdCompact(Number(d), 0),
       tickCount: 8,
     }),
-    [t.yAxis],
+    [compact, t.yAxis, t.yAxisCompact],
   );
 
   const onRender = useMemo(
@@ -688,15 +820,15 @@ export default function ProfitEstimatorChart({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full" ref={setContainerRef}>
       <D3Chart<ProfitSegment>
         ref={chartRef}
         chartId="profit-estimator-chart"
         data={segments}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        height={CHART_HEIGHT}
-        margin={CHART_MARGIN}
+        height={compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT}
+        margin={margin}
         watermark={getChartWatermark()}
         testId="profit-estimator-chart"
         clipContent={false}
@@ -707,7 +839,8 @@ export default function ProfitEstimatorChart({
         layers={layers}
         tooltip={tooltip}
         onRender={onRender}
-        instructions={t.instructions}
+        // No hover hint: the bars carry their own labels and the tooltip is discoverable.
+        instructions=""
         legendElement={legendElement}
         caption={caption}
       />

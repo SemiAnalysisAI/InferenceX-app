@@ -45,6 +45,12 @@ function suppressNudges(win: Cypress.AUTWindow): void {
 
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const bars = () => chart().find('rect.bar');
+// The formula fold is collapsed by default; open it (if it is not already) before
+// reading the text. Tests share one page, so a previous test may have opened it.
+const openFormulaNotes = () =>
+  cy.get('[data-testid="profit-formula-notes"] button').then(($btn) => {
+    if ($btn.attr('aria-expanded') === 'false') cy.wrap($btn).click();
+  });
 const revenueLabels = () => chart().find('text.revenue-label tspan.revenue-amount');
 
 function parseCompactUsd(text: string): number {
@@ -74,7 +80,7 @@ describe('Profit Estimator', () => {
     chart().should('contain.text', 'Model license fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Revenue & Profit Estimates per GigaWatt at P90 45 tok/s/user Interactivity',
+      'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
     );
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
@@ -95,15 +101,22 @@ describe('Profit Estimator', () => {
     // Each x label carries its vendor mark; the H200 curve stops short of 45
     // tok/s/user, so it is absent from the chart rather than extrapolated.
     chart().find('.tick image.vendor-mark').should('have.length', 4);
+    // Desktop width: upright two-line labels, SKU name then framework.
+    chart().find('.tick text tspan').should('have.length', 8);
+    chart().find('.tick text').first().should('not.have.attr', 'transform');
+    chart().find('.tick text').first().should('contain.text', 'GB300 NVL72');
     cy.get('[data-testid="profit-skipped"]').should('not.exist');
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     cy.get('[data-testid="profit-high-contrast"]').should('not.exist');
     chart().should('not.contain.text', 'H200');
+    cy.get('[data-testid="profit-formula-notes"]')
+      .should('contain.text', 'Revenue per GigaWatt Formula')
+      .and('not.contain.text', '60% utilization');
+    openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
     cy.get('[data-testid="profit-formula-notes"] button').click();
     cy.get('[data-testid="profit-formula-notes"]').should('not.contain.text', '60% utilization');
-    cy.get('[data-testid="profit-formula-notes"] button').click();
-    cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
+    chart().should('not.contain.text', 'Hover a bar');
     cy.get('[data-testid="export-button"]').should('exist');
     cy.get('[data-testid="profit-scenario"]').should('not.exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
@@ -136,6 +149,7 @@ describe('Profit Estimator', () => {
         tcoHeightAt60 = String(height);
       });
 
+    openFormulaNotes();
     cy.get('[data-testid="profit-utilization-input"]').clear().type('30').blur();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '30% utilization');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '30%');
@@ -163,6 +177,7 @@ describe('Profit Estimator', () => {
   });
 
   it('clamps utilization and the license fee to 0–100 on blur', () => {
+    openFormulaNotes();
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('250').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '100');
     cy.get('[data-testid="profit-formula-notes"]').should(
@@ -200,6 +215,7 @@ describe('Profit Estimator', () => {
   it('lets a custom price pair replace the OpenRouter catalog', () => {
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'Custom $/M tok').click();
+    cy.get('[data-testid="profit-custom-prices"]').should('exist');
     cy.get('[data-testid="profit-input-price"]').should('have.value', '0.6');
     cy.get('[data-testid="profit-cached-price"]').should('have.value', '0.1');
     cy.get('[data-testid="profit-output-price"]').should('have.value', '2.5');
@@ -298,7 +314,8 @@ describe('Profit Estimator — Chinese mirror', () => {
     cy.get('label[for="profit-lab-cut"]').should('contain.text', '模型许可费');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
     chart().should('contain.text', '模型许可费').and('contain.text', '利润');
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦收入与利润估算');
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦每年收入与利润估算');
+    openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
   });
 });

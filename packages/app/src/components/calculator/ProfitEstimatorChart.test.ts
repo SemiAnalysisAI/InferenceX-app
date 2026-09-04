@@ -7,6 +7,9 @@ import {
   buildProfitSegments,
   contrastingTextColor,
   generateProfitTooltipHTML,
+  estimateTextWidth,
+  splitAxisLabel,
+  xLabelLayout,
   operatorMarginLabel,
   profitYDomain,
   rowLabel,
@@ -174,6 +177,45 @@ describe('segmentLabelLines', () => {
     const lossRow = row({ tco: 1300, grossMargin: -300, labCut: 300, profit: -600 });
     expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual(['Loss', '-$600']);
   });
+
+  it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
+    // "Compute expense" is 15 glyphs; at 11px that is ~91px plus padding.
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 200)).toEqual([
+      'Compute expense',
+      '$400',
+    ]);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 60)).toEqual(['$400']);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 20)).toEqual([]);
+  });
+});
+
+describe('splitAxisLabel', () => {
+  it('puts the SKU name on the first line and the parenthesised detail on the second', () => {
+    expect(splitAxisLabel('GB300 NVL72 (Dynamo vLLM) (FP4)')).toEqual([
+      'GB300 NVL72',
+      '(Dynamo vLLM) (FP4)',
+    ]);
+    expect(splitAxisLabel('B200')).toEqual(['B200', '']);
+  });
+});
+
+describe('xLabelLayout', () => {
+  const labels = ['GB300 NVL72 (Dynamo vLLM) (FP4)', 'B200 (SGLang) (FP4)'];
+  it('stands labels upright on two lines when every slot has room', () => {
+    expect(xLabelLayout(labels, 200, 10)).toBe('stacked');
+  });
+  it('falls back to the slanted single line on narrow slots or with no data', () => {
+    expect(xLabelLayout(labels, 80, 10)).toBe('slanted');
+    expect(xLabelLayout([], 200, 10)).toBe('slanted');
+    expect(xLabelLayout(labels, 0, 10)).toBe('slanted');
+  });
+});
+
+describe('estimateTextWidth', () => {
+  it('scales with glyph count and font size', () => {
+    expect(estimateTextWidth('abcd', 10)).toBeCloseTo(22);
+    expect(estimateTextWidth('', 10)).toBe(0);
+  });
 });
 
 describe('contrastingTextColor', () => {
@@ -197,5 +239,10 @@ describe('operatorMarginLabel', () => {
 
   it('returns nothing when there is no revenue to divide by', () => {
     expect(operatorMarginLabel(row({ revenue: 0 }), 'margin')).toBe('');
+  });
+
+  it('keeps only the percentage when the bar is too narrow for the word', () => {
+    expect(operatorMarginLabel(row(), 'margin', 40)).toBe('42.0%');
+    expect(operatorMarginLabel(row(), 'margin', 200)).toBe('42.0% margin');
   });
 });

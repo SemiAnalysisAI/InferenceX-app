@@ -1020,7 +1020,8 @@ other.
 Fleet Lifecycle answers "what did a fixed fleet earn over its life". This page answers
 a narrower, present-tense question: at one interactivity operating point, what does a
 **gigawatt-year** of each chip earn today, and who keeps it? One vertical stacked bar
-per SKU, all in US$ per all-in utility GW per year.
+per SKU; the y axis reads "Revenue per all-in provisioned utility GW per year ($ USD)"
+(a shorter form on phones).
 
 ### The arithmetic
 
@@ -1073,11 +1074,18 @@ and the two can be collapsed into one once both are on master.
   (`defaultRouteModel('profit-estimator')`); `/profit-estimator/kimi-k3` is the same
   page, aliases 308 to the canonical slug, and any model outside the allow-list 404s.
   Widening the page to more models is one list edit plus fixture rows.
-- **Vendor marks on the x axis and above each bar.** Each rotated SKU label leads
-  with its vendor logo (`getAxisVendorIcon`), kept upright, and the same mark sits
-  above the revenue figure. NVIDIA's mark is the brand green and is never inverted;
-  AMD publishes no color mark, so its arrow is black and inverts to white in dark
-  mode.
+- **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
+  estimates the widest label against the room per tick. With room, each SKU stands
+  upright as two lines, name over framework and precision (`splitAxisLabel`), and
+  the bottom margin shrinks to match. Otherwise the label rotates -50° as one line.
+  Either way the vendor logo (`getAxisVendorIcon`) leads the first line and follows
+  its slant; the same mark sits above the revenue figure. NVIDIA's mark is the brand
+  green and is never inverted; AMD publishes no color mark, so its arrow is black
+  and inverts to white in dark mode.
+- **Phone layout.** Below 640px the chart switches to compact margins and height, and
+  segment labels drop the name, then the amount, when the bar is too narrow
+  (`segmentLabelLines` with a width); the margin line keeps only the percentage.
+  Custom token prices always take their own row under the main controls.
 - **Legend is the SKU filter.** Same click semantics as the fleet page (click to
   isolate, click again to restore), and the same `resolveCalculatorVisibility`
   intent so the choice survives a model change when the SKU still exists.
@@ -1088,8 +1096,10 @@ and the two can be collapsed into one once both are on master.
   cost tier, utilization, run date, and source beneath it; TCO $/chip/hr badges and
   the selling prices under that. The TCO source line is omitted when the cost
   provider is a custom $/GPU/hr, since there is nothing to cite. Segments are
-  labelled in place, so there is no separate key. The formula sits in a fold under
-  the chart, and the export button (top right of the card) writes PNG and CSV.
+  labelled in place, so there is no separate key and no hover hint under the chart.
+  The formula sits in a fold under the chart ("Revenue per GigaWatt Formula"),
+  collapsed by default, and the export button (top right of the card) writes PNG
+  and CSV.
 - **Number inputs ignore the mouse wheel.** A wheel event over a focused number
   input blurs it, so scrolling the page never nudges a percentage.
 

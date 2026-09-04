@@ -123,9 +123,7 @@ const PRICE_SOURCE_OPTIONS: { value: PriceSource; label: string; labelZh: string
 
 const STRINGS = {
   en: {
-    title: 'Profit Estimator',
-    description:
-      'What one all-in utility gigawatt-year of each chip earns at a chosen interactivity. Each bar is that year’s revenue at the utilization you set, split into compute expense (TCO), the model license fee paid to the lab, and what is left for the operator. Every figure is US$ per GW per year.',
+    title: 'Revenue & Profit Estimator',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
@@ -155,13 +153,13 @@ const STRINGS = {
         ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
     chartTitle: (model: string, workload: string, percentile: string, target: number) =>
-      `${model} ${workload} Revenue & Profit Estimates per GigaWatt at ${percentile} ${target} tok/s/user Interactivity`,
+      `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
     sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
     sourceLabel: 'Source:',
-    formulaTitle: 'How the bars are computed',
+    formulaTitle: 'Revenue per GigaWatt Formula',
     formulaToggle: 'Toggle formula notes',
     captionFormula: (util: number, labCut: number) =>
       `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
@@ -186,9 +184,7 @@ const STRINGS = {
     } satisfies Record<ProfitEstimatorSkipReason, string>,
   },
   zh: {
-    title: '利润估算器',
-    description:
-      '在选定的交互性下，每款芯片一个全电源配置吉瓦年能赚多少。每根柱形是按所设利用率计算的当年收入，拆分为算力支出（TCO）、支付给模型实验室的许可费，以及运营方所剩的利润。所有数字均为每吉瓦每年美元。',
+    title: '收入与利润估算器',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
@@ -218,13 +214,13 @@ const STRINGS = {
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
     chartTitle: (model: string, workload: string, percentile: string, target: number) =>
-      `${model} ${workload} 每吉瓦收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+      `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
     tcoBadgesLabel: 'TCO $/chip/hr：',
     sourceLabel: '来源：',
-    formulaTitle: '柱形计算方式',
+    formulaTitle: '每吉瓦收入公式',
     formulaToggle: '展开或收起公式说明',
     captionFormula: (util: number, labCut: number) =>
       `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
@@ -262,7 +258,8 @@ function InfoFold({
   children: React.ReactNode;
   testId: string;
 }) {
-  const [open, setOpen] = useState(true);
+  // Collapsed by default; the formula is reference material, not the result.
+  const [open, setOpen] = useState(false);
   return (
     <div className="rounded-md border border-border px-3 py-2 text-xs" data-testid={testId}>
       <button
@@ -729,11 +726,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       <section data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader
-              title={t.title}
-              description={t.description}
-              actions={<ChartShareActions />}
-            />
+            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
               <div
@@ -794,11 +787,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 </div>
               </div>
 
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                  priceSource === 'custom' ? 'lg:grid-cols-7' : 'lg:grid-cols-4'
-                }`}
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:grid-cols-4">
                 <div className="flex flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="profit-target"
@@ -903,71 +892,76 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     onBlur={labCut.onBlur}
                   />
                 </div>
-                {priceSource === 'custom' && (
-                  <>
-                    <div className="flex flex-col space-y-1.5">
-                      <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
-                      <Input
-                        id="profit-input-price"
-                        data-testid="profit-input-price"
-                        type="number"
-                        onWheel={blurOnWheel}
-                        inputMode="decimal"
-                        min={0}
-                        step={0.01}
-                        value={customInputPrice}
-                        onChange={(e) => setCustomInputPrice(e.target.value)}
-                        onBlur={() =>
-                          track('profit_custom_price_set', {
-                            stream: 'input',
-                            value: customInputPrice,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col space-y-1.5">
-                      <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
-                      <Input
-                        id="profit-cached-price"
-                        data-testid="profit-cached-price"
-                        type="number"
-                        onWheel={blurOnWheel}
-                        inputMode="decimal"
-                        min={0}
-                        step={0.001}
-                        value={customCachedPrice}
-                        onChange={(e) => setCustomCachedPrice(e.target.value)}
-                        onBlur={() =>
-                          track('profit_custom_price_set', {
-                            stream: 'cached',
-                            value: customCachedPrice,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col space-y-1.5">
-                      <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
-                      <Input
-                        id="profit-output-price"
-                        data-testid="profit-output-price"
-                        type="number"
-                        onWheel={blurOnWheel}
-                        inputMode="decimal"
-                        min={0}
-                        step={0.01}
-                        value={customOutputPrice}
-                        onChange={(e) => setCustomOutputPrice(e.target.value)}
-                        onBlur={() =>
-                          track('profit_custom_price_set', {
-                            stream: 'output',
-                            value: customOutputPrice,
-                          })
-                        }
-                      />
-                    </div>
-                  </>
-                )}
               </div>
+
+              {/* Custom token prices get their own row so the main controls keep their width. */}
+              {priceSource === 'custom' && (
+                <div
+                  data-testid="profit-custom-prices"
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                >
+                  <div className="flex flex-col space-y-1.5">
+                    <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
+                    <Input
+                      id="profit-input-price"
+                      data-testid="profit-input-price"
+                      type="number"
+                      onWheel={blurOnWheel}
+                      inputMode="decimal"
+                      min={0}
+                      step={0.01}
+                      value={customInputPrice}
+                      onChange={(e) => setCustomInputPrice(e.target.value)}
+                      onBlur={() =>
+                        track('profit_custom_price_set', {
+                          stream: 'input',
+                          value: customInputPrice,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1.5">
+                    <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
+                    <Input
+                      id="profit-cached-price"
+                      data-testid="profit-cached-price"
+                      type="number"
+                      onWheel={blurOnWheel}
+                      inputMode="decimal"
+                      min={0}
+                      step={0.001}
+                      value={customCachedPrice}
+                      onChange={(e) => setCustomCachedPrice(e.target.value)}
+                      onBlur={() =>
+                        track('profit_custom_price_set', {
+                          stream: 'cached',
+                          value: customCachedPrice,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1.5">
+                    <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
+                    <Input
+                      id="profit-output-price"
+                      data-testid="profit-output-price"
+                      type="number"
+                      onWheel={blurOnWheel}
+                      inputMode="decimal"
+                      min={0}
+                      step={0.01}
+                      value={customOutputPrice}
+                      onChange={(e) => setCustomOutputPrice(e.target.value)}
+                      onBlur={() =>
+                        track('profit_custom_price_set', {
+                          stream: 'output',
+                          value: customOutputPrice,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               {costProvider === 'custom' && customCostBases.length > 0 && (
                 <div
