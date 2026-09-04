@@ -1,6 +1,8 @@
 // /profit-estimator: one stacked bar per SKU, US$ per all-in GW per year.
 // Behaviours worth locking down:
 //  - defaults are Kimi K3, 45 tok/s/user, 60% utilization, 30% model license fee;
+//  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user and the Z.ai list price
+//    ($1.40 / $0.26 cached / $4.40), and a model switch re-seeds both;
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
@@ -8,8 +10,8 @@
 //  - the OpenRouter catalog is the default price source and a custom triple
 //    (input, cached input, output) can replace it;
 //  - the workload is pinned to agentic traces, so there is no scenario or
-//    precision selector, the model selector offers Kimi K3 only, and the target
-//    interactivity is a typed number, not a slider;
+//    precision selector, the model selector offers Kimi K3 and GLM 5.2/5.3 only,
+//    and the target interactivity is a typed number, not a slider;
 //  - the cost provider has a custom $/GPU/hr option with one input per chip;
 //  - the heading reads like /inference, the subtitle names the utilization, and
 //    the formula folds away under the chart;
@@ -19,12 +21,17 @@
 import { interceptProfitData } from '../support/profit-fixtures';
 
 // Kimi K3 is the page default; the DeepSeek row proves the page prices the
-// routed model, not the first catalog entry.
+// routed model, not the first catalog entry. The GLM row sits below Z.ai's
+// list price, as the real aggregate does, so the spec can tell the two apart.
 const OPENROUTER_MODELS = {
   data: [
     {
       id: 'moonshotai/kimi-k3',
       pricing: { prompt: '0.0000006', completion: '0.0000025', input_cache_read: '0.0000001' },
+    },
+    {
+      id: 'z-ai/glm-5.3',
+      pricing: { prompt: '0.00000115', completion: '0.0000035', input_cache_read: '0.0000002' },
     },
     {
       id: 'deepseek/deepseek-v4-pro-0813',
@@ -110,7 +117,14 @@ describe('Profit Estimator per GW', () => {
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
-    cy.get('[role="option"]').should('have.length', 1).and('contain.text', 'Kimi K3');
+    cy.get('[role="option"]')
+      .should('have.length', 2)
+      .and('contain.text', 'Kimi K3')
+      .and('contain.text', 'GLM5.2/GLM5.3');
+    cy.get('body').type('{esc}');
+    // Kimi K3 has no list price, so the selector offers the catalog and custom only.
+    cy.get('button#profit-price-source').click();
+    cy.get('[role="option"]').should('have.length', 2).and('not.contain.text', 'list price');
     cy.get('body').type('{esc}');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     // Each x label carries its vendor mark; the H200 curve stops short of 45
@@ -372,6 +386,95 @@ describe('Profit Estimator per GW — per-model route', () => {
     cy.request({ url: '/profit-estimator-per-gigawatt/not-a-model', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
+  });
+});
+
+describe('Profit Estimator — GLM 5.2/5.3', () => {
+  beforeEach(() => {
+    stubOpenRouter();
+    cy.viewport(1280, 1000);
+  });
+
+  it('opens /profit-estimator/glm-5-2 on 100 tok/s/user and the Z.ai list price', () => {
+    cy.visit('/profit-estimator/glm-5-2', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.location('pathname').should('eq', '/profit-estimator/glm-5-2');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-caption"] h2').should(
+      'contain.text',
+      'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 100 tok/s/user Interactivity',
+    );
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $1.4')
+      .and('contain.text', 'Cached Input: $0.26')
+      .and('contain.text', 'Output: $4.4')
+      .and('contain.text', '(Z.ai list price)');
+    cy.get('[data-testid="profit-list-price-source"]')
+      .should('have.attr', 'href', 'https://docs.z.ai/guides/overview/pricing')
+      .and('contain.text', 'Z.ai');
+    // The wide curve covers 100 tok/s/user; the H200 curve stops short of it.
+    chart().find('image.bar-vendor-mark').should('have.length', 4);
+    chart().should('not.contain.text', 'H200');
+    cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
+
+    // The catalog stays one click away and reads the GLM row, not Kimi's.
+    cy.get('button#profit-price-source').click();
+    cy.get('[role="option"]')
+      .should('have.length', 3)
+      .and('contain.text', 'OpenRouter')
+      .and('contain.text', 'Z.ai list price')
+      .and('contain.text', 'Custom $/M tok');
+    cy.contains('[role="option"]', 'OpenRouter').click();
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $1.15')
+      .and('contain.text', 'Output: $3.5')
+      .and('contain.text', '(OpenRouter)');
+    cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
+
+    // Custom seeds from the price in force, here the list price.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'Z.ai list price').click();
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'Custom $/M tok').click();
+    cy.get('[data-testid="profit-input-price"]').should('have.value', '1.4');
+    cy.get('[data-testid="profit-cached-price"]').should('have.value', '0.26');
+    cy.get('[data-testid="profit-output-price"]').should('have.value', '4.4');
+  });
+
+  it('re-seeds the operating point and price source on a model switch', () => {
+    cy.visit('/profit-estimator-per-gigawatt/glm-5-2', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'Kimi K3').click();
+    // Kimi K3 is the tab default, so its page is the bare path.
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    cy.get('[data-testid="profit-caption"] h2')
+      .should('contain.text', 'Kimi K3')
+      .and('contain.text', '45 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.6')
+      .and('contain.text', '(OpenRouter)');
+
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-2');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $1.4')
+      .and('contain.text', '(Z.ai list price)');
+  });
+
+  it('serves the Chinese mirror with the list price named in Chinese', () => {
+    cy.visit('/zh/profit-estimator/glm-5-2', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', '输入：$1.4')
+      .and('contain.text', 'Z.ai 官方定价');
+    cy.get('button#profit-price-source').should('contain.text', 'Z.ai 官方定价');
   });
 });
 

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { Model } from '@/lib/data-mappings';
 
 import {
   clampPercent,
+  DEFAULT_PROFIT_INTERACTIVITY,
   estimateProfitRows,
   estimateSkuProfit,
   formatProfitUsd,
@@ -12,8 +14,10 @@ import {
   gpuHoursPerGwYear,
   HOURS_PER_YEAR,
   isProfitEstimatorRow,
+  listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
+  profitModelDefaults,
   type ProfitEstimatorRow,
 } from './profit-estimator';
 
@@ -322,5 +326,62 @@ describe('parseTokenPriceInput', () => {
     expect(parseTokenPriceInput('')).toBeNull();
     expect(parseTokenPriceInput('-1')).toBeNull();
     expect(parseTokenPriceInput('abc')).toBeNull();
+  });
+});
+
+describe('profitModelDefaults', () => {
+  it('opens Kimi K3 on 45 tok/s/user and the OpenRouter catalog', () => {
+    expect(profitModelDefaults(Model.Kimi_K3)).toEqual({
+      interactivity: DEFAULT_PROFIT_INTERACTIVITY,
+      listPricing: null,
+    });
+  });
+
+  it('opens GLM 5.2/5.3 on 100 tok/s/user and the Z.ai list price', () => {
+    const defaults = profitModelDefaults(Model.GLM_5_2);
+    expect(defaults.interactivity).toBe(100);
+    expect(defaults.listPricing).toEqual({
+      vendor: 'Z.ai',
+      inputPerMillion: 1.4,
+      cachedInputPerMillion: 0.26,
+      outputPerMillion: 4.4,
+      sourceUrl: 'https://docs.z.ai/guides/overview/pricing',
+    });
+  });
+
+  it('falls back to 45 tok/s/user and OpenRouter for models without an entry', () => {
+    expect(profitModelDefaults(Model.DeepSeek_V4_Pro)).toEqual({
+      interactivity: DEFAULT_PROFIT_INTERACTIVITY,
+      listPricing: null,
+    });
+  });
+
+  it('converts a list price into the normalized triple the revenue math takes', () => {
+    const list = profitModelDefaults(Model.GLM_5_2).listPricing!;
+    const pricing = listPricingToTokenRevenuePricing(list);
+    expect(pricing).toEqual({
+      source: 'normalized',
+      inputPerMillion: 1.4,
+      cachedInputPerMillion: 0.26,
+      outputPerMillion: 4.4,
+    });
+    // The explicit cache price is honoured rather than the 10% default: a chip
+    // producing 1M tokens per hour at a 50/50 input/output split with every
+    // input token cached earns 0.5 x $0.26 + 0.5 x $4.40.
+    const priced = row(
+      estimateSkuProfit(
+        {
+          hwKey: 'b200',
+          resultKey: 'b200_sglang',
+          value: 1_000_000 / 3_600,
+          inputTokenShare: 0.5,
+          cacheHitRate: 1,
+        },
+        { powerKwPerGpu: 2, costPerGpuHour: 1 },
+        pricing,
+        { utilizationPct: 100, labCutPct: 0, basis: 'chip-hour' },
+      ),
+    );
+    expect(priced.revenue).toBeCloseTo(0.5 * 0.26 + 0.5 * 4.4, 9);
   });
 });
