@@ -41,12 +41,14 @@ export interface ProfitSegment {
 }
 
 /**
- * Bottom and left margins leave room for x labels rotated 50° (the longest
- * SKU label is ≈32 chars, ≈190px at the sub-label size): 190·sin50° ≈ 146px
- * of height below the axis and 190·cos50° ≈ 122px of reach left of the first
- * tick.
+ * Base margins for slanted x labels. The bottom is only a floor for the
+ * shortest labels (tick, one line of text and a little air); `slantedMargins`
+ * grows both the bottom and the left from the actual label set, so a short
+ * label set does not leave a band of dead space between the axis and the
+ * formula note under the chart. The longest SKU label (≈32 chars, ≈190px at
+ * the sub-label size) rotated 50° needs ≈146px of drop and ≈122px of reach.
  */
-const CHART_MARGIN = { top: 12, right: 24, bottom: 172, left: 116 };
+const CHART_MARGIN = { top: 12, right: 24, bottom: 40, left: 116 };
 /** Bottom margin when the x labels stand upright on two lines (name / framework). */
 const X_LABEL_STACKED_BOTTOM = 64;
 /** Tallest the chart gets, on a viewport with room to spare. */
@@ -62,7 +64,7 @@ export const CHART_HEIGHT_MIN = 440;
 export const CHART_VIEWPORT_RESERVE = 260;
 /** Below this container width the chart uses the compact margins and height. */
 export const COMPACT_CHART_MAX_WIDTH = 640;
-const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 140, left: 64 };
+const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 40, left: 64 };
 export const CHART_HEIGHT_COMPACT = 560;
 
 /** Chart height for a viewport: as tall as `maxHeight`, but never taller than the space under the card header. */
