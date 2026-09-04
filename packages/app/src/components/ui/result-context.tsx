@@ -54,7 +54,7 @@ export function ResultContext({
           cost: '成本口径',
           costTier: '成本层级',
           utilization: '利用率',
-          licenseFee: '模型许可费',
+          licenseFee: '模型许可费假设',
         }
       : {
           model: 'Model',
@@ -68,7 +68,7 @@ export function ResultContext({
           cost: 'Cost basis',
           costTier: 'Cost Tier',
           utilization: 'Utilization',
-          licenseFee: 'Model License Fee',
+          licenseFee: 'Model License Fee Assumption',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
   const selectedDates = dates && dates.length > 1 ? dates.join(', ') : date;
