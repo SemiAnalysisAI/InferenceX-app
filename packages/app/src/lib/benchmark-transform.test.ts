@@ -1,3 +1,4 @@
+import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import { describe, it, expect, vi } from 'vitest';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
@@ -422,6 +423,22 @@ describe('rowToAggDataEntry', () => {
     expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
     expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
     expect(point.measuredPowerPercentTdp).toBeUndefined();
+  });
+
+  it('withholds every MEASURED_POWER_METRIC_KEYS field when power_valid=0 (ETL parity)', () => {
+    const metrics: BenchmarkRow['metrics'] = { power_valid: 0 };
+    for (const key of MEASURED_POWER_METRIC_KEYS) metrics[key] = 123.45;
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics,
+        workers: [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 123.45 }],
+      }),
+    );
+
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect((entry as unknown as Record<string, unknown>)[key]).toBeUndefined();
+    }
+    expect(entry.workers).toBeUndefined();
   });
 
   it('keeps measured telemetry compatible when a legacy row omits power_valid', () => {

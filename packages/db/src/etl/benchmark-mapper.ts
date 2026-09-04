@@ -6,7 +6,11 @@
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
-import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  MEASURED_POWER_METRIC_KEYS,
+  METRIC_KEYS,
+  PRECISION_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
@@ -343,12 +347,16 @@ export function mapBenchmarkRow(
       ? rawRecipeFingerprint.trim()
       : null;
 
+  // Keep this after agentic reassignment and runtime metadata merging so no
+  // later mutation can reintroduce a withheld key.
+  const powerWithheld = scrubWithheldPowerMetrics(metrics);
   // Per-worker measured-power breakdown. The runner emits this as an array
   // of objects sibling to the scalar metrics; we surface it on a dedicated
   // BenchmarkParams.workers field so downstream consumers can treat it as
   // structured data without polluting the flat metrics record. Defensive
-  // narrowing — anything other than a non-empty array of objects is dropped.
-  const workers = extractWorkers(row.workers);
+  // narrowing — anything other than a non-empty array of objects is dropped,
+  // and a withheld power verdict drops the payload entirely.
+  const workers = powerWithheld ? undefined : extractWorkers(row.workers);
 
   return {
     config: {
@@ -458,7 +466,7 @@ function captureNumericMetrics(row: Record<string, any>): Record<string, number>
  * two fields are semantic discriminators, so loose numeric coercion must never
  * turn malformed producer output into an affirmative verdict or schema.
  */
-function normalizePowerContractMetrics(
+export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
@@ -487,6 +495,20 @@ function normalizePowerContractMetrics(
   } else {
     delete metrics.power_metric_schema_version;
   }
+}
+
+/**
+ * Enforces fail-closed power publication at ingest. An explicit normalized
+ * invalid verdict removes every measured field while preserving the contract
+ * and diagnostic fields; legacy rows without a verdict remain unchanged.
+ * Returns true so callers also drop worker telemetry. Paths that bypass
+ * `mapBenchmarkRow` must normalize the verdict before calling this function.
+ * Queries intentionally remain raw; the frontend withholds independently.
+ */
+export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.power_valid !== 0) return false;
+  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  return true;
 }
 
 /**
