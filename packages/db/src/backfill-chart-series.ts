@@ -26,12 +26,18 @@
  */
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { CHART_SERIES_VERSION, computeChartSeries } from './etl/compute-chart-series.js';
+import {
+  CHART_SERIES_VERSION,
+  computeChartSeries,
+  type ChartSeries,
+} from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
+  requireBackfillPayload,
+  retainPopulatedFields,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
@@ -65,7 +71,7 @@ async function main(): Promise<void> {
             and exists (
               select 1
               from benchmark_results br
-              join latest_workflow_runs wr on wr.id = br.workflow_run_id
+              join workflow_runs wr on wr.id = br.workflow_run_id
               where br.trace_replay_id = agentic_trace_replay.id
                 and wr.github_run_id = ${githubRunId}
             )
@@ -90,7 +96,7 @@ async function main(): Promise<void> {
               and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
               and (
                 chart_series is null
-                or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
+                or coalesce((chart_series->>'version')::int, -1) < ${CHART_SERIES_VERSION}
               )
               ${runFilter}
             -- Restore the newest, most actively viewed runs first. The backfill is
@@ -106,9 +112,10 @@ async function main(): Promise<void> {
           server_metrics_json_gz: Buffer | null;
           framework: string | null;
           disagg: boolean | null;
+          chart_series: ChartSeries | null;
         }[]
       >`
-        select atr.server_metrics_json_gz, source.framework, source.disagg
+        select atr.server_metrics_json_gz, atr.chart_series, source.framework, source.disagg
         from agentic_trace_replay atr
         left join lateral (
           select c.framework, c.disagg
@@ -125,15 +132,28 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
-      const series = await computeChartSeries(row.server_metrics_json_gz, {
-        framework: row.framework,
-        disagg: row.disagg ?? false,
-      });
+      const series = requireBackfillPayload(
+        await computeChartSeries(row.server_metrics_json_gz, {
+          framework: row.framework,
+          disagg: row.disagg ?? false,
+        }),
+        'chart_series',
+      );
+      retainPopulatedFields(row.chart_series, series, [
+        'kvCacheUsage',
+        'queueDepth',
+        'prefixCacheHitRate',
+        'prefillTps',
+        'decodeTps',
+        'prefixCacheHitsTps',
+        'hostKvCacheUsage',
+      ]);
 
       await sql`
         update agentic_trace_replay
-        set chart_series = ${series === null ? null : jsonbParam(sql, series)}
+        set chart_series = ${jsonbParam(sql, series)}
         where id = ${id}
+          and coalesce((chart_series->>'version')::int, -1) <= ${CHART_SERIES_VERSION}
       `;
       return 'ok';
     },

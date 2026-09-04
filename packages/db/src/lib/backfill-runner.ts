@@ -16,6 +16,31 @@ export interface LimitForceFlags {
   shardIndex: number;
 }
 
+export function requireBackfillPayload<T>(payload: T | null, field: string): T {
+  if (payload === null) {
+    throw new Error(`Could not compute ${field}; existing data was not changed`);
+  }
+  return payload;
+}
+
+function populated(value: unknown): boolean {
+  return Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined;
+}
+
+export function retainPopulatedFields<T extends object>(
+  previous: T | null,
+  next: T,
+  fields: readonly (keyof T)[],
+): void {
+  for (const field of fields) {
+    const before = previous?.[field];
+    const after = next[field];
+    if (populated(before) && !populated(after)) {
+      throw new Error(`${String(field)} became empty; existing data was not changed`);
+    }
+  }
+}
+
 /** Restrict a backfill to one GitHub run; malformed selectors must never scan all rows. */
 export function parseRunIdFlag(argv: readonly string[] = process.argv): number | undefined {
   const index = argv.indexOf('--run-id');

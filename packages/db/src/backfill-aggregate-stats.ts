@@ -35,6 +35,7 @@ import {
   jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
+  retainPopulatedFields,
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
@@ -81,7 +82,7 @@ async function main(): Promise<void> {
             and exists (
               select 1
               from benchmark_results br
-              join latest_workflow_runs wr on wr.id = br.workflow_run_id
+              join workflow_runs wr on wr.id = br.workflow_run_id
               where br.trace_replay_id = agentic_trace_replay.id
                 and wr.github_run_id = ${githubRunId}
             )
@@ -94,7 +95,7 @@ async function main(): Promise<void> {
         ? await sql<{ id: number }[]>`
             select id
             from agentic_trace_replay
-            where true ${runFilter}
+            where mod(id, ${flags.shardCount}) = ${flags.shardIndex} ${runFilter}
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `
@@ -102,7 +103,8 @@ async function main(): Promise<void> {
             select id
             from agentic_trace_replay
             where (aggregate_stats is null
-               or coalesce((aggregate_stats->>'version')::int, -1) <> ${STATS_VERSION})
+               or coalesce((aggregate_stats->>'version')::int, -1) < ${STATS_VERSION})
+              and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
               ${runFilter}
             order by id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
@@ -168,10 +170,18 @@ async function main(): Promise<void> {
         stats = mergeProfileStatsUpgrade(serverStats, profileStats);
       }
 
+      retainPopulatedFields(row.aggregate_stats, stats, [
+        'isl',
+        'osl',
+        'kvCacheUtil',
+        'prefixCacheHitRate',
+        'e2elPerOsl',
+      ]);
       await sql`
         update agentic_trace_replay
         set aggregate_stats = ${jsonbParam(sql, stats)}
         where id = ${id}
+          and coalesce((aggregate_stats->>'version')::int, -1) <= ${STATS_VERSION}
       `;
       return 'ok';
     },
