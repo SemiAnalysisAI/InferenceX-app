@@ -74,7 +74,7 @@ const translations: Readonly<Record<string, ChipPageTranslation>> = {
       'NVIDIA B200 规格、云端价格与实时 LLM 推理基准测试：180 GB HBM3e、8 TB/s 带宽、9,000 稠密 FP4 TFLOP/s 与 NVLink 5.0，每日在 vLLM、SGLang 与 TensorRT-LLM 上持续测量。',
     overview: [
       'NVIDIA B200 是 Blackwell 一代的主力数据中心芯片：180 GB 可用 HBM3e（带宽 8 TB/s）、单芯片 900 GB/s 的 NVLink 5.0，Tensor Core 每时钟吞吐量翻倍于 Hopper 并新增 FP4。稠密算力 9,000 FP4 / 4,500 FP8 TFLOP/s，在主导 LLM decode 的内存带宽受限场景中，单颗 B200 的表现超过两颗 H100。',
-      'NVFP4 推理正是在 B200 上成为主流：前沿开源模型发布 FP4 checkpoint，精度与 FP8 相差无几，单芯片吞吐量却接近翻倍。它 1,000 W 的 TDP 和约 1.7 kW 的整机功耗使小时租价远高于 Hopper，因此升级决策取决于每美元性能而非峰值算力。',
+      'NVFP4 推理正是在 B200 上成为主流：前沿开源模型发布 FP4 checkpoint，精度与 FP8 相差无几，单芯片吞吐量却接近翻倍。它的单芯片 TDP 为 1,000 W，综合功耗约为 1.7 kW，因此小时租价远高于 Hopper；是否值得升级，取决于每美元性能而非峰值算力。',
     ],
     benchmarkContext:
       'B200 是 InferenceX 上测试最密集的芯片之一：每日在 vLLM、SGLang、TensorRT-LLM 和 Dynamo 分离式推理上运行固定序列扫描与 AgentX agentic 编码 trace，每美元性能与精度对比页面持续追踪每个模型上 NVFP4 与 FP8 的差距。',

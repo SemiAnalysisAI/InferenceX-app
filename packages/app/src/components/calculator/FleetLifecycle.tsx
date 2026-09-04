@@ -94,6 +94,16 @@ interface FleetLifecycleProps {
 
 type LifecycleView = 'chart' | 'table';
 
+interface CsvAssumptions {
+  priceInput: string;
+  outputPriceInput: string;
+  rampInput: string;
+  mtbiInput: string;
+  recoveryInput: string;
+  horizonInput: string;
+  mw: number | null;
+}
+
 const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
   {
     value: 'chart',
@@ -165,7 +175,19 @@ const STRINGS = {
     colLatest: 'Latest Best',
     colSteps: 'Improvements',
     colGain: 'Gain',
+    inputTokenPrefix: 'input ',
+    outputTokenPrefix: 'output ',
     colTpPerMw: (tokenType: string) => `${tokenType}tok/s/MW now`,
+    csvAssumptions: ({
+      priceInput,
+      outputPriceInput,
+      rampInput,
+      mtbiInput,
+      recoveryInput,
+      horizonInput,
+      mw,
+    }: CsvAssumptions) =>
+      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
     colRevenue: 'Revenue $/day',
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
@@ -279,7 +301,19 @@ const STRINGS = {
     colLatest: '最新最佳',
     colSteps: '提升次数',
     colGain: '提升倍数',
+    inputTokenPrefix: '输入',
+    outputTokenPrefix: '输出',
     colTpPerMw: (tokenType: string) => `当前${tokenType} tok/s/MW`,
+    csvAssumptions: ({
+      priceInput,
+      outputPriceInput,
+      rampInput,
+      mtbiInput,
+      recoveryInput,
+      horizonInput,
+      mw,
+    }: CsvAssumptions) =>
+      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW`,
     colRevenue: '收入 $/天',
     colCost: '成本 $/天',
     colMargin: '利润 $/天',
@@ -891,7 +925,8 @@ export default function FleetLifecycle({
     [rows, colorResolver, anchorMs],
   );
 
-  const tokenTypeLabel = costType === 'input' ? 'input ' : costType === 'output' ? 'output ' : '';
+  const tokenTypeLabel =
+    costType === 'input' ? t.inputTokenPrefix : costType === 'output' ? t.outputTokenPrefix : '';
 
   const handleAssumption = useCallback(
     (
@@ -1000,7 +1035,15 @@ export default function FleetLifecycle({
     exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
       // The assumptions are not in the rows, and a CSV read six months later
       // cannot be reconstructed without them.
-      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
+      t.csvAssumptions({
+        priceInput,
+        outputPriceInput,
+        rampInput,
+        mtbiInput,
+        recoveryInput,
+        horizonInput,
+        mw,
+      }),
     ]);
   }, [
     rows,
@@ -1489,7 +1532,11 @@ export default function FleetLifecycle({
 
         <div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t.assumptions(getCostProviderLabel(costProvider), `${mw} MW`, anchorDate ?? '—')}
+            {t.assumptions(
+              getCostProviderLabel(costProvider, locale),
+              `${mw} MW`,
+              anchorDate ?? '—',
+            )}
           </p>
           <p className="text-muted-foreground mt-1">
             <small>

@@ -35,6 +35,7 @@ import {
 } from '@/lib/chip-pages-zh';
 import { getGlossaryEntry } from '@/lib/glossary';
 import { getZhGlossaryEntry } from '@/lib/glossary-zh';
+import { formatScaleUpTopology } from '@/lib/gpu-specs';
 import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n';
 import {
   ACCELERATOR_MODEL_TITLE,
@@ -317,7 +318,7 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
     [t.specLabels.scaleUp, spec.scaleUpTech],
     [t.specLabels.scaleUpBandwidth, spec.scaleUpBandwidth],
     [t.specLabels.worldSize, String(spec.scaleUpWorldSize)],
-    [t.specLabels.scaleUpTopology, spec.scaleUpTopology],
+    [t.specLabels.scaleUpTopology, formatScaleUpTopology(spec.scaleUpTopology, locale)],
     [t.specLabels.scaleOut, spec.scaleOutTech ?? t.none],
     [t.specLabels.nic, spec.nic ?? t.none],
     [t.specLabels.tdp, `${hw.tdp.toLocaleString('en-US')} W`],

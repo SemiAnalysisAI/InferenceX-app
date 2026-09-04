@@ -6,6 +6,8 @@ import { unlockAgenticGate } from '../support/e2e';
 
 type CsvCaptureWindow = Cypress.AUTWindow & {
   __capturedLifecycleCsvBlob?: Blob;
+  __capturedLifecyclePngUrl?: string;
+  __capturedLifecyclePngAxis?: string[];
 };
 
 function captureLifecycleCsvDownloads(win: Cypress.AUTWindow): void {
@@ -108,6 +110,24 @@ const firstRowCell = (header: string) => {
 /** The time-axis tick labels, as one string — changes when the x domain moves. */
 const xAxisTicks = () =>
   cy.get('[data-testid="calculator-lifecycle-chart-svg"] .x-axis .tick text').invoke('text');
+
+/** Includes tick positions: a sparse mobile axis can keep the same month while zooming. */
+const xAxisLayout = () =>
+  cy.get('[data-testid="calculator-lifecycle-chart-svg"] .x-axis').invoke('html');
+
+const assertReadableChineseAxis = () =>
+  cy.get('[data-testid="calculator-lifecycle-chart-svg"] .x-axis .tick text').should(($ticks) => {
+    const bounds = $ticks.toArray().map((tick) => {
+      expect(tick.textContent).to.match(/^\d{4}年\d{1,2}月$/u);
+      return tick.getBoundingClientRect();
+    });
+    for (let i = 1; i < bounds.length; i += 1) {
+      expect(
+        bounds[i]!.left - bounds[i - 1]!.right,
+        'gap between Chinese date labels',
+      ).to.be.at.least(4);
+    }
+  });
 
 /** The rect that owns hover for the whole plot area. */
 const plotOverlay = () =>
@@ -1003,6 +1023,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
     cy.visit('/zh/fleet', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
       },
     });
     // Readiness: the lifecycle section only mounts once run data has loaded.
@@ -1035,4 +1056,145 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       .and('not.contain.text', 'Cumulative Margin')
       .and('not.contain.text', 'First Run');
   });
+
+  it('keeps token-type headers and exported assumptions in Chinese as selections change', () => {
+    showTable();
+    cy.window().then(captureLifecycleCsvDownloads);
+    for (const [testId, value] of [
+      ['calc-lifecycle-price-input', '1.25'],
+      ['calc-lifecycle-output-price-input', '3.5'],
+      ['calc-lifecycle-ramp-input', '2'],
+      ['calc-lifecycle-mtbi-input', '12'],
+      ['calc-lifecycle-recovery-input', '6'],
+      ['calc-lifecycle-horizon-input', '18'],
+      ['calc-fleet-mw-input', '4'],
+    ]) {
+      cy.get(`[data-testid="${testId}"]`).clear().type(value);
+    }
+
+    for (const [option, header] of [
+      ['输入 Token', '当前输入 tok/s/MW'],
+      ['输出 Token', '当前输出 tok/s/MW'],
+      ['总 Token', '当前 tok/s/MW'],
+    ]) {
+      cy.get('[data-testid="fleet-cost-type-selector"]').click();
+      cy.contains('[role="option"]', option).click();
+      cy.get('[data-testid="calculator-lifecycle-table"] thead').should('contain.text', header);
+      exportMenu().click();
+      cy.get('[data-testid="export-csv-button"]').click();
+      readCapturedLifecycleCsv().then((csv) => {
+        expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain(header);
+        expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
+          '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW',
+        );
+        expect(csv).not.to.contain('# Assumptions:');
+      });
+    }
+  });
+
+  it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
+    for (const [option, label] of [
+      ['Neocloud', '自有设备 · Neocloud'],
+      ['3 年租赁', '租赁设备 · 3 年期'],
+      ['超大规模云服务商', '自有设备 · Hyperscaler'],
+    ]) {
+      cy.get('[data-testid="fleet-cost-selector"]').click();
+      cy.contains('[role="option"]', option).click();
+      cy.contains('[data-testid="calculator-lifecycle-section"] p', '成本 = 芯片数')
+        .should('contain.text', label)
+        .and('not.contain.text', 'Owning -')
+        .and('not.contain.text', 'Renting -');
+    }
+  });
+
+  for (const [width, height] of [
+    [1280, 900],
+    [390, 844],
+  ]) {
+    it(`keeps Chinese axis and pinned dates when zooming at ${width}px`, () => {
+      cy.viewport(width, height);
+      showChart();
+      assertReadableChineseAxis();
+      hoverPlot(0.4);
+      readout()
+        .should('have.css', 'display', 'block')
+        .find('.font-semibold')
+        .invoke('text')
+        .should('match', /^\d{4}年\d{1,2}月\d{1,2}日$/u)
+        .then((date) => {
+          clickPlot(0.4);
+          hoverPlot(0.7);
+          readout().should('have.css', 'pointer-events', 'auto').and('contain.text', date);
+          clickPlot(0.7);
+          readout().should('have.css', 'display', 'none');
+        });
+      xAxisLayout().then((before) => {
+        plotOverlay().then(($overlay) => {
+          const bounds = $overlay[0]!.getBoundingClientRect();
+          plotOverlay().trigger('wheel', {
+            deltaY: -400,
+            shiftKey: true,
+            clientX: bounds.left + bounds.width / 2,
+            clientY: bounds.top + 40,
+            bubbles: true,
+          });
+        });
+        xAxisLayout().should('not.equal', before);
+        assertReadableChineseAxis();
+        cy.get(
+          '[data-testid="calculator-lifecycle-figure"] [data-testid="zoom-reset-button"]',
+        ).click();
+        xAxisLayout().should('equal', before);
+        // Wait for the existing D3 reset transition before the next viewport update.
+        cy.wait(900);
+      });
+
+      if (width === 1280) {
+        cy.window().then((win) => {
+          const capture = win as CsvCaptureWindow;
+          capture.__capturedLifecyclePngUrl = undefined;
+          capture.__capturedLifecyclePngAxis = undefined;
+          win.HTMLAnchorElement.prototype.click = function () {
+            if (this.download.endsWith('.png')) {
+              capture.__capturedLifecyclePngUrl = this.href;
+              capture.__capturedLifecyclePngAxis = Array.from(
+                win.document.querySelectorAll('#fleet-lifecycle-export .x-axis .tick text'),
+                (tick) => tick.textContent ?? '',
+              );
+            }
+          };
+        });
+        exportMenu().click();
+        cy.get('[data-testid="export-png-button"]').click();
+        cy.window()
+          .should((win) => {
+            expect((win as CsvCaptureWindow).__capturedLifecyclePngUrl).to.match(
+              /^data:image\/png;base64,/u,
+            );
+          })
+          .then((win) => {
+            const image = (win as CsvCaptureWindow).__capturedLifecyclePngUrl!;
+            const labels = (win as CsvCaptureWindow).__capturedLifecyclePngAxis!;
+            expect(labels.length, 'date labels in the exported clone').to.be.greaterThan(0);
+            labels.forEach((label) => expect(label).to.match(/^\d{4}年\d{1,2}月$/u));
+            cy.writeFile('cypress/downloads/fleet-lifecycle-zh.png', image.split(',')[1], 'base64');
+            cy.then(
+              () =>
+                new Cypress.Promise<void>((resolve, reject) => {
+                  const png = new win.Image();
+                  png.addEventListener('load', () => {
+                    expect(png.naturalWidth).to.be.greaterThan(600);
+                    expect(png.naturalHeight).to.be.greaterThan(400);
+                    resolve();
+                  });
+                  png.addEventListener('error', () =>
+                    reject(new Error('Exported PNG did not decode')),
+                  );
+                  png.src = image;
+                }),
+            );
+          });
+      }
+    });
+  }
 });

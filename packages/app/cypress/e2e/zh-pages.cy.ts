@@ -1,3 +1,5 @@
+import { SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+
 describe('Chinese (/zh) pages', () => {
   describe('zh landing page', () => {
     before(() => {
@@ -155,6 +157,26 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Run and Rankings model links', () => {
+    it('adds index supporter attribution only to the search description, matching English scope', () => {
+      for (const path of ['/zh/run', '/zh/rankings']) {
+        cy.request(path).then(({ body }) => {
+          const document = new DOMParser().parseFromString(body, 'text/html');
+          const content = (selector: string) =>
+            document.querySelector(selector)?.getAttribute('content');
+          const baseDescription = content('meta[property="og:description"]');
+          expect(baseDescription).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
+          expect(content('meta[name="description"]')).to.eq(
+            `${baseDescription}${SUPPORTERS_LINE_ZH}`,
+          );
+          expect(content('meta[name="twitter:description"]')).to.eq(baseDescription);
+          const collection = [...document.querySelectorAll('script[type="application/ld+json"]')]
+            .map((script) => JSON.parse(script.textContent ?? '{}'))
+            .find((data) => data['@type'] === 'CollectionPage');
+          expect(collection?.description).to.eq(baseDescription);
+        });
+      }
+    });
+
     for (const [path, section] of [
       ['/zh/run/deepseek-r1-on-b300', 'run-explore'],
       ['/zh/rankings/fastest-gpu-for-deepseek-r1', 'ranking-explore'],
@@ -167,6 +189,13 @@ describe('Chinese (/zh) pages', () => {
           },
         });
 
+        cy.get('meta[name="description"]')
+          .invoke('attr', 'content')
+          .should('match', new RegExp(`${SUPPORTERS_LINE_ZH}$`, 'u'))
+          .then((description) => {
+            cy.get('meta[property="og:description"]').should('have.attr', 'content', description);
+            cy.get('meta[name="twitter:description"]').should('have.attr', 'content', description);
+          });
         cy.get(`[aria-labelledby="${section}"] a[href="/zh/model/deepseek-r1"]`)
           .should('contain.text', 'DeepSeek R1')
           .click();
