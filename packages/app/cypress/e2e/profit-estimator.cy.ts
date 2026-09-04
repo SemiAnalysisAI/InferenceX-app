@@ -549,7 +549,7 @@ describe('Profit Estimator — MiniMax M3', () => {
   });
 
   it('re-seeds the operating point and price source when switching from GLM', () => {
-    cy.visit('/profit-estimator-per-gigawatt/glm-5-2', { onBeforeLoad: suppressNudges });
+    cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
