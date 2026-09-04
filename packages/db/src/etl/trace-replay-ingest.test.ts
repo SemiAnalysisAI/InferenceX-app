@@ -53,7 +53,10 @@ function preparedFixture(): PreparedTraceReplay {
   };
 }
 
-function mockSqlWithTransaction(lockedRows: { id: number }[]): {
+function mockSqlWithTransaction(
+  lockedRows: { id: number }[],
+  capacityLog?: string,
+): {
   sql: Parameters<typeof persistPreparedTraceReplay>[0];
   calls: SqlCall[];
 } {
@@ -63,6 +66,9 @@ function mockSqlWithTransaction(lockedRows: { id: number }[]): {
     calls.push({ text, values });
     if (text.includes('for update')) return Promise.resolve(lockedRows);
     if (text.includes('insert into agentic_trace_replay')) return Promise.resolve([{ id: 123 }]);
+    if (text.includes('select br.id') && capacityLog) {
+      return Promise.resolve([{ id: 41, capacity_log: capacityLog }]);
+    }
     return Promise.resolve([]);
   };
   const tx = Object.assign(execute, {
@@ -132,6 +138,18 @@ describe('gzipTraceReplayInput', () => {
 });
 
 describe('persistPreparedTraceReplay', () => {
+  it('derives ATOM capacity from the stored startup log during ingestion', async () => {
+    const { sql, calls } = mockSqlWithTransaction(
+      [{ id: 41 }],
+      'Concurrent capacity vs context length (max_model_len=1048576, block_size=128, max_slots=32, pool_blocks=8687, dcp=8 (blk/req is per-rank)):',
+    );
+    const prepared = { ...preparedFixture(), atomKvCacheBlocks: 8414 };
+    await expect(persistPreparedTraceReplay(sql, [41], prepared)).resolves.toBe(1);
+    const update = calls.find((call) =>
+      call.text.includes("jsonb_set(metrics, '{kv_cache_pool_tokens}'"),
+    );
+    expect(update?.values).toEqual([8615936, 41, 8615936]);
+  });
   it('rechecks links under a row lock and avoids creating an orphan after a concurrent ingest', async () => {
     const { sql, calls } = mockSqlWithTransaction([]);
 

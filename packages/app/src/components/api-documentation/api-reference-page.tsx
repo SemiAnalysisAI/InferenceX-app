@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 import { JsonLd } from '@/components/json-ld';
 import { getApiDocumentation, type ApiDocumentationLocale } from '@/lib/api-documentation';
 import { ZH_LANG_TAG } from '@/lib/i18n';
@@ -59,7 +60,7 @@ const UI_COPY = {
     },
     openApiKicker: '机器可读契约',
     openApiTitle: 'OpenAPI 3.1 JSON',
-    openApiDescription: '查看标准数据结构，或将其直接传入开发工具。',
+    openApiDescription: '查看标准 schema，或直接将其传入工具链。',
     openApiAction: '打开 OpenAPI JSON',
     quickstart: '快速入门',
     quickstartDescription: '只需几步，即可从查看契约到获得真实响应。',
@@ -68,7 +69,7 @@ const UI_COPY = {
     schemas: 'BenchmarkRow 与指标',
     schemasDescription: '理解主要基准测试响应数据及其中的实测字段。',
     endpoints: '端点参考',
-    endpointsDescription: '展开操作，查看参数、状态码与完整示例。',
+    endpointsDescription: '展开任一操作，即可查看参数、状态码和完整示例。',
     operation: '项操作',
     operations: '项操作',
     parameters: '参数',
@@ -99,14 +100,6 @@ const UI_COPY = {
 function formatCode(value: unknown): string {
   if (typeof value === 'string') return value;
   return JSON.stringify(value, null, 2) ?? '';
-}
-
-function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-lg border border-border/50 bg-foreground p-4 text-xs leading-6 text-background">
-      <code>{children}</code>
-    </pre>
-  );
 }
 
 export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale }) {
@@ -143,7 +136,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
     <main data-testid="api-reference" className="relative">
       <JsonLd data={jsonLd} />
       <div className="container mx-auto flex flex-col gap-4 px-4 pb-8 lg:px-8">
-        <Card className="overflow-hidden p-0">
+        <Card className="overflow-hidden p-0 md:p-0">
           <header className="grid lg:grid-cols-3">
             <div className="p-5 sm:p-6 lg:col-span-2 lg:p-8">
               <p className="font-mono text-xs font-semibold tracking-widest text-brand uppercase">
@@ -168,7 +161,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               <a
                 data-testid="api-openapi-link"
                 href={documentation.openApiUrl}
-                className="mt-5 inline-flex min-h-10 items-center rounded-md border border-brand/50 px-4 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                className="mt-5 inline-flex min-h-10 items-center rounded-md border border-brand/50 px-4 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:outline-none"
               >
                 {copy.openApiAction}
                 <span aria-hidden="true" className="ml-2">
@@ -214,7 +207,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
           </dl>
         </Card>
 
-        <Card className="p-0">
+        <Card className="p-0 md:p-0">
           <section aria-labelledby="api-quickstart-heading" className="p-5 sm:p-6 lg:p-8">
             <div className="max-w-3xl">
               <p className="font-mono text-xs font-semibold tracking-widest text-brand uppercase">
@@ -246,7 +239,9 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                     </div>
                   </div>
                   <div className="min-w-0 lg:col-span-2">
-                    <CodeBlock>{step.command}</CodeBlock>
+                    <CopyableCodeBlock locale={locale} label={step.label}>
+                      {step.command}
+                    </CopyableCodeBlock>
                   </div>
                 </li>
               ))}
@@ -254,7 +249,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
           </section>
         </Card>
 
-        <Card className="p-0">
+        <Card className="p-0 md:p-0">
           <section aria-labelledby="api-conventions-heading" className="p-5 sm:p-6 lg:p-8">
             <div className="max-w-3xl">
               <p className="font-mono text-xs font-semibold tracking-widest text-brand uppercase">
@@ -275,7 +270,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               {documentation.conventions.map((convention) => (
                 <div
                   key={convention.id}
-                  className="border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
+                  className="min-w-0 border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
                 >
                   <dt className="font-semibold">{convention.title}</dt>
                   <dd className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -287,7 +282,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
           </section>
         </Card>
 
-        <Card className="p-0">
+        <Card className="p-0 md:p-0">
           <section aria-labelledby="api-schemas-heading" className="p-5 sm:p-6 lg:p-8">
             <div className="max-w-3xl">
               <p className="font-mono text-xs font-semibold tracking-widest text-brand uppercase">
@@ -305,7 +300,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               {documentation.schemaNotes.map((schema) => (
                 <div
                   key={schema.id}
-                  className="border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
+                  className="min-w-0 border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
                 >
                   <dt className="font-mono text-sm font-semibold">{schema.title}</dt>
                   <dd className="mt-2">
@@ -313,13 +308,17 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                     <p className="mt-4 mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                       {copy.schemaShape}
                     </p>
-                    <CodeBlock>{formatCode(schema.shape)}</CodeBlock>
+                    <CopyableCodeBlock locale={locale}>
+                      {formatCode(schema.shape)}
+                    </CopyableCodeBlock>
                     {schema.example !== undefined && (
                       <>
                         <p className="mt-4 mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                           {copy.schemaExample}
                         </p>
-                        <CodeBlock>{formatCode(schema.example)}</CodeBlock>
+                        <CopyableCodeBlock locale={locale}>
+                          {formatCode(schema.example)}
+                        </CopyableCodeBlock>
                       </>
                     )}
                   </dd>
@@ -329,7 +328,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
           </section>
         </Card>
 
-        <Card className="p-0">
+        <Card className="p-0 md:p-0">
           <section aria-labelledby="api-endpoints-heading" className="p-5 sm:p-6 lg:p-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="max-w-3xl">
@@ -370,7 +369,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                         data-testid={`api-endpoint-${operation.id}`}
                         className="group"
                       >
-                        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-md px-2 py-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                        <summary className="flex cursor-pointer list-none flex-wrap items-start gap-3 rounded-md hover:bg-muted/50 px-2 py-4 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
                           <Badge
                             variant="outline"
                             className="mt-0.5 border-brand/50 font-mono text-brand"
@@ -410,7 +409,12 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                 {copy.noParameters}
                               </p>
                             ) : (
-                              <div className="mt-2 overflow-x-auto rounded-lg border border-border/50">
+                              <div
+                                tabIndex={0}
+                                role="region"
+                                aria-labelledby={`${operation.id}-parameters`}
+                                className="mt-2 overflow-x-auto rounded-lg border border-border/50 focus-visible:outline-none"
+                              >
                                 <table className="w-full min-w-3xl border-collapse text-left text-sm">
                                   <caption className="sr-only">
                                     {operation.method} {operation.path}: {copy.parameters}
@@ -478,7 +482,9 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                             >
                               {copy.request}
                             </h4>
-                            <CodeBlock>{`curl -sS '${operation.curlUrl}'`}</CodeBlock>
+                            <CopyableCodeBlock
+                              locale={locale}
+                            >{`curl -sS '${operation.curlUrl}'`}</CopyableCodeBlock>
                           </section>
 
                           <section className="mt-6" aria-labelledby={`${operation.id}-responses`}>
@@ -514,14 +520,18 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                       <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                         {copy.responseShape}
                                       </p>
-                                      <CodeBlock>{formatCode(response.schema)}</CodeBlock>
+                                      <CopyableCodeBlock locale={locale}>
+                                        {formatCode(response.schema)}
+                                      </CopyableCodeBlock>
                                     </div>
                                     {response.example !== undefined && (
                                       <div className="min-w-0">
                                         <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                           {copy.responseExample}
                                         </p>
-                                        <CodeBlock>{formatCode(response.example)}</CodeBlock>
+                                        <CopyableCodeBlock locale={locale}>
+                                          {formatCode(response.example)}
+                                        </CopyableCodeBlock>
                                       </div>
                                     )}
                                   </div>
@@ -538,13 +548,17 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                           <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                             {copy.responseShape}
                                           </p>
-                                          <CodeBlock>{formatCode(alternate.schema)}</CodeBlock>
+                                          <CopyableCodeBlock locale={locale}>
+                                            {formatCode(alternate.schema)}
+                                          </CopyableCodeBlock>
                                         </div>
                                         <div className="min-w-0">
                                           <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                             {copy.responseExample}
                                           </p>
-                                          <CodeBlock>{formatCode(alternate.example)}</CodeBlock>
+                                          <CopyableCodeBlock locale={locale}>
+                                            {formatCode(alternate.example)}
+                                          </CopyableCodeBlock>
                                         </div>
                                       </div>
                                     </div>

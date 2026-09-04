@@ -1,11 +1,94 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const exportMocks = vi.hoisted(() => ({ pathname: '/inference', toPng: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
+vi.mock('@jpinsonneau/html-to-image', () => ({
+  toPng: exportMocks.toPng,
+  getFontEmbedCSS: undefined,
+}));
 
 import {
   getExportCaptureDimensions,
   getExportFontFamily,
+  getLogoWatermarkLayout,
+  getLogoWatermarkOpacity,
+  getLogoWatermarkSrc,
   normalizeChartSvgWidthsForExport,
+  useChartExport,
 } from './useChartExport';
+
+describe('useChartExport failure messages', () => {
+  let root: Root;
+  let container: HTMLDivElement;
+  let chart: HTMLDivElement;
+  let exportContainer: HTMLDivElement;
+  let current: ReturnType<typeof useChartExport>;
+  let originalFonts: PropertyDescriptor | undefined;
+
+  function HookProbe() {
+    current = useChartExport({ chartId: 'inference-chart' });
+    return null;
+  }
+
+  beforeEach(() => {
+    exportMocks.pathname = '/inference';
+    exportMocks.toPng.mockReset();
+    originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready: Promise.resolve() },
+    });
+    container = document.createElement('div');
+    chart = document.createElement('div');
+    chart.id = 'inference-chart';
+    chart.textContent = 'DeepSeek R1';
+    exportContainer = document.createElement('div');
+    exportContainer.id = 'inference-chart-export';
+    document.body.append(container, chart, exportContainer);
+    root = createRoot(container);
+    act(() => root.render(createElement(HookProbe)));
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    chart.remove();
+    exportContainer.remove();
+    if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);
+    else Reflect.deleteProperty(document, 'fonts');
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['/inference', 'Failed to export image. Please try again.'],
+    ['/zh/inference', '图片导出失败，请重试。'],
+  ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
+    // Keep the hook mounted across locale navigation to catch a stale callback.
+    exportMocks.pathname = pathname;
+    act(() => root.render(createElement(HookProbe)));
+    const error = new Error('PNG capture failed');
+    exportMocks.toPng.mockRejectedValueOnce(error);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await act(async () => {
+      await current.exportToImage();
+    });
+
+    expect(exportMocks.toPng).toHaveBeenCalledExactlyOnceWith(
+      exportContainer,
+      expect.objectContaining({ quality: 1, pixelRatio: 2 }),
+    );
+    expect(alertSpy).toHaveBeenCalledExactlyOnceWith(message);
+    expect(errorSpy).toHaveBeenCalledExactlyOnceWith('Error exporting image:', error);
+    expect(current.isExporting).toBe(false);
+    expect(exportContainer.childElementCount).toBe(0);
+    expect(chart.textContent).toBe('DeepSeek R1');
+  });
+});
 
 describe('getExportFontFamily', () => {
   it('uses Minecraft font stack when minecraft theme is active', () => {
@@ -74,5 +157,38 @@ describe('normalizeChartSvgWidthsForExport', () => {
     expect(root.querySelector<SVGElement>('svg[data-testid="legend-info-icon"]')?.style.width).toBe(
       '14px',
     );
+  });
+});
+
+describe('logo watermark', () => {
+  it('uses the white logo on dark themes and the color logo on light themes', () => {
+    expect(getLogoWatermarkSrc(true)).toBe('/brand/logo-white.png');
+    expect(getLogoWatermarkSrc(false)).toBe('/brand/logo-color.png');
+  });
+
+  it('keeps the logo faint so plotted data stays legible', () => {
+    expect(getLogoWatermarkOpacity(false)).toBeLessThan(0.15);
+    expect(getLogoWatermarkOpacity(true)).toBeLessThan(0.15);
+  });
+
+  it('centers the logo and caps its width for wide captures', () => {
+    const layout = getLogoWatermarkLayout(
+      { width: 2000, height: 1200 },
+      { width: 1920, height: 825 },
+    );
+    // Width-bound: 60% of 2000 = 1200 wide, aspect preserved
+    expect(layout.width).toBe(1200);
+    expect(layout.height).toBe(Math.round(825 * (1200 / 1920)));
+    expect(layout.x).toBe((2000 - layout.width) / 2);
+    expect(layout.y).toBe(Math.round((1200 - layout.height) / 2));
+  });
+
+  it('caps the logo height for tall, narrow captures', () => {
+    const layout = getLogoWatermarkLayout(
+      { width: 800, height: 600 },
+      { width: 1000, height: 1000 },
+    );
+    // Height-bound: 60% of 600 = 360 tall square logo
+    expect(layout).toEqual({ x: 220, y: 120, width: 360, height: 360 });
   });
 });

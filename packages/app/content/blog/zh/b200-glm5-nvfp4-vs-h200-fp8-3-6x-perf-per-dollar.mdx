@@ -71,7 +71,7 @@ NVIDIA 还发布了量化权重版本 [`nvidia/GLM-5-NVFP4`](https://huggingface
 - [sgl-project/sglang #21405](https://github.com/sgl-project/sglang/pull/21405) 为稀疏 MLA 启用了 **IndexCache**，在连续 decode 步骤间复用索引张量，在相同内核调用序列上带来 >10% 的 decode 吞吐量提升。
 - [flashinfer-ai/flashinfer #2726](https://github.com/flashinfer-ai/flashinfer/pull/2726)（FlashInfer v0.6.6.post1）修复了一个间歇性 NVFP4 非法内存访问 bug，此前一直[阻塞](https://github.com/sgl-project/sglang/issues/19081) NVFP4 的功能验证签核；[flashinfer-ai/flashinfer #2836](https://github.com/flashinfer-ai/flashinfer/pull/2836)（v0.6.7）提升了 trtllm-gen 稀疏 MLA 的性能上限。
 
-**MTP。** GLM-5 复用了 SGLang 为 DeepSeek V3.2 构建的 EAGLE 推测解码管线（`--speculative-algorithm EAGLE --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4`），并通过 `SGLANG_ENABLE_SPEC_V2=1` 启用 overlap 调度器。H200 和 B200 使用完全相同的参数集——两款 SKU 在下面方案中唯一的不同是模型检查点和注意力后端的选择。
+**MTP。** GLM-5 复用了 SGLang 为 DeepSeek V3.2 实现的 EAGLE 投机解码机制（`--speculative-algorithm EAGLE --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4`），并通过 `SGLANG_ENABLE_SPEC_V2=1` 启用 overlap 调度器。H200 与 B200 使用完全相同的一组启动参数；在下述测试配置中，两款 SKU 之间仅模型检查点和注意力后端不同。
 
 ## 详细数据
 

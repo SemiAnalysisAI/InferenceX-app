@@ -24,6 +24,8 @@ interface ChartSectionProps {
   leadingControls?: ReactNode;
   /** Disable PNG image export (e.g., when showing a table view). */
   hideImageExport?: boolean;
+  /** Keep chart actions reachable on narrow screens. */
+  mobileActions?: boolean;
 }
 
 /**
@@ -38,16 +40,17 @@ export function ChartSection({
   analyticsPrefix,
   children,
   zoomResetEvent,
-  className = 'pt-8 md:pt-0',
+  className,
   setIsLegendExpanded,
   onExportCsv,
   exportFileName,
   leadingControls,
   hideImageExport,
+  mobileActions,
 }: ChartSectionProps) {
   return (
     <section className={className}>
-      <figure className="relative rounded-lg">
+      <figure className="relative min-w-0 rounded-xl">
         {/* Export and Reset Zoom Buttons */}
         <ChartButtons
           chartId={chartId}
@@ -58,6 +61,7 @@ export function ChartSection({
           exportFileName={exportFileName}
           leadingControls={leadingControls}
           hideImageExport={hideImageExport}
+          mobileVisible={mobileActions}
         />
 
         <Card>{children}</Card>

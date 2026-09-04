@@ -3,7 +3,15 @@
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { track } from '@/lib/analytics';
 import {
@@ -39,6 +47,8 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   historical: 'Historical Trends',
   calculator: 'TCO Calculator',
   fleet: 'Fleet Lifecycle',
+  'profit-estimator': 'Profit Estimator',
+  'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
   reliability: 'Reliability',
   'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',
@@ -58,7 +68,7 @@ const tabLinkClass = cn(
   'text-muted-foreground',
   'border-b-2 border-transparent',
   'transition-colors duration-200',
-  'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring',
+  'focus-visible:outline-none',
 );
 
 const currentTabClass = (active: boolean) =>
@@ -71,16 +81,81 @@ function handleDesktopClick(tab: DashboardRouteKey) {
   track('tab_changed', { tab });
 }
 
-export function TabNav() {
+/**
+ * Sliding active-tab indicator. Measures the active link and translates a
+ * 2px bar under it (transform + width on an absolutely positioned element,
+ * so no layout impact on the tabs themselves). While unmeasured — first
+ * paint, no-JS, or a gated tab active in the popover — each link's static
+ * `border-b` fallback renders instead, so the active state is never lost.
+ */
+function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
+  const navRef = useRef<HTMLElement>(null);
+  const hasAnimatedRef = useRef(false);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  const measure = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const active = nav.querySelector<HTMLElement>('[data-tab-active="true"]');
+    if (!active) {
+      setIndicator(null);
+      return;
+    }
+    setIndicator({ left: active.offsetLeft, width: active.offsetWidth });
+  }, []);
+
+  useLayoutEffect(measure, [measure, current]);
+
+  // The gated "Hidden" trigger mounts a tick after hydration (the feature
+  // gate reads localStorage in an effect), which shifts every sibling under
+  // `justify-evenly` WITHOUT resizing the nav box — the ResizeObserver below
+  // stays silent, so the indicator would keep pre-unlock coordinates.
+  // Reposition without animating, exactly as for a resize.
+  useLayoutEffect(() => {
+    hasAnimatedRef.current = false;
+    measure();
+  }, [measure, gateUnlocked]);
+
+  // Only slide between positions after the first measurement has painted;
+  // the initial placement (and any resize reflow) must not animate.
+  useLayoutEffect(() => {
+    if (indicator) {
+      const id = requestAnimationFrame(() => {
+        hasAnimatedRef.current = true;
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    hasAnimatedRef.current = false;
+  }, [indicator]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      hasAnimatedRef.current = false;
+      measure();
+    });
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  return { navRef, indicator, animate: hasAnimatedRef.current };
+}
+
+export function TabNav({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
   const current = dashboardRouteForPathname(pathname)?.key ?? 'inference';
-  const selectedTab = getDashboardRoute(current).navGroup === 'footer-only' ? '' : current;
+  const currentRoute = getDashboardRoute(current);
+  const selectedTab = currentRoute.navGroup === 'footer-only' ? '' : current;
+  const lockedCurrentGatedTab =
+    !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
+  const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
   const searchParams = useClientSearchParams();
   const unofficialIds = useMemo(() => {
     for (const [key, value] of searchParams) {
@@ -99,54 +174,58 @@ export function TabNav() {
   };
 
   return (
-    <>
-      {/* Mobile: Dropdown */}
-      <div className="lg:hidden mb-4">
-        <div className="w-full pb-6" />
-        <Card>
-          <div className="space-y-2">
-            <Label htmlFor="chart-select">{locale === 'zh' ? '选择图表' : 'Select Chart'}</Label>
-            <Select value={selectedTab} onValueChange={handleMobileChange}>
-              <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-                <SelectValue placeholder={locale === 'zh' ? '选择图表' : 'Select Chart'} />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIMARY_TABS.map((route) => (
-                  <SelectItem
-                    key={route.key}
-                    value={route.key}
-                    data-ph-capture-attribute-tab={route.key}
-                  >
-                    {tabLabel(route)}
-                  </SelectItem>
-                ))}
-                {featureGateUnlocked && (
-                  <>
-                    <SelectSeparator />
-                    <SelectGroup>
-                      <SelectLabel>{locale === 'zh' ? '隐藏' : 'Hidden'}</SelectLabel>
-                      {GATED_TABS.map((route) => (
-                        <SelectItem
-                          key={route.key}
-                          value={route.key}
-                          data-ph-capture-attribute-tab={route.key}
-                        >
-                          {tabLabel(route)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </Card>
-      </div>
+    <div className="mb-4 pt-6 lg:pt-0">
+      <Card className="vt-dashboard-tabs p-0 md:p-0" data-slot="dashboard-navigation">
+        {/* Mobile: Dropdown */}
+        <div className="space-y-2 p-4 md:p-6 lg:hidden">
+          <Label htmlFor="chart-select">{locale === 'zh' ? '选择图表' : 'Select Chart'}</Label>
+          <Select value={selectedTab} onValueChange={handleMobileChange}>
+            <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
+              <SelectValue placeholder={locale === 'zh' ? '选择图表' : 'Select Chart'} />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIMARY_TABS.map((route) => (
+                <SelectItem
+                  key={route.key}
+                  value={route.key}
+                  data-ph-capture-attribute-tab={route.key}
+                >
+                  {tabLabel(route)}
+                </SelectItem>
+              ))}
+              {lockedCurrentGatedTab && (
+                <SelectItem
+                  value={lockedCurrentGatedTab.key}
+                  data-ph-capture-attribute-tab={lockedCurrentGatedTab.key}
+                >
+                  {tabLabel(lockedCurrentGatedTab)}
+                </SelectItem>
+              )}
+              {featureGateUnlocked && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>{locale === 'zh' ? '隐藏' : 'Hidden'}</SelectLabel>
+                    {GATED_TABS.map((route) => (
+                      <SelectItem
+                        key={route.key}
+                        value={route.key}
+                        data-ph-capture-attribute-tab={route.key}
+                      >
+                        {tabLabel(route)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Desktop: Nav links */}
-      <div className="hidden lg:flex flex-col mb-4">
-        <Card className="overflow-x-auto py-6 md:py-6">
+        {/* Desktop: Nav links */}
+        <div className="hidden overflow-x-auto p-6 lg:block">
           <nav
+            ref={navRef}
             data-testid="chart-section-tabs"
             className="relative flex items-center justify-evenly min-w-0"
           >
@@ -156,12 +235,30 @@ export function TabNav() {
                 href={tabHref(localePath(route.path, locale))}
                 data-testid={`tab-trigger-${route.key}`}
                 data-ph-capture-attribute-tab={route.key}
+                data-tab-active={current === route.key || undefined}
                 onClick={() => handleDesktopClick(route.key)}
-                className={cn(tabLinkClass, currentTabClass(current === route.key))}
+                className={cn(
+                  tabLinkClass,
+                  // The static border is the no-JS/unmeasured fallback; once the
+                  // sliding indicator is live it owns the underline.
+                  currentTabClass(current === route.key && !indicator),
+                  current === route.key && 'text-secondary dark:text-primary',
+                )}
               >
                 {tabLabel(route)}
               </Link>
             ))}
+            {indicator && (
+              <span
+                aria-hidden
+                className="tab-indicator bg-secondary dark:bg-primary"
+                style={{
+                  width: indicator.width,
+                  transform: `translateX(${indicator.left}px)`,
+                  ...(animate ? null : { transition: 'none' }),
+                }}
+              />
+            )}
             {featureGateUnlocked && (
               <HiddenTabsPopover
                 current={current}
@@ -172,9 +269,10 @@ export function TabNav() {
               />
             )}
           </nav>
-        </Card>
-      </div>
-    </>
+        </div>
+        {footer}
+      </Card>
+    </div>
   );
 }
 

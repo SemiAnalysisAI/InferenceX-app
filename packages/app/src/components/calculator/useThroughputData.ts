@@ -8,6 +8,7 @@ import type { AggDataEntry, HardwareConfig } from '@/components/inference/types'
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
@@ -99,18 +100,6 @@ function getAgenticMetric(
  *
  * The clamp is not decorative — the GPU figure alone reaches 1.185 on some rows.
  */
-function cacheHitRateOf(m: Record<string, number>): number | null {
-  const gpu = m.server_gpu_cache_hit_rate;
-  const external = m.server_external_cache_hit_rate;
-  const cpu = m.server_cpu_cache_hit_rate;
-  const hasExternal = typeof external === 'number';
-  // Only the tier that is not already counted by `external` is added.
-  const secondary = hasExternal ? external : typeof cpu === 'number' ? cpu : undefined;
-  if (typeof gpu !== 'number' && secondary === undefined) return null;
-  const sum = (typeof gpu === 'number' ? gpu : 0) + (secondary ?? 0);
-  return Math.max(0, Math.min(1, sum));
-}
-
 /**
  * Fraction of a config's tokens that are input tokens.
  *
@@ -207,7 +196,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = cacheHitRateOf(m);
+    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
     const tokenShare = inputTokenShare(row, inputTput, outputTput);
     const specs = getGpuSpecs(hwKey);
     const power = specs.power;

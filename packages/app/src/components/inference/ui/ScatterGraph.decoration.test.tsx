@@ -127,6 +127,41 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
+  it('rings legacy-power points only on Measured Energy axes', () => {
+    const legacy = {
+      ...point('h100', 'fp8', 10, 100, 1),
+      power_tier: 'legacy',
+    } as InferenceData;
+    const certified = {
+      ...point('h100', 'fp8', 20, 200, 2),
+      power_tier: 'certified',
+    } as InferenceData;
+    const tierless = point('h100', 'fp8', 40, 400, 4);
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y_measuredAvgPower',
+    };
+    const measured = mountChart({ data: [legacy, certified, tierless] });
+    const groups = dotGroups(measured.container);
+
+    expect(groups[0].querySelector('.legacy-power-ring')).not.toBeNull();
+    expect(groups[1].querySelector('.legacy-power-ring')).toBeNull();
+    expect(groups[2].querySelector('.legacy-power-ring')).toBeNull();
+    // The legend key lives in ChartDisplay's axis-metric footer, not the chart.
+    expect(measured.container.querySelector('[data-testid="legacy-power-key"]')).toBeNull();
+    measured.unmount();
+
+    // Non-measured axis: the same legacy point renders without a ring.
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y',
+    };
+    const throughput = mountChart({ data: [legacy, certified, tierless] });
+    expect(throughput.container.querySelectorAll('.legacy-power-ring')).toHaveLength(0);
+    throughput.unmount();
+  });
+
   it('reads current trace availability without changing metric identity', () => {
     const agenticPoint = {
       ...point('h100', 'fp8', 20, 200, 2),

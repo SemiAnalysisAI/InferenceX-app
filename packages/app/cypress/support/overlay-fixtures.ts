@@ -40,6 +40,10 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
   tput_per_gpu: tput,
   output_tput_per_gpu: tput * 0.3,
   input_tput_per_gpu: tput * 0.7,
+  server_gpu_cache_hit_rate: 0.8,
+  server_external_cache_hit_rate: 0.1,
+  // External already includes the offload tier; revenue must not add this again.
+  server_cpu_cache_hit_rate: 0.05,
 });
 
 /**

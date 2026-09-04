@@ -1,3 +1,5 @@
+import { SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+
 describe('Chinese (/zh) pages', () => {
   describe('zh landing page', () => {
     before(() => {
@@ -7,21 +9,11 @@ describe('Chinese (/zh) pages', () => {
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
-      cy.contains('h2', '探索 InferenceX').should('exist');
       // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
       // landing-page.tsx; the card and its Chinese strings still exist in the
       // source, so assert it is not rendered rather than dropping the check.
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
-    });
-
-    it('links to the Chinese overview and full dashboard', () => {
-      cy.get('[data-testid="landing-overview-link"]')
-        .should('have.attr', 'href', '/zh/overview')
-        .and('have.text', '总览');
-      cy.get('[data-testid="landing-full-dashboard-link"]')
-        .should('have.attr', 'href', '/zh/inference')
-        .and('have.text', '查看完整仪表板');
     });
 
     it('sets hreflang alternates to the English homepage', () => {
@@ -46,6 +38,10 @@ describe('Chinese (/zh) pages', () => {
           .should('contain.text', '总览')
           .and('have.attr', 'href', '/zh/overview');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
+        // Ledger NEW pills localize to 新 on the Chinese landing page.
+        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
+          .should('have.length', 6)
+          .each(($badge) => expect($badge.text()).to.equal('新'));
       });
     });
 
@@ -71,9 +67,7 @@ describe('Chinese (/zh) pages', () => {
         'href',
         '/zh/land-acknowledgement',
       );
-      cy.get('[data-testid="footer-link-zh"]')
-        .should('contain.text', 'English')
-        .and('have.attr', 'href', '/');
+      cy.get('[data-testid="footer-link-zh"]').should('not.exist');
     });
   });
 
@@ -116,6 +110,19 @@ describe('Chinese (/zh) pages', () => {
             .should('be.visible');
         });
       cy.location('hash').should('eq', '#faq-normalized-interactivity');
+      cy.get('#faq-normalized-interactivity').should(($row) => {
+        const question = $row.find('dt')[0].getBoundingClientRect();
+        const answer = $row.find('dd')[0].getBoundingClientRect();
+        expect(answer.left, 'desktop answer column').to.be.greaterThan(question.right);
+      });
+      cy.viewport(390, 720);
+      cy.get('#faq-normalized-interactivity').should(($row) => {
+        const question = $row.find('dt')[0].getBoundingClientRect();
+        const answer = $row.find('dd')[0].getBoundingClientRect();
+        expect(answer.top, 'mobile answer follows its question').to.be.greaterThan(question.bottom);
+        expect(answer.right).to.be.at.most(390);
+      });
+      cy.viewport(1280, 720);
     });
   });
 
@@ -130,6 +137,127 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('About pages', () => {
+    it('keeps both Chinese article links inside /zh and follows one to its translation', () => {
+      cy.viewport(390, 844);
+      cy.visit('/zh/about');
+
+      cy.contains('a', 'InferenceX v1')
+        .should('have.attr', 'href', '/zh/blog/inferencemax-open-source-inference-benchmarking')
+        .and('not.have.attr', 'hreflang', 'en');
+      cy.contains('a', 'InferenceX v2')
+        .should('have.attr', 'href', '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper')
+        .and('not.have.attr', 'hreflang', 'en')
+        .click();
+      cy.location('pathname').should(
+        'eq',
+        '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper',
+      );
+    });
+  });
+
+  describe('Run and Rankings model links', () => {
+    it('adds index supporter attribution only to the search description, matching English scope', () => {
+      for (const path of ['/zh/run', '/zh/rankings']) {
+        cy.request(path).then(({ body }) => {
+          const document = new DOMParser().parseFromString(body, 'text/html');
+          const content = (selector: string) =>
+            document.querySelector(selector)?.getAttribute('content');
+          const baseDescription = content('meta[property="og:description"]');
+          expect(baseDescription).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
+          expect(content('meta[name="description"]')).to.eq(
+            `${baseDescription}${SUPPORTERS_LINE_ZH}`,
+          );
+          expect(content('meta[name="twitter:description"]')).to.eq(baseDescription);
+          const collection = [...document.querySelectorAll('script[type="application/ld+json"]')]
+            .map((script) => JSON.parse(script.textContent ?? '{}'))
+            .find((data) => data['@type'] === 'CollectionPage');
+          expect(collection?.description).to.eq(baseDescription);
+        });
+      }
+    });
+
+    for (const [path, section] of [
+      ['/zh/run/deepseek-r1-on-b300', 'run-explore'],
+      ['/zh/rankings/fastest-gpu-for-deepseek-r1', 'ranking-explore'],
+    ] as const) {
+      it(`opens the matching Chinese model detail from ${path}`, () => {
+        cy.viewport(390, 844);
+        cy.visit(path, {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        });
+
+        cy.get('meta[name="description"]')
+          .invoke('attr', 'content')
+          .should('match', new RegExp(`${SUPPORTERS_LINE_ZH}$`, 'u'))
+          .then((description) => {
+            cy.get('meta[property="og:description"]').should('have.attr', 'content', description);
+            cy.get('meta[name="twitter:description"]').should('have.attr', 'content', description);
+          });
+        cy.get(`[aria-labelledby="${section}"] a[href="/zh/model/deepseek-r1"]`)
+          .should('contain.text', 'DeepSeek R1')
+          .click();
+        cy.location('pathname').should('eq', '/zh/model/deepseek-r1');
+        cy.get('h1').should('have.text', 'DeepSeek R1 0528');
+      });
+    }
+  });
+
+  describe('Glossary pages', () => {
+    it('supports a mobile Chinese search, filter, and term navigation journey without overflow', () => {
+      cy.viewport(375, 844);
+      cy.visit('/zh/glossary');
+
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+      cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').as('search').type('MTP');
+      cy.get('a[href="/zh/glossary/multi-token-prediction"]').should('be.visible');
+      cy.get('@search').clear().type('不存在的术语-xyz');
+      cy.contains('h2', '未找到相关术语').should('be.visible');
+      cy.contains('button', '显示全部术语').click();
+      cy.get('@search').should('have.value', '');
+
+      cy.contains('button', '智能体推理').click().should('have.attr', 'aria-pressed', 'true');
+      cy.get('a[href="/zh/glossary/agentx"]').click();
+      cy.location('pathname').should('eq', '/zh/glossary/agentx');
+      cy.contains('a', 'AI 推理术语表').click();
+      cy.location('pathname').should('eq', '/zh/glossary');
+    });
+  });
+
+  describe('Land acknowledgement pages', () => {
+    it('keeps every region and nation visible on mobile', () => {
+      cy.viewport(375, 812);
+      cy.visit('/zh/land-acknowledgement');
+
+      cy.get('[data-testid="land-acknowledgement-page"]').should(
+        'contain.text',
+        '原住民传统领地声明',
+      );
+      cy.title().should('contain', '原住民传统领地声明');
+      for (const [testId, region, nation] of [
+        ['land-acknowledgement-san-jose', 'San Jose', 'Muwekma Ohlone'],
+        ['land-acknowledgement-los-angeles', 'Los Angeles', 'Tongva'],
+        ['land-acknowledgement-chicago', 'Chicago', 'Potawatomi'],
+      ] as const) {
+        cy.get(`[data-testid="${testId}"]`)
+          .should('contain.text', region)
+          .and('contain.text', nation);
+      }
+      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+    });
+  });
+
   describe('zh blog post page', () => {
     before(() => {
       cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
@@ -137,12 +265,62 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders translated content with Chinese chrome', () => {
       cy.get('article.prose').should('exist');
-      cy.contains('分钟阅读').should('exist');
+      cy.contains('预计阅读').should('exist');
       cy.get('a[href="/zh/blog"]').should('exist');
     });
 
     it('links to the English original', () => {
       cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
+    });
+
+    it('localizes the table of contents and heading-link controls at mobile widths', () => {
+      cy.viewport(390, 844);
+      cy.get('details[aria-label="本页目录"]')
+        .should('be.visible')
+        .find('summary')
+        .should('contain.text', '点击展开');
+      cy.get('article.prose a[aria-label="复制本节链接"]')
+        .first()
+        .should('have.attr', 'href')
+        .and('match', /^#/u);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
+  describe('localized not-found pages', { testIsolation: true }, () => {
+    it('returns a noindex English 404 for unknown paths', () => {
+      const path = '/this-route-does-not-exist';
+      cy.request({ url: path, failOnStatusCode: false }).then(({ body, status }) => {
+        const document = new DOMParser().parseFromString(body, 'text/html');
+        const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
+
+        expect(status).to.eq(404);
+        expect(document.querySelector('h1')?.textContent).to.eq('404 - Page Not Found');
+        expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
+        expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
+          'noindex',
+        );
+        expect(document.querySelector('link[rel="canonical"]')).to.eq(null);
+      });
+    });
+
+    it('returns a noindex Chinese 404 for unknown /zh paths', () => {
+      const path = '/zh/this-route-does-not-exist';
+      cy.request({ url: path, failOnStatusCode: false }).its('status').should('eq', 404);
+      cy.visit(path, { failOnStatusCode: false });
+
+      cy.contains('h1', '404 - 页面不存在').should('be.visible');
+      cy.contains('找不到该页面。').should('be.visible');
+      cy.contains('a[href="/zh"]', '返回首页').should('be.visible');
+      cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
+      cy.get('link[rel="canonical"]').should('not.exist');
+      cy.get('link[rel="alternate"][hreflang]').should('not.exist');
+      cy.viewport(375, 812);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
     });
   });
 
@@ -158,6 +336,177 @@ describe('Chinese (/zh) pages', () => {
     it('keeps figures and their Chinese captions', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
       cy.get('article.prose figcaption').first().should('contain.text', '来源');
+    });
+  });
+
+  describe('zh submissions workflow', () => {
+    beforeEach(() => {
+      cy.visit('/zh/submissions');
+      cy.get('[data-testid="submissions-display"]').should('be.visible');
+    });
+
+    it('localizes chart controls, table headers, sorting, and expanded details', () => {
+      cy.viewport(1440, 900);
+      cy.contains('h2', '基准测试提交').should('be.visible');
+      cy.get('[data-testid="submissions-mode-toggle"]')
+        .should('have.attr', 'aria-label', '图表模式')
+        .and('contain.text', '按周')
+        .and('contain.text', '累计');
+      cy.get('[role="group"][aria-label="基准测试提交活动图表"]')
+        .should('contain.text', 'Shift+滚轮横向缩放')
+        .find('[data-testid="submissions-chart-svg"]')
+        .should('contain.text', '数据点数量');
+      cy.get('[data-testid="submissions-chart-svg"] .proximity-overlay').click('center', {
+        force: true,
+      });
+      cy.get('[data-chart-tooltip]:visible')
+        .should('contain.text', '点击其他区域关闭')
+        .and('contain.text', '合计');
+      cy.contains('th button', '投机解码').should('be.visible');
+      cy.contains('th button', '数据点').click().parent('th').should('have.attr', 'aria-sort');
+      cy.get('button[aria-label="展开配置详情"]').first().click();
+      cy.get('[data-testid="submissions-display"]')
+        .should('contain.text', '投机解码方法：')
+        .and('contain.text', '分离式部署：')
+        .and('contain.text', '聚合推理芯片数：');
+      // Disaggregated deployments split the chip pool, so their expanded
+      // details localize the prefill/decode fields instead of the aggregate ones.
+      cy.contains('tr', 'Mooncake ATOMesh')
+        .first()
+        .find('button[aria-label="展开配置详情"]')
+        .click();
+      cy.get('[data-testid="submissions-display"]')
+        .should('contain.text', '预填充芯片数：')
+        .and('contain.text', '解码芯片数：');
+    });
+
+    it('separates localized empty chart and table states', () => {
+      cy.intercept('GET', '**/api/v1/submissions', { body: { summary: [], volume: [] } }).as(
+        'emptySubmissions',
+      );
+      cy.reload();
+      cy.wait('@emptySubmissions');
+      cy.contains('暂无提交活动数据。').should('be.visible');
+      cy.contains('暂无提交记录。').should('be.visible');
+    });
+
+    it('shows a safe error and retries through a real button click', () => {
+      // Fail every request until the retry button is actually clicked — counting
+      // attempts is race-prone because query retries can consume the "healthy"
+      // response before the error UI is asserted.
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/submissions', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'submissions-database-internal-detail' } }
+            : { body: { summary: [], volume: [] } },
+        );
+      }).as('retrySubmissions');
+      cy.reload();
+      cy.wait('@retrySubmissions');
+      cy.contains('加载提交数据失败。').should('be.visible');
+      cy.contains('submissions-database-internal-detail').should('not.exist');
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.contains('暂无提交记录。').should('be.visible');
+    });
+
+    it('keeps the chart labels readable and the table scrollable at 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="submissions-chart-svg"] .x-axis .tick text').then(($ticks) => {
+        expect($ticks.length, 'mobile date tick count').to.be.at.most(3);
+        const boxes = [...$ticks]
+          .map((tick) => tick.getBoundingClientRect())
+          .sort((left, right) => left.left - right.left);
+        for (let index = 1; index < boxes.length; index += 1) {
+          expect(boxes[index - 1].right, 'adjacent mobile date ticks').to.be.at.most(
+            boxes[index].left,
+          );
+        }
+      });
+      cy.get('[data-testid="submissions-display"] table').should('be.visible');
+      cy.get('[data-testid="submissions-display"] .overflow-x-auto')
+        .scrollTo('right')
+        .should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
+  describe('zh feedback viewer workflow', () => {
+    beforeEach(() => {
+      cy.intercept('GET', '**/api/v1/feedback/list', { body: { rows: [] } }).as('feedbackList');
+      cy.visit('/zh/feedback', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-feature-gate', '1');
+        },
+      });
+      cy.wait('@feedbackList');
+    });
+
+    it('localizes the empty state, key validation, and accessibility label', () => {
+      cy.viewport(1440, 900);
+      cy.get('[data-testid="feedback-viewer"]')
+        .should('contain.text', '用户反馈')
+        .and('contain.text', '暂无反馈记录。');
+      cy.contains('仅在浏览器中处理密钥').and('contain.text', '不会持久化').should('be.visible');
+      cy.get('button[aria-label="显示密钥"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
+      cy.get('[data-testid="feedback-key-submit"]').click();
+      cy.get('[role="alert"]').should('contain.text', '解密密钥必须是有效的 base64 编码');
+      cy.get('[data-testid="feedback-key-input"]')
+        .clear()
+        .type('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+      cy.get('[data-testid="feedback-key-submit"]').click();
+      cy.contains('button', '清除密钥').should('be.visible');
+    });
+
+    it('names the feedback loading state instead of showing an objectless spinner label', () => {
+      cy.intercept('GET', '**/api/v1/feedback/list', {
+        delay: 500,
+        body: { rows: [] },
+      }).as('slowFeedbackList');
+      cy.reload();
+      cy.contains('正在加载反馈记录……').should('be.visible');
+      cy.wait('@slowFeedbackList');
+      cy.contains('暂无反馈记录。').should('be.visible');
+    });
+
+    it('shows a safe fetch error and retries through a real button click', () => {
+      let failRequests = true;
+      cy.intercept('GET', '**/api/v1/feedback/list', (request) => {
+        request.reply(
+          failRequests
+            ? { statusCode: 500, body: { error: 'feedback-database-internal-detail' } }
+            : { body: { rows: [] } },
+        );
+      }).as('retryFeedbackList');
+      cy.reload();
+      cy.wait('@retryFeedbackList');
+      cy.wait('@retryFeedbackList');
+      cy.contains('无法加载反馈数据。').should('be.visible');
+      cy.contains('feedback-database-internal-detail').should('not.exist');
+      cy.contains('button', '重试')
+        .then(() => {
+          failRequests = false;
+        })
+        .click();
+      cy.wait('@retryFeedbackList');
+      cy.contains('暂无反馈记录。').should('be.visible');
+    });
+
+    it('keeps the key controls and content within 375px', () => {
+      cy.viewport(375, 844);
+      cy.get('[data-testid="feedback-key-input"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-submit"]').should('be.visible');
+      cy.get('[data-testid="feedback-key-input"]').invoke('outerHeight').should('be.gte', 44);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
     });
   });
 

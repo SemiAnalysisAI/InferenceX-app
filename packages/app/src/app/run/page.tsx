@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { Card } from '@/components/ui/card';
 import { enAlternates } from '@/lib/i18n';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
@@ -70,7 +70,7 @@ export default async function RunIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {title}
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
@@ -82,17 +82,24 @@ export default async function RunIndexPage() {
 
           <section className="mt-10 mb-16 space-y-8">
             {models.map((model) => (
-              <Card key={model.slug} className="p-5">
-                <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+              <Card key={model.slug} className="gap-0 p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                    {(byModel.get(model.slug) ?? []).length} GPUs
+                  </span>
+                </div>
+                <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                   {(byModel.get(model.slug) ?? []).map((entry) => (
                     <li key={entry.slug}>
-                      <Link
+                      <CatalogLinkCard
                         href={`/run/${entry.slug}`}
-                        className="text-sm font-medium text-brand hover:underline"
-                      >
-                        {model.seoName} on {entry.chip.label}
-                      </Link>
+                        title={`${model.seoName} on ${entry.chip.label}`}
+                        description="Measured throughput, latency & cost"
+                        slug={entry.slug}
+                        locale="en"
+                        event="run_index_entry_clicked"
+                      />
                     </li>
                   ))}
                 </ul>

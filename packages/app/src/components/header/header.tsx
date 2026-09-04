@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
+import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { navigateInApp } from '@/lib/client-navigation';
@@ -126,7 +127,7 @@ function LanguageToggle({
       prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
-      className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+      className={cn(HEADER_ACTION_STYLE, 'min-h-11 px-2 text-sm font-medium whitespace-nowrap')}
       onClick={(event) => {
         track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
         if (!isOverview) navigateInApp(event, router, target + search);
@@ -191,7 +192,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   return (
     <header
       data-testid="header"
-      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
+      className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
@@ -270,9 +271,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 type="button"
                 data-testid="mobile-menu-toggle"
                 onClick={toggleMenu}
-                className="flex items-center justify-center size-11 rounded-md transition-colors hover:bg-muted cursor-pointer"
+                className={cn(HEADER_ACTION_STYLE, 'size-11')}
                 aria-expanded={mobileMenuOpen}
-                aria-label="Navigation menu"
+                aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >
                 <svg
                   width="20"
@@ -292,7 +293,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               {mobileMenuOpen && (
                 <div
                   data-testid="mobile-menu"
-                  className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
+                  className="motion-pop-in absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
                 >
                   {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link

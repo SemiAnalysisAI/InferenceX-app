@@ -51,12 +51,14 @@ const URL_STATE_KEYS = [
   'i_gradlabel',
   'i_linelabel',
   'i_active',
-  // Quick filters (vendor / framework / deployment / mtp-stp).
+  // Quick filters (vendor / framework / deployment / mtp-stp / power tier).
   // `i_disagg` keeps its historical name for shared-link compatibility.
   'i_vendor',
   'i_fw',
   'i_disagg',
   'i_spec',
+  // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
+  'i_power',
   // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
@@ -98,16 +100,19 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
- * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
- * Neocloud TCO, so the dashboard leads with the economics rather than raw
- * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
+ * Dashboard default y-axis: total tokens purchased per $1 of Hyperscaler
+ * ownership TCO. It leads with infrastructure purchasing power, which depends
+ * only on measured throughput and hardware cost, so the opening view does not
+ * assume a token sale price. Token Revenue per GPU Hour remains one selector
+ * click away for revenue-side questions.
+ * `?i_metric=` still wins, so existing shared links are unaffected.
  *
  * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
  * strips any value equal to the default from share links. If the two drifted,
  * a link captured on the *other* metric would be written without `i_metric`
  * and reopen on this one.
  */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarN';
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';
@@ -156,6 +161,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_fw: '',
   i_disagg: '',
   i_spec: '',
+  i_power: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',
@@ -203,19 +209,41 @@ if (typeof window !== 'undefined') {
       currentState[key] = value;
     }
   }
-  // Defer cleanup so the Next.js router doesn't overwrite it during hydration
-  setTimeout(() => {
-    const sp = new URLSearchParams(window.location.search);
-    for (const key of URL_STATE_KEYS) {
-      sp.delete(key);
-    }
-    const s = sp.toString();
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
-    );
-  }, 0);
+  // Strip share-link params from the address bar. Deferred so the Next.js
+  // router doesn't overwrite it during hydration, and skipped entirely when
+  // the URL carries none: this module is pulled in by dashboard chunks, so on
+  // a landing → dashboard client navigation it initializes *mid-transition*.
+  // Going through the Next-patched `window.history.replaceState` here would
+  // dispatch a router restore built from the pre-commit URL, reverting the
+  // just-committed navigation (the "first dashboard click replays the landing
+  // page" regression). The pristine prototype method rewrites the address bar
+  // without involving the App Router — same trick as `replaceClientSearch` in
+  // client-navigation.ts. Router state is carried over so Back/Forward keep
+  // working.
+  if (Object.keys(_initialParams).length > 0) {
+    setTimeout(() => {
+      const sp = new URLSearchParams(window.location.search);
+      let dirty = false;
+      for (const key of URL_STATE_KEYS) {
+        if (sp.has(key)) {
+          sp.delete(key);
+          dirty = true;
+        }
+      }
+      if (!dirty) return;
+      const s = sp.toString();
+      const replace =
+        typeof History === 'undefined'
+          ? window.history.replaceState
+          : History.prototype.replaceState;
+      replace.call(
+        window.history,
+        window.history.state,
+        '',
+        `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
+      );
+    }, 0);
+  }
 }
 
 /** Returns the current share-link state, flushing pending writes for provider remounts. */

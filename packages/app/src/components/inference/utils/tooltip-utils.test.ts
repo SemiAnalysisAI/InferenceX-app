@@ -241,6 +241,60 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
   });
 
+  it('localizes agentic request counters and workflow link chrome for Chinese tooltips', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          num_requests_successful: 9,
+          num_requests_total: 10,
+          total_prompt_tokens: 12_345,
+          total_generation_tokens: 678,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>请求：</strong> 9 / 10 (90%)');
+    expect(html).toContain('<strong>提示 token：</strong>');
+    expect(html).toContain('<strong>生成 token：</strong>');
+    expect(html).toContain('GitHub Actions 运行记录');
+    expect(html).not.toContain('<strong>Requests:</strong>');
+    expect(html).not.toContain('GitHub Actions Run');
+  });
+
+  it('localizes dates, DPA flags, and worker labels for Chinese disaggregated tooltips', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({
+          date: '2026-01-02',
+          actualDate: '2026-01-02',
+          ep: 2,
+          disagg: true,
+          is_multinode: true,
+          prefill_tp: 2,
+          prefill_ep: 2,
+          prefill_dp_attention: true,
+          prefill_num_workers: 2,
+          decode_tp: 4,
+          decode_ep: 4,
+          decode_dp_attention: false,
+          decode_num_workers: 1,
+          num_prefill_gpu: 4,
+          num_decode_gpu: 4,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>日期：</strong> 2026年1月2日');
+    expect(html).toContain('DPA: 是, worker 数: 2');
+    expect(html).toContain('DPA: 否, worker 数: 1');
+    expect(html).not.toContain('DPA: True');
+    expect(html).not.toContain('Workers:');
+  });
+
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
     // link to /inference/agentic/0, a doomed lookup.
@@ -444,6 +498,23 @@ describe('generateTooltipContent', () => {
 
     expect(disabled).not.toContain('CPU Cache Hit Rate');
     expect(enabled).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+  });
+
+  it('labels TRTLLM offload cache hits as a combined chip and CPU rate', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          framework: 'dynamo-trt',
+          kv_offloading: 'dram',
+          server_gpu_cache_hit_rate: 0.978,
+          server_cpu_cache_hit_rate: undefined,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Combined Chip + CPU Cache Hit Rate:</strong> 97.8%');
+    expect(html).not.toContain('<strong>CPU Cache Hit Rate:</strong>');
+    expect(html).not.toContain('<strong>Chip Cache Hit Rate:</strong>');
   });
 
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
@@ -724,5 +795,226 @@ describe('generateGPUGraphTooltipContent', () => {
         }),
       ),
     ).not.toContain('data-action="view-charts"');
+  });
+});
+
+describe('worker power drilldown', () => {
+  const workers = [
+    { role: 'frontend', worker_idx: 0, hosts: ['fe0'], num_gpus: 0, avg_power_w: 120 },
+    {
+      role: 'prefill',
+      worker_idx: 0,
+      hosts: ['pn0'],
+      num_gpus: 8,
+      avg_power_w: 612.3,
+      avg_temp_c: 68.4,
+      peak_temp_c: 79.2,
+      avg_util_pct: 88.5,
+      avg_mem_used_mb: 71234.5,
+    },
+    { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+  ];
+
+  const overlayData = {
+    label: 'feature-branch',
+    hardwareConfig: mockHardwareConfig,
+    data: [],
+    runUrl: 'https://example.com',
+  } as any;
+
+  it('renders the worker table on a pinned tooltip in all three generators', () => {
+    const config = tooltipConfig({ data: pt({ workers }), isPinned: true });
+    const outputs = [
+      generateTooltipContent(config),
+      generateOverlayTooltipContent({ ...config, overlayData }),
+      generateGPUGraphTooltipContent(config),
+    ];
+    for (const html of outputs) {
+      expect(html).toContain('data-testid="tooltip-worker-power"');
+      expect(html).toContain('Measured Worker Power');
+      expect(html).toContain('<strong>prefill[0]</strong>');
+      expect(html).toContain('612.3 W');
+      expect(html).toContain('<strong>decode[0]</strong>');
+      expect(html).toContain('701.5 W');
+      expect(html).toContain('<strong>frontend[0]</strong>');
+      expect(html).toContain('0 chips');
+      expect(html).toContain('pn0');
+    }
+  });
+
+  it('includes optional telemetry cells only when the worker carries them', () => {
+    const html = generateTooltipContent(tooltipConfig({ data: pt({ workers }), isPinned: true }));
+    expect(html).toContain('68.4/79.2°C');
+    expect(html).toContain('88.5%');
+    expect(html).toContain('69.565 GiB');
+    const decodeRow = html.split('<strong>decode[0]</strong>')[1].split('</div>')[0];
+    expect(decodeRow).not.toContain('°C');
+    expect(decodeRow).not.toContain('%');
+    expect(decodeRow).not.toContain('GiB');
+  });
+
+  it('renders nothing when the tooltip is not pinned', () => {
+    const config = tooltipConfig({ data: pt({ workers }), isPinned: false });
+    expect(generateTooltipContent(config)).not.toContain('tooltip-worker-power');
+    expect(generateOverlayTooltipContent({ ...config, overlayData })).not.toContain(
+      'tooltip-worker-power',
+    );
+    expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
+  });
+
+  it('renders nothing when workers is absent or empty', () => {
+    expect(generateTooltipContent(tooltipConfig({ isPinned: true }))).not.toContain(
+      'tooltip-worker-power',
+    );
+    expect(
+      generateTooltipContent(tooltipConfig({ data: pt({ workers: [] }), isPinned: true })),
+    ).not.toContain('tooltip-worker-power');
+  });
+
+  it('caps the table at 8 rows with a "+N more workers" line', () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({
+      role: 'decode',
+      worker_idx: i,
+      num_gpus: 8,
+      avg_power_w: 700 + i,
+    }));
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: many }), isPinned: true }),
+    );
+    expect(html).toContain('<strong>decode[7]</strong>');
+    expect(html).not.toContain('<strong>decode[8]</strong>');
+    expect(html).toContain('+2 more workers');
+  });
+
+  it('renders the ZH strings under the zh locale', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers }), isPinned: true, locale: 'zh' }),
+    );
+    expect(html).toContain('各 Worker 实测功耗');
+    expect(html).toContain('8 芯片');
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      role: 'decode',
+      worker_idx: i,
+      num_gpus: 8,
+      avg_power_w: 700,
+    }));
+    const capped = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: many }), isPinned: true, locale: 'zh' }),
+    );
+    expect(capped).toContain('另有 1 个 worker');
+  });
+
+  it('HTML-escapes role and hosts strings from the JSONB boundary', () => {
+    const hostile = [
+      {
+        role: '<img src=x onerror=alert(1)>',
+        worker_idx: 0,
+        hosts: ['<script>evil</script>'],
+        num_gpus: 8,
+        avg_power_w: 700,
+      },
+    ];
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ workers: hostile }), isPinned: true }),
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('&lt;script&gt;evil&lt;/script&gt;');
+  });
+});
+
+describe('power tier tooltip line', () => {
+  it('states the tier for a legacy point on a measured axis', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    expect(html).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
+  });
+
+  it('states the certified tier on a measured axis', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'certified' }),
+      }),
+    );
+    expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
+  });
+
+  it('omits the tier line on non-measured axes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_tpPerGpu',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    expect(html).not.toContain('Power Measurement');
+  });
+
+  it('omits the tier line when the point carries no tier', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ selectedYAxisMetric: 'y_measuredAvgPower', data: pt() }),
+    );
+    expect(html).not.toContain('Power Measurement');
+  });
+
+  it('renders the ZH strings under the zh locale', () => {
+    const legacy = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'legacy' }),
+        locale: 'zh',
+      }),
+    );
+    const certified = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'certified' }),
+        locale: 'zh',
+      }),
+    );
+    expect(legacy).toContain('<strong>功耗测量：</strong> 历史测量（尚未按当前方法验证）');
+    expect(certified).toContain('<strong>功耗测量：</strong> 已验证（采用当前 PowerX 方法）');
+  });
+
+  it('reaches overlay and GPU-graph tooltips through the same gate', () => {
+    const overlay = generateOverlayTooltipContent({
+      ...tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+      overlayData: {
+        label: 'feature-branch',
+        hardwareConfig: mockHardwareConfig,
+        data: [],
+        runUrl: 'https://example.com',
+      } as any,
+    });
+    const gpuGraph = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    const gpuGraphOffAxis = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_costh',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+
+    expect(overlay).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
+    expect(gpuGraph).toContain(
+      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+    );
+    expect(gpuGraphOffAxis).not.toContain('Power Measurement');
   });
 });

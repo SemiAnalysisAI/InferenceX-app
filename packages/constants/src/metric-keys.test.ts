@@ -36,6 +36,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
+    // These fields describe or explain withholding; they are not measurements.
     for (const key of [
       'power_valid',
       'power_metric_schema_version',

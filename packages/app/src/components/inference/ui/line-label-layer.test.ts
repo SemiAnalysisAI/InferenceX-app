@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import * as d3 from 'd3';
 
 import {
   firstNonCollidingRect,
-  placeEndpointLineLabels,
+  fitsVertically,
+  horizontalShiftIntoBounds,
   placeLineLabels,
   rectsOverlap,
   type LineLabelSeries,
@@ -46,6 +46,38 @@ describe('line-label collision primitives', () => {
     ];
 
     expect(firstNonCollidingRect(candidates, placed)).toBeNull();
+  });
+});
+
+describe('point-label plot bounding box primitives', () => {
+  const plot = { left: 0, right: 100, top: 0, bottom: 50 };
+
+  it('needs no shift when the rect already sits inside the plot', () => {
+    expect(horizontalShiftIntoBounds({ left: 10, right: 40, top: 5, bottom: 15 }, plot)).toBe(0);
+  });
+
+  it('slides a rect that spills past the left edge back inside', () => {
+    expect(horizontalShiftIntoBounds({ left: -8, right: 22, top: 5, bottom: 15 }, plot)).toBe(8);
+  });
+
+  it('slides a rect that spills past the right edge back inside', () => {
+    expect(horizontalShiftIntoBounds({ left: 90, right: 115, top: 5, bottom: 15 }, plot)).toBe(-15);
+  });
+
+  it('gives up on a rect wider than the plot', () => {
+    expect(horizontalShiftIntoBounds({ left: -10, right: 120, top: 5, bottom: 15 }, plot)).toBe(
+      null,
+    );
+  });
+
+  it('accepts a rect touching the plot edges as fitting', () => {
+    expect(horizontalShiftIntoBounds({ left: 0, right: 100, top: 0, bottom: 50 }, plot)).toBe(0);
+    expect(fitsVertically({ left: 0, right: 100, top: 0, bottom: 50 }, plot)).toBe(true);
+  });
+
+  it('rejects any vertical overflow, however small', () => {
+    expect(fitsVertically({ left: 10, right: 20, top: -0.5, bottom: 10 }, plot)).toBe(false);
+    expect(fitsVertically({ left: 10, right: 20, top: 40, bottom: 50.5 }, plot)).toBe(false);
   });
 });
 
@@ -102,16 +134,36 @@ describe('line-label placement', () => {
     expect(zoomed[0]).toMatchObject({ x: 60, y: 120, visible: true });
   });
 
-  it('nudges endpoint labels into the scale range without changing identities', () => {
-    const yScale = d3.scaleLinear().domain([0, 100]).range([100, 0]);
-    const labels = placeEndpointLineLabels(
-      [series('a', [{ x: 1, y: 50 }]), series('b', [{ x: 2, y: 51 }])],
+  it('staggers anchor slots so converging curves spread along the line instead of stacking at the endpoint', () => {
+    // Frontier-shaped curves that all converge on the same right-edge region,
+    // like the e2e latency chart: endpoint placement used to pile every label
+    // on top of the shared endpoint.
+    const converging = (key: string, startY: number): LineLabelSeries<Point> =>
+      series(
+        key,
+        [0, 25, 50, 75, 100].map((x) => ({ x, y: startY + ((50 - startY) * x) / 100 })),
+      );
+    const labels = placeLineLabels(
+      [converging('a', 0), converging('b', 100), converging('c', 200), converging('d', 300)],
       identity,
-      yScale,
+      identity,
+      { collisionWidth: 30 },
     );
 
-    expect(labels.map((label) => label.key).toSorted()).toEqual(['a', 'b']);
-    expect(Math.abs(labels[0].y - labels[1].y)).toBeGreaterThanOrEqual(17.9);
-    expect(labels.every((label) => label.y >= 18 && label.y <= 82)).toBe(true);
+    expect(labels).toHaveLength(4);
+    expect(labels.every((label) => label.visible)).toBe(true);
+    // Labels occupy distinct anchor slots along the x-range rather than all
+    // sitting at the shared endpoint (x = 100).
+    const distinctX = new Set(labels.map((label) => label.x));
+    expect(distinctX.size).toBeGreaterThanOrEqual(3);
+    expect(labels.filter((label) => label.x === 100).length).toBeLessThanOrEqual(1);
+  });
+
+  it('places a single-point series at its only point', () => {
+    const labels = placeLineLabels([series('solo', [{ x: 5, y: 7 }])], identity, identity, {
+      collisionWidth: 30,
+    });
+
+    expect(labels[0]).toMatchObject({ x: 5, y: 7, visible: true });
   });
 });

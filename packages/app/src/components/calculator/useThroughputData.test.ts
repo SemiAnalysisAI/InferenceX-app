@@ -467,7 +467,7 @@ describe('interpolateForGPU', () => {
     it('opts the whole frontier out when only some points carry a rate', () => {
       // Splining a 0 in for the unmeasured point would invent a dip in the
       // cached fraction and overstate the billable rate there. Opting out bills
-      // every input token at full price instead — wrong in the safe direction.
+      // every input token at full price instead, without inventing a cache rate.
       const result = interpolateForGPU(
         withCache([0.9, undefined]),
         30,
@@ -1212,7 +1212,7 @@ describe('buildGpuGroups', () => {
     });
 
     // The three tiers do not all stack. These three cases are the shapes the
-    // production data actually comes in; see `cacheHitRateOf` for the counts.
+    // production data actually comes in; see `measuredCacheHitRate` for the counts.
     it('ignores the CPU tier when an external rate is reported — external already counts it', () => {
       // The shape of 106 of 132 production rows with a non-zero CPU rate. Adding
       // CPU here is what breached `theoretical_cache_hit_rate` on 56 of them.
@@ -1729,6 +1729,69 @@ describe('interpolateForGPU cost derivation', () => {
     });
 
     expect(pythonValue).toBeCloseTo(typescriptValue, 14);
+  });
+
+  it('keeps the Python helper in sync for cache-aware revenue interpolation', () => {
+    const pythonValue = interpolateWithPython({
+      points: [
+        {
+          interactivity: 20,
+          throughput: 800,
+          input_tput_per_gpu: 640,
+          output_tput_per_gpu: 160,
+          server_gpu_cache_hit_rate: 0.8,
+          revenue: 1.22112,
+        },
+        {
+          interactivity: 40,
+          throughput: 600,
+          input_tput_per_gpu: 480,
+          output_tput_per_gpu: 120,
+          server_gpu_cache_hit_rate: 0.9,
+          revenue: 0.76032,
+        },
+      ],
+      target_iv: 30,
+      metric_key: 'revenue',
+      proportional_to: 'throughput',
+      revenue_pricing: {
+        input_per_million: 1,
+        cached_input_per_million: 0.1,
+        output_per_million: 1,
+      },
+    });
+
+    expect(pythonValue).toBeCloseTo(0.935015625, 14);
+  });
+
+  it('keeps the Python helper in sync for infrastructure total tokens per dollar', () => {
+    const interactivities = [20, 40];
+    const throughputs = [800, 600];
+    const interpolatedThroughput = hermiteInterpolate(
+      interactivities,
+      throughputs,
+      monotoneSlopes(interactivities, throughputs),
+      30,
+    );
+    const pythonValue = interpolateWithPython({
+      points: [
+        {
+          interactivity: 20,
+          throughput: 800,
+          tokens_per_dollar: 2_000_000,
+        },
+        {
+          interactivity: 40,
+          throughput: 600,
+          tokens_per_dollar: 1_500_000,
+        },
+      ],
+      target_iv: 30,
+      metric_key: 'tokens_per_dollar',
+      proportional_to: 'throughput',
+    });
+
+    expect(pythonValue).toBeCloseTo(interpolatedThroughput * 2_500, 8);
   });
 
   it('makes the Python helper return null when reciprocal throughput is missing', () => {

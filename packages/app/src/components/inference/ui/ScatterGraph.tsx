@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -22,7 +23,6 @@ import {
   avoidPointLabelCollisions,
   parallelismLabelBoxes,
   placeLineLabels,
-  placeEndpointLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
@@ -33,7 +33,6 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
-import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
@@ -46,6 +45,7 @@ import {
 } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
+import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -114,13 +114,24 @@ import {
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
 } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import {
+  countPowerTiers,
+  MeasuredPowerSummary,
+} from '@/components/inference/ui/MeasuredPowerSummary';
+import {
+  isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
+} from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
+import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
 import {
   type ParetoPointLabel,
@@ -136,7 +147,7 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
-import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
+import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -371,6 +382,14 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
+    noData: 'No data available',
+    noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    noRoleEnergyDataHint:
+      'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
+    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialRun: 'UNOFFICIAL RUN',
+    branch: 'Branch',
+    viewWorkflow: 'View workflow run',
   },
   zh: {
     logScale: '对数缩放',
@@ -391,6 +410,14 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
+    noData: '暂无数据',
+    noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    noRoleEnergyDataHint:
+      '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
+    unofficialTitle: (branch: string) => `非官方：${branch}`,
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewWorkflow: '查看工作流运行记录',
   },
 } as const;
 
@@ -404,6 +431,7 @@ const ScatterGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
@@ -458,11 +486,16 @@ const ScatterGraph = React.memo(
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
+    // Legacy-power rings decorate points only while a Measured Energy y-axis
+    // is selected (see legacy-power-marker.ts).
+    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
 
     const {
       isUnofficialRun,
@@ -682,27 +715,15 @@ const ScatterGraph = React.memo(
     });
 
     // --- Changelog ---
-    const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
-    const highlightedHwKeys = useMemo(() => {
-      if (availableRuns) {
-        const cl = availableRuns[selectedRunId]?.changelog;
-        if (cl) {
-          const hwKeys = cl.entries.flatMap((entry: any) =>
-            (entry.config_keys ?? entry['config-keys'] ?? [])
-              .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) =>
-                changelogConfigToHwKey(
-                  key,
-                  selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
-                ),
-              )
-              .filter((key: string | null): key is string => key !== null),
-          );
-          return new Set(hwKeys);
-        }
-      }
-      return new Set<string>();
-    }, [availableRuns, selectedRunId, selectedPrecisions, selectedSequence]);
+    const legendChangelogs = useMemo(
+      () =>
+        legendChangelogsByHardware(
+          data,
+          availableRuns,
+          selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn',
+        ),
+      [data, availableRuns, selectedSequence],
+    );
 
     // --- Data Processing ---
     const groupedData = useMemo(
@@ -1068,17 +1089,21 @@ const ScatterGraph = React.memo(
       quickFilters.vendors.length +
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
+      quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
-      setQuickFilterSpec([]);
+      if (selectedSequence !== Sequence.AgenticTraces) setQuickFilterSpec([]);
+      setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
+      selectedSequence,
     ]);
 
     const pointsTable = useMemo(() => {
@@ -1191,15 +1216,16 @@ const ScatterGraph = React.memo(
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
           : ([0, 100] as [number, number]));
 
-      let useLog = false;
-      if (isInputTputMetric) {
-        const isTTFT =
-          xLabel.toLowerCase().includes('time to first token') ||
-          xLabel.toLowerCase().includes('ttft');
-        if (scaleType === 'log') useLog = ext[0] > 0;
-        else if (scaleType === 'linear') useLog = false;
-        else useLog = isTTFT && ext[0] > 0 && ext[1] / ext[0] > 10;
-      }
+      // `x_scale_field` comes from useChartData and follows remapped `data[].x`
+      // through both the live chart and Replay. Unlike `xLabel`, it is stable
+      // across locales and distinct from the registry's natural `x` field.
+      const useLog =
+        resolveScatterXAxisScale({
+          extent: ext,
+          selectedYAxisMetric,
+          xAxisField: chartDefinition.x_scale_field,
+          scaleType,
+        }) === 'log';
 
       const domain: [number, number] = useLog ? [ext[0] * 0.9, ext[1] * 1.05] : [0, ext[1] * 1.05];
       return {
@@ -1208,7 +1234,14 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
+    }, [
+      visiblePoints,
+      selectedYAxisMetric,
+      chartDefinition.x_scale_field,
+      scaleType,
+      niceAxes,
+      xExtentOverride,
+    ]);
     const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
     const yScaleConfigRaw = useMemo(() => {
@@ -1310,6 +1343,30 @@ const ScatterGraph = React.memo(
         (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
       [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
     );
+
+    const powerTierCounts = useMemo(() => {
+      const officialTotal = pointsData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const overlayTotal = processedOverlayData.filter((point) =>
+        selectedPrecisions.includes(point.precision),
+      );
+      const officialVisible = officialTotal.filter(isPointVisible);
+      const overlayVisible = overlayTotal.filter(
+        (point) => activeOverlayHwTypes.has(String(point.hwKey)) && isOverlayPointVisible(point),
+      );
+      return {
+        total: countPowerTiers([...officialTotal, ...overlayTotal]),
+        visible: countPowerTiers([...officialVisible, ...overlayVisible]),
+      };
+    }, [
+      pointsData,
+      processedOverlayData,
+      selectedPrecisions,
+      isPointVisible,
+      activeOverlayHwTypes,
+      isOverlayPointVisible,
+    ]);
 
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
@@ -1889,8 +1946,10 @@ const ScatterGraph = React.memo(
               btnEvent.stopPropagation();
               // Full-document navigation: stamp the chart state onto THIS
               // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults.
-              rememberChartStateInUrl();
+              // rebuilds from defaults. Skipped in ephemeral scopes (/model
+              // embeds): the store holds the primary dashboard's state there,
+              // not this chart's.
+              if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
@@ -2219,17 +2278,15 @@ const ScatterGraph = React.memo(
             });
             const labelSeries = [...officialSeries, ...overlaySeries];
 
-            lineLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, xScale, yScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, xScale, yScale, {
-                    nudge: !pinLineLabels,
-                  });
+            // Both chart types spread labels along their lines with collision
+            // avoidance — endpoint-only placement stacked every label at the
+            // right edge of the e2e latency chart.
+            lineLabels = placeLineLabels(labelSeries, xScale, yScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
+            });
 
             // Keep hidden data-join entries for precision/date curves that lost
             // deduplication, preserving the chart's one-label-per-series identity.
@@ -2257,6 +2314,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-hw-key',
+            iconFor: (label) => getLineLabelVendorIcon(label.seriesId),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
@@ -2458,17 +2516,12 @@ const ScatterGraph = React.memo(
                 : [],
             );
             const labelSeries = [...officialSeries, ...overlaySeries];
-            const zoomLabels =
-              chartDefinition.chartType === 'interactivity'
-                ? placeLineLabels(labelSeries, newXScale, newYScale, {
-                    collisionWidth: 120,
-                    anchors: lineLabelAnchorRef.current,
-                    pinAnchors: pinLineLabels,
-                    obstacles: parallelismLabelBoxes(zoomGroup.node()),
-                  })
-                : placeEndpointLineLabels(labelSeries, newXScale, newYScale, {
-                    nudge: !pinLineLabels,
-                  });
+            const zoomLabels = placeLineLabels(labelSeries, newXScale, newYScale, {
+              collisionWidth: 120,
+              anchors: lineLabelAnchorRef.current,
+              pinAnchors: pinLineLabels,
+              obstacles: parallelismLabelBoxes(zoomGroup.node()),
+            });
             updateRenderedLineLabels(zoomGroup, zoomLabels);
           }
         },
@@ -2604,14 +2657,15 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload is the only persistent
-              // point decoration. Decode method remains in the tooltip.
+              // Match official points: KV offload and the measured-axis
+              // legacy-power ring are the only persistent point decorations.
+              // Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
-                renderOffloadHalo(
-                  d3.select(this),
-                  d,
-                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                const overlayStroke = overlayRunColor(
+                  overlayRunIndex(d.run_url ?? null, runIndexByUrl),
                 );
+                renderOffloadHalo(d3.select(this), d, overlayStroke);
+                renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
               // Labels
@@ -2976,6 +3030,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      isMeasuredEnergyAxis,
       chartDefinition,
       locale,
       drawPerfRuler,
@@ -2997,9 +3052,11 @@ const ScatterGraph = React.memo(
         // CSS transitions for smooth opacity animation on hw toggle
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
-        // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
+        // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
+        // Legacy-power ring: dotted ring on unvalidated telemetry, measured axes only.
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
+          renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, 'var(--foreground)');
         });
 
         avoidPointLabelCollisions(zoomGroup);
@@ -3029,6 +3086,9 @@ const ScatterGraph = React.memo(
         optimalPointKeys,
         getCssColor,
         resolveColor,
+        // A metric-only change must re-run the decoration pass so legacy-power
+        // rings appear/disappear with the Measured Energy axis selection.
+        isMeasuredEnergyAxis,
       ],
     );
 
@@ -3062,8 +3122,9 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the offload halo above that shape after the swap.
+        // Keep the decorations above that shape after the swap.
         point.selectAll('.offload-halo').raise();
+        point.selectAll('.legacy-power-ring').raise();
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
@@ -3311,45 +3372,57 @@ const ScatterGraph = React.memo(
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
 
+    // Distinguish only causes supported by the currently available rows. The
+    // official data is already scope-filtered, so an empty array alone cannot
+    // prove which upstream filter removed it. Overlay rows use the same filters.
+    const hasMatchingHiddenPoints =
+      data.some((point) => selectedPrecisions.includes(point.precision)) ||
+      (overlayData?.data ?? []).some(
+        (point) =>
+          selectedPrecisions.includes(point.precision) && matchesQuickFilters(point, quickFilters),
+      );
+    const hasMatchingClippedPoints =
+      clippedData.some(
+        ({ point }) =>
+          selectedPrecisions.includes(point.precision) &&
+          effectiveActiveHwTypes.has(String(point.hwKey)),
+      ) || processedOverlayClippedData.length > 0;
+    const emptyReason = hasMatchingClippedPoints
+      ? 'clipped'
+      : hasMatchingHiddenPoints
+        ? 'hidden'
+        : quickFilterCount > 0
+          ? 'filtered'
+          : 'selection';
+    const emptyState = (
+      <ScatterEmptyState
+        reason={emptyReason}
+        description={
+          emptyReason === 'selection' && isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+            ? legendT.noRoleEnergyDataHint
+            : undefined
+        }
+        onShowChips={() => {
+          resetUnifiedSelection();
+          track('inference_empty_recovered', { action: 'show_matching_chips' });
+        }}
+        onClearFilters={() => {
+          clearQuickFilters();
+          track('inference_quick_filters_cleared', { source: 'scatter_empty' });
+        }}
+        onEditFilters={() => {
+          setQuickFiltersOpen(true);
+          track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
+        }}
+        onShowTable={onShowTable}
+      />
+    );
+
     // --- Empty state ---
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
-          <div className="flex flex-col items-center justify-center min-h-100 text-center">
-            <div className="text-muted-foreground">
-              <svg
-                className="mx-auto size-12 mb-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              <h3 className="text-sm font-medium mb-1">No data available</h3>
-              <p className="text-xs">
-                Please change the model, sequence, precision, date range or chip selection.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-4"
-                data-testid="scatter-empty-quick-filters"
-                onClick={() => {
-                  setQuickFiltersOpen(true);
-                  track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
-                }}
-              >
-                {legendT.quickFilters(quickFilterCount)}
-              </Button>
-            </div>
-          </div>
+          <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
@@ -3390,12 +3463,7 @@ const ScatterGraph = React.memo(
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{ zIndex: 100 }}
               >
-                <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
-                  <p className="text-sm font-medium">No data available</p>
-                  <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or chip selection.
-                  </p>
-                </div>
+                {emptyState}
               </div>
             ) : undefined
           }
@@ -3423,7 +3491,7 @@ const ScatterGraph = React.memo(
                           name: `✕ unofficial-run-${info.id}`,
                           label: `✕ ${branch}`,
                           color: overlayRunColor(idx),
-                          title: `UNOFFICIAL: ${branch}`,
+                          title: legendT.unofficialTitle(branch),
                           isHighlighted: true,
                           hw: `overlay-run-${info.id}`,
                           isActive: true,
@@ -3442,8 +3510,12 @@ const ScatterGraph = React.memo(
                           },
                           tooltip: (
                             <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                              <div>Branch: {branch}</div>
+                              <div className="text-red-500 font-semibold">
+                                {legendT.unofficialRun}
+                              </div>
+                              <div>
+                                {legendT.branch}: {branch}
+                              </div>
                               {info.url && (
                                 <a
                                   href={info.url}
@@ -3451,7 +3523,7 @@ const ScatterGraph = React.memo(
                                   rel="noopener noreferrer"
                                   className="underline"
                                 >
-                                  View workflow run
+                                  {legendT.viewWorkflow}
                                 </a>
                               )}
                             </div>
@@ -3474,7 +3546,7 @@ const ScatterGraph = React.memo(
                     label: getDisplayLabel(hwConfig),
                     color: resolveColor(key),
                     title: hwConfig.gpu,
-                    isHighlighted: highlightedHwKeys.has(key),
+                    isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
                     hw: key,
                     isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
                     onClick: showAllHardwareTypes
@@ -3490,8 +3562,10 @@ const ScatterGraph = React.memo(
                         framework: hwConfig.framework ?? '',
                       });
                     },
-                    tooltip: changelog
-                      ? formatChangelogDescription(changelog.entries[0].description)
+                    tooltip: legendChangelogs.has(key)
+                      ? formatChangelogDescription(
+                          legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                        )
                       : null,
                   })),
               ]}
@@ -3671,12 +3745,19 @@ const ScatterGraph = React.memo(
                   },
                 },
               ]}
-              precisionIndicators={selectedPrecisions}
               hideAtomFootnote
               enableTooltips={true}
             />
           }
         />
+        {isMeasuredEnergyAxis && (
+          <MeasuredPowerSummary
+            total={powerTierCounts.total}
+            visible={powerTierCounts.visible}
+            bestPerSku={bestPerSku}
+            optimalOnly={hideNonOptimal}
+          />
+        )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}

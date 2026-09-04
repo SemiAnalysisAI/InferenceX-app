@@ -12,7 +12,7 @@ function visitAgenticChart(extraQuery = '') {
   });
 }
 
-describe('resident sequence-length subtitle', () => {
+describe('resident sequence-length footer summary', () => {
   it('summarizes every resident official point without following legend selection', () => {
     interceptOverlayRun();
     interceptDerivedAgenticMetrics();
@@ -39,7 +39,7 @@ describe('resident sequence-length subtitle', () => {
       .and('contain.text', 'OSL p50 1k');
 
     // Legend visibility is downstream of the resident set. Hiding a series
-    // must not remove the subtitle or issue a narrower stats request.
+    // must not remove the footer summary or issue a narrower stats request.
     cy.get('.sidebar-legend button').first().click({ force: true });
     cy.get('[data-testid="resident-sequence-lengths"]').should('be.visible');
     cy.get('@residentSequenceLengths.all').should('have.length', 1);

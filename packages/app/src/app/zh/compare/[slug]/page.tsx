@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -10,13 +11,7 @@ import {
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import {
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  compareModelDisplayLabel,
-  compareModelSeoName,
-  parseCompareSlug,
-} from '@/lib/compare-slug';
+import { canonicalCompareSlug, compareModelSeoName, parseCompareSlug } from '@/lib/compare-slug';
 import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
   getComparePageDerivedData,
@@ -30,6 +25,7 @@ import {
   compareTableNarrativeZh,
 } from '@/lib/compare-ssr-zh';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
@@ -57,6 +53,12 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
     : `/zh/compare/${canonical}`;
 }
 
+function gpuPairLabelZh(a: string, b: string): string {
+  const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
+  const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  return `${aLabel} 与 ${bLabel}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -73,8 +75,8 @@ export async function buildCompareMetadataZh(
 ): Promise<Metadata> {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
-  const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
-  const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
+  const gpuLabel = gpuPairLabelZh(parsed.a, parsed.b);
+  const fullLabel = `${parsed.model.label} — ${gpuLabel}`;
   const modelSeoName = compareModelSeoName(parsed.model);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   // The scenario segments are views of one comparison, so the bare slug URL
@@ -124,7 +126,7 @@ export default async function ComparePageZh({ params, searchParams }: Props) {
   return renderComparePageZh(slug, await searchParams, {});
 }
 
-export async function renderComparePageZh(
+export function renderComparePageZh(
   slug: string,
   sp: Record<string, string | string[] | undefined>,
   { scenarioSegment }: ScenarioOptions,
@@ -147,6 +149,33 @@ export async function renderComparePageZh(
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
+  // In-page Suspense, NOT loading.tsx: a route-level loading boundary would
+  // stream a 200 shell before the notFound()/permanentRedirect() above run,
+  // degrading real 404/308 responses to soft client-side handling. See the
+  // English page for the full rationale.
+  return (
+    <Suspense fallback={<CompareDetailRouteSkeleton />}>
+      <CompareDetailZh
+        parsed={parsed}
+        canonical={canonical}
+        sp={sp}
+        scenarioSegment={scenarioSegment}
+      />
+    </Suspense>
+  );
+}
+
+async function CompareDetailZh({
+  parsed,
+  canonical,
+  sp,
+  scenarioSegment,
+}: {
+  parsed: NonNullable<ReturnType<typeof parseCompareSlug>>;
+  canonical: string;
+  sp: Record<string, string | string[] | undefined>;
+  scenarioSegment?: ScenarioSegment;
+}) {
   const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
 
   const urlSeq = pickString(sp.i_seq);
@@ -194,12 +223,8 @@ export async function renderComparePageZh(
     newest,
     parsed.model.displayName,
   );
-  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh(
-    'full',
-    compareModelDisplayLabel(parsed.model, parsed.a, parsed.b),
-    url,
-  );
-  const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
+  const label = `${parsed.model.label} — ${gpuPairLabelZh(parsed.a, parsed.b)}`;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh('full', label, url);
   const aMeta = HW_REGISTRY[parsed.a];
   const bMeta = HW_REGISTRY[parsed.b];
   const aLabel = aMeta?.label ?? parsed.a.toUpperCase();

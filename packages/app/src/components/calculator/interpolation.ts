@@ -454,8 +454,8 @@ export function interpolateForGPU(
   // is the fixed-sequence case, where there is no cache to discount. A *mixed*
   // frontier is the interesting one: substituting 0 for the missing points
   // would invent a dip in the cached fraction, so the whole sweep opts out and
-  // its input tokens bill at full price — understating margin rather than
-  // overstating it, which is the safe direction for this number to be wrong in.
+  // its input tokens bill at full price. That avoids inventing a cache curve,
+  // but overstates revenue and margin if the missing point actually had hits.
   const cacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
     ? buildMetric((p) => p.cacheHitRate!)
     : undefined;

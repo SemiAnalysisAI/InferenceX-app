@@ -1,8 +1,6 @@
 // Merged from tabs.cy.ts and first-load-navigation.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
-import { keepLaunchModal } from '../support/e2e';
-
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
     cy.window().then((win) => {
@@ -18,14 +16,30 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-historical"]').click();
     cy.url().should('include', '/historical');
 
-    cy.get('[data-testid="tab-trigger-calculator"]').click();
-    cy.url().should('include', '/calculator');
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').click();
+    cy.url().should('include', '/profit-estimator-per-gigawatt');
 
-    cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
-    cy.url().should('include', '/gpu-specs');
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
+    cy.url().should('include', '/profit-estimator');
+    cy.url().should('not.include', '/profit-estimator-per-gigawatt');
+
+    cy.get('[data-testid="tab-trigger-submissions"]').click();
+    cy.url().should('include', '/submissions');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.url().should('include', '/inference');
+  });
+
+  it('opens the TCO Calculator and Fleet Lifecycle from the footer links', () => {
+    cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
+    cy.url().should('include', '/calculator');
+    cy.get('[data-testid="calculator-controls"]').should('exist');
+
+    cy.get('[data-testid="footer-link-fleet"]').scrollIntoView().click();
+    cy.url().should('include', '/fleet');
   });
 
   it('opens GPU Reliability from the footer link', () => {
@@ -36,39 +50,70 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
   });
 
+  it('opens Chip Specs from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
+    cy.url().should('include', '/gpu-specs');
+    cy.get('[data-testid="gpu-specs-content"]').should('exist');
+  });
+
   it('shows mobile chart select dropdown on small viewport', () => {
     cy.viewport(375, 812);
     cy.visit('/inference');
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
   });
+
+  it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
+    // Start locked: testIsolation is off, so an unlock persisted by an earlier
+    // test would make the konami sequence below a no-op (nothing would insert,
+    // nothing would shift, and the assertion would pass vacuously).
+    cy.visit('/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
+    // Unlock mid-session: inserting the Hidden trigger reflows the
+    // justify-evenly tabs WITHOUT resizing the nav box, so the nav's
+    // ResizeObserver never fires — only the gateUnlocked remeasure keeps
+    // the indicator under the active tab.
+    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
+      const active = $indicator
+        .closest('[data-testid="chart-section-tabs"]')
+        .find('[data-tab-active="true"]')[0];
+      expect(active, 'active tab link').to.not.equal(undefined);
+      const indicator = $indicator[0];
+      const match = /translateX\((?<left>-?[\d.]+)px\)/u.exec(indicator.style.transform);
+      expect(match, 'indicator transform').to.not.equal(null);
+      expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
+      expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
+    });
+    // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+  });
 });
 
 describe('First-load navigation', () => {
-  // These specs need the launch modal to actually show on first load.
-  before(keepLaunchModal);
-
   beforeEach(() => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        // Snoozed, not cleared: dismissing the launch modal below makes the
-        // star modal the next eligible landing nudge, and its corner card
-        // would sit over the footer links these specs click.
+        // Snoozed, not cleared: the star modal is the eligible landing nudge
+        // on first load, and its corner card would sit over the footer links
+        // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
         win.localStorage.removeItem('inferencex-openai-rubin-banner-dismissed');
       },
     });
 
-    // The launch modal is centered behind a backdrop, so it owns the first
-    // interaction — dismiss it before exercising the page underneath.
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
-    cy.get('[data-testid="launch-modal-dismiss"]').click();
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
 
-  it('navigates to articles from the footer after the launch modal is dismissed', () => {
+  it('navigates to articles from the footer', () => {
     cy.get('[data-testid="footer-link-articles"]').scrollIntoView().click();
     cy.location('pathname').should('eq', '/blog');
   });
@@ -98,19 +143,6 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/agentx');
   });
 
-  it('navigates to overview and the full dashboard from the landing CTAs', () => {
-    cy.get('[data-testid="landing-overview-link"]')
-      .should('have.attr', 'href', '/overview')
-      .click();
-    cy.location('pathname').should('eq', '/overview');
-
-    cy.visit('/');
-    cy.get('[data-testid="landing-full-dashboard-link"]')
-      .should('have.attr', 'href', '/inference')
-      .click();
-    cy.location('pathname').should('eq', '/inference');
-  });
-
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       // The hero owns /compare's h1; on the landing page it is a section heading.
@@ -123,7 +155,7 @@ describe('First-load navigation', () => {
         .should('contain.text', 'Full dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
@@ -135,8 +167,13 @@ describe('First-load navigation', () => {
           'glm-5-2',
           'minimax-m3',
           'qwen-3-5',
+          'qwen-3-8-flash-next',
         ]);
       });
+      // Every featured ledger row carries the NEW pill.
+      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
+        .should('have.length', 6)
+        .each(($badge) => expect($badge.text()).to.equal('NEW'));
     });
     cy.get('[data-testid="compare-agentx-overview-link"]').click();
     cy.location('pathname').should('eq', '/overview');

@@ -538,7 +538,7 @@ const PER_DOLLAR_BOTH_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
   (i) =>
     `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctDelta(i.ratio)}.`,
   (i) =>
-    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtPctDelta(i.ratio)} more output per dollar.`,
+    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtPctDelta(i.ratio)} more total tokens per dollar.`,
 ];
 
 const PER_DOLLAR_TIED_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
@@ -597,7 +597,7 @@ function fullSummary(i: FullBoth): string {
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
-    : 'numbers are too close to call';
+    : 'Comparable data is unavailable';
 }
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
@@ -915,13 +915,14 @@ export function compareMetaDescription(
       ? `${stat.faster} delivers ${stat.tputPct}% more tok/s/chip than ${stat.slower} on ${modelName}`
       : null;
   const costClause =
-    stat.costPct > 0 ? `${stat.cheaper} is ${stat.costPct}% cheaper per token` : null;
+    stat.costPct > 0
+      ? `${stat.cheaper} is ${stat.costPct}% more cost-efficient than ${stat.pricier}`
+      : null;
 
   let core: string;
   if (tputClause && costClause) core = `${tputClause}; ${costClause}.`;
   else if (tputClause) core = `${tputClause}.`;
-  else if (costClause)
-    core = `${stat.cheaper} is ${stat.costPct}% cheaper per token than ${stat.pricier} on ${modelName}.`;
+  else if (costClause) core = `${costClause} on ${modelName}.`;
   else return fallback; // both dimensions within 1% — nothing differentiating to lead with
 
   return (

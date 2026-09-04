@@ -4,7 +4,9 @@ import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -27,7 +29,9 @@ import { useLocale } from '@/lib/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
+import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
+  collectiveXConclusionLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
@@ -68,11 +72,13 @@ const STRINGS = {
   en: {
     operation: {
       dispatch: 'Dispatch',
+      stage: 'Stage',
       combine: 'Combine',
       roundtrip: 'Round trip',
     },
     operationHeading: {
       dispatch: 'Dispatch',
+      stage: 'Stage',
       combine: 'Combine',
       roundtrip: 'Round trip (measured)',
     },
@@ -83,6 +89,7 @@ const STRINGS = {
     yAxis: {
       latency: 'Latency',
       'tokens-per-second': 'Token rate at selected latency percentile',
+      'activation-rate': 'Activation-data rate at selected latency percentile',
       'payload-rate': 'Payload bandwidth at selected latency percentile (per chip)',
     },
     all: 'All',
@@ -108,6 +115,7 @@ const STRINGS = {
     suiteAria: 'Filter CollectiveX runs by suite',
     allSuites: 'All',
     noSuiteRuns: 'No runs contain the selected suite.',
+    shownRunCount: (count: number) => `${count} runs shown`,
     selectRuns: 'Select one or more runs from the table to show their data.',
     selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
@@ -128,6 +136,7 @@ const STRINGS = {
     backend: 'Backend',
     yAxisControl: 'Y axis',
     tokenRateOption: 'Token rate at latency percentile',
+    activationRateOption: 'Activation-data rate at latency percentile',
     noSeries: 'No measured series match these filters.',
     resetFilter: 'Reset filter',
     payloadNote:
@@ -146,86 +155,65 @@ const STRINGS = {
     deleteFailed: 'Deleting the run failed. Try again.',
     deleteShownFailed: (deleted: number, total: number) =>
       `Deleted ${deleted} of ${total} shown runs before the operation failed. Try again.`,
+    atLatency: (percentile: string) => `at ${percentile} latency`,
+    chartControlsHeading: 'Chart filters',
+    chartControlsDescription:
+      'Choose the measured slice and display metric for the explorer below.',
   },
   zh: {
     operation: {
       dispatch: '分发',
+      stage: '中间处理',
       combine: '合并',
       roundtrip: '往返',
-      'isolated-sum': '分项之和',
     },
     operationHeading: {
       dispatch: '分发',
+      stage: '中间处理',
       combine: '合并',
       roundtrip: '往返（实测）',
-      'isolated-sum': '分项之和（派生）',
     },
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
     precision: { bf16: 'BF16', fp8: 'FP8' },
-    scale: { log: '对数', linear: '线性' },
-    xAxis: {
-      'tokens-per-rank': '每 rank 源 token 数',
-      'global-tokens': '全局源 token 数',
-    },
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
+      'activation-rate': '所选延迟分位点的激活数据速率',
       'payload-rate': '所选延迟分位点的载荷带宽（每芯片）',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
-    fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
-    topologyScope: { 'scale-up': '域内（scale-up）', 'scale-out': '跨域（scale-out）' },
-    payloadUnit: { 'token-rank': 'Token-rank 载荷', 'token-expert': 'Token-expert 载荷' },
-    combineSemantics: {
-      'activation-only': '仅激活值合并',
-      'gate-weighted': '门控加权合并',
-    },
-    tabs: {
-      case: 'Selected matrix case',
-      evidence: '证据',
-    },
-    noCases: 'This run has no matrix cases to inspect.',
     all: '全部',
-    loading: 'Resolving CollectiveX run...',
-    unavailable: 'CollectiveX run unavailable',
-    sourceUnavailable: 'The GitHub Actions run source is temporarily unavailable.',
-    runsErrorMessage: 'No CollectiveX run has been published yet.',
-    loadError: 'The CollectiveX dataset failed to load.',
+    loading: '正在加载 CollectiveX 运行数据……',
+    unavailable: 'CollectiveX 运行暂不可用',
+    loadError: 'CollectiveX 数据集加载失败。',
     retry: '重试',
     description: '对比集合通信库与系统的专家并行（EP）延迟和逻辑载荷速率。',
     source: '源代码',
     methodology: '测试方法',
-    sourceLinkUnavailable: 'Source unavailable because measured series span different revisions',
     refresh: '刷新',
-    seriesCount: 'Series',
-    measuredCases: 'Measured cases',
-    terminalCases: '已终结用例',
-    retainedAttempts: '保留尝试',
-    allocations: '独立分配',
+    seriesCount: '序列数',
+    measuredCases: '实测用例',
+    terminalCases: '终态用例',
     publishedUtc: '发布时间（UTC）',
     version: '基准版本',
-    // English placeholders per the repository's temporary language override
-    // (no new Chinese translations); localize when the override lifts.
-    runsHeading: 'Runs',
-    runsDescription:
-      'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
-    runsShown: 'Runs shown',
+    runsHeading: '运行记录',
+    runsDescription: '该基准测试版本下保存的全部运行记录。勾选一条或多条记录，即可在图表中对比。',
+    runsShown: '已显示运行',
+    shownRunCount: (count: number) => `已显示 ${count} 个运行`,
     suiteControl: '测试套件',
     suiteAria: '按测试套件筛选 CollectiveX 运行',
     allSuites: '全部',
     noSuiteRuns: '没有包含所选测试套件的运行。',
-    selectRuns: 'Select one or more runs from the table to show their data.',
-    selectedRunsFailed: 'One or more selected runs failed to load.',
-    runControl: 'Run',
-    loadRuns: 'Load runs',
-    loadingRuns: 'Loading runs…',
-    latestPublished: 'Latest run',
+    selectRuns: '请从表格中选择至少一个运行以显示数据。',
+    selectedRunsFailed: '至少一个所选运行加载失败。',
+    runControl: '运行',
+    loadRuns: '加载运行',
+    loadingRuns: '正在加载运行……',
+    latestPublished: '最新运行',
     modeControl: '模式',
     modeAria: 'CollectiveX 模式',
     epControl: 'EP 并行度',
-    fabricScopeControl: '互联范围',
-    fabricScopeAria: 'CollectiveX 互联范围',
     operationControl: '操作',
     phaseControl: '阶段',
     phaseAria: 'CollectiveX 阶段',
@@ -235,59 +223,17 @@ const STRINGS = {
     percentileAria: 'CollectiveX 延迟分位点',
     sku: 'SKU',
     backend: '后端',
-    routing: '路由',
-    xAxisControl: 'X 轴',
-    xScale: 'X 轴刻度',
-    xScaleAria: 'CollectiveX X 轴刻度',
     yAxisControl: 'Y 轴',
     tokenRateOption: '延迟分位点对应的 token 速率',
-    yScale: 'Y 轴刻度',
-    yScaleAria: 'CollectiveX Y 轴刻度',
-    noSeries: 'No measured series match these filters.',
-    highContrast: '高对比度',
+    activationRateOption: '延迟分位点对应的激活数据速率',
+    noSeries: '没有实测序列符合当前筛选条件。',
     resetFilter: '重置筛选',
-    stableOrdering: '排名顺序稳定性已通过',
-    samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
-      `${trials}×${iterations} = 每个分项 ${samples} 个样本 · 同步 warmup ${warmups} 次`,
-    selectedFactorsDiffer: '所选配置存在差异',
-    differenceLabels: {
-      model: '模型',
-      suite: '测试套件',
-      mode: '模式',
-      phase: '阶段',
-      'backend implementation': '后端实现',
-      'implementation build': '实现构建',
-      'system identity': '系统标识',
-      'fabric scope': '互联范围',
-      topology: '拓扑',
-      transport: '传输方式',
-      'world size': '全局 rank 数',
-      'EP degree': 'EP 并行度',
-      placement: '放置方式',
-      workload: '工作负载',
-      'model shape': '模型形状',
-      routing: '路由',
-      'EPLB plan': 'EPLB 方案',
-      dtypes: '数据类型',
-      'resource profile': '资源配置',
-      measurement: '测量协议',
-      'token ladder': 'token 梯度',
-      'component availability': '测量分项可用性',
-      correctness: '正确性',
-    },
-    missingComponents: '不可用的测量分项保持为空，并从图表中省略。',
-    isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
-      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
-    provenance: '发布数据溯源',
-    runLabel: 'Run',
-    attemptLabel: 'Attempt',
-    matrixLabel: 'Matrix',
-    sourceBundles: '源产物包',
+      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
     deleteRun: '删除运行',
     deleteShownRuns: '删除已显示的运行',
-    deletingShownRuns: '正在删除已显示的运行…',
+    deletingShownRuns: '正在删除已显示的运行……',
     deleteConfirm: (id: string) => `从仪表板数据库中删除运行 #${id}？此操作无法撤销。`,
     deleteShownConfirm: (ids: readonly string[]) =>
       `从仪表板数据库中删除当前显示的 ${ids.length} 个运行？此操作无法撤销。\n\n${ids.map((id) => `#${id}`).join('\n')}`,
@@ -296,6 +242,9 @@ const STRINGS = {
     deleteFailed: '删除运行失败，请重试。',
     deleteShownFailed: (deleted: number, total: number) =>
       `操作失败前已删除 ${total} 个已显示运行中的 ${deleted} 个，请重试。`,
+    atLatency: (percentile: string) => `${percentile} 延迟分位点`,
+    chartControlsHeading: '图表筛选',
+    chartControlsDescription: '选择下方图表要展示的测量切片和指标。',
   },
 } as const;
 const CONCLUSION_CLASSES: Record<string, string> = {
@@ -308,10 +257,18 @@ const CONCLUSION_FALLBACK_CLASS =
 // rotated secret re-prompts instead of failing silently forever.
 const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 
-function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function ControlGroup({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );
@@ -399,7 +356,7 @@ export default function CollectiveXDisplay() {
   const [legendExpanded, setLegendExpanded] = useState(true);
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
     { value: 'dispatch', label: t.operation.dispatch },
-    { value: 'stage', label: 'Stage' },
+    { value: 'stage', label: t.operation.stage },
     { value: 'combine', label: t.operation.combine },
     { value: 'roundtrip', label: t.operation.roundtrip },
   ];
@@ -467,7 +424,7 @@ export default function CollectiveXDisplay() {
       ),
     [combinedSeries, epSize, phase],
   );
-  const modeOptions: SegmentedToggleOption<CollectiveXMode>[] = availableModes.map((value) => ({
+  const modeOptions = availableModes.map((value) => ({
     value,
     label: t.mode[value],
   }));
@@ -585,11 +542,11 @@ export default function CollectiveXDisplay() {
     () =>
       phaseSeries.map((item) => ({
         name: item.series_id,
-        label: collectiveXLegendLabel(item),
+        label: collectiveXLegendLabel(item, locale),
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
+        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -600,7 +557,7 @@ export default function CollectiveXDisplay() {
           track('collectivex_series_toggled', { series: item.series_id });
         },
       })),
-    [activeSeriesIds, colors, phaseSeries],
+    [activeSeriesIds, colors, locale, phaseSeries],
   );
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
@@ -707,11 +664,12 @@ export default function CollectiveXDisplay() {
     );
   }
   if (runsQuery.error || !runsQuery.data) {
-    const message = runsQuery.error instanceof Error ? runsQuery.error.message : t.loadError;
     return (
       <Card data-testid="collectivex-error" className="border-destructive">
-        <h1 className="text-lg font-semibold">{t.unavailable}</h1>
-        <p className="mt-2 text-sm text-destructive">{message}</p>
+        <Heading as="h1" level="card">
+          {t.unavailable}
+        </Heading>
+        <p className="mt-2 text-sm text-destructive">{t.loadError}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="min-w-32">
             <SelectControl
@@ -748,19 +706,21 @@ export default function CollectiveXDisplay() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold">CollectiveX</h1>
+              <Heading as="h1" level="card">
+                CollectiveX
+              </Heading>
               <span
                 data-testid="collectivex-run-conclusion"
-                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                className={`rounded-md border px-2 py-0.5 text-2xs font-medium ${
                   singleDataset ? singleConclusionClass : CONCLUSION_FALLBACK_CLASS
                 }`}
               >
                 {singleDataset
-                  ? `#${singleDataset.run.run_id} · ${singleDataset.run.conclusion ?? 'pending'}`
-                  : `${datasets.length} ${t.runsShown.toLowerCase()}`}
+                  ? `#${singleDataset.run.run_id} · ${collectiveXConclusionLabel(singleDataset.run.conclusion, locale)}`
+                  : t.shownRunCount(datasets.length)}
               </span>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">{t.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {singleDataset && (
@@ -775,7 +735,7 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
                 >
                   {t.source} <ExternalLink className="size-3.5" />
                 </a>
@@ -789,7 +749,7 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
                 >
                   <BookOpen className="size-3.5" /> {t.methodology}
                 </a>
@@ -818,7 +778,7 @@ export default function CollectiveXDisplay() {
       <Card data-testid="collectivex-runs">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{t.runsHeading}</h2>
+            <Heading level="card">{t.runsHeading}</Heading>
             <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end md:w-auto">
@@ -906,76 +866,11 @@ export default function CollectiveXDisplay() {
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
             </Card>
           )}
-          {/* KV-transfer cases lead for kv-only runs: the EP chart below is
-              legitimately empty for them and must not bury the selected data. */}
-          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
-          <Card data-testid="collectivex-main-chart" className="relative">
-            <CollectiveXChart
-              chartId="collectivex-explorer"
-              testId="collectivex-explorer-chart"
-              series={activeSeries}
-              colors={colors}
-              operation={operation}
-              percentile={percentile}
-              yAxis={yAxis}
-              caption={
-                <>
-                  <h2 className="text-lg font-semibold">
-                    {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
-                    {t.phaseValue[phase]} ·{' '}
-                    {yAxis === 'latency'
-                      ? percentile
-                      : locale === 'zh'
-                        ? `${percentile} 延迟分位点`
-                        : `at ${percentile} latency`}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {yAxis === 'activation-rate'
-                      ? 'Activation-data rate at selected latency percentile'
-                      : t.yAxis[yAxis]}
-                  </p>
-                </>
-              }
-              legendElement={
-                <ChartLegend
-                  variant="sidebar"
-                  legendItems={legendItems}
-                  disableActiveSort
-                  onItemRemove={(id) => {
-                    setActiveSeriesIds(
-                      (previous) => new Set([...previous].filter((item) => item !== id)),
-                    );
-                    track('collectivex_series_toggled', { series: id, visible: false });
-                  }}
-                  isLegendExpanded={legendExpanded}
-                  onExpandedChange={setLegendExpanded}
-                  actions={
-                    activeSeries.length < phaseSeries.length
-                      ? [
-                          {
-                            id: 'collectivex-reset-filter',
-                            label: t.resetFilter,
-                            onClick: () => {
-                              setActiveSeriesIds(
-                                new Set(phaseSeries.map((item) => item.series_id)),
-                              );
-                              track('collectivex_series_filter_reset');
-                            },
-                          },
-                        ]
-                      : []
-                  }
-                />
-              }
-            />
-            {yAxis === 'activation-rate' && (
-              <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
-            )}
-            {yAxis === 'payload-rate' && (
-              <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
-            )}
-          </Card>
-          <Card className="py-4 md:py-5">
+          <Card className="relative z-10 py-4 md:py-5" data-testid="collectivex-chart-filters">
+            <div className="mb-4">
+              <Heading level="card">{t.chartControlsHeading}</Heading>
+              <p className="mt-1 text-sm text-muted-foreground">{t.chartControlsDescription}</p>
+            </div>
             <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               <SelectControl
                 label={t.epControl}
@@ -1014,39 +909,24 @@ export default function CollectiveXDisplay() {
                 />
               </ControlGroup>
               {availableModes.length > 1 && (
-                <ControlGroup label={t.modeControl}>
-                  <div
-                    className="inline-flex items-center gap-0.5 rounded-lg border border-border p-0.5"
-                    role="group"
-                    aria-label={t.modeAria}
-                    data-testid="collectivex-mode-toggle"
-                  >
-                    {modeOptions.map((option) => {
-                      const selected = modes.includes(option.value);
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          aria-pressed={selected}
-                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                            selected
-                              ? 'bg-muted text-foreground'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                          onClick={() => {
-                            const next = selected
-                              ? modes.filter((mode) => mode !== option.value)
-                              : [...modes, option.value];
-                            if (next.length === 0) return;
-                            setModes(next);
-                            track('collectivex_mode_changed', { modes: next });
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <ControlGroup label={t.modeControl} htmlFor="collectivex-mode-select">
+                  <MultiSelect
+                    triggerId="collectivex-mode-select"
+                    triggerTestId="collectivex-mode-select"
+                    ariaLabel={t.modeAria}
+                    options={modeOptions}
+                    value={modes}
+                    onChange={(values) => {
+                      const next = values as CollectiveXMode[];
+                      if (next.length === 0) return;
+                      setModes(next);
+                      track('collectivex_mode_changed', { modes: next });
+                    }}
+                    minSelections={1}
+                    showClearAll={false}
+                    plainSelectedText
+                    searchable={false}
+                  />
                 </ControlGroup>
               )}
               <ControlGroup label={t.precisionControl}>
@@ -1071,6 +951,7 @@ export default function CollectiveXDisplay() {
                   }}
                   ariaLabel={t.percentileAria}
                   testId="collectivex-percentile-toggle"
+                  buttonClassName="px-1.5"
                 />
               </ControlGroup>
               <SelectControl
@@ -1104,27 +985,84 @@ export default function CollectiveXDisplay() {
                 options={[
                   { value: 'latency', label: t.yAxis.latency },
                   ...(operation === 'roundtrip'
-                    ? ([
-                        {
-                          value: 'tokens-per-second',
-                          label: t.tokenRateOption,
-                        },
-                      ] as const)
+                    ? ([{ value: 'tokens-per-second', label: t.tokenRateOption }] as const)
                     : []),
-                  {
-                    value: 'activation-rate',
-                    label: 'Activation-data rate at latency percentile',
-                  },
-                  {
-                    value: 'payload-rate',
-                    label: t.yAxis['payload-rate'],
-                  },
+                  { value: 'activation-rate', label: t.activationRateOption },
+                  { value: 'payload-rate', label: t.yAxis['payload-rate'] },
                 ]}
+                className="sm:col-span-2 lg:col-span-2 xl:col-span-2"
               />
             </div>
           </Card>
+          {/* KV-transfer cases lead for kv-only runs: the EP chart below is
+              legitimately empty for them and must not bury the selected data. */}
+          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
+          <Card data-testid="collectivex-main-chart" className="relative">
+            <CollectiveXChart
+              chartId="collectivex-explorer"
+              testId="collectivex-explorer-chart"
+              series={activeSeries}
+              colors={colors}
+              operation={operation}
+              percentile={percentile}
+              yAxis={yAxis}
+              caption={
+                <>
+                  <Heading level="card">
+                    {t.operationHeading[operation]} · {t.phaseValue[phase]} ·{' '}
+                    {yAxis === 'latency' ? percentile : t.atLatency(percentile)}
+                  </Heading>
+                  <p className="text-sm text-muted-foreground">{t.yAxis[yAxis]}</p>
+                </>
+              }
+              legendElement={
+                <ChartLegend
+                  variant="sidebar"
+                  legendItems={legendItems}
+                  disableActiveSort
+                  onItemRemove={(id) => {
+                    setActiveSeriesIds(
+                      (previous) => new Set([...previous].filter((item) => item !== id)),
+                    );
+                    track('collectivex_series_toggled', { series: id, visible: false });
+                  }}
+                  isLegendExpanded={legendExpanded}
+                  onExpandedChange={(expanded) => {
+                    setLegendExpanded(expanded);
+                    track('collectivex_legend_expanded', { expanded });
+                  }}
+                  actions={
+                    activeSeries.length < phaseSeries.length
+                      ? [
+                          {
+                            id: 'collectivex-reset-filter',
+                            label: t.resetFilter,
+                            onClick: () => {
+                              setActiveSeriesIds(
+                                new Set(phaseSeries.map((item) => item.series_id)),
+                              );
+                              track('collectivex_series_filter_reset');
+                            },
+                          },
+                        ]
+                      : []
+                  }
+                />
+              }
+            />
+            {yAxis === 'activation-rate' && (
+              <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
+            )}
+            {yAxis === 'payload-rate' && (
+              <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
+            )}
+          </Card>
         </>
       )}
+      {/* The curated support picture is run-independent, so it renders even
+          with nothing checked, and last: it is reference material, not data
+          from the selection above. */}
+      <CollectiveXSupportMatrices />
     </section>
   );
 }
@@ -1153,6 +1091,7 @@ function SelectControl<T extends string | number>({
   options,
   onChange,
   placeholder,
+  className,
 }: {
   label: string;
   testId: string;
@@ -1160,29 +1099,32 @@ function SelectControl<T extends string | number>({
   options: SelectOption<T>[];
   onChange: (value: T) => void;
   placeholder?: string;
+  className?: string;
 }) {
   // Radix Select speaks strings; numeric option values (e.g. the release version)
   // round-trip through String() and are recovered from the option list on change.
   return (
-    <ControlGroup label={label}>
-      <Select
-        value={String(value)}
-        onValueChange={(next) => {
-          const match = options.find((item) => String(item.value) === next);
-          if (match) onChange(match.value);
-        }}
-      >
-        <SelectTrigger data-testid={testId} className="min-w-0 w-full">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((item) => (
-            <SelectItem key={String(item.value)} value={String(item.value)}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </ControlGroup>
+    <div className={className}>
+      <ControlGroup label={label} htmlFor={testId}>
+        <Select
+          value={String(value)}
+          onValueChange={(next) => {
+            const match = options.find((item) => String(item.value) === next);
+            if (match) onChange(match.value);
+          }}
+        >
+          <SelectTrigger id={testId} data-testid={testId} className="min-w-0 w-full">
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((item) => (
+              <SelectItem key={String(item.value)} value={String(item.value)}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </ControlGroup>
+    </div>
   );
 }

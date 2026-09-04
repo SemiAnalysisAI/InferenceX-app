@@ -57,6 +57,9 @@ export interface NudgeAction {
 
 export interface NudgeRenderContext {
   dismiss: () => void;
+  /** IDs owned by the engine's dialog accessibility contract. */
+  titleId: string;
+  descriptionId: string;
 }
 
 export interface NudgeAnchor {
@@ -189,7 +192,7 @@ export interface NudgeDefinition {
 
   /**
    * A secondary localStorage key that permanently suppresses the nudge.
-   * Example: `inferencex-starred` suppresses both star-nudge and github-star-modal.
+   * Example: `inferencex-starred` suppresses the star-nudge toast.
    */
   permanentSuppressKey?: string;
   /**

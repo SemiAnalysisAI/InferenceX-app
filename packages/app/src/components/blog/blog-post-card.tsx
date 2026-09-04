@@ -17,12 +17,12 @@ export function BlogPostCard({ slug, title, basePath = '/blog', children }: Blog
   return (
     <Link
       href={`${basePath}/${slug}`}
-      className="group relative block rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-4 md:p-8 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
+      className="group relative block overflow-hidden rounded-xl border border-border bg-background/20 p-4 backdrop-blur-[2px] transition-[border-color,background-color,box-shadow] duration-200 hover:border-brand/50 hover:bg-brand/3 hover:shadow-lg hover:shadow-brand/5 focus-visible:outline-none md:p-8"
       onClick={() => track('blog_post_clicked', { slug, title })}
     >
       <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0 flex-1">{children}</div>
         <ArrowRight className="size-5 shrink-0 mt-1 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
     </Link>

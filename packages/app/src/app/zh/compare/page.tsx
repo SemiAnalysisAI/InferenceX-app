@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -7,10 +8,14 @@ import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { bucketComparePairsByVendor } from '@/lib/compare-ssr';
+import { formatModelListZh } from '@/lib/compare-ssr-zh';
+import { type Model } from '@/lib/data-mappings';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -50,21 +55,21 @@ function groupPairsByVendorForModel(
   const groups: VendorGroup[] = [];
   if (cross.length > 0) {
     groups.push({
-      heading: 'NVIDIA vs AMD',
+      heading: 'NVIDIA 与 AMD',
       description: '跨厂商的不同架构代际对比。',
       pairs: cross,
     });
   }
   if (nvidia.length > 0) {
     groups.push({
-      heading: 'NVIDIA vs NVIDIA',
+      heading: 'NVIDIA 芯片对比',
       description: 'Hopper 与 Blackwell 代际对比。',
       pairs: nvidia,
     });
   }
   if (amd.length > 0) {
     groups.push({
-      heading: 'AMD vs AMD',
+      heading: 'AMD 芯片对比',
       description: 'CDNA 3 与 CDNA 4 代际对比。',
       pairs: amd,
     });
@@ -81,7 +86,20 @@ const jsonLd = {
   inLanguage: 'zh-CN',
 };
 
-export default async function CompareIndexPageZh() {
+export default function CompareIndexPageZh() {
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <AgentXCompareHero locale="zh" />
+      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
+      <Suspense fallback={<CompareRouteSkeleton />}>
+        <CompareCatalogZh />
+      </Suspense>
+    </>
+  );
+}
+
+async function CompareCatalogZh() {
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
   const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
@@ -90,22 +108,19 @@ export default async function CompareIndexPageZh() {
 
   return (
     <>
-      <JsonLd data={jsonLd} />
-      <AgentXCompareHero locale="zh" />
-
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
-          <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            对比结果目录
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
+            对比目录
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
-            AgentX 与 8K→1K 结果
+            AgentX 与 8K/1K 测试结果
           </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
-            {totalUrls.toLocaleString()} 组推理基准测试的正面对比，涵盖{' '}
-            {formatModelList(modelsWithPairs)}
-            。已有 AgentX 数据的模型默认打开长上下文、多轮 trace replay 结果；尚未纳入 AgentX
-            的模型默认打开受控的 8K→1K 工作负载。每张卡片均标明对应场景。
+            共 {totalUrls.toLocaleString()} 组推理基准测试对比，涵盖{' '}
+            {formatModelListZh(modelsWithPairs)}
+            。已有 AgentX 数据的模型会默认展示长上下文、多轮 trace 回放结果；尚无 AgentX
+            数据的模型则默认展示受控的 8K/1K 工作负载。每张卡片都会标明测试场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -123,7 +138,7 @@ export default async function CompareIndexPageZh() {
               href="/zh/compare-precision"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              {'精度对比（FP8 vs BF16 等）'}
+              量化精度对比（FP8 与 BF16 等）
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -133,7 +148,7 @@ export default async function CompareIndexPageZh() {
               href="/zh/compare-spec-decode"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              {'投机解码对比（MTP vs 关闭）'}
+              投机解码对比（启用 MTP 与关闭投机解码）
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -150,9 +165,16 @@ export default async function CompareIndexPageZh() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
+                {/* `displayName` 按约定即 Model 枚举值（见 compare-slug.ts 中的
+                    CompareModelSlug），因此共享的 ModelLogo 可从 MODEL_CONFIG
+                    解析各区块的品牌标识（DeepSeek、MiniMax、Kimi 等）；没有
+                    配置 logo 的模型则不渲染任何内容。 */}
+                <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
+                  <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
+                  {model.label}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组芯片对比具有 {model.label} 的基准测试数据。
+                  在 {model.label} 上共有 {pairs.length} 组芯片对比，均有基准测试数据。
                 </p>
               </div>
               {groups.map((group) => (
@@ -174,6 +196,7 @@ export default async function CompareIndexPageZh() {
                           label={label}
                           archLine={archLine}
                           scenarioLabel={scenario.label}
+                          locale="zh"
                           hardwareA={{
                             label: aMeta?.label ?? a.toUpperCase(),
                             vendor: aMeta?.vendor,

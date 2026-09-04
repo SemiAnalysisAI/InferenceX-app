@@ -53,6 +53,23 @@ export interface GpuSpec {
   scaleUpSwitch: string | null;
 }
 
+export function formatScaleOutTopology(value: string, locale: 'en' | 'zh'): string {
+  if (locale === 'en') return value;
+  const match = /^(?<rails>\d+)-rail optimized$/u.exec(value);
+  return match?.groups ? `${match.groups.rails}-rail 优化拓扑` : value;
+}
+
+export function getScaleOutExpandAriaLabel(gpuName: string, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? `展开 ${gpuName} 横向扩展拓扑图` : `Expand ${gpuName} topology diagram`;
+}
+
+export function formatScaleUpTopology(value: string, locale: 'en' | 'zh'): string {
+  if (locale === 'en') return value;
+  if (value === 'Full Mesh') return '全互连';
+  const match = /^Switched (?<rails>\d+)-rail Optimized$/u.exec(value);
+  return match?.groups ? `${match.groups.rails}-rail 优化交换拓扑` : value;
+}
+
 export const GPU_SPECS: GpuSpec[] = [
   {
     name: 'H100 SXM',
@@ -411,8 +428,12 @@ export interface GpuChartMetric {
   key: string;
   /** Display label */
   label: string;
+  /** Simplified Chinese display label. */
+  labelZh: string;
   /** Unit for the axis label */
   unit: string;
+  /** Simplified Chinese display unit; protected technical units stay unchanged. */
+  unitZh: string;
   /** Extract the numeric value from a GPU spec. Returns null if not available. */
   getValue: (spec: GpuSpec) => number | null;
 }
@@ -448,61 +469,81 @@ export const GPU_CHART_METRICS: GpuChartMetric[] = [
   {
     key: 'memory',
     label: 'Memory',
+    labelZh: '显存容量',
     unit: 'GB',
+    unitZh: 'GB',
     getValue: (spec) => parseNumericFromString(spec.memory),
   },
   {
     key: 'memoryBandwidth',
     label: 'Mem BW',
+    labelZh: '显存带宽',
     unit: 'TB/s',
+    unitZh: 'TB/s',
     getValue: (spec) => parseNumericFromString(spec.memoryBandwidth),
   },
   {
     key: 'fp4',
     label: 'FP4 TFLOP/s',
+    labelZh: 'FP4 TFLOP/s',
     unit: 'TFLOP/s',
+    unitZh: 'TFLOP/s',
     getValue: (spec) => spec.fp4,
   },
   {
     key: 'fp8',
     label: 'FP8 TFLOP/s',
+    labelZh: 'FP8 TFLOP/s',
     unit: 'TFLOP/s',
+    unitZh: 'TFLOP/s',
     getValue: (spec) => spec.fp8,
   },
   {
     key: 'bf16',
     label: 'BF16 TFLOP/s',
+    labelZh: 'BF16 TFLOP/s',
     unit: 'TFLOP/s',
+    unitZh: 'TFLOP/s',
     getValue: (spec) => spec.bf16,
   },
   {
     key: 'scaleUpBandwidth',
     label: 'Scale Up BW',
+    labelZh: '纵向扩展带宽',
     unit: 'GB/s',
+    unitZh: 'GB/s',
     getValue: (spec) => parseNumericFromString(spec.scaleUpBandwidth),
   },
   {
     key: 'scaleUpWorldSize',
     label: 'World Size',
+    labelZh: '域内芯片数',
     unit: 'Chips',
+    unitZh: '芯片',
     getValue: (spec) => spec.scaleUpWorldSize,
   },
   {
     key: 'domainMemory',
     label: 'Scale Up Domain Memory',
+    labelZh: '纵向扩展域显存',
     unit: 'TB',
+    unitZh: 'TB',
     getValue: (spec) => getScaleUpDomainMemoryNumeric(spec),
   },
   {
     key: 'domainMemoryBandwidth',
     label: 'Scale Up Domain Mem BW',
+    labelZh: '纵向扩展域显存带宽',
     unit: 'TB/s',
+    unitZh: 'TB/s',
     getValue: (spec) => getScaleUpDomainMemoryBwNumeric(spec),
   },
   {
     key: 'scaleOutBandwidth',
     label: 'Scale Out BW per Chip',
+    labelZh: '每芯片横向扩展带宽',
     unit: 'Gbit/s',
+    unitZh: 'Gbit/s',
     getValue: (spec) => parseNumericFromString(spec.scaleOutBandwidth),
   },
 ];

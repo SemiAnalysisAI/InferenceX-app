@@ -101,7 +101,7 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 }
 
 const RAW_SOURCE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
+  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none';
 
 /** No result for this GPU. The reason reads as visible text, mirroring the
  *  stack line on a populated cell — a `title` tooltip reaches neither keyboard
@@ -115,7 +115,7 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
     >
       <span>{'—'}</span>
       {reason === '' ? null : (
-        <div className="min-w-0 text-[11px] leading-tight font-normal text-muted-foreground/70">
+        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground/70">
           {reason}
         </div>
       )}
@@ -299,7 +299,7 @@ function CostDeltaBadge({
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
-      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
+      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-3xs font-semibold tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
@@ -446,7 +446,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground">
+        <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-muted-foreground">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
@@ -520,7 +520,7 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             data-testid="overview-model-category-badge"
             data-category={model.category}
             title={strings.categoryBadgeTitle}
-            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-3xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             {badge}
             {/* `title` reaches a hovering mouse and nothing else, so a screen
@@ -535,7 +535,7 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
       <p
         data-testid="overview-model-scenario"
         title={label}
-        className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
+        className="mt-0.5 text-2xs font-normal leading-tight text-muted-foreground"
       >
         {shortLabel === label ? (
           label
@@ -849,7 +849,7 @@ export function OverviewEngineScopeSwitcher({
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
   const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:w-auto';
+    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none sm:w-auto';
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
@@ -943,7 +943,7 @@ export function OverviewComparisonSwitcher({
   // darker light-theme blue also keeps this small active label above AA
   // contrast on the page background; dark mode retains the brand primary.
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none sm:min-w-[140px]';
   const inactiveOptionClass =
     'border-transparent text-muted-foreground hover:border-muted-foreground/30';
   return (
@@ -1048,7 +1048,7 @@ function ScopeChipCount({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none tabular-nums"
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-3xs leading-none tabular-nums"
     >
       {count}
     </span>

@@ -97,6 +97,15 @@ cannot blank the initial explorer. Deletion is available per row or as one confi
 currently shown runs; both paths keep the same tombstone semantics described above.
 The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
 both appears under both filters, and changing the filter does not alter the checked-run selection.
+The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
+throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of which runs are
+checked. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
+carrying a numbered note with the investigated reason (upstream issue references included, e.g.
+ROCm/mori#610); gray degrees do not exist for that pairing (vendor-mismatched library, a kernel
+with no such mode, or a pool the library was never brought up on). The table is maintained by hand
+in `known-support.ts`, mirroring the InferenceX repo's `platform_config.json` registry plus its
+wall investigations — when a registry row flips or a wall falls upstream, the cell and its note
+change here.
 
 ## The raw-rows exception
 

@@ -13,12 +13,14 @@ const OPTIONS: MultiSelectOption[] = [
 
 function MultiSelectWrapper({
   initial = [],
+  options = OPTIONS,
   maxSelections,
   minSelections,
   searchable = true,
   useDefaults = false,
 }: {
   initial?: string[];
+  options?: MultiSelectOption[];
   maxSelections?: number;
   minSelections?: number;
   searchable?: boolean;
@@ -27,7 +29,7 @@ function MultiSelectWrapper({
   const [value, setValue] = useState<string[]>(initial);
   return (
     <MultiSelect
-      options={OPTIONS}
+      options={options}
       value={value}
       onChange={setValue}
       placeholder={useDefaults ? undefined : 'Select Chips...'}
@@ -39,9 +41,103 @@ function MultiSelectWrapper({
 }
 
 describe('MultiSelect', () => {
+  it('selects with the keyboard, skips unavailable values, and restores trigger focus', () => {
+    cy.mount(
+      <MultiSelectWrapper
+        options={[
+          { value: 'unavailable', label: 'Unavailable', disabled: true },
+          { value: 'h100', label: 'H100' },
+          { value: 'h200', label: 'H200' },
+        ]}
+      />,
+    );
+    cy.get('[role="combobox"]').focus().type('{downarrow}');
+    cy.get('[role="listbox"]').should('have.attr', 'aria-multiselectable', 'true');
+    cy.focused().should('have.attr', 'aria-label', 'Search options').type('{downarrow}');
+    cy.contains('[role="option"]', 'Unavailable').should('be.disabled');
+    cy.focused().should('have.text', 'H100').type('{downarrow}{enter}');
+    cy.focused().should('have.attr', 'role', 'combobox').and('have.attr', 'aria-expanded', 'false');
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.focused().type('{downarrow}');
+    cy.focused().type('{downarrow}');
+    cy.focused().should('have.text', 'H100').type('{enter}');
+    cy.get('[role="combobox"]').should('contain.text', 'H200').and('contain.text', 'H100');
+    cy.focused().should('have.attr', 'role', 'combobox');
+    cy.get('[role="listbox"]').should('not.exist');
+  });
+
+  it('closes after each selection and deselection, preserving the other selected values', () => {
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="multi-select-done"]').should('not.exist');
+    cy.get('input[aria-label="Search options"]').type('NVIDIA');
+    cy.contains('[role="option"]', 'H100').click();
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.get('[role="combobox"]').should('have.attr', 'aria-expanded', 'false').click();
+    cy.get('input[aria-label="Search options"]').should('have.value', '');
+    cy.contains('[role="option"]', 'H100').should('have.attr', 'aria-selected', 'true');
+    cy.contains('[role="option"]', 'H200').click();
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.get('[role="combobox"]').should('contain.text', 'H100').and('contain.text', 'H200').click();
+    cy.contains('[role="option"]', 'H100').should('have.attr', 'aria-selected', 'true');
+    cy.contains('[role="option"]', 'H200').should('have.attr', 'aria-selected', 'true');
+    cy.contains('[role="option"]', 'H100').click();
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.get('[role="combobox"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .and('contain.text', 'H200')
+      .and('not.contain.text', 'H100');
+  });
+
+  it('keeps single-value selectors a one-click replacement', () => {
+    cy.mount(<MultiSelectWrapper initial={['h100-sxm']} maxSelections={1} minSelections={1} />);
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="multi-select-done"]').should('not.exist');
+    cy.contains('[role="option"]', 'H200').click();
+    cy.get('[role="combobox"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .and('contain.text', 'H200')
+      .and('not.contain.text', 'H100');
+  });
+
+  it('still closes with Escape when the open menu has lost element focus', () => {
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.focused().blur();
+    cy.get('[role="combobox"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('body').type('{esc}');
+    cy.get('[role="listbox"]').should('not.exist');
+    cy.focused().should('have.attr', 'role', 'combobox');
+  });
+
+  it('keeps disabled choices in grouped menus unavailable', () => {
+    cy.mount(
+      <MultiSelect
+        sections={[
+          {
+            id: 'hardware',
+            header: 'Hardware',
+            options: [
+              { value: 'h100', label: 'H100', disabled: true },
+              { value: 'h200', label: 'H200' },
+            ],
+          },
+        ]}
+        onChange={cy.stub().as('choose')}
+        searchable={false}
+      />,
+    );
+    cy.get('[role="combobox"]').click();
+    cy.focused().should('have.text', 'H200').type('{enter}');
+    cy.get('@choose').should('have.been.calledOnceWith', ['h200']);
+  });
+
   it('renders placeholder when no selections', () => {
     cy.mount(<MultiSelectWrapper />);
     cy.contains('Select Chips...').should('be.visible');
+    cy.get('[data-slot="select-trigger"]').should(($trigger) => {
+      expect($trigger[0].getBoundingClientRect().height, 'default field height').to.equal(36);
+    });
   });
 
   it('click trigger opens dropdown', () => {
@@ -73,6 +169,33 @@ describe('MultiSelect', () => {
     cy.contains('Select Chips...').should('be.visible');
   });
 
+  it('keeps long selected labels contained in the shared trigger density', () => {
+    cy.viewport(320, 720);
+    const longLabel = 'DeepSeek V4 Pro 0813 1.6T FP4 Agentic long-context deployment configuration';
+    cy.mount(
+      <div style={{ width: 280 }}>
+        <MultiSelectWrapper options={[{ value: 'long', label: longLabel }]} initial={['long']} />
+      </div>,
+    );
+
+    cy.get('[data-slot="select-trigger"]').should(($trigger) => {
+      const trigger = $trigger[0];
+      const bounds = trigger.getBoundingClientRect();
+      expect(bounds.width).to.equal(280);
+      expect(bounds.height, 'selected field keeps the shared phone touch target').to.equal(44);
+      expect(trigger.scrollWidth, 'selected chip does not overflow the trigger').to.be.at.most(
+        trigger.clientWidth,
+      );
+      const label = trigger.querySelector('span[title]') as HTMLElement;
+      expect(label.title, 'full label remains available').to.equal(longLabel);
+      expect(label.scrollWidth, 'long label is visually truncated').to.be.greaterThan(
+        label.clientWidth,
+      );
+    });
+    cy.get(`[aria-label="Remove ${longLabel}"]`).click();
+    cy.contains('Select Chips...').should('be.visible');
+  });
+
   it('search filters options', () => {
     cy.mount(<MultiSelectWrapper searchable={true} />);
     cy.get('[data-slot="select-trigger"]').click();
@@ -98,7 +221,7 @@ describe('MultiSelect', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm']} minSelections={1} />);
     // Try to deselect via dropdown
     cy.get('[data-slot="select-trigger"]').click();
-    cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
+    cy.contains('[data-slot="select-item"]', 'NVIDIA H100 SXM').should('be.disabled');
     // Should still be selected since we can't go below 1
     cy.get('[data-slot="select-trigger"]').within(() => {
       cy.contains('NVIDIA H100 SXM').should('be.visible');

@@ -7,13 +7,15 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
   'deepseek-v4',
   'glm-5-2',
   'minimax-m3',
+  // Editorial call: Flash Next sits below Qwen 3.5, the family's flagship row.
   'qwen-3-5',
+  'qwen-3-8-flash-next',
 ] as const;
 
 const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
 
 export interface ComparisonScenario {
-  label: 'AgentX' | '8K→1K';
+  label: 'AgentX' | '8K/1K';
   sequence: 'agentic-traces' | '8k/1k';
 }
 
@@ -23,6 +25,16 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
     if (!model) throw new Error(`Missing AgentX comparison model: ${slug}`);
     return model;
   },
+);
+
+/**
+ * `Model` enum values (the dashboard's model identifiers) for the featured
+ * AgentX set. The landing/compare hero ledger and the /inference model
+ * selector both mark these models with a NEW badge, so the badge follows the
+ * single featured list instead of maintaining a second one.
+ */
+export const AGENTX_NEW_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
+  FEATURED_AGENTX_MODELS.map((model) => model.displayName),
 );
 
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {
@@ -48,7 +60,7 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {
   return FEATURED_AGENTX_MODEL_SET.has(model.slug)
     ? { label: 'AgentX', sequence: 'agentic-traces' }
-    : { label: '8K→1K', sequence: '8k/1k' };
+    : { label: '8K/1K', sequence: '8k/1k' };
 }
 
 /**

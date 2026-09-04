@@ -1,10 +1,9 @@
 'use client';
 
-import { Info } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { Label } from '@/components/ui/label';
-import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoHelp } from '@/components/ui/option-info';
 
 interface LabelWithTooltipProps {
   /**
@@ -19,16 +18,16 @@ interface LabelWithTooltipProps {
 
 export function LabelWithTooltip({ htmlFor, label, tooltip }: LabelWithTooltipProps) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-start gap-1">
       <Label htmlFor={htmlFor}>{label}</Label>
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info className="size-3.5 text-muted-foreground cursor-help" />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
-          <span>{tooltip}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp
+        label={label}
+        value={htmlFor ?? label}
+        analyticsEvent="selector_help_opened"
+        align="start"
+      >
+        {tooltip}
+      </InfoHelp>
     </div>
   );
 }

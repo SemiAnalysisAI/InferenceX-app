@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
-import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/rankings';
@@ -16,7 +16,7 @@ const description =
 
 export const metadata: Metadata = {
   title,
-  description,
+  description: `${description}${SUPPORTERS_LINE_ZH}`,
   keywords: [
     'LLM 推理最快 GPU',
     'LLM 推理最便宜 GPU',
@@ -61,7 +61,7 @@ export default function ZhRankingsIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {title}
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
@@ -72,24 +72,28 @@ export default function ZhRankingsIndexPage() {
 
           <section className="mt-10 mb-16 grid gap-4 sm:grid-cols-2">
             {INFERENCE_MODEL_SLUGS.map((model) => (
-              <Card key={model.slug} className="p-5">
+              <Card key={model.slug} className="gap-0 p-5">
                 <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                <ul className="mt-3 space-y-1">
+                <ul className="mt-4 space-y-2">
                   <li>
-                    <Link
+                    <CatalogLinkCard
                       href={`/zh/rankings/fastest-gpu-for-${model.slug}`}
-                      className="text-sm font-medium text-brand hover:underline"
-                    >
-                      {model.seoName} 最快 GPU 排行
-                    </Link>
+                      title={`${model.seoName} 最快 GPU 排行`}
+                      description="按实测单 GPU tokens/s 排名"
+                      slug={`fastest-gpu-for-${model.slug}`}
+                      locale="zh"
+                      event="ranking_index_entry_clicked"
+                    />
                   </li>
                   <li>
-                    <Link
+                    <CatalogLinkCard
                       href={`/zh/rankings/cheapest-gpu-for-${model.slug}`}
-                      className="text-sm font-medium text-brand hover:underline"
-                    >
-                      {model.seoName} 最低成本 GPU 排行
-                    </Link>
+                      title={`${model.seoName} 最低成本 GPU 排行`}
+                      description="按实测每百万 token 成本排名"
+                      slug={`cheapest-gpu-for-${model.slug}`}
+                      locale="zh"
+                      event="ranking_index_entry_clicked"
+                    />
                   </li>
                 </ul>
               </Card>

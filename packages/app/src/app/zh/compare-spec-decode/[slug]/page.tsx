@@ -96,8 +96,8 @@ export function buildSpecDecodeMetadataZh(
   // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${parsed.model.label} 在 ${gpuLabel} ${precLabel} 上的 ${aLabel} vs Off 投机解码对比：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现结果。${SUPPORTERS_LINE_ZH}查看投机解码是否在各交互性水平下提升吞吐量和降低成本。`;
-  const title = `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs Off — 投机解码对比`;
+  const description = `在 ${gpuLabel} ${precLabel} 上运行 ${parsed.model.label} 时，对比启用 ${aLabel} 与关闭投机解码的表现。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}了解投机解码在不同交互性水平下能否提高吞吐量并降低成本。`;
+  const title = `${parsed.model.label} — ${gpuLabel} ${precLabel}：启用 ${aLabel} 与关闭投机解码的对比`;
   return {
     title,
     description,
@@ -155,7 +155,7 @@ export async function renderSpecDecodePageZh(
   const gpuLabel = gpuMeta?.label ?? parsed.gpu.toUpperCase();
   const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
-  const bLabel = 'Off';
+  const bLabel = '关闭';
 
   // Precision is fixed by the slug — both sides share it.
   const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
@@ -191,7 +191,7 @@ export async function renderSpecDecodePageZh(
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
-  const imageUrl = `${SITE_URL}/compare-spec-decode/${canonical}/spec-decode-comparison.png`;
+  const imageUrl = `${SITE_URL}/compare-spec-decode/${canonical}/spec-decode-comparison.png?lang=zh`;
 
   const jsonLd = buildVariantJsonLdZh(
     'spec-decode',
@@ -209,7 +209,7 @@ export async function renderSpecDecodePageZh(
   );
   const breadcrumbJsonLd = buildVariantBreadcrumbJsonLdZh(
     'spec-decode',
-    `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs ${bLabel}`,
+    `${parsed.model.label} — ${gpuLabel} ${precLabel}：启用 ${aLabel} 与关闭投机解码的对比`,
     url,
   );
   const narrative = variantCompareNarrativeZh(
@@ -243,7 +243,7 @@ export async function renderSpecDecodePageZh(
         gpuVendor={gpuMeta?.vendor ?? ''}
         aLabel={aLabel}
         bLabel={bLabel}
-        heroImageSrc={`/compare-spec-decode/${canonical}/spec-decode-comparison.png`}
+        heroImageSrc={`/compare-spec-decode/${canonical}/spec-decode-comparison.png?lang=zh`}
         locale="zh"
       />
     </>

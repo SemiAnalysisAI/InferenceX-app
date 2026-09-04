@@ -95,7 +95,7 @@ describe('Compare scenario routes', () => {
         .first()
         .should('have.attr', 'href')
         .and('match', new RegExp(`^${base}/.+/agentic$`, 'u'));
-      cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
+      cy.get('#deepseek-r1 a[data-scenario="8K/1K"]')
         .first()
         .should('have.attr', 'href')
         .and('match', new RegExp(`^${base}/.+/8k-1k$`, 'u'));
@@ -106,14 +106,14 @@ describe('Compare scenario routes', () => {
     cy.visit('/compare-per-dollar');
     cy.contains('Models with AgentX data open long-context').should('be.visible');
     cy.get('a[data-scenario="AgentX"]').should('have.length.greaterThan', 0);
-    cy.get('a[data-scenario="8K→1K"]').should('have.length.greaterThan', 0);
+    cy.get('a[data-scenario="8K/1K"]').should('have.length.greaterThan', 0);
   });
 
   it('ships the Chinese explainer on the Chinese scenario route', () => {
     cy.visit(`/zh/compare/${AGENTX_SLUG}/agentic`);
 
     cy.get('[data-testid="compare-agentic-intro"]')
-      .should('contain.text', 'AgentX 回放真实的编码 agent 会话')
+      .should('contain.text', 'AgentX 回放真实的 coding agent 会话')
       .find('[data-testid="compare-agentic-intro-link"]')
       .should('contain.text', '进一步了解 AgentX')
       .and('have.attr', 'href', '/zh/agentx');

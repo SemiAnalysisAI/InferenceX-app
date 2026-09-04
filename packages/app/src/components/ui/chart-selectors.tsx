@@ -1,21 +1,21 @@
 'use client';
 
-import { Info } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { NewBadge } from '@/components/ui/new-badge';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoHelp } from '@/components/ui/option-info';
 import {
   type Model,
   type Precision,
@@ -26,7 +26,7 @@ import {
   getModelLabel,
   getPercentileLabel,
   getPrecisionLabel,
-  getSequenceCategory,
+  getSequenceCategoryForModel,
   getSequenceLabel,
   groupByCategory,
   sequenceKind,
@@ -37,6 +37,7 @@ const STRINGS = {
   en: {
     model: 'Model',
     modelTooltip: 'The language model being benchmarked.',
+    newModel: 'NEW',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
@@ -52,6 +53,7 @@ const STRINGS = {
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
     fixedSequenceLength: 'Fixed Sequence Length',
+    deprecatedSequenceLabel: (label: string) => `${label} (deprecated)`,
     experimentalSupport: 'Experimental Support (WIP)',
     maintenanceMode: 'Maintenance Mode',
     maintenanceReason: 'Updated at a lower priority because these models are irrelevant.',
@@ -63,6 +65,7 @@ const STRINGS = {
   zh: {
     model: '模型',
     modelTooltip: '正在进行基准测试的语言模型。',
+    newModel: '新',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       '输入序列长度 / 输出序列长度（Input Sequence Length / Output Sequence Length）。定义基准测试的输入和输出 token 数量（如 1K/8K 表示 1,024 个输入 token 和 8,192 个输出 token）。',
@@ -77,6 +80,7 @@ const STRINGS = {
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
     fixedSequenceLength: '固定序列长度',
+    deprecatedSequenceLabel: (label: string) => `${label}（已弃用）`,
     experimentalSupport: '实验性支持（开发中）',
     maintenanceMode: '维护模式',
     maintenanceReason: '这些模型的相关性较低，因此以较低优先级更新。',
@@ -98,69 +102,27 @@ function CategorySectionTitle({
   return (
     <span className="flex items-center gap-1">
       {label}
-      <TooltipRoot>
-        <TooltipTrigger asChild>
-          <Info
-            className="size-3 text-muted-foreground cursor-help"
-            data-testid={`selector-category-${id}-info`}
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10} className="z-[130]">
-          <span>{reason}</span>
-        </TooltipContent>
-      </TooltipRoot>
+      <InfoHelp
+        label={label}
+        value={`selector-category-${id}`}
+        triggerTestId={`selector-category-${id}-info`}
+        triggerClassName="-my-1"
+        tabIndex={-1}
+      >
+        {reason}
+      </InfoHelp>
     </span>
-  );
-}
-
-/**
- * Info affordance shown next to the scenario selector while an agentic scenario
- * is selected. The agentic workload isn't self-describing from its name alone,
- * and it's now the opening scenario for the AgentX models — so the explainer
- * sits beside the closed trigger rather than inside the dropdown, where the
- * "learn more" link would be swallowed by the select's outside-click handling.
- */
-function AgenticScenarioInfo({
-  tooltip,
-  learnMore,
-  href,
-}: {
-  tooltip: string;
-  learnMore: string;
-  href: string;
-}) {
-  return (
-    <TooltipRoot>
-      <TooltipTrigger asChild>
-        <Info
-          className="size-3.5 shrink-0 text-muted-foreground cursor-help"
-          data-testid="scenario-agentic-info"
-        />
-      </TooltipTrigger>
-      <TooltipContent side="top" collisionPadding={10} className="z-[130]">
-        <span>
-          {tooltip}{' '}
-          <a
-            href={href}
-            className="underline underline-offset-2"
-            data-testid="scenario-agentic-info-link"
-            onClick={() => track('selector_scenario_agentx_link')}
-          >
-            {learnMore}
-          </a>
-        </span>
-      </TooltipContent>
-    </TooltipRoot>
   );
 }
 
 // Full-color creator logo beside each model name, in the dropdown rows and
 // the closed trigger alike. `ModelLogo` renders nothing for models without
 // a configured logo, so rows degrade to plain text instead of breaking.
-const toOption = (model: string) => ({
+const toOption = (model: string, badge?: ReactNode) => ({
   value: model,
   label: getModelLabel(model as Model),
   icon: <ModelLogo model={model as Model} />,
+  badge,
 });
 
 interface ModelSelectorProps {
@@ -171,6 +133,18 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
+  /**
+   * Optional affordance rendered beside the closed trigger (outside the
+   * dropdown) — e.g. the
+   * model-architecture deep-dive link on the inference dashboard.
+   */
+  trailing?: ReactNode;
+  /**
+   * Models whose dropdown rows carry a NEW pill (localized). The inference
+   * dashboard passes the featured AgentX set; surfaces that don't highlight
+   * new models simply omit the prop.
+   */
+  newModels?: ReadonlySet<string>;
 }
 
 export function ModelSelector({
@@ -181,20 +155,29 @@ export function ModelSelector({
   onOpenChange,
   availableModels,
   'data-testid': testId,
+  trailing,
+  newModels,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
+  const optionFor = (model: string) =>
+    toOption(
+      model,
+      newModels?.has(model) ? (
+        <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>
+      ) : undefined,
+    );
   const sections = [
     {
       id: 'default',
-      options: groups.default.map(toOption),
+      options: groups.default.map(optionFor),
     },
     ...(groups.experimental.length > 0
       ? [
           {
             id: 'experimental',
             header: t.experimentalSupport,
-            options: groups.experimental.map(toOption),
+            options: groups.experimental.map(optionFor),
           },
         ]
       : []),
@@ -209,7 +192,7 @@ export function ModelSelector({
                 reason={t.maintenanceReason}
               />
             ),
-            options: groups.maintenance.map(toOption),
+            options: groups.maintenance.map(optionFor),
           },
         ]
       : []),
@@ -224,7 +207,7 @@ export function ModelSelector({
                 reason={t.deprecatedModelReason}
               />
             ),
-            options: groups.deprecated.map(toOption),
+            options: groups.deprecated.map(optionFor),
           },
         ]
       : []),
@@ -233,28 +216,31 @@ export function ModelSelector({
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
       <LabelWithTooltip htmlFor={id} label={t.model} tooltip={t.modelTooltip} />
-      <div>
-        <MultiSelect
-          sections={sections}
-          value={[value]}
-          onChange={(values) => {
-            const next = values[0];
-            if (!next) return;
-            track('selector_model_changed', { model: next });
-            onChange(next as Model);
-          }}
-          open={open}
-          onOpenChange={onOpenChange}
-          triggerId={id}
-          triggerTestId={testId}
-          placeholder={t.model}
-          minSelections={1}
-          maxSelections={1}
-          showClearAll={false}
-          searchable={false}
-          plainSelectedText
-          showSelectionSummary={false}
-        />
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <MultiSelect
+            sections={sections}
+            value={[value]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              track('selector_model_changed', { model: next });
+              onChange(next as Model);
+            }}
+            open={open}
+            onOpenChange={onOpenChange}
+            triggerId={id}
+            triggerTestId={testId}
+            placeholder={t.model}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+        {trailing}
       </div>
     </div>
   );
@@ -267,6 +253,8 @@ interface SequenceSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
+  /** Selected model, so per-model scenario retirements group as Deprecated. */
+  model?: Model | null;
   'data-testid'?: string;
 }
 
@@ -277,11 +265,14 @@ export function SequenceSelector({
   open,
   onOpenChange,
   availableSequences,
+  model,
   'data-testid': testId,
 }: SequenceSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
+  const groups = groupByCategory(availableSequences, (s) =>
+    getSequenceCategoryForModel(s as Sequence, model),
+  );
   const sections = [
     {
       id: 'default',
@@ -347,18 +338,18 @@ interface ScenarioSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
+  /** Selected model, so retired scenarios carry the correct status in their labels. */
+  model?: Model | null;
   'data-testid'?: string;
 }
 
 /**
  * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
- * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
+ * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
- * Renders nothing when fewer than two scenarios are available: a dropdown
- * with a single choice is dead UI (e.g. agentic-only models like Kimi K3),
- * and a static "Scenario: Agentic" readout is just as redundant when there is
- * nothing to choose — so the whole control disappears.
+ * A single selected scenario stays visible in the same control, disabled when
+ * there is no alternative workload to choose.
  */
 export function ScenarioSelector({
   id = 'scenario-select',
@@ -367,85 +358,78 @@ export function ScenarioSelector({
   open,
   onOpenChange,
   availableSequences,
+  model,
   'data-testid': testId,
 }: ScenarioSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
-  const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
-  const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
-
-  if (availableSequences.length < 2) return null;
+  const fixedGroups = groupByCategory(fixedSeq, (s) =>
+    getSequenceCategoryForModel(s as Sequence, model),
+  );
+  if (availableSequences.length === 0) return null;
+  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  const scenarioLabel = (seq: string) => {
+    const label = getSequenceLabel(seq as Sequence, locale);
+    return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
+      ? t.deprecatedSequenceLabel(label)
+      : label;
+  };
+  const toScenarioOption = (seq: string) => ({
+    value: seq,
+    label: scenarioLabel(seq),
+    help:
+      sequenceKind(seq as Sequence) === 'agentic' ? (
+        <p>
+          {t.agenticScenarioTooltip}{' '}
+          <a
+            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+            className="underline underline-offset-2"
+            data-testid="scenario-agentic-info-link"
+            onClick={() => track('selector_scenario_agentx_link')}
+          >
+            {t.agenticScenarioLearnMore}
+          </a>
+        </p>
+      ) : (
+        <>
+          <p>{t.islOslTooltip}</p>
+          {getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated' && (
+            <p>{t.deprecatedSequenceReason}</p>
+          )}
+        </>
+      ),
+  });
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <div className="flex items-center gap-1.5">
-        <Select
-          value={value}
-          onValueChange={(v) => {
-            track('selector_scenario_changed', { scenario: v });
-            onChange(v as Sequence);
-          }}
-          open={open}
-          onOpenChange={onOpenChange}
-        >
-          <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {/* Agentic entries listed first when available (display order only
-                — availability decides which scenario opens by default). They
-                carry no group header: they are named "Agentic" themselves, so a
-                heading above them would just repeat the word. They stay in their
-                own SelectGroup so the "Fixed Sequence Length" heading below
-                still reads as a separate section. */}
-            {agentic.length > 0 && (
-              <SelectGroup>
-                {agentic.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-            {fixedSeq.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
-                {fixedGroups.default.map((seq) => (
-                  <SelectItem key={seq} value={seq}>
-                    {getSequenceLabel(seq as Sequence, locale)}
-                  </SelectItem>
-                ))}
-                {fixedGroups.deprecated.length > 0 && (
-                  <>
-                    <SelectLabel>
-                      <CategorySectionTitle
-                        id="deprecated"
-                        label={t.deprecated}
-                        reason={t.deprecatedSequenceReason}
-                      />
-                    </SelectLabel>
-                    {fixedGroups.deprecated.map((seq) => (
-                      <SelectItem key={seq} value={seq}>
-                        {getSequenceLabel(seq as Sequence, locale)}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectGroup>
-            )}
-          </SelectContent>
-        </Select>
-        {isAgenticSelected && (
-          <AgenticScenarioInfo
-            tooltip={t.agenticScenarioTooltip}
-            learnMore={t.agenticScenarioLearnMore}
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
-          />
-        )}
-      </div>
+      <SearchableSelect
+        key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
+        disabled={isOnlySelectedScenario}
+        value={value}
+        initialLabel={scenarioLabel(value)}
+        contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
+        placeholder={t.scenario}
+        triggerId={id}
+        triggerTestId={testId}
+        searchable={false}
+        onValueChange={(v) => {
+          track('selector_scenario_changed', { scenario: v });
+          onChange(v as Sequence);
+        }}
+        open={isOnlySelectedScenario ? false : open}
+        onOpenChange={onOpenChange}
+        groups={[
+          // Agentic is already named in its row, so it needs no repeated heading.
+          { label: '', options: agentic.map(toScenarioOption) },
+          {
+            label: t.fixedSequenceLength,
+            options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
+          },
+        ].filter((group) => group.options.length > 0)}
+      />
     </div>
   );
 }
@@ -509,9 +493,8 @@ interface PrecisionSelectorProps {
 }
 
 /**
- * Precision multi-select. Renders nothing when fewer than two precisions are
- * available — a single-precision model (e.g. Kimi K3) has nothing to toggle,
- * so the control disappears instead of offering a no-op menu.
+ * Precision multi-select. Keep a single selected precision visible in the same
+ * disabled control so benchmark context and geometry remain consistent.
  */
 export function PrecisionSelector({
   id = 'precision-select',
@@ -524,20 +507,24 @@ export function PrecisionSelector({
 }: PrecisionSelectorProps) {
   const t = STRINGS[useLocale()];
 
-  if (availablePrecisions.length < 2) return null;
+  if (availablePrecisions.length === 0) return null;
+  const isOnlySelectedPrecision =
+    availablePrecisions.length === 1 && value.length === 1 && availablePrecisions[0] === value[0];
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.precision} tooltip={t.precisionTooltip} />
       <div>
         <MultiSelect
+          key={isOnlySelectedPrecision ? 'fixed' : 'selectable'}
+          disabled={isOnlySelectedPrecision}
           options={availablePrecisions.map((p) => ({
             value: p,
             label: getPrecisionLabel(p as Precision),
           }))}
           value={value}
           onChange={onChange}
-          open={open}
+          open={isOnlySelectedPrecision ? false : open}
           onOpenChange={onOpenChange}
           triggerId={id}
           triggerTestId={testId}
@@ -545,6 +532,7 @@ export function PrecisionSelector({
           minSelections={1}
           showClearAll={false}
           searchable={false}
+          wrapSelectedChips={false}
         />
       </div>
     </div>

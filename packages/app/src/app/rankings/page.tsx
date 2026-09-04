@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { enAlternates } from '@/lib/i18n';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/rankings';
@@ -61,7 +61,7 @@ export default function RankingsIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-[-0.035em] text-balance md:text-5xl">
+            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
               {title}
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
@@ -73,24 +73,28 @@ export default function RankingsIndexPage() {
 
           <section className="mt-10 mb-16 grid gap-4 sm:grid-cols-2">
             {INFERENCE_MODEL_SLUGS.map((model) => (
-              <Card key={model.slug} className="p-5">
+              <Card key={model.slug} className="gap-0 p-5">
                 <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                <ul className="mt-3 space-y-1">
+                <ul className="mt-4 space-y-2">
                   <li>
-                    <Link
+                    <CatalogLinkCard
                       href={`/rankings/fastest-gpu-for-${model.slug}`}
-                      className="text-sm font-medium text-brand hover:underline"
-                    >
-                      Fastest GPU for {model.seoName}
-                    </Link>
+                      title={`Fastest GPU for ${model.seoName}`}
+                      description="Ranked by measured tokens/s per GPU"
+                      slug={`fastest-gpu-for-${model.slug}`}
+                      locale="en"
+                      event="ranking_index_entry_clicked"
+                    />
                   </li>
                   <li>
-                    <Link
+                    <CatalogLinkCard
                       href={`/rankings/cheapest-gpu-for-${model.slug}`}
-                      className="text-sm font-medium text-brand hover:underline"
-                    >
-                      Cheapest GPU for {model.seoName}
-                    </Link>
+                      title={`Cheapest GPU for ${model.seoName}`}
+                      description="Ranked by measured cost per million tokens"
+                      slug={`cheapest-gpu-for-${model.slug}`}
+                      locale="en"
+                      event="ranking_index_entry_clicked"
+                    />
                   </li>
                 </ul>
               </Card>

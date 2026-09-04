@@ -10,7 +10,9 @@ import type {
 } from '@/components/inference/types';
 import {
   applyTokenRevenuePricing,
+  inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
+  tokenRevenueFromRatesPerGpuHour,
 } from '@/components/inference/token-revenue';
 import {
   isBenchmarkMetricKey,
@@ -30,6 +32,7 @@ import { isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
 
@@ -62,6 +65,7 @@ export function rowToLightweightPoint(
   const point = {
     x: row.metrics.median_intvty ?? 0,
     y: row.metrics.tput_per_gpu ?? 0,
+    hw: row.hardware,
     hwKey,
     precision: row.precision,
     tp: row.decode_tp,
@@ -74,6 +78,10 @@ export function rowToLightweightPoint(
     osl: entry.osl,
     total_prompt_tokens: entry.total_prompt_tokens,
     total_generation_tokens: entry.total_generation_tokens,
+    server_gpu_cache_hit_rate: entry.server_gpu_cache_hit_rate,
+    server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
+    server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
+    theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
 
@@ -127,15 +135,6 @@ const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>
   inputTokensPerDollarH: 'inputTputPerGpu',
   inputTokensPerDollarN: 'inputTputPerGpu',
   inputTokensPerDollarR: 'inputTputPerGpu',
-  tokensPerRmbH: 'tpPerGpu',
-  tokensPerRmbN: 'tpPerGpu',
-  tokensPerRmbR: 'tpPerGpu',
-  outputTokensPerRmbH: 'outputTputPerGpu',
-  outputTokensPerRmbN: 'outputTputPerGpu',
-  outputTokensPerRmbR: 'outputTputPerGpu',
-  inputTokensPerRmbH: 'inputTputPerGpu',
-  inputTokensPerRmbN: 'inputTputPerGpu',
-  inputTokensPerRmbR: 'inputTputPerGpu',
 };
 
 export function trendMetricDependencies(metricKey: YAxisMetricKey): DerivedMetricKey[] {
@@ -182,6 +181,7 @@ export function interpolateMetricAtInteractivity(
   points: InferenceData[],
   targetInteractivity: number,
   metricKey: YAxisMetricKey,
+  tokenRevenuePricing?: TokenRevenuePricing | null,
 ): number | null {
   if (points.length === 0) return null;
 
@@ -228,10 +228,40 @@ export function interpolateMetricAtInteractivity(
     metricYs.push(v);
   }
 
+  // Fleet Lifecycle interpolates the physical throughput, measured cache hit
+  // fraction, and compatible input-token share independently, then prices that
+  // operating point. Do the same for Historical Trends instead of splining
+  // already-multiplied dollar values. A partly measured cache frontier opts out
+  // of the discount as a whole rather than inventing a zero-hit knot.
+  if (metricKey === 'tokenRevenuePerGpuHour' && tokenRevenuePricing) {
+    const interpolateBounded = (ys: number[]) => {
+      const slopes = monotoneSlopes(xs, ys);
+      const raw = hermiteInterpolate(xs, ys, slopes, targetInteractivity);
+      return Math.max(Math.min(...ys), Math.min(Math.max(...ys), raw));
+    };
+    const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
+    const inputShares = sorted.map(inputTokenShareForRevenue);
+    const cacheHitRates = sorted.map(pricingCacheHitRate);
+    const inputShare = inputShares.every((share): share is number => share !== null)
+      ? interpolateBounded(inputShares)
+      : null;
+    const cacheHitRate = cacheHitRates.every((hit): hit is number => hit !== null)
+      ? interpolateBounded(cacheHitRates)
+      : null;
+
+    const throughput = interpolateBounded(throughputYs);
+    return tokenRevenueFromRatesPerGpuHour(
+      throughput,
+      inputShare,
+      cacheHitRate,
+      tokenRevenuePricing,
+    );
+  }
+
   // When a business metric is a fixed multiple of throughput, spline the
   // matching throughput and apply that multiplier so the derived curve cannot
-  // drift from its throughput/interactivity Pareto curve. OpenRouter revenue
-  // falls through to a direct metric spline when the token mix varies by point.
+  // drift from its throughput/interactivity Pareto curve. Metrics whose ratio
+  // varies across the frontier fall through to a direct metric spline.
   if (proportionalThroughputKey) {
     const tputYs = sorted.map((p) => extractMetric(p, proportionalThroughputKey)!);
     const multiplier = recoverProportionalMultiplier(metricYs, tputYs);
@@ -294,6 +324,8 @@ interface UseInterpolatedTrendDataResult {
   hwKeysWithData: string[];
   loading: boolean;
   progress: number;
+  error: Error | null;
+  refetch: () => Promise<unknown>;
 }
 
 /**
@@ -314,7 +346,12 @@ export function useInterpolatedTrendData({
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
-  const { data: allRows, isLoading } = useBenchmarkHistory(
+  const {
+    data: allRows,
+    isLoading,
+    error,
+    refetch,
+  } = useBenchmarkHistory(
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
@@ -369,6 +406,7 @@ export function useInterpolatedTrendData({
           points,
           targetInteractivity,
           metricKey,
+          tokenRevenuePricing,
         );
         if (interpolated === null) continue;
         if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
@@ -410,7 +448,7 @@ export function useInterpolatedTrendData({
     }
 
     return { trendLines: lines, hwKeysWithData: keysWithData };
-  }, [dateGroupedData, targetInteractivity, trendMetricKey]);
+  }, [dateGroupedData, targetInteractivity, trendMetricKey, tokenRevenuePricing]);
 
   // Artificial progress that ramps up while the API call is in flight
   const [progress, setProgress] = useState(0);
@@ -437,8 +475,10 @@ export function useInterpolatedTrendData({
       hwKeysWithData: [],
       loading: false,
       progress: 0,
+      error: null,
+      refetch,
     };
   }
 
-  return { trendLines, hwKeysWithData, loading: isLoading, progress };
+  return { trendLines, hwKeysWithData, loading: isLoading, progress, error, refetch };
 }

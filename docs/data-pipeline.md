@@ -114,6 +114,15 @@ updates both the first-class column and `metrics.offload_mode`; for example, a m
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
 metadata in one correction. Unrelated metrics remain unchanged.
 
+When extending an already-applied identity-changing correction, record its old
+`set` as `previousSet`. The recovery command accepts that declared prior patch
+before applying the new fields; unrecognized destination states still fail closed.
+
+Post-ingest workflows scope recovery to the ingested run with `--run-id` and
+`--allow-unregistered-run` (a no-op for runs without corrections). They do not
+reapply unrelated historical corrections that may be absent from a staging branch.
+The standalone recovery command remains strict by default.
+
 Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
 the command requires confirmation unless passed `--yes`. It fails before writing when a
 target is missing, when a point's desired identity already exists, or when registry
@@ -172,6 +181,16 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+Dynamo/TRT-LLM KV charts prefer `dynamo_component_gpu_cache_usage_percent`, which
+retains `dp_rank`, over the rankless native `trtllm_kv_cache_utilization` gauge.
+Ranks remain inside each worker's source; native-only endpoints retain their fallback.
+The all-endpoints view summarizes workers, while selecting a worker exposes its ranks.
+
+For runs ingested before a server-metric adapter was available, dispatch
+`Recompute Agentic Metrics` on `master` with the benchmark run ID. It force-rebuilds
+chart series and aggregate statistics from stored blobs for that run in production,
+then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
+
 ### Logical Engines vs Raw Series
 
 A raw series in the blob is one `(scrape endpoint × phase block × label set)` tuple, which is **not** the same as one engine. The KV-cache chart needs one entry per _logical engine_ — one KV pool — so `compute-chart-series.ts` groups series by their Prometheus label set (`seriesIdentityKey`) rather than emitting one entry per raw series. Three kinds of duplication collapse there:
@@ -183,6 +202,51 @@ A raw series in the blob is one `(scrape endpoint × phase block × label set)` 
 The cluster average is then a mean across those logical engines on the union of their scrape instants, with each engine holding its last sample until its next one and contributing only inside its own observed window (and only while that sample is fresher than 5× the engine's own median scrape gap, so a reporting hole drops the engine out of the mean rather than pinning it to a stale reading). Grouping on an exact `start_ns` instead would average whichever engines happened to share that nanosecond — on a disaggregated run that alternates between "prefill only" and "decode only" and reads as a full-scale sawtooth.
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
+
+### ATOM Server Metrics
+
+ATOM exports aggregate `atom:` gauges and counters. KV usage and request queues
+map directly to the existing charts; token throughput uses its completed-request
+counters. Prefix-cache hit rates and token-source breakdowns use admitted cached
+tokens and `prefix_cache_full_tokens`, not compressed-index matches,
+checkpoint-eligible tokens, or completion-time prompt counts. The exporter does
+not provide per-rank KV usage or CPU-pool utilization, so those remain absent.
+
+ATOM's nominal KV token capacity is `allocated blocks × resolved block_size × DCP`.
+Startup `Concurrent capacity vs context length` lines supply the resolved block size
+and DCP width. Use `atom:kv_cache_blocks_total` for the allocated count: startup
+`pool_blocks` estimates differ between TP workers, while the metric reflects the
+selected pool and already sums independent DP pools. Do not sum worker estimates
+or multiply by TP. Checkpoints may share this nominal pool with token KV storage.
+Missing or inconsistent capacity metadata stays unset rather than guessed.
+
+Ingestion derives `metrics.kv_cache_pool_tokens` when it links the trace artifact.
+The `db:backfill-atom-kv-capacity --run-id <id> --yes` command applies the same logic
+to stored artifacts. The workflow's `atom-kv-capacity-only` option skips chart and
+aggregate recomputation; no benchmark rerun or raw-artifact replacement is needed.
+
+The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
+rebuild a stored run in an existing child database. It verifies the child and
+connection endpoint before writing; production recomputation still requires
+`master`. Preview environments use branch-scoped database and cache settings.
+After a child-database repair, refresh its isolated `CACHE_NAMESPACE` and
+`BLOB_CACHE_PREFIX` and redeploy that preview to retire cached payloads.
+
+Use `run-id: all` for a stale-only repair across historical and current AgentX
+points. Eight independent shards recompute charts, aggregates, and request
+timelines using the checked-out code's versions. Each shard records database-side
+fingerprints before writing and verifies that benchmark rows, raw artifacts, and
+already-current timelines are unchanged afterward. Previously populated metrics
+cannot be replaced with empty output; parsing failures fail the job and preserve
+the old payload. Integrity manifests are retained as workflow artifacts.
+
+Relevant backfill/parser changes merged to `master` run this stale-only repair
+against production and invalidate the cache only after every shard passes.
+Test on a snapshot branch first, then staging using the preview's parser version.
+Production must use its own deployed parser version, not an unmerged preview's.
+Runs without original metrics or trace artifacts are reported separately: a
+version upgrade cannot reconstruct data that was never captured. To deliberately
+rebuild an already-current run, set `stale-only: false` with its numeric run ID.
 
 ### Summed Series and the Canonical Grid
 

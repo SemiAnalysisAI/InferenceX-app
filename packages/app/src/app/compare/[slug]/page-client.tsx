@@ -41,7 +41,7 @@ const STRINGS = {
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
     emptyState:
-      '当前默认模型没有可用的插值对比数据。请使用下方图表控件选择一个两款芯片均有基准测试数据的模型。',
+      '默认模型暂时没有可用于插值对比的数据。请在下方图表控件中选择一个在两款芯片上都有基准测试数据的模型。',
   },
 } as const;
 
@@ -140,13 +140,18 @@ export default function ComparePageClient({
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · {t.eyebrowSuffix}
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
+              {/* `vt-compare-title` pairs with the compare-catalog card the
+                  visitor clicked for a cross-document shared-element morph
+                  (see motion.css); inert without View Transitions support. */}
+              <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+                {label}
+              </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
-                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的正面 AI
-                  推理基准测试对比。涵盖各类 LLM
-                  工作负载的延迟、吞吐量与成本。使用下方图表控件切换序列、精度和指标——交互方式与
+                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
+                  推理基准测试结果，涵盖不同 LLM
+                  工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
                   <Link href="/zh" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -190,7 +195,7 @@ export default function ComparePageClient({
                           {' '}
                           <span className="text-muted-foreground italic">
                             {isZh
-                              ? `（数据反映此 URL 的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 选择——如果您在控件中更改序列、精度或模型，下方表格和图表会自动更新。）`
+                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
                               : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
                           </span>
                         </>

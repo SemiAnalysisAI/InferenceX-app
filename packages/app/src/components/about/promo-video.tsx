@@ -80,7 +80,7 @@ export function PromoVideo() {
           type="button"
           onClick={handlePlay}
           aria-label={t.play}
-          className="group absolute inset-0 flex cursor-pointer items-center justify-center bg-black/20 transition-colors hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className="group absolute inset-0 flex cursor-pointer items-center justify-center bg-black/20 transition-colors hover:bg-black/10"
         >
           <span className="flex size-16 items-center justify-center rounded-full bg-background/80 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-110 md:size-20">
             <Play className="ml-1 size-7 fill-foreground text-foreground md:size-9" />

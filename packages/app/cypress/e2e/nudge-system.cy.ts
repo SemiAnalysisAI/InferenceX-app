@@ -6,12 +6,6 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
-import { keepLaunchModal } from '../support/e2e';
-
-// This spec owns launch-modal state, so it opts out of the global suppression
-// in cypress/support/e2e.ts rather than fighting it per visit.
-keepLaunchModal();
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -20,7 +14,6 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-agentic-results-modal-dismissed',
     'inferencex-openai-rubin-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
@@ -33,17 +26,6 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     win.localStorage.removeItem(key);
     win.sessionStorage.removeItem(key);
   }
-}
-
-/**
- * Banner-only state: everything cleared except the launch modal, which stays
- * dismissed. The modal is centered behind a full-screen backdrop, and that
- * backdrop covers the banner — including its dismiss button — whenever both
- * are eligible. These tests are about the banner, so keep the modal out.
- */
-function clearBannerNudgeStorage(win: Cypress.AUTWindow) {
-  clearAllNudgeStorage(win);
-  win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
 }
 
 // `cypress.config.ts` runs with `testIsolation: false` — the browser context
@@ -60,11 +42,10 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('Landing nudges — modals', () => {
-  it('shows launch modal and banner simultaneously on fresh first load', () => {
+  it('shows the launch banner on fresh first load', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    // Banner (inline) and modal (overlay) occupy independent slots
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('contain.text', "OpenAI's Latest In House Chip verus Rubin NVL72")
@@ -73,15 +54,10 @@ describe('Landing nudges — modals', () => {
         'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
       )
       .and('contain.text', 'View results');
-    cy.get('[data-testid="launch-modal"]')
-      .should('be.visible')
-      .and('contain.text', 'Real-world agentic inference benchmark results are live')
-      .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3')
-      .and('contain.text', 'View results')
-      // Centered launch modal: a real backdrop-backed dialog, not a corner card.
-      .and('match', 'div[role="dialog"][aria-modal="true"]');
+    // Banner + header-nav badges, plus the six AgentX hero ledger rows — the
+    // shared pill must render at the same fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 3)
+      .should('have.length', 8)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -120,8 +96,6 @@ describe('Landing nudges — modals', () => {
           expect(inkOffset, 'label ink is centred').to.be.closeTo(0, 0.5);
         }
       });
-    // Only one overlay at a time — star modal should not appear
-    cy.get('[data-testid="github-star-modal"]').should('not.exist');
   });
 
   it('localizes the Rubin comparison banner title in Chinese', () => {
@@ -136,105 +110,18 @@ describe('Landing nudges — modals', () => {
         '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
       )
       .and('contain.text', '查看结果');
-    cy.get('[data-testid="launch-modal"]')
-      .should('be.visible')
-      .and('contain.text', '真实场景智能体推理基准测试结果已上线')
-      .and('contain.text', 'Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3')
-      .and('contain.text', '查看结果');
   });
 
-  it('renders the launch modal centered in the viewport, over a backdrop', () => {
+  it('does not float a duplicate GitHub star card over the footer', () => {
+    // The persistent star CTA lives in the footer grid (footer-star-cta) and
+    // the header; the old immediate star modal duplicated it and covered the
+    // footer, so it must stay gone.
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
-    cy.window().then((win) => {
-      const rect = win.document
-        .querySelector('[data-testid="launch-modal"]')!
-        .getBoundingClientRect();
-      // clientWidth, not innerWidth: a fixed overlay is laid out against the
-      // viewport minus the scrollbar, so innerWidth is half a scrollbar off.
-      const { clientWidth, clientHeight } = win.document.documentElement;
-      expect(Math.abs((rect.left + rect.right) / 2 - clientWidth / 2)).to.be.lessThan(2);
-      expect(Math.abs((rect.top + rect.bottom) / 2 - clientHeight / 2)).to.be.lessThan(2);
-    });
-  });
-
-  it('dismissing launch modal persists — not shown on reload', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
-    cy.get('[data-testid="launch-modal-dismiss"]').click();
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
-    // Assert the write itself, not just the absence after reload — the latter
-    // is only meaningful because this spec opted out of the global seeding.
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-agentic-results-modal-dismissed')).to.eq('1');
-    });
-
-    cy.reload();
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
-  });
-
-  it('launch modal View results action opens Agentic Traces and persists dismissal', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
-
-    // The action records engagement and opens the Agentic Traces results.
-    cy.get('[data-testid="launch-modal-action"]').click();
-    cy.location('pathname').should('eq', '/inference');
-    cy.location('search').should('include', 'i_seq=agentic-traces');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-agentic-results-modal-dismissed')).to.eq('1');
-    });
-  });
-
-  it('shows star modal when launch modal was previously dismissed', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
-      },
-    });
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-  });
-
-  it('star modal dismiss uses timed strategy — re-shows after expiry', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
-      },
-    });
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-    cy.get('[data-testid="github-star-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
-
-    cy.window().then((win) => {
-      const value = win.localStorage.getItem('inferencex-star-modal-dismissed');
-      expect(value).to.not.equal(null);
-      expect(Number(value)).to.be.greaterThan(0);
-    });
-  });
-
-  it('starring permanently suppresses both star modal and star nudge', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
-      },
-    });
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-    cy.get('[data-testid="github-star-modal-action"]').click();
-    cy.get('[data-testid="github-star-modal"]').should('not.exist');
-
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-starred')).to.eq('1');
-    });
+    cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 });
 
@@ -245,22 +132,14 @@ describe('Landing nudges — modals', () => {
 describe('Landing nudges — banner', () => {
   it('shows launch banner on landing page', () => {
     cy.visit('/', {
-      onBeforeLoad(win) {
-        clearBannerNudgeStorage(win);
-        // Dismiss modals so the banner (highest priority at 60) is the active nudge.
-        // Actually the banner has priority 60 > launch modal 50, so it should show first.
-        // But the engine only shows one nudge at a time; the banner wins because of priority.
-      },
+      onBeforeLoad: clearAllNudgeStorage,
     });
-    // The banner has the highest priority (60), so it should appear.
-    // However, NudgeEngine only shows one nudge at a time.
-    // With immediate triggers and priority 60 > 50 > 40, the banner wins.
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
 
   it('banner renders within container constraints (not full-width)', () => {
     cy.visit('/', {
-      onBeforeLoad: clearBannerNudgeStorage,
+      onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     // The banner's parent section has the container class for width constraints
@@ -269,7 +148,7 @@ describe('Landing nudges — banner', () => {
 
   it('dismissing the banner persists across reloads', () => {
     cy.visit('/', {
-      onBeforeLoad: clearBannerNudgeStorage,
+      onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner-dismiss"]').click();
@@ -281,7 +160,7 @@ describe('Landing nudges — banner', () => {
 
   it('rendering the banner does not write its dismissal storage key', () => {
     cy.visit('/', {
-      onBeforeLoad: clearBannerNudgeStorage,
+      onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
@@ -292,7 +171,7 @@ describe('Landing nudges — banner', () => {
 
   it('clicking the banner body navigates without persisting dismissal', () => {
     cy.visit('/', {
-      onBeforeLoad: clearBannerNudgeStorage,
+      onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner"]').click();
@@ -475,7 +354,6 @@ describe('Nudge scope isolation', () => {
     cy.visit('/inference', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="launch-banner"]').should('not.exist');
   });
@@ -485,7 +363,6 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
         win.localStorage.setItem('inferencex-openai-rubin-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },

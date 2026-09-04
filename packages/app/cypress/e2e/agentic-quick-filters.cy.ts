@@ -140,7 +140,7 @@ describe('Agentic Quick Filters', () => {
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
-    cy.contains('button', 'Done').click();
+    cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
     cy.get('[data-testid="scatter-reset-filter"]').click();

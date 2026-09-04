@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
+import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { useLocale } from '@/lib/use-locale';
@@ -11,7 +12,7 @@ import {
   versionedComponentLabel,
 } from '@/components/inference/utils/runtime-metadata-labels';
 
-const STRINGS = {
+export const POINT_SUMMARY_STRINGS = {
   en: {
     selectedPoint: 'Selected point',
     disagg: 'disagg',
@@ -24,22 +25,24 @@ const STRINGS = {
     concurrency: 'Concurrency',
     gpuCacheHit: 'Chip cache hit',
     cpuCacheHit: 'CPU cache hit',
+    combinedCacheHit: 'Combined chip + CPU cache hit',
     enabledLegacy: 'Enabled (legacy data)',
     disabledLegacy: 'Disabled (legacy data)',
     none: 'None',
   },
   zh: {
     selectedPoint: '已选数据点',
-    disagg: '解耦',
+    disagg: '分离式',
     multiNodeAggregate: '多节点聚合',
-    githubRun: 'GitHub Actions 运行 →',
+    githubRun: 'GitHub Actions 运行记录 →',
     offloadType: 'offload 类型',
     offloadBackend: 'KV offload 引擎',
     transferEngine: 'KV 传输引擎',
     router: '路由器',
     concurrency: '并发数',
-    gpuCacheHit: '芯片 Cache 命中率',
-    cpuCacheHit: 'CPU Cache 命中率',
+    gpuCacheHit: '芯片 cache 命中率',
+    cpuCacheHit: 'CPU cache 命中率',
+    combinedCacheHit: '芯片 + CPU 综合 cache 命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',
     none: '无',
@@ -59,7 +62,7 @@ function MetaLine({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function offloadDisplay(meta: PointMeta, locale: Locale): string {
-  const t = STRINGS[locale];
+  const t = POINT_SUMMARY_STRINGS[locale];
   const type = meta.kv_offloading?.trim();
   if (type) return type.toLowerCase() === 'none' ? t.none : offloadTypeLabel(type);
   if (!meta.offload_mode) return t.none;
@@ -69,8 +72,9 @@ function offloadDisplay(meta: PointMeta, locale: Locale): string {
 /** Selected-point header: runtime components, concurrency, cache hit rates, and ISL/OSL. */
 export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = POINT_SUMMARY_STRINGS[locale];
   const showCpuCacheHit = isKvOffloadEnabled(meta);
+  const showCombinedCacheHit = showCpuCacheHit && frameworkFamily(meta.framework) === 'trt';
   const offloadBackend = versionedComponentLabel(
     meta.kv_offload_backend,
     meta.kv_offload_backend_version,
@@ -104,8 +108,11 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
         {transferEngine && <MetaLine label={t.transferEngine} value={transferEngine} />}
         {router && <MetaLine label={t.router} value={router} />}
         <MetaLine label={t.concurrency} value={meta.conc} />
-        <MetaLine label={t.gpuCacheHit} value={fmtPct(meta.server_gpu_cache_hit_rate)} />
-        {showCpuCacheHit && (
+        <MetaLine
+          label={showCombinedCacheHit ? t.combinedCacheHit : t.gpuCacheHit}
+          value={fmtPct(meta.server_gpu_cache_hit_rate)}
+        />
+        {showCpuCacheHit && !showCombinedCacheHit && (
           <MetaLine label={t.cpuCacheHit} value={fmtPct(meta.server_cpu_cache_hit_rate)} />
         )}
         {meta.isl !== null && <MetaLine label="ISL" value={meta.isl} />}

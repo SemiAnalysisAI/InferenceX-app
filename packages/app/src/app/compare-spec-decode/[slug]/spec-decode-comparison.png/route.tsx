@@ -21,9 +21,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
+  const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (
@@ -70,22 +71,34 @@ export async function GET(
   const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = 'Off';
+  const imageALabel = lang === 'zh' ? `启用 ${aLabel}` : aLabel;
+  const imageBLabel = lang === 'zh' ? '关闭投机解码' : bLabel;
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
 
   try {
-    return renderComparePngChart({
+    return await renderComparePngChart({
       curveRows,
       plottedRows,
       logoSrc,
-      aLabel,
-      bLabel,
-      eyebrow: 'InferenceX Speculative Decoding Comparison',
+      aLabel: imageALabel,
+      bLabel: imageBLabel,
+      eyebrow:
+        lang === 'zh' ? 'InferenceX 投机解码对比' : 'InferenceX Speculative Decoding Comparison',
       title: parsed.model.label,
-      subtitle: `${gpuLabel} ${precLabel}: ${aLabel} vs ${bLabel} | Cost per Million Tokens`,
+      subtitle:
+        lang === 'zh'
+          ? `${gpuLabel} ${precLabel}：启用 ${aLabel} 与关闭投机解码｜每百万 token 成本`
+          : `${gpuLabel} ${precLabel}: ${aLabel} vs ${bLabel} | Cost per Million Tokens`,
       workload,
       rangeNote:
-        "Dashed segments extend to each config's operating envelope, where cost rises steeply",
-      footer: 'Speculative decoding comparison | interpolated from benchmark results',
+        lang === 'zh'
+          ? '虚线延伸至各配置对应的运行区间；接近区间边界时，成本会快速上升'
+          : "Dashed segments extend to each config's operating envelope, where cost rises steeply",
+      footer:
+        lang === 'zh'
+          ? '投机解码对比｜数据由基准测试结果插值得出'
+          : 'Speculative decoding comparison | interpolated from benchmark results',
+      lang,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

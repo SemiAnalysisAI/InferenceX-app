@@ -35,6 +35,11 @@ const QUERY_ENERGY_METRICS = [
   'y_measuredWhPerSuccessfulQuery',
 ] as const;
 
+const ROLE_ENERGY_METRICS = [
+  'y_measuredPrefillJPerInputToken',
+  'y_measuredDecodeJPerOutputToken',
+] as const;
+
 const defs = chartDefinitions as unknown as ChartDefinition[];
 const interactivityDef = defs.find((d) => d.chartType === 'interactivity')!;
 const e2eDef = defs.find((d) => d.chartType === 'e2e')!;
@@ -140,6 +145,16 @@ describe('measured-power Pareto direction', () => {
   });
 
   it.each(QUERY_ENERGY_METRICS)('%s is bilingual and lower-is-better', (metric) => {
+    expect(declaredDirection(interactivityDef, metric)).toBe('lower_right');
+    expect(declaredDirection(e2eDef, metric)).toBe('lower_left');
+    for (const chartDef of [interactivityDef, e2eDef]) {
+      expect(chartDef[metric]).toMatch(/\.y$/u);
+      expect(chartDef[`${metric}_label`]).toBeTruthy();
+      expect(chartDef[`${metric}_labelZh`]).toBeTruthy();
+    }
+  });
+
+  it.each(ROLE_ENERGY_METRICS)('%s is bilingual and lower-is-better', (metric) => {
     expect(declaredDirection(interactivityDef, metric)).toBe('lower_right');
     expect(declaredDirection(e2eDef, metric)).toBe('lower_left');
     for (const chartDef of [interactivityDef, e2eDef]) {

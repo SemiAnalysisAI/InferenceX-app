@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 
+const route = vi.hoisted(() => ({ pathname: '/inference' }));
+vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -23,6 +26,7 @@ const GROUPS: SearchableSelectGroup[] = [
 ];
 
 beforeEach(() => {
+  route.pathname = '/inference';
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -68,6 +72,25 @@ function setSearchValue(value: string) {
 }
 
 describe('SearchableSelect', () => {
+  it('uses Chinese defaults for search, clear, empty and placeholder without overriding caller copy', () => {
+    route.pathname = '/zh/inference';
+    render({ value: 'unknown' });
+    expect(container.textContent).toContain('请选择...');
+    openMenu();
+    const input = document.body.querySelector('input')!;
+    expect(input.getAttribute('placeholder')).toBe('搜索...');
+    expect(input.getAttribute('aria-label')).toBe('搜索选项');
+    setSearchValue('no matching option');
+    expect(document.body.textContent).toContain('没有结果');
+    const clear = document.body.querySelector('button[aria-label="清除搜索"]') as HTMLButtonElement;
+    act(() => clear.click());
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    render({ value: 'unknown', placeholder: '选择指标', searchPlaceholder: '搜索指标' });
+    expect(container.textContent).toContain('选择指标');
+    expect(document.body.querySelector('input')?.getAttribute('placeholder')).toBe('搜索指标');
+  });
+
   it('renders the selected option label on the trigger', () => {
     render();
     const trigger = container.querySelector('[data-testid="yaxis"]');
@@ -78,6 +101,20 @@ describe('SearchableSelect', () => {
     render({ value: 'unknown', placeholder: 'Pick one' });
     const trigger = container.querySelector('[data-testid="yaxis"]');
     expect(trigger?.textContent).toContain('Pick one');
+  });
+
+  it('exposes the compact size token and full selected label for long values', () => {
+    const longLabel = 'DeepSeek V4 Pro 0813 1.6T FP4 Agentic deployment configuration';
+    render({
+      size: 'sm',
+      value: 'long',
+      groups: [{ label: 'Models', options: [{ value: 'long', label: longLabel }] }],
+    });
+    const trigger = container.querySelector('[data-testid="yaxis"]');
+    const label = trigger?.querySelector('span');
+    expect((trigger as HTMLElement | null)?.dataset.size).toBe('sm');
+    expect(label?.className).toContain('truncate');
+    expect(label?.getAttribute('title')).toBe(longLabel);
   });
 
   it('shows all groups and options when opened', () => {

@@ -103,6 +103,8 @@ export function createMockChartDefinition(overrides?: Partial<ChartDefinition>):
     y_tpPerGpu_title: 'Throughput per Chip',
     y_tpPerGpu_roofline: 'upper_right',
     ...overrides,
+    x_scale_field: overrides?.x_scale_field ?? String(overrides?.x ?? 'conc'),
+    x_labelZh: overrides?.x_labelZh ?? '并发数',
   };
 }
 
@@ -208,6 +210,7 @@ export function createMockInferenceContextValues(
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions'),
     loading: false,
+    refreshing: false,
     error: null,
     selectedYAxisMetric: 'y_tpPerGpu',
     setSelectedYAxisMetric: namedStub('setSelectedYAxisMetric'),
@@ -230,12 +233,13 @@ export function createMockInferenceContextValues(
     setSelectedXAxisMode: namedStub('setSelectedXAxisMode'),
     scaleType: 'auto',
     setScaleType: namedStub('setScaleType'),
-    quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
-    availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
+    quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
+    availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     setQuickFilterVendors: namedStub('setQuickFilterVendors'),
     setQuickFilterFrameworks: namedStub('setQuickFilterFrameworks'),
     setQuickFilterDeployment: namedStub('setQuickFilterDeployment'),
     setQuickFilterSpec: namedStub('setQuickFilterSpec'),
+    setQuickFilterPower: namedStub('setQuickFilterPower'),
     isLegendExpanded: true,
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
@@ -343,7 +347,12 @@ export function createMockEvaluationContext(
 ): EvaluationChartContextType {
   return {
     loading: false,
+    isEvaluationDataSettled: true,
     error: null,
+    isError: false,
+    isAvailabilityError: false,
+    isEvaluationDataError: false,
+    retry: namedStub('retryEvaluations'),
     selectedBenchmark: 'mmlu',
     setSelectedBenchmark: namedStub('setSelectedBenchmark'),
     selectedModel: Model.DeepSeek_R1,
@@ -405,6 +414,7 @@ export function createMockReliabilityContext(
   return {
     loading: false,
     error: null,
+    refetch: namedStub('refetchReliability').resolves(),
     dateRangeSuccessRateData: {
       'last-7-days': {
         [Model.DeepSeek_R1]: {
@@ -479,6 +489,8 @@ export function createMockGlobalFilterContexts(
     availabilityRows: undefined,
     availabilitySettled: true,
     availabilityError: null,
+    availabilityIsError: false,
+    retryAvailability: namedStub('retryAvailability'),
     availableRuns: {},
     workflowLoading: false,
     workflowError: null,
@@ -515,6 +527,8 @@ export function createMockGlobalFilterContexts(
       availabilityRows: values.availabilityRows,
       availabilitySettled: values.availabilitySettled,
       availabilityError: values.availabilityError,
+      availabilityIsError: values.availabilityIsError,
+      retryAvailability: values.retryAvailability,
     },
     workflow: {
       availableRuns: values.availableRuns,

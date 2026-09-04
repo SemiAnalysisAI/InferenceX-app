@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
+import { CHART_TYPE, px } from '../typography';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
 import {
   renderHorizontalBars,
@@ -272,7 +273,7 @@ export function updateLayerForMetric<T>(
         .attr('class', 'point-label')
         .attr('text-anchor', 'middle')
         .attr('fill', foreground)
-        .attr('font-size', '10px')
+        .attr('font-size', px(CHART_TYPE.dataLabel))
         .attr('font-weight', '700')
         .attr('pointer-events', 'none')
         .style('display', layer.config.hideLabels ? 'none' : '')

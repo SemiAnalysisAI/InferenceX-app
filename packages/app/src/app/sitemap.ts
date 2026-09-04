@@ -21,10 +21,10 @@ import { getAllGlossaryEntries } from '@/lib/glossary';
 import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import {
-  DEFAULT_ROUTE_MODEL,
+  defaultRouteModel,
   MODEL_ROUTE_TABS,
-  MODEL_ROUTES,
   modelRoutePath,
+  modelRoutesForTab,
 } from '@/lib/model-routes';
 import { getAllRankingPageEntries } from '@/lib/rankings';
 import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
@@ -76,13 +76,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // default model's pages canonicalize to the bare tab paths (already
     // emitted above), so they stay out of the sitemap.
     ...MODEL_ROUTE_TABS.flatMap((tab) =>
-      MODEL_ROUTES.filter((route) => route.model !== DEFAULT_ROUTE_MODEL).flatMap((route) =>
-        localizedPair(modelRoutePath(tab, route.slug), {
-          lastModified: now,
-          changeFrequency: 'daily' as const,
-          priority: 0.8,
-        }),
-      ),
+      modelRoutesForTab(tab)
+        .filter((route) => route.model !== defaultRouteModel(tab))
+        .flatMap((route) =>
+          localizedPair(modelRoutePath(tab, route.slug), {
+            lastModified: now,
+            changeFrequency: 'daily' as const,
+            priority: 0.8,
+          }),
+        ),
     ),
     ...localizedPair('/overview', {
       lastModified: now,
@@ -216,19 +218,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
     // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
-    // English-only: no /zh sibling, so no localizedPair.
-    {
-      url: `${BASE_URL}/model`,
+    ...localizedPair('/model', {
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
-    },
-    ...getModelPageSlugs().map((slug) => ({
-      url: `${BASE_URL}/model/${slug}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    })),
+    }),
+    ...getModelPageSlugs().flatMap((slug) =>
+      localizedPair(`/model/${slug}`, {
+        lastModified: now,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }),
+    ),
     ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
       localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
         lastModified: now,

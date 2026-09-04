@@ -215,6 +215,19 @@ describe('CollectiveX artifact assembly', () => {
     );
   });
 
+  it('prefers wire_byte_provenance when the artifact carries it', () => {
+    // A token-expert LL row moves one copy per (token, expert); its deduplicated
+    // byte_provenance is a lower bound (~34% low on nccl-ep LL EP8 at T=128), so
+    // rates must divide from the wire basis when present.
+    const dispatch = makeCollectiveXSeries({ rows: [{ wireBytesFactor: 1.5 }] }).points[0]
+      .components.dispatch;
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
+      ((400000000 * 1.5) / 8 / 417) * 1e-3,
+      3,
+    );
+    expect(dispatch?.payload_bytes).toBe(400000000 * 1.5);
+  });
+
   it('does not invent rates for zero-byte or unavailable components', () => {
     const zeroStage = makeCollectiveXSeries({ rows: [{ stageZeroBytes: true }] }).points[0]
       .components.stage;

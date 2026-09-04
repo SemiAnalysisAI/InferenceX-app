@@ -16,6 +16,43 @@ export interface LimitForceFlags {
   shardIndex: number;
 }
 
+export function requireBackfillPayload<T>(payload: T | null, field: string): T {
+  if (payload === null) {
+    throw new Error(`Could not compute ${field}; existing data was not changed`);
+  }
+  return payload;
+}
+
+function populated(value: unknown): boolean {
+  return Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined;
+}
+
+export function retainPopulatedFields<T extends object>(
+  previous: T | null,
+  next: T,
+  fields: readonly (keyof T)[],
+): void {
+  for (const field of fields) {
+    const before = previous?.[field];
+    const after = next[field];
+    if (populated(before) && !populated(after)) {
+      throw new Error(`${String(field)} became empty; existing data was not changed`);
+    }
+  }
+}
+
+/** Restrict a backfill to one GitHub run; malformed selectors must never scan all rows. */
+export function parseRunIdFlag(argv: readonly string[] = process.argv): number | undefined {
+  const index = argv.indexOf('--run-id');
+  if (index === -1) return undefined;
+  const raw = argv[index + 1];
+  const runId = Number(raw);
+  if (!raw || !/^\d+$/u.test(raw) || !Number.isSafeInteger(runId) || runId < 1) {
+    throw new Error('--run-id requires a positive integer GitHub workflow run ID');
+  }
+  return runId;
+}
+
 /** Parse the standard `--limit N` / `--force` backfill flags from argv. */
 export function parseLimitForceFlags(): LimitForceFlags {
   let limit: number | null = null;

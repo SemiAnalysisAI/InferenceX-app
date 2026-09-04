@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { updateRepoUrl } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 
 import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import {
@@ -25,13 +27,61 @@ import {
   formatConfigKeys,
 } from '@/components/inference/utils/changelogFormatters';
 
-const CONCLUSION_LABELS: Record<string, string> = {
-  success: 'Run succeeded',
-  failure: 'Run failed',
-  cancelled: 'Run cancelled',
-};
+const WORKFLOW_STRINGS = {
+  en: {
+    conclusions: { success: 'Run succeeded', failure: 'Run failed', cancelled: 'Run cancelled' },
+    run: 'Run',
+    runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'en'),
+    previousRun: 'Previous run',
+    nextRun: 'Next run',
+    changelog: 'Changelog',
+    description: 'Description',
+    updatedConfigs: 'Updated Configs',
+    gitCommit: 'Git Commit',
+    noChangelog: 'No changelog data available.',
+    trackingHistory: 'This date predates changelog tracking.',
+  },
+  zh: {
+    conclusions: { success: '运行成功', failure: '运行失败', cancelled: '运行已取消' },
+    run: '运行',
+    runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'zh'),
+    previousRun: '上一次运行',
+    nextRun: '下一次运行',
+    changelog: '变更日志',
+    description: '说明',
+    updatedConfigs: '已更新配置',
+    gitCommit: 'Git Commit',
+    noChangelog: '暂无变更日志数据。',
+    trackingHistory: '该日期早于变更日志开始记录的时间。',
+  },
+} as const;
 
-function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
+export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
+  return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
+}
+
+/**
+ * Returns the run id adjacent to `selectedRunId` in `runIds` (which is ordered
+ * oldest → newest, matching the "Run i/n" labels), or `undefined` when there is
+ * no run in that direction or the selection is unknown.
+ */
+export function getAdjacentRunId(
+  runIds: readonly string[],
+  selectedRunId: string,
+  direction: 'previous' | 'next',
+): string | undefined {
+  const index = runIds.indexOf(selectedRunId);
+  if (index === -1) return undefined;
+  const target = direction === 'previous' ? index - 1 : index + 1;
+  return target >= 0 && target < runIds.length ? runIds[target] : undefined;
+}
+
+/** The newest run id, i.e. the last entry of the oldest → newest `runIds` list. */
+export function getLatestRunId(runIds: readonly string[]): string | undefined {
+  return runIds.at(-1);
+}
+
+function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; locale: Locale }) {
   if (!conclusion) return null;
   const color =
     conclusion === 'success'
@@ -41,7 +91,7 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
         : conclusion === 'cancelled'
           ? 'bg-yellow-500'
           : 'bg-gray-400';
-  const label = CONCLUSION_LABELS[conclusion] ?? conclusion;
+  const label = WORKFLOW_STRINGS[locale].conclusions[conclusion as 'success'] ?? conclusion;
   return (
     <span
       className={`inline-block size-2 mr-1 rounded-full ${color} cursor-help`}
@@ -52,35 +102,24 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
 }
 
 export default function WorkflowInfoDisplay() {
+  const locale = useLocale();
+  const t = WORKFLOW_STRINGS[locale];
   const { selectedRunDate, selectedRunId } = useInferenceFilters();
   const { availableDates, availableRuns, isCheckingAvailableDates } = useInferenceData();
   const { setSelectedRunDate, setSelectedRunId } = useInferenceActions();
 
   const { effectivePrecisions } = useGlobalFilterSelection();
 
-  // Navigation functions for runs
   const runIds = Object.keys(availableRuns);
-  const currentRunIndex = runIds.indexOf(selectedRunId);
+  const latestRunId = getLatestRunId(runIds);
+  const isLatestRunSelected = latestRunId === undefined || selectedRunId === latestRunId;
+  const previousRunId = getAdjacentRunId(runIds, selectedRunId, 'previous');
+  const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
 
-  const canGoPreviousRun = () => currentRunIndex > 0;
-
-  const canGoNextRun = () => currentRunIndex !== -1 && currentRunIndex < runIds.length - 1;
-
-  const handleGoPreviousRun = () => {
-    if (canGoPreviousRun()) {
-      track('inference_run_previous', {
-        toRun: runIds[currentRunIndex - 1],
-        totalRuns: runIds.length,
-      });
-      setSelectedRunId(runIds[currentRunIndex - 1]);
-    }
-  };
-
-  const handleGoNextRun = () => {
-    if (canGoNextRun()) {
-      track('inference_run_next', { toRun: runIds[currentRunIndex + 1], totalRuns: runIds.length });
-      setSelectedRunId(runIds[currentRunIndex + 1]);
-    }
+  const selectRun = (runId: string | undefined, source: string) => {
+    if (!runId) return;
+    track('inference_run_selected', { run: runId, source });
+    setSelectedRunId(runId);
   };
 
   if (runIds.length === 0) {
@@ -119,28 +158,26 @@ export default function WorkflowInfoDisplay() {
         onChange={(date) => setSelectedRunDate(date)}
         availableDates={availableDates}
         isCheckingAvailableDates={isCheckingAvailableDates}
+        isLatestRunSelected={isLatestRunSelected}
+        onGoToLatestRun={() => selectRun(latestRunId, 'latest')}
       />
       {runIds.length > 0 ? (
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleGoPreviousRun}
-            disabled={!canGoPreviousRun()}
-            className="size-8"
+            onClick={() => selectRun(previousRunId, 'previous')}
+            disabled={previousRunId === undefined}
+            className="size-11 md:size-8"
+            aria-label={t.previousRun}
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <Select
-            value={selectedRunId}
-            onValueChange={(value) => {
-              track('inference_run_selected', { run: value });
-              setSelectedRunId(value);
-            }}
-          >
+          <Select value={selectedRunId} onValueChange={(value) => selectRun(value, 'select')}>
             <SelectTrigger
               id="run-select"
-              className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
+              aria-label={t.run}
+              className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
               onPointerDown={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-external-link]')) {
@@ -153,7 +190,7 @@ export default function WorkflowInfoDisplay() {
                 }
               }}
             >
-              <SelectValue placeholder="Run" />
+              <SelectValue placeholder={t.run} />
             </SelectTrigger>
             <SelectContent>
               {Object.keys(availableRuns).map((run, index) => {
@@ -172,8 +209,11 @@ export default function WorkflowInfoDisplay() {
                     }}
                   >
                     <span className="flex items-center gap-1">
-                      <RunConclusionDot conclusion={availableRuns[run].conclusion} />
-                      Run {index + 1}/{runIds.length}
+                      <RunConclusionDot
+                        conclusion={availableRuns[run].conclusion}
+                        locale={locale}
+                      />
+                      {t.runCount(index + 1, runIds.length)}
                       <span
                         data-external-link
                         className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
@@ -189,9 +229,10 @@ export default function WorkflowInfoDisplay() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleGoNextRun}
-            disabled={!canGoNextRun()}
-            className="size-8"
+            onClick={() => selectRun(nextRunId, 'next')}
+            disabled={nextRunId === undefined}
+            className="size-11 md:size-8"
+            aria-label={t.nextRun}
           >
             <ChevronRight className="size-4" />
           </Button>
@@ -200,8 +241,8 @@ export default function WorkflowInfoDisplay() {
       <div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
-              <strong>Changelog</strong>
+            <Button variant="outline">
+              <strong>{t.changelog}</strong>
               <ChevronDownIcon />
             </Button>
           </PopoverTrigger>
@@ -213,9 +254,9 @@ export default function WorkflowInfoDisplay() {
                     <div key={index}>
                       {index > 0 && <hr className="my-3" />}
                       <div className="flex flex-col gap-2 text-xs line-break-words">
-                        <div className="text-xs font-bold">Description</div>
+                        <div className="text-xs font-bold">{t.description}</div>
                         {formatChangelogDescription(entry.description)}
-                        <div className="text-xs font-bold">Updated Configs</div>
+                        <div className="text-xs font-bold">{t.updatedConfigs}</div>
                         <ul className="list-disc pl-4">
                           {entry.config_keys.map((key: string) => (
                             <li key={key}>{formatConfigKeys(key)}</li>
@@ -231,17 +272,15 @@ export default function WorkflowInfoDisplay() {
                       rel="noopener noreferrer"
                       className="text-xs hover:underline text-foreground underline"
                     >
-                      Git Commit
+                      {t.gitCommit}
                     </a>
                   )}
                 </>
               ) : (
                 <div className="flex flex-col gap-2 text-xs">
-                  <div className="text-xs font-bold">Description</div>
-                  <span className="text-muted-foreground">No changelog data available.</span>
-                  <span className="text-muted-foreground">
-                    This date predates changelog tracking.
-                  </span>
+                  <div className="text-xs font-bold">{t.description}</div>
+                  <span className="text-muted-foreground">{t.noChangelog}</span>
+                  <span className="text-muted-foreground">{t.trackingHistory}</span>
                 </div>
               )}
             </div>

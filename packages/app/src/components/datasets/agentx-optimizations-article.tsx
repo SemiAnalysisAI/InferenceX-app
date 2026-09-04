@@ -49,7 +49,7 @@ function SectionFigure({
       target="_blank"
       rel="noopener noreferrer"
       prefetch={false}
-      className="group my-7 block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
         className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"
@@ -104,7 +104,7 @@ function SectionBlock({
       {section.figure && <SectionFigure figure={section.figure} ui={ui} />}
       {section.prs && section.prs.length > 0 && (
         <div className="mt-5">
-          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
             {ui.prsLabel}
           </p>
           <ul className="mt-2 flex flex-wrap gap-2">
@@ -129,7 +129,7 @@ function SectionBlock({
       )}
       {section.links && section.links.length > 0 && (
         <div className="mt-5">
-          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
             {ui.referencesLabel}
           </p>
           <ul className="mt-2 grid gap-x-8 gap-y-2 sm:grid-cols-2">
@@ -173,7 +173,7 @@ function FrameworkCard({
       data-framework={framework.slug}
       className="group flex flex-col rounded-xl border border-border/70 bg-card p-5 transition-colors hover:border-primary/50"
     >
-      <p className="font-mono text-[11px] font-medium tracking-[0.18em] text-brand uppercase">
+      <p className="font-mono text-2xs font-medium tracking-eyebrow text-brand uppercase">
         {overview.layerLabels[framework.layer]}
       </p>
       <h3 className="mt-2 text-lg font-semibold text-foreground">{framework.name}</h3>
@@ -202,7 +202,7 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
         >
           {overview.ui.backToAgentX}
         </AgentXOptimizationsLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
           {overview.eyebrow}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
@@ -274,7 +274,7 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
         >
           {overview.ui.backToOverview}
         </AgentXOptimizationsLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
           {overview.eyebrow} · {overview.layerLabels[framework.layer]}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
@@ -286,7 +286,7 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
 
       <div className="py-10">
         <nav aria-label={overview.ui.onThisPage} className="mb-10">
-          <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
             {overview.ui.onThisPage}
           </p>
           <ul className="mt-2 grid gap-x-8 gap-y-1 sm:grid-cols-2">

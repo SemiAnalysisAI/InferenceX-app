@@ -14,6 +14,7 @@ import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
+import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
@@ -63,6 +64,7 @@ export interface PreparedTraceReplay {
   computeMs: number;
   cacheHitRates: { gpu: number; cpu: number | null } | null;
   fullResponseMetrics: Record<string, number>;
+  atomKvCacheBlocks?: number | null;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -194,11 +196,8 @@ export async function prepareTraceReplay(
   const compressionMs = Date.now() - compressionStart;
 
   const computeStart = Date.now();
-  const { aggregateStats, chartSeries, requestTimeline } = await computeTraceDerivedPayloads(
-    profile.data,
-    metricsJson.data,
-    metricsContext,
-  );
+  const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
+    await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -218,6 +217,7 @@ export async function prepareTraceReplay(
     computeMs,
     cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
     fullResponseMetrics,
+    atomKvCacheBlocks,
   };
 }
 
@@ -382,6 +382,11 @@ export async function persistPreparedTraceReplay(
       log('filled full-response ITL and interactivity from the AIPerf profile');
     }
     linkedCount = unlinked.length;
+    await updateAtomKvCachePoolTokens(
+      tx,
+      unlinked.map((row) => row.id),
+      prepared.atomKvCacheBlocks ?? null,
+    );
   });
   if (linkedCount > 0) log(`inserted trace_replay payload (${elapsed(insertStart)})`);
   return linkedCount;

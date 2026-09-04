@@ -31,9 +31,6 @@ const TOTAL_COST_METRICS = new Set([
   'y_tokensPerDollarH',
   'y_tokensPerDollarN',
   'y_tokensPerDollarR',
-  'y_tokensPerRmbH',
-  'y_tokensPerRmbN',
-  'y_tokensPerRmbR',
 ]);
 const OUTPUT_COST_METRICS = new Set([
   'y_costhOutput',
@@ -42,9 +39,6 @@ const OUTPUT_COST_METRICS = new Set([
   'y_outputTokensPerDollarH',
   'y_outputTokensPerDollarN',
   'y_outputTokensPerDollarR',
-  'y_outputTokensPerRmbH',
-  'y_outputTokensPerRmbN',
-  'y_outputTokensPerRmbR',
 ]);
 const INPUT_COST_METRICS = new Set([
   'y_costhi',
@@ -53,9 +47,6 @@ const INPUT_COST_METRICS = new Set([
   'y_inputTokensPerDollarH',
   'y_inputTokensPerDollarN',
   'y_inputTokensPerDollarR',
-  'y_inputTokensPerRmbH',
-  'y_inputTokensPerRmbN',
-  'y_inputTokensPerRmbR',
 ]);
 const POWER_VALUES = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([base, specs]) => [base, `${specs.power}kW`]),
@@ -106,8 +97,7 @@ const NOUN_ZH: Record<string, string> = {
   cost: '成本',
   'cost per million tokens': '每百万 token 成本',
   'token cost': 'token 成本',
-  'tokens per $1 USD': '每 1 美元可购买的 token 数',
-  'tokens per ¥1 RMB': '每 1 元人民币可购买的 token 数',
+  'tokens per $1 TCO': '每 1 美元 TCO 对应的 token 数',
   'purchasing power': '购买力',
   'input throughput': '输入吞吐量',
   'output throughput': '输出吞吐量',
@@ -166,9 +156,6 @@ function getCostValues(selectedYAxisMetric: string) {
       selectedYAxisMetric === 'y_costh' ||
       selectedYAxisMetric === 'y_costhOutput' ||
       selectedYAxisMetric === 'y_costhi' ||
-      selectedYAxisMetric === 'y_tokensPerRmbH' ||
-      selectedYAxisMetric === 'y_outputTokensPerRmbH' ||
-      selectedYAxisMetric === 'y_inputTokensPerRmbH' ||
       selectedYAxisMetric === 'y_tokensPerDollarH' ||
       selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
       selectedYAxisMetric === 'y_inputTokensPerDollarH'
@@ -176,9 +163,6 @@ function getCostValues(selectedYAxisMetric: string) {
         : selectedYAxisMetric === 'y_costn' ||
             selectedYAxisMetric === 'y_costnOutput' ||
             selectedYAxisMetric === 'y_costni' ||
-            selectedYAxisMetric === 'y_tokensPerRmbN' ||
-            selectedYAxisMetric === 'y_outputTokensPerRmbN' ||
-            selectedYAxisMetric === 'y_inputTokensPerRmbN' ||
             selectedYAxisMetric === 'y_tokensPerDollarN' ||
             selectedYAxisMetric === 'y_outputTokensPerDollarN' ||
             selectedYAxisMetric === 'y_inputTokensPerDollarN'
@@ -247,8 +231,6 @@ export function MetricAssumptionNotes({
   // split the throughput caveats above already make (input/output, not total).
   const showCostCaveat = showOutputCostSource || showInputCostSource;
   const isTokensPerDollar = selectedYAxisMetric.includes('TokensPerDollar');
-  const isTokensPerRmb = selectedYAxisMetric.includes('TokensPerRmb');
-  const isTokensPerCurrency = isTokensPerDollar || isTokensPerRmb;
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
@@ -283,14 +265,8 @@ export function MetricAssumptionNotes({
       )}
       <DisaggCaveat
         visible={showCostCaveat}
-        calculationNoun={
-          isTokensPerRmb
-            ? 'tokens per ¥1 RMB'
-            : isTokensPerDollar
-              ? 'tokens per $1 USD'
-              : 'cost per million tokens'
-        }
-        comparisonNoun={isTokensPerCurrency ? 'purchasing power' : 'token cost'}
+        calculationNoun={isTokensPerDollar ? 'tokens per $1 TCO' : 'cost per million tokens'}
+        comparisonNoun={isTokensPerDollar ? 'purchasing power' : 'token cost'}
         locale={locale}
       />
       <DisaggCaveat

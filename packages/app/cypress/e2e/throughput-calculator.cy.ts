@@ -19,20 +19,25 @@ describe('TCO Calculator', () => {
       cy.visit('/inference');
     });
 
-    it('shows the TCO Calculator tab trigger', () => {
-      cy.get('[data-testid="tab-trigger-calculator"]').should('be.visible');
-      cy.get('[data-testid="tab-trigger-calculator"]').should('contain.text', 'TCO Calculator');
+    it('links the TCO Calculator from the footer, not the tab bar', () => {
+      cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+      cy.get('[data-testid="footer-link-calculator"]')
+        .scrollIntoView()
+        .should('be.visible')
+        .and('contain.text', 'TCO Calculator');
     });
 
-    it('clicking the calculator tab navigates to it', () => {
-      cy.get('[data-testid="tab-trigger-calculator"]').click();
+    it('clicking the footer calculator link navigates to it', () => {
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
     });
 
     it('switches back to inference tab and then returns to calculator', () => {
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
+      cy.url().should('include', '/calculator');
       cy.get('[data-testid="tab-trigger-inference"]').click();
       cy.url().should('include', '/inference');
-      cy.get('[data-testid="tab-trigger-calculator"]').click();
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
     });
@@ -68,6 +73,36 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').should('contain.text', 'TCO Calculator');
     });
 
+    it('groups benchmark economics above the comparison target', () => {
+      cy.viewport(1280, 900);
+      cy.get('[data-testid="calculator-controls"] fieldset').should('have.length', 2);
+      cy.get('[data-testid="calculator-controls"] fieldset').then(($groups) => {
+        const rects = [...$groups].map((group) => group.getBoundingClientRect());
+        expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+      });
+      cy.get('[data-testid="calc-cost-selector"]').should('contain.text', 'Hyperscaler');
+      cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
+      cy.get('[data-testid="calculator-metric-throughput"]')
+        .parent()
+        .should(($group) => {
+          const bounds = $group[0].getBoundingClientRect();
+          const buttons = [...$group[0].querySelectorAll('button')];
+          const first = buttons[0].getBoundingClientRect();
+          expect(bounds.height, 'metric group matches regular desktop controls').to.equal(36);
+          expect(first.top, 'joined fill reaches the upper border').to.equal(bounds.top + 1);
+          expect(first.bottom, 'joined fill reaches the lower border').to.equal(bounds.bottom - 1);
+          for (let i = 1; i < buttons.length; i++) {
+            // Firefox can round adjacent fractional coordinates differently;
+            // a subpixel tolerance still rejects any visible inset or gap.
+            expect(
+              buttons[i].getBoundingClientRect().left,
+              'segments have no inset gaps',
+            ).to.be.closeTo(buttons[i - 1].getBoundingClientRect().right, 0.1);
+          }
+        });
+      cy.get('input[type="range"]').should('be.visible');
+    });
+
     it('renders Model selector', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-model').should('exist');
@@ -80,12 +115,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('hides the Precision selector for a single-precision model', () => {
-      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
-      // is nothing to choose, so the control is hidden entirely.
+    it('shows the precision for a single-precision model', () => {
+      // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('not.exist');
+        cy.contains('Precision').should('be.visible');
+        cy.get('button#calc-precision').should('have.text', 'FP4').and('be.disabled');
       });
     });
 
@@ -330,10 +365,12 @@ describe('TCO Calculator', () => {
 
     it('sequence selector has selectable options', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').click();
+        cy.get('#calc-sequence').click('right');
       });
-      cy.get('[role="option"]').should('have.length.greaterThan', 0);
+      cy.get('[data-select-option]').should('have.length.greaterThan', 0);
       cy.get('body').type('{esc}');
+      // Wait for the preceding popover's focus restoration before opening the next menu.
+      cy.get('#calc-sequence').should('be.focused');
     });
 
     it('cost provider selector appears and has all three options', () => {
@@ -659,10 +696,13 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      // The agentic fixture exposes a single scenario, so the scenario
-      // control disappears entirely — no dropdown, no static readout.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      cy.get('button[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -719,10 +759,14 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      // Single-scenario fixture → the scenario control disappears entirely;
-      // the gate is locked, so no percentile selector either.
-      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
-      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      // Scenario and precision stay readable; only percentile is feature-gated.
+      cy.get('button[data-testid="calc-sequence-selector"]')
+        .should('be.visible')
+        .and('have.text', 'Agentic')
+        .and('be.disabled');
+      cy.get('button[data-testid="calc-precision-selector"]')
+        .should('have.text', 'FP4')
+        .and('be.disabled');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -861,5 +905,99 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-costcap-collapse"]').click();
       cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
     });
+  });
+});
+
+describe('TCO Calculator Chinese route', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/calculator', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+  });
+
+  it('localizes chart internals, table headers, and preserved units', () => {
+    cy.contains('label', '计价方式').should('be.visible');
+    cy.get('[data-testid="calculator-secondary-controls"] > button').click();
+    cy.contains('label', '目标交互性 (tok/s/user)')
+      .parent()
+      .find('button')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[role="dialog"]')
+      .should('contain.text', '用于插值计算的交互性目标值。')
+      .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.get('[data-testid="calculator-bar-chart"]').should('contain.text', 'Shift+滚轮横向缩放');
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '吞吐量：')
+      .and('contain.text', '成本：');
+    cy.get('[data-testid="calculator-metric-power"]').click();
+    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗：');
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    cy.get('[data-testid="calculator-results-table"] thead')
+      .should('contain.text', '芯片')
+      .and('contain.text', '成本 ($/M tok)')
+      .and('contain.text', '并发数');
+  });
+
+  it('supports the complete chart-to-table path at 1440px', () => {
+    cy.viewport(1440, 900);
+    cy.reload();
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
+    cy.get('[data-testid="calculator-comparison-banner"]')
+      .should('be.visible')
+      .and('contain.text', '已选中。点击其他柱形即可对比。');
+    cy.get('[data-testid="calculator-table-view-btn"]').click();
+    cy.get('[data-testid="calculator-results-table"]').should('be.visible');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps dense tables internally scrollable without body overflow at 390px', () => {
+    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
+    cy.contains('[role="tab"]:visible', '表格').click();
+    // DataTable renders its horizontal scroller inside the testid wrapper.
+    cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
+      .first()
+      .then(($scroller) => {
+        expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+      });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('keeps the localized chart contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片吞吐量 (tok/s/chip)',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('emits bidirectional hreflang metadata', () => {
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/calculator');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/calculator');
   });
 });

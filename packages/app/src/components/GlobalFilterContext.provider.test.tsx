@@ -9,7 +9,10 @@ const mocks = vi.hoisted(() => ({
   availability: {
     data: [] as unknown[],
     error: null as Error | null,
+    isError: false,
+    isPending: false,
     isSuccess: true,
+    refetch: vi.fn(),
   },
   workflow: {
     data: undefined as
@@ -44,9 +47,11 @@ vi.mock('@/components/unofficial-run-provider', () => ({
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
+  useGlobalFilterAvailability,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
   type GlobalFilterActionsContextType,
+  type GlobalFilterAvailabilityContextType,
 } from './GlobalFilterContext';
 
 let root: Root | undefined;
@@ -57,6 +62,7 @@ let selectionRenders = 0;
 let actionRenders = 0;
 let workflowRenders = 0;
 const actionSnapshots: GlobalFilterActionsContextType[] = [];
+let availabilitySnapshot: GlobalFilterAvailabilityContextType | undefined;
 
 const SelectionProbe = memo(() => {
   useGlobalFilterSelection();
@@ -74,6 +80,11 @@ const ActionProbe = memo(() => {
 const WorkflowProbe = memo(() => {
   useGlobalFilterWorkflow();
   workflowRenders += 1;
+  return null;
+});
+
+const AvailabilityProbe = memo(() => {
+  availabilitySnapshot = useGlobalFilterAvailability();
   return null;
 });
 
@@ -95,6 +106,7 @@ function ProviderHarness() {
       <SelectionProbe />
       <ActionProbe />
       <WorkflowProbe />
+      <AvailabilityProbe />
       <ActionIdentityProbe />
     </GlobalFilterProvider>
   );
@@ -108,6 +120,10 @@ function mountProvider(): void {
 
 beforeEach(() => {
   mocks.availability.data = [];
+  mocks.availability.error = null;
+  mocks.availability.isError = false;
+  mocks.availability.isPending = false;
+  mocks.availability.refetch.mockReset();
   mocks.workflow.data = undefined;
   mocks.workflow.isLoading = false;
   mocks.workflow.error = null;
@@ -120,6 +136,7 @@ beforeEach(() => {
   actionRenders = 0;
   workflowRenders = 0;
   actionSnapshots.length = 0;
+  availabilitySnapshot = undefined;
 });
 
 afterEach(() => {
@@ -180,5 +197,19 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(actionSnapshots[1].setSelectedPrecisions).toBe(initialActions.setSelectedPrecisions);
     expect(actionSnapshots[1].setSelectedRunDate).toBe(initialActions.setSelectedRunDate);
     expect(actionSnapshots[1].setSelectedRunId).toBe(initialActions.setSelectedRunId);
+  });
+
+  it('exposes availability failure state and the matching refetch callback', () => {
+    mountProvider();
+
+    act(() => {
+      mocks.availability.error = new Error('availability failed');
+      mocks.availability.isError = true;
+      rerenderProvider?.();
+    });
+
+    expect(availabilitySnapshot?.availabilityIsError).toBe(true);
+    availabilitySnapshot?.retryAvailability();
+    expect(mocks.availability.refetch).toHaveBeenCalledOnce();
   });
 });

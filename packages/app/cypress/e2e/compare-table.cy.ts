@@ -25,6 +25,31 @@ describe('Compare Interpolated Table', () => {
     );
   });
 
+  it('keeps metric context visible while scrolling the mobile comparison', () => {
+    cy.viewport(390, 720);
+    cy.get('[data-testid="compare-interpolated-table"]')
+      .parent()
+      .should('have.attr', 'tabindex', '0')
+      .scrollTo('right');
+    cy.get('[data-testid="compare-interpolated-table"] tbody tr')
+      .first()
+      .within(() => {
+        cy.get('td')
+          .first()
+          .should(($cell) => {
+            const bounds = $cell[0].getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(0);
+            expect(bounds.right).to.be.lessThan(300);
+          });
+      });
+    cy.get('[data-testid="compare-interpolated-table"]').parent().scrollTo('left');
+    cy.get('[data-testid="compare-table-target-0"]')
+      .should('have.attr', 'aria-label', 'Target interactivity 1 (tok/s/user)')
+      .invoke('outerHeight')
+      .should('be.gte', 44);
+    cy.viewport(1280, 720);
+  });
+
   it('displays editable target interactivity input boxes', () => {
     cy.get('[data-testid^="compare-table-target-"]').should('have.length.greaterThan', 0);
     cy.get('[data-testid="compare-table-target-0"]').should('have.attr', 'type', 'text');
@@ -118,5 +143,18 @@ describe('Compare Interpolated Table', () => {
       .parent()
       .parent()
       .should('contain.text', 'Interpolated from real benchmark data');
+  });
+
+  it('localizes the comparison reader and target input names', () => {
+    cy.visit('/zh/compare/deepseek-r1-gb200-vs-h100');
+    cy.get('[data-testid="compare-interpolated-table"]')
+      .should('contain.text', '吞吐量（tok/s/chip）')
+      .and('contain.text', '成本（$/M tok）')
+      .and('contain.text', '并发数');
+    cy.get('[data-testid="compare-table-target-0"]').should(
+      'have.attr',
+      'aria-label',
+      '目标交互性 1（tok/s/user）',
+    );
   });
 });

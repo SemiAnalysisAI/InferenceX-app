@@ -95,10 +95,10 @@ export default function GlossaryPage() {
             />
             <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
               <div>
-                <p className="font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
+                <p className="font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
                   Field guide / AI infrastructure
                 </p>
-                <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-[-0.045em] text-balance md:text-6xl lg:text-7xl">
+                <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl lg:text-7xl">
                   The language behind the inference curve.
                 </h1>
                 <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
@@ -110,13 +110,13 @@ export default function GlossaryPage() {
 
               <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border/50 bg-border/50 lg:grid-cols-1">
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     Terms
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">{entries.length}</dd>
                 </div>
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     Categories
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
@@ -124,7 +124,7 @@ export default function GlossaryPage() {
                   </dd>
                 </div>
                 <div className="bg-background/70 p-4">
-                  <dt className="font-mono text-[0.65rem] tracking-[0.16em] text-muted-foreground uppercase">
+                  <dt className="font-mono text-3xs tracking-eyebrow text-muted-foreground uppercase">
                     Articles reviewed
                   </dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">{articleCount}</dd>
@@ -138,7 +138,7 @@ export default function GlossaryPage() {
 
         <section className="mt-4 grid gap-4 md:grid-cols-2">
           <Card>
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               Reading the benchmark
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">
@@ -163,7 +163,7 @@ export default function GlossaryPage() {
           </Card>
 
           <Card>
-            <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
+            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               Grounded in measurements
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">

@@ -1,0 +1,26 @@
+{
+  "src/app/land-acknowledgement/page.tsx": {
+    "arbitrary-tracking": 2
+  },
+  "src/app/zh/land-acknowledgement/page.tsx": {
+    "arbitrary-tracking": 2
+  },
+  "src/components/compare/agentx-compare-hero.tsx": {
+    "arbitrary-text-size": 1
+  },
+  "src/components/evaluation/ui/EvaluationTable.tsx": {
+    "arbitrary-text-size": 1
+  },
+  "src/components/glossary/glossary-browser.tsx": {
+    "arbitrary-tracking": 1
+  },
+  "src/components/inference/agentic-point/request-timeline.tsx": {
+    "arbitrary-text-size": 2
+  },
+  "src/components/inference/agentic-point/timeline-tooltips.tsx": {
+    "arbitrary-text-size": 1
+  },
+  "src/lib/d3-chart/layers/perf-ruler.ts": {
+    "chart-font-literal": 1
+  }
+}

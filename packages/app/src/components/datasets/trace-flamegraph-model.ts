@@ -5,6 +5,7 @@
  */
 
 import type { StructureNode } from '@/hooks/api/use-datasets';
+import type { Locale } from '@/lib/i18n';
 
 // Kept distinct from token-segment colors. A row can carry multiple rails when
 // it overlaps different requests during different parts of its lifetime.
@@ -252,7 +253,13 @@ export function buildVisibleRows(
   nodes: readonly StructureNode[],
   expanded: ReadonlySet<number>,
   overlapsByRow: ReadonlyMap<string, RowOverlap[]>,
+  locale: Locale = 'en',
 ): VisibleRow[] {
+  const turnLabel = (turn: number) => (locale === 'zh' ? `第 ${turn} 轮` : `Turn ${turn}`);
+  const turnCount = (count: number) =>
+    locale === 'zh' ? `${count} 轮` : `${count} turn${count === 1 ? '' : 's'}`;
+  const subturnLabel = (turn: number) =>
+    locale === 'zh' ? `↳ 子轮次 ${turn}` : `↳ subturn ${turn}`;
   const out: VisibleRow[] = [];
   let turnNo = 0;
   nodes.forEach((node: StructureNode, i) => {
@@ -260,7 +267,7 @@ export function buildVisibleRows(
       turnNo += 1;
       out.push({
         key: `t-${i}`,
-        label: `Turn ${turnNo}`,
+        label: turnLabel(turnNo),
         sublabel: node.model ?? undefined,
         timeLabel: timeLabel(node.startS, node.endS),
         cached: node.cached,
@@ -277,7 +284,7 @@ export function buildVisibleRows(
       out.push({
         key: `g-${i}`,
         label: `${node.label}`,
-        sublabel: `${node.children.length} turn${node.children.length === 1 ? '' : 's'}${
+        sublabel: `${turnCount(node.children.length)}${
           node.durationMs ? ` · ${(node.durationMs / 1000).toFixed(0)}s` : ''
         }`,
         timeLabel: timeLabel(node.startS, node.endS),
@@ -295,7 +302,7 @@ export function buildVisibleRows(
         node.children.forEach((child, ci) => {
           out.push({
             key: `g-${i}-c-${ci}`,
-            label: `↳ subturn ${ci + 1}`,
+            label: subturnLabel(ci + 1),
             sublabel: child.model ?? undefined,
             timeLabel: timeLabel(child.startS, child.endS),
             cached: child.cached,

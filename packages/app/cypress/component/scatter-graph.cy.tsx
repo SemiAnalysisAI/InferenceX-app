@@ -19,11 +19,122 @@ import {
 } from '../support/mock-data';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
 describe('ScatterGraph', () => {
+  for (const mixedRuns of [false, true]) {
+    it(`${mixedRuns ? 'hides' : 'shows'} the refresh changelog for a ${mixedRuns ? 'mixed' : 'matching'} run series`, () => {
+      const refreshUrl =
+        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219708211/attempts/1';
+      const point = createMockInferenceData({
+        hwKey: 'gb300_dynamo-trt',
+        model: Model.Qwen3_5,
+        run_url: refreshUrl,
+        benchmark_type: 'agentic_traces',
+      });
+      const description = 'Refresh to collect TensorRT-LLM server metrics.';
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="changelog-provenance"
+            modelLabel="Qwen3.5 397B"
+            data={
+              mixedRuns
+                ? [
+                    point,
+                    {
+                      ...point,
+                      x: 50,
+                      run_url:
+                        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/31927376673/attempts/1',
+                    },
+                  ]
+                : [point]
+            }
+            xLabel="Interactivity"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedModel: Model.Qwen3_5,
+            selectedSequence: Sequence.AgenticTraces,
+            selectedRunId: '33219708211',
+            selectedPrecisions: [Precision.FP4],
+            activeHwTypes: new Set(['gb300_dynamo-trt']),
+            hwTypesWithData: new Set(['gb300_dynamo-trt']),
+            hardwareConfig: {
+              'gb300_dynamo-trt': {
+                name: 'gb300-dynamo-trt',
+                label: 'GB300',
+                suffix: '(Dynamo TRTLLM)',
+                gpu: 'GB300',
+              },
+            },
+            availableRuns: {
+              '33219708211': {
+                runId: '33219708211',
+                runUrl: refreshUrl,
+                runDate: '2026-09-01',
+                conclusion: 'success',
+                changelog: {
+                  entries: [
+                    {
+                      config_keys: ['qwen3.5-fp4-gb300-dynamo-trt-agentic-disagg'],
+                      description,
+                      pr_link: null,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('label[for="checkbox-gb300_dynamo-trt"]')
+        .parent()
+        .trigger('pointermove', { pointerType: 'mouse' });
+      cy.contains('[role="tooltip"]', description).should(mixedRuns ? 'not.exist' : 'exist');
+    });
+  }
+
+  it('offers the complete table when matching official points are all clipped', () => {
+    const point = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
+    mountWithProviders(
+      <div style={{ width: 800 }}>
+        <ScatterGraph
+          chartId="empty-clipped"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          clippedData={[{ point, reasons: ['cost'] }]}
+          xLabel="Concurrency"
+          yLabel="Cost"
+          chartDefinition={defaultChartDef}
+          onShowTable={cy.stub().as('showCompleteTable')}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {},
+      },
+    );
+    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'clipped');
+    cy.get('[data-testid="scatter-empty-show-table"]').click();
+    cy.get('@showCompleteTable').should('have.been.calledOnce');
+    cy.get('@setQuickFilterVendors').should('not.have.been.called');
+    cy.get('@selectAllHwTypes').should('not.have.been.called');
+  });
+
   it('renders SVG within chart container', () => {
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
@@ -78,6 +189,182 @@ describe('ScatterGraph', () => {
     );
 
     cy.contains('No data available').should('be.visible');
+  });
+
+  it('explains when the selected dataset lacks role-local energy', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-role-energy-empty"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="Measured Prefill J per Input Token"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+      'be.visible',
+    );
+    cy.contains(
+      'No measurements to plot for this selection. Review the benchmark controls above or adjust quick filters.',
+    ).should('not.exist');
+  });
+
+  it('localizes the complete Chinese empty state', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="并发数"
+            yLabel="单芯片吞吐量 (tok/s)"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+        },
+        unofficial: {},
+      },
+    );
+    cy.contains('暂无数据').should('be.visible');
+    cy.contains('请检查上方的基准测试设置，或调整快捷筛选。').should('be.visible');
+    cy.contains('No data available').should('not.exist');
+  });
+
+  it('localizes the missing role-energy explanation', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-role-energy-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每输入 token 实测 Prefill 能耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('当前数据集未提供 Prefill/Decode 各角色的能耗数据。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。请检查上方的基准测试设置，或调整快捷筛选。').should(
+      'not.exist',
+    );
+  });
+
+  for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
+    it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
+      mountWithProviders(
+        <div style={{ width: 800 }}>
+          <ScatterGraph
+            chartId="empty-filtered"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="Concurrency"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric,
+            quickFilters: {
+              vendors: ['AMD'],
+              frameworks: ['vllm'],
+              deployment: [],
+              spec: [],
+              power: [],
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
+      cy.contains('No points match this selection. Try removing a quick filter;').should(
+        'be.visible',
+      );
+      cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+        'not.exist',
+      );
+      cy.get('[data-testid="scatter-empty-clear-filters"]').click();
+      cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
+      cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
+      cy.get('@setSelectedModel').should('not.have.been.called');
+      cy.get('@setSelectedPrecisions').should('not.have.been.called');
+      cy.get('@setSelectedDateRange').should('not.have.been.called');
+    });
+  }
+
+  it('restores hidden matching official and unofficial chip series together', () => {
+    const restore = cy.stub().as('restoreUnified');
+    const official = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
+    const overlay = createMockInferenceData({ hwKey: 'h100', precision: Precision.FP4 });
+    mountWithProviders(
+      <div style={{ width: 800 }}>
+        <ScatterGraph
+          chartId="empty-hidden"
+          modelLabel="DeepSeek R1"
+          data={[official]}
+          xLabel="Concurrency"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          overlayData={{ data: [overlay], hardwareConfig: hwConfig, label: 'test-run' }}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          localOfficialOverride: new Set(),
+          activeOverlayHwTypes: new Set(),
+          allOverlayHwTypes: new Set(['h100']),
+          setUnifiedOverlaySelection: restore,
+        },
+      },
+    );
+    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'hidden');
+    cy.get('[data-testid="scatter-empty-show-chips"]').click();
+    cy.get('@restoreUnified')
+      .should('have.been.calledOnce')
+      .then(() => {
+        expect([...restore.lastCall.args[0]]).to.include('b200_trt');
+        expect([...restore.lastCall.args[1]]).to.include('h100');
+      });
+    cy.get('@setQuickFilterVendors').should('not.have.been.called');
   });
 
   it('renders scatter points as shapes in SVG with mock data', () => {
@@ -1139,6 +1426,132 @@ describe('ScatterGraph', () => {
   });
 });
 
+describe('ChartDisplay responsive status notes', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    for (const width of [390, 1440]) {
+      it(`uses available width and preserves complete notices (${locale}, ${width}px)`, () => {
+        cy.viewport(width, 900);
+        const point = createMockInferenceData({ framework: 'atom', offload_mode: 'on' });
+        mountWithProviders(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <div className="p-4">
+              <ChartDisplay />
+            </div>
+          </PathnameContext.Provider>,
+          {
+            inference: {
+              selectedSequence: Sequence.AgenticTraces,
+              graphs: [
+                {
+                  model: Model.DeepSeek_R1,
+                  sequence: Sequence.AgenticTraces,
+                  chartDefinition: defaultChartDef,
+                  data: [point],
+                },
+              ],
+            },
+            globalFilters: {
+              selectedSequence: Sequence.AgenticTraces,
+              effectiveSequence: Sequence.AgenticTraces,
+            },
+            unofficial: {},
+          },
+        );
+        cy.get('[data-testid="chart-status-notes"]').should(($notes) => {
+          const notes = $notes[0];
+          const bounds = notes.getBoundingClientRect();
+          const offload = notes
+            .querySelector('[data-testid="offload-halo-key"]')!
+            .getBoundingClientRect();
+          const optimization = notes
+            .querySelector('[data-testid="agentic-optimization-note"]')!
+            .getBoundingClientRect();
+          const footnote = notes
+            .querySelector('[data-testid="atom-engine-footnote"]')!
+            .getBoundingClientRect();
+          for (const item of [offload, optimization, footnote]) {
+            expect(item.left).to.be.at.least(bounds.left);
+            expect(item.right).to.be.at.most(bounds.right + 1);
+          }
+          if (width === 1440) {
+            expect(optimization.left).to.be.greaterThan(offload.right);
+            expect(footnote.left).to.be.greaterThan(optimization.right);
+            expect(optimization.top + optimization.height / 2).to.be.closeTo(
+              offload.top + offload.height / 2,
+              1,
+            );
+          } else {
+            expect(footnote.top, 'long caveat wraps below short status notes').to.be.at.least(
+              optimization.bottom,
+            );
+            expect(notes.scrollWidth, 'notes never overflow horizontally').to.be.at.most(
+              notes.clientWidth,
+            );
+          }
+        });
+        cy.get('[data-testid="offload-halo-key"]').should(
+          'contain.text',
+          locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
+        );
+        cy.get('[data-testid="atom-engine-footnote"]').should(
+          'have.text',
+          locale === 'zh'
+            ? '1 ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。'
+            : '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
+        );
+        cy.get('[data-testid="agentic-optimization-note"] button').click();
+        cy.get('[data-testid="option-help-content-agentic-optimizations"]').should(
+          'contain.text',
+          locale === 'zh'
+            ? '每项配置可能使用推测解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
+            : 'Each configuration may use inference optimizations such as speculative decoding. Hover over a point to see its exact settings.',
+        );
+      });
+    }
+  }
+
+  it('includes offload and ATOM notices when only the unofficial overlay uses them', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/707';
+    const runInfo = {
+      id: 707,
+      name: 'footer-overlay',
+      branch: 'footer-overlay',
+      sha: 'abc707',
+      createdAt: '2026-08-09T00:00:00Z',
+      url: runUrl,
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+    mountWithProviders(<ChartDisplay />, {
+      inference: {},
+      globalFilters: {},
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runUrl]: 0, '707': 0 },
+        getOverlayData: () => ({
+          data: [
+            createMockInferenceData({ framework: 'atom', offload_mode: 'on', run_url: runUrl }),
+          ],
+          hardwareConfig: hwConfig,
+        }),
+        activeOverlayHwTypes: new Set(['b200_trt']),
+        allOverlayHwTypes: new Set(['b200_trt']),
+      },
+    });
+    cy.get('[data-testid="chart-status-notes"] [data-testid="offload-halo-key"]').should(
+      'contain.text',
+      'KV offload ON',
+    );
+    cy.get('[data-testid="chart-status-notes"] [data-testid="atom-engine-footnote"]').should(
+      'contain.text',
+      'has yet to serve production tokens',
+    );
+  });
+});
+
 describe('ChartDisplay engine comparison guard', () => {
   it('includes explicitly clipped official and unofficial points in table mode', () => {
     const chartDefinition = createMockChartDefinition({
@@ -1230,6 +1643,7 @@ describe('ChartDisplay engine comparison guard', () => {
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
+    cy.get('[data-testid="data-table-preset-all"]').click();
     cy.get('[data-testid="inference-results-table"] tbody')
       .contains('tr', '7.0')
       .should('contain.text', 'SGLang')

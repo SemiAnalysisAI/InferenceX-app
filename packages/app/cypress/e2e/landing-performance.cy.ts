@@ -59,7 +59,6 @@ describe('Landing page performance', () => {
 
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
         win.localStorage.removeItem('inferencex-openai-rubin-banner-dismissed');
         observeLayoutShifts(win);
       },

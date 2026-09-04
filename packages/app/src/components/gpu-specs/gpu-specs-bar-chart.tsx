@@ -9,6 +9,7 @@ import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { useLocale } from '@/lib/use-locale';
 import type {
   CustomLayerConfig,
   HorizontalBarLayerConfig,
@@ -24,6 +25,21 @@ import {
 
 const NVIDIA_BAR_COLOR = '#76b900';
 const AMD_BAR_COLOR = '#ed1c24';
+
+const STRINGS = {
+  en: {
+    metric: 'Metric:',
+    noData: 'No data available for this metric.',
+    instructions: 'Hover over a bar for details',
+    fp4Note: 'Chips without FP4 support (H100, H200, MI300X, MI325X) are excluded.',
+  },
+  zh: {
+    metric: '指标：',
+    noData: '该指标暂无数据。',
+    instructions: '悬停柱形可查看详情',
+    fp4Note: '不支持 FP4 的芯片（H100、H200、MI300X、MI325X）不会显示。',
+  },
+} as const;
 
 interface ChartDatum {
   name: string;
@@ -92,6 +108,8 @@ export function GpuSpecsBarChart({
   onMetricChange,
   caption,
 }: GpuSpecsBarChartProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const metric = useMemo(
     () => GPU_CHART_METRICS.find((m) => m.key === selectedMetric) ?? GPU_CHART_METRICS[0],
     [selectedMetric],
@@ -107,6 +125,39 @@ export function GpuSpecsBarChart({
         .filter((d): d is ChartDatum => d.value !== null)
         .sort((a, b) => b.value - a.value),
     [metric],
+  );
+
+  const metricSelector = (
+    <div className="mb-4 flex flex-col gap-1.5 px-4 sm:flex-row sm:items-center sm:gap-3 md:px-8">
+      <label
+        htmlFor="gpu-specs-metric-select"
+        className="text-sm font-medium text-muted-foreground"
+      >
+        {t.metric}
+      </label>
+      <Select
+        value={selectedMetric}
+        onValueChange={(value) => {
+          onMetricChange(value);
+          track('gpu_specs_chart_metric_changed', { metric: value });
+        }}
+      >
+        <SelectTrigger
+          id="gpu-specs-metric-select"
+          className="w-full sm:w-[240px]"
+          data-testid="gpu-specs-metric-select"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {GPU_CHART_METRICS.map((m) => (
+            <SelectItem key={m.key} value={m.key}>
+              {locale === 'zh' ? m.labelZh : m.label} ({locale === 'zh' ? m.unitZh : m.unit})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 
   const maxValue = useMemo(() => Math.max(...chartData.map((d) => d.value), 0) * 1.1, [chartData]);
@@ -128,7 +179,8 @@ export function GpuSpecsBarChart({
     [chartData],
   );
 
-  const unit = metric.unit;
+  const unit = locale === 'zh' ? metric.unitZh : metric.unit;
+  const metricLabel = locale === 'zh' ? metric.labelZh : metric.label;
   const labelLayer = useMemo(
     (): CustomLayerConfig => ({
       type: 'custom',
@@ -176,7 +228,7 @@ export function GpuSpecsBarChart({
     [chartData, unit],
   );
 
-  const xAxisLabel = `${metric.label} (${metric.unit})`;
+  const xAxisLabel = `${metricLabel} (${unit})`;
 
   const tooltip = useMemo(
     () => ({
@@ -192,7 +244,7 @@ export function GpuSpecsBarChart({
               <span style="font-size: 10px; color: ${vendorColor}; font-weight: 500;">${vendorLabel}</span>
             </div>
             <div style="color: var(--muted-foreground); font-size: 11px;">
-              <strong>${metric.label}:</strong> ${formatValue(d.value)} ${metric.unit}
+              <strong>${metricLabel}${locale === 'zh' ? '：' : ':'}</strong> ${formatValue(d.value)} ${unit}
             </div>
           </div>`;
       },
@@ -209,7 +261,7 @@ export function GpuSpecsBarChart({
       },
       attachToLayer: 0,
     }),
-    [metric],
+    [locale, metric, metricLabel, unit],
   );
 
   const layers = useMemo(() => [barLayer, labelLayer], [barLayer, labelLayer]);
@@ -242,31 +294,9 @@ export function GpuSpecsBarChart({
   if (chartData.length === 0) {
     return (
       <div data-testid="gpu-specs-bar-chart">
-        <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-          <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-            Metric:
-          </label>
-          <Select
-            value={selectedMetric}
-            onValueChange={(value) => {
-              onMetricChange(value);
-              track('gpu_specs_chart_metric_changed', { metric: value });
-            }}
-          >
-            <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {GPU_CHART_METRICS.map((m) => (
-                <SelectItem key={m.key} value={m.key}>
-                  {m.label} ({m.unit})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {metricSelector}
         <div className="flex items-center justify-center h-60 text-muted-foreground">
-          No data available for this metric.
+          {t.noData}
         </div>
       </div>
     );
@@ -274,29 +304,7 @@ export function GpuSpecsBarChart({
 
   return (
     <div data-testid="gpu-specs-bar-chart">
-      <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-          Metric:
-        </label>
-        <Select
-          value={selectedMetric}
-          onValueChange={(value) => {
-            onMetricChange(value);
-            track('gpu_specs_chart_metric_changed', { metric: value });
-          }}
-        >
-          <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {GPU_CHART_METRICS.map((m) => (
-              <SelectItem key={m.key} value={m.key}>
-                {m.label} ({m.unit})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {metricSelector}
 
       <D3Chart<ChartDatum>
         chartId="gpu-specs-bar-chart"
@@ -307,7 +315,7 @@ export function GpuSpecsBarChart({
         watermark="logo"
         clipContent={false}
         grabCursor={false}
-        instructions="Hover over a bar for details"
+        instructions={t.instructions}
         xScale={xScaleConfig}
         yScale={yScaleConfig}
         xAxis={xAxisConfig}
@@ -328,11 +336,7 @@ export function GpuSpecsBarChart({
             AMD
           </div>
         </div>
-        {metric.key === 'fp4' && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Chips without FP4 support (H100, H200, MI300X, MI325X) are excluded.
-          </p>
-        )}
+        {metric.key === 'fp4' && <p className="text-xs text-muted-foreground mt-2">{t.fp4Note}</p>}
       </div>
     </div>
   );

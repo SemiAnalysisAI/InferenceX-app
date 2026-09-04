@@ -471,6 +471,95 @@ describe('rowToAggDataEntry', () => {
     expect(point.measuredPowerPercentTdp?.y).toBe(80);
   });
 
+  it('certifies a validated non-disagg row (no schema version required)', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          power_valid: 1,
+          avg_power_w: 685.5,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('certified');
+  });
+
+  it('certifies a validated disagg row stamped with schema v2', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          power_valid: 1,
+          power_metric_schema_version: 2,
+          avg_power_w: 650,
+          joules_per_output_token: 9.7,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('certified');
+  });
+
+  it('classifies a no-verdict row with telemetry as legacy', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          avg_power_w: 560,
+          joules_per_successful_query: 1800,
+        },
+      }),
+    );
+    expect(entry.power_tier).toBe('legacy');
+    // The tier is informational only: historical telemetry remains visible
+    // so users can distinguish measurement status without losing older data.
+    expect(entry.avg_power_w).toBe(560);
+  });
+
+  it('classifies a validated disagg row without schema v2 as legacy', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          power_valid: 1,
+          avg_power_w: 650,
+          prefill_avg_power_w: 612.3,
+          joules_per_output_token: 9.7,
+        },
+      }),
+    );
+    // Role watts render, but their provenance predates the versioned
+    // whole-deployment energy contract.
+    expect(entry.power_tier).toBe('legacy');
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.joules_per_output_token).toBeUndefined();
+  });
+
+  it('leaves power_tier absent for explicit power_valid=0 and telemetry-free rows', () => {
+    const invalid = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          power_valid: 0,
+          avg_power_w: 685.5,
+          joules_per_output_token: 8.4,
+        },
+      }),
+    );
+    expect(invalid.power_tier).toBeUndefined();
+
+    const noTelemetry = rowToAggDataEntry(makeRow({ metrics: {} }));
+    expect(noTelemetry.power_tier).toBeUndefined();
+  });
+
+  it('carries power_tier onto transformed chart points', () => {
+    const legacyRow = makeRow({ id: 1, metrics: { avg_power_w: 560 } });
+    const certifiedRow = makeRow({
+      id: 2,
+      conc: 128,
+      metrics: { power_valid: 1, avg_power_w: 685.5 },
+    });
+    const { chartData } = transformBenchmarkRows([legacyRow, certifiedRow]);
+    const points = chartData.find((data) => data.length > 0)!;
+    expect(points.map((p) => p.power_tier)).toEqual(['legacy', 'certified']);
+  });
+
   it('passes through per-worker measured power array intact', () => {
     const workers = [
       {
@@ -575,6 +664,108 @@ describe('rowToAggDataEntry', () => {
     expect(entry.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
     // Optional telemetry fields stay undefined when source omits them.
     expect(entry.workers![1].avg_temp_c).toBeUndefined();
+  });
+});
+
+describe('rowToAggDataEntry — agentic measured power', () => {
+  // AgentX (agentic_traces) rows carry the same measured-power contract as
+  // fixed-seq rows; nothing in the transform may key off benchmark_type.
+  const agenticPowerMetrics = {
+    tput_per_gpu: 100,
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    avg_power_w: 685.5,
+    prefill_avg_power_w: 612.3,
+    decode_avg_power_w: 701.5,
+    joules_per_input_token: 1.2,
+    joules_per_output_token: 9.7,
+    joules_per_total_token: 0.8,
+    joules_per_successful_query: 1542.75,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 5.1,
+    avg_temp_c: 68.4,
+    peak_temp_c: 79.2,
+    avg_util_pct: 88.5,
+    avg_mem_used_mb: 71234.5,
+  };
+  const agenticWorkers = [
+    {
+      role: 'prefill' as const,
+      worker_idx: 0,
+      hosts: ['pn0'],
+      num_gpus: 8,
+      avg_power_w: 612.3,
+      avg_temp_c: 68.4,
+      avg_util_pct: 88.5,
+    },
+    { role: 'decode' as const, worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+  ];
+  const agenticPowerRow = (metricOverrides: Record<string, number> = {}) =>
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      disagg: true,
+      metrics: { ...agenticPowerMetrics, ...metricOverrides },
+      workers: agenticWorkers,
+    });
+
+  it('passes the full measured-power payload through for a validated agentic disagg row', () => {
+    const entry = rowToAggDataEntry(agenticPowerRow());
+
+    expect(entry.benchmark_type).toBe('agentic_traces');
+    expect(entry.power_valid).toBe(1);
+    expect(entry.power_metric_schema_version).toBe(2);
+    expect(entry.power_tier).toBe('certified');
+    expect(entry.avg_power_w).toBe(685.5);
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.decode_avg_power_w).toBe(701.5);
+    expect(entry.joules_per_input_token).toBe(1.2);
+    expect(entry.joules_per_output_token).toBe(9.7);
+    expect(entry.joules_per_total_token).toBe(0.8);
+    expect(entry.joules_per_successful_query).toBe(1542.75);
+    expect(entry.prefill_joules_per_input_token).toBe(0.4);
+    expect(entry.decode_joules_per_output_token).toBe(5.1);
+    expect(entry.avg_temp_c).toBe(68.4);
+    expect(entry.peak_temp_c).toBe(79.2);
+    expect(entry.avg_util_pct).toBe(88.5);
+    expect(entry.avg_mem_used_mb).toBe(71234.5);
+    expect(entry.workers).toEqual(agenticWorkers);
+  });
+
+  it('carries agentic role energy onto chart points as the new role-local axes', () => {
+    const { chartData } = transformBenchmarkRows([agenticPowerRow()]);
+    const point = chartData.find((data) => data.length > 0)![0];
+    expect(point.measuredPrefillJPerInputToken?.y).toBe(0.4);
+    expect(point.measuredDecodeJPerOutputToken?.y).toBe(5.1);
+    expect(point.workers).toEqual(agenticWorkers);
+  });
+
+  it('scrubs all measured telemetry (including workers) on an agentic power_valid=0 row', () => {
+    const row = agenticPowerRow({ power_valid: 0 });
+    const entry = rowToAggDataEntry(row);
+
+    expect(entry.avg_power_w).toBeUndefined();
+    expect(entry.prefill_avg_power_w).toBeUndefined();
+    expect(entry.decode_avg_power_w).toBeUndefined();
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token).toBeUndefined();
+    expect(entry.joules_per_total_token).toBeUndefined();
+    expect(entry.joules_per_successful_query).toBeUndefined();
+    expect(entry.prefill_joules_per_input_token).toBeUndefined();
+    expect(entry.decode_joules_per_output_token).toBeUndefined();
+    expect(entry.avg_temp_c).toBeUndefined();
+    expect(entry.peak_temp_c).toBeUndefined();
+    expect(entry.avg_util_pct).toBeUndefined();
+    expect(entry.avg_mem_used_mb).toBeUndefined();
+    expect(entry.workers).toBeUndefined();
+    expect(entry.power_tier).toBeUndefined();
+
+    const { chartData } = transformBenchmarkRows([row]);
+    const point = chartData.find((data) => data.length > 0)![0];
+    expect(point.measuredPrefillJPerInputToken).toBeUndefined();
+    expect(point.measuredDecodeJPerOutputToken).toBeUndefined();
+    expect(point.workers).toBeUndefined();
   });
 });
 

@@ -36,7 +36,7 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
     'Cost ($/M tok)': 'Dollar per Million Tokens',
   },
   zh: {
-    'Cost ($/M tok)': '每百万 token 美元成本',
+    'Cost ($/M tok)': '每百万 token 成本（美元）',
   },
 } as const;
 
@@ -64,10 +64,10 @@ const STRINGS = {
     fullComparisonLinkText: '查看完整延迟与吞吐量对比 →',
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
-    pricingLabel: '芯片定价（所属云服务商）：',
+    pricingLabel: '芯片价格（Hyperscaler 自有设备口径）：',
     pricingSource: '来源：',
     emptyState:
-      '当前默认模型在此芯片组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款芯片均有基准测试数据的模型和精度。',
+      '默认模型在这组芯片上暂时没有可用于插值的每 token 成本数据。请在下方图表控件中选择一个在两款芯片上都有基准测试数据的模型和精度。',
   },
 } as const;
 
@@ -178,11 +178,12 @@ export default function ComparePerDollarPageClient({
               </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
                   {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
-                  成本。基于所属云服务商 TCO 归一化的输出 token 性能——在各类 LLM
-                  工作负载下的每美元性能。在每个目标交互性水平下选出更经济的
-                  SKU。使用下方图表控件切换序列、精度和指标——交互方式与
+                  成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token
+                  数归一化，用于比较不同 LLM
+                  工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
+                  SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
                   <Link href="/zh" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -192,7 +193,7 @@ export default function ComparePerDollarPageClient({
                 <p className="mt-2 text-sm text-muted-foreground">
                   Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                   <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
-                  Owning-hyperscaler TCO normalized by output tokens — performance per dollar across
+                  Owning-hyperscaler TCO normalized by total tokens — performance per dollar across
                   LLM workloads. Pick the more cost-efficient SKU at every target interactivity
                   level. Use the chart controls below to switch sequences, precisions, and metrics —
                   same interactions as{' '}
@@ -230,7 +231,7 @@ export default function ComparePerDollarPageClient({
                           {' '}
                           <span className="text-muted-foreground italic">
                             {isZh
-                              ? `（数据反映此 URL 的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 选择——如果您在控件中更改序列、精度或模型，下方表格和图表会自动更新。）`
+                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
                               : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
                           </span>
                         </>

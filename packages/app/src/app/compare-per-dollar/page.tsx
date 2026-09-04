@@ -111,7 +111,7 @@ export default async function ComparePerDollarIndexPage() {
           </p>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             Models with AgentX data open long-context, multi-turn trace replay results. Models not
-            yet covered by AgentX open the controlled 8K→1K workload. Each card identifies its
+            yet covered by AgentX open the controlled 8K/1K workload. Each card identifies its
             scenario.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
@@ -153,7 +153,7 @@ export default async function ComparePerDollarIndexPage() {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
         // Same scenario split /compare uses: models with AgentX data open the
-        // agentic trace replay, the rest open the fixed 8K→1K workload.
+        // agentic trace replay, the rest open the fixed 8K/1K workload.
         const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>

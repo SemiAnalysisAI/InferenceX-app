@@ -1,5 +1,7 @@
 'use client';
 
+import { ControlPanel } from '@/components/ui/control-panel';
+import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
@@ -30,6 +32,8 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { Heading } from '@/components/ui/heading';
 import {
   ModelSelector,
   PercentileSelector,
@@ -173,12 +177,13 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
   },
 ];
 
-const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] =
-  CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
-
 const STRINGS = {
   en: {
     title: 'TCO Calculator',
+    benchmarkGroup: 'Configuration & economics',
+    comparisonGroup: 'Comparison target',
+    secondaryControls: 'More comparison settings',
+    changed: 'changed',
     description:
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
     costProviderLabel: 'Cost Provider',
@@ -236,24 +241,28 @@ const STRINGS = {
   },
   zh: {
     title: 'TCO 计算器',
+    benchmarkGroup: '配置与经济性',
+    comparisonGroup: '对比目标',
+    secondaryControls: '更多对比设置',
+    changed: '项已更改',
     description:
       '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
       '用于计算每百万 token 成本的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
-    costProviderPlaceholder: '成本供应商',
-    tokenTypeLabel: 'Token 类型',
+    costProviderPlaceholder: '计价方式',
+    tokenTypeLabel: 'token 类型',
     tokenTypeTooltip: '选择显示总 token、仅输入 token 还是仅输出 token 的成本。',
-    tokenTypePlaceholder: 'Token 类型',
+    tokenTypePlaceholder: 'token 类型',
     metricLabel: '指标',
     metricTooltip:
       '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
     targetLabel: '目标交互性 (tok/s/user)',
     targetTooltip:
-      '用于插值的交互性操作点。调整滑块以比较不同交互性级别下芯片的吞吐量、成本和能效。',
+      '用于插值计算的交互性目标值。拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `用于智能体工作负载插值的 ${percentile} 交互性操作点。调整滑块以比较芯片的吞吐量、成本和能效。`,
+      `用于智能体工作负载插值计算的 ${percentile} 交互性目标值。拖动滑块，可比较各芯片的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',
@@ -261,22 +270,22 @@ const STRINGS = {
     viewModeAria: '显示模式',
     toggleSection: '展开或折叠此板块',
     errorLoading: '加载数据出错，请尝试其他选择。',
-    clickToCompare: '已选中。点击另一个柱状图进行对比。',
+    clickToCompare: '已选中。点击其他柱形即可对比。',
     clearSelection: '清除选择',
     highContrast: '高对比度',
     resetFilter: '重置筛选',
-    totalTokens: '总 Token',
-    inputTokens: '输入 Token',
-    outputTokens: '输出 Token',
-    allInPower: '全含功率/芯片：',
+    totalTokens: '总 token',
+    inputTokens: '输入 token',
+    outputTokens: '输出 token',
+    allInPower: '单芯片整机功耗：',
     tcoPerHr: 'TCO $/chip/hr：',
     source: '来源：',
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，解耦配置显示的成本低于实际，中位数偏低 2 倍，在运行历史中最高达 18 倍。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际，中位数偏低 2 倍，在运行历史中最高达 18 倍。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数。由于除以的芯片数更少，在「输入」与「输出」token 类型下，解耦配置显示的每芯片吞吐量高于实际，中位数偏高 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按芯片总数报告。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数。由于除以的芯片数更少，在「输入」与「输出」token 类型下，分离式配置显示的每芯片吞吐量高于实际，中位数偏高 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按芯片总数报告。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     fleetMoved:
       '「集群生命周期」已移至独立页面：按功率预算确定固定集群的规模，结合每次实测配置改进，测算其整个生命周期的经济性。',
     fleetMovedLink: '打开集群生命周期',
@@ -292,7 +301,7 @@ const STRINGS = {
   },
 } as const;
 
-function getChartTitleZh(
+export function getChartTitleZh(
   barMetric: BarMetric,
   mode: CalculatorMode,
   targetValue: number,
@@ -310,10 +319,10 @@ function getChartTitleZh(
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
     case 'power': {
-      return `${targetLabel}下每满配兆瓦${tokenTypeLabel} token 数`;
+      return `${targetLabel}下每全电源配置兆瓦${tokenTypeLabel} token 吞吐量`;
     }
     case 'cost': {
-      const providerLabel = getCostProviderLabel(costProvider || 'costh');
+      const providerLabel = getCostProviderLabel(costProvider || 'costh', 'zh');
       return `${targetLabel}下每百万${tokenTypeLabel} token 成本（${providerLabel}）`;
     }
     default: {
@@ -374,6 +383,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
   const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
+  const comparisonSettingsCount =
+    (barMetric === 'throughput' ? 0 : 1) + (hideSkuAboveConfigLimit === true ? 0 : 1);
 
   const costTypeLabels: Record<CostType, string> = useMemo(
     () => ({ total: t.totalTokens, input: t.inputTokens, output: t.outputTokens }),
@@ -387,11 +398,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       label: opt.value === 'chart' ? t.viewChart : t.viewTable,
     }));
   }, [locale, t]);
-
-  const mobileViewModeOptions = useMemo<SegmentedToggleOption<CalculatorViewMode>[]>(() => {
-    if (locale === 'en') return CALCULATOR_MOBILE_VIEW_MODE_OPTIONS;
-    return viewModeOptions.map(({ testId: _testId, ...opt }) => opt);
-  }, [locale, viewModeOptions]);
 
   // Unofficial-run overlay (`?unofficialrun=…`). Overlay bars are interpolated
   // separately from official ones and only ever reach the bar chart — the
@@ -915,18 +921,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       <section data-testid="calculator-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">{t.title}</h2>
-                <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
-              </div>
-              <ChartShareActions />
-            </div>
+            <DashboardSectionHeader
+              title={t.title}
+              description={t.description}
+              actions={<ChartShareActions />}
+            />
 
             {/* Controls — grid layout matching inference chart controls */}
             <TooltipProvider delayDuration={0}>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+              <ControlPanel
+                legend={t.benchmarkGroup}
+                className={`md:grid-cols-2 ${
                   isAgenticSequence ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
                 }`}
               >
@@ -947,6 +952,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
+                  model={selectedModel}
                 />
                 {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
@@ -972,8 +978,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     label={t.costProviderLabel}
                     tooltip={t.costProviderTooltip}
                   />
-                  <div id="calc-cost" data-testid="calc-cost-selector">
+                  <div data-testid="calc-cost-selector">
                     <MultiSelect
+                      triggerId="calc-cost"
                       options={COST_PROVIDER_OPTIONS.map((provider) => ({
                         value: provider.value,
                         label: locale === 'zh' ? provider.labelZh : provider.label,
@@ -1003,8 +1010,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     label={t.tokenTypeLabel}
                     tooltip={t.tokenTypeTooltip}
                   />
-                  <div id="calc-cost-type" data-testid="calc-cost-type-selector">
+                  <div data-testid="calc-cost-type-selector">
                     <MultiSelect
+                      triggerId="calc-cost-type"
                       options={COST_TYPE_OPTIONS.map((ct) => ({
                         value: ct.value,
                         label: costTypeLabels[ct.value],
@@ -1027,123 +1035,137 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     />
                   </div>
                 </div>
-              </div>
+              </ControlPanel>
 
-              <div className="flex items-end gap-3">
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="calc-metric"
-                    label={t.metricLabel}
-                    tooltip={t.metricTooltip}
-                  />
-                  <div className="flex rounded-lg border border-border overflow-hidden h-9">
-                    {BAR_METRIC_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        data-testid={`calculator-metric-${opt.value}`}
-                        className={`px-3 text-xs font-medium transition-colors ${
-                          barMetric === opt.value
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-background text-muted-foreground hover:bg-muted'
-                        }`}
-                        onClick={() => handleBarMetricChange(opt.value)}
-                      >
-                        {opt.value === 'throughput'
-                          ? t.metricThroughput
-                          : opt.value === 'cost'
-                            ? t.metricCost
-                            : 'tok/s/MW'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {/* Target value slider + input */}
-              {!loading && hasAnyData && (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                    <LabelWithTooltip
-                      htmlFor="calc-target"
-                      label={
-                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                      }
-                      tooltip={
-                        isAgenticSequence
-                          ? t.targetAgenticTooltip(percentileLabel)
-                          : t.targetTooltip
-                      }
-                    />
-                    <div
-                      className="flex items-center gap-2"
-                      data-testid="calculator-hide-over-limit-control"
-                    >
-                      <LabelWithTooltip
-                        htmlFor="calc-hide-over-limit"
-                        label={t.hideSkuAboveConfigLimitLabel}
-                        tooltip={t.hideSkuAboveConfigLimitHelp}
-                      />
-                      <Switch
-                        id="calc-hide-over-limit"
-                        checked={hideSkuAboveConfigLimit}
-                        onCheckedChange={handleHideSkuAboveLimitChange}
-                        className="shrink-0"
+              <MobileControlSection
+                label={t.secondaryControls}
+                count={comparisonSettingsCount}
+                countLabel={t.changed}
+                testId="calculator-secondary-controls"
+              >
+                <ControlPanel legend={t.comparisonGroup}>
+                  <div className="flex items-end gap-3">
+                    <div className="flex flex-col space-y-1.5">
+                      <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
+                      <SegmentedToggle
+                        role="group"
+                        size="default"
+                        ariaLabel={t.metricLabel}
+                        value={barMetric}
+                        onValueChange={handleBarMetricChange}
+                        className="items-stretch gap-0 overflow-hidden md:h-9 md:p-0"
+                        buttonClassName="rounded-none px-3"
+                        activeButtonClassName="bg-primary text-primary-foreground"
+                        inactiveButtonClassName="bg-background text-muted-foreground hover:bg-muted"
+                        options={BAR_METRIC_OPTIONS.map((opt) => ({
+                          value: opt.value,
+                          testId: `calculator-metric-${opt.value}`,
+                          label:
+                            opt.value === 'throughput'
+                              ? t.metricThroughput
+                              : opt.value === 'cost'
+                                ? t.metricCost
+                                : 'tok/s/MW',
+                        }))}
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <input
-                        type="range"
-                        min={currentRange.min}
-                        max={currentRange.max}
-                        step={1}
-                        value={targetValue}
-                        onChange={handleSliderChange}
-                        onPointerUp={() =>
-                          track('calculator_target_slider_set', { mode, value: targetValue })
-                        }
-                        className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
+                  {/* Target value slider + input */}
+                  {!loading && hasAnyData && (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <LabelWithTooltip
+                          htmlFor="calc-target"
+                          label={
+                            isAgenticSequence
+                              ? t.targetAgenticLabel(percentileLabel)
+                              : t.targetLabel
+                          }
+                          tooltip={
+                            isAgenticSequence
+                              ? t.targetAgenticTooltip(percentileLabel)
+                              : t.targetTooltip
+                          }
+                        />
+                        <div
+                          className="flex items-center gap-2"
+                          data-testid="calculator-hide-over-limit-control"
+                        >
+                          <LabelWithTooltip
+                            htmlFor="calc-hide-over-limit"
+                            label={t.hideSkuAboveConfigLimitLabel}
+                            tooltip={t.hideSkuAboveConfigLimitHelp}
+                          />
+                          <Switch
+                            id="calc-hide-over-limit"
+                            checked={hideSkuAboveConfigLimit}
+                            onCheckedChange={handleHideSkuAboveLimitChange}
+                            className="shrink-0"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <input
+                            type="range"
+                            aria-label={
+                              isAgenticSequence
+                                ? t.targetAgenticLabel(percentileLabel)
+                                : t.targetLabel
+                            }
+                            min={currentRange.min}
+                            max={currentRange.max}
+                            step={1}
+                            value={targetValue}
+                            onChange={handleSliderChange}
+                            onPointerUp={() =>
+                              track('calculator_target_slider_set', { mode, value: targetValue })
+                            }
+                            className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
                         [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
                         [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
                         [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
                         [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                      />
-                      <div
-                        className="relative h-4 text-xs text-muted-foreground"
-                        style={{ marginLeft: 8, marginRight: 8 }}
-                      >
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span
-                            key={i}
-                            className="absolute -translate-x-1/2"
-                            style={{ left: `${(i / 5) * 100}%` }}
+                          />
+                          <div
+                            className="relative h-4 text-xs text-muted-foreground"
+                            style={{ marginLeft: 8, marginRight: 8 }}
                           >
-                            {Math.round(
-                              currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                            )}
-                          </span>
-                        ))}
+                            {Array.from({ length: 6 }, (_, i) => (
+                              <span
+                                key={i}
+                                className="absolute -translate-x-1/2"
+                                style={{ left: `${(i / 5) * 100}%` }}
+                              >
+                                {Math.round(
+                                  currentRange.min +
+                                    (currentRange.max - currentRange.min) * (i / 5),
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <Input
+                          id="calc-target"
+                          type="number"
+                          value={resolveCalculatorTargetInputValue(
+                            inputValue,
+                            targetValue,
+                            isTargetInputFocused,
+                          )}
+                          onFocus={handleInputFocus}
+                          onChange={handleInputChange}
+                          onBlur={handleInputBlur}
+                          className="w-24"
+                          min={0}
+                        />
                       </div>
                     </div>
-                    <Input
-                      type="number"
-                      value={resolveCalculatorTargetInputValue(
-                        inputValue,
-                        targetValue,
-                        isTargetInputFocused,
-                      )}
-                      onFocus={handleInputFocus}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      className="w-24 h-9"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              )}
+                  )}
+                </ControlPanel>
+              </MobileControlSection>
             </TooltipProvider>
           </div>
         </Card>
@@ -1202,16 +1224,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   {(() => {
                     const captionContent = (
                       <>
-                        <div className="flex items-start justify-between gap-4">
-                          <h2 className="text-lg font-semibold">{chartTitle}</h2>
-                          <SegmentedToggle
-                            value={viewMode}
-                            options={mobileViewModeOptions}
-                            onValueChange={handleViewModeChange}
-                            ariaLabel={t.viewModeAria}
-                            className="md:hidden shrink-0"
-                          />
-                        </div>
+                        <Heading as="h2" level="card">
+                          {chartTitle}
+                        </Heading>
                         <p className="text-sm text-muted-foreground mb-2">
                           {getModelLabel(selectedModel)} •{' '}
                           {selectedPrecisions

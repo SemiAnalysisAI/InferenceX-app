@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { resolveEvaluationDate } from '@/components/evaluation/EvaluationContext';
+import {
+  resolveEvaluationDate,
+  retryFailedEvaluationQueries,
+} from '@/components/evaluation/EvaluationContext';
 
 describe('resolveEvaluationDate', () => {
   const dates = ['2026-08-01', '2026-08-10', '2026-08-20'];
@@ -20,5 +23,37 @@ describe('resolveEvaluationDate', () => {
 
   it('preserves requested intent while evaluation availability is empty', () => {
     expect(resolveEvaluationDate('2026-08-13', [])).toBe('2026-08-13');
+  });
+});
+
+describe('retryFailedEvaluationQueries', () => {
+  it('retries only the availability query when availability metadata failed', () => {
+    const refetchAvailability = vi.fn();
+    const refetchEvaluations = vi.fn();
+
+    retryFailedEvaluationQueries({
+      availabilityFailed: true,
+      evaluationsFailed: false,
+      refetchAvailability,
+      refetchEvaluations,
+    });
+
+    expect(refetchAvailability).toHaveBeenCalledOnce();
+    expect(refetchEvaluations).not.toHaveBeenCalled();
+  });
+
+  it('retries every failed query when both sources failed', () => {
+    const refetchAvailability = vi.fn();
+    const refetchEvaluations = vi.fn();
+
+    retryFailedEvaluationQueries({
+      availabilityFailed: true,
+      evaluationsFailed: true,
+      refetchAvailability,
+      refetchEvaluations,
+    });
+
+    expect(refetchAvailability).toHaveBeenCalledOnce();
+    expect(refetchEvaluations).toHaveBeenCalledOnce();
   });
 });
