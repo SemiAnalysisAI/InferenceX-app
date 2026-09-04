@@ -101,6 +101,7 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Select database
+        timeout-minutes: 8
         env:
           PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -114,7 +115,8 @@ jobs:
               exit 1
             fi
             api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
-            branches=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" "$api/branches?limit=100")
+            curl_args=(--fail --silent --show-error --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors -H "Authorization: Bearer $NEON_API_KEY")
+            branches=$(curl "${curl_args[@]}" "$api/branches?limit=100")
             branch=$(jq -c --arg name "$NEON_BRANCH_NAME" '.branches[] | select(.name == $name)' <<<"$branches")
             if [ -z "$branch" ]; then
               echo "::error::Neon child branch not found: $NEON_BRANCH_NAME"
@@ -122,11 +124,11 @@ jobs:
             fi
             jq -e '.parent_id != null and .default != true and .protected != true' <<<"$branch" >/dev/null
             branch_id=$(jq -r '.id' <<<"$branch")
-            database_url=$(npx --yes neonctl connection-string "$branch_id" \
-              --api-key "$NEON_API_KEY" --project-id "$NEON_PROJECT_ID" \
-              --database-name neondb --role-name neondb_owner)
+            echo "Resolving connection for child branch $branch_id"
+            database_url=$(curl "${curl_args[@]}" \
+              "$api/connection_uri?branch_id=$branch_id&database_name=neondb&role_name=neondb_owner&pooled=false" | jq -er '.uri')
             echo "::add-mask::$database_url"
-            endpoints=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" "$api/endpoints")
+            endpoints=$(curl "${curl_args[@]}" "$api/endpoints")
             database_host=$(CHECK_DATABASE_URL="$database_url" node -e 'console.log(new URL(process.env.CHECK_DATABASE_URL).hostname.replace("-pooler.", "."))')
             jq -e --arg branch "$branch_id" --arg host "$database_host" \
               '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null
