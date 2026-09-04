@@ -48,7 +48,7 @@ describe('CSV Export', () => {
   });
 
   it('TCO calculator chart has CSV export option', () => {
-    cy.get('[data-testid="tab-trigger-calculator"]').click();
+    cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
     cy.get('[data-testid="calculator-chart-section"]').should('exist');
 
     cy.get('[data-testid="export-button"]').first().click();

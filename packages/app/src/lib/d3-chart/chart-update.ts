@@ -45,9 +45,9 @@ export function renderAxes(
   if (updateX) {
     let xAxisGen: d3.Axis<d3.AxisDomain>;
     if ('bandwidth' in xScale) {
-      xAxisGen = d3
-        .axisBottom(xScale as d3.ScaleBand<string>)
-        .tickSize(6) as unknown as d3.Axis<d3.AxisDomain>;
+      const bandGen = d3.axisBottom(xScale as d3.ScaleBand<string>).tickSize(6);
+      if (xTickFormat) bandGen.tickFormat(xTickFormat as any);
+      xAxisGen = bandGen as unknown as d3.Axis<d3.AxisDomain>;
     } else {
       const gen = d3.axisBottom(xScale as ContinuousScale).tickSize(6);
       if (xTickCount) gen.ticks(xTickCount);
