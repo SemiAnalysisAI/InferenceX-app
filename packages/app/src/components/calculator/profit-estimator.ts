@@ -61,7 +61,13 @@ export interface ProfitModelDefaults {
  * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
  * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
  * no priced SKU has a measured point that low yet, so the nearest round
- * operating point every curve covers is used until one does.
+ * operating point every curve covers is used until one does. MiniMax M3 opens
+ * on MiniMax's standard list price for <=512K-token calls ($0.30 / $0.06
+ * cached / $1.20 per M tok, the permanent 50%-off rate) because the OpenRouter
+ * aggregate also sits below it, and on 83 tok/s/user, the speed MiniMax's own
+ * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
+ * point, and the Hopper and MI300-series curves top out below it and list as
+ * not priced.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   [Model.Kimi_K3]: { interactivity: DEFAULT_PROFIT_INTERACTIVITY, listPricing: null },
@@ -73,6 +79,16 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
       cachedInputPerMillion: 0.26,
       outputPerMillion: 4.4,
       sourceUrl: 'https://docs.z.ai/guides/overview/pricing',
+    },
+  },
+  [Model.MiniMax_M3]: {
+    interactivity: 83,
+    listPricing: {
+      vendor: 'MiniMax',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.06,
+      outputPerMillion: 1.2,
+      sourceUrl: 'https://platform.minimax.io/docs/guides/pricing-paygo',
     },
   },
 };

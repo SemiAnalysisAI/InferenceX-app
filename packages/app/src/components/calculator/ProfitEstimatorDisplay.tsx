@@ -455,8 +455,8 @@ function ProfitEstimatorInner({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list (Kimi K3 and GLM 5.2/5.3) intersected with the models
-  // that have an agentic-traces run, so the selector never offers a model
+  // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3) intersected
+  // with the models that have an agentic-traces run, so the selector never offers a model
   // that would draw an empty chart. If the intersection is still loading or
   // empty, the allow-list alone is offered so the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
@@ -494,8 +494,9 @@ function ProfitEstimatorInner({
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   // Each model has its own operating point and price source (Kimi K3: 45
   // tok/s/user on OpenRouter; GLM 5.2/5.3: 100 tok/s/user on the Z.ai list
-  // price), so a model switch re-seeds both. The ref keeps this to actual
-  // switches: re-renders with the same model leave the reader's edits alone.
+  // price; MiniMax M3: 83 tok/s/user on the MiniMax list price), so a model
+  // switch re-seeds both. The ref keeps this to actual switches: re-renders
+  // with the same model leave the reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
   useEffect(() => {
     if (defaultsAppliedFor.current === selectedModel) return;

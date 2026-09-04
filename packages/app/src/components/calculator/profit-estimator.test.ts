@@ -349,6 +349,24 @@ describe('profitModelDefaults', () => {
     });
   });
 
+  it('opens MiniMax M3 on 83 tok/s/user and the MiniMax list price', () => {
+    const defaults = profitModelDefaults(Model.MiniMax_M3);
+    expect(defaults.interactivity).toBe(83);
+    expect(defaults.listPricing).toEqual({
+      vendor: 'MiniMax',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.06,
+      outputPerMillion: 1.2,
+      sourceUrl: 'https://platform.minimax.io/docs/guides/pricing-paygo',
+    });
+    expect(listPricingToTokenRevenuePricing(defaults.listPricing!)).toEqual({
+      source: 'normalized',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.06,
+      outputPerMillion: 1.2,
+    });
+  });
+
   it('falls back to 45 tok/s/user and OpenRouter for models without an entry', () => {
     expect(profitModelDefaults(Model.DeepSeek_V4_Pro)).toEqual({
       interactivity: DEFAULT_PROFIT_INTERACTIVITY,

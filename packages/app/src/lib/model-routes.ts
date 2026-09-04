@@ -71,10 +71,10 @@ export function defaultRouteModel(tab: ModelRouteTab): Model {
 /**
  * Tabs that expose only a subset of `MODEL_ROUTES`. The profit estimators
  * serve the agentic models whose coverage spans every SKU we price: Kimi K3
- * (the default) and GLM 5.2/5.3. Other slugs 404 there and stay out of the
- * sitemap. Tabs absent from this map offer every model.
+ * (the default), GLM 5.2/5.3, and MiniMax M3. Other slugs 404 there and stay
+ * out of the sitemap. Tabs absent from this map offer every model.
  */
-const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [Model.Kimi_K3, Model.GLM_5_2];
+const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [Model.Kimi_K3, Model.GLM_5_2, Model.MiniMax_M3];
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': PROFIT_ESTIMATOR_MODELS,
   'profit-estimator-per-gigawatt': PROFIT_ESTIMATOR_MODELS,
