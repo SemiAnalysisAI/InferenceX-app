@@ -250,6 +250,8 @@ The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
 connection endpoint before writing; production recomputation still requires
 `master`. Preview environments use branch-scoped database and cache settings.
+After a child-database repair, refresh its isolated `CACHE_NAMESPACE` and
+`BLOB_CACHE_PREFIX` and redeploy that preview to retire cached payloads.
 
 Use `run-id: all` for a stale-only repair across historical and current AgentX
 points. Eight independent shards recompute charts, aggregates, and request
