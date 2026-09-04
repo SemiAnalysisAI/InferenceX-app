@@ -81,7 +81,7 @@ describe('barMarkHeight', () => {
   it('grows the vendor mark with the bar between the phone and desktop bounds', () => {
     expect(barMarkHeight(0)).toBe(BAR_ICON_MIN_HEIGHT);
     expect(barMarkHeight(40)).toBe(BAR_ICON_MIN_HEIGHT);
-    expect(barMarkHeight(100)).toBeCloseTo(22, 5);
+    expect(barMarkHeight(100)).toBeCloseTo(30, 5);
     expect(barMarkHeight(400)).toBe(BAR_ICON_MAX_HEIGHT);
     // The headroom the domain reserves follows the mark.
     expect(stackHeadroomPx(BAR_ICON_MAX_HEIGHT) - STACK_HEADROOM_PX).toBe(

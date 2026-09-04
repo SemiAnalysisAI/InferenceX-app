@@ -165,9 +165,9 @@ const REVENUE_LABEL_GAP = 20;
 /** Smallest vendor mark above a bar, in px; what a phone-width bar gets. */
 export const BAR_ICON_MIN_HEIGHT = 14;
 /** Largest vendor mark above a bar, in px, however wide the bar gets. */
-export const BAR_ICON_MAX_HEIGHT = 40;
+export const BAR_ICON_MAX_HEIGHT = 48;
 /** Share of the bar width the mark grows to between those bounds. */
-const BAR_ICON_WIDTH_SHARE = 0.22;
+const BAR_ICON_WIDTH_SHARE = 0.3;
 /** Gap between the vendor mark and the top of the revenue figure, in px. */
 const BAR_ICON_GAP = 4;
 

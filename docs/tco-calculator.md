@@ -1106,7 +1106,7 @@ and the two can be collapsed into one once both are on master.
   (`getAxisVendorIcon`) sits above the revenue figure and margin line. NVIDIA's mark
   is the brand green and is never inverted; AMD publishes no color mark, so its arrow
   is black and inverts to white in dark mode. The mark scales with the bar:
-  `barMarkHeight(bandwidth)` is 22% of the band width clamped to 14–40px, so desktop
+  `barMarkHeight(bandwidth)` is 30% of the band width clamped to 14–48px, so desktop
   bars get a large logo and phone bars the small one. The y domain leaves exactly
   `stackHeadroomPx(markHeight)` above the tallest stack for those labels
   (`profitYDomain` takes the plot height and that headroom), and the top margin is
