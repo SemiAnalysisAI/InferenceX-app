@@ -125,7 +125,7 @@ const STRINGS = {
     liveCtaBody:
       '以上都是静态硬件数据。实际交付的 token 吞吐量、每百万 token 成本和每 token 能耗在仪表板上持续测量：',
     liveLinkInference: '实时推理仪表板',
-    liveLinkCompare: '芯片对芯片模型对比',
+    liveLinkCompare: '对比不同芯片运行同一模型的表现',
     liveLinkPerDollar: '每美元性能',
     liveLinkOverview: '基准测试方法与总览',
     modelsHeading: '通过 SemiAnalysis 行业模型深入研究',
@@ -134,7 +134,7 @@ const STRINGS = {
     modelsAccDesc:
       '按 SKU 跟踪 AI 加速器的出货量、价格与规格，覆盖从晶圆代工投片、HBM 供应到客户级装机量的完整链路，按季度更新并包含多年预测。',
     modelsTcoDesc:
-      '本页每小时费率的数据来源：从服务器资本开支、电力、托管与资金成本自下而上构建 GPU 全含拥有成本，并提供租赁价格情景与完整的集群财务模型。',
+      '本页小时费率来自这一模型。它汇总服务器资本开支、电力、托管和资金成本，计算 GPU 总拥有成本，并提供不同租赁价格情景及完整的集群财务分析功能。',
     pricingSource: '来源：$/芯片/小时 费率取自 SemiAnalysis',
     specLabels: {
       vendor: '厂商',
@@ -151,7 +151,7 @@ const STRINGS = {
       scaleOut: 'Scale-out 网络',
       nic: '网卡',
       tdp: '单芯片 TDP',
-      allInPower: '单芯片整机功耗',
+      allInPower: '单芯片综合功耗',
       costHyperscaler: '超大规模云 $/芯片/小时',
       costNeocloud: 'Neocloud $/芯片/小时',
       costRetail: '零售档 $/芯片/小时',
