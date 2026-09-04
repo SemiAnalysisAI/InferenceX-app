@@ -94,14 +94,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'GLM-5',
   },
   {
-    slug: 'glm-5-2',
+    slug: 'glm-5-3',
     displayName: 'GLM-5.2',
     dbKeys: ['glm5.2'],
     // GLM-5.2 and GLM-5.3 share one data bucket (see MODEL_CONFIG); the card
-    // shows the current release. `slug`, `displayName`, and `dbKeys` stay on
-    // 5.2 so URLs and the `g_model` param keep resolving.
+    // and the slug follow the current release ("newer version supersedes", as
+    // with kimi-k26), and `glm-5-2` aliases here so old links 308. `displayName`
+    // and `dbKeys` stay on 5.2 so the `g_model` param and DB rows keep resolving.
     label: 'GLM 5.3 744B',
-    seoName: 'GLM-5.2',
+    seoName: 'GLM-5.3',
   },
   {
     slug: 'minimax-m3',
@@ -165,6 +166,7 @@ export const COMPARE_MODEL_ALIASES: Record<string, string> = {
   qwen: 'qwen-3-5',
   glm: 'glm-5-1',
   'glm-5': 'glm-5-1',
+  'glm-5-2': 'glm-5-3',
   minimax: 'minimax-m27',
   'minimax-m25': 'minimax-m27',
   llama: 'llama-3-3-70b',

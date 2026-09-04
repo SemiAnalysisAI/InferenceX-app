@@ -5,7 +5,7 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/inference-mod
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
   'deepseek-v4',
-  'glm-5-2',
+  'glm-5-3',
   'minimax-m3',
   // Editorial call: Flash Next sits below Qwen 3.5, the family's flagship row.
   'qwen-3-5',

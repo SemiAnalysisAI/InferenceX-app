@@ -23,7 +23,7 @@ export const MODEL_PAGE_ZH = {
       'Z.ai 的 MoE 模型系列，总参数量 744B、每个 token 激活 40B 参数，采用 DeepSeek 稀疏注意力（DSA），使用 28.5T token 训练，并以 MIT 许可证发布。',
     releaseDate: '2026 年 2 月 11 日（GLM-5）；2026 年 4 月 7 日（GLM-5.1）',
   },
-  'glm-5-2': {
+  'glm-5-3': {
     description:
       'Z.ai 的 744B 级 MoE 模型系列，借助 IndexShare 将稀疏注意力扩展至 1M token 上下文；GLM-5.3 还进行了一轮重点面向智能体能力的后训练。',
     releaseDate: '2026 年 6 月 16 日（GLM-5.2）；2026 年 8 月 14 日（GLM-5.3）',

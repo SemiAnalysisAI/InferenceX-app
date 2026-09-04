@@ -395,10 +395,10 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.viewport(1280, 1000);
   });
 
-  it('opens /profit-estimator/glm-5-2 on 100 tok/s/user and the Z.ai list price', () => {
-    cy.visit('/profit-estimator/glm-5-2', { onBeforeLoad: suppressNudges });
+  it('opens /profit-estimator/glm-5-3 on 100 tok/s/user and the Z.ai list price', () => {
+    cy.visit('/profit-estimator/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.location('pathname').should('eq', '/profit-estimator/glm-5-2');
+    cy.location('pathname').should('eq', '/profit-estimator/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
@@ -441,15 +441,23 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.get('[data-testid="profit-output-price"]').should('have.value', '4.4');
   });
 
+  it('308s the older glm-5-2 slug to glm-5-3', () => {
+    cy.request({ url: '/profit-estimator/glm-5-2', followRedirect: false }).then((res) => {
+      expect(res.status).to.eq(308);
+      expect(res.headers['location']).to.match(/\/profit-estimator\/glm-5-3$/);
+    });
+  });
+
   it('re-seeds the operating point and price source on a model switch', () => {
-    cy.visit('/profit-estimator-per-gigawatt/glm-5-2', { onBeforeLoad: suppressNudges });
+    cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    // Kimi K3 is the tab default, so its page is the bare path.
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    // The in-page switch rewrites to the slugged path; only a fresh visit to the
+    // slug canonicalizes the default model back to the bare path.
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'Kimi K3')
       .and('contain.text', '45 tok/s/user');
@@ -460,7 +468,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-2');
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.4')
@@ -468,7 +476,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
-    cy.visit('/zh/profit-estimator/glm-5-2', { onBeforeLoad: suppressNudges });
+    cy.visit('/zh/profit-estimator/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
     cy.get('[data-testid="profit-selling-prices"]')

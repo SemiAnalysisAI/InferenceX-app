@@ -1094,7 +1094,7 @@ and the two can be collapsed into one once both are on master.
   `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
   models that have an agentic run. Each bare path opens on Kimi K3
   (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
-  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, `/glm-5-2` is the
+  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, `/glm-5-3` is the
   GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site), aliases
   308 to the canonical slug, and any model outside the allow-list 404s. Widening
   the pages to more models is one list edit, a `profitModelDefaults` entry, and

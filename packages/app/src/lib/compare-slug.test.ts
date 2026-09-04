@@ -18,7 +18,7 @@ import {
 const DEEPSEEK_R1 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'deepseek-r1')!;
 const KIMI_K26 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'kimi-k26')!;
 const GLM_51 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-1')!;
-const GLM_52 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-2')!;
+const GLM_53 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-3')!;
 
 describe('parseCompareSlug — new model-prefixed form', () => {
   it('parses a canonical model-prefixed slug', () => {
@@ -256,7 +256,7 @@ describe('compareModelDisplayLabel', () => {
       'Kimi K2.5/K2.6/K2.7-Code 1T — GB200 NVL72 vs MI355X',
     );
     expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1 — H100 vs H200');
-    expect(compareModelDisplayLabel(GLM_52, 'h100', 'h200')).toBe('GLM 5.3 744B — H100 vs H200');
+    expect(compareModelDisplayLabel(GLM_53, 'h100', 'h200')).toBe('GLM 5.3 744B — H100 vs H200');
   });
 });
 
@@ -269,7 +269,7 @@ describe('compareModelSeoName', () => {
     'kimi-k3': 'Kimi K3',
     'kimi-k26': 'Kimi K2.6',
     'glm-5-1': 'GLM-5',
-    'glm-5-2': 'GLM-5.2',
+    'glm-5-3': 'GLM-5.3',
     'minimax-m3': 'MiniMax M3',
     'minimax-m27': 'MiniMax M2.7',
     'qwen-3-8-flash-next': 'Qwen3.8-Flash-Next',
@@ -329,8 +329,8 @@ describe('getCompareModelBySlug', () => {
   it('returns canonical models for canonical slugs', () => {
     expect(getCompareModelBySlug('deepseek-r1')).toBe(DEEPSEEK_R1);
     expect(getCompareModelBySlug('kimi-k26')).toBe(KIMI_K26);
-    expect(getCompareModelBySlug('glm-5-2')).toBe(GLM_52);
-    expect(GLM_52.dbKeys).toEqual(['glm5.2']);
+    expect(getCompareModelBySlug('glm-5-3')).toBe(GLM_53);
+    expect(GLM_53.dbKeys).toEqual(['glm5.2']);
   });
 
   it('resolves alias slugs to their canonical model', () => {
@@ -338,6 +338,7 @@ describe('getCompareModelBySlug', () => {
     expect(getCompareModelBySlug('kimi')).toBe(KIMI_K26);
     expect(getCompareModelBySlug('kimi-k25')).toBe(KIMI_K26);
     expect(getCompareModelBySlug('glm-5')).toBe(GLM_51);
+    expect(getCompareModelBySlug('glm-5-2')).toBe(GLM_53);
   });
 
   it('keeps the bare minimax alias on the M2 series, with minimax-m3 canonical', () => {

@@ -43,7 +43,7 @@ describe('Chinese model-page catalog', () => {
   });
 
   it('preserves the scope of the GLM-5.3 agentic post-training claim', () => {
-    expect(MODEL_PAGE_ZH['glm-5-2'].description).toContain('重点面向智能体能力的后训练');
-    expect(MODEL_PAGE_ZH['glm-5-2'].description).not.toContain('大规模智能体后训练');
+    expect(MODEL_PAGE_ZH['glm-5-3'].description).toContain('重点面向智能体能力的后训练');
+    expect(MODEL_PAGE_ZH['glm-5-3'].description).not.toContain('大规模智能体后训练');
   });
 });
