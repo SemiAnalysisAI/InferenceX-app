@@ -77,14 +77,14 @@ describe('ResultContext', () => {
       createRoot(en).render(<ResultContext locale="en" utilization="60%" licenseFee="30%" />);
     });
     expect(en.textContent).toContain('Utilization: 60%');
-    expect(en.textContent).toContain('Model License Fee: 30%');
+    expect(en.textContent).toContain('Model License Fee Assumption: 30%');
     expect(en.querySelector('[data-testid="result-context-license-fee"]')?.textContent).toBe('30%');
     const zh = document.createElement('div');
     act(() => {
       createRoot(zh).render(<ResultContext locale="zh" utilization="60%" licenseFee="30%" />);
     });
     expect(zh.textContent).toContain('利用率: 60%');
-    expect(zh.textContent).toContain('模型许可费: 30%');
+    expect(zh.textContent).toContain('模型许可费假设: 30%');
   });
 
   it('localizes the Cost Tier label', () => {
