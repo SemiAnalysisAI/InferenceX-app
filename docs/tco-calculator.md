@@ -1111,6 +1111,10 @@ and the two can be collapsed into one once both are on master.
   `stackHeadroomPx(markHeight)` above the tallest stack for those labels
   (`profitYDomain` takes the plot height and that headroom), and the top margin is
   12px, so the grid starts right under the selling-price line.
+- **TCO badges track the legend.** The `TCO $/chip/hr:` line lists one badge per base
+  chip whose bar is currently drawn; isolating a SKU in the legend leaves only its badge.
+- **Cost provider names match `/inference`.** The selector reuses `COST_TIER_LABELS[...].option`
+  (Owning - Hyperscaler, Owning - Neocloud Giant, 3 Year Rental) plus Custom $/GPU/hr.
 - **Chart height follows the viewport.** `chartHeightForViewport(window.innerHeight)` is
   the full 720px only when the window has room; otherwise it is the viewport minus
   `CHART_VIEWPORT_RESERVE` (260px: sticky nav, card header, padding), never below

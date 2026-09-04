@@ -25,7 +25,11 @@ import {
   useGlobalFilterSelection,
 } from '@/components/GlobalFilterContext';
 import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
-import { costTierLabel, type CostTier } from '@/components/inference/metric-registry';
+import {
+  COST_TIER_LABELS,
+  costTierLabel,
+  type CostTier,
+} from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,19 +89,23 @@ type PriceSource = 'openrouter' | 'custom';
 /** The three published TCO tiers plus a per-chip $/GPU/hr the reader types. */
 type ProfitCostProvider = CostProvider | 'custom';
 
-const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
-  { value: 'costh', label: 'Hyperscaler', labelZh: '超大规模云服务商' },
-  { value: 'costn', label: 'Neocloud', labelZh: 'Neocloud' },
-  { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
-  { value: 'custom', label: 'Custom $/GPU/hr', labelZh: '自定义 $/GPU/hr' },
-];
-
 const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   costh: 'hyperscaler',
   costn: 'neocloud',
   costr: 'rental',
   custom: 'custom',
 };
+
+// The published tiers use the same option labels as the /inference y-axis
+// selector (Owning - Hyperscaler, Owning - Neocloud Giant, 3 Year Rental).
+const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
+  ...(['costh', 'costn', 'costr'] as const).map((value) => ({
+    value,
+    label: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].option,
+    labelZh: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].optionZh,
+  })),
+  { value: 'custom', label: 'Custom $/GPU/hr', labelZh: '自定义 $/GPU/hr' },
+];
 
 /** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
 const CUSTOM_COST_SEED: CostProvider = 'costh';
@@ -682,9 +690,11 @@ function ProfitEstimatorInner({
   const priceSourceLabel =
     pricing?.source === 'openrouter' ? 'OpenRouter' : locale === 'zh' ? '自定义' : 'custom';
 
+  // Only the SKUs the legend currently shows; hiding a bar drops its badge.
   const tcoBadges = useMemo(() => {
     const bases = new Set<string>();
     for (const key of legendHwKeys) {
+      if (!visibleHwKeys.has(key)) continue;
       const base = key.split('_')[0];
       if (base in HW_REGISTRY) bases.add(base);
     }
@@ -695,7 +705,7 @@ function ProfitEstimatorInner({
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
         cost: costPerGpuHourFor(base),
       }));
-  }, [legendHwKeys, costPerGpuHourFor]);
+  }, [legendHwKeys, visibleHwKeys, costPerGpuHourFor]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
@@ -721,10 +731,13 @@ function ProfitEstimatorInner({
           date={selectedRunDate}
           source="SemiAnalysis InferenceX™"
         />
-        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <p
+          className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+          data-testid="profit-tco-badges"
+        >
           {t.tcoBadgesLabel}{' '}
           {tcoBadges.map((badge) => (
-            <Badge key={badge.base} variant="outline">
+            <Badge key={badge.base} variant="outline" data-testid="profit-tco-badge">
               {badge.label}: {badge.cost}
             </Badge>
           ))}

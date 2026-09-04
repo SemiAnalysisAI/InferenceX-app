@@ -77,6 +77,18 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     bars().should('have.length.greaterThan', 0);
+    // Cost tiers carry the same names as the /inference y-axis selector.
+    cy.get('button#profit-cost').should('contain.text', 'Owning - Hyperscaler').click();
+    cy.get('[role="option"]').then(($opts) => {
+      const labels = [...$opts].map((el) => el.textContent?.trim());
+      expect(labels).to.include.members([
+        'Owning - Hyperscaler',
+        'Owning - Neocloud Giant',
+        '3 Year Rental',
+        'Custom $/GPU/hr',
+      ]);
+    });
+    cy.get('body').type('{esc}');
     // Segments are labelled in place; there is no separate key under the title.
     cy.get('[data-testid="profit-segment-key"]').should('not.exist');
     chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
@@ -227,14 +239,24 @@ describe('Profit Estimator per GW', () => {
       .its('length')
       .then((allBars) => {
         cy.get('[data-testid="profit-legend"] li').should('have.length.greaterThan', 1);
+        // One badge per base chip drawn: GB300, B300, B200, MI355X.
+        cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
+        cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
         cy.get('[data-testid="profit-legend"] li').first().click();
         bars().should('have.length.lessThan', allBars);
         chart()
           .find('rect.bar-tco')
           .should('have.length.lessThan', 4)
           .and('have.length.greaterThan', 0);
+        // Clicking a legend item isolates it; the subtitle keeps only that
+        // SKU's TCO badge.
+        cy.get('[data-testid="profit-tco-badge"]').should('have.length', 1);
+        cy.get('[data-testid="profit-tco-badges"]')
+          .should('contain.text', 'GB300: 2.31')
+          .and('not.contain.text', 'MI355X');
         cy.get('[data-testid="profit-reset-filter"]').click();
         bars().should('have.length', allBars);
+        cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
         cy.get('[data-testid="profit-reset-filter"]').should('not.exist');
       });
   });
@@ -289,7 +311,7 @@ describe('Profit Estimator per GW', () => {
       });
 
     cy.get('button#profit-cost').click();
-    cy.contains('[role="option"]', 'Hyperscaler').click();
+    cy.contains('[role="option"]', 'Owning - Hyperscaler').click();
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
