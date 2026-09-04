@@ -69,10 +69,9 @@ describe('Profit Estimator', () => {
     cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     bars().should('have.length.greaterThan', 0);
-    cy.get('[data-testid="profit-segment-key"]')
-      .should('contain.text', 'Compute expense (TCO)')
-      .and('contain.text', 'Model license fee')
-      .and('contain.text', 'Operator profit');
+    // Segments are labelled in place; there is no separate key under the title.
+    cy.get('[data-testid="profit-segment-key"]').should('not.exist');
+    chart().should('contain.text', 'Model license fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'Revenue & Profit Estimates per GigaWatt at P90 45 tok/s/user Interactivity',
@@ -84,7 +83,9 @@ describe('Profit Estimator', () => {
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
       .and('contain.text', 'Cached Input: $0.1')
-      .and('contain.text', 'Output: $2.5');
+      .and('contain.text', 'Output: $2.5')
+      .and('contain.text', '(OpenRouter)')
+      .and('not.contain.text', 'moonshotai');
     cy.location('pathname').should('eq', '/profit-estimator');
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
@@ -92,9 +93,12 @@ describe('Profit Estimator', () => {
     cy.get('body').type('{esc}');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     // Each x label carries its vendor mark; the H200 curve stops short of 45
-    // tok/s/user, so it is listed as unpriced instead of extrapolated.
+    // tok/s/user, so it is absent from the chart rather than extrapolated.
     chart().find('.tick image.vendor-mark').should('have.length', 4);
-    cy.get('[data-testid="profit-skipped"]').should('contain.text', 'H200');
+    cy.get('[data-testid="profit-skipped"]').should('not.exist');
+    chart().find('image.bar-vendor-mark').should('have.length', 4);
+    cy.get('[data-testid="profit-high-contrast"]').should('not.exist');
+    chart().should('not.contain.text', 'H200');
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
     cy.get('[data-testid="profit-formula-notes"] button').click();
     cy.get('[data-testid="profit-formula-notes"]').should('not.contain.text', '60% utilization');
@@ -215,6 +219,8 @@ describe('Profit Estimator', () => {
     cy.contains('[role="option"]', 'Custom $/GPU/hr').click();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     cy.get('[data-testid="profit-custom-costs"] input').should('have.length.greaterThan', 0);
+    // A user-entered $/GPU/hr has no external source to cite.
+    cy.get('[data-testid="profit-tco-source"]').should('not.exist');
     chart()
       .find('rect.bar-tco')
       .its('length')
@@ -242,6 +248,7 @@ describe('Profit Estimator', () => {
     cy.get('button#profit-cost').click();
     cy.contains('[role="option"]', 'Hyperscaler').click();
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
+    cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
   });
 
@@ -290,7 +297,7 @@ describe('Profit Estimator — Chinese mirror', () => {
     cy.get('label[for="profit-utilization"]').should('contain.text', '利用率');
     cy.get('label[for="profit-lab-cut"]').should('contain.text', '模型许可费');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
-    cy.get('[data-testid="profit-segment-key"]').should('contain.text', '算力支出');
+    chart().should('contain.text', '模型许可费').and('contain.text', '利润');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦收入与利润估算');
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
   });

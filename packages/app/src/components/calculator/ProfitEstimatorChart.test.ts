@@ -111,7 +111,7 @@ describe('generateProfitTooltipHTML', () => {
     expect(html).toContain('$400');
     expect(html).toContain('30%');
     expect(html).toContain('60%');
-    expect(html).toContain('Operator profit');
+    expect(html).toContain('Profit');
   });
 
   it('labels a negative result as a loss and still lists the license fee, which is a share of revenue', () => {
@@ -122,7 +122,7 @@ describe('generateProfitTooltipHTML', () => {
       'en',
       false,
     );
-    expect(html).toContain('Operator loss');
+    expect(html).toContain('Loss');
     expect(html).toContain('-$190');
     expect(html).toContain('Model license fee');
     expect(html).toContain('$90');
@@ -149,26 +149,20 @@ describe('generateProfitTooltipHTML', () => {
 });
 
 const SEGMENT_WORDS = {
-  tco: 'Compute expense (TCO)',
+  tco: 'Compute expense',
   labCut: 'Model license fee',
-  profit: 'Operator profit',
-  loss: 'Operator loss',
+  profit: 'Profit',
+  loss: 'Loss',
 };
 
 describe('segmentLabelLines', () => {
   it('names the segment and its amount when the rectangle is tall enough', () => {
-    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual([
-      'Compute expense (TCO)',
-      '$400',
-    ]);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute expense', '$400']);
     expect(segmentLabelLines('labCut', row(), 40, SEGMENT_WORDS)).toEqual([
       'Model license fee',
       '$180',
     ]);
-    expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual([
-      'Operator profit',
-      '$420',
-    ]);
+    expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual(['Profit', '$420']);
   });
 
   it('drops to the amount alone, then to nothing, as the rectangle shrinks', () => {
@@ -178,10 +172,7 @@ describe('segmentLabelLines', () => {
 
   it('labels a loss with the loss word and the negative amount', () => {
     const lossRow = row({ tco: 1300, grossMargin: -300, labCut: 300, profit: -600 });
-    expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual([
-      'Operator loss',
-      '-$600',
-    ]);
+    expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual(['Loss', '-$600']);
   });
 });
 

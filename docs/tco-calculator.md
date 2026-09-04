@@ -1057,13 +1057,12 @@ and the two can be collapsed into one once both are on master.
   the two deductions can be read separately.
 - **Every segment is labelled in place.** Name and dollar amount sit inside each
   rectangle when it is tall enough, amount only when it is shorter, nothing when
-  it would not fit. Revenue and operator margin (profit ÷ revenue) sit above the
-  bar.
+  it would not fit. Revenue and margin (profit ÷ revenue) sit above the bar, with
+  the vendor's full-color mark above those.
 - **Out-of-range reads are excluded, not clamped.** A config the target
   interactivity falls outside of (H200 on Kimi K3 at 45 tok/s/user, say) is not
-  drawn and not offered in the legend; the caption names it with the reason. This
-  matches the fleet page, which drops those points rather than showing an edge
-  value that was never measured.
+  drawn and not offered in the legend. This matches the fleet page, which drops
+  those points rather than showing an edge value that was never measured.
 - **Agentic traces only.** The page pins the sequence to agentic traces, so there is
   no scenario selector and no precision selector (precision stays in auto mode, the
   densest measured run set). The interactivity target is a typed number in the same
@@ -1074,23 +1073,29 @@ and the two can be collapsed into one once both are on master.
   (`defaultRouteModel('profit-estimator')`); `/profit-estimator/kimi-k3` is the same
   page, aliases 308 to the canonical slug, and any model outside the allow-list 404s.
   Widening the page to more models is one list edit plus fixture rows.
-- **Vendor marks on the x axis.** Each rotated SKU label carries its vendor logo
-  (`getLineLabelVendorIcon`), kept upright and inverted in dark mode, so a chip's
-  maker can be read without parsing the name.
+- **Vendor marks on the x axis and above each bar.** Each rotated SKU label leads
+  with its vendor logo (`getAxisVendorIcon`), kept upright, and the same mark sits
+  above the revenue figure. NVIDIA's mark is the brand green and is never inverted;
+  AMD publishes no color mark, so its arrow is black and inverts to white in dark
+  mode.
 - **Legend is the SKU filter.** Same click semantics as the fleet page (click to
   isolate, click again to restore), and the same `resolveCalculatorVisibility`
   intent so the choice survives a model change when the SKU still exists.
-- **Unpriceable SKUs are listed, not dropped quietly.** A SKU with no power figure,
-  no TCO for the chosen tier, or no recorded input/output mix is named in the
-  caption with the reason.
+- **Unpriceable SKUs are dropped.** A SKU with no power figure, no TCO for the
+  chosen tier, or no recorded input/output mix is left out of the chart and the
+  legend; the legend is the record of what is priced.
 - **The heading reads like `/inference`.** Model, workload, and target in the title;
-  cost tier, utilization, run date, and source beneath it; TCO $/chip/hr badges, the
-  selling prices, and the segment key under that. The formula sits in a fold under
-  the chart, and the export button writes PNG and CSV.
+  cost tier, utilization, run date, and source beneath it; TCO $/chip/hr badges and
+  the selling prices under that. The TCO source line is omitted when the cost
+  provider is a custom $/GPU/hr, since there is nothing to cite. Segments are
+  labelled in place, so there is no separate key. The formula sits in a fold under
+  the chart, and the export button (top right of the card) writes PNG and CSV.
+- **Number inputs ignore the mouse wheel.** A wheel event over a focused number
+  input blurs it, so scrolling the page never nudges a percentage.
 
 ### Fixtures
 
 The captured API fixtures carry no `agentic_traces` rows, so the Cypress spec
 (`cypress/e2e/profit-estimator.cy.ts`) intercepts availability and benchmarks with
 synthetic Kimi K3 curves from `cypress/support/profit-fixtures.ts`. The H200 curve
-stops below 45 tok/s/user on purpose so the "Not priced" path stays covered.
+stops below 45 tok/s/user on purpose so the exclusion path stays covered.

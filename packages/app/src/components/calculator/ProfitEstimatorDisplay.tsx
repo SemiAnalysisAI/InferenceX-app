@@ -44,7 +44,6 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ResultContext } from '@/components/ui/result-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -131,7 +130,6 @@ const STRINGS = {
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
-    customCostSource: 'custom $/GPU/hr',
     costProviderPlaceholder: 'Cost provider',
     priceSourceLabel: 'Token Price',
     priceSourceTooltip:
@@ -150,7 +148,6 @@ const STRINGS = {
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
-    highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
@@ -167,7 +164,7 @@ const STRINGS = {
     formulaTitle: 'How the bars are computed',
     formulaToggle: 'Toggle formula notes',
     captionFormula: (util: number, labCut: number) =>
-      `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Operator profit = revenue − TCO − license fee. Operator margin above each bar is profit ÷ revenue.`,
+      `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
     csvHeaders: [
       'SKU',
       'Precision',
@@ -175,8 +172,8 @@ const STRINGS = {
       'Compute expense TCO ($/GW/yr)',
       'Gross margin ($/GW/yr)',
       'Model license fee ($/GW/yr)',
-      'Operator profit ($/GW/yr)',
-      'Operator margin',
+      'Profit ($/GW/yr)',
+      'Margin',
       'Revenue ($/GPU/hr, 100% util)',
       'GPU-hours per GW-year',
     ],
@@ -187,12 +184,6 @@ const STRINGS = {
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
-    segmentKey: {
-      tco: 'Compute expense (TCO)',
-      labCut: 'Model license fee',
-      profit: 'Operator profit',
-      loss: 'Operator loss',
-    },
   },
   zh: {
     title: '利润估算器',
@@ -202,7 +193,6 @@ const STRINGS = {
     costProviderTooltip:
       '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
-    customCostSource: '自定义 $/GPU/hr',
     costProviderPlaceholder: '成本供应商',
     priceSourceLabel: 'Token 售价',
     priceSourceTooltip:
@@ -221,7 +211,6 @@ const STRINGS = {
     labCutTooltip:
       '每售出一个 token 以许可费形式支付给模型实验室的收入比例。即使算力支出已超过收入也需支付，因此运营方可能亏损。',
     errorLoading: '加载数据出错，请尝试其他选择。',
-    highContrast: '高对比度',
     resetFilter: '重置筛选',
     pricingLoading: '正在加载 OpenRouter 价格…',
     pricingUnavailable: (modelId: string | null) =>
@@ -238,7 +227,7 @@ const STRINGS = {
     formulaTitle: '柱形计算方式',
     formulaToggle: '展开或收起公式说明',
     captionFormula: (util: number, labCut: number) =>
-      `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。运营方利润 = 收入 − TCO − 许可费。柱形上方的运营方利润率 = 利润 ÷ 收入。`,
+      `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
     csvHeaders: [
       'SKU',
       '精度',
@@ -246,8 +235,8 @@ const STRINGS = {
       '算力支出 TCO（$/GW/yr）',
       '毛利（$/GW/yr）',
       '模型许可费（$/GW/yr）',
-      '运营方利润（$/GW/yr）',
-      '运营方利润率',
+      '利润（$/GW/yr）',
+      '利润率',
       '收入（$/GPU/hr，100% 利用率）',
       '每吉瓦年 GPU 小时数',
     ],
@@ -258,12 +247,6 @@ const STRINGS = {
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
-    segmentKey: {
-      tco: '算力支出（TCO）',
-      labCut: '模型许可费',
-      profit: '运营方利润',
-      loss: '运营方亏损',
-    },
   },
 } as const;
 
@@ -303,6 +286,11 @@ function InfoFold({
       {open && <div className="mt-2 text-muted-foreground">{children}</div>}
     </div>
   );
+}
+
+/** Number inputs step on mouse wheel while focused; drop focus so a scroll over the box only scrolls the page. */
+function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
+  event.currentTarget.blur();
 }
 
 export default function ProfitEstimatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
@@ -395,7 +383,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
   const [targetRaw, setTargetRaw] = useState<string>(String(DEFAULT_PROFIT_INTERACTIVITY));
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
-  const [highContrast, setHighContrast] = useState(false);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(DEFAULT_LAB_CUT_PCT, 'profit_lab_cut_set');
 
@@ -514,7 +501,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     [visibilityIntent, selectionKey, legendHwKeys],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor } = useThemeColors({ highContrast, activeKeys: visibleKeysArray });
+  const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
 
   const estimate = useMemo(
     () => ({
@@ -617,56 +604,9 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     return null;
   }, [priceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
-  const segmentKey = useMemo(() => {
-    // Swatches are drawn in the neutral foreground colour: on the chart each
-    // segment takes its SKU's colour, so the key describes texture, not hue.
-    const ink = 'var(--foreground)';
-    const hasLoss = estimate.rows.some((row) => row.profit < 0);
-    const items: { key: string; label: string; style: React.CSSProperties }[] = [
-      {
-        key: 'tco',
-        label: t.segmentKey.tco,
-        style: { background: ink, opacity: 0.22, boxShadow: `inset 0 0 0 1px ${ink}` },
-      },
-      {
-        key: 'labCut',
-        label: t.segmentKey.labCut,
-        style: { background: ink, opacity: 0.5, boxShadow: `inset 0 0 0 1px ${ink}` },
-      },
-      { key: 'profit', label: t.segmentKey.profit, style: { background: ink } },
-    ];
-    if (hasLoss) {
-      items.push({
-        key: 'loss',
-        label: t.segmentKey.loss,
-        style: {
-          backgroundImage: `repeating-linear-gradient(45deg, ${ink} 0 1.5px, transparent 1.5px 4px)`,
-          boxShadow: `inset 0 0 0 1px ${ink}`,
-        },
-      });
-    }
-    return (
-      <ul
-        className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
-        data-testid="profit-segment-key"
-      >
-        {items.map((item) => (
-          <li key={item.key} className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-[2px]" style={item.style} aria-hidden />
-            {item.label}
-          </li>
-        ))}
-      </ul>
-    );
-  }, [estimate.rows, t]);
-
   const costTier = costTierLabel(COST_PROVIDER_TIER[costProvider], locale);
   const priceSourceLabel =
-    pricing?.source === 'openrouter'
-      ? `OpenRouter · ${pricing.openRouterModelId ?? ''}`.trim()
-      : locale === 'zh'
-        ? '自定义'
-        : 'custom';
+    pricing?.source === 'openrouter' ? 'OpenRouter' : locale === 'zh' ? '自定义' : 'custom';
 
   const tcoBadges = useMemo(() => {
     const bases = new Set<string>();
@@ -682,19 +622,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
         cost: costPerGpuHourFor(base),
       }));
   }, [legendHwKeys, costPerGpuHourFor]);
-
-  const skippedText = useMemo(() => {
-    if (estimate.skipped.length === 0) return null;
-    return t.skipped(
-      estimate.skipped
-        .map((sk) => {
-          const config = hardwareConfig[sk.hwKey];
-          const name = config ? getDisplayLabel(config) : sk.hwKey;
-          return `${sk.precision ? `${name} (${sk.precision.toUpperCase()})` : name} — ${t.skipReason[sk.reason]}`;
-        })
-        .join('; '),
-    );
-  }, [estimate.skipped, hardwareConfig, t]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
@@ -725,12 +652,10 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
             </Badge>
           ))}
         </p>
-        <p className="mb-2 text-xs text-muted-foreground">
-          <small>
-            {t.sourceLabel}{' '}
-            {costProvider === 'custom' ? (
-              t.customCostSource
-            ) : (
+        {costProvider !== 'custom' && (
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-tco-source">
+            <small>
+              {t.sourceLabel}{' '}
               <Link
                 target="_blank"
                 className="underline hover:text-foreground"
@@ -739,9 +664,9 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 {TCO_SOURCE_TITLE}
                 <ExternalLinkIcon />
               </Link>
-            )}
-          </small>
-        </p>
+            </small>
+          </p>
+        )}
         <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
           <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
           {t.sellingPrices(
@@ -751,12 +676,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
             priceSourceLabel,
           )}
         </p>
-        {segmentKey}
-        {skippedText && (
-          <p className="text-xs text-muted-foreground" data-testid="profit-skipped">
-            {skippedText}
-          </p>
-        )}
       </div>
     );
   }, [
@@ -771,8 +690,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     selectedRunDate,
     tcoBadges,
     priceSourceLabel,
-    segmentKey,
-    skippedText,
     t,
   ]);
 
@@ -890,6 +807,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     id="profit-target"
                     data-testid="profit-target-input"
                     type="number"
+                    onWheel={blurOnWheel}
                     inputMode="decimal"
                     min={1}
                     step={1}
@@ -953,6 +871,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     id="profit-utilization"
                     data-testid="profit-utilization-input"
                     type="number"
+                    onWheel={blurOnWheel}
                     inputMode="decimal"
                     min={0}
                     max={100}
@@ -972,6 +891,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     id="profit-lab-cut"
                     data-testid="profit-lab-cut-input"
                     type="number"
+                    onWheel={blurOnWheel}
                     inputMode="decimal"
                     min={0}
                     max={100}
@@ -989,6 +909,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                         id="profit-input-price"
                         data-testid="profit-input-price"
                         type="number"
+                        onWheel={blurOnWheel}
                         inputMode="decimal"
                         min={0}
                         step={0.01}
@@ -1008,6 +929,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                         id="profit-cached-price"
                         data-testid="profit-cached-price"
                         type="number"
+                        onWheel={blurOnWheel}
                         inputMode="decimal"
                         min={0}
                         step={0.001}
@@ -1027,6 +949,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                         id="profit-output-price"
                         data-testid="profit-output-price"
                         type="number"
+                        onWheel={blurOnWheel}
                         inputMode="decimal"
                         min={0}
                         step={0.01}
@@ -1060,6 +983,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                           id={`profit-custom-cost-${base}`}
                           data-testid={`profit-custom-cost-${base}`}
                           type="number"
+                          onWheel={blurOnWheel}
                           inputMode="decimal"
                           min={0}
                           step={0.01}
@@ -1100,23 +1024,6 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                     {t.resetFilter}
                   </Button>
                 )}
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="profit-high-contrast"
-                    data-testid="profit-high-contrast"
-                    checked={highContrast}
-                    onCheckedChange={(checked: boolean) => {
-                      setHighContrast(checked);
-                      track('profit_high_contrast_toggled', { enabled: checked });
-                    }}
-                  />
-                  <Label
-                    htmlFor="profit-high-contrast"
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    {t.highContrast}
-                  </Label>
-                </div>
               </div>
             )}
           </div>
@@ -1144,6 +1051,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
+                className="absolute top-0 right-0 z-10 mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}
                 exportFileName={`InferenceX_profit_estimator_${selectedModel}`}

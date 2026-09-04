@@ -18,7 +18,7 @@ import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import { escapeHtml, getDisplayLabel } from '@/lib/utils';
-import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
+import { getAxisVendorIcon } from '@/lib/vendor-logos';
 
 import { formatUsdCompact, type ProfitEstimatorRow } from './profit-estimator';
 
@@ -42,12 +42,37 @@ export interface ProfitSegment {
 const CHART_MARGIN = { top: 44, right: 24, bottom: 172, left: 116 };
 const CHART_HEIGHT = 720;
 const X_LABEL_ROTATION = -50;
-/** Vendor mark beside each x label, in px; a touch larger than the label text so the logo stays legible. */
-const X_LABEL_ICON_SIZE = CHART_TYPE.axisLabel;
+/** Height of the vendor mark before each x label, in px; width follows the mark's aspect. */
+const X_LABEL_ICON_HEIGHT = CHART_TYPE.axisLabel;
 /** Gap between the vendor mark and the label text, px. */
 const X_LABEL_ICON_GAP = 4;
 /** Distance from the tick to the label's end, in em (the d3 default is 0). */
 const X_LABEL_DX_EM = 0.4;
+/** Gap between the top of the stack and the revenue figure's baseline, in px. */
+const REVENUE_LABEL_GAP = 20;
+/** Height of the vendor mark above each bar, in px. */
+const BAR_ICON_HEIGHT = 14;
+/** Gap between the vendor mark and the top of the revenue figure, in px. */
+const BAR_ICON_GAP = 4;
+
+function barMarkWidth(icon: { width: number; height: number } | undefined): number {
+  return icon ? (icon.width / icon.height) * BAR_ICON_HEIGHT : 0;
+}
+
+/** Average glyph advance as a fraction of font size, for environments without text metrics. */
+const X_LABEL_CHAR_WIDTH_EM = 0.55;
+
+/**
+ * Rendered length of an axis label in px. Uses the browser's text metrics when
+ * available and falls back to a per-character estimate (test DOMs, SSR).
+ */
+export function axisLabelLength(node: SVGTextElement | null, fontPx: number): number {
+  if (node && typeof node.getComputedTextLength === 'function') {
+    const measured = node.getComputedTextLength();
+    if (Number.isFinite(measured) && measured > 0) return measured;
+  }
+  return (node?.textContent?.length ?? 0) * X_LABEL_CHAR_WIDTH_EM * fontPx;
+}
 
 /** Opacity of the license-fee segment relative to the SKU's profit colour. */
 /**
@@ -73,12 +98,12 @@ const STRINGS = {
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
     gpuHours: 'GPU-hours per GW-year',
-    tco: 'Compute expense (TCO)',
+    tco: 'Compute expense',
     grossMargin: 'Gross margin',
     labCut: 'Model license fee',
-    profit: 'Operator profit',
-    loss: 'Operator loss',
-    marginPct: 'Operator margin',
+    profit: 'Profit',
+    loss: 'Loss',
+    marginPct: 'Margin',
     marginShort: 'margin',
     utilization: 'Utilization',
     labCutShare: 'License fee share',
@@ -92,12 +117,12 @@ const STRINGS = {
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
     gpuHours: '每吉瓦年 GPU 小时数',
-    tco: '算力支出（TCO）',
+    tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
-    profit: '运营方利润',
-    loss: '运营方亏损',
-    marginPct: '运营方利润率',
+    profit: '利润',
+    loss: '亏损',
+    marginPct: '利润率',
     marginShort: '利润率',
     utilization: '利用率',
     labCutShare: '许可费比例',
@@ -189,7 +214,8 @@ export function profitYDomain(rows: readonly ProfitEstimatorRow[]): [number, num
   // exceed both revenue and TCO, so size the top to the tallest positive stack.
   const top = Math.max(0, ...rows.map((row) => Math.max(row.revenue, row.tco + row.labCut)));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
-  return [bottom * 1.12, top === 0 ? 1 : top * 1.2];
+  // Headroom above the tallest stack holds the revenue figure, margin, and vendor mark.
+  return [bottom * 1.12, top === 0 ? 1 : top * 1.3];
 }
 
 export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig): string {
@@ -441,16 +467,44 @@ export default function ProfitEstimatorChart({
           .attr('font-weight', (d) => (d.count === 2 && d.index === 1 ? '600' : '400'))
           .text((d) => d.line);
 
-        // Revenue above the stack with the operator margin under it; the loss
-        // figure sits below the bar when the stack dips under zero.
+        // Revenue above the stack with the margin under it; the loss figure
+        // sits below the bar when the stack dips under zero. The vendor's
+        // full-color mark sits above the revenue figure.
         const labelData = segments.filter((d) => d.kind === 'tco');
+        const stackTopPx = (d: ProfitSegment) => yScale(Math.max(d.row.revenue, d.row.tco));
+        const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
+        group
+          .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
+          .data(
+            labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
+            (d) => d.row.resultKey,
+          )
+          .join('image')
+          .attr('class', (d) =>
+            getAxisVendorIcon(d.row.hwKey)?.monochrome
+              ? 'bar-vendor-mark dark:invert'
+              : 'bar-vendor-mark',
+          )
+          .attr('aria-hidden', 'true')
+          .attr('href', (d) => getAxisVendorIcon(d.row.hwKey)?.href ?? '')
+          .attr('width', (d) => barMarkWidth(getAxisVendorIcon(d.row.hwKey)))
+          .attr('height', BAR_ICON_HEIGHT)
+          .attr('x', (d) => {
+            const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey));
+            return (xScale(d.row.resultKey) ?? 0) + bandwidth / 2 - w / 2;
+          })
+          .attr(
+            'y',
+            (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - BAR_ICON_HEIGHT,
+          )
+          .attr('pointer-events', 'none');
         const revenueText = group
           .selectAll<SVGTextElement, ProfitSegment>('.revenue-label')
           .data(labelData, (d) => d.row.resultKey)
           .join('text')
           .attr('class', 'revenue-label')
           .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', (d) => yScale(Math.max(d.row.revenue, d.row.tco)) - 20)
+          .attr('y', revenueBaselineY)
           .attr('text-anchor', 'middle')
           .attr('font-size', px(CHART_TYPE.axisLabel))
           .attr('font-weight', '700')
@@ -555,28 +609,29 @@ export default function ProfitEstimatorChart({
         const ticks = axisGroup.selectAll<SVGGElement, d3.AxisDomain>('.tick');
         ticks.each(function (d) {
           const tick = d3.select(this);
-          const icon = getLineLabelVendorIcon(hwKeyByResultKey.get(String(d)) ?? '');
+          const icon = getAxisVendorIcon(hwKeyByResultKey.get(String(d)) ?? '');
           // The label is rotated about the tick and anchored at its end, so
           // the text runs away from the axis towards the lower left. The
-          // vendor mark sits between the tick and the text, on the same
-          // rotated baseline, and the text shifts left to make room for it.
-          const iconOffset = icon ? icon.width + X_LABEL_ICON_GAP : 0;
-          tick
+          // vendor mark leads the label: it sits just before the first
+          // character, on the same rotated baseline, upright.
+          const text = tick
             .select<SVGTextElement>('text')
             .attr('transform', `rotate(${X_LABEL_ROTATION})`)
             .attr('text-anchor', 'end')
-            .attr('dx', `${-(X_LABEL_DX_EM * fontPx + iconOffset)}px`)
+            .attr('dx', `${-(X_LABEL_DX_EM * fontPx)}px`)
             .attr('dy', '0.6em')
             .attr('font-size', px(fontPx))
             .style('fill', 'var(--foreground)');
           tick.selectAll('image.vendor-mark').remove();
           if (!icon) return;
-          const scale = X_LABEL_ICON_SIZE / Math.max(icon.width, icon.height);
+          const textNode = text.node();
+          const textLength = axisLabelLength(textNode, fontPx);
+          const scale = X_LABEL_ICON_HEIGHT / icon.height;
           const w = icon.width * scale;
           const h = icon.height * scale;
-          // Centre of the mark in the label's rotated frame: just before the
-          // text end, vertically on the x-height (the baseline sits at dy=0.6em).
-          const cx = -(X_LABEL_DX_EM * fontPx) - w / 2;
+          // Centre of the mark in the label's rotated frame: before the start
+          // of the text, vertically on the x-height (the baseline sits at dy=0.6em).
+          const cx = -(X_LABEL_DX_EM * fontPx) - textLength - X_LABEL_ICON_GAP - w / 2;
           const cy = 0.6 * fontPx - h / 2 + fontPx * 0.15;
           // Map back to the tick's frame so the mark itself stays upright.
           const theta = (X_LABEL_ROTATION * Math.PI) / 180;
@@ -584,7 +639,7 @@ export default function ProfitEstimatorChart({
           const py0 = cx * Math.sin(theta) + cy * Math.cos(theta);
           tick
             .append('image')
-            .attr('class', 'vendor-mark dark:invert')
+            .attr('class', icon.monochrome ? 'vendor-mark dark:invert' : 'vendor-mark')
             .attr('aria-hidden', 'true')
             .attr('href', icon.href)
             .attr('width', w)
