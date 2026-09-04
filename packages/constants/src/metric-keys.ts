@@ -46,6 +46,23 @@ export const MEASURED_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(
 );
 
 /**
+ * Complete measured-power contract surface on `metrics`: the contract
+ * discriminators plus every measured power / energy / GPU-telemetry key.
+ * This is the set the public API documentation types on
+ * `BenchmarkRow.metrics`; it feeds METRIC_KEYS automatically.
+ */
+export const POWER_METRIC_KEYS = [
+  // measured power / energy publication contract (aggregate_power.py)
+  // power_valid: numeric 1/0 publication verdict; explicit 0 withholds power
+  // power_metric_schema_version: version 2 defines every unprefixed
+  //                              joules_per_* field as whole-deployment energy
+  'power_valid',
+  'power_metric_schema_version',
+  // measured power / energy / telemetry values, withheld when power_valid = 0
+  ...MEASURED_POWER_METRIC_KEY_LIST,
+] as const;
+
+/**
  * Canonical set of metric keys stored in the benchmark_results.metrics JSONB column.
  *
  * Latency values (ttft/tpot/itl/e2el/intvty) are in seconds. Throughput values are
@@ -177,13 +194,7 @@ export const METRIC_KEYS = new Set([
   // profiling window (agentic aiperf; flat in v2 artifacts, mapped from
   // server_metrics.kv_cache.gpu_usage_pct in v3)
   'gpu_kv_cache_usage_pct',
-  // measured power / energy publication contract (aggregate_power.py)
-  // power_valid: numeric 1/0 publication verdict; explicit 0 withholds power
-  // power_metric_schema_version: version 2 defines every unprefixed
-  //                              joules_per_* field as whole-deployment energy
-  'power_valid',
-  'power_metric_schema_version',
-  ...MEASURED_POWER_METRIC_KEY_LIST,
+  ...POWER_METRIC_KEYS,
   // extended parallelism dimensions (2026-07+ artifacts): pipeline parallelism
   // and decode/prefill context parallelism per role. These are config
   // dimensions, not measurements, but the configs table has no columns for

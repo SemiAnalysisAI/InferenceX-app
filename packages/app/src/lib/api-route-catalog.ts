@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c6a5b78108b7e0d523b11590e1e34ef2e8c2d5457673eb41338d93d3d8f04909',
+    sourceSha256: '7b251598bf9e4e181834311a554aa8ef7a9bc39d605eed243364ce5c3f5cc43e',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -443,7 +443,7 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmarks',
-    parameters: ['model', 'date', 'exact', 'runId', 'exactRun'],
+    parameters: ['model', 'date', 'exact', 'runId', 'exactRun', 'view', 'sequence', 'powerValid'],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',
