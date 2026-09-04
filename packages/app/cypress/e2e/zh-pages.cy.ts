@@ -154,6 +154,28 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('Run and Rankings model links', () => {
+    for (const [path, section] of [
+      ['/zh/run/deepseek-r1-on-b300', 'run-explore'],
+      ['/zh/rankings/fastest-gpu-for-deepseek-r1', 'ranking-explore'],
+    ] as const) {
+      it(`opens the matching Chinese model detail from ${path}`, () => {
+        cy.viewport(390, 844);
+        cy.visit(path, {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        });
+
+        cy.get(`[aria-labelledby="${section}"] a[href="/zh/model/deepseek-r1"]`)
+          .should('contain.text', 'DeepSeek R1')
+          .click();
+        cy.location('pathname').should('eq', '/zh/model/deepseek-r1');
+        cy.get('h1').should('have.text', 'DeepSeek R1 0528');
+      });
+    }
+  });
+
   describe('Glossary pages', () => {
     it('supports a mobile Chinese search, filter, and term navigation journey without overflow', () => {
       cy.viewport(375, 844);

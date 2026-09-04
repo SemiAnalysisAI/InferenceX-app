@@ -91,7 +91,7 @@ const STRINGS = {
   zh: {
     title: '集群生命周期',
     description:
-      '选择模型、工作负载与目标交互性。下方的测算会按设施功率预算确定各芯片固定集群的规模，并在该操作点上读取完整运行历史——各条曲线的含义见板块内说明。',
+      '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '集群成本线采用的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
