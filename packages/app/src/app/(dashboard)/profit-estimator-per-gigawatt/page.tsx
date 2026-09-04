@@ -5,7 +5,7 @@ import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { defaultRouteModel } from '@/lib/model-routes';
 import { tabMetadata } from '@/lib/tab-meta';
 
-export const metadata: Metadata = tabMetadata('profit-estimator');
+export const metadata: Metadata = tabMetadata('profit-estimator-per-gigawatt');
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -21,8 +21,8 @@ export default async function ProfitEstimatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <ProfitEstimatorDisplay
-      basis="chip-hour"
-      urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
+      basis="gw-year"
+      urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt') }}
     />
   );
 }

@@ -28,29 +28,39 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
-  if (!resolved || !modelRouteAvailableForTab('profit-estimator', resolved.route.model)) return {};
-  return modelTabMetadata('profit-estimator', resolved.route);
+  if (
+    !resolved ||
+    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
+  )
+    return {};
+  return modelTabMetadata('profit-estimator-per-gigawatt', resolved.route);
 }
 
 export default async function ProfitEstimatorModelPage({ params, searchParams }: Props) {
   const [{ model }, sp] = await Promise.all([params, searchParams]);
   const resolved = resolveModelRouteSlug(model);
   // Only the models this tab serves (see MODEL_ROUTE_TAB_MODELS) get a page.
-  if (!resolved || !modelRouteAvailableForTab('profit-estimator', resolved.route.model)) {
+  if (
+    !resolved ||
+    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
+  ) {
     notFound();
   }
   // Aliases and non-canonical casing 308 to the canonical slug, keeping any
   // share-link params.
   if (resolved.isAlias) {
     permanentRedirect(
-      pathWithSearchParams(modelRoutePath('profit-estimator', resolved.route.slug), sp),
+      pathWithSearchParams(
+        modelRoutePath('profit-estimator-per-gigawatt', resolved.route.slug),
+        sp,
+      ),
     );
   }
   const seed = resolveCalculatorUrlSeed(sp);
   // A legacy explicit ?g_model= wins over the path, as on /calculator/<model>.
   return (
     <ProfitEstimatorDisplay
-      basis="chip-hour"
+      basis="gw-year"
       urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
     />
   );

@@ -6,8 +6,8 @@ import {
 import { Model, MODEL_OPTIONS } from '@/lib/data-mappings';
 
 // ---------------------------------------------------------------------------
-// Per-model dashboard routes: /calculator/<model>, /historical/<model>, and
-// /profit-estimator/<model>
+// Per-model dashboard routes: /calculator/<model>, /historical/<model>,
+// /profit-estimator/<model>, and /profit-estimator-per-gigawatt/<model>
 // ---------------------------------------------------------------------------
 //
 // The bare /calculator and /historical tabs render the DEFAULT model; the
@@ -25,13 +25,19 @@ import { Model, MODEL_OPTIONS } from '@/lib/data-mappings';
 // canonical slug, mirroring compare behavior.
 
 /** Dashboard tabs that expose per-model child routes. */
-export const MODEL_ROUTE_TABS = ['calculator', 'historical', 'profit-estimator'] as const;
+export const MODEL_ROUTE_TABS = [
+  'calculator',
+  'historical',
+  'profit-estimator',
+  'profit-estimator-per-gigawatt',
+] as const;
 export type ModelRouteTab = (typeof MODEL_ROUTE_TABS)[number];
 
 const MODEL_ROUTE_TAB_PATHS: Record<ModelRouteTab, `/${string}`> = {
   calculator: '/calculator',
   historical: '/historical',
   'profit-estimator': '/profit-estimator',
+  'profit-estimator-per-gigawatt': '/profit-estimator-per-gigawatt',
 };
 
 /**
@@ -45,7 +51,7 @@ export const DEFAULT_ROUTE_MODEL: Model = Model.DeepSeek_V4_Pro;
 
 /**
  * Model each bare tab route renders. Calculator and historical follow the
- * app-wide default; the profit estimator is pinned to agentic traces and opens
+ * app-wide default; the profit estimators are pinned to agentic traces and open
  * on Kimi K3, the model that workload is benchmarked most widely on. The page
  * component seeds `GlobalFilterProvider` with the same model, and
  * `model-routes.test.ts` pins that agreement.
@@ -54,6 +60,7 @@ const MODEL_ROUTE_TAB_DEFAULT_MODEL: Record<ModelRouteTab, Model> = {
   calculator: DEFAULT_ROUTE_MODEL,
   historical: DEFAULT_ROUTE_MODEL,
   'profit-estimator': Model.Kimi_K3,
+  'profit-estimator-per-gigawatt': Model.Kimi_K3,
 };
 
 /** Model the bare `tab` route shows; its slugged page canonicalizes to the bare path. */
@@ -62,13 +69,14 @@ export function defaultRouteModel(tab: ModelRouteTab): Model {
 }
 
 /**
- * Tabs that expose only a subset of `MODEL_ROUTES`. The profit estimator is
+ * Tabs that expose only a subset of `MODEL_ROUTES`. The profit estimators are
  * launching with Kimi K3 alone (the only model whose agentic coverage spans
  * every SKU we price); other slugs 404 there and stay out of the sitemap.
  * Tabs absent from this map offer every model.
  */
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': [Model.Kimi_K3],
+  'profit-estimator-per-gigawatt': [Model.Kimi_K3],
 };
 
 /** Routes a tab actually serves, in `MODEL_ROUTES` order. */

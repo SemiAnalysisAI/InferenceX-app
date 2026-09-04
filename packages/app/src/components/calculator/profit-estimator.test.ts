@@ -6,7 +6,9 @@ import {
   clampPercent,
   estimateProfitRows,
   estimateSkuProfit,
+  formatProfitUsd,
   formatUsdCompact,
+  formatUsdPerChipHour,
   gpuHoursPerGwYear,
   HOURS_PER_YEAR,
   isProfitEstimatorRow,
@@ -74,7 +76,11 @@ describe('clampPercent', () => {
 describe('estimateSkuProfit', () => {
   it('stacks TCO, license fee and profit back up to revenue at 100% utilization', () => {
     const r = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 100, labCutPct: 30 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 100,
+        labCutPct: 30,
+        basis: 'gw-year',
+      }),
     );
     expect(r.revenuePerGpuHour).toBeCloseTo(3.6, 9);
     expect(r.revenue).toBeCloseTo(3.6 * B200_GPU_HOURS, 0);
@@ -88,10 +94,18 @@ describe('estimateSkuProfit', () => {
 
   it('scales revenue by utilization and leaves TCO alone', () => {
     const full = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 100, labCutPct: 30 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 100,
+        labCutPct: 30,
+        basis: 'gw-year',
+      }),
     );
     const partial = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 60, labCutPct: 30 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 60,
+        labCutPct: 30,
+        basis: 'gw-year',
+      }),
     );
     expect(partial.revenue).toBeCloseTo(full.revenue * 0.6, 3);
     expect(partial.tco).toBeCloseTo(full.tco, 9);
@@ -101,7 +115,11 @@ describe('estimateSkuProfit', () => {
 
   it('takes the license fee from revenue, not from gross margin', () => {
     const r = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 60, labCutPct: 30 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 60,
+        labCutPct: 30,
+        basis: 'gw-year',
+      }),
     );
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
     expect(r.labCut).not.toBeCloseTo(0.3 * (r.revenue - r.tco), 0);
@@ -113,7 +131,13 @@ describe('estimateSkuProfit', () => {
       inputPerMillion: 0.2,
       outputPerMillion: 0.2,
     };
-    const r = row(estimateSkuProfit(result, B200, cheap, { utilizationPct: 60, labCutPct: 30 }));
+    const r = row(
+      estimateSkuProfit(result, B200, cheap, {
+        utilizationPct: 60,
+        labCutPct: 30,
+        basis: 'gw-year',
+      }),
+    );
     // 1000 tok/s * 3600 / 1e6 * $0.2 = $0.72/GPU/hr, then 60% -> well below $1.73.
     expect(r.grossMargin).toBeLessThan(0);
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
@@ -123,13 +147,21 @@ describe('estimateSkuProfit', () => {
 
   it('honours a zero license fee and clamps out-of-range percentages', () => {
     const none = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 100, labCutPct: 0 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 100,
+        labCutPct: 0,
+        basis: 'gw-year',
+      }),
     );
     expect(none.labCut).toBe(0);
     expect(none.profit).toBeCloseTo(none.grossMargin, 9);
 
     const over = row(
-      estimateSkuProfit(result, B200, FLAT_PRICING, { utilizationPct: 250, labCutPct: 130 }),
+      estimateSkuProfit(result, B200, FLAT_PRICING, {
+        utilizationPct: 250,
+        labCutPct: 130,
+        basis: 'gw-year',
+      }),
     );
     expect(over.revenue).toBeCloseTo(3.6 * B200_GPU_HOURS, 0);
     expect(over.labCut).toBeCloseTo(over.revenue, 3);
@@ -138,7 +170,11 @@ describe('estimateSkuProfit', () => {
 
   it('prices input and output streams separately when the prices differ', () => {
     const r = row(
-      estimateSkuProfit(result, B200, SPLIT_PRICING, { utilizationPct: 100, labCutPct: 0 }),
+      estimateSkuProfit(result, B200, SPLIT_PRICING, {
+        utilizationPct: 100,
+        labCutPct: 0,
+        basis: 'gw-year',
+      }),
     );
     // 800 input tok/s at $0.5/M + 200 output tok/s at $2/M, per hour.
     const expected = ((800 * 0.5 + 200 * 2) * 3_600) / 1_000_000;
@@ -149,6 +185,7 @@ describe('estimateSkuProfit', () => {
     const skip = estimateSkuProfit({ ...result, inputTokenShare: undefined }, B200, SPLIT_PRICING, {
       utilizationPct: 60,
       labCutPct: 30,
+      basis: 'gw-year',
     });
     expect(isProfitEstimatorRow(skip)).toBe(false);
     if (!isProfitEstimatorRow(skip)) expect(skip.reason).toBe('no-token-mix');
@@ -162,6 +199,7 @@ describe('estimateSkuProfit', () => {
       {
         utilizationPct: 60,
         labCutPct: 30,
+        basis: 'gw-year',
       },
     );
     const noCost = estimateSkuProfit(
@@ -171,16 +209,33 @@ describe('estimateSkuProfit', () => {
       {
         utilizationPct: 60,
         labCutPct: 30,
+        basis: 'gw-year',
       },
     );
     expect(isProfitEstimatorRow(noPower) ? null : noPower.reason).toBe('no-power');
     expect(isProfitEstimatorRow(noCost) ? null : noCost.reason).toBe('no-cost');
   });
 
+  it('prices one chip-hour when the basis is chip-hour: GPU-hours = 1 and power is ignored', () => {
+    const r = row(
+      estimateSkuProfit(result, { powerKwPerGpu: 0, costPerGpuHour: 1.73 }, FLAT_PRICING, {
+        utilizationPct: 60,
+        labCutPct: 30,
+        basis: 'chip-hour',
+      }),
+    );
+    expect(r.gpuHours).toBe(1);
+    expect(r.revenue).toBeCloseTo(3.6 * 0.6, 9);
+    expect(r.tco).toBeCloseTo(1.73, 9);
+    expect(r.labCut).toBeCloseTo(3.6 * 0.6 * 0.3, 9);
+    expect(r.profit).toBeCloseTo(3.6 * 0.6 - 1.73 - 3.6 * 0.6 * 0.3, 9);
+  });
+
   it('skips a config the target falls outside of instead of pricing its edge point', () => {
     const skipped = estimateSkuProfit({ ...result, clamped: true }, B200, FLAT_PRICING, {
       utilizationPct: 60,
       labCutPct: 30,
+      basis: 'gw-year',
     });
     expect(isProfitEstimatorRow(skipped) ? null : skipped.reason).toBe('outside-measured-range');
   });
@@ -201,12 +256,23 @@ describe('estimateProfitRows', () => {
       ],
       (hwKey) => specs[hwKey]!,
       FLAT_PRICING,
-      { utilizationPct: 60, labCutPct: 30 },
+      { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' },
     );
     expect(rows.map((r) => r.resultKey)).toEqual(['b200', 'h200']);
     expect(skipped).toEqual([
       { hwKey: 'ghost', resultKey: 'ghost', precision: undefined, reason: 'no-power' },
     ]);
+  });
+});
+
+describe('formatProfitUsd', () => {
+  it('uses fixed cents per chip-hour and compact units per GW-year', () => {
+    expect(formatProfitUsd(2.3, 'chip-hour')).toBe('$2.30');
+    expect(formatProfitUsd(-0.456, 'chip-hour')).toBe('-$0.46');
+    expect(formatProfitUsd(2.3, 'chip-hour', 0)).toBe('$2.30');
+    expect(formatProfitUsd(135.2e9, 'gw-year')).toBe('$135.2B');
+    expect(formatProfitUsd(135.2e9, 'gw-year', 0)).toBe('$135B');
+    expect(formatUsdPerChipHour(Number.NaN)).toBe('—');
   });
 });
 

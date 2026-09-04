@@ -6,7 +6,7 @@ import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { defaultRouteModel } from '@/lib/model-routes';
 import { tabMetadataZh } from '@/lib/tab-meta-zh';
 
-export const metadata: Metadata = tabMetadataZh('profit-estimator');
+export const metadata: Metadata = tabMetadataZh('profit-estimator-per-gigawatt');
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -18,10 +18,13 @@ export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="profit-estimator" />
+      <ZhTabIntro tab="profit-estimator-per-gigawatt" />
       <ProfitEstimatorDisplay
-        basis="chip-hour"
-        urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
+        basis="gw-year"
+        urlSeed={{
+          ...seed,
+          model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt'),
+        }}
       />
     </>
   );

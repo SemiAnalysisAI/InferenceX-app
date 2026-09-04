@@ -19,20 +19,25 @@ describe('TCO Calculator', () => {
       cy.visit('/inference');
     });
 
-    it('shows the TCO Calculator tab trigger', () => {
-      cy.get('[data-testid="tab-trigger-calculator"]').should('be.visible');
-      cy.get('[data-testid="tab-trigger-calculator"]').should('contain.text', 'TCO Calculator');
+    it('links the TCO Calculator from the footer, not the tab bar', () => {
+      cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+      cy.get('[data-testid="footer-link-calculator"]')
+        .scrollIntoView()
+        .should('be.visible')
+        .and('contain.text', 'TCO Calculator');
     });
 
-    it('clicking the calculator tab navigates to it', () => {
-      cy.get('[data-testid="tab-trigger-calculator"]').click();
+    it('clicking the footer calculator link navigates to it', () => {
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
     });
 
     it('switches back to inference tab and then returns to calculator', () => {
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
+      cy.url().should('include', '/calculator');
       cy.get('[data-testid="tab-trigger-inference"]').click();
       cy.url().should('include', '/inference');
-      cy.get('[data-testid="tab-trigger-calculator"]').click();
+      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
     });

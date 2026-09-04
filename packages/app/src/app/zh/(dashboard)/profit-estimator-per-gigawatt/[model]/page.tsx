@@ -24,11 +24,15 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
-  if (!resolved || !modelRouteAvailableForTab('profit-estimator', resolved.route.model)) return {};
+  if (
+    !resolved ||
+    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
+  )
+    return {};
   return modelTabMetadataZh(
-    'profit-estimator',
+    'profit-estimator-per-gigawatt',
     resolved.route,
-    modelTabCanonicalPath('profit-estimator', resolved.route),
+    modelTabCanonicalPath('profit-estimator-per-gigawatt', resolved.route),
   );
 }
 
@@ -36,26 +40,32 @@ export default async function ZhProfitEstimatorModelPage({ params, searchParams 
   const [{ model }, sp] = await Promise.all([params, searchParams]);
   const resolved = resolveModelRouteSlug(model);
   // Only the models this tab serves (see MODEL_ROUTE_TAB_MODELS) get a page.
-  if (!resolved || !modelRouteAvailableForTab('profit-estimator', resolved.route.model)) {
+  if (
+    !resolved ||
+    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
+  ) {
     notFound();
   }
   // Keep share-link params through the 308.
   if (resolved.isAlias) {
     permanentRedirect(
-      pathWithSearchParams(`/zh${modelRoutePath('profit-estimator', resolved.route.slug)}`, sp),
+      pathWithSearchParams(
+        `/zh${modelRoutePath('profit-estimator-per-gigawatt', resolved.route.slug)}`,
+        sp,
+      ),
     );
   }
   const seed = resolveCalculatorUrlSeed(sp);
-  const meta = MODEL_TAB_META_ZH['profit-estimator'];
+  const meta = MODEL_TAB_META_ZH['profit-estimator-per-gigawatt'];
   return (
     <>
       <ZhTabIntro
-        tab="profit-estimator"
+        tab="profit-estimator-per-gigawatt"
         title={meta.title(resolved.route.seoName)}
         intro={meta.intro(resolved.route.seoName)}
       />
       <ProfitEstimatorDisplay
-        basis="chip-hour"
+        basis="gw-year"
         urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
       />
     </>

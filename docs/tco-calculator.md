@@ -1011,28 +1011,49 @@ the comment there. The MW budget is `c_mw`, defaults to 10 MW, and is shared by
 the calculator and Fleet Lifecycle page so a budget set on either seeds the
 other.
 
-## Profit Estimator (`/profit-estimator`)
+## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
 
-> Hosted by `ProfitEstimatorDisplay.tsx` with the math in `profit-estimator.ts` and the
-> bars in `ProfitEstimatorChart.tsx`. Mirrored at `/zh/profit-estimator`. Per-model
-> routes live at `/profit-estimator/<slug>` (and `/zh/...`), see below.
+> Both hosted by `ProfitEstimatorDisplay.tsx` with the math in `profit-estimator.ts` and
+> the bars in `ProfitEstimatorChart.tsx`; the page passes `basis="chip-hour"` or
+> `basis="gw-year"`. Mirrored at `/zh/profit-estimator` and
+> `/zh/profit-estimator-per-gigawatt`. Per-model routes live at `/<tab>/<slug>` (and
+> `/zh/...`), see below.
 
-Fleet Lifecycle answers "what did a fixed fleet earn over its life". This page answers
-a narrower, present-tense question: at one interactivity operating point, what does a
-**gigawatt-year** of each chip earn today, and who keeps it? One vertical stacked bar
-per SKU; the y axis reads "Revenue per all-in provisioned utility GW per year ($ USD)"
-(a shorter form on phones).
+Fleet Lifecycle answers "what did a fixed fleet earn over its life". These two tabs
+answer a narrower, present-tense question: at one interactivity operating point, what
+does each chip earn today, and who keeps it? One vertical stacked bar per SKU. The two
+tabs differ only in the denominator (`ProfitBasis`):
+
+- **Profit Estimator** (`/profit-estimator`, `chip-hour`): one GPU for one hour. The
+  bar is the $/GPU/hr the chip sells for at that interactivity; compute expense is the
+  TCO tier's $/chip/hr as published. Figures are dollars and cents (`$2.31`). The y
+  axis reads "Revenue per chip per hour ($ USD)".
+- **Profit Estimator per GW** (`/profit-estimator-per-gigawatt`, `gw-year`): the same
+  per-chip figures multiplied by the GPU-hours one all-in utility gigawatt-year buys
+  for that SKU, so chips with very different power draw compare on the same
+  denominator. Figures are compact (`$135.2B`). The y axis reads "Revenue per all-in
+  provisioned utility GW per year ($ USD)" (a shorter form on phones).
+
+In the nav both sit right after Inference Performance and Accuracy Evals. TCO
+Calculator and Fleet Lifecycle moved out of the tab bar into the footer's "More" column
+(`navGroup: 'footer-only'`, `footer-link-calculator` / `footer-link-fleet`); their
+pages, `/zh` mirrors and sitemap entries are unchanged.
 
 ### The arithmetic
 
 ```
-gpuHoursPerGwYear = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h
-revenue           = $/GPU/hr(sale) × gpuHoursPerGwYear × utilization
-tco               = $/GPU/hr(cost) × gpuHoursPerGwYear
-grossMargin       = revenue − tco
-licenseFee        = revenue × licenseFeePct       # `labCut` in code
-profit            = revenue − tco − licenseFee
+gpuHours    = 1                                          # chip-hour basis
+gpuHours    = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h   # gw-year basis
+revenue     = $/GPU/hr(sale) × gpuHours × utilization
+tco         = $/GPU/hr(cost) × gpuHours
+grossMargin = revenue − tco
+licenseFee  = revenue × licenseFeePct       # `labCut` in code
+profit      = revenue − tco − licenseFee
 ```
+
+`formatProfitUsd(value, basis)` picks the formatter: two fixed decimals per chip-hour,
+`formatUsdCompact` per GW-year. A SKU with no power figure is skipped (`no-power`) on
+the GW-year basis only; per chip-hour power never enters.
 
 `$/GPU/hr(sale)` comes from `tokenRevenueFromRatesPerGpuHour`, so it reuses the
 calculator's input/cached/output token split and the OpenRouter catalog price (or a
@@ -1069,11 +1090,13 @@ and the two can be collapsed into one once both are on master.
   densest measured run set). The interactivity target is a typed number in the same
   row as utilization and the license fee.
 - **Kimi K3 only, for now.** The model selector offers the tab's route allow-list
-  (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` in `model-routes.ts`) intersected with
-  the models that have an agentic run. The bare path opens on Kimi K3
-  (`defaultRouteModel('profit-estimator')`); `/profit-estimator/kimi-k3` is the same
-  page, aliases 308 to the canonical slug, and any model outside the allow-list 404s.
-  Widening the page to more models is one list edit plus fixture rows.
+  (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
+  `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
+  models that have an agentic run. Each bare path opens on Kimi K3
+  (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
+  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, aliases 308 to the
+  canonical slug, and any model outside the allow-list 404s. Widening the pages to
+  more models is one list edit plus fixture rows.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and
@@ -1082,10 +1105,12 @@ and the two can be collapsed into one once both are on master.
 - **Vendor mark above each bar, not on the axis.** The full-color logo
   (`getAxisVendorIcon`) sits above the revenue figure and margin line. NVIDIA's mark
   is the brand green and is never inverted; AMD publishes no color mark, so its arrow
-  is black and inverts to white in dark mode. The y domain leaves exactly
-  `STACK_HEADROOM_PX` above the tallest stack for those labels (`profitYDomain` takes
-  the plot height), and the top margin is 12px, so the grid starts right under the
-  selling-price line.
+  is black and inverts to white in dark mode. The mark scales with the bar:
+  `barMarkHeight(bandwidth)` is 22% of the band width clamped to 14–40px, so desktop
+  bars get a large logo and phone bars the small one. The y domain leaves exactly
+  `stackHeadroomPx(markHeight)` above the tallest stack for those labels
+  (`profitYDomain` takes the plot height and that headroom), and the top margin is
+  12px, so the grid starts right under the selling-price line.
 - **Phone layout.** Below 640px the chart switches to compact margins and height, and
   segment labels drop the name, then the amount, when the bar is too narrow
   (`segmentLabelLines` with a width); the margin line keeps only the percentage.

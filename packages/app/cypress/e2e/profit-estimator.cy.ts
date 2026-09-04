@@ -61,10 +61,10 @@ function parseCompactUsd(text: string): number {
   return (sign === '-' ? -1 : 1) * Number.parseFloat(digits) * scale;
 }
 
-describe('Profit Estimator', () => {
+describe('Profit Estimator per GW', () => {
   before(() => {
     stubOpenRouter();
-    cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
   });
 
@@ -77,7 +77,7 @@ describe('Profit Estimator', () => {
     bars().should('have.length.greaterThan', 0);
     // Segments are labelled in place; there is no separate key under the title.
     cy.get('[data-testid="profit-segment-key"]').should('not.exist');
-    chart().should('contain.text', 'Model license fee').and('contain.text', 'Profit');
+    chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
@@ -93,7 +93,7 @@ describe('Profit Estimator', () => {
       .and('contain.text', 'Output: $2.5')
       .and('contain.text', '(OpenRouter)')
       .and('not.contain.text', 'moonshotai');
-    cy.location('pathname').should('eq', '/profit-estimator');
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
     cy.get('[role="option"]').should('have.length', 1).and('contain.text', 'Kimi K3');
@@ -121,6 +121,29 @@ describe('Profit Estimator', () => {
     cy.get('[data-testid="export-button"]').should('exist');
     cy.get('[data-testid="profit-scenario"]').should('not.exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
+    // Both profit tabs follow Accuracy Evals; the TCO calculator and fleet
+    // lifecycle left the nav for the footer.
+    cy.get('[data-testid^="tab-trigger-"]').then(($tabs) => {
+      const keys = [...$tabs].map((el) => (el as HTMLElement).dataset.testid);
+      expect(keys.slice(0, 4)).to.deep.equal([
+        'tab-trigger-inference',
+        'tab-trigger-evaluation',
+        'tab-trigger-profit-estimator-per-gigawatt',
+        'tab-trigger-profit-estimator',
+      ]);
+      expect(keys).to.not.include('tab-trigger-calculator');
+      expect(keys).to.not.include('tab-trigger-fleet');
+    });
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should(
+      'contain.text',
+      'Profit Estimator per GW',
+    );
+    cy.get('[data-testid="footer-link-calculator"]')
+      .should('have.attr', 'href', '/calculator')
+      .and('contain.text', 'TCO Calculator');
+    cy.get('[data-testid="footer-link-fleet"]')
+      .should('have.attr', 'href', '/fleet')
+      .and('contain.text', 'Fleet Lifecycle');
   });
 
   it('stacks TCO first and labels every bar with its revenue', () => {
@@ -273,7 +296,7 @@ describe('Profit Estimator', () => {
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {
     interceptProfitData();
     cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] }).as('openrouter-empty');
-    cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="profit-pricing-notice"]').should(
       'contain.text',
       'OpenRouter has no price',
@@ -282,35 +305,37 @@ describe('Profit Estimator', () => {
   });
 });
 
-describe('Profit Estimator — per-model route', () => {
-  it('serves /profit-estimator/kimi-k3 and 308s aliases to the canonical slug', () => {
+describe('Profit Estimator per GW — per-model route', () => {
+  it('serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug', () => {
     stubOpenRouter();
-    cy.visit('/profit-estimator/kimi-k3', { onBeforeLoad: suppressNudges });
+    cy.visit('/profit-estimator-per-gigawatt/kimi-k3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
     // A canonical slug is left alone; only aliases and model switches rewrite.
-    cy.location('pathname').should('eq', '/profit-estimator/kimi-k3');
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
 
-    cy.request({ url: '/profit-estimator/Kimi-K3', followRedirect: false }).then((response) => {
-      expect(response.status).to.eq(308);
-      expect(response.headers.location).to.match(/\/profit-estimator\/kimi-k3$/u);
-    });
+    cy.request({ url: '/profit-estimator-per-gigawatt/Kimi-K3', followRedirect: false }).then(
+      (response) => {
+        expect(response.status).to.eq(308);
+        expect(response.headers.location).to.match(/\/profit-estimator-per-gigawatt\/kimi-k3$/u);
+      },
+    );
   });
 
   it('404s models the estimator does not serve yet', () => {
-    cy.request({ url: '/profit-estimator/deepseek-v4-pro', failOnStatusCode: false })
+    cy.request({ url: '/profit-estimator-per-gigawatt/deepseek-v4-pro', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
-    cy.request({ url: '/profit-estimator/not-a-model', failOnStatusCode: false })
+    cy.request({ url: '/profit-estimator-per-gigawatt/not-a-model', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
   });
 });
 
-describe('Profit Estimator — Chinese mirror', () => {
-  it('renders /zh/profit-estimator with translated controls and caption', () => {
+describe('Profit Estimator per GW — Chinese mirror', () => {
+  it('renders /zh/profit-estimator-per-gigawatt with translated controls and caption', () => {
     stubOpenRouter();
-    cy.visit('/zh/profit-estimator', { onBeforeLoad: suppressNudges });
+    cy.visit('/zh/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('label[for="profit-utilization"]').should('contain.text', '利用率');
     cy.get('label[for="profit-lab-cut"]').should('contain.text', '模型许可费');
@@ -319,5 +344,64 @@ describe('Profit Estimator — Chinese mirror', () => {
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦每年收入与利润估算');
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
+  });
+});
+
+describe('Profit Estimator (per chip-hour)', () => {
+  before(() => {
+    stubOpenRouter();
+    cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+  });
+
+  beforeEach(stubOpenRouter);
+
+  it('prices one chip-hour with the same defaults and TCO $/chip/hr as the expense', () => {
+    cy.location('pathname').should('eq', '/profit-estimator');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-caption"] h2').should(
+      'contain.text',
+      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity',
+    );
+    cy.get('[data-testid="profit-formula-notes"]').should(
+      'contain.text',
+      'Revenue per Chip-Hour Formula',
+    );
+    openFormulaNotes();
+    cy.get('[data-testid="profit-formula-notes"]').should('contain.text', 'TCO $/chip/hr');
+    // Revenue labels are dollars and cents, not billions.
+    revenueLabels().should('have.length', 4);
+    revenueLabels()
+      .first()
+      .invoke('text')
+      .should('match', /^\$\d+\.\d{2}/u)
+      .and('not.match', /[BMk]/u);
+    chart().should('contain.text', 'Compute Expense').and('contain.text', 'Model License Fee');
+    chart().find('image.bar-vendor-mark').should('have.length', 4);
+    cy.get('[data-testid="tab-trigger-profit-estimator"]')
+      .should('contain.text', 'Profit Estimator')
+      .and('have.attr', 'data-tab-active');
+  });
+
+  it('serves the Kimi K3 slug, the Chinese mirror, and 404s other models', () => {
+    cy.request({ url: '/profit-estimator/Kimi-K3', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.match(/\/profit-estimator\/kimi-k3$/u);
+    });
+    cy.request({ url: '/profit-estimator/deepseek-v4-pro', failOnStatusCode: false })
+      .its('status')
+      .should('eq', 404);
+    stubOpenRouter();
+    cy.visit('/zh/profit-estimator', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-caption"] h2').should(
+      'contain.text',
+      '每芯片每小时收入与利润估算',
+    );
+    cy.get('[data-testid="footer-link-calculator"]')
+      .should('have.attr', 'href', '/zh/calculator')
+      .and('contain.text', 'TCO 计算器');
   });
 });

@@ -50,6 +50,17 @@ describe('per-model profit estimator metadata', () => {
     expect(modelTabCanonicalPath('calculator', deepseek)).toBe('/calculator');
   });
 
+  it('gives the per-gigawatt view its own Kimi-defaulted route and GW wording', () => {
+    expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
+    expect(modelTabCanonicalPath('profit-estimator-per-gigawatt', kimi)).toBe(
+      '/profit-estimator-per-gigawatt',
+    );
+    expect(MODEL_TAB_META['profit-estimator-per-gigawatt'].title(kimi.seoName)).toContain(
+      'per GigaWatt',
+    );
+    expect(MODEL_TAB_META['profit-estimator'].description(kimi.seoName)).toContain('chip-hour');
+  });
+
   it('names the model in the title and description', () => {
     const meta = modelTabMetadata('profit-estimator', deepseek);
     expect(meta.title).toBe(MODEL_TAB_META['profit-estimator'].title(deepseek.seoName));

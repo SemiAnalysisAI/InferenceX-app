@@ -13,7 +13,11 @@ import {
   xLabelLayout,
   operatorMarginLabel,
   profitYDomain,
+  BAR_ICON_MAX_HEIGHT,
+  BAR_ICON_MIN_HEIGHT,
+  barMarkHeight,
   STACK_HEADROOM_PX,
+  stackHeadroomPx,
   rowLabel,
   segmentLabelLines,
 } from './ProfitEstimatorChart';
@@ -22,7 +26,7 @@ function row(overrides: Partial<ProfitEstimatorRow> = {}): ProfitEstimatorRow {
   return {
     hwKey: 'h200',
     resultKey: 'h200',
-    gpuHoursPerGwYear: 6_394_160_584,
+    gpuHours: 6_394_160_584,
     revenuePerGpuHour: 3,
     revenue: 1000,
     tco: 400,
@@ -68,6 +72,19 @@ describe('buildProfitSegments', () => {
   });
 });
 
+describe('barMarkHeight', () => {
+  it('grows the vendor mark with the bar between the phone and desktop bounds', () => {
+    expect(barMarkHeight(0)).toBe(BAR_ICON_MIN_HEIGHT);
+    expect(barMarkHeight(40)).toBe(BAR_ICON_MIN_HEIGHT);
+    expect(barMarkHeight(100)).toBeCloseTo(22, 5);
+    expect(barMarkHeight(400)).toBe(BAR_ICON_MAX_HEIGHT);
+    // The headroom the domain reserves follows the mark.
+    expect(stackHeadroomPx(BAR_ICON_MAX_HEIGHT) - STACK_HEADROOM_PX).toBe(
+      BAR_ICON_MAX_HEIGHT - BAR_ICON_MIN_HEIGHT,
+    );
+  });
+});
+
 describe('profitYDomain', () => {
   it('falls back to a unit domain with no rows', () => {
     expect(profitYDomain([])).toEqual([0, 1]);
@@ -87,6 +104,10 @@ describe('profitYDomain', () => {
     // A taller plot needs proportionally less data-space headroom.
     expect(profitYDomain([row()], 1000)[1]).toBeLessThan(top);
     expect(top).toBeLessThan(1300);
+    // A bigger vendor mark asks for more headroom at the same plot height.
+    const [, roomy] = profitYDomain([row()], 500, stackHeadroomPx(BAR_ICON_MAX_HEIGHT));
+    expect(roomy).toBeGreaterThan(top);
+    expect((roomy - 1000) * (500 / roomy)).toBeCloseTo(stackHeadroomPx(BAR_ICON_MAX_HEIGHT), 5);
   });
 
   it('extends below zero when any SKU loses money, and covers TCO when it exceeds revenue', () => {
@@ -118,7 +139,7 @@ describe('rowLabel', () => {
 });
 
 describe('generateProfitTooltipHTML', () => {
-  const assumptions = { utilizationPct: 60, labCutPct: 30 };
+  const assumptions = { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' } as const;
 
   it('lists revenue, TCO, license fee, and profit with the configured percentages', () => {
     const html = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false);
@@ -139,8 +160,24 @@ describe('generateProfitTooltipHTML', () => {
     );
     expect(html).toContain('Loss');
     expect(html).toContain('-$190');
-    expect(html).toContain('Model license fee');
+    expect(html).toContain('Model License Fee');
     expect(html).toContain('$90');
+  });
+
+  it('formats cents and drops the GPU-hours footer on the chip-hour basis', () => {
+    const html = generateProfitTooltipHTML(
+      row({ revenue: 2.16, tco: 1.73, grossMargin: 0.43, labCut: 0.648, profit: -0.218 }),
+      hardwareConfig,
+      { ...assumptions, basis: 'chip-hour' },
+      'en',
+      false,
+    );
+    expect(html).toContain('$2.16');
+    expect(html).toContain('-$0.22');
+    expect(html).not.toContain('/GPU/hr');
+    const perGw = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false);
+    expect(perGw).toContain('/GPU/hr');
+    expect(perGw).not.toContain('GPU-hours');
   });
 
   it('renders Chinese copy and the pin hint when requested', () => {
@@ -164,17 +201,17 @@ describe('generateProfitTooltipHTML', () => {
 });
 
 const SEGMENT_WORDS = {
-  tco: 'Compute expense',
-  labCut: 'Model license fee',
+  tco: 'Compute Expense',
+  labCut: 'Model License Fee',
   profit: 'Profit',
   loss: 'Loss',
 };
 
 describe('segmentLabelLines', () => {
   it('names the segment and its amount when the rectangle is tall enough', () => {
-    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute expense', '$400']);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute Expense', '$400']);
     expect(segmentLabelLines('labCut', row(), 40, SEGMENT_WORDS)).toEqual([
-      'Model license fee',
+      'Model License Fee',
       '$180',
     ]);
     expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual(['Profit', '$420']);
@@ -182,6 +219,9 @@ describe('segmentLabelLines', () => {
 
   it('drops to the amount alone, then to nothing, as the rectangle shrinks', () => {
     expect(segmentLabelLines('profit', row(), 20, SEGMENT_WORDS)).toEqual(['$420']);
+    expect(
+      segmentLabelLines('profit', row({ profit: 0.5 }), 40, SEGMENT_WORDS, undefined, 'chip-hour'),
+    ).toEqual(['Profit', '$0.50']);
     expect(segmentLabelLines('profit', row(), 10, SEGMENT_WORDS)).toEqual([]);
   });
 
@@ -191,9 +231,9 @@ describe('segmentLabelLines', () => {
   });
 
   it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
-    // "Compute expense" is 15 glyphs; at 11px that is ~91px plus padding.
+    // "Compute Expense" is 15 glyphs; at 11px that is ~91px plus padding.
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 200)).toEqual([
-      'Compute expense',
+      'Compute Expense',
       '$400',
     ]);
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 60)).toEqual(['$400']);

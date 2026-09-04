@@ -37,13 +37,19 @@ describe('MODEL_ROUTES registry', () => {
   });
 
   it('gives every tab a default model, with the profit estimator pinned to Kimi K3', () => {
-    expect(MODEL_ROUTE_TABS).toEqual(['calculator', 'historical', 'profit-estimator']);
+    expect(MODEL_ROUTE_TABS).toEqual([
+      'calculator',
+      'historical',
+      'profit-estimator',
+      'profit-estimator-per-gigawatt',
+    ]);
     expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
     expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
     // The estimator only plots agentic traces, and Kimi K3 is the model with
     // the widest agentic hardware coverage; the page seeds its provider from
     // this same helper.
     expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
+    expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
     for (const tab of MODEL_ROUTE_TABS) {
       expect(MODEL_ROUTES.some((route) => route.model === defaultRouteModel(tab))).toBe(true);
     }

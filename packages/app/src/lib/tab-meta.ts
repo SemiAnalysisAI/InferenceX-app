@@ -49,6 +49,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   'profit-estimator': {
     title: 'Inference Profit Estimator',
     description:
+      'Estimate what one chip-hour of AI inference earns: revenue at a chosen interactivity and utilization, split into compute expense (TCO $/chip/hr), model license fee, and operator profit.',
+  },
+  'profit-estimator-per-gigawatt': {
+    title: 'Inference Profit Estimator per GigaWatt',
+    description:
       'Estimate what one gigawatt-year of AI inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.',
   },
   reliability: {
@@ -120,6 +125,11 @@ export const MODEL_TAB_META: Record<
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} Inference Profit Estimator`,
+    description: (seoName) =>
+      `Estimate what one chip-hour of ${seoName} agentic inference earns: revenue at a chosen interactivity and utilization, split into compute expense (TCO $/chip/hr), model license fee, and operator profit.`,
+  },
+  'profit-estimator-per-gigawatt': {
+    title: (seoName) => `${seoName} Inference Profit Estimator per GigaWatt`,
     description: (seoName) =>
       `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.`,
   },

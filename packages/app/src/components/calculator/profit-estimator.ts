@@ -1,11 +1,12 @@
 /**
- * Profit Estimator — per-GW-year economics for one hardware SKU at a chosen
- * interactivity operating point.
+ * Profit Estimator — economics of one hardware SKU at a chosen interactivity
+ * operating point, on one of two denominators (`ProfitBasis`):
  *
- * Every figure is normalised to one all-in utility gigawatt-year so SKUs with
- * very different per-chip power draw compare on the same denominator:
+ *   chip-hour  one GPU for one hour (GPU-hours = 1), the raw $/GPU/hr view
+ *   gw-year    one all-in utility gigawatt-year, so SKUs with very different
+ *              per-chip power draw compare on the same denominator:
+ *              GPU-hours = (1,000,000 kW / all-in kW per GPU) x 8,760 h
  *
- *   GPU-hours per GW-year = (1,000,000 kW / all-in kW per GPU) x 8,760 h
  *   Revenue               = $/GPU/hr sale revenue x GPU-hours x utilization
  *   Compute expense (TCO) = tier $/GPU/hr x GPU-hours
  *   Gross margin          = Revenue - TCO
@@ -34,30 +35,37 @@ export const DEFAULT_UTILIZATION_PCT = 60;
 /** Share of revenue paid to the model lab. */
 export const DEFAULT_LAB_CUT_PCT = 30;
 
+/**
+ * Denominator every figure is expressed in. `/profit-estimator` is per chip-hour;
+ * `/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
+ */
+export type ProfitBasis = 'chip-hour' | 'gw-year';
+
 export interface ProfitEstimatorAssumptions {
   /** 0–100. Revenue is scaled by this share; TCO is not. */
   utilizationPct: number;
   /** 0–100. Share of revenue paid to the model lab. */
   labCutPct: number;
+  basis: ProfitBasis;
 }
 
 export interface ProfitEstimatorRow {
   hwKey: string;
   resultKey: string;
   precision?: string;
-  /** GPU-hours one all-in utility GW buys in a year for this SKU. */
-  gpuHoursPerGwYear: number;
+  /** GPU-hours in the denominator: 1 per chip-hour, or what one GW-year buys for this SKU. */
+  gpuHours: number;
   /** Gross $/GPU/hr at 100% utilization, before any haircut. */
   revenuePerGpuHour: number;
-  /** $/GW/yr after utilization. */
+  /** $ per basis after utilization. */
   revenue: number;
-  /** $/GW/yr compute expense at the chosen cost tier. */
+  /** $ per basis compute expense at the chosen cost tier. */
   tco: number;
-  /** $/GW/yr revenue minus TCO. Negative when the sale price does not cover compute. */
+  /** $ per basis revenue minus TCO. Negative when the sale price does not cover compute. */
   grossMargin: number;
-  /** $/GW/yr paid to the model lab as a share of revenue. */
+  /** $ per basis paid to the model lab as a share of revenue. */
   labCut: number;
-  /** $/GW/yr left to the operator after compute and the license fee. */
+  /** $ per basis left to the operator after compute and the license fee. */
   profit: number;
 }
 
@@ -124,7 +132,8 @@ export function estimateSkuProfit(
 ): ProfitEstimatorRow | ProfitEstimatorSkipped {
   const base = { hwKey: result.hwKey, resultKey: result.resultKey, precision: result.precision };
   if (result.clamped) return { ...base, reason: 'outside-measured-range' };
-  const gpuHours = gpuHoursPerGwYear(specs.powerKwPerGpu);
+  // Per chip-hour the denominator is one GPU-hour, so power never enters.
+  const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
   if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
 
@@ -147,7 +156,7 @@ export function estimateSkuProfit(
 
   return {
     ...base,
-    gpuHoursPerGwYear: gpuHours,
+    gpuHours,
     revenuePerGpuHour,
     revenue,
     tco,
@@ -197,6 +206,22 @@ export function formatUsdCompact(value: number, digits = 1): string {
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(digits)}M`;
   if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(digits)}k`;
   return `${sign}$${abs.toFixed(abs >= 100 ? 0 : digits)}`;
+}
+
+/** Format a $/GPU/hr figure: cents matter, so a fixed two decimals with the sign in front. */
+export function formatUsdPerChipHour(value: number, digits = 2): string {
+  if (!Number.isFinite(value)) return '—';
+  const sign = value < 0 ? '-' : '';
+  return `${sign}$${Math.abs(value).toFixed(digits)}`;
+}
+
+/**
+ * Formatter for the basis in use. `digits` is the compact-unit precision on
+ * the GW-year basis (0 for axis ticks, 1 for labels) and is ignored per
+ * chip-hour, where two decimals always read right.
+ */
+export function formatProfitUsd(value: number, basis: ProfitBasis, digits?: number): string {
+  return basis === 'chip-hour' ? formatUsdPerChipHour(value) : formatUsdCompact(value, digits);
 }
 
 /**

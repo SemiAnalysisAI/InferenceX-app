@@ -60,7 +60,7 @@ import {
   Sequence,
   type Model,
 } from '@/lib/data-mappings';
-import { modelRoutesForTab } from '@/lib/model-routes';
+import { modelRoutesForTab, type ModelRouteTab } from '@/lib/model-routes';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
@@ -73,6 +73,7 @@ import {
   estimateProfitRows,
   modelsWithAgenticData,
   parseTokenPriceInput,
+  type ProfitBasis,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
 import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
@@ -123,7 +124,10 @@ const PRICE_SOURCE_OPTIONS: { value: PriceSource; label: string; labelZh: string
 
 const STRINGS = {
   en: {
-    title: 'Revenue & Profit Estimator',
+    title: {
+      'gw-year': 'Revenue & Profit Estimator per GigaWatt',
+      'chip-hour': 'Revenue & Profit Estimator',
+    },
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
@@ -152,29 +156,53 @@ const STRINGS = {
       modelId
         ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
-    chartTitle: (model: string, workload: string, percentile: string, target: number) =>
-      `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
+    chartTitle: {
+      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
+        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
+      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
+        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity`,
+    },
     sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
     sourceLabel: 'Source:',
-    formulaTitle: 'Revenue per GigaWatt Formula',
+    formulaTitle: {
+      'gw-year': 'Revenue per GigaWatt Formula',
+      'chip-hour': 'Revenue per Chip-Hour Formula',
+    },
     formulaToggle: 'Toggle formula notes',
-    captionFormula: (util: number, labCut: number) =>
-      `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
-    csvHeaders: [
-      'SKU',
-      'Precision',
-      'Revenue ($/GW/yr)',
-      'Compute expense TCO ($/GW/yr)',
-      'Gross margin ($/GW/yr)',
-      'Model license fee ($/GW/yr)',
-      'Profit ($/GW/yr)',
-      'Margin',
-      'Revenue ($/GPU/hr, 100% util)',
-      'GPU-hours per GW-year',
-    ],
+    captionFormula: {
+      'gw-year': (util: number, labCut: number) =>
+        `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
+      'chip-hour': (util: number, labCut: number) =>
+        `Revenue = $/GPU/hr × ${util}% utilization, where $/GPU/hr = benchmarked tok/s per chip at the target interactivity × the selling price per token. Compute expense = TCO $/chip/hr for the chosen cost tier. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
+    },
+    csvHeaders: {
+      'gw-year': [
+        'SKU',
+        'Precision',
+        'Revenue ($/GW/yr)',
+        'Compute expense TCO ($/GW/yr)',
+        'Gross margin ($/GW/yr)',
+        'Model license fee ($/GW/yr)',
+        'Profit ($/GW/yr)',
+        'Margin',
+        'Revenue ($/GPU/hr, 100% util)',
+        'GPU-hours per GW-year',
+      ],
+      'chip-hour': [
+        'SKU',
+        'Precision',
+        'Revenue ($/chip/hr)',
+        'Compute expense TCO ($/chip/hr)',
+        'Gross margin ($/chip/hr)',
+        'Model license fee ($/chip/hr)',
+        'Profit ($/chip/hr)',
+        'Margin',
+        'Revenue ($/GPU/hr, 100% util)',
+      ],
+    },
     skipped: (entries: string) => `Not priced: ${entries}.`,
     skipReason: {
       'outside-measured-range': 'no measured point at the target interactivity',
@@ -184,7 +212,10 @@ const STRINGS = {
     } satisfies Record<ProfitEstimatorSkipReason, string>,
   },
   zh: {
-    title: '收入与利润估算器',
+    title: {
+      'gw-year': '每吉瓦收入与利润估算器',
+      'chip-hour': '收入与利润估算器',
+    },
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
@@ -213,29 +244,53 @@ const STRINGS = {
       modelId
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
-    chartTitle: (model: string, workload: string, percentile: string, target: number) =>
-      `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+    chartTitle: {
+      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
+        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
+        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+    },
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
     tcoBadgesLabel: 'TCO $/chip/hr：',
     sourceLabel: '来源：',
-    formulaTitle: '每吉瓦收入公式',
+    formulaTitle: {
+      'gw-year': '每吉瓦收入公式',
+      'chip-hour': '每芯片小时收入公式',
+    },
     formulaToggle: '展开或收起公式说明',
-    captionFormula: (util: number, labCut: number) =>
-      `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
-    csvHeaders: [
-      'SKU',
-      '精度',
-      '收入（$/GW/yr）',
-      '算力支出 TCO（$/GW/yr）',
-      '毛利（$/GW/yr）',
-      '模型许可费（$/GW/yr）',
-      '利润（$/GW/yr）',
-      '利润率',
-      '收入（$/GPU/hr，100% 利用率）',
-      '每吉瓦年 GPU 小时数',
-    ],
+    captionFormula: {
+      'gw-year': (util: number, labCut: number) =>
+        `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
+      'chip-hour': (util: number, labCut: number) =>
+        `收入 = $/GPU/hr × ${util}% 利用率，其中 $/GPU/hr = 目标交互性下实测的每芯片 tok/s × 每 token 售价。算力支出 = 所选成本层级的 TCO $/chip/hr。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
+    },
+    csvHeaders: {
+      'gw-year': [
+        'SKU',
+        '精度',
+        '收入（$/GW/yr）',
+        '算力支出 TCO（$/GW/yr）',
+        '毛利（$/GW/yr）',
+        '模型许可费（$/GW/yr）',
+        '利润（$/GW/yr）',
+        '利润率',
+        '收入（$/GPU/hr，100% 利用率）',
+        '每吉瓦年 GPU 小时数',
+      ],
+      'chip-hour': [
+        'SKU',
+        '精度',
+        '收入（$/chip/hr）',
+        '算力支出 TCO（$/chip/hr）',
+        '毛利（$/chip/hr）',
+        '模型许可费（$/chip/hr）',
+        '利润（$/chip/hr）',
+        '利润率',
+        '收入（$/GPU/hr，100% 利用率）',
+      ],
+    },
     skipped: (entries: string) => `未定价：${entries}。`,
     skipReason: {
       'outside-measured-range': '未在该交互性下实测',
@@ -290,7 +345,20 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
-export default function ProfitEstimatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+/** Dashboard tab each basis is served from; drives the model allow-list and the URL rewrite. */
+export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
+  'chip-hour': 'profit-estimator',
+  'gw-year': 'profit-estimator-per-gigawatt',
+};
+
+export default function ProfitEstimatorDisplay({
+  urlSeed,
+  basis,
+}: {
+  urlSeed?: CalculatorUrlSeed;
+  /** `/profit-estimator` is per chip-hour; `/profit-estimator-per-gigawatt` scales to a GW-year. */
+  basis: ProfitBasis;
+}) {
   return (
     <GlobalFilterProvider
       initialModel={urlSeed?.model}
@@ -298,7 +366,10 @@ export default function ProfitEstimatorDisplay({ urlSeed }: { urlSeed?: Calculat
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
-      <ProfitEstimatorInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
+      <ProfitEstimatorInner
+        initialPercentile={urlSeed?.percentile ?? Percentile.P90}
+        basis={basis}
+      />
     </GlobalFilterProvider>
   );
 }
@@ -325,7 +396,13 @@ function usePercentField(defaultValue: number, eventName: string) {
   return { raw, value, onChange, onBlur };
 }
 
-function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percentile }) {
+function ProfitEstimatorInner({
+  initialPercentile,
+  basis,
+}: {
+  initialPercentile: Percentile;
+  basis: ProfitBasis;
+}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
@@ -351,7 +428,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
   // empty, the allow-list alone is offered so the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(() => {
-    const allowed = modelRoutesForTab('profit-estimator').map((route) => route.model);
+    const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
     const withData = modelsWithAgenticData(
       availableModels,
       availabilityRows,
@@ -359,7 +436,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     );
     const both = allowed.filter((m) => withData.includes(m));
     return both.length > 0 ? both : allowed;
-  }, [availableModels, availabilityRows]);
+  }, [availableModels, availabilityRows, basis]);
   const modelAllowed = agenticModels.includes(selectedModel);
   useEffect(() => {
     if (!modelAllowed && agenticModels[0]) setSelectedModel(agenticModels[0]);
@@ -454,8 +531,8 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
   }, [priceSource, customInputPrice, customCachedPrice, customOutputPrice, openRouterQuery.data]);
 
   const assumptions = useMemo(
-    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value }),
-    [utilization.value, labCut.value],
+    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis }),
+    [utilization.value, labCut.value, basis],
   );
 
   // Price every SKU first, then build the legend from the ones that produced a
@@ -629,7 +706,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       <div className="mb-2 pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
           <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
-          {t.chartTitle(
+          {t.chartTitle[basis](
             getModelLabel(selectedModel),
             getSequenceLabel(Sequence.AgenticTraces, locale),
             percentileLabel,
@@ -687,29 +764,39 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
     costTier,
     costProvider,
     assumptions.utilizationPct,
+    assumptions.labCutPct,
+    basis,
     selectedRunDate,
     tcoBadges,
     priceSourceLabel,
     t,
   ]);
 
+  const exportFileName =
+    basis === 'gw-year'
+      ? `InferenceX_profit_estimator_per_gigawatt_${selectedModel}`
+      : `InferenceX_profit_estimator_${selectedModel}`;
+
   const handleExportCsv = useCallback(() => {
+    // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
+    const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
     const rows = estimate.rows.map((row) => [
       rowLabel(row, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
-      Math.round(row.revenue),
-      Math.round(row.tco),
-      Math.round(row.grossMargin),
-      Math.round(row.labCut),
-      Math.round(row.profit),
+      usd(row.revenue),
+      usd(row.tco),
+      usd(row.grossMargin),
+      usd(row.labCut),
+      usd(row.profit),
       row.revenue > 0 ? (row.profit / row.revenue).toFixed(4) : '',
       row.revenuePerGpuHour.toFixed(4),
-      Math.round(row.gpuHoursPerGwYear),
+      // GPU-hours is 1 per chip-hour, so that basis has no column for it.
+      ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
     ]);
-    exportToCsv(`InferenceX_profit_estimator_${selectedModel}`, [...t.csvHeaders], rows, [
-      t.captionFormula(assumptions.utilizationPct, assumptions.labCutPct),
+    exportToCsv(exportFileName, [...t.csvHeaders[basis]], rows, [
+      t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
     ]);
-  }, [estimate.rows, hardwareConfig, selectedModel, t, assumptions]);
+  }, [estimate.rows, hardwareConfig, exportFileName, t, assumptions, basis]);
 
   if (!loading && error) {
     console.error(error);
@@ -727,7 +814,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
       <section data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
+            <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
               <div
@@ -1051,7 +1138,7 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
                 className="absolute top-0 right-0 z-10 mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}
-                exportFileName={`InferenceX_profit_estimator_${selectedModel}`}
+                exportFileName={exportFileName}
               />
               <ProfitEstimatorChart
                 rows={estimate.rows}
@@ -1062,11 +1149,11 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
               />
               <div className="mt-3">
                 <InfoFold
-                  title={t.formulaTitle}
+                  title={t.formulaTitle[basis]}
                   toggleLabel={t.formulaToggle}
                   testId="profit-formula-notes"
                 >
-                  {t.captionFormula(assumptions.utilizationPct, assumptions.labCutPct)}
+                  {t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct)}
                 </InfoFold>
               </div>
             </figure>

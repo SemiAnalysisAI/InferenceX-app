@@ -22,11 +22,16 @@ import { useLocale } from '@/lib/use-locale';
 import { escapeHtml, getDisplayLabel } from '@/lib/utils';
 import { getAxisVendorIcon } from '@/lib/vendor-logos';
 
-import { formatUsdCompact, type ProfitEstimatorRow } from './profit-estimator';
+import {
+  formatProfitUsd,
+  type ProfitBasis,
+  type ProfitEstimatorAssumptions,
+  type ProfitEstimatorRow,
+} from './profit-estimator';
 
 export type ProfitSegmentKind = 'tco' | 'labCut' | 'profit' | 'loss';
 
-/** One rectangle of the stack. `y0`/`y1` are $/GW/yr; loss segments run below zero. */
+/** One rectangle of the stack. `y0`/`y1` are $ per basis; loss segments run below zero. */
 export interface ProfitSegment {
   key: string;
   kind: ProfitSegmentKind;
@@ -121,15 +126,33 @@ export function slantedMargins(
 }
 /** Distance from the tick to the label's end, in em (the d3 default is 0). */
 const X_LABEL_DX_EM = 0.4;
+/** Band-scale padding between bars; also drives the vendor-mark size above each bar. */
+const BAND_PADDING = 0.3;
 /** Gap between the top of the stack and the revenue figure's baseline, in px. */
 const REVENUE_LABEL_GAP = 20;
-/** Height of the vendor mark above each bar, in px. */
-const BAR_ICON_HEIGHT = 14;
+/** Smallest vendor mark above a bar, in px; what a phone-width bar gets. */
+export const BAR_ICON_MIN_HEIGHT = 14;
+/** Largest vendor mark above a bar, in px, however wide the bar gets. */
+export const BAR_ICON_MAX_HEIGHT = 40;
+/** Share of the bar width the mark grows to between those bounds. */
+const BAR_ICON_WIDTH_SHARE = 0.22;
 /** Gap between the vendor mark and the top of the revenue figure, in px. */
 const BAR_ICON_GAP = 4;
 
-function barMarkWidth(icon: { width: number; height: number } | undefined): number {
-  return icon ? (icon.width / icon.height) * BAR_ICON_HEIGHT : 0;
+/** Vendor mark height for a bar `bandwidthPx` wide: as big as the bar allows, within bounds. */
+export function barMarkHeight(bandwidthPx: number): number {
+  if (!Number.isFinite(bandwidthPx) || bandwidthPx <= 0) return BAR_ICON_MIN_HEIGHT;
+  return Math.min(
+    BAR_ICON_MAX_HEIGHT,
+    Math.max(BAR_ICON_MIN_HEIGHT, bandwidthPx * BAR_ICON_WIDTH_SHARE),
+  );
+}
+
+function barMarkWidth(
+  icon: { width: number; height: number } | undefined,
+  heightPx: number,
+): number {
+  return icon ? (icon.width / icon.height) * heightPx : 0;
 }
 
 /** Opacity of the license-fee segment relative to the SKU's profit colour. */
@@ -152,14 +175,19 @@ export function lossPatternId(resultKey: string): string {
 
 const STRINGS = {
   en: {
-    yAxis: 'Revenue per all-in provisioned utility GW per year ($ USD)',
-    yAxisCompact: 'Revenue per provisioned GW-year ($ USD)',
+    yAxis: {
+      'gw-year': 'Revenue per all-in provisioned utility GW per year ($ USD)',
+      'chip-hour': 'Revenue per chip per hour ($ USD)',
+    },
+    yAxisCompact: {
+      'gw-year': 'Revenue per provisioned GW-year ($ USD)',
+      'chip-hour': 'Revenue per chip-hour ($ USD)',
+    },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
-    gpuHours: 'GPU-hours per GW-year',
-    tco: 'Compute expense',
-    grossMargin: 'Gross margin',
-    labCut: 'Model license fee',
+    tco: 'Compute Expense',
+    grossMargin: 'Gross Margin',
+    labCut: 'Model License Fee',
     profit: 'Profit',
     loss: 'Loss',
     marginPct: 'Margin',
@@ -171,11 +199,16 @@ const STRINGS = {
     noData: 'No SKU can be priced for the current selection.',
   },
   zh: {
-    yAxis: '每全电源配置吉瓦每年收入（美元）',
-    yAxisCompact: '每吉瓦每年收入（美元）',
+    yAxis: {
+      'gw-year': '每全电源配置吉瓦每年收入（美元）',
+      'chip-hour': '每芯片每小时收入（美元）',
+    },
+    yAxisCompact: {
+      'gw-year': '每吉瓦每年收入（美元）',
+      'chip-hour': '每芯片小时收入（美元）',
+    },
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
-    gpuHours: '每吉瓦年 GPU 小时数',
     tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
@@ -202,12 +235,13 @@ export function segmentLabelLines(
   heightPx: number,
   t: { tco: string; labCut: string; profit: string; loss: string },
   widthPx: number = Number.POSITIVE_INFINITY,
+  basis: ProfitBasis = 'gw-year',
 ): string[] {
   // Profit and loss both read `row.profit`; the loss kind only changes the word.
   const amount = kind === 'tco' ? row.tco : kind === 'labCut' ? row.labCut : row.profit;
   const name =
     kind === 'tco' ? t.tco : kind === 'labCut' ? t.labCut : kind === 'profit' ? t.profit : t.loss;
-  const amountText = formatUsdCompact(amount);
+  const amountText = formatProfitUsd(amount, basis);
   const fits = (text: string) =>
     estimateTextWidth(text, CHART_TYPE.annotation) + LABEL_SIDE_PAD_PX <= widthPx;
   // A narrow bar (phones) drops the name first, then the amount, so text
@@ -281,22 +315,26 @@ export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): Profit
   return segments;
 }
 
-/** Y domain that always includes zero, with headroom for the revenue label. */
 /**
  * Pixels the tallest stack needs above it: the revenue figure and margin line
- * (REVENUE_LABEL_GAP covers both), then the vendor mark and its gap.
+ * (REVENUE_LABEL_GAP covers both), then a vendor mark `iconHeightPx` tall and its gap.
  */
-export const STACK_HEADROOM_PX =
-  REVENUE_LABEL_GAP + CHART_TYPE.axisLabel + BAR_ICON_GAP + BAR_ICON_HEIGHT + 8;
+export function stackHeadroomPx(iconHeightPx = BAR_ICON_MIN_HEIGHT): number {
+  return REVENUE_LABEL_GAP + CHART_TYPE.axisLabel + BAR_ICON_GAP + iconHeightPx + 8;
+}
+
+/** Headroom with the smallest vendor mark; what a phone-width chart reserves. */
+export const STACK_HEADROOM_PX = stackHeadroomPx();
 
 /**
  * Y domain for the bars. The top is the tallest positive stack plus exactly the
- * pixel headroom its labels need, converted to data units through `plotHeightPx`
- * (a proportional 30% fallback when the plot has not been measured yet).
+ * pixel headroom its labels need (`headroomPx`), converted to data units through
+ * `plotHeightPx` (a proportional 30% fallback when the plot has not been measured yet).
  */
 export function profitYDomain(
   rows: readonly ProfitEstimatorRow[],
   plotHeightPx = 0,
+  headroomPx = STACK_HEADROOM_PX,
 ): [number, number] {
   if (rows.length === 0) return [0, 1];
   // A loss bar stacks TCO and the license fee above the axis, and that sum can
@@ -305,9 +343,7 @@ export function profitYDomain(
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   const span = top - bottom;
   const headroom =
-    plotHeightPx > STACK_HEADROOM_PX * 2
-      ? (span * STACK_HEADROOM_PX) / (plotHeightPx - STACK_HEADROOM_PX)
-      : span * 0.3;
+    plotHeightPx > headroomPx * 2 ? (span * headroomPx) / (plotHeightPx - headroomPx) : span * 0.3;
   return [bottom * 1.12, top === 0 ? 1 : top + headroom];
 }
 
@@ -324,12 +360,13 @@ function formatPct(value: number): string {
 export function generateProfitTooltipHTML(
   row: ProfitEstimatorRow,
   hardwareConfig: HardwareConfig,
-  assumptions: { utilizationPct: number; labCutPct: number },
+  assumptions: ProfitEstimatorAssumptions,
   locale: Locale,
   isPinned: boolean,
   skuColor = 'var(--foreground)',
 ): string {
   const t = STRINGS[locale];
+  const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
   const colon = locale === 'zh' ? '：' : ':';
   const label = escapeHtml(rowLabel(row, hardwareConfig));
   const line = (name: string, value: string, color?: string, opacity = 1) =>
@@ -342,11 +379,11 @@ export function generateProfitTooltipHTML(
   const operatorMargin = row.revenue > 0 ? row.profit / row.revenue : Number.NaN;
   const profitLine =
     row.profit >= 0
-      ? line(t.profit, formatUsdCompact(row.profit), skuColor)
-      : line(t.loss, formatUsdCompact(row.profit), LOSS_FILL);
+      ? line(t.profit, usd(row.profit), skuColor)
+      : line(t.loss, usd(row.profit), LOSS_FILL);
   const labCutLine = line(
     `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
-    formatUsdCompact(row.labCut),
+    usd(row.labCut),
     skuColor,
     LAB_CUT_OPACITY,
   );
@@ -354,16 +391,20 @@ export function generateProfitTooltipHTML(
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 260px; max-width: 340px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, formatUsdCompact(row.revenue))}
-      ${line(t.tco, formatUsdCompact(row.tco), skuColor, TCO_OPACITY)}
-      ${line(t.grossMargin, formatUsdCompact(row.grossMargin))}
+      ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, usd(row.revenue))}
+      ${line(t.tco, usd(row.tco), skuColor, TCO_OPACITY)}
+      ${line(t.grossMargin, usd(row.grossMargin))}
       ${labCutLine}
       ${profitLine}
       ${line(t.marginPct, Number.isFinite(operatorMargin) ? formatPct(operatorMargin) : '—')}
-      <div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
+      ${
+        // Per chip-hour the bar already is the $/GPU/hr figure.
+        assumptions.basis === 'gw-year'
+          ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
         ${line(t.revenuePerGpuHour, `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr`)}
-        ${line(t.gpuHours, `${Math.round(row.gpuHoursPerGwYear).toLocaleString('en-US')} h`)}
-      </div>
+      </div>`
+          : ''
+      }
     </div>`;
 }
 
@@ -371,7 +412,7 @@ interface ProfitEstimatorChartProps {
   rows: ProfitEstimatorRow[];
   hardwareConfig: HardwareConfig;
   colorResolver: (hwKey: string) => string;
-  assumptions: { utilizationPct: number; labCutPct: number };
+  assumptions: ProfitEstimatorAssumptions;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
 }
@@ -390,11 +431,12 @@ export default function ProfitEstimatorChart({
   const locale = useLocale();
   const t = STRINGS[locale];
   const strings = t;
+  const basis = assumptions.basis;
 
   const segments = useMemo(() => buildProfitSegments(rows), [rows]);
 
   const xScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'band', domain: rows.map((row) => row.resultKey), padding: 0.3 }),
+    () => ({ type: 'band', domain: rows.map((row) => row.resultKey), padding: BAND_PADDING }),
     [rows],
   );
   const labelMap = useMemo(
@@ -526,7 +568,7 @@ export default function ProfitEstimatorChart({
           const height = Math.max(0, yScale(d.y0) - yScale(d.y1));
           return {
             segment: d,
-            lines: segmentLabelLines(d.kind, d.row, height, labelText, bandwidth),
+            lines: segmentLabelLines(d.kind, d.row, height, labelText, bandwidth, basis),
             height,
           };
         });
@@ -562,6 +604,8 @@ export default function ProfitEstimatorChart({
         const labelData = segments.filter((d) => d.kind === 'tco');
         const stackTopPx = (d: ProfitSegment) => yScale(Math.max(d.row.revenue, d.row.tco));
         const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
+        // Same size the y domain reserved headroom for (both derive from the band width).
+        const iconHeight = barMarkHeight(bandwidth);
         group
           .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
           .data(
@@ -576,16 +620,13 @@ export default function ProfitEstimatorChart({
           )
           .attr('aria-hidden', 'true')
           .attr('href', (d) => getAxisVendorIcon(d.row.hwKey)?.href ?? '')
-          .attr('width', (d) => barMarkWidth(getAxisVendorIcon(d.row.hwKey)))
-          .attr('height', BAR_ICON_HEIGHT)
+          .attr('width', (d) => barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight))
+          .attr('height', iconHeight)
           .attr('x', (d) => {
-            const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey));
+            const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight);
             return (xScale(d.row.resultKey) ?? 0) + bandwidth / 2 - w / 2;
           })
-          .attr(
-            'y',
-            (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - BAR_ICON_HEIGHT,
-          )
+          .attr('y', (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight)
           .attr('pointer-events', 'none');
         const revenueText = group
           .selectAll<SVGTextElement, ProfitSegment>('.revenue-label')
@@ -601,7 +642,7 @@ export default function ProfitEstimatorChart({
         revenueText
           .selectAll<SVGTSpanElement, ProfitSegment>('tspan')
           .data((d) => [
-            { row: d.row, text: formatUsdCompact(d.row.revenue), sub: false },
+            { row: d.row, text: formatProfitUsd(d.row.revenue, basis), sub: false },
             {
               row: d.row,
               text: operatorMarginLabel(d.row, strings.marginShort, bandwidth + X_GAP_ALLOWANCE),
@@ -637,13 +678,13 @@ export default function ProfitEstimatorChart({
           .attr('font-size', px(CHART_TYPE.annotation))
           .attr('font-weight', '600')
           .style('fill', LOSS_FILL)
-          .text((d) => `${strings.loss} ${formatUsdCompact(d.row.profit)}`);
+          .text((d) => `${strings.loss} ${formatProfitUsd(d.row.profit, basis)}`);
 
         return bars;
       },
     };
     return [stackLayer];
-  }, [segments, fillFor, outlineFor, labelColorFor, colorResolver, strings]);
+  }, [segments, fillFor, outlineFor, labelColorFor, colorResolver, strings, basis]);
 
   const tooltip = useMemo(
     () => ({
@@ -708,7 +749,22 @@ export default function ProfitEstimatorChart({
     return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
   }, [baseMargin, labelLayout, dimensions.width, rows.length, labelMap]);
   const plotHeight = (compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT) - margin.top - margin.bottom;
-  const yDomain = useMemo(() => profitYDomain(rows, plotHeight), [rows, plotHeight]);
+  // The vendor mark grows with the bar, so the headroom above the tallest stack
+  // has to be sized from the same band width the renderer will see.
+  const bandwidth = useMemo(() => {
+    const plotWidth = dimensions.width - margin.left - margin.right;
+    if (plotWidth <= 0 || rows.length === 0) return 0;
+    return d3
+      .scaleBand<string>()
+      .domain(rows.map((row) => row.resultKey))
+      .range([0, plotWidth])
+      .padding(BAND_PADDING)
+      .bandwidth();
+  }, [dimensions.width, margin, rows]);
+  const yDomain = useMemo(
+    () => profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
+    [rows, plotHeight, bandwidth],
+  );
   const yScaleConfig = useMemo<ScaleConfig>(
     () => ({ type: 'linear', domain: yDomain, nice: true }),
     [yDomain],
@@ -756,11 +812,11 @@ export default function ProfitEstimatorChart({
   // chart uses the short form.
   const yAxisConfig = useMemo(
     () => ({
-      label: compact ? t.yAxisCompact : t.yAxis,
-      tickFormat: (d: d3.AxisDomain) => formatUsdCompact(Number(d), 0),
+      label: compact ? t.yAxisCompact[basis] : t.yAxis[basis],
+      tickFormat: (d: d3.AxisDomain) => formatProfitUsd(Number(d), basis, 0),
       tickCount: 8,
     }),
-    [compact, t.yAxis, t.yAxisCompact],
+    [compact, basis, t.yAxis, t.yAxisCompact],
   );
 
   const onRender = useMemo(

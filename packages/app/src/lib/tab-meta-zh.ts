@@ -45,6 +45,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   'profit-estimator': {
     title: '推理利润估算器',
     description:
+      '估算每款芯片每小时的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。',
+  },
+  'profit-estimator-per-gigawatt': {
+    title: '每吉瓦推理利润估算器',
+    description:
       '估算每款芯片一个吉瓦年的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。',
   },
   reliability: {
@@ -102,7 +107,9 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   fleet:
     '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润率与回本时间。',
   'profit-estimator':
-    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
+    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
+  'profit-estimator-per-gigawatt':
+    '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
@@ -129,6 +136,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   calculator: 'TCO 计算器',
   fleet: '集群生命周期',
   'profit-estimator': '利润估算',
+  'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
   'gpu-metrics': '芯片功耗',
@@ -187,6 +195,13 @@ export const MODEL_TAB_META_ZH: Record<
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} 推理利润估算器`,
+    description: (seoName) =>
+      `估算每款芯片每小时运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。`,
+    intro: (seoName) =>
+      `本页面按芯片估算每小时运行 ${seoName} 智能体推理的收入、算力支出（TCO $/chip/hr）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
+  },
+  'profit-estimator-per-gigawatt': {
+    title: (seoName) => `${seoName} 每吉瓦推理利润估算器`,
     description: (seoName) =>
       `估算每款芯片一个吉瓦年运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
     intro: (seoName) =>

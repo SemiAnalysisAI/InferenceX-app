@@ -48,6 +48,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   calculator: 'TCO Calculator',
   fleet: 'Fleet Lifecycle',
   'profit-estimator': 'Profit Estimator',
+  'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
   reliability: 'Reliability',
   'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',

@@ -35,6 +35,31 @@ describe('dashboard route registry', () => {
     expect(getDashboardRoute('feedback').indexable).toBe(false);
   });
 
+  it('moves the TCO calculator and fleet lifecycle to the footer but keeps them indexed', () => {
+    expect(getDashboardRoute('calculator').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('calculator').indexable).toBe(true);
+    expect(getDashboardRoute('fleet').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('fleet').indexable).toBe(true);
+  });
+
+  it('puts both profit estimators in the primary nav right after the benchmark tabs', () => {
+    const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
+      (route) => route.key,
+    );
+    expect(primary.slice(0, 4)).toEqual([
+      'inference',
+      'evaluation',
+      'profit-estimator-per-gigawatt',
+      'profit-estimator',
+    ]);
+    expect(primary).not.toContain('calculator');
+    expect(primary).not.toContain('fleet');
+    expect(dashboardRouteForPathname('/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
+      'profit-estimator-per-gigawatt',
+    );
+    expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
+  });
+
   it('declares the standalone and self-seeded provider capabilities', () => {
     expect(getDashboardRoute('collectivex').providers).toEqual({
       globalFilters: false,
