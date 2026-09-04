@@ -3,7 +3,7 @@
 //  - defaults are Kimi K3, 45 tok/s/user, 60% utilization, 30% model license fee;
 //  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user and the Z.ai list price
 //    ($1.40 / $0.26 cached / $4.40), and a model switch re-seeds both;
-//  - MiniMax M3 opens on 83 tok/s/user and the MiniMax list price
+//  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
@@ -505,6 +505,8 @@ describe('Profit Estimator — MiniMax M3', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/minimax-m3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '83');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'MiniMax M3 428B Agentic Revenue & Profit Estimates per Chip per Hour at P90 83 tok/s/user Interactivity',
@@ -550,6 +552,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-2', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'MiniMax M3').click();
@@ -558,6 +561,7 @@ describe('Profit Estimator — MiniMax M3', () => {
       .should('contain.text', 'MiniMax M3')
       .and('contain.text', '83 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '83');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.3')
       .and('contain.text', '(MiniMax list price)');
@@ -566,6 +570,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.contains('[role="option"]', 'Kimi K3').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
       .and('contain.text', '(OpenRouter)');

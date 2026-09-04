@@ -5,6 +5,7 @@ import { Model } from '@/lib/data-mappings';
 
 import {
   clampPercent,
+  DEFAULT_LAB_CUT_PCT,
   DEFAULT_PROFIT_INTERACTIVITY,
   estimateProfitRows,
   estimateSkuProfit,
@@ -330,16 +331,18 @@ describe('parseTokenPriceInput', () => {
 });
 
 describe('profitModelDefaults', () => {
-  it('opens Kimi K3 on 45 tok/s/user and the OpenRouter catalog', () => {
+  it('opens Kimi K3 on 45 tok/s/user, the OpenRouter catalog, and a 30% license fee', () => {
     expect(profitModelDefaults(Model.Kimi_K3)).toEqual({
       interactivity: DEFAULT_PROFIT_INTERACTIVITY,
       listPricing: null,
+      labCutPct: DEFAULT_LAB_CUT_PCT,
     });
   });
 
   it('opens GLM 5.2/5.3 on 100 tok/s/user and the Z.ai list price', () => {
     const defaults = profitModelDefaults(Model.GLM_5_2);
     expect(defaults.interactivity).toBe(100);
+    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
     expect(defaults.listPricing).toEqual({
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
@@ -349,9 +352,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens MiniMax M3 on 83 tok/s/user and the MiniMax list price', () => {
+  it('opens MiniMax M3 on 83 tok/s/user, the MiniMax list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.MiniMax_M3);
     expect(defaults.interactivity).toBe(83);
+    expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'MiniMax',
       inputPerMillion: 0.3,
@@ -367,10 +371,11 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('falls back to 45 tok/s/user and OpenRouter for models without an entry', () => {
+  it('falls back to 45 tok/s/user, OpenRouter, and a 30% license fee for models without an entry', () => {
     expect(profitModelDefaults(Model.DeepSeek_V4_Pro)).toEqual({
       interactivity: DEFAULT_PROFIT_INTERACTIVITY,
       listPricing: null,
+      labCutPct: DEFAULT_LAB_CUT_PCT,
     });
   });
 

@@ -1101,8 +1101,8 @@ and the two can be collapsed into one once both are on master.
   the pages to more models is one list edit, a `profitModelDefaults` entry, and
   fixture rows.
 - **Per-model defaults.** `profitModelDefaults(model)` in `profit-estimator.ts`
-  gives each model the operating point and price source it opens on, and a model
-  switch re-seeds both. Kimi K3 opens on 45 tok/s/user and the OpenRouter catalog,
+  gives each model the operating point, price source, and model license fee it
+  opens on, and a model switch re-seeds all three. Kimi K3 opens on 45 tok/s/user and the OpenRouter catalog,
   where Moonshot's price holds across hosts. GLM 5.2/5.3 opens on 100 tok/s/user
   and Z.ai's list price ($1.40 input / $0.26 cached / $4.40 output per M tok):
   third-party hosts undercut Z.ai on OpenRouter, so the catalog aggregate would
@@ -1113,7 +1113,9 @@ and the two can be collapsed into one once both are on master.
   input / $0.06 cached / $1.20 output per M tok, the permanent 50%-off rate on its
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
-  H100, H200, MI300X, and MI325X curves top out below it and list as not priced. A
+  H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
+  MiniMax M3 also opens on a 20% model license fee; every other model opens on
+  the 30% `DEFAULT_LAB_CUT_PCT`. A
   model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom
