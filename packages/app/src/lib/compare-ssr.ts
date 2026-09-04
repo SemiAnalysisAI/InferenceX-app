@@ -597,7 +597,7 @@ function fullSummary(i: FullBoth): string {
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
-    : 'comparable data is unavailable at this point';
+    : 'Comparable data is unavailable';
 }
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [

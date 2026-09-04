@@ -11,9 +11,15 @@ import {
   KNOWN_MODELS,
   KNOWN_SEQUENCES,
   META_DESCRIPTION_MAX,
+  compareTableNarrative,
   type SsrInterpolatedRow,
 } from './compare-ssr';
-import { buildJsonLdZh, compareMetaDescriptionZh, formatModelListZh } from './compare-ssr-zh';
+import {
+  buildJsonLdZh,
+  compareMetaDescriptionZh,
+  compareTableNarrativeZh,
+  formatModelListZh,
+} from './compare-ssr-zh';
 
 // BenchmarkRow.id is required (stable per-point id from benchmark_results);
 // hand out a fresh one per stub so id-keyed logic can't collide across rows.
@@ -250,6 +256,21 @@ function makeSsrRows(
 ): SsrInterpolatedRow[] {
   return triples.map(([target, a, b]) => ({ target, a, b }));
 }
+
+describe('compare table narrative fallbacks', () => {
+  it('states unavailable comparisons once in both locales', () => {
+    const rows = makeSsrRows([[40, ir(0, 0), ir(0, 0)]]);
+    const range = { min: 20, max: 60 };
+
+    // This page seed selects the first template, which adds its own location suffix.
+    const en = compareTableNarrative('full', 'Model 3', 'A', 'B', rows, range)[0];
+    expect(en).toContain('Comparable data is unavailable at this point.');
+    expect(en).not.toContain('at this point at this point');
+
+    const zh = compareTableNarrativeZh('full', 'Model 3', 'A', 'B', rows, range)[0];
+    expect(zh).toContain('缺少可比较的有效数据。');
+  });
+});
 
 describe('compareMetaDescription', () => {
   it('leads with the throughput + cost stat when both dimensions differ', () => {
