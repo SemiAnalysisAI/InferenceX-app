@@ -626,8 +626,10 @@ function ProfitEstimatorInner({ initialPercentile }: { initialPercentile: Percen
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
+    // Right padding keeps the title and price lines clear of the export
+    // button, which sits in the figure corner.
     return (
-      <div className="mb-2" data-testid="profit-caption">
+      <div className="mb-2 pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
           <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
           {t.chartTitle(
