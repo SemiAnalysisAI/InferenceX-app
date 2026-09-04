@@ -206,7 +206,7 @@ jobs:
         if: inputs.neon-branch != ''
         env:
           PREVIEW_URL: ${{ inputs.preview-url }}
-          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_STAGING_INVALIDATE_SECRET }}
           PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
         run: |
           node -e '
