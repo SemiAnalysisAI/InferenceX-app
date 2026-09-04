@@ -127,7 +127,14 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     cy.get('[data-testid="tab-trigger-overview"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-evaluation"]').should('have.attr', 'href', '/evaluation');
     cy.get('[data-testid="tab-trigger-historical"]').should('have.attr', 'href', '/historical');
-    cy.get('[data-testid="tab-trigger-calculator"]').should('have.attr', 'href', '/calculator');
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+      'have.attr',
+      'href',
+      '/profit-estimator',
+    );
+    // TCO Calculator and Fleet Lifecycle live in the footer, not the tab bar.
+    cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
   });
 
   it('appends unofficialruns to every tab href when the URL has the param', () => {
