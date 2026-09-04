@@ -1089,25 +1089,34 @@ and the two can be collapsed into one once both are on master.
   no scenario selector and no precision selector (precision stays in auto mode, the
   densest measured run set). The interactivity target is a typed number in the same
   row as utilization and the license fee.
-- **Kimi K3 and GLM 5.2/5.3.** The model selector offers the tab's route allow-list
+- **Kimi K3, GLM 5.2/5.3, and MiniMax M3.** The model selector offers the tab's route allow-list
   (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
   `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
   models that have an agentic run. Each bare path opens on Kimi K3
   (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
   `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, `/glm-5-3` is the
-  GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site), aliases
-  308 to the canonical slug, and any model outside the allow-list 404s. Widening
+  GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site),
+  `/minimax-m3` is the MiniMax M3 page, aliases 308 to the canonical slug, and any
+  model outside the allow-list 404s. Widening
   the pages to more models is one list edit, a `profitModelDefaults` entry, and
   fixture rows.
 - **Per-model defaults.** `profitModelDefaults(model)` in `profit-estimator.ts`
-  gives each model the operating point and price source it opens on, and a model
-  switch re-seeds both. Kimi K3 opens on 45 tok/s/user and the OpenRouter catalog,
+  gives each model the operating point, price source, and model license fee it
+  opens on, and a model switch re-seeds all three. Kimi K3 opens on 45 tok/s/user and the OpenRouter catalog,
   where Moonshot's price holds across hosts. GLM 5.2/5.3 opens on 100 tok/s/user
   and Z.ai's list price ($1.40 input / $0.26 cached / $4.40 output per M tok):
   third-party hosts undercut Z.ai on OpenRouter, so the catalog aggregate would
   understate what the lab charges, and Z.ai's own 48 tok/s/user is below the
   measured range of the priced SKUs, so 100 is the nearest round point every curve
-  covers. A model with a list price gets a third Token Price option, `<vendor> list
+  covers. MiniMax M3 opens on 83 tok/s/user, the speed MiniMax's own API serves
+  at, and MiniMax's standard list price for calls up to 512K input tokens ($0.30
+  input / $0.06 cached / $1.20 output per M tok, the permanent 50%-off rate on its
+  pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
+  tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
+  H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
+  MiniMax M3 also opens on a 20% model license fee; every other model opens on
+  the 30% `DEFAULT_LAB_CUT_PCT`. A
+  model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom
   seeds the three fields from whichever price is in force.

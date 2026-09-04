@@ -71,7 +71,6 @@ import { getDisplayLabel } from '@/lib/utils';
 
 import {
   clampPercent,
-  DEFAULT_LAB_CUT_PCT,
   DEFAULT_UTILIZATION_PCT,
   estimateProfitRows,
   listPricingToTokenRevenuePricing,
@@ -411,6 +410,10 @@ export default function ProfitEstimatorDisplay({
 function usePercentField(defaultValue: number, eventName: string) {
   const [raw, setRaw] = useState(String(defaultValue));
   const [value, setValue] = useState(defaultValue);
+  const reset = useCallback((next: number) => {
+    setRaw(String(next));
+    setValue(next);
+  }, []);
   const onChange = useCallback(
     (next: string) => {
       setRaw(next);
@@ -426,7 +429,7 @@ function usePercentField(defaultValue: number, eventName: string) {
     setRaw(String(clamped));
     track(eventName, { value: clamped });
   }, [raw, defaultValue, eventName]);
-  return { raw, value, onChange, onBlur };
+  return { raw, value, onChange, onBlur, reset };
 }
 
 function ProfitEstimatorInner({
@@ -455,8 +458,8 @@ function ProfitEstimatorInner({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list (Kimi K3 and GLM 5.2/5.3) intersected with the models
-  // that have an agentic-traces run, so the selector never offers a model
+  // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3) intersected
+  // with the models that have an agentic-traces run, so the selector never offers a model
   // that would draw an empty chart. If the intersection is still loading or
   // empty, the allow-list alone is offered so the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
@@ -492,11 +495,19 @@ function ProfitEstimatorInner({
     () => profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
-  // Each model has its own operating point and price source (Kimi K3: 45
-  // tok/s/user on OpenRouter; GLM 5.2/5.3: 100 tok/s/user on the Z.ai list
-  // price), so a model switch re-seeds both. The ref keeps this to actual
-  // switches: re-renders with the same model leave the reader's edits alone.
+  const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
+  const labCut = usePercentField(
+    profitModelDefaults(selectedModel).labCutPct,
+    'profit_lab_cut_set',
+  );
+  // Each model has its own operating point, price source, and license fee
+  // (Kimi K3: 45 tok/s/user on OpenRouter at 30%; GLM 5.2/5.3: 100 tok/s/user
+  // on the Z.ai list price at 30%; MiniMax M3: 83 tok/s/user on the MiniMax
+  // list price at 20%), so a model switch re-seeds all three. The ref keeps
+  // this to actual switches: re-renders with the same model leave the
+  // reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
+  const resetLabCut = labCut.reset;
   useEffect(() => {
     if (defaultsAppliedFor.current === selectedModel) return;
     defaultsAppliedFor.current = selectedModel;
@@ -504,7 +515,8 @@ function ProfitEstimatorInner({
     setTargetValue(defaults.interactivity);
     setTargetRaw(String(defaults.interactivity));
     setPriceSource(defaultPriceSource(selectedModel));
-  }, [selectedModel]);
+    resetLabCut(defaults.labCutPct);
+  }, [selectedModel, resetLabCut]);
   const listPricing = profitModelDefaults(selectedModel).listPricing;
   // A model without a list price cannot stay on 'list' (e.g. the route seeded
   // one model and the allow-list swapped it); fall back to the catalog.
@@ -512,8 +524,6 @@ function ProfitEstimatorInner({
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
-  const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
-  const labCut = usePercentField(DEFAULT_LAB_CUT_PCT, 'profit_lab_cut_set');
 
   const { hardwareConfig, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(

@@ -1,6 +1,6 @@
 /**
  * Synthetic agentic rows for the `/profit-estimator` e2e spec, one identical
- * SKU set per model the estimator serves (Kimi K3 and GLM 5.2/5.3).
+ * SKU set per model the estimator serves (Kimi K3, GLM 5.2/5.3, MiniMax M3).
  *
  * The captured API fixtures carry no `agentic_traces` rows, and the estimator
  * is pinned to that workload, so the spec intercepts availability and
@@ -10,17 +10,19 @@
  *
  * The H200 curve tops out below the 45 tok/s/user default on purpose: the page
  * must list it under "Not priced" rather than extrapolate a bar for it. The
- * wide curve reaches 130 tok/s/user so GLM's 100 tok/s/user default is a read,
- * not a clamp, on every other SKU.
+ * wide curve reaches 130 tok/s/user so GLM's 100 and MiniMax M3's 83 tok/s/user
+ * defaults are reads, not clamps, on every other SKU.
  */
 import { metricsFor } from './overlay-fixtures';
 
 export const PROFIT_MODEL_DB_KEY = 'kimik3';
 export const PROFIT_GLM_DB_KEY = 'glm5.2';
+export const PROFIT_MINIMAX_DB_KEY = 'minimaxm3';
 /** `?model=` display key the benchmarks request carries → DB key of its rows. */
 const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
   'Kimi-K3': PROFIT_MODEL_DB_KEY,
   'GLM-5.2': PROFIT_GLM_DB_KEY,
+  'MiniMax-M3': PROFIT_MINIMAX_DB_KEY,
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
