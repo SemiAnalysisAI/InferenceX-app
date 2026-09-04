@@ -82,7 +82,7 @@ const PER_DOLLAR_ZERO_TEMPLATES_ZH: ((args: {
   bCost: number;
 }) => string)[] = [
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。至少一方缺少有效的定价或吞吐量数据，因此无法进行等价比较。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。由于至少一方缺少有效的定价或吞吐量数据，此处无法计算有意义的成本比率。`,
   (i) =>
     `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。至少一方的输入值为零，因此无法用比率表示差距。`,
 ];
