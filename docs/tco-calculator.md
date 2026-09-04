@@ -1089,14 +1089,28 @@ and the two can be collapsed into one once both are on master.
   no scenario selector and no precision selector (precision stays in auto mode, the
   densest measured run set). The interactivity target is a typed number in the same
   row as utilization and the license fee.
-- **Kimi K3 only, for now.** The model selector offers the tab's route allow-list
+- **Kimi K3 and GLM 5.2/5.3.** The model selector offers the tab's route allow-list
   (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
   `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
   models that have an agentic run. Each bare path opens on Kimi K3
   (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
-  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, aliases 308 to the
-  canonical slug, and any model outside the allow-list 404s. Widening the pages to
-  more models is one list edit plus fixture rows.
+  `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, `/glm-5-3` is the
+  GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site), aliases
+  308 to the canonical slug, and any model outside the allow-list 404s. Widening
+  the pages to more models is one list edit, a `profitModelDefaults` entry, and
+  fixture rows.
+- **Per-model defaults.** `profitModelDefaults(model)` in `profit-estimator.ts`
+  gives each model the operating point and price source it opens on, and a model
+  switch re-seeds both. Kimi K3 opens on 45 tok/s/user and the OpenRouter catalog,
+  where Moonshot's price holds across hosts. GLM 5.2/5.3 opens on 100 tok/s/user
+  and Z.ai's list price ($1.40 input / $0.26 cached / $4.40 output per M tok):
+  third-party hosts undercut Z.ai on OpenRouter, so the catalog aggregate would
+  understate what the lab charges, and Z.ai's own 48 tok/s/user is below the
+  measured range of the priced SKUs, so 100 is the nearest round point every curve
+  covers. A model with a list price gets a third Token Price option, `<vendor> list
+price`, next to OpenRouter and Custom; the caption names the source in force and
+  links the lab's pricing page when the list price is used. Switching to Custom
+  seeds the three fields from whichever price is in force.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and

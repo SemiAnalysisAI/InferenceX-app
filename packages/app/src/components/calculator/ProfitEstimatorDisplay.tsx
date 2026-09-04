@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   DISPLAY_MODEL_TO_DB,
@@ -72,11 +72,12 @@ import { getDisplayLabel } from '@/lib/utils';
 import {
   clampPercent,
   DEFAULT_LAB_CUT_PCT,
-  DEFAULT_PROFIT_INTERACTIVITY,
   DEFAULT_UTILIZATION_PCT,
   estimateProfitRows,
+  listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
+  profitModelDefaults,
   type ProfitBasis,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
@@ -84,7 +85,17 @@ import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
 import type { CostProvider } from './types';
 import { useThroughputData } from './useThroughputData';
 
-type PriceSource = 'openrouter' | 'custom';
+/**
+ * Where the $/M tok sale price comes from: the OpenRouter catalog, the lab's
+ * published list price (offered only for models that have one in
+ * `profitModelDefaults`), or a typed triple.
+ */
+type PriceSource = 'openrouter' | 'list' | 'custom';
+
+/** Source a model opens on: its list price when it has one, else OpenRouter. */
+function defaultPriceSource(model: Model): PriceSource {
+  return profitModelDefaults(model).listPricing ? 'list' : 'openrouter';
+}
 
 /** The three published TCO tiers plus a per-chip $/GPU/hr the reader types. */
 type ProfitCostProvider = CostProvider | 'custom';
@@ -125,10 +136,24 @@ export function parseCustomCostInput(raw: string | undefined): number | undefine
   return Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-const PRICE_SOURCE_OPTIONS: { value: PriceSource; label: string; labelZh: string }[] = [
-  { value: 'openrouter', label: 'OpenRouter', labelZh: 'OpenRouter' },
-  { value: 'custom', label: 'Custom $/M tok', labelZh: '自定义 $/M tok' },
-];
+/** Options in selector order; the list-price entry is filtered out per model when absent. */
+function priceSourceOptions(
+  listVendor: string | null,
+): { value: PriceSource; label: string; labelZh: string }[] {
+  return [
+    { value: 'openrouter', label: 'OpenRouter', labelZh: 'OpenRouter' },
+    ...(listVendor
+      ? [
+          {
+            value: 'list' as const,
+            label: `${listVendor} list price`,
+            labelZh: `${listVendor} 官方定价`,
+          },
+        ]
+      : []),
+    { value: 'custom', label: 'Custom $/M tok', labelZh: '自定义 $/M tok' },
+  ];
+}
 
 const STRINGS = {
   en: {
@@ -143,7 +168,7 @@ const STRINGS = {
     costProviderPlaceholder: 'Cost provider',
     priceSourceLabel: 'Token Price',
     priceSourceTooltip:
-      'Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; Custom lets you type your own input and output prices.',
+      "Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; the lab's list price is its published API rate, offered where third-party hosts undercut it; Custom lets you type your own input and output prices.",
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
@@ -231,7 +256,7 @@ const STRINGS = {
     costProviderPlaceholder: '成本供应商',
     priceSourceLabel: 'Token 售价',
     priceSourceTooltip:
-      '每百万 token 售价的来源。OpenRouter 读取该模型的公开目录价格；自定义则可自行输入输入/输出价格。',
+      '每百万 token 售价的来源。OpenRouter 读取该模型的公开目录价格；官方定价为模型厂商公布的 API 价格，在第三方托管方报价低于官方时提供；自定义则可自行输入输入/输出价格。',
     priceSourcePlaceholder: 'Token 售价',
     inputPriceLabel: '输入 $/M tok',
     outputPriceLabel: '输出 $/M tok',
@@ -430,7 +455,7 @@ function ProfitEstimatorInner({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list (Kimi K3 for now) intersected with the models
+  // the tab's route allow-list (Kimi K3 and GLM 5.2/5.3) intersected with the models
   // that have an agentic-traces run, so the selector never offers a model
   // that would draw an empty chart. If the intersection is still loading or
   // empty, the allow-list alone is offered so the selector is never blank.
@@ -457,12 +482,34 @@ function ProfitEstimatorInner({
   const mode = 'interactivity_to_throughput' as const;
 
   const [costProvider, setCostProvider] = useState<ProfitCostProvider>('costh');
-  const [priceSource, setPriceSource] = useState<PriceSource>('openrouter');
+  const [priceSource, setPriceSource] = useState<PriceSource>(() =>
+    defaultPriceSource(selectedModel),
+  );
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
-  const [targetValue, setTargetValue] = useState<number>(DEFAULT_PROFIT_INTERACTIVITY);
-  const [targetRaw, setTargetRaw] = useState<string>(String(DEFAULT_PROFIT_INTERACTIVITY));
+  const [targetValue, setTargetValue] = useState<number>(
+    () => profitModelDefaults(selectedModel).interactivity,
+  );
+  const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  // Each model has its own operating point and price source (Kimi K3: 45
+  // tok/s/user on OpenRouter; GLM 5.2/5.3: 100 tok/s/user on the Z.ai list
+  // price), so a model switch re-seeds both. The ref keeps this to actual
+  // switches: re-renders with the same model leave the reader's edits alone.
+  const defaultsAppliedFor = useRef<Model>(selectedModel);
+  useEffect(() => {
+    if (defaultsAppliedFor.current === selectedModel) return;
+    defaultsAppliedFor.current = selectedModel;
+    const defaults = profitModelDefaults(selectedModel);
+    setTargetValue(defaults.interactivity);
+    setTargetRaw(String(defaults.interactivity));
+    setPriceSource(defaultPriceSource(selectedModel));
+  }, [selectedModel]);
+  const listPricing = profitModelDefaults(selectedModel).listPricing;
+  // A model without a list price cannot stay on 'list' (e.g. the route seeded
+  // one model and the allow-list swapped it); fall back to the catalog.
+  const effectivePriceSource: PriceSource =
+    priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
@@ -520,10 +567,16 @@ function ProfitEstimatorInner({
   const percentileLabel = selectedPercentile.toUpperCase();
 
   const openRouterModelId = getOpenRouterModelId(selectedModel);
-  const openRouterQuery = useOpenRouterPricing(openRouterModelId, priceSource === 'openrouter');
+  const openRouterQuery = useOpenRouterPricing(
+    openRouterModelId,
+    effectivePriceSource === 'openrouter',
+  );
 
   const pricing = useMemo<TokenRevenuePricing | null>(() => {
-    if (priceSource === 'custom') {
+    if (effectivePriceSource === 'list' && listPricing) {
+      return listPricingToTokenRevenuePricing(listPricing);
+    }
+    if (effectivePriceSource === 'custom') {
       const input = parseTokenPriceInput(customInputPrice);
       const cached = parseTokenPriceInput(customCachedPrice);
       const output = parseTokenPriceInput(customOutputPrice);
@@ -536,7 +589,14 @@ function ProfitEstimatorInner({
       };
     }
     return openRouterQuery.data ?? null;
-  }, [priceSource, customInputPrice, customCachedPrice, customOutputPrice, openRouterQuery.data]);
+  }, [
+    effectivePriceSource,
+    listPricing,
+    customInputPrice,
+    customCachedPrice,
+    customOutputPrice,
+    openRouterQuery.data,
+  ]);
 
   const assumptions = useMemo(
     () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis }),
@@ -677,18 +737,26 @@ function ProfitEstimatorInner({
   );
 
   const pricingNotice = useMemo(() => {
-    if (priceSource !== 'openrouter') return null;
+    if (effectivePriceSource !== 'openrouter') return null;
     // A model with no OpenRouter listing never starts the query, and TanStack v5
     // leaves a disabled query `isPending`, so check the id before the fetch state.
     if (openRouterModelId === null) return t.pricingUnavailable(null);
     if (openRouterQuery.isLoading) return t.pricingLoading;
     if (!openRouterQuery.data) return t.pricingUnavailable(openRouterModelId);
     return null;
-  }, [priceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
+  }, [effectivePriceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
   const costTier = costTierLabel(COST_PROVIDER_TIER[costProvider], locale);
   const priceSourceLabel =
-    pricing?.source === 'openrouter' ? 'OpenRouter' : locale === 'zh' ? '自定义' : 'custom';
+    pricing?.source === 'openrouter'
+      ? 'OpenRouter'
+      : effectivePriceSource === 'list' && listPricing
+        ? locale === 'zh'
+          ? `${listPricing.vendor} 官方定价`
+          : `${listPricing.vendor} list price`
+        : locale === 'zh'
+          ? '自定义'
+          : 'custom';
 
   // Only the SKUs the legend currently shows; hiding a bar drops its badge.
   const tcoBadges = useMemo(() => {
@@ -765,11 +833,27 @@ function ProfitEstimatorInner({
             formatTokenPrice(pricing.outputPerMillion),
             priceSourceLabel,
           )}
+          {effectivePriceSource === 'list' && listPricing && (
+            <>
+              {' '}
+              <Link
+                target="_blank"
+                className="underline hover:text-foreground"
+                href={listPricing.sourceUrl}
+                data-testid="profit-list-price-source"
+              >
+                {t.sourceLabel} {listPricing.vendor}
+                <ExternalLinkIcon />
+              </Link>
+            </>
+          )}
         </p>
       </div>
     );
   }, [
     pricing,
+    effectivePriceSource,
+    listPricing,
     selectedModel,
     locale,
     percentileLabel,
@@ -917,26 +1001,23 @@ function ProfitEstimatorInner({
                   <div data-testid="profit-price-source-selector">
                     <MultiSelect
                       triggerId="profit-price-source"
-                      options={PRICE_SOURCE_OPTIONS.map((option) => ({
+                      options={priceSourceOptions(listPricing?.vendor ?? null).map((option) => ({
                         value: option.value,
                         label: locale === 'zh' ? option.labelZh : option.label,
                       }))}
-                      value={[priceSource]}
+                      value={[effectivePriceSource]}
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
-                        // Seed the custom fields from the live catalog so switching
-                        // over starts from a real price instead of $1/M.
-                        if (next === 'custom' && openRouterQuery.data) {
-                          setCustomInputPrice(
-                            formatTokenPrice(openRouterQuery.data.inputPerMillion),
-                          );
+                        // Seed the custom fields from the price in force (list or
+                        // live catalog) so switching over starts from a real price
+                        // instead of $1/M.
+                        if (next === 'custom' && pricing) {
+                          setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
                           setCustomCachedPrice(
-                            formatTokenPrice(cachedInputPricePerMillion(openRouterQuery.data)),
+                            formatTokenPrice(cachedInputPricePerMillion(pricing)),
                           );
-                          setCustomOutputPrice(
-                            formatTokenPrice(openRouterQuery.data.outputPerMillion),
-                          );
+                          setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
                         }
                         setPriceSource(next as PriceSource);
                         track('profit_price_source_changed', { source: next });
@@ -996,7 +1077,7 @@ function ProfitEstimatorInner({
               </div>
 
               {/* Custom token prices get their own row so the main controls keep their width. */}
-              {priceSource === 'custom' && (
+              {effectivePriceSource === 'custom' && (
                 <div
                   data-testid="profit-custom-prices"
                   className="grid grid-cols-1 md:grid-cols-3 gap-4"

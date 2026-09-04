@@ -164,7 +164,7 @@ describe('First-load navigation', () => {
         expect(slugs).to.deep.equal([
           'kimi-k3',
           'deepseek-v4',
-          'glm-5-2',
+          'glm-5-3',
           'minimax-m3',
           'qwen-3-5',
           'qwen-3-8-flash-next',

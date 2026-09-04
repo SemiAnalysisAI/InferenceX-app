@@ -8,6 +8,8 @@ import {
   MODEL_ROUTES,
   modelRoutePath,
   modelRoutePathnameRewrite,
+  modelRouteAvailableForTab,
+  modelRoutesForTab,
   pathWithSearchParams,
   modelRouteSlug,
   parseModelRoutePathname,
@@ -177,6 +179,35 @@ describe('modelRoutePathnameRewrite', () => {
     expect(modelRoutePathnameRewrite('/inference', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/historical/not-a-model', Model.Kimi_K3)).toBeNull();
+  });
+});
+
+describe('modelRoutesForTab', () => {
+  it('serves Kimi K3 and GLM 5.2/5.3 on the profit estimators and every model elsewhere', () => {
+    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
+      expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
+        Model.Kimi_K3,
+        Model.GLM_5_2,
+      ]);
+      expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
+      // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
+      // release, as on the rest of the site, and `glm-5-2` 308s to it.
+      expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
+        'glm-5-3',
+      );
+      expect(resolveModelRouteSlug('glm-5-2')).toEqual(
+        expect.objectContaining({
+          isAlias: true,
+          route: expect.objectContaining({ slug: 'glm-5-3' }),
+        }),
+      );
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(false);
+      expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
+    }
+    for (const tab of ['calculator', 'historical'] as const) {
+      expect(modelRoutesForTab(tab)).toEqual(MODEL_ROUTES);
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
+    }
   });
 });
 

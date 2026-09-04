@@ -22,6 +22,7 @@
 
 import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { Model } from '@/lib/data-mappings';
 
 import type { InterpolatedResult } from './types';
 
@@ -30,6 +31,72 @@ export const HOURS_PER_YEAR = 8_760;
 const KW_PER_GW = 1_000_000;
 
 export const DEFAULT_PROFIT_INTERACTIVITY = 45;
+
+/**
+ * A lab's published API price, offered as a Token Price source next to the
+ * OpenRouter catalog. Useful where third-party hosts undercut the lab and the
+ * catalog aggregate would understate what the lab itself charges.
+ */
+export interface ProfitListPricing {
+  /** Who publishes the price, e.g. `Z.ai`; shown in the selector and caption. */
+  vendor: string;
+  inputPerMillion: number;
+  cachedInputPerMillion: number;
+  outputPerMillion: number;
+  /** Public pricing page the figures were read from. */
+  sourceUrl: string;
+}
+
+/** Operating point and price source each model opens on. */
+export interface ProfitModelDefaults {
+  /** Interactivity target (tok/s/user) the page opens on for this model. */
+  interactivity: number;
+  /** Lab list price; when present the page opens on it instead of OpenRouter. */
+  listPricing: ProfitListPricing | null;
+}
+
+/**
+ * Per-model defaults. Kimi K3 opens on 45 tok/s/user and OpenRouter, where
+ * Moonshot's price holds across hosts. GLM 5.2/5.3 opens on Z.ai's list price
+ * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
+ * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
+ * no priced SKU has a measured point that low yet, so the nearest round
+ * operating point every curve covers is used until one does.
+ */
+const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.Kimi_K3]: { interactivity: DEFAULT_PROFIT_INTERACTIVITY, listPricing: null },
+  [Model.GLM_5_2]: {
+    interactivity: 100,
+    listPricing: {
+      vendor: 'Z.ai',
+      inputPerMillion: 1.4,
+      cachedInputPerMillion: 0.26,
+      outputPerMillion: 4.4,
+      sourceUrl: 'https://docs.z.ai/guides/overview/pricing',
+    },
+  },
+};
+
+const FALLBACK_MODEL_DEFAULTS: ProfitModelDefaults = {
+  interactivity: DEFAULT_PROFIT_INTERACTIVITY,
+  listPricing: null,
+};
+
+/** Defaults for `model`; models without an entry get 45 tok/s/user and OpenRouter. */
+export function profitModelDefaults(model: Model): ProfitModelDefaults {
+  return PROFIT_MODEL_DEFAULTS[model] ?? FALLBACK_MODEL_DEFAULTS;
+}
+
+/** The list price as a normalized pricing triple the revenue math accepts. */
+export function listPricingToTokenRevenuePricing(list: ProfitListPricing): TokenRevenuePricing {
+  return {
+    source: 'normalized',
+    inputPerMillion: list.inputPerMillion,
+    cachedInputPerMillion: list.cachedInputPerMillion,
+    outputPerMillion: list.outputPerMillion,
+  };
+}
+
 /** Fraction of benchmarked throughput that is actually sold. */
 export const DEFAULT_UTILIZATION_PCT = 60;
 /** Share of revenue paid to the model lab. */

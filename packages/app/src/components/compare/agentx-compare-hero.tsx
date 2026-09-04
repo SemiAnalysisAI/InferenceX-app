@@ -18,7 +18,7 @@ const MODEL_LOGOS: Record<string, string> = {
   'deepseek-v4': '/logos/deepseek-color.svg',
   // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
   // mark rather than the Zhipu corporate dot cluster.
-  'glm-5-2': '/logos/zai-color.svg',
+  'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',

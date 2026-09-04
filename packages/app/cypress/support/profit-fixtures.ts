@@ -1,5 +1,6 @@
 /**
- * Synthetic Kimi K3 agentic rows for the `/profit-estimator` e2e spec.
+ * Synthetic agentic rows for the `/profit-estimator` e2e spec, one identical
+ * SKU set per model the estimator serves (Kimi K3 and GLM 5.2/5.3).
  *
  * The captured API fixtures carry no `agentic_traces` rows, and the estimator
  * is pinned to that workload, so the spec intercepts availability and
@@ -8,11 +9,20 @@
  * (concurrency, p90 interactivity tok/s/user, tput_per_gpu, p90 e2e latency s).
  *
  * The H200 curve tops out below the 45 tok/s/user default on purpose: the page
- * must list it under "Not priced" rather than extrapolate a bar for it.
+ * must list it under "Not priced" rather than extrapolate a bar for it. The
+ * wide curve reaches 130 tok/s/user so GLM's 100 tok/s/user default is a read,
+ * not a clamp, on every other SKU.
  */
 import { metricsFor } from './overlay-fixtures';
 
 export const PROFIT_MODEL_DB_KEY = 'kimik3';
+export const PROFIT_GLM_DB_KEY = 'glm5.2';
+/** `?model=` display key the benchmarks request carries → DB key of its rows. */
+const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
+  'Kimi-K3': PROFIT_MODEL_DB_KEY,
+  'GLM-5.2': PROFIT_GLM_DB_KEY,
+};
+const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
 
 type Curve = [conc: number, intvty: number, tput: number, e2el: number][];
@@ -49,13 +59,13 @@ export const PROFIT_SKUS: ProfitSku[] = [
 
 let idCursor = 800_000;
 
-export const profitBenchmarkRows = () =>
+export const profitBenchmarkRows = (dbKey: string = PROFIT_MODEL_DB_KEY) =>
   PROFIT_SKUS.flatMap((sku) =>
     sku.curve.map(([conc, intvty, tput, e2el]) => ({
       id: idCursor++,
       hardware: sku.hardware,
       framework: sku.framework,
-      model: PROFIT_MODEL_DB_KEY,
+      model: dbKey,
       precision: sku.precision,
       spec_method: 'none',
       disagg: false,
@@ -77,26 +87,32 @@ export const profitBenchmarkRows = () =>
     })),
   );
 
-export const profitAvailabilityRows = () =>
-  PROFIT_SKUS.map((sku) => ({
-    model: PROFIT_MODEL_DB_KEY,
-    isl: null,
-    osl: null,
-    precision: sku.precision,
-    hardware: sku.hardware,
-    framework: sku.framework,
-    spec_method: 'none',
-    disagg: false,
-    benchmark_type: 'agentic_traces',
-    date: PROFIT_DATE,
-  }));
+export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEYS) =>
+  dbKeys.flatMap((dbKey) =>
+    PROFIT_SKUS.map((sku) => ({
+      model: dbKey,
+      isl: null,
+      osl: null,
+      precision: sku.precision,
+      hardware: sku.hardware,
+      framework: sku.framework,
+      spec_method: 'none',
+      disagg: false,
+      benchmark_type: 'agentic_traces',
+      date: PROFIT_DATE,
+    })),
+  );
 
-/** Intercept availability and benchmarks with the Kimi K3 agentic set. */
+/**
+ * Intercept availability (both models) and benchmarks (the rows of whichever
+ * model the request names, so a model switch never sees another model's bars).
+ */
 export const interceptProfitData = (): void => {
   cy.intercept('GET', '/api/v1/availability*', { body: profitAvailabilityRows() }).as(
     'profit-availability',
   );
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: profitBenchmarkRows() }).as(
-    'profit-benchmarks',
-  );
+  cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+    const display = String(req.query['model'] ?? '');
+    req.reply({ body: profitBenchmarkRows(PROFIT_DB_KEY_BY_DISPLAY_MODEL[display]) });
+  }).as('profit-benchmarks');
 };
