@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const exportMocks = vi.hoisted(() => ({ pathname: '/inference', toPng: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
+vi.mock('@jpinsonneau/html-to-image', () => ({
+  toPng: exportMocks.toPng,
+  getFontEmbedCSS: undefined,
+}));
 
 import {
   getExportCaptureDimensions,
@@ -8,7 +17,78 @@ import {
   getLogoWatermarkOpacity,
   getLogoWatermarkSrc,
   normalizeChartSvgWidthsForExport,
+  useChartExport,
 } from './useChartExport';
+
+describe('useChartExport failure messages', () => {
+  let root: Root;
+  let container: HTMLDivElement;
+  let chart: HTMLDivElement;
+  let exportContainer: HTMLDivElement;
+  let current: ReturnType<typeof useChartExport>;
+  let originalFonts: PropertyDescriptor | undefined;
+
+  function HookProbe() {
+    current = useChartExport({ chartId: 'inference-chart' });
+    return null;
+  }
+
+  beforeEach(() => {
+    exportMocks.pathname = '/inference';
+    exportMocks.toPng.mockReset();
+    originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready: Promise.resolve() },
+    });
+    container = document.createElement('div');
+    chart = document.createElement('div');
+    chart.id = 'inference-chart';
+    chart.textContent = 'DeepSeek R1';
+    exportContainer = document.createElement('div');
+    exportContainer.id = 'inference-chart-export';
+    document.body.append(container, chart, exportContainer);
+    root = createRoot(container);
+    act(() => root.render(createElement(HookProbe)));
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    chart.remove();
+    exportContainer.remove();
+    if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);
+    else Reflect.deleteProperty(document, 'fonts');
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['/inference', 'Failed to export image. Please try again.'],
+    ['/zh/inference', '图片导出失败，请重试。'],
+  ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
+    // Keep the hook mounted across locale navigation to catch a stale callback.
+    exportMocks.pathname = pathname;
+    act(() => root.render(createElement(HookProbe)));
+    const error = new Error('PNG capture failed');
+    exportMocks.toPng.mockRejectedValueOnce(error);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await act(async () => {
+      await current.exportToImage();
+    });
+
+    expect(exportMocks.toPng).toHaveBeenCalledExactlyOnceWith(
+      exportContainer,
+      expect.objectContaining({ quality: 1, pixelRatio: 2 }),
+    );
+    expect(alertSpy).toHaveBeenCalledExactlyOnceWith(message);
+    expect(errorSpy).toHaveBeenCalledExactlyOnceWith('Error exporting image:', error);
+    expect(current.isExporting).toBe(false);
+    expect(exportContainer.childElementCount).toBe(0);
+    expect(chart.textContent).toBe('DeepSeek R1');
+  });
+});
 
 describe('getExportFontFamily', () => {
   it('uses Minecraft font stack when minecraft theme is active', () => {

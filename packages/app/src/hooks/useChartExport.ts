@@ -1,6 +1,12 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: { exportFailed: 'Failed to export image. Please try again.' },
+  zh: { exportFailed: '图片导出失败，请重试。' },
+};
 
 interface UseChartExportOptions {
   chartId: string;
@@ -315,6 +321,8 @@ export function useChartExport({
   setIsLegendExpanded,
   exportFileName,
 }: UseChartExportOptions) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [isExporting, setIsExporting] = useState(false);
 
   const exportToImage = useCallback(async () => {
@@ -555,14 +563,14 @@ export function useChartExport({
       window.dispatchEvent(new CustomEvent('inferencex:action'));
     } catch (error) {
       console.error('Error exporting image:', error);
-      alert('Failed to export image. Please try again.');
+      alert(t.exportFailed);
       if (wasClosed && setIsLegendExpanded) setIsLegendExpanded(false);
     } finally {
       setIsExporting(false);
       const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
       if (exportElement) exportElement.innerHTML = '';
     }
-  }, [chartId, setIsLegendExpanded]);
+  }, [chartId, setIsLegendExpanded, t]);
 
   return { isExporting, exportToImage };
 }

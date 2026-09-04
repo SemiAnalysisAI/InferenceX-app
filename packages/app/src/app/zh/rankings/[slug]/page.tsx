@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  AUTHOR_NAME,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE_ZH,
+} from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -43,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRankingPageData(entry.slug);
   const title = rankingPageTitleZh(entry);
-  const description = data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry);
+  const description = `${data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry)}${SUPPORTERS_LINE_ZH}`;
   const url = `${SITE_URL}/zh/rankings/${entry.slug}`;
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
