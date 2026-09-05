@@ -1,60 +1,25 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
   lstatSync,
-  mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   readlinkSync,
-  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import process from 'node:process';
-import { after, before, test } from 'node:test';
+import { test } from 'node:test';
 
-const packageRoot = resolve(import.meta.dirname, '..');
-const packageInfo = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-skill.mjs';
+
+const suite = packedSkillSuite();
+const { project, run } = suite;
 const metadataName = '.inferencex-skills.json';
-const temporaryRoot = realpathSync(mkdtempSync(join(tmpdir(), 'inferencex-skills-test-')));
-const environment = {
-  ...process.env,
-  PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH}`,
-  npm_config_cache: join(temporaryRoot, 'npm-cache'),
-  npm_config_update_notifier: 'false',
-  npm_config_audit: 'false',
-  npm_config_fund: 'false',
-};
-let archive;
-let packedFiles;
-
-function npm(args, cwd) {
-  const result = spawnSync('npm', args, {
-    cwd,
-    env: environment,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  assert.ifError(result.error);
-  return result;
-}
-
-function project() {
-  return mkdtempSync(join(temporaryRoot, 'project with spaces-'));
-}
-
-function run(args, cwd, packageArchive = archive) {
-  return npm(
-    ['exec', '--yes', '--offline', '--package', packageArchive, '--', 'inferencex-skills', ...args],
-    cwd,
-  );
-}
 
 function setInstalledVersion(destination, version) {
   writeFileSync(
@@ -71,41 +36,25 @@ function setInstalledVersion(destination, version) {
   );
 }
 
-function succeeded(result) {
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-}
-
-before(() => {
-  const result = npm(['pack', '--json', '--pack-destination', temporaryRoot], packageRoot);
-  succeeded(result);
-  const [packed] = JSON.parse(result.stdout);
-  archive = join(temporaryRoot, packed.filename);
-  packedFiles = packed.files.map((file) => file.path);
-});
-
-after(() => {
-  rmSync(temporaryRoot, { recursive: true, force: true });
-});
-
 test('the real npm archive installs the single skill with all bundled resources', () => {
   const cwd = project();
   const result = run(['install', '--target', 'codex'], cwd);
   succeeded(result);
   assert.ok(result.stdout.includes(`Installed version: ${packageInfo.version}\n`));
   assert.deepEqual(readdirSync(join(cwd, '.agents', 'skills')), ['inferencex-api']);
-  assert.ok(packedFiles.includes('package.json'));
-  assert.ok(packedFiles.includes('README.md'));
-  assert.ok(packedFiles.includes('LICENSE'));
-  assert.ok(packedFiles.includes('bin/install.mjs'));
-  assert.ok(packedFiles.includes('skills/inferencex-api/SKILL.md'));
+  assert.ok(suite.packedFiles.includes('package.json'));
+  assert.ok(suite.packedFiles.includes('README.md'));
+  assert.ok(suite.packedFiles.includes('LICENSE'));
+  assert.ok(suite.packedFiles.includes('bin/install.mjs'));
+  assert.ok(suite.packedFiles.includes('skills/inferencex-api/SKILL.md'));
   assert.ok(
-    packedFiles.every(
+    suite.packedFiles.every(
       (path) =>
         ['package.json', 'README.md', 'LICENSE', 'bin/install.mjs'].includes(path) ||
         path.startsWith('skills/inferencex-api/'),
     ),
   );
-  for (const path of packedFiles.filter((entry) => entry.startsWith('skills/'))) {
+  for (const path of suite.packedFiles.filter((entry) => entry.startsWith('skills/'))) {
     assert.deepEqual(
       readFileSync(join(cwd, '.agents', path)),
       readFileSync(join(packageRoot, path)),

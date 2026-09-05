@@ -1,25 +1,16 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
-import { after, before, test } from 'node:test';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-const packageRoot = resolve(import.meta.dirname, '..');
-const temporaryRoot = mkdtempSync(join(tmpdir(), 'inferencex-powerx-test-'));
+import { packageInfo, packedSkillSuite, succeeded } from './packed-skill.mjs';
+
+const suite = packedSkillSuite();
+const { temporaryRoot, environment, project } = suite;
 const preload = join(temporaryRoot, 'http-response.mjs');
-const environment = {
-  ...process.env,
-  PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH}`,
-  npm_config_cache: join(temporaryRoot, 'npm-cache'),
-  npm_config_update_notifier: 'false',
-  npm_config_audit: 'false',
-  npm_config_fund: 'false',
-};
 const requiredArgs = ['--model', 'GLM-5', '--isl', '8192', '--osl', '1024'];
-const version = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
+const version = packageInfo.version;
 let exporter;
 
 function observation(overrides = {}) {
@@ -69,34 +60,19 @@ function observation(overrides = {}) {
   };
 }
 
-function succeeded(result) {
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-}
-
-function project() {
-  return mkdtempSync(join(temporaryRoot, 'project with spaces-'));
-}
-
 function run(args, rows = [], { body = JSON.stringify(rows), status = 200, cwd = project() } = {}) {
-  const fixtureRoot = mkdtempSync(join(temporaryRoot, 'response-'));
+  const fixtureRoot = project('response-');
   const responsePath = join(fixtureRoot, 'response.json');
   const requestPath = join(fixtureRoot, 'requests.txt');
   writeFileSync(responsePath, JSON.stringify({ body, status }));
-  const result = spawnSync(
-    process.execPath,
-    ['--import', pathToFileURL(preload).href, exporter, ...args],
-    {
-      cwd,
-      env: {
-        ...environment,
-        INFERENCEX_TEST_RESPONSE: responsePath,
-        INFERENCEX_TEST_REQUESTS: requestPath,
-      },
-      encoding: 'utf8',
-      timeout: 10_000,
+  const result = suite.node(['--import', pathToFileURL(preload).href, exporter, ...args], {
+    cwd,
+    env: {
+      ...environment,
+      INFERENCEX_TEST_RESPONSE: responsePath,
+      INFERENCEX_TEST_REQUESTS: requestPath,
     },
-  );
-  assert.ifError(result.error);
+  });
   const requests = existsSync(requestPath)
     ? readFileSync(requestPath, 'utf8').trimEnd().split('\n')
     : [];
@@ -121,40 +97,8 @@ globalThis.fetch = async (input) => {
 };
 `,
   );
-  const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', temporaryRoot], {
-    cwd: packageRoot,
-    env: environment,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  assert.ifError(packed.error);
-  succeeded(packed);
-  const archive = join(temporaryRoot, JSON.parse(packed.stdout)[0].filename);
-  const installRoot = project();
-  const installed = spawnSync(
-    'npm',
-    [
-      'exec',
-      '--yes',
-      '--offline',
-      '--package',
-      archive,
-      '--',
-      'inferencex-skills',
-      'install',
-      '--target',
-      'codex',
-    ],
-    { cwd: installRoot, env: environment, encoding: 'utf8', timeout: 60_000 },
-  );
-  assert.ifError(installed.error);
-  succeeded(installed);
-  exporter = join(installRoot, '.agents/skills/inferencex-api/scripts/export-powerx.mjs');
+  exporter = join(suite.install('codex'), 'scripts/export-powerx.mjs');
   assert.ok(existsSync(exporter), 'the actual npm artifact installs the exporter');
-});
-
-after(() => {
-  rmSync(temporaryRoot, { recursive: true, force: true });
 });
 
 test('installed JSON exporter preserves request, model, measurement and snapshot identities', () => {

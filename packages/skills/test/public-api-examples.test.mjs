@@ -1,23 +1,14 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
-import { after, before, test } from 'node:test';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-const packageRoot = resolve(import.meta.dirname, '..');
-const temporaryRoot = mkdtempSync(join(tmpdir(), 'inferencex-public-examples-'));
+import { packedSkillSuite, succeeded as expectSuccess } from './packed-skill.mjs';
+
+const suite = packedSkillSuite();
+const { temporaryRoot, environment } = suite;
 const base = 'https://inferencex.semianalysis.com';
-const environment = {
-  ...process.env,
-  PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH}`,
-  npm_config_cache: join(temporaryRoot, 'npm-cache'),
-  npm_config_update_notifier: 'false',
-  npm_config_audit: 'false',
-  npm_config_fund: 'false',
-};
 const installed = new Map();
 const preload = join(temporaryRoot, 'http-response.mjs');
 const schema = {
@@ -36,39 +27,9 @@ const schema = {
   },
 };
 
-function npm(args, cwd) {
-  const result = spawnSync('npm', args, {
-    cwd,
-    env: environment,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  return result;
-}
-
 before(() => {
-  const packed = npm(['pack', '--json', '--pack-destination', temporaryRoot], packageRoot);
-  const archive = join(temporaryRoot, JSON.parse(packed.stdout)[0].filename);
   for (const target of ['codex', 'claude']) {
-    const project = mkdtempSync(join(temporaryRoot, `${target} project `));
-    npm(
-      [
-        'exec',
-        '--yes',
-        '--offline',
-        '--package',
-        archive,
-        '--',
-        'inferencex-skills',
-        'install',
-        '--target',
-        target,
-      ],
-      project,
-    );
-    const root = join(project, target === 'codex' ? '.agents' : '.claude', 'skills/inferencex-api');
+    const root = suite.install(target);
     const cookbook = readFileSync(join(root, 'references/public-api-examples.md'), 'utf8');
     const snippets = [
       ...cookbook.matchAll(
@@ -97,10 +58,8 @@ globalThis.fetch = async (input) => {
   );
 });
 
-after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
-
 function run(index, responses, { target = 'codex', replacement, openapi = schema } = {}) {
-  const project = mkdtempSync(join(temporaryRoot, 'request-'));
+  const project = suite.project('request-');
   const fixtures = { [`${base}/api/openapi.json`]: { body: JSON.stringify(openapi) } };
   for (const [path, value] of Object.entries(responses)) {
     fixtures[`${base}${path}`] = value;
@@ -110,22 +69,15 @@ function run(index, responses, { target = 'codex', replacement, openapi = schema
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
   let code = installed.get(target)[index];
   if (replacement) code = code.replace(...replacement);
-  const result = spawnSync(
-    process.execPath,
-    ['--import', pathToFileURL(preload).href, '--input-type=module'],
-    {
-      cwd: project,
-      env: {
-        ...environment,
-        INFERENCEX_EXAMPLE_FIXTURES: fixturesPath,
-        INFERENCEX_EXAMPLE_REQUESTS: requestsPath,
-      },
-      input: code,
-      encoding: 'utf8',
-      timeout: 10_000,
+  const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
+    cwd: project,
+    env: {
+      ...environment,
+      INFERENCEX_EXAMPLE_FIXTURES: fixturesPath,
+      INFERENCEX_EXAMPLE_REQUESTS: requestsPath,
     },
-  );
-  assert.ifError(result.error);
+    input: code,
+  });
   return {
     ...result,
     requests: readFileSync(requestsPath, 'utf8').trimEnd().split('\n').map(JSON.parse),
@@ -172,7 +124,7 @@ const item = (conv_id) => ({
 });
 
 function succeeded(result) {
-  assert.equal(result.status, 0, result.stderr);
+  expectSuccess(result);
   const output = JSON.parse(result.stdout);
   assert.deepEqual(
     output.requests.map((request) => request.query_url),

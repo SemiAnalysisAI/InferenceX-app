@@ -72,7 +72,9 @@ test('public verification decodes gzip HTTP JSON but preserves raw npm tarball b
 import gzip, hashlib, importlib.util, io, json, tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import TestCase
 from unittest.mock import patch
+assertions = TestCase()
 spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
@@ -108,12 +110,8 @@ with tempfile.TemporaryDirectory() as directory:
         report = {'requests':[]}
         opener = SimpleNamespace(open=lambda *a, **kw: Response(wire, {'Content-Encoding':encoding}, url))
         with patch.object(check, 'build_opener', return_value=opener):
-            try:
+            with assertions.assertRaises((ValueError, gzip.BadGzipFile), msg='Unsupported or malformed encoding must fail'):
                 check.fetch_public(url, root / ('bad-' + encoding), report)
-            except (ValueError, gzip.BadGzipFile):
-                pass
-            else:
-                raise AssertionError('Unsupported or malformed encoding must fail')
         assert Path(report['requests'][0]['wire_response_file']).read_bytes() == wire
         assert 'response_file' not in report['requests'][0]
 `,
@@ -133,7 +131,9 @@ test('read-only verification rejects incomplete or altered exports and preserves
 import csv, importlib.util, json, subprocess, tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import TestCase
 from unittest.mock import patch
+assertions = TestCase()
 spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
@@ -169,22 +169,14 @@ with tempfile.TemporaryDirectory() as directory:
         old = record[key]
         record[key] = value
         write()
-        try:
+        with assertions.assertRaises(ValueError, msg='Verifier accepted changed ' + key):
             check.check_exports(root, [row], [row], args, '0.2.0')
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('Verifier accepted changed ' + key)
         record[key] = old
     for headers in [[key for key in columns if key != 'framework'], list(reversed(columns)), columns + ['extra']]:
         record['extra'] = 'not in the published contract'
         write(headers)
-        try:
+        with assertions.assertRaisesRegex(ValueError, 'CSV header', msg='Verifier accepted an incomplete or changed CSV contract'):
             check.check_exports(root, [row], [row], args, '0.2.0')
-        except ValueError as error:
-            assert 'CSV header' in str(error)
-        else:
-            raise AssertionError('Verifier accepted an incomplete or changed CSV contract')
     assert not check.strict({'metrics': {'power_valid': True, 'power_metric_schema_version':2}})
     assert not check.same_url(url, url + '&date=2026-01-01')
     assert not check.same_url(url, url + '&date=')
@@ -194,21 +186,13 @@ lookup = {'matching_rows':6, 'sample_rows':available[:5], 'query_url':args.base_
           'scope':{'date':'latest available', 'benchmark_type':'single_turn', 'isl':8192, 'osl':1024}}
 check.check_lookup(lookup, available, args)
 for sample in [[available[0]] * 5, list(reversed(available[:5])), available[1:6]]:
-    try:
+    with assertions.assertRaises(ValueError, msg='Verifier accepted repeated or incorrectly ordered lookup observations'):
         check.check_lookup(lookup | {'sample_rows':sample}, available, args)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError('Verifier accepted repeated or incorrectly ordered lookup observations')
 for key, value in [('query_url',url), ('retrieved_at','2026-01-02T00:00:00'), ('requested_model','Other'),
                    ('returned_models',[]), ('returned_models',['example','example']),
                    ('scope',lookup['scope'] | {'isl':1024}), ('scope',lookup['scope'] | {'date':'2026-01-01'})]:
-    try:
+    with assertions.assertRaises(ValueError, msg='Verifier accepted changed lookup provenance: ' + key):
         check.check_lookup(lookup | {key:value}, available, args)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError('Verifier accepted changed lookup provenance: ' + key)
 detail = {'outcome':'no_observations', 'scoped_rows':0, 'rows':[], 'query_url':args.base_url,
           'retrieved_at':'2026-01-02T00:00:00+00:00', 'returned_rows':6,
           'scope':{'requested_model':'Example', 'requested_date':None, 'raw_model':None,
@@ -219,23 +203,15 @@ check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail}, metadata, 
 for key, value in [('rows',[row]), ('retrieved_at','2026-01-02T00:00:00'), ('validation_counts',{}),
                    ('validation_counts',detail['validation_counts'] | {'invalid':False}),
                    ('validation_counts',detail['validation_counts'] | {'extra':0})]:
-    try:
+    with assertions.assertRaises(ValueError, msg='Verifier accepted changed empty diagnostic evidence: ' + key):
         check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail | {key:value}}, metadata, 6, args)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError('Verifier accepted changed empty diagnostic evidence: ' + key)
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
     for label, stdout, stderr in [('bytes', b'partial output', b'partial error'), ('text', 'partial output', 'partial error')]:
         timeout = subprocess.TimeoutExpired(['npm','exec'], 180, output=stdout, stderr=stderr)
         with patch.object(check.subprocess, 'run', side_effect=timeout):
-            try:
+            with assertions.assertRaises(subprocess.TimeoutExpired, msg='Timeout must remain a failed command'):
                 check.run(['npm','exec'], root, {}, label)
-            except subprocess.TimeoutExpired:
-                pass
-            else:
-                raise AssertionError('Timeout must remain a failed command')
         assert (root / (label + '.stdout.log')).read_text() == 'partial output'
         assert (root / (label + '.stderr.log')).read_text() == 'partial error'
     records = [json.loads(line) for line in (root / 'commands.jsonl').read_text().splitlines()]

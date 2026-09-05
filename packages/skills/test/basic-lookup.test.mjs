@@ -1,34 +1,13 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
-import { after, test } from 'node:test';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-const packageRoot = resolve(import.meta.dirname, '..');
-const temporaryRoot = mkdtempSync(join(tmpdir(), 'inferencex-lookup-test-'));
-const environment = {
-  ...process.env,
-  PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH}`,
-  npm_config_cache: join(temporaryRoot, 'npm-cache'),
-  npm_config_update_notifier: 'false',
-  npm_config_audit: 'false',
-  npm_config_fund: 'false',
-};
+import { packedSkillSuite, succeeded } from './packed-skill.mjs';
 
-function npm(args, cwd) {
-  const result = spawnSync('npm', args, {
-    cwd,
-    env: environment,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  return result;
-}
+const suite = packedSkillSuite();
+const { temporaryRoot, environment } = suite;
 
 function observation(id, date, overrides = {}) {
   return {
@@ -47,30 +26,10 @@ function observation(id, date, overrides = {}) {
   };
 }
 
-after(() => {
-  rmSync(temporaryRoot, { recursive: true, force: true });
-});
-
 test('the installed basic lookup limits the newest scoped observation dates and preserves provenance', () => {
-  const packed = npm(['pack', '--json', '--pack-destination', temporaryRoot], packageRoot);
-  const archive = join(temporaryRoot, JSON.parse(packed.stdout)[0].filename);
-  const project = mkdtempSync(join(temporaryRoot, 'project with spaces-'));
-  npm(
-    [
-      'exec',
-      '--yes',
-      '--offline',
-      '--package',
-      archive,
-      '--',
-      'inferencex-skills',
-      'install',
-      '--target',
-      'claude',
-    ],
-    project,
-  );
-  const skill = readFileSync(join(project, '.claude/skills/inferencex-api/SKILL.md'), 'utf8');
+  const project = suite.project();
+  const skillRoot = suite.install('claude', project);
+  const skill = readFileSync(join(skillRoot, 'SKILL.md'), 'utf8');
   const section = skill.split('## Basic benchmark lookup\n')[1];
   assert.ok(section, 'the installed skill contains the worked lookup');
   const snippet = section.match(
@@ -120,23 +79,16 @@ globalThis.fetch = async (input) => {
 };
 `,
   );
-  const result = spawnSync(
-    process.execPath,
-    ['--import', pathToFileURL(preload).href, '--input-type=module'],
-    {
-      cwd: project,
-      env: {
-        ...environment,
-        INFERENCEX_TEST_ROWS: fixturePath,
-        INFERENCEX_TEST_REQUESTS: requestsPath,
-      },
-      input: snippet.groups.code,
-      encoding: 'utf8',
-      timeout: 10_000,
+  const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
+    cwd: project,
+    env: {
+      ...environment,
+      INFERENCEX_TEST_ROWS: fixturePath,
+      INFERENCEX_TEST_REQUESTS: requestsPath,
     },
-  );
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    input: snippet.groups.code,
+  });
+  succeeded(result);
   const output = JSON.parse(result.stdout);
   assert.deepEqual(readFileSync(requestsPath, 'utf8').trimEnd().split('\n').map(JSON.parse), [
     'https://inferencex.semianalysis.com/api/openapi.json',
