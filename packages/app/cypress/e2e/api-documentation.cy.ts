@@ -3,6 +3,110 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  for (const locale of [
+    {
+      path: '/api',
+      heading: 'Use the API with your agent',
+      candidate: 'Unpublished candidate',
+      scope: 'benchmarks, provenance, datasets, CollectiveX, and diagnostics',
+      example: 'First example: measured PowerX',
+      missing: 'Keep missing metrics unavailable and genuine zeros unchanged',
+      context: 'request URL, retrieval time, package version, local filters',
+      excluded: 'Explain why rows were excluded and list missing requested metrics',
+      copy: 'Copy',
+      copied: 'Copied',
+    },
+    {
+      path: '/zh/api',
+      heading: '通过智能体使用 API',
+      candidate: '尚未发布的候选版本',
+      scope: '基准测试、溯源、数据集、CollectiveX 和诊断接口',
+      example: '首个示例：实测 PowerX 数据',
+      missing: '缺失指标保持不可用，真实零值保持为零',
+      context: '请求 URL、提取时间、包版本、本地筛选条件',
+      excluded: '说明数据行被排除的原因，并列出所请求指标的缺失项',
+      copy: '复制',
+      copied: '已复制',
+    },
+  ]) {
+    it(`guides ${locale.path} visitors from the candidate install to a traceable export`, () => {
+      cy.visit(locale.path, {
+        onBeforeLoad(win) {
+          cy.stub(win.navigator.clipboard, 'writeText').as('copyAgentExample').resolves();
+        },
+      });
+      // The reference is server-rendered; wait for the shell's client mount before copying.
+      cy.get('[data-testid="theme-toggle"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'currently');
+
+      cy.get('[data-testid="copyable-code-block"]')
+        .first()
+        .find('code')
+        .should('contain.text', 'curl');
+      cy.readFile<{ name: string; version: string }>('../skills/package.json').then((manifest) => {
+        cy.get('[data-testid="api-agent-skill"]')
+          .should('contain.text', locale.heading)
+          .and('contain.text', `${locale.candidate} · ${manifest.version}`)
+          .and('contain.text', manifest.name)
+          .and('contain.text', locale.scope)
+          .and('contain.text', 'Node 24');
+
+        for (const target of ['codex', 'claude']) {
+          const command = `INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-${manifest.version}.tgz'\nnpm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target ${target}`;
+          cy.get(`[data-testid="api-agent-install-${target}"]`).within(() => {
+            cy.get('code').should('have.text', command);
+            cy.contains('button', locale.copy).click();
+            cy.contains('button', locale.copied).should('be.visible');
+          });
+          cy.get('@copyAgentExample').should('have.been.calledWithExactly', command);
+          cy.readFile('../skills/README.md').should('contain', command.split('\n')[1]);
+        }
+      });
+
+      cy.get('[data-testid="api-agent-prompt"]').within(() => {
+        cy.contains(locale.example).should('be.visible');
+        cy.get('code')
+          .should('contain.text', 'inferencex-api')
+          .and('contain.text', 'DeepSeek-V4-Pro')
+          .and('contain.text', '8192')
+          .and('contain.text', '1024')
+          .and('contain.text', 'strictV2')
+          .and('contain.text', 'powerx.csv')
+          .and('contain.text', 'powerx.json')
+          .and('contain.text', locale.missing)
+          .and('contain.text', locale.context)
+          .and('contain.text', locale.excluded)
+          .invoke('text')
+          .then((prompt) => {
+            cy.contains('button', locale.copy).click();
+            cy.get('@copyAgentExample').should('have.been.calledWithExactly', prompt);
+          });
+      });
+
+      cy.get('#api-powerx-cookbook').should('not.have.attr', 'open');
+      cy.get('#api-powerx-cookbook summary').click();
+      cy.get('#api-powerx-cookbook')
+        .should(($details) => expect($details).to.have.attr('open'))
+        .and('contain.text', '.agents/skills/inferencex-api/references/powerx.md')
+        .and('contain.text', '.claude/skills/inferencex-api/references/powerx.md')
+        .and('contain.text', 'avg_power_w')
+        .and('contain.text', '--format json --output powerx.json')
+        .within(() => {
+          cy.get('pre code')
+            .should('contain.text', 'node .agents/skills/inferencex-api/scripts/export-powerx.mjs')
+            .and('contain.text', '--model DeepSeek-V4-Pro --isl 8192 --osl 1024')
+            .and('contain.text', '--format csv --output powerx.csv 2> powerx-report.log')
+            .invoke('text')
+            .then((command) => {
+              cy.contains('button', locale.copy).click();
+              cy.get('@copyAgentExample').should('have.been.calledWithExactly', command);
+            });
+          cy.get('a').should('not.exist');
+        });
+    });
+  }
+
   it('keeps full requests and response schemas readable on mobile', () => {
     cy.viewport(390, 720);
     cy.visit('/zh/api');
