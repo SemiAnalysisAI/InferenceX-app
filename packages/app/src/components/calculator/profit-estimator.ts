@@ -71,8 +71,8 @@ export interface ProfitModelDefaults {
  * aggregate also sits below it, and on 83 tok/s/user, the speed MiniMax's own
  * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
  * point, and the Hopper and MI300-series curves top out below it and list as
- * not priced. MiniMax M3 also opens on a 20% model license fee instead of the
- * 30% the other models assume.
+ * not priced. GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on
+ * 20%, instead of the 30% the other models assume.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   [Model.Kimi_K3]: {
@@ -82,7 +82,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   },
   [Model.GLM_5_2]: {
     interactivity: 100,
-    labCutPct: DEFAULT_LAB_CUT_PCT,
+    labCutPct: 10,
     listPricing: {
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
