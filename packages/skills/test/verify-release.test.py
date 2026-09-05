@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location(
     'release_check', Path(__file__).resolve().parents[1] / 'scripts/verify-release.py')
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 ETARGET = f'npm error code ETARGET\nnpm error notarget No matching version found for {check.PACKAGE}@{VERSION}.\n'
 
 
@@ -113,7 +113,7 @@ class RetryTests(unittest.TestCase):
             'npm error code E401\nAuthentication required',
             'npm error code E403\nForbidden',
             'npm error code EINTEGRITY\nIntegrity checksum failed',
-            ETARGET.replace(VERSION, '0.3.1'),
+            ETARGET.replace(VERSION, '0.4.1'),
             ETARGET.replace(check.PACKAGE, 'another-package'),
             ETARGET.replace('code ETARGET', 'code E404'),
             ETARGET + 'npm error code E401\n',

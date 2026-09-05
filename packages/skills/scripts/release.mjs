@@ -14,6 +14,18 @@ export const REGISTRY = 'https://registry.npmjs.org';
 const packageRoot = resolve(import.meta.dirname, '..');
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') =>
   createHash(algorithm).update(bytes).digest(encoding);
+const releaseFiles = [
+  'LICENSE',
+  'README.md',
+  'bin/install.mjs',
+  'package.json',
+  'skills/inferencex-api/SKILL.md',
+  'skills/inferencex-api/references/agentx.md',
+  'skills/inferencex-api/references/powerx.md',
+  'skills/inferencex-api/references/public-api-examples.md',
+  'skills/inferencex-api/scripts/export-agentx.mjs',
+  'skills/inferencex-api/scripts/export-powerx.mjs',
+];
 
 export async function requireUnpublished(version, manifest, request = fetch) {
   assert.match(
@@ -38,6 +50,20 @@ export async function requireUnpublished(version, manifest, request = fetch) {
 export function verifyArchive(record, bytes, reviewedSha256) {
   assert.equal(record.name, PACKAGE, 'Unexpected package name');
   assert.equal(record.filename, basename(record.filename), 'Archive must be beside its manifest');
+  verifyContents(record.files);
+  assert.equal(record.source_dirty, false, 'Package source must be clean');
+  assert.match(
+    record.source_commit,
+    /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u,
+    'Source commit must be a canonical Git object ID',
+  );
+  assert.equal(typeof record.prepared_at, 'string', 'Preparation time must be a string');
+  assert.match(
+    record.prepared_at,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u,
+    'Preparation time must be a timezone-qualified timestamp',
+  );
+  assert.ok(Number.isFinite(Date.parse(record.prepared_at)), 'Preparation time must be valid');
   assert.equal(digest(bytes), record.sha256, 'Archive SHA-256 differs from release manifest');
   assert.equal(
     `sha512-${digest(bytes, 'sha512', 'base64')}`,
@@ -51,24 +77,9 @@ export function verifyArchive(record, bytes, reviewedSha256) {
 }
 
 export function verifyContents(files) {
-  const required = [
-    'package.json',
-    'README.md',
-    'LICENSE',
-    'bin/install.mjs',
-    'skills/inferencex-api/SKILL.md',
-  ];
-  for (const path of required) assert.ok(files.includes(path), `Archive is missing ${path}`);
-  for (const path of files) {
-    assert.ok(
-      !path.split('/').some((part) => part.startsWith('.')),
-      `Unexpected hidden file: ${path}`,
-    );
-    assert.ok(
-      required.includes(path) || path.startsWith('skills/inferencex-api/'),
-      `Maintainer files must not enter the public archive: ${path}`,
-    );
-  }
+  assert.ok(Array.isArray(files), 'Archive file list is missing');
+  assert.equal(new Set(files).size, files.length, 'Archive file list contains duplicates');
+  assert.deepEqual([...files].sort(), [...releaseFiles].sort(), 'Archive file list differs');
 }
 
 function main(args) {
@@ -90,6 +101,16 @@ function main(args) {
 
 async function prepare(version, output, reviewedSha256) {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+  const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: packageRoot,
+    encoding: 'utf8',
+  }).trim();
+  const sourceDirty =
+    execFileSync('git', ['status', '--porcelain', '--', '.'], {
+      cwd: packageRoot,
+      encoding: 'utf8',
+    }).trim().length > 0;
+  assert.equal(sourceDirty, false, 'Package source must be clean before preparing a release');
   await requireUnpublished(version, manifest);
   const destination = resolve(output);
   // A new directory preserves earlier attempts, including failures.
@@ -113,15 +134,8 @@ async function prepare(version, output, reviewedSha256) {
     sha256: digest(bytes),
     integrity: archive.integrity,
     files: archive.files.map((file) => file.path),
-    source_commit: execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: packageRoot,
-      encoding: 'utf8',
-    }).trim(),
-    source_dirty:
-      execFileSync('git', ['status', '--porcelain', '--', '.'], {
-        cwd: packageRoot,
-        encoding: 'utf8',
-      }).trim().length > 0,
+    source_commit: sourceCommit,
+    source_dirty: sourceDirty,
     prepared_at: new Date().toISOString(),
   };
   verifyArchive(record, bytes, reviewedSha256);

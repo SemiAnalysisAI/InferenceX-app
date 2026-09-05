@@ -1,9 +1,34 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { PACKAGE, requireUnpublished, verifyArchive, verifyContents } from '../scripts/release.mjs';
+
+const VERSION = '0.4.0';
+const EXPECTED_FILES = [
+  'LICENSE',
+  'README.md',
+  'bin/install.mjs',
+  'package.json',
+  'skills/inferencex-api/SKILL.md',
+  'skills/inferencex-api/references/agentx.md',
+  'skills/inferencex-api/references/powerx.md',
+  'skills/inferencex-api/references/public-api-examples.md',
+  'skills/inferencex-api/scripts/export-agentx.mjs',
+  'skills/inferencex-api/scripts/export-powerx.mjs',
+];
 
 test('read-only release verification rejects altered evidence and unsafe retries', () => {
   const result = spawnSync('python3', ['-B', 'test/verify-release.test.py'], {
@@ -16,7 +41,7 @@ test('read-only release verification rejects altered evidence and unsafe retries
 });
 
 test('release refuses mismatched or existing versions and registry failures', async () => {
-  const manifest = { name: PACKAGE, version: '0.3.0' };
+  const manifest = { name: PACKAGE, version: VERSION };
   let requests = 0;
   const request = () => {
     requests++;
@@ -25,14 +50,14 @@ test('release refuses mismatched or existing versions and registry failures', as
   await assert.rejects(requireUnpublished('0.1.0', manifest, request), /differs/);
   await assert.rejects(requireUnpublished('latest', manifest, request), /exact stable version/);
   assert.equal(requests, 0, 'Invalid versions must fail before network access');
-  await requireUnpublished('0.3.0', manifest, request);
+  await requireUnpublished(VERSION, manifest, request);
   for (const [status, message] of [
     [200, /already published/],
     [429, /Cannot establish/],
     [503, /Cannot establish/],
   ]) {
     await assert.rejects(
-      requireUnpublished('0.3.0', manifest, () => Promise.resolve(new Response(null, { status }))),
+      requireUnpublished(VERSION, manifest, () => Promise.resolve(new Response(null, { status }))),
       message,
     );
   }
@@ -42,7 +67,12 @@ test('release rejects changed bytes and a different reviewed archive', () => {
   const bytes = Buffer.from('exact reviewed archive');
   const record = {
     name: PACKAGE,
+    version: VERSION,
     filename: 'package.tgz',
+    files: EXPECTED_FILES,
+    source_commit: 'a'.repeat(40),
+    source_dirty: false,
+    prepared_at: '2026-09-05T00:00:00Z',
     sha256: createHash('sha256').update(bytes).digest('hex'),
     integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
   };
@@ -50,27 +80,116 @@ test('release rejects changed bytes and a different reviewed archive', () => {
   assert.throws(() => verifyArchive(record, Buffer.from('changed')), /SHA-256 differs/);
   assert.throws(() => verifyArchive(record, bytes, '0'.repeat(64)), /reviewed candidate/);
   assert.throws(() => verifyArchive({ ...record, filename: '../package.tgz' }, bytes), /beside/);
+  assert.throws(
+    () => verifyArchive({ ...record, files: EXPECTED_FILES.slice(1) }, bytes),
+    /differs/,
+  );
   assert.throws(() => verifyArchive({ ...record, integrity: 'sha512-other' }, bytes), /integrity/);
 });
 
-test('release content boundary excludes maintainer tools, tests and hidden files', () => {
-  const files = [
-    'package.json',
-    'README.md',
-    'LICENSE',
-    'bin/install.mjs',
-    'skills/inferencex-api/SKILL.md',
-  ];
-  verifyContents([...files, 'skills/inferencex-api/references/examples.md']);
+test('release content boundary is the exact independent ten-file contract', () => {
+  verifyContents(EXPECTED_FILES.toReversed());
+  for (const missing of EXPECTED_FILES) {
+    assert.throws(
+      () => verifyContents(EXPECTED_FILES.filter((path) => path !== missing)),
+      /differs/,
+    );
+  }
   for (const path of [
+    'credentials.json',
+    'skills/inferencex-api/DRAFT.md',
+    'skills/inferencex-api/SKILL.md.bak',
+    '.scratch/acceptance.json',
     'scripts/release.mjs',
     'test/release.test.mjs',
-    '.env',
-    'skills/inferencex-api/.secret',
   ]) {
-    assert.throws(() => verifyContents([...files, path]), /public archive|hidden file/);
+    assert.throws(() => verifyContents([...EXPECTED_FILES, path]), /differs/);
   }
-  assert.throws(() => verifyContents(files.slice(1)), /missing package.json/);
+  assert.throws(() => verifyContents([...EXPECTED_FILES, EXPECTED_FILES[0]]), /duplicates/);
+});
+
+test('release manifest provenance is clean, canonical and timezone-qualified', () => {
+  const bytes = Buffer.from('exact reviewed archive');
+  const record = {
+    name: PACKAGE,
+    version: VERSION,
+    filename: 'package.tgz',
+    files: EXPECTED_FILES,
+    source_commit: 'a'.repeat(40),
+    source_dirty: false,
+    prepared_at: '2026-09-05T00:00:00+00:00',
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
+  };
+  verifyArchive(record, bytes);
+  verifyArchive({ ...record, source_commit: 'b'.repeat(64) }, bytes);
+  for (const source_dirty of [true, null, undefined]) {
+    assert.throws(() => verifyArchive({ ...record, source_dirty }, bytes), /source must be clean/);
+  }
+  for (const source_commit of ['A'.repeat(40), 'a'.repeat(39), 'a'.repeat(65), 'g'.repeat(40)]) {
+    assert.throws(() => verifyArchive({ ...record, source_commit }, bytes), /Git object ID/);
+  }
+  for (const prepared_at of [
+    null,
+    '2026-09-05Z',
+    '2026-09-05 00:00:00Z',
+    '2026-09-05T00:00:00',
+    'not-a-dateZ',
+    '2026-09-05T00:00:00+99:99',
+  ]) {
+    assert.throws(() => verifyArchive({ ...record, prepared_at }, bytes), /Preparation time/);
+  }
+});
+
+test('prepare rejects dirty package source and packs a clean real candidate', (context) => {
+  const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-release-test-'));
+  context.after(() => rmSync(temporary, { recursive: true, force: true }));
+  const source = resolve(import.meta.dirname, '..');
+  const packageRoot = join(temporary, 'skills');
+  cpSync(source, packageRoot, { recursive: true });
+  const packagePath = join(packageRoot, 'package.json');
+  const manifest = JSON.parse(readFileSync(packagePath, 'utf8'));
+  writeFileSync(packagePath, `${JSON.stringify({ ...manifest, version: VERSION }, null, 2)}\n`);
+  execFileSync('git', ['init', '--quiet'], { cwd: packageRoot });
+  execFileSync('git', ['config', 'user.email', 'release-test@example.com'], { cwd: packageRoot });
+  execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: packageRoot });
+  execFileSync('git', ['add', '.'], { cwd: packageRoot });
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--quiet', '-m', 'fixture'], {
+    cwd: packageRoot,
+  });
+  const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: packageRoot,
+    encoding: 'utf8',
+  }).trim();
+  const preload = join(temporary, 'registry-404.mjs');
+  writeFileSync(preload, 'globalThis.fetch = async () => new Response(null, { status: 404 });\n');
+  const command = [
+    '--import',
+    pathToFileURL(preload).href,
+    join(packageRoot, 'scripts/release.mjs'),
+    'prepare',
+    VERSION,
+  ];
+
+  writeFileSync(
+    join(packageRoot, 'README.md'),
+    `${readFileSync(join(packageRoot, 'README.md'))}\ndirty\n`,
+  );
+  const dirtyOutput = join(temporary, 'dirty-candidate');
+  const dirty = spawnSync(process.execPath, [...command, dirtyOutput], { encoding: 'utf8' });
+  assert.notEqual(dirty.status, 0, `${dirty.stdout}\n${dirty.stderr}`);
+  assert.match(dirty.stderr, /source must be clean/);
+  assert.equal(existsSync(dirtyOutput), false);
+
+  execFileSync('git', ['checkout', '--quiet', '--', 'README.md'], { cwd: packageRoot });
+  const output = join(temporary, 'candidate');
+  const clean = spawnSync(process.execPath, [...command, output], { encoding: 'utf8' });
+  assert.equal(clean.status, 0, clean.stderr);
+  const record = JSON.parse(readFileSync(join(output, 'release.json'), 'utf8'));
+  assert.equal(record.source_commit, sourceCommit);
+  assert.equal(record.source_dirty, false);
+  assert.deepEqual([...record.files].sort(), [...EXPECTED_FILES].sort());
+  verifyArchive(record, readFileSync(join(output, record.filename)));
 });
 
 test('public verification decodes gzip HTTP JSON but preserves raw npm tarball bytes', () => {
@@ -152,7 +271,7 @@ args = SimpleNamespace(model='Example', date=None, isl=8192, osl=1024, raw_model
 row = {'id':'9007199254740993', 'model':'example', 'hardware':'h200', 'date':'2026-01-01',
        'benchmark_type':'single_turn', 'isl':8192, 'osl':1024,
        'metrics': {'power_valid':1, 'power_metric_schema_version':2, 'avg_power_w':0}}
-metadata = {'package_version':'0.3.0', 'query_url':url, 'requested_model':'Example',
+metadata = {'package_version':'0.4.0', 'query_url':url, 'requested_model':'Example',
             'requested_date':None, 'date_selection':'latest', 'benchmark_type':'single_turn',
             'isl':8192, 'osl':1024, 'raw_model':None, 'returned_rows':1, 'selected_rows':1,
             'returned_models':['example'], 'selected_models':['example'],
@@ -173,19 +292,19 @@ with tempfile.TemporaryDirectory() as directory:
             writer.writeheader()
             writer.writerow({key:record[key] for key in headers})
     write()
-    assert check.check_exports(root, [row], [row], args, '0.3.0')['selected_rows'] == 1
+    assert check.check_exports(root, [row], [row], args, '0.4.0')['selected_rows'] == 1
     for key, value in [('prefill_avg_power_w', 0), ('avg_power_w', 1), ('id', '9007199254740992')]:
         old = record[key]
         record[key] = value
         write()
         with assertions.assertRaises(ValueError, msg='Verifier accepted changed ' + key):
-            check.check_exports(root, [row], [row], args, '0.3.0')
+            check.check_exports(root, [row], [row], args, '0.4.0')
         record[key] = old
     for headers in [[key for key in columns if key != 'framework'], list(reversed(columns)), columns + ['extra']]:
         record['extra'] = 'not in the published contract'
         write(headers)
         with assertions.assertRaisesRegex(ValueError, 'CSV header', msg='Verifier accepted an incomplete or changed CSV contract'):
-            check.check_exports(root, [row], [row], args, '0.3.0')
+            check.check_exports(root, [row], [row], args, '0.4.0')
     assert not check.strict({'metrics': {'power_valid': True, 'power_metric_schema_version':2}})
     assert not check.same_url(url, url + '&date=2026-01-01')
     assert not check.same_url(url, url + '&date=')
