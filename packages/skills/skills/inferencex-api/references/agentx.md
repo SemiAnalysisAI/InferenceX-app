@@ -56,6 +56,10 @@ applied. Metadata marks every filter as applied or omitted and lists values pres
 in the returned AgentX rows so an empty exact selection can be diagnosed without
 making claims about jobs or artifacts outside that response.
 
+Add `--evidence-dir agentx-evidence` with a path that does not exist to save every
+decoded response consumed by the export and an atomic manifest linking those
+responses to the output hash. Keep the evidence directory separate from `--output`.
+
 JSON retains every selected benchmark object separately from its `agentx`
 enrichment. CSV repeats package, request, and filter context on every row. Its
 `metrics.*` columns are the sorted union of scalar metric keys in the selected

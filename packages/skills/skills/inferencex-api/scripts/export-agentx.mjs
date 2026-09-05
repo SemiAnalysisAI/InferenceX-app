@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { lstat, mkdir, readlink, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 
@@ -25,6 +27,7 @@ Options:
   --concurrency <n>    Select an exact positive concurrency
   --format <format>    csv (default) or json
   --output <file>      Output file; default stdout
+  --evidence-dir <dir> Save consumed responses and a manifest in a new directory
   --help               Show this help without making a request
 
 The benchmark response is filtered locally to benchmark_type=agentic_traces.
@@ -159,6 +162,92 @@ function unique(values) {
   return [...new Set(values)].toSorted();
 }
 
+// Resolve existing symlink ancestors, including dangling output links, before creating evidence.
+async function physicalPath(path) {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    const entry = await lstat(path).catch((statError) => {
+      if (statError.code !== 'ENOENT') throw statError;
+      return null;
+    });
+    if (entry?.isSymbolicLink()) return physicalPath(resolve(dirname(path), await readlink(path)));
+    return join(await physicalPath(dirname(path)), basename(path));
+  }
+}
+
+function containsPath(parent, child) {
+  const path = relative(parent, child);
+  return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function saveManifest(evidence) {
+  const temporary = join(evidence.directory, 'manifest.tmp');
+  await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
+  await rename(temporary, join(evidence.directory, 'manifest.json'));
+}
+
+async function writeStdout(bytes) {
+  // The callback reports a closed consumer after write() has accepted the buffer.
+  process.stdout.on('error', () => {});
+  await new Promise((resolveWrite, reject) => {
+    process.stdout.write(bytes, (error) => (error ? reject(error) : resolveWrite()));
+  });
+}
+
+async function stageFileOutput(destination, bytes) {
+  const target = resolve(destination);
+  const suffix = `${process.pid}-${randomUUID()}`;
+  const temporary = join(dirname(target), `.${basename(target)}.${suffix}.tmp`);
+  const backup = join(dirname(target), `.${basename(target)}.${suffix}.backup`);
+  try {
+    await writeFile(temporary, bytes, { flag: 'wx' });
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
+  let installed = false;
+  let original = false;
+
+  return {
+    async commit() {
+      const entry = await lstat(target).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+        return null;
+      });
+      if (entry?.isDirectory()) throw new Error(`--output must not name a directory: ${target}`);
+      if (entry) {
+        await rename(target, backup);
+        original = true;
+      }
+      await rename(temporary, target);
+      installed = true;
+    },
+    async rollback() {
+      const errors = [];
+      if (installed) {
+        await rm(target, { force: true }).catch((error) => errors.push(error));
+      }
+      if (original) {
+        await rename(backup, target).catch((error) => errors.push(error));
+      }
+      await rm(temporary, { force: true }).catch((error) => errors.push(error));
+      if (errors.length > 0) {
+        throw new Error(errors.map((error) => error.message).join('; '));
+      }
+    },
+    async finish() {
+      await rm(backup, { force: true }).catch(() => {});
+      await rm(temporary, { force: true }).catch(() => {});
+    },
+  };
+}
+
 function benchmarkRow(row) {
   return (
     object(row) &&
@@ -246,8 +335,26 @@ function traceMap(value, requestedIds) {
   );
 }
 
-async function fetchJson(url, operation, requestUrls) {
+async function fetchJson(url, operation, requestUrls, evidence, requestedChunkIds = null) {
+  const requestNumber = requestUrls.length + 1;
   requestUrls.push({ operation, url: url.href });
+  let record;
+  if (evidence) {
+    record = {
+      operation,
+      request_number: requestNumber,
+      url: url.href,
+      method: 'GET',
+      retrieved_at: null,
+      http_status: null,
+      decoded_body_sha256: null,
+      body_file: null,
+      requested_chunk_ids: requestedChunkIds,
+      checksum_covers: 'saved decoded response body',
+    };
+    evidence.manifest.responses.push(record);
+    await saveManifest(evidence);
+  }
   let response;
   try {
     response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
@@ -256,14 +363,27 @@ async function fetchJson(url, operation, requestUrls) {
       cause: error,
     });
   }
-  let body;
+  if (record) {
+    record.retrieved_at = new Date().toISOString();
+    record.http_status = response.status;
+  }
+  let bytes;
   try {
-    body = await response.text();
+    bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     throw new Error(`Could not read ${operation} response body: ${error.message}`, {
       cause: error,
     });
   }
+  if (record) {
+    const filename = `response-${String(requestNumber).padStart(4, '0')}-${operation}.json`;
+    await writeFile(join(evidence.directory, filename), bytes, { flag: 'wx' });
+    record.decoded_body_sha256 = sha256(bytes);
+    record.body_file = filename;
+    await saveManifest(evidence);
+  }
+  // Fetch has already decoded HTTP compression. Parse the same bytes saved above.
+  const body = new TextDecoder().decode(bytes);
   if (!response.ok) {
     let detail = '';
     try {
@@ -281,13 +401,13 @@ async function fetchJson(url, operation, requestUrls) {
   }
 }
 
-async function fetchChunks(operation, ids, limit, validate, requestUrls) {
+async function fetchChunks(operation, ids, limit, validate, requestUrls, evidence) {
   const joined = new Map();
   for (let offset = 0; offset < ids.length; offset += limit) {
     const chunk = ids.slice(offset, offset + limit);
     const url = new URL(`/api/v1/${operation}`, API_ORIGIN);
     url.searchParams.set('ids', chunk.join(','));
-    const entries = validate(await fetchJson(url, operation, requestUrls), chunk);
+    const entries = validate(await fetchJson(url, operation, requestUrls, evidence, chunk), chunk);
     for (const [id, value] of entries) joined.set(id, value);
   }
   return joined;
@@ -361,6 +481,7 @@ async function run(args = process.argv.slice(2)) {
       concurrency: { type: 'string' },
       format: { type: 'string', default: 'csv' },
       output: { type: 'string' },
+      'evidence-dir': { type: 'string' },
       help: { type: 'boolean' },
     },
     allowPositionals: false,
@@ -394,18 +515,10 @@ async function run(args = process.argv.slice(2)) {
   if (values.output !== undefined && !values.output.trim()) {
     throw new Error('--output requires a file path');
   }
-
-  const requestUrls = [];
-  const benchmarkUrl = new URL('/api/v1/benchmarks', API_ORIGIN);
-  benchmarkUrl.searchParams.set('model', values.model);
-  if (values.date !== undefined) benchmarkUrl.searchParams.set('date', values.date);
-  const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls);
-  if (!Array.isArray(benchmarks) || benchmarks.some((row) => !benchmarkRow(row))) {
-    throw new Error(
-      'Unexpected benchmarks response shape: expected complete rows with required identity, configuration, workload, date, run_url, and metrics fields',
-    );
+  if (values['evidence-dir'] !== undefined && !values['evidence-dir'].trim()) {
+    throw new Error('--evidence-dir requires a new directory path');
   }
-  const agentxRows = benchmarks.filter((row) => row.benchmark_type === 'agentic_traces');
+
   const requestedFilters = {
     raw_model: values['raw-model'],
     hardware: values.hardware,
@@ -415,188 +528,352 @@ async function run(args = process.argv.slice(2)) {
     offload_mode: values['offload-mode'],
     concurrency,
   };
-  const selected = agentxRows.filter((row) =>
-    FILTERS.every(
-      ([name, field]) =>
-        requestedFilters[name] === undefined || row[field] === requestedFilters[name],
-    ),
-  );
-  const ids = [...new Set(selected.map((row) => safeResultId(row.id)).filter((id) => id !== null))];
-  const aggregates = await fetchChunks('agentic-aggregates', ids, 200, aggregateMap, requestUrls);
-  const derived = await fetchChunks('derived-agentic-metrics', ids, 200, derivedMap, requestUrls);
-  const traces = await fetchChunks('trace-availability', ids, 500, traceMap, requestUrls);
-  let nonFiniteValues = 0;
-  const rows = selected.map((row) => {
-    const benchmark = JSON.parse(
-      JSON.stringify(row, (_key, value) => {
-        if (typeof value === 'number' && !Number.isFinite(value)) {
-          nonFiniteValues++;
-          return null;
-        }
-        return value;
-      }),
-    );
-    const id = safeResultId(row.id);
-    if (id === null) {
-      return {
-        benchmark,
-        agentx: {
-          status: 'unsupported_id',
-          result_id: null,
-          aggregates: { status: 'unsupported_id', value: null },
-          derived_metrics: { status: 'unsupported_id', value: null },
-          trace_availability: {
-            status: 'unsupported_id',
-            value: null,
-            response_key_present: null,
-          },
-        },
-      };
-    }
-    const hasAggregates = aggregates.has(id);
-    const hasDerived = derived.has(id);
-    const hasTraceKey = traces.has(id);
-    const traceAvailable = hasTraceKey ? traces.get(id) : false;
-    return {
-      benchmark,
-      agentx: {
-        status: hasAggregates && hasDerived ? 'complete' : 'partial',
-        result_id: id,
-        aggregates: {
-          status: hasAggregates ? 'available' : 'not_returned',
-          value: hasAggregates ? aggregates.get(id) : null,
-        },
-        derived_metrics: {
-          status: hasDerived ? 'available' : 'not_returned',
-          value: hasDerived ? derived.get(id) : null,
-        },
-        trace_availability: {
-          status: traceAvailable ? 'stored_trace' : 'no_stored_trace',
-          value: traceAvailable,
-          response_key_present: hasTraceKey,
-        },
-      },
-    };
-  });
-  const retrievedAt = new Date().toISOString();
-  const benchmarkRequest = requestUrls[0].url;
   const filters = Object.fromEntries(
     Object.entries(requestedFilters).map(([name, value]) => [
       name,
       { status: value === undefined ? 'omitted' : 'applied', value: value ?? null },
     ]),
   );
-  const metadata = {
-    package_version: PACKAGE_VERSION,
-    retrieved_at: retrievedAt,
-    request_urls: requestUrls,
-    requested_scope: {
-      display_model: values.model,
-      date: values.date ?? null,
-      date_selection: values.date === undefined ? 'latest' : 'as-of',
-      raw_model: values['raw-model'] ?? null,
-      hardware: values.hardware ?? null,
-      framework: values.framework ?? null,
-      precision: values.precision ?? null,
-      spec_method: values['spec-method'] ?? null,
-      offload_mode: values['offload-mode'] ?? null,
-      concurrency: concurrency ?? null,
-      benchmark_type: 'agentic_traces',
+  const requestedScope = {
+    display_model: values.model,
+    date: values.date ?? null,
+    date_selection: values.date === undefined ? 'latest' : 'as-of',
+    raw_model: values['raw-model'] ?? null,
+    hardware: values.hardware ?? null,
+    framework: values.framework ?? null,
+    precision: values.precision ?? null,
+    spec_method: values['spec-method'] ?? null,
+    offload_mode: values['offload-mode'] ?? null,
+    concurrency: concurrency ?? null,
+    benchmark_type: 'agentic_traces',
+  };
+  const appliedFilters = {
+    display_model: { status: 'applied', value: values.model },
+    date: {
+      status: values.date === undefined ? 'omitted' : 'applied',
+      value: values.date ?? null,
     },
-    filters,
-    outcome:
+    benchmark_type: { status: 'applied', value: 'agentic_traces' },
+    ...filters,
+  };
+  const outputPath = values.output === undefined ? null : resolve(values.output);
+  let evidence;
+  let outputTransaction;
+
+  try {
+    if (values['evidence-dir'] !== undefined) {
+      const directory = resolve(values['evidence-dir']);
+      if (outputPath !== null) {
+        const physicalEvidencePath = await physicalPath(directory);
+        const physicalOutputPath = await physicalPath(outputPath);
+        const evidencePath = physicalEvidencePath.toLowerCase();
+        const physicalOutput = physicalOutputPath.toLowerCase();
+        if (
+          containsPath(evidencePath, physicalOutput) ||
+          containsPath(physicalOutput, evidencePath)
+        ) {
+          throw new Error('--output collides with the evidence directory');
+        }
+      }
+      await mkdir(dirname(directory), { recursive: true });
+      await mkdir(directory); // EEXIST also rejects empty directories and symlinks.
+      evidence = {
+        directory,
+        manifest: {
+          schema_version: 1,
+          package_version: PACKAGE_VERSION,
+          status: 'pending',
+          started_at: new Date().toISOString(),
+          finished_at: null,
+          outcome: null,
+          requested_filters: requestedScope,
+          applied_filters: appliedFilters,
+          counts: {
+            returned_rows: null,
+            returned_agentx_rows: null,
+            selected_rows: null,
+          },
+          responses: [],
+          export: {
+            format: values.format,
+            destination: outputPath ?? 'stdout',
+            sha256: null,
+            metadata: null,
+            source_request_numbers: [],
+          },
+          error: null,
+        },
+      };
+      await saveManifest(evidence);
+    }
+
+    const requestUrls = [];
+    const benchmarkUrl = new URL('/api/v1/benchmarks', API_ORIGIN);
+    benchmarkUrl.searchParams.set('model', values.model);
+    if (values.date !== undefined) benchmarkUrl.searchParams.set('date', values.date);
+    const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls, evidence);
+    if (!Array.isArray(benchmarks) || benchmarks.some((row) => !benchmarkRow(row))) {
+      throw new Error(
+        'Unexpected benchmarks response shape: expected complete rows with required identity, configuration, workload, date, run_url, and metrics fields',
+      );
+    }
+    const agentxRows = benchmarks.filter((row) => row.benchmark_type === 'agentic_traces');
+    const selected = agentxRows.filter((row) =>
+      FILTERS.every(
+        ([name, field]) =>
+          requestedFilters[name] === undefined || row[field] === requestedFilters[name],
+      ),
+    );
+    const outcome =
       agentxRows.length === 0
         ? 'no_agentx_rows'
         : selected.length === 0
           ? 'no_matching_rows'
-          : 'selected_rows',
-    returned_rows: benchmarks.length,
-    returned_agentx_rows: agentxRows.length,
-    selected_rows: rows.length,
-    available_filter_values: {
-      raw_model: unique(agentxRows.map((row) => row.model)),
-      hardware: unique(agentxRows.map((row) => row.hardware)),
-      framework: unique(agentxRows.map((row) => row.framework)),
-      precision: unique(agentxRows.map((row) => row.precision)),
-      spec_method: unique(agentxRows.map((row) => row.spec_method)),
-      offload_mode: unique(agentxRows.map((row) => row.offload_mode)),
-      concurrency: unique(agentxRows.map((row) => row.conc)),
-    },
-    returned_model_keys: unique(benchmarks.map((row) => row.model)),
-    selected_model_keys: unique(selected.map((row) => row.model)),
-    enrichment_coverage: coverage(rows),
-    non_finite_values: nonFiniteValues,
-    observation_context: 'Existing observations were read; no new benchmark was run.',
-  };
-  let output;
-  if (values.format === 'json') {
-    output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
-  } else {
-    const metricColumns = unique(
-      rows.flatMap(({ benchmark }) =>
-        Object.entries(benchmark.metrics)
-          .filter(([, value]) => scalar(value))
-          .map(([key]) => `metrics.${key}`),
-      ),
-    );
-    const columns = [
-      ...CSV_CONTEXT_COLUMNS,
-      ...CSV_BENCHMARK_COLUMNS,
-      ...metricColumns,
-      ...CSV_ENRICHMENT_COLUMNS,
+          : 'selected_rows';
+    if (evidence) {
+      evidence.manifest.outcome = outcome;
+      evidence.manifest.counts = {
+        returned_rows: benchmarks.length,
+        returned_agentx_rows: agentxRows.length,
+        selected_rows: selected.length,
+      };
+      await saveManifest(evidence);
+    }
+    const ids = [
+      ...new Set(selected.map((row) => safeResultId(row.id)).filter((id) => id !== null)),
     ];
-    const context = {
+    const aggregates = await fetchChunks(
+      'agentic-aggregates',
+      ids,
+      200,
+      aggregateMap,
+      requestUrls,
+      evidence,
+    );
+    const derived = await fetchChunks(
+      'derived-agentic-metrics',
+      ids,
+      200,
+      derivedMap,
+      requestUrls,
+      evidence,
+    );
+    const traces = await fetchChunks(
+      'trace-availability',
+      ids,
+      500,
+      traceMap,
+      requestUrls,
+      evidence,
+    );
+    let nonFiniteValues = 0;
+    const rows = selected.map((row) => {
+      const benchmark = JSON.parse(
+        JSON.stringify(row, (_key, value) => {
+          if (typeof value === 'number' && !Number.isFinite(value)) {
+            nonFiniteValues++;
+            return null;
+          }
+          return value;
+        }),
+      );
+      const id = safeResultId(row.id);
+      if (id === null) {
+        return {
+          benchmark,
+          agentx: {
+            status: 'unsupported_id',
+            result_id: null,
+            aggregates: { status: 'unsupported_id', value: null },
+            derived_metrics: { status: 'unsupported_id', value: null },
+            trace_availability: {
+              status: 'unsupported_id',
+              value: null,
+              response_key_present: null,
+            },
+          },
+        };
+      }
+      const hasAggregates = aggregates.has(id);
+      const hasDerived = derived.has(id);
+      const hasTraceKey = traces.has(id);
+      const traceAvailable = hasTraceKey ? traces.get(id) : false;
+      return {
+        benchmark,
+        agentx: {
+          status: hasAggregates && hasDerived ? 'complete' : 'partial',
+          result_id: id,
+          aggregates: {
+            status: hasAggregates ? 'available' : 'not_returned',
+            value: hasAggregates ? aggregates.get(id) : null,
+          },
+          derived_metrics: {
+            status: hasDerived ? 'available' : 'not_returned',
+            value: hasDerived ? derived.get(id) : null,
+          },
+          trace_availability: {
+            status: traceAvailable ? 'stored_trace' : 'no_stored_trace',
+            value: traceAvailable,
+            response_key_present: hasTraceKey,
+          },
+        },
+      };
+    });
+    const retrievedAt = new Date().toISOString();
+    const benchmarkRequest = requestUrls[0].url;
+    const metadata = {
       package_version: PACKAGE_VERSION,
-      query_url: benchmarkRequest,
       retrieved_at: retrievedAt,
-      requested_model: values.model,
-      requested_date: values.date ?? null,
-      date_selection: values.date === undefined ? 'latest' : 'as-of',
-      requested_benchmark_type: 'agentic_traces',
-      ...Object.fromEntries(
-        Object.entries(requestedFilters).map(([name, value]) => [`filter.${name}`, value ?? null]),
-      ),
+      request_urls: requestUrls,
+      requested_scope: requestedScope,
+      filters,
+      outcome,
+      returned_rows: benchmarks.length,
+      returned_agentx_rows: agentxRows.length,
+      selected_rows: rows.length,
+      available_filter_values: {
+        raw_model: unique(agentxRows.map((row) => row.model)),
+        hardware: unique(agentxRows.map((row) => row.hardware)),
+        framework: unique(agentxRows.map((row) => row.framework)),
+        precision: unique(agentxRows.map((row) => row.precision)),
+        spec_method: unique(agentxRows.map((row) => row.spec_method)),
+        offload_mode: unique(agentxRows.map((row) => row.offload_mode)),
+        concurrency: unique(agentxRows.map((row) => row.conc)),
+      },
+      returned_model_keys: unique(benchmarks.map((row) => row.model)),
+      selected_model_keys: unique(selected.map((row) => row.model)),
+      enrichment_coverage: coverage(rows),
+      non_finite_values: nonFiniteValues,
+      observation_context: 'Existing observations were read; no new benchmark was run.',
     };
-    const lines = rows.map(({ benchmark, agentx }) => {
-      const aggregateCells = Object.fromEntries(
-        AGGREGATE_GROUPS.flatMap((group) =>
-          [...PERCENTILE_FIELDS, 'n'].map((field) => [
-            `aggregate.${group}.${field}`,
-            agentx.aggregates.value?.[group]?.[field],
-          ]),
+    let output;
+    if (values.format === 'json') {
+      output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
+    } else {
+      const metricColumns = unique(
+        rows.flatMap(({ benchmark }) =>
+          Object.entries(benchmark.metrics)
+            .filter(([, value]) => scalar(value))
+            .map(([key]) => `metrics.${key}`),
         ),
       );
-      const enrichment = {
-        ...aggregateCells,
-        'derived.p75_e2e_norm_intvty': agentx.derived_metrics.value?.p75_e2e_norm_intvty,
-        'derived.p90_e2e_norm_intvty': agentx.derived_metrics.value?.p90_e2e_norm_intvty,
-        'trace.available': agentx.trace_availability.value,
-        'trace.response_key_present': agentx.trace_availability.response_key_present,
-        'enrichment.status': agentx.status,
-        'enrichment.aggregates_status': agentx.aggregates.status,
-        'enrichment.derived_metrics_status': agentx.derived_metrics.status,
-        'enrichment.trace_availability_status': agentx.trace_availability.status,
+      const columns = [
+        ...CSV_CONTEXT_COLUMNS,
+        ...CSV_BENCHMARK_COLUMNS,
+        ...metricColumns,
+        ...CSV_ENRICHMENT_COLUMNS,
+      ];
+      const context = {
+        package_version: PACKAGE_VERSION,
+        query_url: benchmarkRequest,
+        retrieved_at: retrievedAt,
+        requested_model: values.model,
+        requested_date: values.date ?? null,
+        date_selection: values.date === undefined ? 'latest' : 'as-of',
+        requested_benchmark_type: 'agentic_traces',
+        ...Object.fromEntries(
+          Object.entries(requestedFilters).map(([name, value]) => [
+            `filter.${name}`,
+            value ?? null,
+          ]),
+        ),
       };
-      return [
-        ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
-        ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
-        ...metricColumns.map((column) => {
-          const value = benchmark.metrics[column.slice('metrics.'.length)];
-          return scalar(value) ? value : null;
-        }),
-        ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
-      ]
-        .map(csvCell)
-        .join(',');
-    });
-    output = `${[columns.join(','), ...lines].join('\r\n')}\r\n`;
+      const lines = rows.map(({ benchmark, agentx }) => {
+        const aggregateCells = Object.fromEntries(
+          AGGREGATE_GROUPS.flatMap((group) =>
+            [...PERCENTILE_FIELDS, 'n'].map((field) => [
+              `aggregate.${group}.${field}`,
+              agentx.aggregates.value?.[group]?.[field],
+            ]),
+          ),
+        );
+        const enrichment = {
+          ...aggregateCells,
+          'derived.p75_e2e_norm_intvty': agentx.derived_metrics.value?.p75_e2e_norm_intvty,
+          'derived.p90_e2e_norm_intvty': agentx.derived_metrics.value?.p90_e2e_norm_intvty,
+          'trace.available': agentx.trace_availability.value,
+          'trace.response_key_present': agentx.trace_availability.response_key_present,
+          'enrichment.status': agentx.status,
+          'enrichment.aggregates_status': agentx.aggregates.status,
+          'enrichment.derived_metrics_status': agentx.derived_metrics.status,
+          'enrichment.trace_availability_status': agentx.trace_availability.status,
+        };
+        return [
+          ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
+          ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
+          ...metricColumns.map((column) => {
+            const value = benchmark.metrics[column.slice('metrics.'.length)];
+            return scalar(value) ? value : null;
+          }),
+          ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
+        ]
+          .map(csvCell)
+          .join(',');
+      });
+      output = `${[columns.map(csvCell).join(','), ...lines].join('\r\n')}\r\n`;
+    }
+    const outputBytes = Buffer.from(output);
+    if (evidence) {
+      const sourceRequestNumbers = evidence.manifest.responses
+        .filter((record) => record.body_file !== null)
+        .map((record) => record.request_number);
+      if (sourceRequestNumbers.length !== evidence.manifest.responses.length) {
+        throw new Error('Cannot complete evidence with an uncaptured response');
+      }
+      evidence.manifest.export.metadata = metadata;
+      evidence.manifest.export.source_request_numbers = sourceRequestNumbers;
+      await saveManifest(evidence);
+    }
+    if (outputPath === null) {
+      await writeStdout(outputBytes);
+    } else {
+      outputTransaction = await stageFileOutput(outputPath, outputBytes);
+      await outputTransaction.commit();
+    }
+    if (evidence) {
+      evidence.manifest.export.sha256 = sha256(outputBytes);
+      evidence.manifest.status = 'complete';
+      evidence.manifest.finished_at = new Date().toISOString();
+      await saveManifest(evidence);
+    }
+    if (outputTransaction) {
+      await outputTransaction.finish();
+      outputTransaction = null;
+    }
+    process.stderr.write(`${JSON.stringify({ metadata })}\n`);
+    process.stderr.write(
+      `Selected ${metadata.selected_rows} AgentX rows from ${metadata.returned_rows} complete benchmark rows (${metadata.returned_agentx_rows} AgentX before exact-filter selection).\n`,
+    );
+  } catch (error) {
+    let failure = error;
+    if (outputTransaction) {
+      try {
+        await outputTransaction.rollback();
+      } catch (rollbackError) {
+        failure = new Error(
+          `${error.message}; could not restore the previous output: ${rollbackError.message}`,
+          { cause: error },
+        );
+      }
+    }
+    if (evidence) {
+      evidence.manifest.status = 'failed';
+      evidence.manifest.finished_at = new Date().toISOString();
+      evidence.manifest.outcome = 'failed';
+      evidence.manifest.error = failure.message;
+      evidence.manifest.export.sha256 = null;
+      evidence.manifest.export.source_request_numbers = [];
+      try {
+        await saveManifest(evidence);
+      } catch (writeError) {
+        throw new Error(
+          `${failure.message}; could not save failure evidence: ${writeError.message}`,
+          { cause: writeError },
+        );
+      }
+    }
+    throw failure;
   }
-  if (values.output === undefined) process.stdout.write(output);
-  else await writeFile(values.output, output, 'utf8');
-  process.stderr.write(`${JSON.stringify({ metadata })}\n`);
-  process.stderr.write(
-    `Selected ${metadata.selected_rows} AgentX rows from ${metadata.returned_rows} complete benchmark rows (${metadata.returned_agentx_rows} AgentX before raw-model selection).\n`,
-  );
 }
 
 run().catch((error) => {
