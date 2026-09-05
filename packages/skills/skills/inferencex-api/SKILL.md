@@ -21,7 +21,12 @@ Public benchmark reads require HTTPS access and no credentials.
    include several releases, so retain the returned keys and narrow them when the
    user asks for an exact release. Resolve mappings from current public sources
    instead of guessing from spelling.
-3. Retrieve the documented raw response and apply unsupported filters locally.
+3. Download and parse the complete JSON response with an HTTP client such as Node
+   `fetch` or `curl`, then apply unsupported filters locally. Web-page extraction
+   tools can summarize or truncate API JSON; their output cannot establish row
+   counts, the latest observation, or absence of data. If a complete response is
+   unavailable, explain that access limitation and leave the export incomplete
+   instead of reconstructing observations from an extracted summary.
    For ordinary `/api/v1/benchmarks` reads, select `benchmark_type`, `isl`, and `osl`
    from the returned rows: `sequence` only applies to the calculator projection.
    Treat non-success HTTP responses, malformed JSON, and unexpected response shapes
