@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+import { getExportFooterText } from '@/lib/export-footer';
 import { useLocale } from '@/lib/use-locale';
 
 const STRINGS = {
@@ -245,12 +246,13 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
   ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
 
-  // Draw watermark text (shrink to fit on narrow exports)
-  const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
+  // Draw footer text: the page route this export came from (shrink to fit on
+  // narrow exports), e.g. "inferencex.semianalysis.com/inference/kimi-k3".
+  const footerText = getExportFooterText();
   let fontSize = 40;
   ctx.font = watermarkFont(fontSize);
   const maxTextWidth = canvas.width - 48;
-  const textWidth = ctx.measureText(WATERMARK_TEXT).width;
+  const textWidth = ctx.measureText(footerText).width;
   if (textWidth > maxTextWidth) {
     fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
     ctx.font = watermarkFont(fontSize);
@@ -258,7 +260,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   ctx.fillStyle = isDark ? '#aaa' : '#555';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(WATERMARK_TEXT, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
+  ctx.fillText(footerText, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
 
   return canvas.toDataURL('image/png');
 }
