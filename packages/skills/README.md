@@ -165,9 +165,12 @@ node .claude/skills/inferencex-api/scripts/export-agentx.mjs \
 
 Optional `--raw-model`, `--hardware`, `--framework`, `--precision`,
 `--spec-method`, and `--offload-mode` values match returned values exactly and
-case-sensitively; `--concurrency` requires an exact positive integer. The exporter
-reads `/api/v1/benchmarks` and the bounded `/api/v1/agentic-aggregates`,
-`/api/v1/derived-agentic-metrics`, and `/api/v1/trace-availability` enrichments.
+case-sensitively; `--concurrency` requires an exact positive integer. The optional
+`--date YYYY-MM-DD` applies an as-of cutoff; omitting it selects the latest available
+observations. The exporter reads `/api/v1/benchmarks` and locally selects rows whose
+`benchmark_type` is exactly `agentic_traces`. It adds enrichments only through the
+request-size-bounded `/api/v1/agentic-aggregates`,
+`/api/v1/derived-agentic-metrics`, and `/api/v1/trace-availability` endpoints.
 CSV leaves missing and null cells blank and preserves `0` and `false`; JSON keeps
 each selected benchmark object separate from its enrichment. Every evidence path
 must be new and contains the complete responses consumed by that export plus a
@@ -359,11 +362,14 @@ node .claude/skills/inferencex-api/scripts/export-agentx.mjs \
 
 `--raw-model`、`--hardware`、`--framework`、`--precision`、`--spec-method` 和
 `--offload-mode` 均为可选筛选；一经提供，必须与响应中的值完全一致并区分大小写。
-`--concurrency` 必须是精确的正整数。导出器读取 `/api/v1/benchmarks`，并有限关联
+`--concurrency` 必须是精确的正整数。`--date YYYY-MM-DD` 为可选项，用于限定观测日期不
+晚于该日；省略时选择最新可用观测数据。导出器读取 `/api/v1/benchmarks`，并在本地仅选择
+`benchmark_type` 恰为 `agentic_traces` 的数据，再只通过有请求规模上限的
 `/api/v1/agentic-aggregates`、`/api/v1/derived-agentic-metrics` 和
-`/api/v1/trace-availability`。CSV 中的缺失值和 `null` 留空，`0` 与 `false` 原样保留；
-JSON 将每条基准测试观测数据与其补充信息分开保存。每次使用的证据目录都必须尚未
-存在，其中包含本次导出实际使用的完整响应，以及将这些响应与输出关联起来的清单。
+`/api/v1/trace-availability` 三个接口补充 AgentX 汇总与 trace availability 信息。CSV
+中的缺失值和 `null` 留空，`0` 与 `false` 原样保留；JSON 将每条基准测试观测数据与其
+补充信息分开保存。每次使用的证据目录都必须尚未存在，其中包含本次导出实际使用的完整
+响应，以及将这些响应与输出关联起来的清单。
 
 `no_agentx_rows` 表示本次基准测试响应中没有 AgentX 观测数据；`no_matching_rows`
 表示精确筛选排除了响应中的 AgentX 数据。两者都不能说明响应以外的任务、产物或数据

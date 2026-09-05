@@ -55,11 +55,11 @@ python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-rele
   --evidence /tmp/inferencex-candidate-check-0.4.0
 ```
 
-The preparer rejects a version mismatch, an already published version, and an
-unavailable registry check. It packs once, checks the public file boundary, and
-records the source commit, whether the package source was dirty, file list, SHA-256,
-and npm integrity. A dirty-source preparation is useful for iteration but is not
-the final reviewed release candidate. Maintainer tools,
+The preparer requires and records a clean package source state. It rejects dirty
+source before registry access or candidate output, and also rejects a version
+mismatch, an already published version, or an unavailable registry check. It packs
+once, checks the public file boundary, and records the source commit,
+`source_dirty: false`, file list, SHA-256, and npm integrity. Maintainer tools,
 tests, credentials, and acceptance artifacts are outside the public package.
 The verifier creates two projects outside the repository with fresh npm caches,
 empty npm configuration, and an allowlisted environment. It installs the exact
