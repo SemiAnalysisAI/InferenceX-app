@@ -132,10 +132,14 @@ different reviewer must inspect the transcript and explanation for:
   Confirm that the agent retained its full unfiltered, strict-before-filtering,
   and diagnostic responses with request context. The checker's later independent
   refetches validate data but do not replace the agent's original response capture.
+  A separate agent request to the same URL is also a refetch; require the response
+  consumed by each operation, including separate CSV and JSON exporter invocations.
 
 Record the reviewer, accepted SHA-256, agent invocations, evidence paths, and any
-limitations. A failed agent attempt remains failed; fix the source, create a new
-archive, and repeat affected acceptance. Never approve solely from an agent's
+limitations. A failed agent attempt remains failed; identify and address the cause,
+record any prompt or harness changes, and repeat affected acceptance. If packaged
+source changes, create a new archive and rerun acceptance for those new bytes.
+Never approve solely from an agent's
 statement that its answer is correct. Broader API cookbook examples have their own
 packed-example tests and should also be exercised naturally when they change.
 

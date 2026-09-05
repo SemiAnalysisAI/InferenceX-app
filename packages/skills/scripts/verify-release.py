@@ -235,6 +235,8 @@ Attempt the same validated export for exactly {args.empty_isl} input and {args.e
 There is no repository or database access in this project. Do not read another checkout, call private services, install dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
 
 The complete response files are required deliverables: save the entire unfiltered benchmark response, the entire strict response before local filtering, and the complete diagnostic response under raw-responses/, each with its own URL and retrieval timestamp. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for the original responses. Capture the responses used by this extraction before selecting rows; do not reconstruct them from exported subsets. Before finishing, verify these response files exist alongside result.md.
+
+Each lookup, CSV export, JSON export, empty export, and diagnostic must be traceable to the complete response from the very same HTTP request it consumed. A separate request to the same URL does not satisfy this requirement. Keep installed skill files unchanged; if the exporter does not save its input response, arrange observation of that HTTP response in your project before running it. Matching row counts alone do not establish original-response capture.
 '''
 
 
