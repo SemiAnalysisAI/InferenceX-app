@@ -284,6 +284,15 @@ Single-turn rows commonly omit producer workflow IDs/start times, while snapshot
 fields remain present. Keep those producer fields absent; a snapshot ID does not
 identify the producer of every observation. Preserve source timestamps as supplied.
 
+Preserve raw topology alongside `disagg`. On non-disaggregated rows, prefill and
+decode roles can share the same GPUs: `num_prefill_gpu=8` and `num_decode_gpu=8`
+are not evidence of a 16-GPU deployment. Do not sum those role fields or invent a
+deployment-total column or range. Report the original configuration fields; if a
+user requests a derived total, first verify the allocation semantics for that
+configuration. A disaggregated configuration can have distinct role pools, but
+that rule cannot be applied to aggregated rows. This follows the distinction in
+the [existing data-transform documentation](https://github.com/SemiAnalysisAI/InferenceX-app/blob/cc5d87cd37a3a502ce63b58c8985fa034fa07965/docs/data-transforms.md).
+
 Optional `workers`, `power_audit`, and `power_invalid_reasons` are top-level row
 fields, separate from `metrics`. JSON retains them when present, including null
 workers. Their absence does not prevent export or justify inventing audit evidence.

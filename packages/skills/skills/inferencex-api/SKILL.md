@@ -21,6 +21,9 @@ and its missing values, report the unavailable fields, and avoid zero filling or
 energy-advantage claims. If the strict selection is empty and the user needs an
 explanation, follow [the bounded diagnostic recipe](references/powerx.md#diagnose-an-empty-strict-selection).
 Partial metric coverage alone does not call for another request.
+Preserve raw topology fields with `disagg`; do not add prefill and decode GPU counts
+on non-disaggregated rows, where the roles can share the same GPUs. Report raw
+configuration fields unless a requested derived total has verified allocation semantics.
 
 ## Query workflow
 
