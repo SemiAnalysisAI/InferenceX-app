@@ -88,7 +88,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
     heroImagePath: `/whitepaper/${MI355X_KIMI_K3_SLUG}/figure-1-revenue-per-gigawatt.png`,
     en: {
       typeLabel: 'Whitepaper · Executive Summary',
-      title: 'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year White Paper',
+      title: 'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year',
       subtitle: 'Executive Summary - AgentX Serving Economics Analysis',
       description:
         'One utility gigawatt of AMD MI355X capacity running Kimi K3 2.8T on vLLM generates up to $32.6B of token revenue per year at 45 tok/s/user and 60% utilization, measured by InferenceX AgentX. Two-page executive summary with method, assumptions, and a downloadable PDF.',
@@ -185,7 +185,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
     },
     zh: {
       typeLabel: '白皮书 · 执行摘要',
-      title: 'AMD Instinct MI355X Kimi K3 每 GigaWatt 每年最高可创造 320 亿美元收入白皮书',
+      title: 'AMD Instinct MI355X Kimi K3 每 GigaWatt 每年最高可创造 320 亿美元收入',
       subtitle: '执行摘要 - AgentX 推理服务经济性分析',
       description:
         '据 InferenceX AgentX 实测，1 GW 电网供电的 AMD MI355X 算力在 vLLM 上运行 Kimi K3 2.8T，在 45 tok/s/user、60% 利用率下每年最高可产生 326 亿美元 token 收入。两页执行摘要，包含方法、假设与 PDF 下载。',
