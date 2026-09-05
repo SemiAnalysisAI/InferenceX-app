@@ -18,7 +18,7 @@ describe('API documentation', () => {
       copy: 'Copy',
       copied: 'Copied',
       upgrade: 'replace the version in the installation command',
-      examples: 'Usage examples and complete exports',
+      examples: 'Usage examples',
     },
     {
       path: '/zh/api',
@@ -32,7 +32,7 @@ describe('API documentation', () => {
       copy: '复制',
       copied: '已复制',
       upgrade: '新的已发布版本',
-      examples: '使用示例与完整导出（英文）',
+      examples: '使用示例（英文）',
     },
   ]) {
     it(`guides ${locale.path} visitors from a pinned public install to a traceable export`, () => {
