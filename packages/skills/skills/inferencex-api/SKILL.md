@@ -64,7 +64,9 @@ configuration fields unless a requested derived total has verified allocation se
    The API array is not chronological: latest per configuration does not mean
    globally newest first. For latest-observation samples, sort scoped rows by their
    own `date` descending before applying a limit; `curve_date` is a snapshot date.
-   State when no new benchmark runs occurred.
+   State that this extraction did not run new benchmarks. An empty result or a
+   missing observation date establishes only what the API returned; it does not
+   prove that no benchmark jobs ran, failed, or remained uningested on that date.
 
 Compare observations with matching workload and configuration scope. Keep metric
 units and missing values intact; a missing measurement is not zero. Use the
@@ -109,4 +111,5 @@ JS
 ```
 
 For a dated lookup, add the documented `date` parameter to the URL and record it in
-the requested scope. Retain the rows' own dates and source links in the answer.
+`scope.date` as the exact `YYYY-MM-DD` query value, without explanatory text inside
+that value. Retain the rows' own dates and source links in the answer.

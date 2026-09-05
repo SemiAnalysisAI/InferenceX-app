@@ -6,6 +6,7 @@ Python 3 standard library plus Node 24/npm on PATH. Never publishes a package.
 import argparse
 import base64
 import csv
+import gzip
 import hashlib
 import io
 import json
@@ -81,10 +82,20 @@ def fetch_public(url, destination, report):
     request = Request(url, headers={'User-Agent': 'InferenceX-skill-release-check', 'Accept-Encoding': 'identity'})
     with build_opener(ProxyHandler({})).open(request, timeout=30) as response:
         require(response.status == 200 and urlsplit(response.url).hostname == parsed.hostname, 'Unexpected HTTP response')
-        body = response.read()
+        wire = response.read()
+        encoding = (response.headers.get('Content-Encoding') or 'identity').strip().lower()
+    request_record = {'query_url': url, 'retrieved_at': now(), 'content_encoding': encoding,
+                      'wire_sha256': hashlib.sha256(wire).hexdigest()}
+    report['requests'].append(request_record)
+    if encoding != 'identity':
+        wire_path = destination.with_name(destination.name + '.wire')
+        wire_path.write_bytes(wire)
+        request_record['wire_response_file'] = str(wire_path)
+    require(encoding in ['identity', 'gzip'], f'Unsupported Content-Encoding: {encoding}')
+    # Content-Type application/gzip describes a tarball, not HTTP transfer encoding.
+    body = gzip.decompress(wire) if encoding == 'gzip' else wire
     destination.write_bytes(body)
-    report['requests'].append({'query_url': url, 'retrieved_at': now(), 'response_file': str(destination),
-                               'sha256': hashlib.sha256(body).hexdigest()})
+    request_record.update(response_file=str(destination), sha256=hashlib.sha256(body).hexdigest())
     return body
 
 

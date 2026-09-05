@@ -63,6 +63,67 @@ test('release content boundary excludes maintainer tools, tests and hidden files
   assert.throws(() => verifyContents(files.slice(1)), /missing package.json/);
 });
 
+test('public verification decodes gzip HTTP JSON but preserves raw npm tarball bytes', () => {
+  const result = spawnSync(
+    'python3',
+    [
+      '-c',
+      String.raw`
+import gzip, hashlib, importlib.util, io, json, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
+check = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(check)
+class Response(io.BytesIO):
+    status = 200
+    def __init__(self, body, headers, url):
+        super().__init__(body)
+        self.headers, self.url = headers, url
+payload = b'{"rows":[{"avg_power_w":0}]}'
+compressed = gzip.compress(payload)
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    for name, wire, headers, expected in [
+        ('compressed.json', compressed, {'Content-Encoding':'gzip','Content-Type':'application/json'}, payload),
+        ('plain.json', payload, {'Content-Encoding':'identity','Content-Type':'application/json'}, payload),
+        ('package.tgz', compressed, {'Content-Type':'application/gzip'}, compressed),
+    ]:
+        url = 'https://registry.npmjs.org/' + name
+        report = {'requests':[]}
+        opener = SimpleNamespace(open=lambda *a, **kw: Response(wire, headers, url))
+        with patch.object(check, 'build_opener', return_value=opener):
+            assert check.fetch_public(url, root / name, report) == expected
+        assert (root / name).read_bytes() == expected
+        record = report['requests'][0]
+        assert record['content_encoding'] == headers.get('Content-Encoding','identity')
+        assert record['wire_sha256'] == hashlib.sha256(wire).hexdigest()
+        assert record['sha256'] == hashlib.sha256(expected).hexdigest()
+        if headers.get('Content-Encoding') == 'gzip':
+            assert Path(record['wire_response_file']).read_bytes() == compressed
+            assert json.loads((root / name).read_bytes()) == {'rows':[{'avg_power_w':0}]}
+    for encoding, wire in [('br', b'unsupported wire bytes'), ('gzip', b'broken gzip')]:
+        url = 'https://registry.npmjs.org/bad-' + encoding
+        report = {'requests':[]}
+        opener = SimpleNamespace(open=lambda *a, **kw: Response(wire, {'Content-Encoding':encoding}, url))
+        with patch.object(check, 'build_opener', return_value=opener):
+            try:
+                check.fetch_public(url, root / ('bad-' + encoding), report)
+            except (ValueError, gzip.BadGzipFile):
+                pass
+            else:
+                raise AssertionError('Unsupported or malformed encoding must fail')
+        assert Path(report['requests'][0]['wire_response_file']).read_bytes() == wire
+        assert 'response_file' not in report['requests'][0]
+`,
+    ],
+    { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', timeout: 10_000 },
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('read-only verification rejects incomplete or altered exports and preserves timeout evidence', () => {
   const result = spawnSync(
     'python3',

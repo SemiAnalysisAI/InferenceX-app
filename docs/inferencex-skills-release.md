@@ -123,7 +123,8 @@ different reviewer must inspect the transcript and explanation for:
   remain distinct; shared prefill/decode GPU counts are not summed blindly.
 - Validated rows can lack the requested metric; missing values are not zero.
 - Original observation dates remain separate from snapshot dates and retrieval
-  time. API reads are not described as new benchmark runs.
+  time. API reads are not described as new benchmark runs, and absent observations
+  are not treated as proof that no benchmark jobs occurred on a date.
 - The empty result is retained, diagnosis keeps its exact scope, and uncertainty
   is explained if the diagnostic request fails.
 - The installed skill actually supplied the workflow and the agent used no
