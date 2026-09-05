@@ -55,6 +55,12 @@ local scope, and both sets of raw model keys. A requested display bucket can cov
 multiple releases. Report the returned keys alongside the requested display name;
 the latter does not establish an exact release for every row.
 
+Inspect `metric_coverage` for the requested measurement fields. Each field reports
+`available_rows` and `unavailable_rows`; strict row eligibility does not guarantee
+that field was measured. Keep eligible rows with their missing values, state which
+requested measurements are unavailable, and avoid zero filling or energy-advantage
+claims. Partial metric coverage alone needs no additional diagnostic request.
+
 An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
 **No strictV2 rows matched the requested scope.** This establishes no eligible
 observations for that selection, not an absence of all underlying benchmarks.
@@ -62,6 +68,149 @@ Non-success HTTP responses, malformed JSON, or unexpected response shapes fail
 with a nonzero status and no successful export. If the complete response cannot
 be obtained, report the access failure rather than reconstructing rows from a
 summary or relaxing strict validity.
+
+## Diagnose an empty strict selection
+
+Start from the successful export's `powerx-report.log`, whose first line records
+the strict request metadata. Use this recipe only when `selected_rows` is zero
+and the user needs an explanation. It makes **one** unfiltered benchmark request
+by removing only `powerValid`, then reapplies the exact local workload/raw-model
+scope. Keep the original export unchanged and save diagnostic output separately.
+Do not rerun this recipe automatically, broaden the date/model, or merge its rows
+into the validated export.
+
+Validation and measurement availability are independent. Apply these rules in
+order, using the original numeric fields without coercion:
+
+| Evidence                                                                                                 | Validation label                                          |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Numeric `power_valid === 0`                                                                              | `invalid`; any remaining measurements are unreliable.     |
+| A present verdict other than numeric `0` or `1`, or a present schema that is not a positive safe integer | `unknown`.                                                |
+| Numeric schema `>= 3`                                                                                    | `unsupported_schema`; future semantics are not schema v2. |
+| Absent verdict, absent schema, or schema `1`                                                             | `legacy_unverified` for strictV2.                         |
+| Numeric verdict `1` and schema `2`                                                                       | `strictV2_eligible`.                                      |
+
+Check the nine named watts/joules fields separately. `some_recorded` means at
+least one is a finite number, including zero; `missing` means none is. The
+`unavailable_metrics` list identifies the rest, including null, non-finite, or
+malformed values. Optional role-specific fields can legitimately be absent.
+Temperature/utilization alone does not establish recorded power or energy.
+Missing audit data does not establish invalidity; quote reported reason codes
+only as supplied and leave an unreported cause unknown.
+
+```bash
+node --input-type=module - powerx-report.log <<'JS'
+import { readFile } from 'node:fs/promises';
+import process from 'node:process';
+
+let strictEmptyConfirmed = false;
+async function diagnose() {
+  if (process.argv.length !== 3) throw new Error('Provide the saved exporter report path');
+  const firstLine = (await readFile(process.argv[2], 'utf8')).split(/\r?\n/u, 1)[0];
+  const { metadata: strict } = JSON.parse(firstLine);
+  const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const positiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
+  const date = strict?.requested_date;
+  const validDate = date === null || (
+    typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(date) &&
+    Number.isFinite(Date.parse(`${date}T00:00:00Z`)) &&
+    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
+  );
+  if (
+    !object(strict) || strict.selected_rows !== 0 ||
+    !Array.isArray(strict.selected_models) || strict.selected_models.length !== 0 ||
+    !Number.isSafeInteger(strict.returned_rows) || strict.returned_rows < 0 ||
+    !Array.isArray(strict.returned_models) || strict.returned_models.some((key) => typeof key !== 'string') ||
+    strict.non_finite_values !== 0 ||
+    typeof strict.package_version !== 'string' || !strict.package_version.trim() ||
+    typeof strict.retrieved_at !== 'string' || !Number.isFinite(Date.parse(strict.retrieved_at)) ||
+    typeof strict.requested_model !== 'string' || !strict.requested_model.trim() ||
+    typeof strict.query_url !== 'string' || strict.benchmark_type !== 'single_turn' ||
+    !positiveInteger(strict.isl) || !positiveInteger(strict.osl) || !validDate ||
+    strict.date_selection !== (date === null ? 'latest' : 'as-of') ||
+    !(strict.raw_model === null || typeof strict.raw_model === 'string' && strict.raw_model.trim())
+  ) throw new Error('Expected a successful empty strict export report with valid scope metadata');
+  const url = new URL(strict.query_url);
+  if (
+    url.origin !== 'https://inferencex.semianalysis.com' ||
+    url.pathname !== '/api/v1/benchmarks' || url.username || url.password || url.hash ||
+    url.searchParams.get('model') !== strict.requested_model ||
+    url.searchParams.get('date') !== date || url.searchParams.get('powerValid') !== 'strictV2' ||
+    [...url.searchParams.keys()].some((key) => !['model', 'date', 'powerValid'].includes(key)) ||
+    ['model', 'date', 'powerValid'].some((key) => url.searchParams.getAll(key).length > 1)
+  ) throw new Error('Recorded URL does not match the strict benchmark scope');
+  strictEmptyConfirmed = true;
+  url.searchParams.delete('powerValid');
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+  if (!response.ok) throw new Error(`Diagnostic request returned HTTP ${response.status}`);
+  const rows = await response.json();
+  const retrievedAt = new Date().toISOString();
+  if (!Array.isArray(rows) || rows.some((row) =>
+    !object(row) || typeof row.model !== 'string' || typeof row.benchmark_type !== 'string' || !object(row.metrics)
+  )) throw new Error('Unexpected diagnostic response shape');
+  const scoped = rows.filter((row) =>
+    row.benchmark_type === 'single_turn' && row.isl === strict.isl && row.osl === strict.osl &&
+    (strict.raw_model === null || row.model === strict.raw_model)
+  );
+  const measurementKeys = [
+    'avg_power_w', 'prefill_avg_power_w', 'decode_avg_power_w',
+    'joules_per_successful_query', 'joules_per_input_token', 'joules_per_output_token',
+    'joules_per_total_token', 'prefill_joules_per_input_token', 'decode_joules_per_output_token',
+  ];
+  function validation(metrics) {
+    const verdict = metrics.power_valid;
+    const schema = metrics.power_metric_schema_version;
+    if (verdict === 0) return 'invalid';
+    if (verdict !== undefined && verdict !== 1) return 'unknown';
+    if (schema !== undefined && !positiveInteger(schema)) return 'unknown';
+    if (schema >= 3) return 'unsupported_schema';
+    if (verdict === undefined || schema === undefined || schema === 1) return 'legacy_unverified';
+    return 'strictV2_eligible';
+  }
+  const validationCounts = { invalid: 0, unknown: 0, unsupported_schema: 0, legacy_unverified: 0, strictV2_eligible: 0 };
+  const measurementCounts = { some_recorded: 0, missing: 0 };
+  const observations = scoped.map((row) => {
+    const label = validation(row.metrics);
+    const recorded = measurementKeys.filter((key) => Number.isFinite(row.metrics[key]));
+    validationCounts[label]++;
+    measurementCounts[recorded.length ? 'some_recorded' : 'missing']++;
+    return {
+      id: row.id, model: row.model, date: row.date, run_url: row.run_url,
+      validation: label, power_valid: row.metrics.power_valid,
+      power_metric_schema_version: row.metrics.power_metric_schema_version,
+      recorded_metrics: Object.fromEntries(recorded.map((key) => [key, row.metrics[key]])),
+      unavailable_metrics: measurementKeys.filter((key) => !recorded.includes(key)),
+      power_invalid_reasons: row.power_invalid_reasons,
+    };
+  });
+  console.log(JSON.stringify({
+    strict,
+    diagnostic: {
+      query_url: url.href, retrieved_at: retrievedAt, returned_rows: rows.length, scoped_rows: scoped.length,
+      scope: { requested_model: strict.requested_model, requested_date: date, raw_model: strict.raw_model,
+        benchmark_type: 'single_turn', isl: strict.isl, osl: strict.osl },
+      outcome: validationCounts.strictV2_eligible ? 'response_discrepancy' : scoped.length ? 'classified' : 'no_observations',
+      validation_counts: validationCounts, measurement_counts: measurementCounts, rows: observations,
+    },
+  }, null, 2));
+}
+diagnose().catch((error) => {
+  const status = strictEmptyConfirmed
+    ? 'The earlier strict selection remains empty; underlying availability is unknown.'
+    : 'No diagnostic request was made; inspect the report.';
+  console.error(`Diagnostic failed: ${error.message}. ${status}`);
+  process.exitCode = 1;
+});
+JS
+```
+
+Retain both request URLs and retrieval times. `no_observations` describes this
+unfiltered response at the recorded scope. `response_discrepancy` means the later
+response contains a scoped row that meets the same strict predicate, even if its
+measurements are missing. The responses disagree; the cause is unknown. Do not
+claim a cache, deployment, or timing cause without evidence, or use those rows to
+silently replace the original export. A failed diagnostic leaves the original
+empty strict result intact and the underlying availability undetermined.
 
 ## Measurement meanings
 

@@ -166,14 +166,15 @@ async function run(args = process.argv.slice(2)) {
       'Unexpected response shape: expected benchmark rows with model, benchmark_type, and metrics',
     );
   }
-  const selected = rows.filter(
+  const scoped = rows.filter(
     (row) =>
-      row.metrics.power_valid === 1 &&
-      row.metrics.power_metric_schema_version === 2 &&
       row.benchmark_type === 'single_turn' &&
       row.isl === isl &&
       row.osl === osl &&
       (values['raw-model'] === undefined || row.model === values['raw-model']),
+  );
+  const selected = scoped.filter(
+    (row) => row.metrics.power_valid === 1 && row.metrics.power_metric_schema_version === 2,
   );
   let nonFiniteValues = 0;
   const observations = JSON.parse(
@@ -200,6 +201,18 @@ async function run(args = process.argv.slice(2)) {
     selected_rows: observations.length,
     returned_models: [...new Set(rows.map((row) => row.model))].toSorted(),
     selected_models: [...new Set(observations.map((row) => row.model))].toSorted(),
+    excluded_rows: {
+      outside_requested_scope: rows.length - scoped.length,
+      not_strict_v2: scoped.length - selected.length,
+    },
+    metric_coverage: Object.fromEntries(
+      METRIC_COLUMNS.filter(
+        (key) => !['power_valid', 'power_metric_schema_version'].includes(key),
+      ).map((key) => {
+        const available = selected.filter((row) => Number.isFinite(row.metrics[key])).length;
+        return [key, { available_rows: available, unavailable_rows: selected.length - available }];
+      }),
+    ),
     non_finite_values: nonFiniteValues,
   };
   let output;
@@ -237,6 +250,14 @@ async function run(args = process.argv.slice(2)) {
   process.stderr.write(
     `Selected ${metadata.selected_rows} of ${metadata.returned_rows} returned rows. Raw models: ${metadata.selected_models.join(', ') || '(none)'}.\n`,
   );
+  process.stderr.write(
+    `Excluded ${metadata.excluded_rows.outside_requested_scope} outside the requested scope and ${metadata.excluded_rows.not_strict_v2} failing strictV2 within that scope.\n`,
+  );
+  if (observations.length > 0) {
+    process.stderr.write(
+      'StrictV2 eligibility does not guarantee every metric is available. See metric_coverage for finite-value counts; unavailable CSV metrics remain blank.\n',
+    );
+  }
   if (observations.length === 0) {
     process.stderr.write('No strictV2 rows matched the requested scope.\n');
   }

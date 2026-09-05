@@ -227,6 +227,10 @@ test('strict flags, exact numeric workload and optional raw model are filtered l
     JSON.parse(allModels.stdout).rows.map((row) => row.id),
     ['900719925474099312345', 'other-release'],
   );
+  assert.deepEqual(JSON.parse(allModels.stdout).metadata.excluded_rows, {
+    outside_requested_scope: 5,
+    not_strict_v2: invalidFlags.length,
+  });
   const result = run([...requiredArgs, '--raw-model', 'glm5.1', '--format', 'json'], rows);
   succeeded(result);
   const output = JSON.parse(result.stdout);
@@ -237,6 +241,10 @@ test('strict flags, exact numeric workload and optional raw model are filtered l
   assert.equal(output.metadata.returned_rows, rows.length);
   assert.equal(output.metadata.selected_rows, 1);
   assert.equal(output.metadata.raw_model, 'glm5.1');
+  assert.deepEqual(output.metadata.excluded_rows, {
+    outside_requested_scope: rows.length - 1,
+    not_strict_v2: 0,
+  });
   assert.equal(output.metadata.date_selection, 'latest');
   assert.equal(output.metadata.requested_date, null);
   assert.deepEqual(Object.fromEntries(new URL(result.requests[0]).searchParams), {
@@ -275,6 +283,26 @@ test('JSON retains nested optional audit data, genuine zero and absence while di
   });
   assert.deepEqual(output.rows[0].power_invalid_reasons, []);
   assert.equal(output.metadata.non_finite_values, 2);
+  assert.deepEqual(output.metadata.metric_coverage.avg_power_w, {
+    available_rows: 1,
+    unavailable_rows: 0,
+  });
+  for (const key of [
+    'joules_per_output_token',
+    'joules_per_total_token',
+    'joules_per_successful_query',
+  ]) {
+    assert.deepEqual(output.metadata.metric_coverage[key], {
+      available_rows: 0,
+      unavailable_rows: 1,
+    });
+  }
+  assert.equal(
+    output.metadata.selected_rows,
+    1,
+    'missing metrics do not remove an eligible observation',
+  );
+  assert.match(result.stderr, /eligibility does not guarantee every metric is available/);
   assert.match(result.stderr, /non.finite/i);
   const csv = run(requiredArgs, [], { body });
   succeeded(csv);
@@ -377,6 +405,10 @@ test('empty selections retain request metadata and distinguish eligibility from 
   assert.equal(metadata.query_url, csv.requests[0]);
   assert.equal(metadata.package_version, version);
   assert.equal(metadata.selected_rows, 0);
+  assert.deepEqual(metadata.metric_coverage.avg_power_w, {
+    available_rows: 0,
+    unavailable_rows: 0,
+  });
   assert.ok(Number.isFinite(Date.parse(metadata.retrieved_at)));
 });
 

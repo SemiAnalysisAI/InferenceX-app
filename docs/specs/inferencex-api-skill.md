@@ -181,3 +181,23 @@ InferenceX 已提供公开 API 和实测功耗契约，但用户仍需自行指�
 - 可选的详细溯源工作见 [#939](https://github.com/SemiAnalysisAI/InferenceX-app/pull/939)。文档包含某个字段，并不代表所有数据集都已提供该字段的值。
 - 面向使用者的权威文档为 [API 文档](https://inferencex.semianalysis.com/api)和 [OpenAPI 文档](https://inferencex.semianalysis.com/api/openapi.json)。实施前重新检查这些内容与相关 PR 的最新状态。
 - 完成标准：用户在干净项目中安装已发布版本，用自然语言请求 PowerX 数据，仅通过公开 HTTP 访问即可获得准确且可追溯的导出结果。包、智能体和网站验收均须通过，仅写出技能说明不足以完成本任务。
+
+## Current-round acceptance refinement / 本轮补充验收
+
+The user confirmed these checks belong to the current implementation:
+
+1. Keep the skill broader than its exporter: navigate supported public operations using live OpenAPI; label single-turn PowerX as the first worked example.
+2. Separate strictV2 eligibility from metric completeness. Preserve eligible rows, genuine zeros and missing values. Report requested-metric coverage, exact empty scope and disjoint exclusion reasons.
+3. Retain request URL, retrieval timestamp, server/local filters, and separate producer and snapshot provenance to reconstruct extraction context.
+4. Install the final exact archive into clean projects outside the repository. Independent Codex and Claude Code sessions receive only the installed skill and natural-language task, with database/private-service credentials removed. Compare CSV against complete public responses; preserve prompts and artifact identity.
+
+These refine existing tickets 01–05 without expanding the API or adding dependencies.
+
+用户确认以下检查在本轮完成：
+
+1. 技能通过实时 OpenAPI 引导公开 API 查询；单轮 PowerX 是首个完整示例，不是技能的全部范围。
+2. 分别判断 strictV2 资格与指标完整性，保留合格行、真实零值及缺失状态，报告用户请求指标的覆盖、精确空结果范围和互不重叠的排除原因。
+3. 保留请求 URL、获取时间、服务端/本地筛选条件，以及彼此独立的生产与快照来源，便于还原提取上下文。
+4. 在仓库外安装最终确切产物，由独立 Codex 和 Claude Code 会话仅凭已安装技能及自然语言任务完成导出；移除数据库和私有服务凭据，并用完整公开响应核对 CSV，保存提示词与产物身份。
+
+这些要求细化现有任务 01–05，不扩大 API 范围或增加依赖。

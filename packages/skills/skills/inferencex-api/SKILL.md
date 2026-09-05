@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Query InferenceX public benchmark data and export validated PowerX measurements. Use for InferenceX API lookups, workload/source checks, or measured power and energy CSV/JSON exports.
+description: Query the InferenceX public API for benchmarks, evaluations, datasets, provenance, CollectiveX, and diagnostics. Use for API data extraction and lookups, including validated PowerX measured-power and energy exports.
 ---
 
 # InferenceX API
@@ -9,20 +9,29 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [current OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json).
 Public benchmark reads require HTTPS access and no credentials.
 
+Use the workflow below for the public operations described in OpenAPI. PowerX
+single-turn export is the first bundled worked example.
+
 For **PowerX measured-power or energy exports**, read the
 [PowerX cookbook](references/powerx.md) and use the
 [bundled exporter](scripts/export-powerx.mjs). It selects validated schema-v2
-observations for an exact single-turn workload. Use the workflow below for other
-public benchmark lookups.
+observations for an exact single-turn workload. Check `metric_coverage` for the
+requested fields: an eligible row can still lack a measurement. Preserve that row
+and its missing values, report the unavailable fields, and avoid zero filling or
+energy-advantage claims. If the strict selection is empty and the user needs an
+explanation, follow [the bounded diagnostic recipe](references/powerx.md#diagnose-an-empty-strict-selection).
+Partial metric coverage alone does not call for another request.
 
 ## Query workflow
 
 1. Read the current OpenAPI operation before constructing a request. Use its exact
    parameter names, model enum, response shape, and authentication requirements.
    Reuse the fetched schema during the task.
-2. Choose the requested model, workload, configuration, and date scope. Availability
-   identifies observed model/date scopes; inspect benchmark rows for configurations.
-   Benchmark requests use display model
+2. Choose the operation and scope that answer the user's request. Its documented
+   parameters and response schema determine how to select and interpret the data;
+   different operations can have different date semantics and response shapes.
+   For benchmark lookups, availability identifies observed model/date scopes;
+   inspect benchmark rows for configurations. Benchmark requests use display model
    names; availability and benchmark rows use raw model keys. A display bucket can
    include several releases, so retain the returned keys and narrow them when the
    user asks for an exact release. Resolve mappings from current public sources
@@ -36,20 +45,22 @@ public benchmark lookups.
    For ordinary `/api/v1/benchmarks` reads, select `benchmark_type`, `isl`, and `osl`
    from the returned rows: `sequence` only applies to the calculator projection.
    Treat non-success HTTP responses, malformed JSON, and unexpected response shapes
-   as failed requests. An empty selection means no rows matched that scope.
-4. Report the request URL, retrieval time, requested scope, returned model keys,
-   observation dates, and source run links. Preserve identifiers as supplied,
-   including numeric-looking strings. Keep original `date` / `run_url` / optional
-   producer metadata separate from `curve_*` snapshot metadata. A `date` query is
-   an as-of cutoff unless `exact=true`; omitted date means latest available data.
-   Neither means the observations were newly measured. Even an exact run snapshot
-   can carry older observations forward. State when no new benchmark runs occurred.
+   as failed requests. Interpret empty results within the operation's documented
+   shape and the selected scope.
+4. Report the request URL, retrieval time, requested scope, and available source
+   identities and dates. Preserve identifiers as supplied, including numeric-looking
+   strings. For benchmark rows, retain returned model keys and original `date` /
+   `run_url` / optional producer metadata separately from `curve_*` snapshot metadata.
+   On `/api/v1/benchmarks`, a `date` query is an as-of cutoff unless `exact=true`;
+   omitted date means latest available data. Neither means the observations were
+   newly measured. Even an exact run snapshot can carry older observations forward.
+   State when no new benchmark runs occurred.
 
 Compare observations with matching workload and configuration scope. Keep metric
 units and missing values intact; a missing measurement is not zero. Use the
 operation's documented metric meanings when interpreting values.
 
-## Basic lookup
+## Basic benchmark lookup
 
 This Node 24 example prints up to five latest available single-turn observations
 with 8192 input and 1024 output tokens. It reports the full matching count before

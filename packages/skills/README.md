@@ -59,6 +59,9 @@ It reads supported operations and model names from the
 Latest available data may contain historical measurements; the requested cutoff and
 each observation's date remain separate.
 
+The skill helps navigate the public API; the single-turn PowerX exporter below is
+its first worked export example, not the boundary of API lookup support.
+
 ### Export measured PowerX data
 
 Ask the installed skill:
@@ -89,6 +92,10 @@ Both formats retain request and package-version metadata. JSON preserves optiona
 nested worker/audit data; CSV leaves missing metrics blank and preserves real zeros.
 Status and coverage go to stderr; omitting `--output` sends the export to stdout.
 The report log includes a JSON metadata record even when CSV has no selected rows.
+It records the applied filters, disjoint exclusion counts, and `metric_coverage`: each
+field's finite-value and unavailable counts among selected rows. A validated row can
+still lack a requested metric. Keep that row and report the missing metric; never
+fill it with zero. Some role-specific metrics may not apply to every configuration.
 
 The exporter downloads complete JSON and selects numeric validity `1`, schema `2`,
 and the exact single-turn workload. Empty results report that no strictV2 rows
@@ -115,7 +122,8 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 本包提供一个 Agent Skill（智能体技能）`inferencex-api`，供 Codex 或 Claude Code
 查询 [InferenceX 公开 API](https://inferencex.semianalysis.com/zh/api)。技能支持查阅
 实时 OpenAPI、基础基准测试查询，以及指定单轮请求工作负载下的已验证 PowerX CSV/JSON
-导出，并在结果中保留测量日期、原始模型键和来源链接。
+导出，并在结果中保留测量日期、原始模型键和来源链接。技能面向整个公开 API 的查询；
+单轮 PowerX 导出是首个完整示例，不代表技能只能查询这类数据。
 
 **当前为尚未发布的候选版本。** 请使用维护者提供的本地 `.tgz` 产物。上面的命令安装
 该本地产物；目前尚未确认可通过公开 npm 仓库安装。
@@ -161,6 +169,9 @@ Claude Code 使用 `.claude/skills/inferencex-api/scripts/export-powerx.mjs`；�
 worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态和覆盖范围输出到 stderr，
 省略 `--output` 时将导出内容写入 stdout。
 即使 CSV 没有选中任何数据行，示例中的报告日志也会包含一条 JSON 格式的元数据记录。
+该记录包含实际筛选条件、互不重叠的排除数量，以及 `metric_coverage` 中每个字段在
+选中数据里的有限数值与不可用数量。已通过验证的数据仍可能缺少用户请求的指标；应
+保留该行并说明指标缺失，不能补零。部分按角色拆分的指标并不适用于所有配置。
 
 导出器下载完整 JSON，只保留验证值为数字 `1`、schema 为数字 `2` 且满足指定单轮工作
 负载的数据。结果为空时，导出器会报告该范围内没有匹配的 strictV2 数据；请求或响应失败会以非零
