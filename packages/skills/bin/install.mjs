@@ -102,10 +102,15 @@ function installedState(destination, packageName) {
       ) {
         return unknownState(`installed ${exporter.name} is missing or not a regular file`);
       }
-      const version = readFileSync(path, 'utf8').match(
-        /^const PACKAGE_VERSION = ['"](?<version>[^'"\r\n]+)['"];$/mu,
-      )?.groups.version;
-      if (!version) return unknownState(`installed ${exporter.name} version is missing`);
+      const declarations = [
+        ...readFileSync(path, 'utf8').matchAll(
+          /^const PACKAGE_VERSION = ['"](?<version>[^'"\r\n]+)['"];$/gmu,
+        ),
+      ];
+      if (declarations.length !== 1) {
+        return unknownState(`installed ${exporter.name} version is missing`);
+      }
+      const version = declarations[0].groups.version;
       if (version !== metadata.version) {
         return unknownState(
           `installation metadata disagrees with the installed ${exporter.name} version`,

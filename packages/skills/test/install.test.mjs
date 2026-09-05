@@ -47,6 +47,16 @@ function jsonResult(result, expectedStatus = 0) {
   return output;
 }
 
+function assertDuplicateVersionsRejected(cwd, exporter, reason) {
+  const matching = `const PACKAGE_VERSION = '${packageInfo.version}';`;
+  for (const second of [matching, "const PACKAGE_VERSION = '9.9.9';"]) {
+    writeFileSync(exporter, `${matching}\n${second}\n`);
+    const status = run(['status'], cwd);
+    succeeded(status);
+    assert.ok(status.stdout.includes(`Installed version: unknown (${reason})\n`));
+  }
+}
+
 function snapshot(root) {
   return ['', ...readdirSync(root, { recursive: true })].sort().map((path) => {
     const fullPath = join(root, path);
@@ -217,6 +227,7 @@ test('status reads exporter versions without executing code and reports missing 
   const readOnly = run(['status'], cwd);
   succeeded(readOnly);
   assert.ok(readOnly.stdout.includes(`Installed version: ${packageInfo.version}\n`));
+  assertDuplicateVersionsRejected(cwd, exporter, 'installed exporter version is missing');
   writeFileSync(exporter, '// no identifiable version');
   const missingVersion = run(['status'], cwd);
   succeeded(missingVersion);
@@ -303,6 +314,11 @@ test('status reads the required AgentX version without executing it and diagnose
   const readOnly = run(['status'], cwd);
   succeeded(readOnly);
   assert.ok(readOnly.stdout.includes(`Installed version: ${packageInfo.version}\n`));
+  assertDuplicateVersionsRejected(
+    cwd,
+    exporter,
+    'installed AgentX exporter version is missing',
+  );
 
   for (const [name, mutate, reason, repairable] of [
     [
