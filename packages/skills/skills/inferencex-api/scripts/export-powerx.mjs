@@ -5,7 +5,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; the packed-artifact test checks this version.
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.2.0';
 const HELP = `export-powerx — export validated single-turn PowerX observations
 
 Requires Node 24 or later.

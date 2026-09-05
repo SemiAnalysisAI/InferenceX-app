@@ -1,0 +1,68 @@
+name: Publish InferenceX skills
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact reviewed version in packages/skills/package.json'
+        required: true
+        type: string
+      reviewed_sha256:
+        description: 'Archive SHA-256 after clean installed-agent acceptance'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: publish-inferencex-skills
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the reviewed skill archive
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing; no long-lived publishing token
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      REVIEWED_SHA256: ${{ inputs.reviewed_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check the npm OIDC runtime
+        run: |
+          node --version
+          npm --version
+          node --input-type=module -e 'import {execFileSync} from "node:child_process"; const [major,minor,patch]=execFileSync("npm",["--version"],{encoding:"utf8"}).trim().split(".").map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) throw Error("npm >=11.5.1 is required for trusted publishing");'
+      - name: Test the packed interfaces
+        run: node --test packages/skills/test/*.test.mjs
+      - name: Prepare the exact accepted archive
+        run: node packages/skills/scripts/release.mjs prepare "$RELEASE_VERSION" "$RUNNER_TEMP/skills-release" "$REVIEWED_SHA256"
+      - name: Verify candidate installation and public API export
+        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --evidence "$RUNNER_TEMP/skills-candidate-verification"
+      - name: Publish the verified archive with OIDC
+        run: |
+          node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
+          npm publish "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" --access public --ignore-scripts --registry https://registry.npmjs.org
+      - name: Verify anonymous pinned public installation and export
+        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --evidence "$RUNNER_TEMP/skills-public-verification"
+      - name: Preserve release and verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: inferencex-skills-release-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/skills-release/
+            ${{ runner.temp }}/skills-candidate-verification/
+            ${{ runner.temp }}/skills-public-verification/
+          if-no-files-found: ignore
+          retention-days: 30

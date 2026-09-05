@@ -12,6 +12,10 @@ Public benchmark reads require HTTPS access and no credentials.
 Use the workflow below for the public operations described in OpenAPI. PowerX
 single-turn export is the first bundled worked example.
 
+For **evaluation lookups** or **dataset discovery and conversation inspection**, use
+the [public API examples](references/public-api-examples.md). They preserve raw task
+metrics and distinguish complete responses from selected samples or pages.
+
 For **PowerX measured-power or energy exports**, read the
 [PowerX cookbook](references/powerx.md) and use the
 [bundled exporter](scripts/export-powerx.mjs). It selects validated schema-v2

@@ -6,7 +6,11 @@ It supports current OpenAPI discovery, basic benchmark lookups, and validated
 PowerX CSV/JSON exports for an exact single-turn workload, preserving measurement
 dates, model keys, and source links.
 
-The npm commands below pin version `0.1.0` and require that version to be published.
+The [public API cookbook](skills/inferencex-api/references/public-api-examples.md)
+also provides evaluation lookups and dataset-to-conversation inspection, with
+request context, exact identifiers, missing values, and page/sample boundaries.
+
+The npm commands below pin version `0.2.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
 
 ## Prerequisites
@@ -22,10 +26,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -36,9 +40,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -51,7 +55,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.1.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.2.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -118,14 +122,35 @@ are existing observations, not new benchmark runs. The cookbook describes the
 measurement units and limitations; strict validity alone does not establish an
 energy-efficiency advantage.
 
+### Inspect the installed version
+
+```bash
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills status --target codex
+```
+
+Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
+destination. `status` reports the invoking installer version, the version last
+successfully installed in that destination, and the installed skill directory's
+absolute path separately.
+It only reads local files and makes no API requests. npm may fetch the installer
+first; add npm's `--offline` when the selected package version is already cached.
+
+Legacy installations without a version record, including `0.1.0`, report an
+unknown installed version. Invalid or unreadable records are also reported as
+unknown. The record must agree with the installed exporter's explicit version;
+a mismatch, missing exporter version, or unreadable exporter reports unknown.
+This catches older installers overwriting files while leaving a newer record.
+This limited check does not verify every file or detect all local edits.
+`--version` reports only the invoking installer version, not the project's installed copy.
+
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.1.0` with the published version you intend to install:
+version. To upgrade, replace `0.2.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -140,7 +165,11 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 导出，并在结果中保留测量日期、原始模型键和来源链接。技能面向整个公开 API 的查询；
 单轮 PowerX 导出是首个完整示例，不代表技能只能查询这类数据。
 
-上面的 npm 命令固定使用 `0.1.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+[公开 API 指南](skills/inferencex-api/references/public-api-examples.md) 还提供评估查询和
+数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
+抽样范围。
+
+上面的 npm 命令固定使用 `0.2.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
 需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。从 npm 安装需要访问
@@ -197,8 +226,19 @@ worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态
 状态退出。导出使用已有观测值，不会启动新的基准测试。指标单位和限制见 PowerX 指南；
 通过严格验证本身并不能证明具有能效优势。
 
+可执行上面的 `status --target codex` 命令查看项目内已安装的技能；其他目标使用
+`--target claude` 或 `--dir`。输出会分别列出本次调用的安装器版本、目标目录中上次成功
+安装的技能版本，以及技能目录的绝对路径。`status` 只读取本地文件，不会请求 API；但 npm 可能先
+下载安装器。如指定版本已经缓存，可给 npm 加上 `--offline`。
+
+包括 `0.1.0` 在内、没有版本记录的旧安装会显示版本未知。记录无效或无法读取时，同样
+显示为未知。版本记录还必须与已安装导出器中声明的版本一致；两者不一致、导出器缺少
+版本声明或无法读取时，也会显示未知。这能识别旧安装器覆盖文件后留下较新版本记录的
+情况。这项检查不会验证所有文件，也不能检测所有本地修改。`--version` 只显示本次调用
+的安装器版本，不显示项目中已安装技能的版本。
+
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.1.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
+的 `0.2.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 

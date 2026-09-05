@@ -139,7 +139,7 @@
     },
     "packages/skills": {
       "name": "@semianalysisai/inferencex-skills",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "bin": {
         "inferencex-skills": "bin/install.mjs",
       },
