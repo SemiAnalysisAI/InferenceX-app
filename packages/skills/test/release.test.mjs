@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { PACKAGE, requireUnpublished, verifyArchive, verifyContents } from '../scripts/release.mjs';
 
-test('public verification retries only exact-version ETARGET within its deadline', () => {
+test('read-only release verification rejects altered evidence and unsafe retries', () => {
   const result = spawnSync('python3', ['-B', 'test/verify-release.test.py'], {
     cwd: resolve(import.meta.dirname, '..'),
     encoding: 'utf8',
