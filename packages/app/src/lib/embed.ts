@@ -69,11 +69,11 @@ export const EMBED_DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
 
 /**
  * Plot height (px) for embedded charts. The dashboard draws at 600px; embeds
- * sit inside a host page that also shows a heading, a caption and a link
- * under the frame, and the whole section should fit a MacBook viewport
- * (about 730px below the host's sticky header) without scrolling.
+ * sit inside a host page that also shows a heading, a caption and a
+ * dashboard link above the frame; 380px keeps the section readable on a
+ * MacBook viewport without cramping the point labels.
  */
-export const EMBED_CHART_HEIGHT = 340;
+export const EMBED_CHART_HEIGHT = 380;
 
 const FRAMEWORK_KEYS = new Set<string>(FRAMEWORK_FAMILIES.map((f) => f.key));
 const Y_AXIS_METRIC_KEYS = new Set<string>(Y_AXIS_METRICS);
