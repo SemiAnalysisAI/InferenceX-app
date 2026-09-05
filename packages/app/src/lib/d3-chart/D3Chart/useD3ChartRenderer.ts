@@ -8,7 +8,7 @@ import {
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
-import { renderAxes, renderGrid, type AnyScale } from '../chart-update';
+import { renderAxes, renderGrid, type AnyScale, type GridVisibility } from '../chart-update';
 import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
@@ -73,6 +73,12 @@ function resolveTickValues(
   if (!tickValues) return undefined;
   return typeof tickValues === 'function' ? tickValues(scale) : tickValues;
 }
+
+/** Map per-axis `grid` flags onto the grid renderer's visibility options. */
+function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility {
+  return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
+}
+
 export interface ZoomFrameBatcher {
   schedule: (work: () => void) => void;
   flush: () => void;
@@ -397,6 +403,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           0,
           xTickValues,
           yTickValues,
+          'both',
+          gridVisibility(xAxisConfig, yAxisConfig),
         );
         renderAxes(layout, xScale as AnyScale, yScale as any, {
           xTickFormat: xAxisConfig?.tickFormat,
@@ -708,6 +716,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                   xTickValues,
                   yTickValues,
                   currentZoomAxes,
+                  gridVisibility(zoomXAxisConfig, zoomYAxisConfig),
                 );
                 for (const layer of zoomLayers) {
                   updateLayerDecorationOnZoom(
@@ -841,6 +850,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         xTickValues,
         yTickValues,
         updateAxes,
+        gridVisibility(xAxisConfig, yAxisConfig),
       );
       renderAxes(layout, currentXScale as AnyScale, yAxisScale, {
         xTickFormat: xAxisConfig?.tickFormat,

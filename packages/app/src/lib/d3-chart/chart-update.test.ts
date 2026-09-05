@@ -473,6 +473,44 @@ describe('renderGrid', () => {
     });
   });
 
+  describe('visibility', () => {
+    it('skips vertical lines when x grid is disabled but keeps horizontal ones', () => {
+      const layout = makeLayout();
+      const domain = ['A', 'B', 'C', 'D'];
+      const xScale = d3.scaleBand().domain(domain).range([0, layout.width]).padding(0.1);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderGrid(layout, xScale, yScale, 5, 0, undefined, undefined, 'both', { x: false });
+
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(0);
+      expect(layout.gridGroup.select('.grid-h').selectAll('line').size()).toBeGreaterThan(0);
+    });
+
+    it('removes previously drawn vertical lines when x grid is turned off', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderGrid(layout, xScale, yScale);
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBeGreaterThan(0);
+
+      renderGrid(layout, xScale, yScale, 5, 0, undefined, undefined, 'both', { x: false });
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(0);
+      expect(layout.gridGroup.select('.grid-h').selectAll('line').size()).toBeGreaterThan(0);
+    });
+
+    it('skips horizontal lines when y grid is disabled', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderGrid(layout, xScale, yScale, 5, 0, undefined, undefined, 'both', { y: false });
+
+      expect(layout.gridGroup.select('.grid-h').selectAll('line').size()).toBe(0);
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBeGreaterThan(0);
+    });
+  });
+
   describe('with band scales', () => {
     it('creates vertical lines at band centers for band x-scale', () => {
       const layout = makeLayout();
