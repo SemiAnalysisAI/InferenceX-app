@@ -384,7 +384,8 @@ export function profitHistoryLegendKeys(
 /**
  * Compared chips with no bar on a comparison entry, or on the current date
  * (`''`) when the chip only priced earlier, as `chip • when` captions so a
- * missing bar reads as "no run that day", not as a zero.
+ * missing bar reads as "no run that day", not as a zero. A pinned run that a
+ * chip already shows as its current bar is not missing for that chip.
  */
 export function profitHistoryMissing(
   pricedRows: readonly Pick<ProfitEstimatorRow, 'hwKey' | 'date'>[],
@@ -393,12 +394,17 @@ export function profitHistoryMissing(
   chipLabel: (hwKey: string) => string,
   entryLabel: (entry: string) => string,
   currentDateLabel: string,
+  currentRunIds: Readonly<Record<string, string>> = {},
 ): string[] {
   const priced = new Set(pricedRows.map((row) => `${row.hwKey}~${row.date ?? ''}`));
   const missing: string[] = [];
   for (const entry of [...comparisonDates, '']) {
+    const { runId } = parseComparisonEntry(entry);
     for (const hwKey of selectedGPUs) {
       if (priced.has(`${hwKey}~${entry}`)) continue;
+      // A pinned run that is this chip's current run is on the chart as
+      // today's bar (`buildProfitHistoryResults` skips it), not missing.
+      if (runId !== undefined && currentRunIds[hwKey] === runId) continue;
       missing.push(`${chipLabel(hwKey)} • ${entry ? entryLabel(entry) : currentDateLabel}`);
     }
   }

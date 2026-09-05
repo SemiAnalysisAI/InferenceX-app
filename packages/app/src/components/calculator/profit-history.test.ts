@@ -483,6 +483,26 @@ describe('profitHistoryMissing', () => {
     ]);
   });
 
+  it('does not report a pinned run for the chip whose current bar is that run', () => {
+    const rows = [
+      { hwKey: 'b200_sglang', date: undefined },
+      { hwKey: 'gb300_sglang', date: undefined },
+      // GB300 sits on run 150 today, so run 200 is a real extra bar for it.
+      { hwKey: 'gb300_sglang', date: '2026-08-31~r200' },
+    ];
+    expect(
+      profitHistoryMissing(
+        rows,
+        ['2026-08-31~r200'],
+        ['b200_sglang', 'gb300_sglang'],
+        missingChipLabel,
+        missingEntryLabel,
+        '2026-08-31',
+        { b200_sglang: '200', gb300_sglang: '150' },
+      ),
+    ).toEqual([]);
+  });
+
   it('is empty when every compared chip priced everywhere', () => {
     const rows = [
       { hwKey: 'b200_sglang', date: undefined },

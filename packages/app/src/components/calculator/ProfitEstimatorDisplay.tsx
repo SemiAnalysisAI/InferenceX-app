@@ -1115,6 +1115,7 @@ function ProfitEstimatorInner({
       },
       historyEntryLabel,
       selectedRunDate,
+      historyCurrentRunIds,
     );
   }, [
     historyActive,
@@ -1124,6 +1125,7 @@ function ProfitEstimatorInner({
     hardwareConfig,
     historyEntryLabel,
     selectedRunDate,
+    historyCurrentRunIds,
   ]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
