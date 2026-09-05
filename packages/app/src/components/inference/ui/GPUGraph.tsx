@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { EMBED_CHART_HEIGHT } from '@/lib/embed';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
@@ -1197,6 +1198,7 @@ const GPUGraph = React.memo(
     return (
       <D3Chart<InferenceData>
         ref={chartRef}
+        height={minimalChrome ? EMBED_CHART_HEIGHT : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}

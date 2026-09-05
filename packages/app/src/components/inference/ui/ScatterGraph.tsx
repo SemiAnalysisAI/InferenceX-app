@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { EMBED_CHART_HEIGHT } from '@/lib/embed';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
@@ -3439,6 +3440,7 @@ const ScatterGraph = React.memo(
       <>
         <D3Chart<InferenceData>
           ref={chartRef}
+          height={minimalChrome ? EMBED_CHART_HEIGHT : undefined}
           chartId={chartId}
           // Stable across toggles: the render effect keys on this for "data
           // changed" rebuilds; scale domains come from x/yScaleConfig (computed
