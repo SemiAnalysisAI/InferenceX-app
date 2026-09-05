@@ -1,24 +1,15 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
-import { after, before, test } from 'node:test';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-const packageRoot = resolve(import.meta.dirname, '..');
-const temporaryRoot = mkdtempSync(join(tmpdir(), 'inferencex-diagnose-test-'));
+import { packageInfo, packedSkillSuite, succeeded } from './packed-skill.mjs';
+
+const suite = packedSkillSuite();
+const { temporaryRoot, environment, project } = suite;
 const preload = join(temporaryRoot, 'http-response.mjs');
-const environment = {
-  ...process.env,
-  PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH}`,
-  npm_config_cache: join(temporaryRoot, 'npm-cache'),
-  npm_config_update_notifier: 'false',
-  npm_config_audit: 'false',
-  npm_config_fund: 'false',
-};
-const version = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version;
+const version = packageInfo.version;
 const powerKeys = [
   'avg_power_w',
   'prefill_avg_power_w',
@@ -87,14 +78,6 @@ function observation(metrics = {}, overrides = {}) {
   };
 }
 
-function succeeded(result) {
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-}
-
-function project() {
-  return mkdtempSync(join(temporaryRoot, 'project with spaces-'));
-}
-
 function run(
   rows = [],
   {
@@ -107,13 +90,12 @@ function run(
 ) {
   const cwd = project();
   const reportPath = join(cwd, 'powerx-report.log');
-  const responseRoot = mkdtempSync(join(temporaryRoot, 'response-'));
+  const responseRoot = project('response-');
   const responsePath = join(responseRoot, 'response.json');
   const requestPath = join(responseRoot, 'requests.jsonl');
   writeFileSync(reportPath, report);
   writeFileSync(responsePath, JSON.stringify({ body, status, networkError }));
-  const result = spawnSync(
-    process.execPath,
+  const result = suite.node(
     ['--import', pathToFileURL(preload).href, '--input-type=module', '-', reportPath],
     {
       cwd,
@@ -123,11 +105,8 @@ function run(
         INFERENCEX_TEST_REQUESTS: requestPath,
       },
       input: diagnosticCode,
-      encoding: 'utf8',
-      timeout: 10_000,
     },
   );
-  assert.ifError(result.error);
   const requests = existsSync(requestPath)
     ? readFileSync(requestPath, 'utf8').trimEnd().split('\n').map(JSON.parse)
     : [];
@@ -156,38 +135,7 @@ globalThis.fetch = async (input, options) => {
 };
 `,
   );
-  const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', temporaryRoot], {
-    cwd: packageRoot,
-    env: environment,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  assert.ifError(packed.error);
-  succeeded(packed);
-  const archive = join(temporaryRoot, JSON.parse(packed.stdout)[0].filename);
-  const installRoot = project();
-  const installed = spawnSync(
-    'npm',
-    [
-      'exec',
-      '--yes',
-      '--offline',
-      '--package',
-      archive,
-      '--',
-      'inferencex-skills',
-      'install',
-      '--target',
-      'codex',
-    ],
-    { cwd: installRoot, env: environment, encoding: 'utf8', timeout: 60_000 },
-  );
-  assert.ifError(installed.error);
-  succeeded(installed);
-  const cookbook = readFileSync(
-    join(installRoot, '.agents/skills/inferencex-api/references/powerx.md'),
-    'utf8',
-  );
+  const cookbook = readFileSync(join(suite.install('codex'), 'references/powerx.md'), 'utf8');
   const section = cookbook.split('## Diagnose an empty strict selection\n')[1]?.split('\n## ')[0];
   assert.ok(section, 'the installed cookbook contains the empty-selection recipe');
   const snippet = section.match(
@@ -195,10 +143,6 @@ globalThis.fetch = async (input, options) => {
   );
   assert.ok(snippet, 'execute the shipped recipe, not a test-only diagnostic implementation');
   diagnosticCode = snippet.groups.code;
-});
-
-after(() => {
-  rmSync(temporaryRoot, { recursive: true, force: true });
 });
 
 test('installed recipe makes one same-scope GET and preserves the earlier strict result', () => {

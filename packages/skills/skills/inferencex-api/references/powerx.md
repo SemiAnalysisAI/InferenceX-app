@@ -246,6 +246,11 @@ All fields below are inside `row.metrics` and may be absent on individual rows.
 | `avg_temp_c`, `peak_temp_c`                 | Mean and peak per-GPU temperature, in °C.                                    |
 | `avg_util_pct`, `avg_mem_used_mb`           | Mean per-GPU utilization (%) and memory use (MB).                            |
 
+For `joules_per_output_token`, GPU energy across the whole deployment is the
+numerator; generated output-token count is the denominator. "Whole deployment"
+describes the energy scope, not the denominator. Keep that distinction in prose
+as well as in the exported field name.
+
 The whole-deployment meanings above require schema version 2, including for
 disaggregated deployments. Role-prefixed energy remains role-local. Preserve the
 producer's values; dividing whole-deployment joules by GPU count changes the metric.
