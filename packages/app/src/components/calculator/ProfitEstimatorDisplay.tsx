@@ -458,10 +458,11 @@ function ProfitEstimatorInner({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3) intersected
-  // with the models that have an agentic-traces run, so the selector never offers a model
-  // that would draw an empty chart. If the intersection is still loading or
-  // empty, the allow-list alone is offered so the selector is never blank.
+  // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4
+  // Pro) intersected with the models that have an agentic-traces run, so the
+  // selector never offers a model that would draw an empty chart. If the
+  // intersection is still loading or empty, the allow-list alone is offered so
+  // the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(() => {
     const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
@@ -503,7 +504,8 @@ function ProfitEstimatorInner({
   // Each model has its own operating point, price source, and license fee
   // (Kimi K3: 45 tok/s/user on OpenRouter at 30%; GLM 5.2/5.3: 100 tok/s/user
   // on the Z.ai list price at 30%; MiniMax M3: 83 tok/s/user on the MiniMax
-  // list price at 20%), so a model switch re-seeds all three. The ref keeps
+  // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
+  // price at 30%), so a model switch re-seeds all three. The ref keeps
   // this to actual switches: re-renders with the same model leave the
   // reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);

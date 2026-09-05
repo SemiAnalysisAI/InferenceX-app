@@ -1089,15 +1089,17 @@ and the two can be collapsed into one once both are on master.
   no scenario selector and no precision selector (precision stays in auto mode, the
   densest measured run set). The interactivity target is a typed number in the same
   row as utilization and the license fee.
-- **Kimi K3, GLM 5.2/5.3, and MiniMax M3.** The model selector offers the tab's route allow-list
+- **Kimi K3, GLM 5.2/5.3, MiniMax M3, and DeepSeek V4 Pro.** The model selector offers the tab's route allow-list
   (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
   `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
   models that have an agentic run. Each bare path opens on Kimi K3
   (`defaultRouteModel(tab)`); `/profit-estimator/kimi-k3` and
   `/profit-estimator-per-gigawatt/kimi-k3` are the same pages, `/glm-5-3` is the
   GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site),
-  `/minimax-m3` is the MiniMax M3 page, aliases 308 to the canonical slug, and any
-  model outside the allow-list 404s. Widening
+  `/minimax-m3` is the MiniMax M3 page, `/deepseek-v4` is the DeepSeek V4 Pro
+  page (the app-wide default elsewhere, but a slugged page here since the bare
+  path is Kimi K3), aliases 308 to the canonical slug, and any model outside the
+  allow-list 404s. Widening
   the pages to more models is one list edit, a `profitModelDefaults` entry, and
   fixture rows.
 - **Per-model defaults.** `profitModelDefaults(model)` in `profit-estimator.ts`
@@ -1115,7 +1117,14 @@ and the two can be collapsed into one once both are on master.
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
   H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
   MiniMax M3 also opens on a 20% model license fee; every other model opens on
-  the 30% `DEFAULT_LAB_CUT_PCT`. A
+  the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user, the
+  speed DeepSeek's own API serves at, and DeepSeek's peak-hour list price for
+  `deepseek-v4-pro-0813` ($1.32 input / $0.044 cached / $3.96 output per M tok;
+  the off-peak rate is half that, and the OpenRouter aggregate sits below both).
+  At 24 tok/s/user the B200, B300, and MI355X agentic curves are priced; the
+  GB200, GB300, and H200 curves bottom out above it (their lowest measured
+  points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
+  a lower-interactivity run lands. A
   model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom

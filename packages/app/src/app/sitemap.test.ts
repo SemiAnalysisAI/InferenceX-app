@@ -84,8 +84,8 @@ describe('sitemap locale parity', () => {
       for (const route of MODEL_ROUTES) {
         // The default model's page canonicalizes to the bare tab path, which
         // the dashboard-route loop above already covers. Models a tab does not
-        // serve (the profit estimator is Kimi K3, GLM 5.2/5.3 and MiniMax M3
-        // only) 404 and stay out.
+        // serve (the profit estimator is Kimi K3, GLM 5.2/5.3, MiniMax M3 and
+        // DeepSeek V4 Pro only) 404 and stay out.
         const expected = served.has(route.model) && route.model !== defaultRouteModel(tab);
         const enPath = modelRoutePath(tab, route.slug);
         expect(urls.has(`${SITE_URL}${enPath}`)).toBe(expected);

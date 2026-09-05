@@ -5,6 +5,8 @@
 //    ($1.40 / $0.26 cached / $4.40), and a model switch re-seeds both;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
+//  - DeepSeek V4 Pro opens on 24 tok/s/user and the DeepSeek peak list price
+//    ($1.32 / $0.044 cached / $3.96);
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
@@ -12,8 +14,9 @@
 //  - the OpenRouter catalog is the default price source and a custom triple
 //    (input, cached input, output) can replace it;
 //  - the workload is pinned to agentic traces, so there is no scenario or
-//    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3 and
-//    MiniMax M3 only, and the target interactivity is a typed number, not a slider;
+//    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3,
+//    MiniMax M3 and DeepSeek V4 Pro only, and the target interactivity is a
+//    typed number, not a slider;
 //  - the cost provider has a custom $/GPU/hr option with one input per chip;
 //  - the heading reads like /inference, the subtitle names the utilization, and
 //    the formula folds away under the chart;
@@ -23,9 +26,9 @@
 import { interceptProfitData } from '../support/profit-fixtures';
 
 // Kimi K3 is the page default; the DeepSeek row proves the page prices the
-// routed model, not the first catalog entry. The GLM and MiniMax rows sit below
-// their labs' list prices, as the real aggregates do, so the spec can tell the
-// two sources apart.
+// routed model, not the first catalog entry. The GLM, MiniMax, and DeepSeek
+// rows sit below their labs' list prices, as the real aggregates do, so the
+// spec can tell the two sources apart.
 const OPENROUTER_MODELS = {
   data: [
     {
@@ -125,10 +128,11 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
     cy.get('[role="option"]')
-      .should('have.length', 3)
+      .should('have.length', 4)
       .and('contain.text', 'Kimi K3')
       .and('contain.text', 'GLM5.2/GLM5.3')
-      .and('contain.text', 'MiniMax M3');
+      .and('contain.text', 'MiniMax M3')
+      .and('contain.text', 'DeepSeek V4 Pro');
     cy.get('body').type('{esc}');
     // Kimi K3 has no list price, so the selector offers the catalog and custom only.
     cy.get('button#profit-price-source').click();
@@ -388,7 +392,7 @@ describe('Profit Estimator per GW — per-model route', () => {
   });
 
   it('404s models the estimator does not serve yet', () => {
-    cy.request({ url: '/profit-estimator-per-gigawatt/deepseek-v4-pro', failOnStatusCode: false })
+    cy.request({ url: '/profit-estimator-per-gigawatt/deepseek-r1', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
     cy.request({ url: '/profit-estimator-per-gigawatt/not-a-model', failOnStatusCode: false })
@@ -587,6 +591,99 @@ describe('Profit Estimator — MiniMax M3', () => {
   });
 });
 
+describe('Profit Estimator — DeepSeek V4 Pro', () => {
+  beforeEach(() => {
+    stubOpenRouter();
+    cy.viewport(1280, 1000);
+  });
+
+  it('opens /profit-estimator/deepseek-v4 on 24 tok/s/user and the DeepSeek list price', () => {
+    cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '30%');
+    cy.get('[data-testid="profit-caption"] h2').should(
+      'contain.text',
+      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
+    );
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $1.32')
+      .and('contain.text', 'Cached Input: $0.044')
+      .and('contain.text', 'Output: $3.96')
+      .and('contain.text', '(DeepSeek list price)');
+    cy.get('[data-testid="profit-list-price-source"]')
+      .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
+      .and('contain.text', 'DeepSeek');
+    // 24 tok/s/user sits inside every fixture curve, the short H200 one included,
+    // so all five SKUs are priced.
+    chart().find('image.bar-vendor-mark').should('have.length', 5);
+    chart().should('contain.text', 'H200');
+    cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
+
+    // The catalog stays one click away and reads the DeepSeek row, not Kimi's.
+    cy.get('button#profit-price-source').click();
+    cy.get('[role="option"]')
+      .should('have.length', 3)
+      .and('contain.text', 'OpenRouter')
+      .and('contain.text', 'DeepSeek list price')
+      .and('contain.text', 'Custom $/M tok');
+    cy.contains('[role="option"]', 'OpenRouter').click();
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.66')
+      .and('contain.text', 'Output: $1.98')
+      .and('contain.text', '(OpenRouter)');
+    cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
+
+    // Custom seeds from the price in force, here the list price.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'DeepSeek list price').click();
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'Custom $/M tok').click();
+    cy.get('[data-testid="profit-input-price"]').should('have.value', '1.32');
+    cy.get('[data-testid="profit-cached-price"]').should('have.value', '0.044');
+    cy.get('[data-testid="profit-output-price"]').should('have.value', '3.96');
+  });
+
+  it('re-seeds the operating point and price source when switching from Kimi K3', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'DeepSeek V4 Pro').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v4');
+    cy.get('[data-testid="profit-caption"] h2')
+      .should('contain.text', 'DeepSeek V4 Pro')
+      .and('contain.text', '24 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $1.32')
+      .and('contain.text', '(DeepSeek list price)');
+
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'Kimi K3').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.6')
+      .and('contain.text', '(OpenRouter)');
+  });
+
+  it('serves the Chinese mirror with the list price named in Chinese', () => {
+    cy.visit('/zh/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', '输入：$1.32')
+      .and('contain.text', 'DeepSeek 官方定价');
+    cy.get('button#profit-price-source').should('contain.text', 'DeepSeek 官方定价');
+  });
+});
+
 describe('Profit Estimator per GW — Chinese mirror', () => {
   it('renders /zh/profit-estimator-per-gigawatt with translated controls and caption', () => {
     stubOpenRouter();
@@ -651,7 +748,7 @@ describe('Profit Estimator (per chip-hour)', () => {
       expect(response.status).to.eq(308);
       expect(response.headers.location).to.match(/\/profit-estimator\/kimi-k3$/u);
     });
-    cy.request({ url: '/profit-estimator/deepseek-v4-pro', failOnStatusCode: false })
+    cy.request({ url: '/profit-estimator/deepseek-r1', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
     stubOpenRouter();
