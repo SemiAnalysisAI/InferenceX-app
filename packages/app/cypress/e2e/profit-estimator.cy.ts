@@ -18,9 +18,20 @@
 //  - the heading reads like /inference, the subtitle names the utilization, and
 //    the formula folds away under the chart;
 //  - /profit-estimator/<model> is the per-model route; switching models
-//    rewrites the address bar in place.
+//    rewrites the address bar in place;
+//  - the compare-history panel mirrors /inference: up to four chip configs and
+//    a date range, kept in `i_gpus`/`i_dstart`/`i_dend`; with a range set the
+//    chart draws only the compared chips, today's bar plus one per range
+//    endpoint priced from that date's run, labelled with the date.
 
-import { interceptProfitData } from '../support/profit-fixtures';
+import {
+  interceptProfitData,
+  PROFIT_CHANGELOG_NOTES,
+  PROFIT_DATE,
+  PROFIT_HISTORY_DATE,
+  PROFIT_RUN_DATE,
+  PROFIT_RUNS,
+} from '../support/profit-fixtures';
 
 // Kimi K3 is the page default; the DeepSeek row proves the page prices the
 // routed model, not the first catalog entry. The GLM and MiniMax rows sit below
@@ -351,6 +362,222 @@ describe('Profit Estimator per GW', () => {
   });
 });
 
+const historyPanel = () => cy.get('[data-testid="profit-history-panel"]');
+const chipTrigger = () =>
+  cy.get('[data-testid="profit-history-gpu-multiselect"] [role="combobox"]');
+const axisLabels = () => chartSvg().find('.x-axis text');
+const changelog = () => cy.get('[data-testid="profit-history-changelog"]');
+// The chip options need the availability rows and the auto-resolved
+// precision, both of which land with the first priced chart, so every panel
+// interaction waits for a bar before opening the MultiSelect.
+const waitForChart = () => {
+  chart().should('exist');
+  bars().should('have.length.greaterThan', 0);
+};
+const pickChip = (label: string) => {
+  chipTrigger().click({ force: true });
+  cy.get('[role="option"]').contains(label).click();
+  cy.get('body').type('{esc}');
+};
+
+describe('Profit Estimator per GW — compare history', () => {
+  beforeEach(stubOpenRouter);
+
+  it('offers the agentic chip configs and shows the range picker once one is chosen', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip Config');
+    cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
+    bars()
+      .its('length')
+      .then((allBars) => {
+        chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+        chipTrigger().click({ force: true });
+        // Every agentic SKU at the effective precisions. The lone fp8 curve
+        // (H200) keeps both precisions in play (the sparse-precision rule), so
+        // it is offered as a chip even though its curve stops short of the
+        // target on the chart, as on `/inference`. Single-turn rows are never
+        // offered.
+        cy.get('[role="option"]').should('have.length', 5).and('contain.text', 'GB300');
+        cy.get('[role="option"]').should('contain.text', 'H200');
+        cy.get('[role="option"]').contains('GB300').click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="profit-history-date-range"]').should('be.visible');
+        // A chip alone changes nothing: the chart waits for a range.
+        bars().should('have.length', allBars);
+        chipTrigger().should('contain.text', 'GB300');
+        // Clearing the chips also clears the range control.
+        chipTrigger().click({ force: true });
+        cy.get('[role="option"]').contains('GB300').click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
+        chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+      });
+  });
+
+  it('prices the chosen chips on the range endpoints next to today', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    waitForChart();
+    // The MultiSelect closes after each pick, so the second chip reopens it.
+    pickChip('GB300');
+    pickChip('B200');
+    cy.contains('button', 'Select date range').click();
+    cy.contains('button', 'Max Range').click();
+    cy.contains('button', 'Apply').click();
+
+    // The picker shows the applied range (the address bar is deliberately
+    // left clean after load, see url-state.ts, so the UI is what is asserted).
+    cy.contains('button', 'Jul 15, 2026').should('be.visible');
+    // Two chips × (today + the earlier endpoint) = four stacked bars; the
+    // range's end date is today's run, so it is not fetched again.
+    chart().find('rect.bar-tco').should('have.length', 4);
+    cy.get('[data-testid="profit-legend"] li').should('have.length', 2);
+    cy.get('[data-testid="profit-history-note"]')
+      .should('contain.text', 'Compare history')
+      .and('contain.text', PROFIT_HISTORY_DATE);
+    axisLabels().should('contain.text', PROFIT_HISTORY_DATE);
+    // The earlier run carries 80% of the throughput, so each chip's history
+    // bar is shorter than its current one and sits immediately to its left.
+    revenueLabels().then(($labels) => {
+      const revenues = [...$labels].map((el) => parseCompactUsd(el.textContent ?? ''));
+      expect(revenues).to.have.length(4);
+      expect(revenues[0]).to.be.lessThan(revenues[1]!);
+      expect(revenues[2]).to.be.lessThan(revenues[3]!);
+    });
+  });
+
+  it('hydrates the comparison from the URL and clears the range with the chips', () => {
+    cy.visit(
+      `/profit-estimator-per-gigawatt?i_gpus=b200_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}`,
+      { onBeforeLoad: suppressNudges },
+    );
+    chart().should('exist');
+    chipTrigger().should('contain.text', 'B200');
+    cy.contains('button', 'Jul 15, 2026').should('be.visible');
+    chart().find('rect.bar-tco').should('have.length', 2);
+    cy.get('[data-testid="profit-legend"] li').should('have.length', 1);
+
+    chipTrigger().click({ force: true });
+    cy.get('[role="option"]').contains('B200').click();
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
+    cy.get('[data-testid="profit-history-note"]').should('not.exist');
+    chart().find('rect.bar-tco').should('have.length', 4);
+    chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+    changelog().should('not.exist');
+  });
+
+  it('lists the Config Changelog for the chosen chips and pins a date onto the chart', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    waitForChart();
+    changelog().should('not.exist');
+    pickChip('GB300');
+    // One block per fixture date, expanded by default as on /inference, with
+    // the run's notes and its Git Commit / Workflow Run links.
+    changelog()
+      .contains('button', 'Config Changelog (3 dates with changes)')
+      .should('have.attr', 'aria-expanded', 'true');
+    changelog()
+      .should('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_HISTORY_DATE])
+      .and('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_DATE])
+      .and('contain.text', 'Git Commit')
+      .and('contain.text', 'Workflow Run')
+      .and('contain.text', 'Add all to chart');
+    // Nothing is on the chart yet, so every date offers "Add to chart".
+    changelog().find('span:contains("On chart")').should('have.length', 0);
+    // Pin the earlier date: the chart shows GB300 today plus GB300 on that
+    // date, the range picker stays empty, and the row flips to "Remove from
+    // chart".
+    changelog()
+      .contains('span', PROFIT_HISTORY_DATE)
+      .parent()
+      .contains('button', 'Add to chart')
+      .click();
+    cy.contains('button', 'Select date range').should('be.visible');
+    chart().find('rect.bar-tco').should('have.length', 2);
+    axisLabels().should('contain.text', PROFIT_HISTORY_DATE);
+    cy.get('[data-testid="profit-history-note"]').should('contain.text', PROFIT_HISTORY_DATE);
+    changelog()
+      .contains('span', PROFIT_HISTORY_DATE)
+      .parent()
+      .contains('button', 'Remove from chart')
+      .click();
+    changelog().find('button:contains("Remove from chart")').should('have.length', 0);
+    cy.get('[data-testid="profit-history-note"]').should('not.exist');
+    chart().find('rect.bar-tco').should('have.length', 4);
+  });
+
+  it('offers each same-day run as its own numbered bar and adds them all at once', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    waitForChart();
+    pickChip('GB300');
+    // The twice-run date renders one block per run, numbered in start order,
+    // each with its own notes.
+    changelog()
+      .should('contain.text', `${PROFIT_RUN_DATE} #1`)
+      .and('contain.text', `${PROFIT_RUN_DATE} #2`)
+      .and('contain.text', PROFIT_CHANGELOG_NOTES.run1)
+      .and('contain.text', PROFIT_CHANGELOG_NOTES.run2);
+    changelog()
+      .contains('span', `${PROFIT_RUN_DATE} #1`)
+      .parent()
+      .contains('button', 'Add to chart')
+      .click();
+    changelog()
+      .contains('span', `${PROFIT_RUN_DATE} #1`)
+      .parent()
+      .contains('button', 'Remove from chart')
+      .should('exist');
+    chart().find('rect.bar-tco').should('have.length', 2);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #1`);
+    // "Add all" pins run #2 and the earlier date as well; today's run date is
+    // already the main bar, so it adds nothing. Bars run oldest → newest and,
+    // at 80% / 85% / 92% / 100% of today's throughput, rise left to right.
+    changelog().contains('button', 'Add all to chart').click();
+    changelog().find('button:contains("Add to chart")').should('have.length', 0);
+    chart().find('rect.bar-tco').should('have.length', 4);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #2`);
+    revenueLabels().then(($labels) => {
+      const revenues = [...$labels].map((el) => parseCompactUsd(el.textContent ?? ''));
+      expect(revenues).to.have.length(4);
+      expect(revenues[0]).to.be.lessThan(revenues[1]!);
+      expect(revenues[1]).to.be.lessThan(revenues[2]!);
+      expect(revenues[2]).to.be.lessThan(revenues[3]!);
+    });
+  });
+
+  it('hydrates pinned runs from the URL and locks the range endpoints as "On chart"', () => {
+    cy.visit(
+      `/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`,
+      { onBeforeLoad: suppressNudges },
+    );
+    chart().should('exist');
+    // Range start + pinned run #2 + today.
+    chart().find('rect.bar-tco').should('have.length', 3);
+    axisLabels()
+      .should('contain.text', PROFIT_HISTORY_DATE)
+      .and('contain.text', `${PROFIT_RUN_DATE} #2`);
+    // Range endpoints cannot be removed individually; the pinned run can.
+    changelog().find('span:contains("On chart")').should('have.length', 2);
+    changelog().find('button:contains("On chart")').should('have.length', 0);
+    changelog().find('button:contains("Remove from chart")').should('have.length', 1);
+    changelog()
+      .contains('span', `${PROFIT_RUN_DATE} #1`)
+      .parent()
+      .contains('button', 'Add to chart')
+      .should('exist');
+  });
+
+  it('serves the panel on the Chinese mirror with translated labels', () => {
+    cy.visit('/zh/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    waitForChart();
+    historyPanel().should('contain.text', '对比历史趋势').and('contain.text', '芯片配置');
+    chipTrigger().should('contain.text', '选择芯片配置进行对比');
+    pickChip('GB300');
+    changelog().should('contain.text', '配置变更日志').and('contain.text', '添加到图表');
+  });
+});
+
 describe('Profit Estimator per GW — chart height follows the viewport', () => {
   beforeEach(stubOpenRouter);
 
@@ -568,7 +795,9 @@ describe('Profit Estimator — MiniMax M3', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    // Leaving a per-model path always rewrites to the target model's slug,
+    // as the GLM → Kimi switch above asserts.
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
