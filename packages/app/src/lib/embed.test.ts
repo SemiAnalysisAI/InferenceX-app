@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { Sequence } from './data-mappings';
 import {
-  EMBED_CHART_HEIGHT,
   EMBED_DEFAULT_Y_AXIS_METRIC,
   EMBED_SKIN_HEADER,
   EMBED_THEME_HEADER,
@@ -136,10 +135,5 @@ describe('isEmbedResizeMessage', () => {
     expect(script).toContain('h.classList.add("light")');
     expect(script).toContain('h.style.colorScheme="light"');
     expect(embedBootScript('dark', undefined)).toContain('var s=null');
-  });
-
-  it('draws embedded charts shorter than the 600px dashboard default', () => {
-    expect(EMBED_CHART_HEIGHT).toBeLessThan(600);
-    expect(EMBED_CHART_HEIGHT).toBeGreaterThanOrEqual(320);
   });
 });

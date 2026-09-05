@@ -851,7 +851,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
                     )}
                   </div>
-                  {residentSequenceLengths && (
+                  {residentSequenceLengths && !minimalChrome && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"
                       data-testid="resident-sequence-lengths"
