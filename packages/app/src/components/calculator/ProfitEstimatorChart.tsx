@@ -850,6 +850,9 @@ export default function ProfitEstimatorChart({
 
   const xAxisConfig = useMemo(
     () => ({
+      // Categorical bars: a vertical line through each bar centre adds nothing,
+      // so only the horizontal $ grid lines are drawn.
+      grid: false,
       tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
       customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         const fontPx = CHART_TYPE.axisLabelSub;

@@ -134,6 +134,12 @@ export interface AxisConfig {
   tickCount?: number;
   /** Explicit ticks or a domain-aware generator, useful for geometric and sparse log axes. */
   tickValues?: (number | Date)[] | ((scale: AnyScale) => (number | Date)[]);
+  /**
+   * Draw grid lines at this axis's ticks. Defaults to true. Set to false to
+   * drop the lines running perpendicular to the axis (e.g. `xAxis.grid: false`
+   * removes vertical grid lines while keeping the horizontal ones).
+   */
+  grid?: boolean;
   /** Post-render callback for custom axis label formatting (e.g., multi-line tspan). */
   customize?: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => void;
 }
