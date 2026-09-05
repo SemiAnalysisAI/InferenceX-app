@@ -6,6 +6,7 @@ import {
   isEmbedPathname,
   isEmbedResizeMessage,
   parseEmbedOptions,
+  parseEmbedTheme,
 } from './embed';
 
 describe('isEmbedPathname', () => {
@@ -48,6 +49,32 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions({ theme: 'light' }).theme).toBe('light');
     expect(parseEmbedOptions({ theme: 'Dark' }).theme).toBe('dark');
     expect(parseEmbedOptions({ theme: 'minecraft' }).theme).toBe('dark');
+    expect(parseEmbedOptions({ theme: 'light' }).skin).toBeUndefined();
+  });
+
+  it('splits a skinned theme into base theme + skin', () => {
+    expect(parseEmbedOptions({ theme: 'vllm-light' })).toMatchObject({
+      theme: 'light',
+      skin: 'vllm',
+    });
+    expect(parseEmbedOptions({ theme: 'VLLM-Dark' })).toMatchObject({
+      theme: 'dark',
+      skin: 'vllm',
+    });
+    // Unknown skin prefix: keep the base theme, drop the skin.
+    expect(parseEmbedOptions({ theme: 'sglang-light' })).toMatchObject({
+      theme: 'light',
+      skin: undefined,
+    });
+    // Standalone skin= is also accepted; theme= prefix wins when both are set.
+    expect(parseEmbedOptions({ skin: 'vllm' })).toMatchObject({ theme: 'dark', skin: 'vllm' });
+    expect(parseEmbedOptions({ skin: 'nope', theme: 'light' }).skin).toBeUndefined();
+  });
+
+  it('parseEmbedTheme handles empty and malformed input', () => {
+    expect(parseEmbedTheme(undefined)).toEqual({ theme: 'dark', skin: undefined });
+    expect(parseEmbedTheme('-')).toEqual({ theme: 'dark', skin: undefined });
+    expect(parseEmbedTheme('vllm-')).toEqual({ theme: 'dark', skin: 'vllm' });
   });
 
   it('resolves scenario path segments and raw sequence keys', () => {

@@ -46,6 +46,7 @@ export default function EmbedModelPage({
   return (
     <EmbedFrame
       theme={options.theme}
+      skin={options.skin}
       locale={locale}
       dashboardHref={dashboardHref}
       frameworkLabels={frameworkLabels}
@@ -55,6 +56,7 @@ export default function EmbedModelPage({
         sequence={sequence}
         yAxisMetric={options.yAxisMetric}
         lockedFrameworks={options.frameworks.length > 0 ? options.frameworks : undefined}
+        minimalChrome
       />
     </EmbedFrame>
   );

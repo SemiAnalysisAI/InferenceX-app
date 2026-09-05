@@ -209,6 +209,7 @@ export function InferenceProvider({
   initialYAxisMetric,
   autoSelectAllGpus = false,
   lockedFrameworks,
+  minimalChrome = false,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -254,6 +255,13 @@ export function InferenceProvider({
    * `undefined` / empty = no lock.
    */
   lockedFrameworks?: readonly string[];
+  /**
+   * Strip the dashboard down to the chart and a plain legend: no x-axis mode
+   * selector, config changelog, chart toolbar, quick-filter chips, or legend
+   * switches/actions. Used by `/embed/model/[slug]`, where the host page owns
+   * the surrounding UI and a bare chart is what gets pasted.
+   */
+  minimalChrome?: boolean;
 }) {
   const locale = useLocale();
   const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
@@ -1747,6 +1755,7 @@ export function InferenceProvider({
       presetGuardRef,
       compareGpuPair: compareGpuPair ?? null,
       lockedFrameworks: frameworkLock,
+      minimalChrome,
     }),
     [
       activeHwTypes,
@@ -1766,6 +1775,7 @@ export function InferenceProvider({
       activePresetId,
       compareGpuPair,
       frameworkLock,
+      minimalChrome,
     ],
   );
 

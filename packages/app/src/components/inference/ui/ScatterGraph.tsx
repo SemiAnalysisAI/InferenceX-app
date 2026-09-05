@@ -454,6 +454,7 @@ const ScatterGraph = React.memo(
       selectedSequence,
       quickFilters,
       lockedFrameworks,
+      minimalChrome,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
@@ -3748,6 +3749,7 @@ const ScatterGraph = React.memo(
                 },
               ]}
               hideAtomFootnote
+              readOnly={minimalChrome}
               enableTooltips={true}
             />
           }

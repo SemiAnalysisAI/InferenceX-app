@@ -8,6 +8,34 @@ export { EMBED_PATH_PREFIX, isEmbedPathname } from '@/lib/embed-route';
 
 export type EmbedTheme = 'light' | 'dark';
 
+/**
+ * Host-site skins. A skin re-tokens the embed (colors, radius, fonts) so the
+ * chart sits inside the host's page instead of looking like a screenshot of
+ * InferenceX. Each skin has a light and a dark variant selected by the theme;
+ * the CSS lives in `globals.css` under `html[data-inferencex-skin='<skin>']`.
+ */
+export const EMBED_SKINS = ['vllm'] as const;
+export type EmbedSkin = (typeof EMBED_SKINS)[number];
+
+const SKIN_KEYS = new Set<string>(EMBED_SKINS);
+
+/**
+ * Split a `theme=` value into base theme + optional skin. Accepts `light`,
+ * `dark`, `<skin>-light`, `<skin>-dark`. Anything else is the dark default.
+ */
+export function parseEmbedTheme(raw: string | undefined): {
+  theme: EmbedTheme;
+  skin: EmbedSkin | undefined;
+} {
+  const value = raw?.trim().toLowerCase() ?? '';
+  const dash = value.lastIndexOf('-');
+  const base = dash === -1 ? value : value.slice(dash + 1);
+  const prefix = dash === -1 ? '' : value.slice(0, dash);
+  const theme: EmbedTheme = base === 'light' ? 'light' : 'dark';
+  const skin = SKIN_KEYS.has(prefix) ? (prefix as EmbedSkin) : undefined;
+  return { theme, skin };
+}
+
 export interface EmbedOptions {
   /**
    * Serving-framework families the chart is locked to (quick-filter keys:
@@ -17,6 +45,8 @@ export interface EmbedOptions {
    */
   frameworks: string[];
   theme: EmbedTheme;
+  /** Host-site skin; `undefined` renders InferenceX's own look. */
+  skin: EmbedSkin | undefined;
   /** Workload override; `undefined` keeps the model's featured scenario. */
   sequence: Sequence | undefined;
   /** Y-axis metric override; `undefined` keeps the dashboard default. */
@@ -37,7 +67,9 @@ function first(value: string | string[] | undefined): string | undefined {
  * should degrade to the unfiltered chart, not a blank frame.
  *
  * - `framework=vllm` or `framework=vllm,sglang` (also accepts `fw=`)
- * - `theme=light|dark` (default dark, matching the site)
+ * - `theme=light|dark|vllm-light|vllm-dark` (default dark, matching the site;
+ *   the `<skin>-` prefix re-tokens the embed to match the host site). `skin=`
+ *   is also accepted on its own.
  * - `scenario=agentic|8k-1k|1k-1k|1k-8k` (also accepts raw `i_seq=` keys)
  * - `metric=<y-axis metric key>` (e.g. `y_tokensPerDollarH`)
  */
@@ -54,8 +86,11 @@ export function parseEmbedOptions(
     ),
   ];
 
-  const rawTheme = first(searchParams.theme)?.toLowerCase();
-  const theme: EmbedTheme = rawTheme === 'light' ? 'light' : 'dark';
+  const parsedTheme = parseEmbedTheme(first(searchParams.theme));
+  const theme = parsedTheme.theme;
+  const rawSkin = first(searchParams.skin)?.trim().toLowerCase();
+  const skin =
+    parsedTheme.skin ?? (rawSkin && SKIN_KEYS.has(rawSkin) ? (rawSkin as EmbedSkin) : undefined);
 
   const rawScenario = first(searchParams.scenario) ?? first(searchParams.i_seq);
   const sequence = rawScenario
@@ -65,7 +100,7 @@ export function parseEmbedOptions(
   const rawMetric = first(searchParams.metric) ?? first(searchParams.i_metric);
   const yAxisMetric = rawMetric && Y_AXIS_METRIC_KEYS.has(rawMetric) ? rawMetric : undefined;
 
-  return { frameworks, theme, sequence, yAxisMetric };
+  return { frameworks, theme, skin, sequence, yAxisMetric };
 }
 
 /**

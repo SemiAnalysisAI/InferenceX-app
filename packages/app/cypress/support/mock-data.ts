@@ -292,6 +292,7 @@ export function createMockInferenceContextValues(
     presetGuardRef: { current: false } as React.RefObject<boolean>,
     compareGpuPair: null,
     lockedFrameworks: null,
+    minimalChrome: false,
     ...overrides,
   };
 }

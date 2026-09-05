@@ -204,6 +204,7 @@ const GPUGraph = React.memo(
       quickFilters,
       activeDates,
       lockedFrameworks,
+      minimalChrome,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
@@ -1586,6 +1587,7 @@ const GPUGraph = React.memo(
               },
             ]}
             hideAtomFootnote
+            readOnly={minimalChrome}
             keyIndicators={
               <>
                 {fixedLogPointId === null ? null : (

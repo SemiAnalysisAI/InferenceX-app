@@ -623,6 +623,8 @@ export interface InferenceFiltersContextType {
    * set, `quickFilters.frameworks` mirrors it and cannot be edited.
    */
   lockedFrameworks: readonly string[] | null;
+  /** Chart-only rendering for embeds; see `InferenceProvider.minimalChrome`. */
+  minimalChrome: boolean;
 }
 
 /** Axis choices and visual presentation state. */

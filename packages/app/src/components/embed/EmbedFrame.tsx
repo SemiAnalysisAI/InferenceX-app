@@ -3,7 +3,12 @@
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, type ReactNode } from 'react';
 
-import { EMBED_RESIZE_MESSAGE_TYPE, type EmbedResizeMessage, type EmbedTheme } from '@/lib/embed';
+import {
+  EMBED_RESIZE_MESSAGE_TYPE,
+  type EmbedResizeMessage,
+  type EmbedSkin,
+  type EmbedTheme,
+} from '@/lib/embed';
 import type { Locale } from '@/lib/i18n';
 
 const STRINGS = {
@@ -25,19 +30,42 @@ const STRINGS = {
  * - Forces the theme the host asked for (`?theme=`) instead of the site's
  *   stored preference. The iframe has its own storage partition, so this does
  *   not leak into the visitor's InferenceX preference.
- * - Marks `<html data-inferencex-embed>` so decorative backgrounds stay out.
+ * - Marks `<html data-inferencex-embed>` so decorative backgrounds stay out,
+ *   and `<html data-inferencex-skin>` when the host asked for a skin
+ *   (`?theme=vllm-light`). Both, plus the theme class, are also written by an
+ *   inline script that runs before first paint so the frame never flashes the
+ *   default look while React hydrates.
+ * - Hoists the skin's font variables (loaded by the embed layout on a wrapper
+ *   element) onto `<html>` so portalled UI (tooltips, dialogs, selects)
+ *   picks them up too.
  * - Posts its rendered height to the parent window whenever it changes so the
  *   host can size the iframe without an inner scrollbar.
  * - Renders a compact attribution row with a link back to the dashboard.
  */
+/** CSS custom properties the skin fonts are published under (see embed layout). */
+const SKIN_FONT_VARS = ['--font-embed-sans', '--font-embed-mono'] as const;
+
+function bootScript(theme: EmbedTheme, skin: EmbedSkin | undefined): string {
+  // Values are validated enums, so string interpolation into JS is safe here.
+  const skinJs = skin ? JSON.stringify(skin) : 'null';
+  return (
+    `(function(){var h=document.documentElement;h.dataset.inferencexEmbed='';` +
+    `var s=${skinJs};if(s){h.dataset.inferencexSkin=s;}` +
+    `h.classList.remove('light','dark','minecraft');h.classList.add(${JSON.stringify(theme)});` +
+    `h.style.colorScheme=${JSON.stringify(theme)};})();`
+  );
+}
+
 export default function EmbedFrame({
   theme,
+  skin,
   locale,
   dashboardHref,
   frameworkLabels,
   children,
 }: {
   theme: EmbedTheme;
+  skin: EmbedSkin | undefined;
   locale: Locale;
   dashboardHref: string;
   /** Human labels for the locked framework families, if any. */
@@ -55,10 +83,32 @@ export default function EmbedFrame({
   useEffect(() => {
     const html = document.documentElement;
     html.dataset.inferencexEmbed = '';
+    if (skin) html.dataset.inferencexSkin = skin;
+    else delete html.dataset.inferencexSkin;
     return () => {
       delete html.dataset.inferencexEmbed;
+      delete html.dataset.inferencexSkin;
     };
-  }, []);
+  }, [skin]);
+
+  // The embed layout loads the skin fonts with next/font on a wrapper element,
+  // which only defines the variables below that wrapper. Copy them to <html>
+  // so `html[data-inferencex-skin] body { --font-dm-sans: var(--font-embed-sans) }`
+  // resolves everywhere, including Radix portals mounted on <body>.
+  useEffect(() => {
+    if (!skin) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const html = document.documentElement;
+    const computed = getComputedStyle(root);
+    for (const name of SKIN_FONT_VARS) {
+      const value = computed.getPropertyValue(name).trim();
+      if (value) html.style.setProperty(name, value);
+    }
+    return () => {
+      for (const name of SKIN_FONT_VARS) html.style.removeProperty(name);
+    };
+  }, [skin]);
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -82,6 +132,7 @@ export default function EmbedFrame({
 
   return (
     <div ref={rootRef} data-testid="embed-frame" className="flex flex-col gap-2 p-2 sm:p-3">
+      <script dangerouslySetInnerHTML={{ __html: bootScript(theme, skin) }} />
       {children}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
         <span data-testid="embed-scope">
