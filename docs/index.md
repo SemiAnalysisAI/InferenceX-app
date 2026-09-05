@@ -4,6 +4,8 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
+- [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, reproduce benchmark and PowerX requests, and inspect source-qualified saved exports
+
 - [Architecture](./architecture.md) — Why client-first, route navigation, URL state, provider nesting, server-side caching (unstable_cache + blob), in-memory client cache, color system, analytics enforcement
 - [D3 Charts](./d3-charts.md) — Why 4 effects, in-place mutation, refs for zoom, rAF throttling, HTML tooltips, Pareto directions, gradient labels
 - [Data Pipeline](./data-pipeline.md) — DB schema reasoning, ETL design, transform pipeline, spline method choice, normalizer resolution order (model/GPU/framework)

@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 import { JsonLd } from '@/components/json-ld';
+import { ApiAgentExamplesLink } from './api-agent-examples-link';
 import { getApiDocumentation, type ApiDocumentationLocale } from '@/lib/api-documentation';
 import { ZH_LANG_TAG } from '@/lib/i18n';
 import { AUTHOR_NAME, AUTHOR_URL, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -20,6 +21,37 @@ const UI_COPY = {
     openApiAction: 'Open OpenAPI JSON',
     quickstart: 'Quickstart',
     quickstartDescription: 'Move from contract discovery to a real response in a few steps.',
+    agentSkill: 'Use the API with your agent',
+    agentSkillDescription:
+      'The inferencex-api skill helps your agent navigate the public API: benchmarks, provenance, datasets, CollectiveX, and diagnostics. Validated single-turn PowerX export is the first worked example.',
+    agentVersion: 'Skill version · 0.1.0',
+    agentPrerequisites:
+      'Requires Node 24 or later with npm and Codex or Claude Code. Installation and API queries require internet access.',
+    agentInstall: 'Install in your project',
+    agentInstallDescription:
+      'Run the command for your agent from your project directory, then start an agent session in that project.',
+    agentUpgrade:
+      'To upgrade, replace the version in the installation command with a new published version and rerun it with --force. Existing skills are otherwise skipped. Save local edits first: --force overwrites matching files and retains obsolete files.',
+    agentExamples: 'Usage examples and complete exports',
+    agentAccess:
+      'Queries use the public API without database credentials. The separate MCP server has its own setup; this skill does not require or reconfigure it.',
+    agentPromptTitle: 'First example: measured PowerX',
+    agentPrompt: `Use inferencex-api to export latest available measured PowerX data for DeepSeek-V4-Pro:
+- Select single-turn requests with exactly 8192 input and 1024 output tokens; require strictV2.
+- Create powerx.csv and powerx.json with the installed exporter, outside the InferenceX repository.
+- Keep measured per-GPU watts and whole-deployment GPU energy distinct from provisioned-power estimates.
+- Preserve raw model keys, source IDs/URLs, measurement dates, and separate snapshot metadata.
+- Record the request URL, retrieval time, package version, local filters, and returned/selected counts.
+- Explain why rows were excluded and list missing requested metrics.
+- Keep missing metrics unavailable and genuine zeros unchanged. Explain empty results without inferring that all benchmarks are absent.`,
+    agentCookbook: 'PowerX cookbook and direct export',
+    agentCookbookDescription:
+      'Open the cookbook at the installed path below for validity, units, missing-data handling, and provenance. The bundled Node 24 exporter also runs directly from your project, without an InferenceX checkout or database credentials.',
+    agentExport: 'Run the installed exporter (Codex)',
+    agentExportDescription:
+      'For Claude Code, use the .claude/skills/inferencex-api path. For JSON, use --format json --output powerx.json. Omit --date for latest available observations, or add --date YYYY-MM-DD for an as-of cutoff. Keep the report log: it records request and coverage metadata even for an empty CSV.',
+    agentMeasurements:
+      'avg_power_w is measured mean watts per GPU. Schema-v2 joules metrics without a role prefix describe whole-deployment GPU energy; prefill/decode-prefixed energy is role-local. These are existing observations, not new benchmark runs or facility-energy measurements.',
     conventions: 'Conventions',
     conventionsDescription: 'Shared request, error, and cache behavior for the supported surface.',
     schemas: 'BenchmarkRow and metrics',
@@ -64,6 +96,36 @@ const UI_COPY = {
     openApiAction: '打开 OpenAPI JSON',
     quickstart: '快速入门',
     quickstartDescription: '只需几步，即可从查看契约到获得真实响应。',
+    agentSkill: '通过智能体使用 API',
+    agentSkillDescription:
+      'inferencex-api 技能帮助智能体查找和使用公开 API，涵盖基准测试、溯源、数据集、CollectiveX 和诊断接口。已验证的单轮请求 PowerX 导出是首个完整示例。',
+    agentVersion: '技能版本 · 0.1.0',
+    agentPrerequisites:
+      '需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。安装和 API 查询均需联网。',
+    agentInstall: '安装到项目',
+    agentInstallDescription: '在项目目录中执行对应智能体的安装命令，然后在该项目中启动智能体会话。',
+    agentUpgrade:
+      '升级时，将安装命令中的版本号改为新的已发布版本，并加上 --force 重新执行。默认会跳过已有技能。请先保存本地修改：--force 会覆盖同名文件，但保留不再随包提供的旧文件。',
+    agentExamples: '使用示例与完整导出（英文）',
+    agentAccess:
+      '查询通过公开 API 完成，无需数据库凭据。独立的 MCP server 有自己的配置流程；本技能不依赖它，也不会改动它的配置。',
+    agentPromptTitle: '首个示例：实测 PowerX 数据',
+    agentPrompt: `使用 inferencex-api 导出 DeepSeek-V4-Pro 最新可用的实测 PowerX 数据：
+- 仅选取输入恰好为 8192、输出恰好为 1024 个 token 的单轮请求，并要求 strictV2。
+- 在 InferenceX 仓库之外，通过已安装的导出器生成 powerx.csv 和 powerx.json。
+- 区分实测单 GPU 功率、整个部署的 GPU 能耗与预留功率估算。
+- 保留原始模型键、来源标识和 URL、测量日期，以及独立的快照元数据。
+- 记录请求 URL、提取时间、包版本、本地筛选条件，以及返回和选中的数据条数。
+- 说明数据行被排除的原因，并列出所请求指标的缺失项。
+- 缺失指标保持不可用，真实零值保持为零。说明空结果的含义，不据此推断所有基准测试数据都不存在。`,
+    agentCookbook: 'PowerX 指南与直接导出',
+    agentCookbookDescription:
+      '打开下方安装路径中的指南，查看验证规则、单位、缺失数据处理和溯源说明。随包提供的 Node 24 导出器也可在项目中直接运行，无需检出 InferenceX 仓库或提供数据库凭据。',
+    agentExport: '运行已安装的导出器（Codex）',
+    agentExportDescription:
+      'Claude Code 使用 .claude/skills/inferencex-api 路径。导出 JSON 时改用 --format json --output powerx.json。省略 --date 表示查询最新可用观测值，也可添加 --date YYYY-MM-DD 指定截止日期。请保留报告日志：即使 CSV 为空，其中也会记录请求和数据覆盖范围的元数据。',
+    agentMeasurements:
+      'avg_power_w 是实测单 GPU 平均功率，单位为 W。schema v2 中不带角色前缀的 joules 指标表示整个部署的 GPU 能耗；带 prefill/decode 前缀的能耗仅对应相应角色。这些数据是已有观测值，不是新运行的基准测试，也不是设施总能耗测量值。',
     conventions: '约定',
     conventionsDescription: '适用于受支持接口的通用请求、错误与缓存行为。',
     schemas: 'BenchmarkRow 与指标',
@@ -246,6 +308,95 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                 </li>
               ))}
             </ol>
+          </section>
+        </Card>
+
+        <Card className="p-0 md:p-0">
+          <section
+            data-testid="api-agent-skill"
+            aria-labelledby="api-agent-skill-heading"
+            className="min-w-0 p-5 sm:p-6 lg:p-8"
+          >
+            <div className="max-w-3xl">
+              <Badge variant="outline">{copy.agentVersion}</Badge>
+              <h2
+                id="api-agent-skill-heading"
+                className="mt-3 text-2xl font-semibold tracking-tight"
+              >
+                {copy.agentSkill}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {copy.agentSkillDescription}
+              </p>
+              <p className="mt-3 break-all font-mono text-xs">@semianalysisai/inferencex-skills</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {copy.agentPrerequisites}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{copy.agentAccess}</p>
+            </div>
+
+            <h3 className="mt-6 font-semibold">{copy.agentInstall}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {copy.agentInstallDescription}
+            </p>
+            <div className="mt-3 grid min-w-0 gap-4 lg:grid-cols-2">
+              {(['codex', 'claude'] as const).map((target) => (
+                <div key={target} data-testid={`api-agent-install-${target}`} className="min-w-0">
+                  <CopyableCodeBlock
+                    locale={locale}
+                    label={target === 'codex' ? 'Codex' : 'Claude Code'}
+                  >
+                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target ${target}`}
+                  </CopyableCodeBlock>
+                </div>
+              ))}
+            </div>
+
+            <p
+              data-testid="api-agent-upgrade"
+              className="mt-3 text-sm leading-6 text-muted-foreground"
+            >
+              {copy.agentUpgrade}
+            </p>
+            <ApiAgentExamplesLink label={copy.agentExamples} locale={locale} />
+
+            <div data-testid="api-agent-prompt" className="mt-6 min-w-0">
+              <CopyableCodeBlock locale={locale} label={copy.agentPromptTitle}>
+                {copy.agentPrompt}
+              </CopyableCodeBlock>
+            </div>
+
+            <details id="api-powerx-cookbook" className="mt-6 border-t border-border/50 pt-4">
+              <summary className="cursor-pointer font-semibold">{copy.agentCookbook}</summary>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {copy.agentCookbookDescription}
+              </p>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div>
+                  <dt className="font-medium">Codex</dt>
+                  <dd className="break-all font-mono text-xs">
+                    .agents/skills/inferencex-api/references/powerx.md
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-medium">Claude Code</dt>
+                  <dd className="break-all font-mono text-xs">
+                    .claude/skills/inferencex-api/references/powerx.md
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4 min-w-0">
+                <CopyableCodeBlock locale={locale} label={copy.agentExport}>
+                  {`node .agents/skills/inferencex-api/scripts/export-powerx.mjs \\\n  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \\\n  --format csv --output powerx.csv 2> powerx-report.log`}
+                </CopyableCodeBlock>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {copy.agentExportDescription}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {copy.agentMeasurements}
+              </p>
+            </details>
           </section>
         </Card>
 

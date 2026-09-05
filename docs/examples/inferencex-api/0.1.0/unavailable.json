@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "package_version": "0.1.0",
+    "query_url": "https://inferencex.semianalysis.com/api/v1/benchmarks?model=DeepSeek-V4-Pro&date=2026-09-04&powerValid=strictV2",
+    "retrieved_at": "2026-09-05T01:02:34.621Z",
+    "requested_model": "DeepSeek-V4-Pro",
+    "requested_date": "2026-09-04",
+    "date_selection": "as-of",
+    "benchmark_type": "single_turn",
+    "isl": 7,
+    "osl": 13,
+    "raw_model": "dsv4",
+    "returned_rows": 96,
+    "selected_rows": 0,
+    "returned_models": ["dsv4"],
+    "selected_models": [],
+    "excluded_rows": {
+      "outside_requested_scope": 96,
+      "not_strict_v2": 0
+    },
+    "metric_coverage": {
+      "avg_power_w": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "prefill_avg_power_w": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "decode_avg_power_w": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "joules_per_successful_query": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "joules_per_input_token": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "joules_per_output_token": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "joules_per_total_token": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "prefill_joules_per_input_token": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "decode_joules_per_output_token": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "avg_temp_c": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "peak_temp_c": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "avg_util_pct": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      },
+      "avg_mem_used_mb": {
+        "available_rows": 0,
+        "unavailable_rows": 0
+      }
+    },
+    "non_finite_values": 0
+  },
+  "rows": []
+}
