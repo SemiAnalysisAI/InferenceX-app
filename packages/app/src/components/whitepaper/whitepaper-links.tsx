@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Download, FileText } from 'lucide-react';
+import { ArrowRight, Download } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -18,7 +18,7 @@ interface WhitepaperPdfButtonProps {
   slug: string;
   label: string;
   /** Where on the page the button sits, so hero vs. closing clicks separate. */
-  placement: 'hero' | 'closing' | 'card';
+  placement: 'hero' | 'closing' | 'card' | 'sidebar';
   size?: 'default' | 'lg' | 'sm';
   variant?: 'default' | 'outline';
   className?: string;
@@ -117,33 +117,39 @@ interface WhitepaperCardProps {
   slug: string;
   href: string;
   title: string;
+  /** Cover thumbnail rendered in the left column. */
+  thumbnail?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
 /** Index card. The whole card links to the landing page; the PDF button inside stops propagation. */
-export function WhitepaperCard({ slug, href, title, children, className }: WhitepaperCardProps) {
+export function WhitepaperCard({
+  slug,
+  href,
+  title,
+  thumbnail,
+  children,
+  className,
+}: WhitepaperCardProps) {
   return (
     <article
       data-testid="whitepaper-card"
       className={cn(
-        'group relative overflow-hidden rounded-xl border border-border bg-background/20 p-4 backdrop-blur-[2px] transition-[border-color,background-color,box-shadow] duration-200 hover:border-brand/50 hover:bg-brand/3 hover:shadow-lg hover:shadow-brand/5 md:p-8',
+        'group relative flex min-w-0 flex-col gap-5 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 sm:flex-row md:gap-7 md:p-7',
         className,
       )}
     >
-      <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
-      <div className="flex items-start gap-4">
-        <FileText aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <Link
-            href={href}
-            className="focus-visible:outline-none before:absolute before:inset-0 before:content-['']"
-            onClick={() => track('whitepaper_card_clicked', { slug, title })}
-          >
-            <span className="sr-only">{title}</span>
-          </Link>
-          {children}
-        </div>
+      {thumbnail}
+      <div className="min-w-0 flex-1">
+        <Link
+          href={href}
+          className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-2xl before:content-['']"
+          onClick={() => track('whitepaper_card_clicked', { slug, title })}
+        >
+          <span className="sr-only">{title}</span>
+        </Link>
+        {children}
       </div>
     </article>
   );

@@ -34,9 +34,17 @@ describe('whitepaper registry', () => {
       expect(paper.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);
       expect(paper.pdfPath.startsWith(`/whitepaper/${paper.slug}/`)).toBe(true);
       expect(paper.pdfPath.endsWith('.pdf')).toBe(true);
-      expect(paper.heroImagePath).toBe(
-        `/whitepaper/${paper.slug}/figure-1-revenue-per-gigawatt.png`,
-      );
+      expect(paper.heroImagePath).toBe(`/whitepaper/${paper.slug}/cover.webp`);
+      expect(paper.coverImagePath).toBe(paper.heroImagePath);
+      expect(paper.chipImagePath.startsWith(`/whitepaper/${paper.slug}/`)).toBe(true);
+      expect(paper.chipImageWidth).toBeGreaterThan(paper.chipImageHeight);
+      expect(paper.figures.length).toBeGreaterThan(0);
+      for (const figure of paper.figures) {
+        expect(figure.srcLight.startsWith(`/whitepaper/${paper.slug}/`)).toBe(true);
+        expect(figure.srcDark.startsWith(`/whitepaper/${paper.slug}/`)).toBe(true);
+        expect(figure.srcLight).not.toBe(figure.srcDark);
+        expect(figure.width).toBeGreaterThan(figure.height);
+      }
       expect(paper.publishedDate).toMatch(ISO_DATE);
       expect(paper.dataDate).toMatch(ISO_DATE);
       expect(paper.pageCount).toBeGreaterThan(0);
@@ -50,18 +58,42 @@ describe('whitepaper registry', () => {
       expect(en.authors).toBe(WHITEPAPER_AUTHORS);
       expect(zh.authors).toBe(WHITEPAPER_AUTHORS_ZH);
       expect(en.keyFindings.length).toBe(zh.keyFindings.length);
-      expect(en.kpis.length).toBe(4);
-      expect(zh.kpis.length).toBe(4);
+      expect(en.kpis.length).toBe(3);
+      expect(zh.kpis.length).toBe(3);
+      expect(en.figures.length).toBe(paper.figures.length);
+      expect(zh.figures.length).toBe(paper.figures.length);
+      expect(en.comparison.items.length).toBe(zh.comparison.items.length);
       expect(en.methodSteps.length).toBe(zh.methodSteps.length);
       expect(en.assumptions.length).toBe(zh.assumptions.length);
       expect(en.sources.length).toBe(zh.sources.length);
       // Headline numbers are locale-independent; the Chinese cards keep them verbatim.
       expect(zh.kpis.map((kpi) => kpi.value)).toEqual(en.kpis.map((kpi) => kpi.value));
+      expect(zh.comparison.items.map((item) => item.value)).toEqual(
+        en.comparison.items.map((item) => item.value),
+      );
       // Chinese copy is real Chinese, English copy carries no Han characters.
-      for (const text of [zh.title, zh.subtitle, zh.abstract, ...zh.keyFindings]) {
+      for (const text of [
+        zh.title,
+        zh.subtitle,
+        zh.abstract,
+        zh.figureTitle,
+        zh.comparison.lead,
+        ...zh.keyFindings,
+        ...zh.kpis.map((kpi) => kpi.label),
+        ...zh.figures.map((figure) => figure.caption),
+      ]) {
         expect(text).toMatch(HAN);
       }
-      for (const text of [en.title, en.subtitle, en.abstract, ...en.keyFindings]) {
+      for (const text of [
+        en.title,
+        en.subtitle,
+        en.abstract,
+        en.figureTitle,
+        en.comparison.lead,
+        ...en.keyFindings,
+        ...en.kpis.map((kpi) => kpi.label),
+        ...en.figures.map((figure) => figure.caption),
+      ]) {
         expect(text).not.toMatch(HAN);
       }
       // External sources keep the same destinations; only internal ones may move to /zh.
@@ -85,12 +117,16 @@ describe('whitepaper registry', () => {
     expect(paper?.en.title).toBe(
       'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year',
     );
-    expect(paper?.en.kpis.map((kpi) => kpi.value)).toEqual([
-      '$32.6B',
-      '6,115 tok/s',
-      '$16.5B',
+    expect(paper?.en.kpis.map((kpi) => kpi.value)).toEqual(['$32.6B', '$16.5B', '50.7%']);
+    expect(paper?.en.comparison.items.map((item) => item.value)).toEqual([
       '$10.3B',
+      '31.5%',
+      '$2.45',
     ]);
+    expect(paper?.figures.map((figure) => figure.tcoBadge)).toEqual(['MI355X: 1.5', 'MI355X: 3']);
+    expect(paper?.chipImageWidth).toBe(1783);
+    expect(paper?.chipImageHeight).toBe(1073);
+    expect(paper?.chart.tcoSourceHref).toBe('https://semianalysis.com/ai-cloud-tco-model/');
     expect(paper?.en.abstract).toContain('$32.6 billion');
     expect(paper?.zh.abstract).toContain('326 亿美元');
     expect(paper?.en.assumptions.find((row) => row.item === 'Data date')?.value).toBe('2026-09-04');
