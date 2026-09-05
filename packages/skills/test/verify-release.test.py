@@ -897,6 +897,19 @@ class AgentXVerifierTests(unittest.TestCase):
             self.assertIn(f'install --target {prepared["target"]}', prompt_text)
             self.assertIn(str(project / 'candidate.tgz'), prompt_text)
 
+    def test_agents_rejects_archive_filename_collision_before_creating_projects(self):
+        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'prompt.txt',
+                  'sha256': '0' * 64, 'integrity': 'sha512-invalid'}
+        check.save(self.root / 'unsafe-release.json', record)
+        command = ['verify-release.py', 'agents', str(self.root / 'unsafe-release.json'), '--model', 'Example',
+                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
+                   '--agentx-no-trace-id', '8', '--evidence', str(self.root / 'unsafe-verification')]
+        with patch.object(sys, 'argv', command), patch.object(check.tempfile, 'mkdtemp') as projects:
+            with self.assertRaisesRegex(ValueError, r'safe \.tgz basename'):
+                check.main()
+        projects.assert_not_called()
+        self.assertFalse((self.root / 'unsafe-verification').exists())
+
     def test_check_agent_runs_both_workload_and_point_oracles(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:

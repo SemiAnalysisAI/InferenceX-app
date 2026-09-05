@@ -1127,7 +1127,9 @@ def main():
     if args.date:
         require(datetime.strptime(args.date, '%Y-%m-%d').strftime('%Y-%m-%d') == args.date, 'Use a YYYY-MM-DD cutoff')
     record = json.loads(args.manifest.read_text())
-    require(Path(record['filename']).name == record['filename'], 'Archive must be beside its manifest')
+    require(type(record.get('filename')) is str and
+            re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*\.tgz', record['filename']) is not None,
+            'Archive filename must be a safe .tgz basename')
     archive = args.manifest.resolve().parent / record['filename']
     body = archive.read_bytes()
     require(record['name'] == PACKAGE and hashlib.sha256(body).hexdigest() == record['sha256'], 'Candidate identity mismatch')
