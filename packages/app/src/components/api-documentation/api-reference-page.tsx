@@ -32,7 +32,7 @@ const UI_COPY = {
       'Run the command for your agent from your project directory, then start an agent session in that project.',
     agentUpgrade:
       'To upgrade, replace the version in the installation command with a new published version and rerun it with --force. Existing skills are otherwise skipped. Save local edits first: --force overwrites matching files and retains obsolete files.',
-    agentExamples: 'Usage examples and complete exports',
+    agentExamples: 'Usage examples',
     agentAccess:
       'Queries use the public API without database credentials. The separate MCP server has its own setup; this skill does not require or reconfigure it.',
     agentPromptTitle: 'First example: measured PowerX',
@@ -106,7 +106,7 @@ const UI_COPY = {
     agentInstallDescription: '在项目目录中执行对应智能体的安装命令，然后在该项目中启动智能体会话。',
     agentUpgrade:
       '升级时，将安装命令中的版本号改为新的已发布版本，并加上 --force 重新执行。默认会跳过已有技能。请先保存本地修改：--force 会覆盖同名文件，但保留不再随包提供的旧文件。',
-    agentExamples: '使用示例与完整导出（英文）',
+    agentExamples: '使用示例（英文）',
     agentAccess:
       '查询通过公开 API 完成，无需数据库凭据。独立的 MCP server 有自己的配置流程；本技能不依赖它，也不会改动它的配置。',
     agentPromptTitle: '首个示例：实测 PowerX 数据',
