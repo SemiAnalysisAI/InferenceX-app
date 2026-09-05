@@ -7,7 +7,7 @@ describe('API documentation', () => {
     {
       path: '/api',
       heading: 'Use the API with your agent',
-      candidate: 'Unpublished candidate',
+      version: 'Skill version',
       scope: 'benchmarks, provenance, datasets, CollectiveX, and diagnostics',
       example: 'First example: measured PowerX',
       missing: 'Keep missing metrics unavailable and genuine zeros unchanged',
@@ -19,7 +19,7 @@ describe('API documentation', () => {
     {
       path: '/zh/api',
       heading: '通过智能体使用 API',
-      candidate: '尚未发布的候选版本',
+      version: '技能版本',
       scope: '基准测试、溯源、数据集、CollectiveX 和诊断接口',
       example: '首个示例：实测 PowerX 数据',
       missing: '缺失指标保持不可用，真实零值保持为零',
@@ -29,7 +29,7 @@ describe('API documentation', () => {
       copied: '已复制',
     },
   ]) {
-    it(`guides ${locale.path} visitors from the candidate install to a traceable export`, () => {
+    it(`guides ${locale.path} visitors from a pinned public install to a traceable export`, () => {
       cy.visit(locale.path, {
         onBeforeLoad(win) {
           cy.stub(win.navigator.clipboard, 'writeText').as('copyAgentExample').resolves();
@@ -47,20 +47,20 @@ describe('API documentation', () => {
       cy.readFile<{ name: string; version: string }>('../skills/package.json').then((manifest) => {
         cy.get('[data-testid="api-agent-skill"]')
           .should('contain.text', locale.heading)
-          .and('contain.text', `${locale.candidate} · ${manifest.version}`)
+          .and('contain.text', `${locale.version} · ${manifest.version}`)
           .and('contain.text', manifest.name)
           .and('contain.text', locale.scope)
           .and('contain.text', 'Node 24');
 
         for (const target of ['codex', 'claude']) {
-          const command = `INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-${manifest.version}.tgz'\nnpm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target ${target}`;
+          const command = `npm exec --yes --package ${manifest.name}@${manifest.version} -- inferencex-skills install --target ${target}`;
           cy.get(`[data-testid="api-agent-install-${target}"]`).within(() => {
             cy.get('code').should('have.text', command);
             cy.contains('button', locale.copy).click();
             cy.contains('button', locale.copied).should('be.visible');
           });
           cy.get('@copyAgentExample').should('have.been.calledWithExactly', command);
-          cy.readFile('../skills/README.md').should('contain', command.split('\n')[1]);
+          cy.readFile('../skills/README.md').should('contain', command);
         }
       });
 
@@ -116,6 +116,22 @@ describe('API documentation', () => {
         cy.contains('button', '复制').should('be.visible');
         cy.get('pre').should('have.attr', 'tabindex', '0').and('contain.text', 'curl');
       });
+    for (const target of ['codex', 'claude']) {
+      cy.get(`[data-testid="api-agent-install-${target}"]`).within(() => {
+        cy.contains('button', '复制').should('be.visible');
+        cy.get('pre')
+          .should('have.attr', 'tabindex', '0')
+          .and('have.css', 'overflow-x', 'auto')
+          .and('contain.text', 'npm exec --yes --package @semianalysisai/inferencex-skills@')
+          .and('contain.text', `--target ${target}`)
+          .should(($pre) => {
+            expect($pre[0].scrollWidth).to.be.greaterThan($pre[0].clientWidth);
+            const bounds = $pre[0].getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(0);
+            expect(bounds.right).to.be.at.most(390);
+          });
+      });
+    }
     cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
     cy.get('[data-testid="api-endpoint-list-benchmarks"]').within(() => {
       cy.get('[role="region"][aria-labelledby="list-benchmarks-parameters"]')

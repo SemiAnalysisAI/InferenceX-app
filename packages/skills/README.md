@@ -6,23 +6,26 @@ It supports current OpenAPI discovery, basic benchmark lookups, and validated
 PowerX CSV/JSON exports for an exact single-turn workload, preserving measurement
 dates, model keys, and source links.
 
-**Unpublished candidate.** Use a local package archive supplied by a maintainer.
-The commands below install that archive; public npm availability has not been established.
+The npm commands below pin version `0.1.0` and require that version to be published.
+For review before publication, use the local archive instructions below.
 
 ## Prerequisites
 
-Node 24 with npm, a local `.tgz` package archive, and Codex or Claude Code. Benchmark
-queries need public HTTPS access. The installed skill works outside this repository
-without database credentials or additional runtime dependencies.
+Node 24 or later with npm, and Codex or Claude Code. Installing from npm requires
+registry access; benchmark queries need public HTTPS access. The installed skill
+works outside this repository without database credentials or additional runtime
+dependencies.
 
-## Install from the archive
+## Install from npm
 
-Run from the project where the agent should discover the skill. Replace the archive
-path with the actual file; quoting preserves paths containing spaces.
+Run the command for your agent from the project where it should discover the skill:
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.1.0.tgz'
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
+# Codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target codex
+
+# Claude Code
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -30,20 +33,31 @@ npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills
 | `codex` or `agents` | `.agents/skills/inferencex-api/`               |
 | `claude` (default)  | `.claude/skills/inferencex-api/`               |
 
-For Claude Code, an explicit skills-root directory, or inspection:
+For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target claude
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills list
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
 A relative directory resolves from the current working directory and takes precedence
-over `--target`. Help and list leave files unchanged. The local archive has no runtime
-dependencies, so `--offline` keeps installation independent of the npm registry;
-subsequent API queries still need internet access.
+over `--target`. Help and list leave files unchanged.
+
+### Review a local archive
+
+To review a maintainer-supplied `.tgz` before publication, replace the path with the
+actual archive and run from the target project. Use `--target claude` for Claude Code.
+
+```bash
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.1.0.tgz'
+npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
+```
+
+Keep the quotes for paths containing spaces. The archive has no runtime dependencies,
+so `--offline` installs without accessing the npm registry. API queries still need
+internet access. The same installer commands and options apply.
 
 ## Use and upgrade
 
@@ -106,11 +120,12 @@ energy-efficiency advantage.
 
 ### Upgrade
 
-Repeated installation skips an existing skill. To upgrade deliberately, point
-`INFERENCEX_SKILLS_TGZ` at the new archive and add `--force`:
+Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
+version. To upgrade, replace `0.1.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -125,21 +140,24 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 导出，并在结果中保留测量日期、原始模型键和来源链接。技能面向整个公开 API 的查询；
 单轮 PowerX 导出是首个完整示例，不代表技能只能查询这类数据。
 
-**当前为尚未发布的候选版本。** 请使用维护者提供的本地 `.tgz` 产物。上面的命令安装
-该本地产物；目前尚未确认可通过公开 npm 仓库安装。
+上面的 npm 命令固定使用 `0.1.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+安装流程。
 
-需要 Node 24、npm、本地包产物，以及 Codex 或 Claude Code。查询需要访问公开 HTTPS
-接口；安装后的技能无需检出本仓库，也不需要数据库凭据或额外运行时依赖。
+需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。从 npm 安装需要访问
+npm 仓库，查询需要访问公开 HTTPS 接口；安装后的技能无需检出本仓库，也不需要
+数据库凭据或额外运行时依赖。
 
-在目标项目目录中执行上面的安装命令，将 `INFERENCEX_SKILLS_TGZ` 改为实际产物的
-文件路径，并保留引号以支持带空格的路径。`--target codex` 和 `--target agents`
+在目标项目目录中执行上面对应智能体的安装命令。`--target codex` 和 `--target agents`
 将技能安装到 `.agents/skills/inferencex-api/`；`--target claude` 安装到
 `.claude/skills/inferencex-api/`，也是省略目标时的默认行为。
 
 `--dir` 指定存放各项技能的目录，安装器在其中创建 `inferencex-api`。相对路径以
 当前工作目录为基准，且 `--dir` 优先于 `--target`。`list` 和 `--help` 不修改文件。
-本地产物没有运行时依赖，因此可用 `--offline` 在不访问 npm 仓库的情况下安装；
-后续 API 查询仍需要联网。
+
+发布前审阅可使用维护者提供的 `.tgz`：在目标项目目录中执行上面的本地产物安装
+命令，将 `INFERENCEX_SKILLS_TGZ` 改为实际路径，并保留引号以支持带空格的路径。
+Claude Code 使用 `--target claude`。本地产物没有运行时依赖，因此可用 `--offline`
+在不访问 npm 仓库的情况下安装；后续 API 查询仍需要联网。安装器的命令和选项用法不变。
 
 安装后，在该项目的智能体会话中提出请求，例如：
 
@@ -179,8 +197,8 @@ worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态
 状态退出。导出使用已有观测值，不会启动新的基准测试。指标单位和限制见 PowerX 指南；
 通过严格验证本身并不能证明具有能效优势。
 
-重复安装默认跳过已有技能。需要升级时，将 `INFERENCEX_SKILLS_TGZ` 指向新产物，
-然后在对应安装命令后添加 `--force`。该选项会将包内文件合并进已有技能目录，并覆盖
+重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
+的 `0.1.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 
