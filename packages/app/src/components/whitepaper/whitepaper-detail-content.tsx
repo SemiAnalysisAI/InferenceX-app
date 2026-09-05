@@ -82,8 +82,8 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
               <img
                 src={paper.heroImagePath}
                 alt={copy.heroAlt}
-                width={2400}
-                height={1698}
+                width={2100}
+                height={1335}
                 loading="eager"
                 fetchPriority="high"
                 className="w-full rounded-lg border border-border/50 bg-card"
