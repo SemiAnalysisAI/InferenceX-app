@@ -24,7 +24,14 @@
 //    chart draws only the compared chips, today's bar plus one per range
 //    endpoint priced from that date's run, labelled with the date.
 
-import { interceptProfitData, PROFIT_DATE, PROFIT_HISTORY_DATE } from '../support/profit-fixtures';
+import {
+  interceptProfitData,
+  PROFIT_CHANGELOG_NOTES,
+  PROFIT_DATE,
+  PROFIT_HISTORY_DATE,
+  PROFIT_RUN_DATE,
+  PROFIT_RUNS,
+} from '../support/profit-fixtures';
 
 // Kimi K3 is the page default; the DeepSeek row proves the page prices the
 // routed model, not the first catalog entry. The GLM and MiniMax rows sit below
@@ -359,6 +366,12 @@ const historyPanel = () => cy.get('[data-testid="profit-history-panel"]');
 const chipTrigger = () =>
   cy.get('[data-testid="profit-history-gpu-multiselect"] [role="combobox"]');
 const axisLabels = () => chartSvg().find('.x-axis text');
+const changelog = () => cy.get('[data-testid="profit-history-changelog"]');
+const pickChip = (label: string) => {
+  chipTrigger().click({ force: true });
+  cy.get('[role="option"]').contains(label).click();
+  cy.get('body').type('{esc}');
+};
 
 describe('Profit Estimator per GW — compare history', () => {
   beforeEach(stubOpenRouter);
@@ -445,11 +458,113 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.location('search').should('not.contain', 'i_dstart=').and('not.contain', 'i_gpus=');
   });
 
+  it('lists the Config Changelog for the chosen chips and pins a date onto the chart', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    changelog().should('not.exist');
+    pickChip('GB300');
+    // One block per fixture date, expanded by default as on /inference, with
+    // the run's notes and its Git Commit / Workflow Run links.
+    changelog()
+      .contains('button', 'Config Changelog (3 dates with changes)')
+      .should('have.attr', 'aria-expanded', 'true');
+    changelog()
+      .should('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_HISTORY_DATE])
+      .and('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_DATE])
+      .and('contain.text', 'Git Commit')
+      .and('contain.text', 'Workflow Run')
+      .and('contain.text', 'Add all to chart');
+    // Nothing is on the chart yet, so every date offers "Add to chart".
+    changelog().find('span:contains("On chart")').should('have.length', 0);
+    // Pin the earlier date: the URL gains `i_dates`, the chart shows GB300
+    // today plus GB300 on that date, and the row flips to "Remove from chart".
+    changelog()
+      .contains('span', PROFIT_HISTORY_DATE)
+      .parent()
+      .contains('button', 'Add to chart')
+      .click();
+    cy.location('search')
+      .should('contain', `i_dates=${PROFIT_HISTORY_DATE}`)
+      .and('not.contain', 'i_dstart=');
+    chart().find('rect.bar-tco').should('have.length', 2);
+    axisLabels().should('contain.text', PROFIT_HISTORY_DATE);
+    cy.get('[data-testid="profit-history-note"]').should('contain.text', PROFIT_HISTORY_DATE);
+    changelog()
+      .contains('span', PROFIT_HISTORY_DATE)
+      .parent()
+      .contains('button', 'Remove from chart')
+      .click();
+    cy.location('search').should('not.contain', 'i_dates=');
+    cy.get('[data-testid="profit-history-note"]').should('not.exist');
+    chart().find('rect.bar-tco').should('have.length', 4);
+  });
+
+  it('offers each same-day run as its own numbered bar and adds them all at once', () => {
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    pickChip('GB300');
+    // The twice-run date renders one block per run, numbered in start order,
+    // each with its own notes.
+    changelog()
+      .should('contain.text', `${PROFIT_RUN_DATE} #1`)
+      .and('contain.text', `${PROFIT_RUN_DATE} #2`)
+      .and('contain.text', PROFIT_CHANGELOG_NOTES.run1)
+      .and('contain.text', PROFIT_CHANGELOG_NOTES.run2);
+    changelog()
+      .contains('span', `${PROFIT_RUN_DATE} #1`)
+      .parent()
+      .contains('button', 'Add to chart')
+      .click();
+    cy.location('search').should('contain', `i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[0].runId}`);
+    chart().find('rect.bar-tco').should('have.length', 2);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #1`);
+    // "Add all" pins run #2 and the earlier date as well; today's run date is
+    // already the main bar, so it adds nothing. Bars run oldest → newest and,
+    // at 80% / 85% / 92% / 100% of today's throughput, rise left to right.
+    changelog().contains('button', 'Add all to chart').click();
+    cy.location('search')
+      .should('contain', `${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`)
+      .and('contain', PROFIT_HISTORY_DATE);
+    chart().find('rect.bar-tco').should('have.length', 4);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #2`);
+    revenueLabels().then(($labels) => {
+      const revenues = [...$labels].map((el) => parseCompactUsd(el.textContent ?? ''));
+      expect(revenues).to.have.length(4);
+      expect(revenues[0]).to.be.lessThan(revenues[1]!);
+      expect(revenues[1]).to.be.lessThan(revenues[2]!);
+      expect(revenues[2]).to.be.lessThan(revenues[3]!);
+    });
+  });
+
+  it('hydrates pinned runs from the URL and locks the range endpoints as "On chart"', () => {
+    cy.visit(
+      `/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`,
+      { onBeforeLoad: suppressNudges },
+    );
+    chart().should('exist');
+    // Range start + pinned run #2 + today.
+    chart().find('rect.bar-tco').should('have.length', 3);
+    axisLabels()
+      .should('contain.text', PROFIT_HISTORY_DATE)
+      .and('contain.text', `${PROFIT_RUN_DATE} #2`);
+    // Range endpoints cannot be removed individually; the pinned run can.
+    changelog().find('span:contains("On chart")').should('have.length', 2);
+    changelog().find('button:contains("On chart")').should('have.length', 0);
+    changelog().find('button:contains("Remove from chart")').should('have.length', 1);
+    changelog()
+      .contains('span', `${PROFIT_RUN_DATE} #1`)
+      .parent()
+      .contains('button', 'Add to chart')
+      .should('exist');
+  });
+
   it('serves the panel on the Chinese mirror with translated labels', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     historyPanel().should('contain.text', '对比历史趋势').and('contain.text', '芯片配置');
     chipTrigger().should('contain.text', '选择芯片配置进行对比');
+    pickChip('GB300');
+    changelog().should('contain.text', '配置变更日志').and('contain.text', '添加到图表');
   });
 });
 

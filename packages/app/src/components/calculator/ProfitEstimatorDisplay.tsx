@@ -32,6 +32,12 @@ import {
   type CostTier,
 } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import ComparisonChangelog from '@/components/inference/ui/ComparisonChangelog';
+import {
+  isRunComparisonEntry,
+  makeRunComparisonEntry,
+} from '@/components/inference/utils/comparisonEntry';
+import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -52,6 +58,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { ResultContext } from '@/components/ui/result-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -93,6 +100,7 @@ import {
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
   profitHistoryDateRanks,
+  profitHistoryEntryLabel,
   shadeHistoryColor,
 } from './profit-history';
 import type { CostProvider } from './types';
@@ -259,11 +267,11 @@ const STRINGS = {
     } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: 'Compare history',
     gpuConfig: 'Chip Config',
-    gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again at the start and end of the date range using the run measured on that date, so software updates show up as a change in the bar.`,
+    gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
     gpuConfigPlaceholder: 'Select a Chip Config for comparison',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
-      'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above.',
+      'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
     dateRangePlaceholder: 'Select date range',
     historyNote: (dates: string) =>
       `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier.`,
@@ -359,11 +367,11 @@ const STRINGS = {
     } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: '对比历史趋势',
     gpuConfig: '芯片配置',
-    gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用该日期实测的运行结果，在日期范围的起止两端重新估价，软件更新带来的差异会直接体现在柱形上。`,
+    gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用当日实测的运行结果，在每个对比日期（日期范围的起止两端，以及从下方配置变更日志中添加的日期或运行）重新估价，软件更新带来的差异会直接体现在柱形上。`,
     gpuConfigPlaceholder: '选择芯片配置进行对比',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
-      '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。',
+      '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。范围内的其他日期可在配置变更日志中逐个添加。',
     dateRangePlaceholder: '选择日期范围',
     historyNote: (dates: string) =>
       `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致。`,
@@ -586,19 +594,28 @@ function ProfitEstimatorInner({
 
   // ── Compare history ───────────────────────────────────────────────────────
   // The `/inference` panel, pinned to this page's workload: up to four chip
-  // configs and a date range. The selection lives in the same `i_gpus`,
-  // `i_dstart`, and `i_dend` URL params, so a comparison built on `/inference`
-  // pastes straight into the estimator. Hydrated after mount so the first
-  // client render matches the server one.
+  // configs, a date range, and the Config Changelog from which individual
+  // dates or runs are pinned onto the chart. The selection lives in the same
+  // `i_gpus`, `i_dstart`, `i_dend`, and `i_dates` URL params, so a comparison
+  // built on `/inference` pastes straight into the estimator. Hydrated after
+  // mount so the first client render matches the server one.
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
   const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   useEffect(() => {
     const gpus = getUrlParam('i_gpus');
     if (gpus) setSelectedGPUs(gpus.split(',').filter(Boolean).slice(0, PROFIT_HISTORY_MAX_GPUS));
     const startDate = getUrlParam('i_dstart') || '';
     const endDate = getUrlParam('i_dend') || '';
     if (startDate && endDate) setSelectedDateRange({ startDate, endDate });
+    const dates = getUrlParam('i_dates');
+    if (dates) setSelectedDates(dates.split(',').filter(Boolean));
+    setHistoryHydrated(true);
   }, [getUrlParam]);
+  useEffect(() => {
+    if (historyHydrated) setUrlParam('i_dates', selectedDates.join(','));
+  }, [historyHydrated, selectedDates, setUrlParam]);
 
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -625,6 +642,26 @@ function ProfitEstimatorInner({
       profitHistoryAvailableDates(availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs),
     [availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
+  // A range whose endpoints the selected chips no longer have data for is
+  // dropped together with the pinned dates, as `InferenceContext` does.
+  useEffect(() => {
+    if (!historyHydrated || !availabilityRows || selectedGPUs.length === 0) return;
+    const { startDate, endDate } = selectedDateRange;
+    if (!startDate || !endDate) return;
+    const available = new Set(historyAvailableDates);
+    if (available.has(startDate) && available.has(endDate)) return;
+    setSelectedDateRange({ startDate: '', endDate: '' });
+    setSelectedDates([]);
+    setUrlParam('i_dstart', '');
+    setUrlParam('i_dend', '');
+  }, [
+    historyHydrated,
+    availabilityRows,
+    selectedGPUs.length,
+    selectedDateRange,
+    historyAvailableDates,
+    setUrlParam,
+  ]);
 
   const handleHistoryGpuChange = useCallback(
     (next: string[]) => {
@@ -632,6 +669,7 @@ function ProfitEstimatorInner({
       setUrlParam('i_gpus', next.join(','));
       if (next.length === 0) {
         setSelectedDateRange({ startDate: '', endDate: '' });
+        setSelectedDates([]);
         setUrlParam('i_dstart', '');
         setUrlParam('i_dend', '');
       }
@@ -639,6 +677,17 @@ function ProfitEstimatorInner({
     },
     [setUrlParam],
   );
+  // Changelog pins. Functional updaters so "Add all" and quick successive
+  // clicks never overwrite each other (the `/inference` fix for the same race).
+  const handleHistoryAddDate = useCallback((entry: string) => {
+    setSelectedDates((prev) => (prev.includes(entry) ? prev : [...prev, entry]));
+  }, []);
+  const handleHistoryRemoveDate = useCallback((entry: string) => {
+    setSelectedDates((prev) => prev.filter((d) => d !== entry));
+  }, []);
+  const handleHistoryAddAllDates = useCallback((entries: string[]) => {
+    setSelectedDates((prev) => [...new Set([...prev, ...entries])]);
+  }, []);
   const handleHistoryDateRangeChange = useCallback(
     (range: { startDate: string; endDate: string }) => {
       setSelectedDateRange(range);
@@ -653,11 +702,73 @@ function ProfitEstimatorInner({
     model: selectedModel,
     sequence: selectedSequence,
     selectedGPUs,
+    selectedDates,
     dateRange: selectedDateRange,
     currentRunDate: selectedRunDate,
     enabled: hasData,
   });
   const historyActive = history.comparisonDates.length > 0;
+  // Config Changelog for the selected chips: one workflow-info query per
+  // available date (bounded to the range once one is set), the same feed
+  // `/inference` renders under its chart.
+  const historyChangelogs = useComparisonChangelogs(
+    selectedGPUs,
+    selectedDateRange,
+    historyAvailableDates,
+    'agentic_traces',
+  );
+  // Same-day runs are numbered from the changelog's run enumeration so a bar
+  // labelled "#2" is the run the changelog calls "#2" (as `ChartDisplay` does).
+  const historyRunScope = useMemo(
+    () => ({
+      modelDbKeys: dbModelKeys,
+      selectedGPUs,
+      selectedPrecisions,
+      benchmarkType: 'agentic_traces' as const,
+    }),
+    [dbModelKeys, selectedGPUs, selectedPrecisions],
+  );
+  const historyRunNumbering = useMemo(() => {
+    const numbering = new Map<string, number>();
+    for (const { date, runConfigs } of historyChangelogs.changelogs) {
+      dataRunsForDate(runConfigs, historyRunScope).forEach((run, i) => {
+        numbering.set(makeRunComparisonEntry(date, run.runId), i + 1);
+      });
+    }
+    return numbering;
+  }, [historyChangelogs.changelogs, historyRunScope]);
+  // A pinned plain date that turns out to have several runs expands into one
+  // entry per run once the changelog knows them, so the bars match the
+  // changelog's per-run blocks instead of a single merged "latest" bar
+  // (`ChartDisplay` does the same). Idempotent once expanded.
+  useEffect(() => {
+    const runConfigsByDate = new Map(
+      historyChangelogs.changelogs.map((c) => [c.date, c.runConfigs] as const),
+    );
+    setSelectedDates((prev) => {
+      let changed = false;
+      const out: string[] = [];
+      for (const entry of prev) {
+        if (isRunComparisonEntry(entry)) {
+          out.push(entry);
+          continue;
+        }
+        const rc = runConfigsByDate.get(entry);
+        const runs = rc ? dataRunsForDate(rc, historyRunScope) : [];
+        if (runs.length > 1) {
+          changed = true;
+          for (const run of runs) out.push(makeRunComparisonEntry(entry, run.runId));
+        } else {
+          out.push(entry);
+        }
+      }
+      return changed ? [...new Set(out)] : prev;
+    });
+  }, [historyChangelogs.changelogs, historyRunScope]);
+  const historyEntryLabel = useCallback(
+    (entry: string) => profitHistoryEntryLabel(entry, historyRunNumbering),
+    [historyRunNumbering],
+  );
   // A comparison date still in flight holds the chart, as on `/inference`, so
   // the bars never show today's chips with the history half missing.
   const loading = throughputLoading || history.loading;
@@ -769,9 +880,13 @@ function ProfitEstimatorInner({
       pricing,
       assumptions,
     );
-    return historyActive
-      ? { ...estimated, rows: orderProfitRowsForHistory(estimated.rows) }
-      : estimated;
+    if (!historyActive) return estimated;
+    return {
+      ...estimated,
+      rows: orderProfitRowsForHistory(estimated.rows).map((row) =>
+        row.date ? { ...row, dateLabel: historyEntryLabel(row.date) } : row,
+      ),
+    };
   }, [
     hasData,
     pricing,
@@ -786,6 +901,7 @@ function ProfitEstimatorInner({
     selectedGPUs,
     selectedPrecisions,
     selectedPercentile,
+    historyEntryLabel,
   ]);
 
   const legendHwKeys = useMemo(() => {
@@ -961,15 +1077,22 @@ function ProfitEstimatorInner({
     if (!historyActive) return [];
     const priced = new Set(fullEstimate.rows.map((row) => `${row.hwKey}~${row.date ?? ''}`));
     const missing: string[] = [];
-    for (const date of history.comparisonDates) {
+    for (const entry of history.comparisonDates) {
       for (const hwKey of selectedGPUs) {
-        if (priced.has(`${hwKey}~${date}`)) continue;
+        if (priced.has(`${hwKey}~${entry}`)) continue;
         const config = hardwareConfig[hwKey];
-        missing.push(`${config ? getDisplayLabel(config) : hwKey} • ${date}`);
+        missing.push(`${config ? getDisplayLabel(config) : hwKey} • ${historyEntryLabel(entry)}`);
       }
     }
     return missing;
-  }, [historyActive, fullEstimate.rows, history.comparisonDates, selectedGPUs, hardwareConfig]);
+  }, [
+    historyActive,
+    fullEstimate.rows,
+    history.comparisonDates,
+    selectedGPUs,
+    hardwareConfig,
+    historyEntryLabel,
+  ]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
@@ -997,7 +1120,9 @@ function ProfitEstimatorInner({
         />
         {historyActive && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-history-note">
-            {t.historyNote(history.comparisonDates.join(locale === 'zh' ? '、' : ', '))}
+            {t.historyNote(
+              history.comparisonDates.map(historyEntryLabel).join(locale === 'zh' ? '、' : ', '),
+            )}
             {historyMissing.length > 0 && <> {t.historyNoData(historyMissing.join(', '))}</>}
           </p>
         )}
@@ -1085,7 +1210,7 @@ function ProfitEstimatorInner({
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
-      row.date ?? selectedRunDate ?? '',
+      row.dateLabel ?? row.date ?? selectedRunDate ?? '',
       usd(row.revenue),
       usd(row.tco),
       usd(row.grossMargin),
@@ -1433,6 +1558,27 @@ function ProfitEstimatorInner({
                 </div>
               </ControlPanel>
             </TooltipProvider>
+
+            {selectedGPUs.length > 0 && (
+              <div data-testid="profit-history-changelog">
+                <ComparisonChangelog
+                  changelogs={historyChangelogs.changelogs}
+                  selectedGPUs={selectedGPUs}
+                  selectedPrecisions={selectedPrecisions}
+                  modelDbKeys={dbModelKeys}
+                  selectedSequence={selectedSequence}
+                  loading={historyChangelogs.loading}
+                  totalDatesQueried={historyChangelogs.totalDatesQueried}
+                  selectedDates={selectedDates}
+                  selectedDateRange={selectedDateRange}
+                  onAddDate={handleHistoryAddDate}
+                  onRemoveDate={handleHistoryRemoveDate}
+                  onAddAllDates={handleHistoryAddAllDates}
+                  firstAvailableDate={historyAvailableDates[0]}
+                  analyticsSection="profit"
+                />
+              </div>
+            )}
 
             {!loading && legendItems.length > 0 && (
               <div

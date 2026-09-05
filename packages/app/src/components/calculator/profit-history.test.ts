@@ -12,8 +12,9 @@ import {
   parseHistoryResultKey,
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
-  profitHistoryComparisonDates,
   profitHistoryDateRanks,
+  profitHistoryEntryDate,
+  profitHistoryEntryLabel,
   shadeHistoryColor,
 } from './profit-history';
 
@@ -90,8 +91,30 @@ describe('historyResultKey', () => {
     });
   });
 
+  it('round-trips a run entry, whose own `~r<runId>` suffix is not the separator', () => {
+    expect(
+      parseHistoryResultKey(historyResultKey('b200_sglang', '2026-06-14~r27489075807')),
+    ).toEqual({ baseKey: 'b200_sglang', date: '2026-06-14~r27489075807' });
+  });
+
   it('leaves an undated key alone', () => {
     expect(parseHistoryResultKey('b200_sglang')).toEqual({ baseKey: 'b200_sglang' });
+  });
+});
+
+describe('profitHistoryEntryLabel', () => {
+  it('prints a plain date as is', () => {
+    expect(profitHistoryEntryLabel('2026-06-14')).toBe('2026-06-14');
+    expect(profitHistoryEntryLabel('2026-06-14', new Map())).toBe('2026-06-14');
+  });
+
+  it('numbers a run entry the way the changelog does', () => {
+    const numbering = new Map([
+      ['2026-06-14~r1', 1],
+      ['2026-06-14~r2', 2],
+    ]);
+    expect(profitHistoryEntryLabel('2026-06-14~r2', numbering)).toBe('2026-06-14 #2');
+    expect(profitHistoryEntryDate('2026-06-14~r2')).toBe('2026-06-14');
   });
 });
 
@@ -138,37 +161,6 @@ describe('profitHistoryAvailableDates', () => {
   });
 });
 
-describe('profitHistoryComparisonDates', () => {
-  const range = { startDate: '2026-06-14', endDate: '2026-08-31' };
-
-  it('needs both a chip and a full range', () => {
-    expect(profitHistoryComparisonDates([], range, '2026-08-31')).toEqual([]);
-    expect(
-      profitHistoryComparisonDates(['b200_sglang'], { startDate: '2026-06-14', endDate: '' }, ''),
-    ).toEqual([]);
-  });
-
-  it('fetches the range endpoints minus the run date already on the chart', () => {
-    expect(profitHistoryComparisonDates(['b200_sglang'], range, '2026-08-31')).toEqual([
-      '2026-06-14',
-    ]);
-    expect(profitHistoryComparisonDates(['b200_sglang'], range, '2026-07-15')).toEqual([
-      '2026-06-14',
-      '2026-08-31',
-    ]);
-  });
-
-  it('collapses a single-day range to one date', () => {
-    expect(
-      profitHistoryComparisonDates(
-        ['b200_sglang'],
-        { startDate: '2026-06-14', endDate: '2026-06-14' },
-        '2026-08-31',
-      ),
-    ).toEqual(['2026-06-14']);
-  });
-});
-
 describe('buildProfitHistoryResults', () => {
   const options = {
     selectedGPUs: ['b200_sglang'],
@@ -193,7 +185,7 @@ describe('buildProfitHistoryResults', () => {
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       hwKey: 'b200_sglang',
-      resultKey: 'b200_sglang~2026-06-14',
+      resultKey: 'b200_sglang|2026-06-14',
       date: '2026-06-14',
       clamped: false,
     });
@@ -263,6 +255,19 @@ describe('orderProfitRowsForHistory', () => {
       'b200_sglang@now',
     ]);
   });
+
+  it('orders same-day runs by run id after the earlier date', () => {
+    const rows = [
+      { hwKey: 'b200_sglang', date: '2026-07-20~r9' },
+      { hwKey: 'b200_sglang', date: '2026-07-20~r10' },
+      { hwKey: 'b200_sglang', date: '2026-06-14' },
+    ];
+    expect(orderProfitRowsForHistory(rows).map((r) => r.date)).toEqual([
+      '2026-06-14',
+      '2026-07-20~r9',
+      '2026-07-20~r10',
+    ]);
+  });
 });
 
 describe('profitHistoryDateRanks', () => {
@@ -276,6 +281,17 @@ describe('profitHistoryDateRanks', () => {
     expect(rank('2026-06-14')).toBe(0);
     expect(rank('2026-07-20')).toBe(1);
     expect(rank(undefined)).toBe(2);
+  });
+
+  it('gives each same-day run its own rank in run order', () => {
+    const { rank, count } = profitHistoryDateRanks([
+      { date: '2026-07-20~r10' },
+      { date: '2026-07-20~r9' },
+      { date: undefined },
+    ]);
+    expect(count).toBe(3);
+    expect(rank('2026-07-20~r9')).toBe(0);
+    expect(rank('2026-07-20~r10')).toBe(1);
   });
 });
 

@@ -2,16 +2,24 @@
  * Compare-history support for the profit estimator — pure, no React.
  *
  * Mirrors the `/inference` "Compare history" panel: the reader picks up to four
- * chip configs and a date range, and the estimator prices those configs at the
- * range's start and end dates alongside today's bar. `/inference` fetches each
- * comparison date as its own exact-date benchmarks query and stamps every row
- * with the date it was requested for (`useChartData`); this module does the
- * same grouping for the calculator's interpolation path so a historical bar is
- * built by the exact logic that builds the current one.
+ * chip configs, a date range, and any individual dates or runs from the Config
+ * Changelog, and the estimator prices those configs on each comparison entry
+ * alongside today's bar. Comparison entries are the same strings `/inference`
+ * keeps in `i_dates` (a plain date, or `date~r<runId>` for one specific run,
+ * see `comparisonEntry.ts`); `/inference` fetches each as its own benchmarks
+ * query and stamps every row with the entry it was requested for
+ * (`useChartData`). This module does the same grouping for the calculator's
+ * interpolation path so a historical bar is built by the exact logic that
+ * builds the current one.
  */
 
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
+import {
+  comparisonEntryDate,
+  comparisonEntryLabel,
+  comparisonEntrySortValue,
+} from '@/components/inference/utils/comparisonEntry';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
@@ -28,22 +36,40 @@ import { buildGpuGroups, type GroupMeta } from './useThroughputData';
 export const PROFIT_HISTORY_MAX_GPUS = 4;
 
 /**
- * Separator between a result key and the date it was priced on. `~` matches
- * the `/inference` comparison entries, is URL-safe, and never appears in a
- * hwKey, a precision, or an ISO date.
+ * Separator between a result key and the comparison entry it was priced on.
+ * `|` is URL-safe in a result key (never serialised) and appears in neither a
+ * hwKey, a precision, nor a comparison entry (which uses `~` for its own run
+ * suffix).
  */
-const HISTORY_KEY_SEP = '~';
+const HISTORY_KEY_SEP = '|';
 
-/** Result key for a chip priced on a comparison date: `gb300_sglang~2026-06-14`. */
-export function historyResultKey(baseKey: string, date: string): string {
-  return `${baseKey}${HISTORY_KEY_SEP}${date}`;
+/**
+ * Result key for a chip priced on a comparison entry:
+ * `gb300_sglang|2026-06-14` or `gb300_sglang|2026-06-14~r27489075807`.
+ */
+export function historyResultKey(baseKey: string, entry: string): string {
+  return `${baseKey}${HISTORY_KEY_SEP}${entry}`;
 }
 
-/** Split a history result key back into its base key and date. */
+/** Split a history result key back into its base key and comparison entry. */
 export function parseHistoryResultKey(resultKey: string): { baseKey: string; date?: string } {
-  const at = resultKey.lastIndexOf(HISTORY_KEY_SEP);
+  const at = resultKey.indexOf(HISTORY_KEY_SEP);
   if (at === -1) return { baseKey: resultKey };
   return { baseKey: resultKey.slice(0, at), date: resultKey.slice(at + 1) };
+}
+
+/**
+ * Human label for a comparison entry, as the `/inference` legend shows it: the
+ * plain date, or `date #n` for one of several same-day runs. `numbering` comes
+ * from the changelog's run enumeration so both surfaces print the same #n.
+ */
+export function profitHistoryEntryLabel(entry: string, numbering?: Map<string, number>): string {
+  return comparisonEntryLabel(entry, numbering);
+}
+
+/** Calendar date behind a comparison entry (drops any `~r<runId>` suffix). */
+export function profitHistoryEntryDate(entry: string): string {
+  return comparisonEntryDate(entry);
 }
 
 interface HistoryGroupMeta extends GroupMeta {
@@ -117,32 +143,17 @@ export function profitHistoryAvailableDates(
   return [...dates].toSorted();
 }
 
-/**
- * The dates to fetch for a comparison: the range endpoints, minus the run date
- * the main query already covers. Nothing to fetch until both a chip and a
- * complete range are chosen. (`/inference` does the same in
- * `buildComparisonDates`, plus individually pinned runs the estimator has no
- * UI for.)
- */
-export function profitHistoryComparisonDates(
-  selectedGPUs: readonly string[],
-  range: { startDate: string; endDate: string },
-  currentRunDate: string | undefined,
-): string[] {
-  if (selectedGPUs.length === 0 || !range.startDate || !range.endDate) return [];
-  return [...new Set([range.startDate, range.endDate])].filter((d) => d !== currentRunDate);
-}
-
-/** Rows fetched for one comparison date. */
+/** Rows fetched for one comparison entry (a date, or one run on a date). */
 export interface ProfitHistoryDateRows {
+  /** The comparison entry the rows were requested for. */
   date: string;
   rows: readonly BenchmarkRow[];
 }
 
 /**
- * Interpolate the selected chips at the target on each comparison date. One
- * agentic run per config per date is kept (the same rule the `/inference`
- * comparison applies), rows are grouped by `hwKey[__precision]~date`, and each
+ * Interpolate the selected chips at the target on each comparison entry. One
+ * agentic run per config per entry is kept (the same rule the `/inference`
+ * comparison applies), rows are grouped by `hwKey[__precision]|entry`, and each
  * group is read at the target by `interpolateForGPU`, so a historical bar is
  * priced by the exact logic that prices today's.
  */
@@ -196,11 +207,18 @@ export function buildProfitHistoryResults(
   return results;
 }
 
+const entryOrder = (a: string, b: string): number => {
+  const [ad, ar] = comparisonEntrySortValue(a);
+  const [bd, br] = comparisonEntrySortValue(b);
+  return ad - bd || ar - br;
+};
+
 /**
  * Order bars for the comparison view: chips in the order they already hold
- * (revenue descending, from `estimateProfitRows`), and within a chip its dates
- * oldest → newest so the current bar sits at the right of its group. Rows with
- * no date are today's and sort last within their chip.
+ * (revenue descending, from `estimateProfitRows`), and within a chip its
+ * entries oldest → newest (same-day runs in run order, as `/inference` sorts
+ * them) so the current bar sits at the right of its group. Rows with no entry
+ * are today's and sort last within their chip.
  */
 export function orderProfitRowsForHistory<T extends Pick<ProfitEstimatorRow, 'hwKey' | 'date'>>(
   rows: readonly T[],
@@ -213,7 +231,7 @@ export function orderProfitRowsForHistory<T extends Pick<ProfitEstimatorRow, 'hw
     if (a.date === b.date) return 0;
     if (a.date === undefined) return 1;
     if (b.date === undefined) return -1;
-    return a.date < b.date ? -1 : 1;
+    return entryOrder(a.date, b.date);
   });
 }
 
@@ -228,7 +246,7 @@ export function profitHistoryDateRanks(rows: readonly Pick<ProfitEstimatorRow, '
   count: number;
 } {
   const dated = [...new Set(rows.map((r) => r.date).filter((d): d is string => Boolean(d)))];
-  dated.sort();
+  dated.sort(entryOrder);
   const hasCurrent = rows.some((r) => r.date === undefined);
   const count = dated.length + (hasCurrent ? 1 : 0);
   return {

@@ -408,9 +408,11 @@ export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig
   const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
   const base = config ? getDisplayLabel(config) : row.hwKey;
   const withPrecision = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
-  // A compare-history bar names the run date it was priced on, as the
-  // `/inference` legend does for its "config • date" series.
-  return row.date ? `${withPrecision}${HISTORY_LABEL_SEP}${row.date}` : withPrecision;
+  // A compare-history bar names the run date (and run number, when the day had
+  // several) it was priced on, as the `/inference` legend does for its
+  // "config • date" series.
+  const dateLabel = row.dateLabel ?? row.date;
+  return dateLabel ? `${withPrecision}${HISTORY_LABEL_SEP}${dateLabel}` : withPrecision;
 }
 
 function formatPct(value: number): string {
@@ -451,7 +453,7 @@ export function generateProfitTooltipHTML(
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 260px; max-width: 340px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${row.date ? line(t.runDate, escapeHtml(row.date)) : ''}
+      ${row.date ? line(t.runDate, escapeHtml(row.dateLabel ?? row.date)) : ''}
       ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, usd(row.revenue))}
       ${line(t.tco, usd(row.tco), skuColor, TCO_OPACITY)}
       ${line(t.grossMargin, usd(row.grossMargin))}

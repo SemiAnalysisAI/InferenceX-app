@@ -147,10 +147,16 @@ export interface ProfitEstimatorRow {
   resultKey: string;
   precision?: string;
   /**
-   * Run date the SKU was priced on, set only for compare-history bars. Today's
-   * bars carry no date: the run date above the chart describes them.
+   * Comparison entry the SKU was priced on (a run date, or `date~r<runId>` for
+   * one specific run), set only for compare-history bars. Today's bars carry
+   * no date: the run date above the chart describes them.
    */
   date?: string;
+  /**
+   * Human label for `date` (e.g. `2026-06-14 #2` for the second run that day),
+   * as the changelog shows it. Falls back to `date` when unset.
+   */
+  dateLabel?: string;
   /** GPU-hours in the denominator: 1 per chip-hour, or what one GW-year buys for this SKU. */
   gpuHours: number;
   /** Gross $/GPU/hr at 100% utilization, before any haircut. */
