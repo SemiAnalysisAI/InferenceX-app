@@ -49,9 +49,17 @@ export interface EmbedOptions {
   skin: EmbedSkin | undefined;
   /** Workload override; `undefined` keeps the model's featured scenario. */
   sequence: Sequence | undefined;
-  /** Y-axis metric override; `undefined` keeps the dashboard default. */
-  yAxisMetric: string | undefined;
+  /**
+   * Y-axis metric. Defaults to {@link EMBED_DEFAULT_Y_AXIS_METRIC} (total
+   * token throughput per chip) rather than the dashboard's $/TCO default,
+   * because host sites want the raw hardware number without InferenceX's
+   * cost-tier assumptions.
+   */
+  yAxisMetric: string;
 }
+
+/** `y_tpPerGpu`: total token throughput per chip (tok/s/chip). */
+export const EMBED_DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
 
 const FRAMEWORK_KEYS = new Set<string>(FRAMEWORK_FAMILIES.map((f) => f.key));
 const Y_AXIS_METRIC_KEYS = new Set<string>(Y_AXIS_METRICS);
@@ -98,7 +106,8 @@ export function parseEmbedOptions(
     : undefined;
 
   const rawMetric = first(searchParams.metric) ?? first(searchParams.i_metric);
-  const yAxisMetric = rawMetric && Y_AXIS_METRIC_KEYS.has(rawMetric) ? rawMetric : undefined;
+  const yAxisMetric =
+    rawMetric && Y_AXIS_METRIC_KEYS.has(rawMetric) ? rawMetric : EMBED_DEFAULT_Y_AXIS_METRIC;
 
   return { frameworks, theme, skin, sequence, yAxisMetric };
 }

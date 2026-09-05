@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Sequence } from './data-mappings';
 import {
+  EMBED_DEFAULT_Y_AXIS_METRIC,
   EMBED_RESIZE_MESSAGE_TYPE,
   isEmbedPathname,
   isEmbedResizeMessage,
@@ -27,7 +28,7 @@ describe('parseEmbedOptions', () => {
       frameworks: [],
       theme: 'dark',
       sequence: undefined,
-      yAxisMetric: undefined,
+      yAxisMetric: 'y_tpPerGpu',
     });
   });
 
@@ -84,12 +85,17 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions({ scenario: 'bogus' }).sequence).toBeUndefined();
   });
 
+  it('defaults the y-axis to total throughput per chip', () => {
+    expect(EMBED_DEFAULT_Y_AXIS_METRIC).toBe('y_tpPerGpu');
+    expect(parseEmbedOptions({}).yAxisMetric).toBe('y_tpPerGpu');
+  });
+
   it('accepts known y-axis metrics only', () => {
     expect(parseEmbedOptions({ metric: 'y_tokensPerDollarH' }).yAxisMetric).toBe(
       'y_tokensPerDollarH',
     );
     expect(parseEmbedOptions({ metric: 'y' }).yAxisMetric).toBe('y');
-    expect(parseEmbedOptions({ metric: 'y_madeUp' }).yAxisMetric).toBeUndefined();
+    expect(parseEmbedOptions({ metric: 'y_madeUp' }).yAxisMetric).toBe('y_tpPerGpu');
   });
 });
 
