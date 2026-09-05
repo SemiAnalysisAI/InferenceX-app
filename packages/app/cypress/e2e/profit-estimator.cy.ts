@@ -1,8 +1,9 @@
 // /profit-estimator: one stacked bar per SKU, US$ per all-in GW per year.
 // Behaviours worth locking down:
 //  - defaults are Kimi K3, 45 tok/s/user, 60% utilization, 30% model license fee;
-//  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user and the Z.ai list price
-//    ($1.40 / $0.26 cached / $4.40), and a model switch re-seeds both;
+//  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
+//    ($1.40 / $0.26 cached / $4.40), and a 10% license fee; a model switch
+//    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
 //  - utilization scales revenue only, so the revenue label moves and the
@@ -635,6 +636,8 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '10%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 100 tok/s/user Interactivity',
@@ -779,7 +782,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'MiniMax M3').click();

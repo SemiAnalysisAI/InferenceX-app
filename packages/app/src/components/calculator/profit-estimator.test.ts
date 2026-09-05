@@ -339,10 +339,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens GLM 5.2/5.3 on 100 tok/s/user and the Z.ai list price', () => {
+  it('opens GLM 5.2/5.3 on 100 tok/s/user, the Z.ai list price, and a 10% license fee', () => {
     const defaults = profitModelDefaults(Model.GLM_5_2);
     expect(defaults.interactivity).toBe(100);
-    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
+    expect(defaults.labCutPct).toBe(10);
     expect(defaults.listPricing).toEqual({
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
