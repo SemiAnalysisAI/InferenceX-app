@@ -3441,6 +3441,8 @@ const ScatterGraph = React.memo(
         <D3Chart<InferenceData>
           ref={chartRef}
           height={minimalChrome ? EMBED_CHART_HEIGHT : undefined}
+          // Embeds drop the zoom/pan hint line; the host page has its own caption.
+          instructions={minimalChrome ? '' : undefined}
           chartId={chartId}
           // Stable across toggles: the render effect keys on this for "data
           // changed" rebuilds; scale domains come from x/yScaleConfig (computed
