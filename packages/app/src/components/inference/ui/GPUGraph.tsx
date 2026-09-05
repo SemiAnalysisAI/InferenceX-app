@@ -1199,6 +1199,8 @@ const GPUGraph = React.memo(
       <D3Chart<InferenceData>
         ref={chartRef}
         height={minimalChrome ? EMBED_CHART_HEIGHT : undefined}
+        // Embeds drop the zoom/pan hint line; the host page has its own caption.
+        instructions={minimalChrome ? '' : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
