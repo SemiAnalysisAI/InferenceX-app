@@ -9,9 +9,18 @@ dates, model keys, and source links.
 The [public API cookbook](skills/inferencex-api/references/public-api-examples.md)
 also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
+It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.2.0` and require that version to be published.
+The npm commands below pin version `0.3.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
+
+## New in 0.3.0
+
+PowerX exports can save their original consumed HTTP response with `--evidence-dir`.
+The installer adds machine-readable `--json` inspection and a read-only `--dry-run`
+preview. A history recipe retains configurations and original observation dates.
+The maintainer verifier retries only the exact package/version ETARGET
+installation failure, with bounded attempts and a total deadline.
 
 ## Prerequisites
 
@@ -26,10 +35,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -40,9 +49,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -55,7 +64,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.2.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.3.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -122,10 +131,16 @@ are existing observations, not new benchmark runs. The cookbook describes the
 measurement units and limitations; strict validity alone does not establish an
 energy-efficiency advantage.
 
+For the original response behind an export, add `--evidence-dir ./powerx-evidence`.
+The directory must be new. It receives the complete same-request decoded response
+and a manifest linking its SHA-256 to the output, request context and extraction
+metadata. CSV, JSON, stdout and empty selections are supported. Evidence is optional;
+requested evidence-write failures fail the command. See the [capture contract](skills/inferencex-api/references/powerx.md#save-the-response-used-by-an-export).
+
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -143,14 +158,51 @@ This catches older installers overwriting files while leaving a newer record.
 This limited check does not verify every file or detect all local edits.
 `--version` reports only the invoking installer version, not the project's installed copy.
 
+### JSON output and installation preview
+
+```bash
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target codex --force --dry-run --json
+```
+
+`--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
+to stderr. Without it, existing text output remains available. Schema version 1:
+
+| Field                          | Meaning                                                         |
+| ------------------------------ | --------------------------------------------------------------- |
+| `schema_version`               | `1`                                                             |
+| `package`, `installer_version` | Executing npm package and version                               |
+| `skill_path`                   | Resolved absolute destination                                   |
+| `installation_state`           | `installed`, `not_installed`, or `unknown`                      |
+| `installed_version`            | Verified receipt/exporter version, otherwise `null`             |
+| `reason`                       | Human-readable explanation or `null`; do not parse it for state |
+
+Install output also includes `dry_run`, `outcome`, `write_paths`, and
+`preserves_extra_files`. Outcomes are `installed`, `overwritten`, or `skipped`;
+previews use `would_install`, `would_overwrite`, or `would_skip`. Written paths are
+relative to `skill_path` and include the version receipt; skip writes nothing.
+A skipped install and a preview report the existing installation's state, not the
+version that the executing package would install.
+
+`--dry-run` uses the same destination and conflict checks as installation, supports
+`--target`, `--dir`, and `--force`, and lists the packaged paths it would write.
+It changes no files, directories, receipts or permissions and makes no API request.
+The npm launcher may download the selected package before the installer starts.
+Unrelated and obsolete files remain untouched, including during a forced upgrade.
+
+Exit codes: `0` for successful installation, skip, preview or inspection (including
+unknown/absent installations); `2` for invalid arguments; `1` for operational
+failure. JSON failures use `{ "schema_version": 1, "outcome": "failed", "reason": "..." }`
+without stale installation fields; use the exit code to determine success.
+
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.2.0` with the published version you intend to install:
+version. To upgrade, replace `0.3.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -167,10 +219,14 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 
 [公开 API 指南](skills/inferencex-api/references/public-api-examples.md) 还提供评估查询和
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
-抽样范围。
+抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.2.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `0.3.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
+
+0.3.0 新增 PowerX 原始响应保存选项 `--evidence-dir`、安装器 JSON 输出 `--json` 和
+只读安装预览 `--dry-run`，以及保留配置和原始观测日期的历史查询示例。维护者的发布后验证仅对指定包及版本的 ETARGET 安装错误
+进行有限重试，并受总时限约束。
 
 需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。从 npm 安装需要访问
 npm 仓库，查询需要访问公开 HTTPS 接口；安装后的技能无需检出本仓库，也不需要
@@ -226,6 +282,11 @@ worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态
 状态退出。导出使用已有观测值，不会启动新的基准测试。指标单位和限制见 PowerX 指南；
 通过严格验证本身并不能证明具有能效优势。
 
+需要保留导出所用的完整原始响应时，添加 `--evidence-dir ./powerx-evidence`，并使用
+尚不存在的目录。目录保存同一次请求的完整解压后响应体，以及记录 SHA-256、导出结果、
+请求上下文和提取元数据的清单。该选项支持 CSV、JSON、stdout 和空结果；默认不保存响应。
+显式请求保存证据后，写入失败会导致命令失败。详细字段和校验范围见上面的响应保存说明。
+
 可执行上面的 `status --target codex` 命令查看项目内已安装的技能；其他目标使用
 `--target claude` 或 `--dir`。输出会分别列出本次调用的安装器版本、目标目录中上次成功
 安装的技能版本，以及技能目录的绝对路径。`status` 只读取本地文件，不会请求 API；但 npm 可能先
@@ -237,8 +298,29 @@ worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态
 情况。这项检查不会验证所有文件，也不能检测所有本地修改。`--version` 只显示本次调用
 的安装器版本，不显示项目中已安装技能的版本。
 
+`status` 和 `install` 支持 `--json`：stdout 只输出一个 JSON 文档，诊断信息写入
+stderr。不加该选项时保留原有文字输出。上表定义 `schema_version: 1` 的字段：
+`installer_version` 是执行中的安装器版本；`installed_version` 是经版本记录和导出器
+声明核对后的已安装版本，无法确认时为 `null`。`installation_state` 分别用
+`installed`、`not_installed`、`unknown` 表示已确认安装、未安装和状态未知；
+`skill_path` 是绝对路径。`reason` 供人阅读，程序应使用结构化状态字段。
+
+安装结果还包含 `dry_run`、`outcome`、`write_paths`、`preserves_extra_files`。
+实际结果为 `installed`、`overwritten` 或 `skipped`；预览结果为 `would_install`、
+`would_overwrite` 或 `would_skip`。`write_paths` 相对于技能目录，包含版本记录文件；
+跳过安装时为空。预览和跳过安装均报告目标目录的实际状态，不将安装器版本当作已安装版本。
+
+`install --dry-run` 复用正式安装的目标路径与冲突检查，支持 `--target`、`--dir`、
+`--force` 和 `--json`。它列出将写入的路径，不创建目录、不改动文件、版本记录或权限，
+也不请求 API。不过 npm 可能在启动安装器前下载所选包。强制升级仍保留其他文件和
+不再随包提供的旧文件。
+
+退出码 `0` 表示操作成功，包括跳过、预览，以及对未安装或版本未知状态的正常检查；
+`2` 表示参数错误，`1` 表示操作失败。JSON 错误结果保留结构化失败信息与供人阅读的说明；
+请用退出码判断操作是否成功。
+
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.2.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
+的 `0.3.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 

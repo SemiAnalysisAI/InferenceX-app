@@ -36,6 +36,28 @@ function setInstalledVersion(destination, version) {
   );
 }
 
+function jsonResult(result, expectedStatus = 0) {
+  assert.equal(result.status, expectedStatus, `${result.stdout}\n${result.stderr}`);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.schema_version, 1);
+  return output;
+}
+
+function snapshot(root) {
+  return ['', ...readdirSync(root, { recursive: true })].sort().map((path) => {
+    const fullPath = join(root, path);
+    const info = lstatSync(fullPath);
+    return {
+      path,
+      mode: info.mode,
+      mtime: info.mtimeMs,
+      ctime: info.ctimeMs,
+      contents: info.isFile() ? readFileSync(fullPath).toString('base64') : null,
+      link: info.isSymbolicLink() ? readlinkSync(fullPath) : null,
+    };
+  });
+}
+
 test('the real npm archive installs the single skill with all bundled resources', () => {
   const cwd = project();
   const result = run(['install', '--target', 'codex'], cwd);
@@ -297,7 +319,7 @@ test('metadata symlinks are not followed by status or overwritten by force', () 
   assert.equal(readFileSync(neighbor, 'utf8'), content);
 });
 
-test('a failed force copy invalidates the old version stamp', () => {
+test('force detects file/directory conflicts before invalidating the old version stamp', () => {
   const cwd = project();
   succeeded(run(['install'], cwd));
   const destination = join(cwd, '.claude/skills/inferencex-api');
@@ -308,7 +330,10 @@ test('a failed force copy invalidates the old version stamp', () => {
   const forced = run(['install', '--force'], cwd);
   assert.equal(forced.status, 1);
   assert.match(forced.stderr, /Could not install the skill/);
-  assert.equal(lstatSync(join(destination, metadataName), { throwIfNoEntry: false }), undefined);
+  assert.equal(
+    JSON.parse(readFileSync(join(destination, metadataName))).version,
+    packageInfo.version,
+  );
   assert.equal(readFileSync(join(exporterPath, 'local-file.txt'), 'utf8'), 'preserve');
   const status = run(['status'], cwd);
   succeeded(status);
@@ -373,6 +398,8 @@ test('invalid commands and options fail without creating destination files', () 
     ['install', '--version'],
     ['--version', '--target', 'codex'],
     ['--target', 'codex'],
+    ['status', '--dry-run'],
+    ['list', '--dry-run'],
   ]) {
     const cwd = project();
     const result = run(args, cwd);
@@ -391,4 +418,282 @@ test('filesystem errors return a clear failure and preserve existing files', () 
   assert.match(result.stderr, /Could not install the skill/);
   assert.equal(readFileSync(destination, 'utf8'), 'untouched');
   assert.deepEqual(readdirSync(cwd), ['file instead of directory']);
+});
+
+test('JSON status reports absent and installed versions separately from the installer', () => {
+  const cwd = project('JSON 版本 with spaces-');
+  const destination = join(cwd, '.agents/skills/inferencex-api');
+  const args = ['status', '--target', 'codex', '--json'];
+  assert.deepEqual(jsonResult(run(args, cwd)), {
+    schema_version: 1,
+    package: packageInfo.name,
+    installer_version: packageInfo.version,
+    skill_path: destination,
+    installation_state: 'not_installed',
+    installed_version: null,
+    reason: null,
+  });
+  assert.deepEqual(readdirSync(cwd), []);
+  succeeded(run(['install', '--target', 'codex'], cwd));
+  setInstalledVersion(destination, '0.1.99');
+  const before = snapshot(cwd);
+  const status = jsonResult(run(args, cwd));
+  assert.equal(status.package, packageInfo.name);
+  assert.equal(status.installer_version, packageInfo.version);
+  assert.equal(status.skill_path, destination);
+  assert.equal(status.installation_state, 'installed');
+  assert.equal(status.installed_version, '0.1.99');
+  assert.equal(status.reason, null);
+  assert.deepEqual(snapshot(cwd), before);
+});
+
+test('JSON status preserves legacy, invalid receipt, and exporter mismatch as unknown versions', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const receipt = join(destination, metadataName);
+  for (const [contents, reason] of [
+    [null, 'no installation metadata; legacy or manually copied skill'],
+    ['{invalid JSON', 'invalid installation metadata'],
+    [
+      JSON.stringify({ package: 'other-package', version: '0.1.0' }),
+      'invalid installation metadata',
+    ],
+    [
+      JSON.stringify({ package: packageInfo.name, version: '0.1.99' }),
+      'installation metadata disagrees with the installed exporter version',
+    ],
+  ]) {
+    if (contents === null) rmSync(receipt);
+    else writeFileSync(receipt, contents);
+    const before = snapshot(cwd);
+    for (const command of ['status', 'install']) {
+      const result = jsonResult(run([command, '--json'], cwd));
+      assert.equal(result.installation_state, 'unknown');
+      assert.equal(result.installed_version, null);
+      assert.equal(result.reason, reason);
+      if (command === 'install') {
+        assert.equal(result.outcome, 'skipped');
+        assert.deepEqual(result.write_paths, []);
+      }
+    }
+    assert.deepEqual(snapshot(cwd), before);
+  }
+});
+
+test('JSON install distinguishes installed, skipped, and overwritten with the actual installed state', () => {
+  const cwd = project();
+  const installed = jsonResult(run(['install', '--json'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  assert.equal(installed.outcome, 'installed');
+  assert.equal(installed.dry_run, false);
+  assert.equal(installed.installed_version, packageInfo.version);
+  assert.equal(installed.installation_state, 'installed');
+  assert.equal(installed.skill_path, destination);
+  assert.equal(installed.preserves_extra_files, true);
+  assert.deepEqual(
+    installed.write_paths,
+    [
+      metadataName,
+      ...suite.packedFiles
+        .filter((path) => path.startsWith('skills/inferencex-api/'))
+        .map((path) => path.slice('skills/inferencex-api/'.length)),
+    ].sort(),
+  );
+  setInstalledVersion(destination, '0.1.99');
+  writeFileSync(join(destination, 'obsolete.txt'), 'keep this');
+  const before = snapshot(cwd);
+  const skipped = jsonResult(run(['install', '--json'], cwd));
+  assert.equal(skipped.outcome, 'skipped');
+  assert.equal(skipped.installed_version, '0.1.99');
+  assert.deepEqual(skipped.write_paths, []);
+  assert.deepEqual(snapshot(cwd), before);
+  const overwritten = jsonResult(run(['install', '--force', '--json'], cwd));
+  assert.equal(overwritten.outcome, 'overwritten');
+  assert.equal(overwritten.installed_version, packageInfo.version);
+  assert.deepEqual(overwritten.write_paths, installed.write_paths);
+  assert.equal(readFileSync(join(destination, 'obsolete.txt'), 'utf8'), 'keep this');
+});
+
+test('dry-run uses the same default, target, and custom destination resolution without writes', () => {
+  for (const [args, relative] of [
+    [[], '.claude/skills'],
+    [['--target', 'codex'], '.agents/skills'],
+    [['--target', 'agents'], '.agents/skills'],
+    [['--target', 'claude'], '.claude/skills'],
+    [['--target', 'codex', '--dir', 'custom 技能 with spaces'], 'custom 技能 with spaces'],
+    [['--dir', join(project(), 'absolute 技能')], null],
+  ]) {
+    const cwd = project();
+    const root = relative === null ? args[1] : join(cwd, relative);
+    const before = snapshot(cwd);
+    const preview = jsonResult(run(['install', ...args, '--dry-run', '--json'], cwd));
+    assert.equal(preview.outcome, 'would_install');
+    assert.equal(preview.dry_run, true);
+    assert.equal(preview.installation_state, 'not_installed');
+    assert.equal(preview.installed_version, null);
+    assert.equal(preview.installer_version, packageInfo.version);
+    assert.equal(preview.skill_path, join(root, 'inferencex-api'));
+    assert.equal(preview.preserves_extra_files, true);
+    assert.deepEqual(snapshot(cwd), before);
+    assert.equal(lstatSync(root, { throwIfNoEntry: false }), undefined);
+    const installed = jsonResult(run(['install', ...args, '--json'], cwd));
+    assert.equal(installed.skill_path, preview.skill_path);
+    assert.deepEqual(installed.write_paths, preview.write_paths);
+  }
+});
+
+test('force previews preserve existing receipts, local edits, obsolete files, and neighboring skills', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  setInstalledVersion(destination, '0.1.99');
+  writeFileSync(join(destination, 'SKILL.md'), 'local edit');
+  writeFileSync(join(destination, 'obsolete.txt'), 'preserved');
+  mkdirSync(join(cwd, '.claude/skills/neighbor'));
+  writeFileSync(join(cwd, '.claude/skills/neighbor/SKILL.md'), 'neighbor');
+  const before = snapshot(cwd);
+  for (const force of [[], ['--force']]) {
+    const args = ['install', '--dry-run', ...force];
+    const text = run(args, cwd);
+    succeeded(text);
+    assert.match(text.stdout, /Dry run: would (?:skip|overwrite)/);
+    assert.match(text.stdout, /Installed version: 0\.1\.99/);
+    assert.match(text.stdout, /Unrelated and obsolete files remain untouched/);
+    const preview = jsonResult(run([...args, '--json'], cwd));
+    assert.equal(preview.installed_version, '0.1.99');
+    assert.equal(preview.installation_state, 'installed');
+    assert.equal(preview.outcome, force.length > 0 ? 'would_overwrite' : 'would_skip');
+    assert.equal(preview.write_paths.length > 0, force.length > 0);
+    assert.equal(preview.preserves_extra_files, true);
+    assert.deepEqual(snapshot(cwd), before);
+  }
+});
+
+test('dry-run and install reject matching packaged conflicts and symlinks before changing files', () => {
+  for (const [relative, type] of [
+    ['scripts', 'file'],
+    ['scripts/export-powerx.mjs', 'directory'],
+    [metadataName, 'directory'],
+    ['SKILL.md', 'symlink'],
+    ['scripts', 'symlink'],
+    [metadataName, 'symlink'],
+    ['', 'file'],
+    ['', 'symlink'],
+  ]) {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const conflict = join(destination, relative);
+    rmSync(conflict, { recursive: true, force: true });
+    if (type === 'file') writeFileSync(conflict, 'local file');
+    else if (type === 'directory') mkdirSync(conflict);
+    else symlinkSync(project('preserved symlink target-'), conflict);
+    const before = snapshot(cwd);
+    const errors = [true, false].map((dryRun) => {
+      const result = run(['install', '--force', '--json', ...(dryRun ? ['--dry-run'] : [])], cwd);
+      const output = jsonResult(result, 1);
+      assert.equal(output.outcome, 'failed');
+      assert.match(result.stderr, /Could not install the skill/);
+      assert.deepEqual(snapshot(cwd), before);
+      return output.reason;
+    });
+    assert.equal(errors[0], errors[1]);
+  }
+});
+
+test('ancestor file conflicts fail before writes while directory parent symlinks remain supported', () => {
+  const cwd = project();
+  const conflict = join(cwd, 'not a directory');
+  writeFileSync(conflict, 'keep');
+  const before = snapshot(cwd);
+  for (const dryRun of [true, false]) {
+    const result = run(
+      [
+        'install',
+        '--dir',
+        join(conflict, 'nested/skills'),
+        '--json',
+        ...(dryRun ? ['--dry-run'] : []),
+      ],
+      cwd,
+    );
+    const error = jsonResult(result, 1);
+    assert.equal(error.outcome, 'failed');
+    assert.deepEqual(snapshot(cwd), before);
+  }
+  const actualRoot = project('parent symlink target-');
+  const linkedRoot = join(cwd, 'linked skills');
+  symlinkSync(actualRoot, linkedRoot);
+  const beforeLink = snapshot(cwd);
+  const beforeTarget = snapshot(actualRoot);
+  const preview = jsonResult(run(['install', '--dir', linkedRoot, '--dry-run', '--json'], cwd));
+  assert.equal(preview.outcome, 'would_install');
+  assert.equal(preview.skill_path, join(linkedRoot, 'inferencex-api'));
+  assert.deepEqual(snapshot(cwd), beforeLink);
+  assert.deepEqual(snapshot(actualRoot), beforeTarget);
+  const installed = jsonResult(run(['install', '--dir', linkedRoot, '--json'], cwd));
+  assert.equal(installed.outcome, 'installed');
+  assert.equal(installed.skill_path, preview.skill_path);
+  assert.deepEqual(installed.write_paths, preview.write_paths);
+  assert.ok(readFileSync(join(actualRoot, 'inferencex-api/SKILL.md')).length);
+});
+
+test('JSON usage failures stay one document and preserve exit code 2 without writes', () => {
+  for (const args of [
+    ['status', '--dry-run', '--json'],
+    ['status', '--force', '--json'],
+    ['install', '--target', 'invalid', '--json'],
+    ['install', '--unknown', '--json'],
+    ['install', '--dir', '', '--json'],
+    ['install', '--help', '--json'],
+    ['help', '--json'],
+    ['list', '--json'],
+    ['--version', '--json'],
+    ['--json'],
+  ]) {
+    const cwd = project();
+    const result = run(args, cwd);
+    const error = jsonResult(result, 2);
+    assert.deepEqual(Object.keys(error), ['schema_version', 'outcome', 'reason']);
+    assert.equal(error.outcome, 'failed');
+    assert.equal(typeof error.reason, 'string');
+    assert.match(result.stderr, /--help/);
+    assert.deepEqual(readdirSync(cwd), []);
+  }
+});
+
+test('an operational copy failure removes the receipt instead of reporting a successful JSON installation', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const preload = join(project(), 'fail-copy.mjs');
+  writeFileSync(
+    preload,
+    `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const copy = fs.cpSync;
+    fs.cpSync = (source, target, options) => {
+      if (target === ${JSON.stringify(destination)}) throw new Error('injected copy failure');
+      return copy(source, target, options);
+    };
+    syncBuiltinESMExports();
+  `,
+  );
+  const priorOptions = suite.environment.NODE_OPTIONS;
+  suite.environment.NODE_OPTIONS = `--import=${JSON.stringify(preload)}`;
+  try {
+    const failed = run(['install', '--force', '--json'], cwd);
+    const error = jsonResult(failed, 1);
+    assert.equal(error.outcome, 'failed');
+    assert.match(failed.stderr, /Could not install the skill: injected copy failure/);
+    assert.equal(lstatSync(join(destination, metadataName), { throwIfNoEntry: false }), undefined);
+    const status = jsonResult(run(['status', '--json'], cwd));
+    assert.equal(status.installation_state, 'unknown');
+    assert.equal(status.installed_version, null);
+  } finally {
+    if (priorOptions === undefined) delete suite.environment.NODE_OPTIONS;
+    else suite.environment.NODE_OPTIONS = priorOptions;
+  }
 });

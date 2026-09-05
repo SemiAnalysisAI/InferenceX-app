@@ -13,10 +13,13 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
+import signal
 import subprocess
 import tarfile
 import tempfile
+import time
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
@@ -24,6 +27,11 @@ from urllib.request import ProxyHandler, Request, build_opener
 PACKAGE = '@semianalysisai/inferencex-skills'
 REGISTRY = 'https://registry.npmjs.org'
 API = 'https://inferencex.semianalysis.com/api/v1/benchmarks'
+# Only the exact-version npm ETARGET propagation symptom is retryable. No HTTP,
+# publication, data-validation, or candidate-install retries.
+PUBLIC_INSTALL_ATTEMPTS = 3
+PUBLIC_RETRY_DELAYS = (5, 10)
+PUBLIC_DEADLINE_SECONDS = 300
 REQUEST_COLUMNS = set('package_version query_url retrieved_at requested_model requested_date date_selection raw_model'.split())
 METRIC_COLUMNS = set('power_valid power_metric_schema_version avg_power_w prefill_avg_power_w decode_avg_power_w joules_per_successful_query joules_per_input_token joules_per_output_token joules_per_total_token prefill_joules_per_input_token decode_joules_per_output_token avg_temp_c peak_temp_c avg_util_pct avg_mem_used_mb'.split())
 # Independent copy of the public CSV contract, not imported from the exporter under test.
@@ -35,21 +43,6 @@ workflow_run_id run_started_at run_url curve_date curve_workflow_run_id curve_ru
 power_valid power_metric_schema_version avg_power_w prefill_avg_power_w decode_avg_power_w
 joules_per_successful_query joules_per_input_token joules_per_output_token joules_per_total_token
 prefill_joules_per_input_token decode_joules_per_output_token avg_temp_c peak_temp_c avg_util_pct avg_mem_used_mb'''.split()
-CAPTURE = """import { writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-const originalFetch = globalThis.fetch;
-globalThis.fetch = async (input, init) => {
-  const url = String(input.url ?? input);
-  if (new URL(url).origin !== 'https://inferencex.semianalysis.com') throw Error('Unexpected origin');
-  const response = await originalFetch(input, init);
-  const body = Buffer.from(await response.clone().arrayBuffer());
-  const prefix = process.env.INFERENCEX_CAPTURE;
-  writeFileSync(`${prefix}.response.json`, body);
-  writeFileSync(`${prefix}.request.json`, JSON.stringify({query_url:url, status:response.status,
-    retrieved_at:new Date().toISOString(), sha256:createHash('sha256').update(body).digest('hex')}, null, 2));
-  return response;
-};
-"""
 
 
 def now():
@@ -75,51 +68,153 @@ def same_url(actual, expected):
         (b.scheme, b.netloc, b.path, parse_qs(b.query, keep_blank_values=True))
 
 
-def fetch_public(url, destination, report):
+def remaining_seconds(deadline, limit):
+    if deadline is None:
+        return limit
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError('Public verification deadline exceeded')
+    return min(limit, remaining)
+
+
+def deadline_expired(signum, frame):
+    raise TimeoutError('Public verification deadline exceeded during HTTP response')
+
+
+def fetch_public(url, destination, report, deadline=None):
     parsed = urlsplit(url)
     require(parsed.scheme == 'https' and parsed.hostname in ['registry.npmjs.org', 'inferencex.semianalysis.com']
             and not parsed.username and not parsed.password, 'Unexpected public URL')
     request = Request(url, headers={'User-Agent': 'InferenceX-skill-release-check', 'Accept-Encoding': 'identity'})
-    with build_opener(ProxyHandler({})).open(request, timeout=30) as response:
-        require(response.status == 200 and urlsplit(response.url).hostname == parsed.hostname, 'Unexpected HTTP response')
-        wire = response.read()
-        encoding = (response.headers.get('Content-Encoding') or 'identity').strip().lower()
-    request_record = {'query_url': url, 'retrieved_at': now(), 'content_encoding': encoding,
-                      'wire_sha256': hashlib.sha256(wire).hexdigest()}
+    request_record = {'query_url': url, 'started_at': now(), 'status': 'running'}
     report['requests'].append(request_record)
-    if encoding != 'identity':
-        wire_path = destination.with_name(destination.name + '.wire')
-        wire_path.write_bytes(wire)
-        request_record['wire_response_file'] = str(wire_path)
-    require(encoding in ['identity', 'gzip'], f'Unsupported Content-Encoding: {encoding}')
-    # Content-Type application/gzip describes a tarball, not HTTP transfer encoding.
-    body = gzip.decompress(wire) if encoding == 'gzip' else wire
-    destination.write_bytes(body)
-    request_record.update(response_file=str(destination), sha256=hashlib.sha256(body).hexdigest())
-    return body
-
-
-def run(command, project, environment, label):
-    timeout_error = None
+    timeout = remaining_seconds(deadline, 30)
+    previous_handler = None
+    if deadline is not None:
+        # Socket timeouts alone reset while a slow body keeps delivering bytes.
+        # This Unix maintainer script also bounds the complete open/read operation.
+        previous_handler = signal.signal(signal.SIGALRM, deadline_expired)
+        signal.setitimer(signal.ITIMER_REAL, remaining_seconds(deadline, PUBLIC_DEADLINE_SECONDS))
     try:
-        result = subprocess.run([str(part) for part in command], cwd=project, env=environment,
-                                capture_output=True, text=True, timeout=180)
-        returncode = result.returncode
-    except subprocess.TimeoutExpired as error:
-        result, timeout_error, returncode = error, error, None
-    # TimeoutExpired may carry bytes even when subprocess.run(text=True) was used.
-    stdout = result.stdout.decode('utf-8', errors='replace') if isinstance(result.stdout, bytes) else result.stdout or ''
-    stderr = result.stderr.decode('utf-8', errors='replace') if isinstance(result.stderr, bytes) else result.stderr or ''
-    (project / f'{label}.stdout.log').write_text(stdout)
-    (project / f'{label}.stderr.log').write_text(stderr)
+        with build_opener(ProxyHandler({})).open(request, timeout=timeout) as response:
+            request_record['response_status'] = response.status
+            require(response.status == 200 and urlsplit(response.url).hostname == parsed.hostname, 'Unexpected HTTP response')
+            wire = response.read()
+            encoding = (response.headers.get('Content-Encoding') or 'identity').strip().lower()
+        remaining_seconds(deadline, 30)
+        request_record.update(retrieved_at=now(), content_encoding=encoding,
+                              wire_sha256=hashlib.sha256(wire).hexdigest())
+        if encoding != 'identity':
+            wire_path = destination.with_name(destination.name + '.wire')
+            wire_path.write_bytes(wire)
+            request_record['wire_response_file'] = str(wire_path)
+        require(encoding in ['identity', 'gzip'], f'Unsupported Content-Encoding: {encoding}')
+        # Content-Type application/gzip describes a tarball, not HTTP transfer encoding.
+        body = gzip.decompress(wire) if encoding == 'gzip' else wire
+        destination.write_bytes(body)
+        request_record.update(status='passed', response_file=str(destination), sha256=hashlib.sha256(body).hexdigest())
+        return body
+    except Exception as error:
+        request_record.update(status='failed', error=f'{type(error).__name__}: {error}')
+        raise
+    finally:
+        if previous_handler is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous_handler)
+        request_record['completed_at'] = now()
+
+
+def run(command, project, environment, label, deadline=None):
+    timeout = remaining_seconds(deadline, 180)
+    started, started_at = time.monotonic(), now()
+    error, returncode = None, None
+    stdout_path, stderr_path = project / f'{label}.stdout.log', project / f'{label}.stderr.log'
+    try:
+        # Files avoid pipe-draining waits when an npm descendant keeps stdout open.
+        with stdout_path.open('w') as stdout_log, stderr_path.open('w') as stderr_log:
+            process = subprocess.Popen([str(part) for part in command], cwd=project, env=environment,
+                                       stdout=stdout_log, stderr=stderr_log, start_new_session=True)
+            try:
+                timeout = remaining_seconds(deadline, timeout)
+                returncode = process.wait(timeout=timeout)
+            except (subprocess.TimeoutExpired, TimeoutError):
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.poll()  # Reap if already exited; never add an unbounded cleanup wait.
+                raise
+    except Exception as caught:
+        error = caught
+    stdout, stderr = stdout_path.read_text(errors='replace'), stderr_path.read_text(errors='replace')
     with (project / 'commands.jsonl').open('a') as log:
         log.write(json.dumps({'command': [str(part) for part in command], 'cwd': str(project),
-                              'completed_at': now(), 'returncode': returncode,
-                              'timed_out': timeout_error is not None, 'timeout_seconds': 180}) + '\n')
-    if timeout_error is not None:
-        raise timeout_error
-    require(returncode == 0, f'{label} failed; inspect {project}/{label}.stderr.log')
+                              'started_at': started_at, 'completed_at': now(), 'returncode': returncode,
+                              'elapsed_seconds': time.monotonic() - started,
+                              'timed_out': isinstance(error, (subprocess.TimeoutExpired, TimeoutError)),
+                              'timeout_seconds': timeout}) + '\n')
+    if error is not None:
+        raise error
+    if returncode != 0:
+        raise subprocess.CalledProcessError(returncode, command, output=stdout, stderr=stderr)
+    remaining_seconds(deadline, 180)
     return stdout
+
+
+def transient_install_error(error, version):
+    if not isinstance(error, subprocess.CalledProcessError):
+        return False
+    stderr = error.stderr or ''
+    codes = re.findall(r'^npm (?:error|ERR!) code (\S+)\s*$', stderr, re.MULTILINE)
+    expected = f'No matching version found for {PACKAGE}@{version}.'
+    return codes == ['ETARGET'] and any(
+        line in [f'npm error notarget {expected}', f'npm ERR! notarget {expected}']
+        for line in stderr.splitlines())
+
+
+def install_target(clean_root, target, node, npm, archive, version, public, report, deadline=None):
+    target_root = clean_root / target
+    for attempt in range(1, (PUBLIC_INSTALL_ATTEMPTS if public else 1) + 1):
+        remaining_seconds(deadline, 180)
+        project = target_root / f'attempt-{attempt}' if public else target_root
+        project.mkdir(parents=True)
+        config = clean_root / f'{target}-npm-{attempt}'
+        config.mkdir()
+        for name in ['user.npmrc', 'global.npmrc']:
+            (config / name).write_text('')
+        env = {'PATH': str(Path(node).parent) + os.pathsep + os.defpath, 'LANG': 'en_US.UTF-8',
+               'npm_config_registry': REGISTRY, 'npm_config_userconfig': str(config / 'user.npmrc'),
+               'npm_config_globalconfig': str(config / 'global.npmrc'), 'npm_config_cache': str(config / 'cache'),
+               'npm_config_update_notifier': 'false', 'npm_config_audit': 'false', 'npm_config_fund': 'false',
+               'npm_config_fetch_retries': '0'}
+        spec = f'{PACKAGE}@{version}' if public else str(archive)
+        command = [npm, 'exec', '--yes', *([] if public else ['--offline']), '--package', spec,
+                   '--', 'inferencex-skills', 'install', '--target', target]
+        started = time.monotonic()
+        entry = {'target': target, 'attempt': attempt, 'project': str(project), 'package': spec,
+                 'started_at': now(), 'status': 'running'}
+        report.setdefault('install_attempts', []).append(entry)
+        try:
+            run(command, project, env, 'install', deadline)
+            entry['status'] = 'passed'
+            return project, env
+        except Exception as error:
+            retryable = public and transient_install_error(error, version)
+            entry.update(status='failed', error=f'{type(error).__name__}: {error}',
+                         retryable=retryable, returncode=getattr(error, 'returncode', None))
+            if not retryable or attempt == PUBLIC_INSTALL_ATTEMPTS:
+                raise
+            delay = PUBLIC_RETRY_DELAYS[attempt - 1]
+            if remaining_seconds(deadline, delay + 1) <= delay:
+                raise TimeoutError('Public verification deadline cannot accommodate the next retry') from error
+            entry['retry_delay_seconds'] = delay
+        finally:
+            entry.update(completed_at=now(), elapsed_seconds=time.monotonic() - started)
+            logs = config / 'cache/_logs'
+            if logs.exists():
+                shutil.copytree(logs, project / 'npm-logs')
+            save(project / 'install-attempt.json', entry)
+        time.sleep(delay)
 
 
 def scoped(rows, isl, osl, raw_model=None):
@@ -187,6 +282,54 @@ def check_exports(project, json_source, csv_source, args, version):
     return {'selected_rows': len(expected), 'metric_coverage': document['metadata']['metric_coverage']}
 
 
+def captured_export(project, name, output, args, version, isl=None, osl=None):
+    capture = json.loads((project / name / 'manifest.json').read_text())
+    require(capture['schema_version'] == 1 and capture['status'] == 'complete'
+            and capture['package_version'] == version, 'Export evidence is incomplete or belongs to another version')
+    request, response, exported = capture['request'], capture['response'], capture['export']
+    require(request['method'] == 'GET' and same_url(request['url'], args.strict_url), 'Captured request differs')
+    require(request['filters'] == {'model': args.model, 'date': args.date, 'powerValid': 'strictV2',
+            'benchmark_type': 'single_turn', 'isl': isl or args.isl, 'osl': osl or args.osl,
+            'raw_model': args.raw_model}, 'Captured filters differ')
+    require(response['status'] == 200 and response['body_file'] == 'response.json' and
+            response['checksum_covers'] == 'saved decoded response body', 'Captured response identity differs')
+    body = (project / name / response['body_file']).read_bytes()
+    require(hashlib.sha256(body).hexdigest() == response['sha256'], 'Captured body checksum differs')
+    require(datetime.fromisoformat(response['retrieved_at'].replace('Z', '+00:00')).tzinfo,
+            'Missing capture retrieval timezone')
+    require(exported['format'] == Path(output).suffix.removeprefix('.') and
+            Path(exported['destination']).is_absolute() and
+            Path(exported['destination']).resolve() == (project / output).resolve() and
+            exported['sha256'] == hashlib.sha256((project / output).read_bytes()).hexdigest(),
+            'Captured export link differs')
+    rows = json.loads(body)
+    check_metadata(exported['metadata'], rows, args, version, isl, osl)
+    require(response['retrieved_at'] == exported['metadata']['retrieved_at'], 'Capture and extraction timestamps differ')
+    if exported['format'] == 'json':
+        require(json.loads((project / output).read_text())['metadata'] == exported['metadata'],
+                'Captured extraction metadata differs')
+    else:
+        with (project / output).open(newline='') as handle:
+            for row in csv.DictReader(handle):
+                for field in REQUEST_COLUMNS:
+                    value = exported['metadata'][field]
+                    require(row[field] == ('' if value is None else str(value)),
+                            f'CSV extraction metadata differs from its captured response: {field}')
+    return rows
+
+
+def captured_request(project, name, expected_url, metadata):
+    context = json.loads((project / 'raw-responses' / f'{name}.request.json').read_text())
+    body = (project / 'raw-responses' / f'{name}.response.json').read_bytes()
+    require(context['status'] == 200 and same_url(context['query_url'], expected_url) and
+            context['sha256'] == hashlib.sha256(body).hexdigest(), 'Original request evidence differs')
+    require(datetime.fromisoformat(context['retrieved_at'].replace('Z', '+00:00')).tzinfo,
+            'Missing original response retrieval timezone')
+    require(same_url(metadata['query_url'], context['query_url']) and
+            metadata['retrieved_at'] == context['retrieved_at'], 'Output and original request context differ')
+    return json.loads(body)
+
+
 def check_lookup(lookup, available, args):
     require(same_url(lookup['query_url'], args.base_url), 'Lookup URL differs from requested scope')
     require(datetime.fromisoformat(lookup['retrieved_at'].replace('Z', '+00:00')).tzinfo, 'Missing lookup retrieval timezone')
@@ -221,10 +364,12 @@ def check_empty_diagnostic(diagnostic, empty_metadata, returned_rows, args):
             and detail['measurement_counts'] == {'some_recorded': 0, 'missing': 0}, 'Diagnostic counts differ')
 
 
-def prompt(args):
+def prompt(args, target, archive):
     cutoff = f'as of {args.date}' if args.date else 'using the latest available observations'
     raw = f' Keep only the exact returned model key {args.raw_model}; record this filter as scope.raw_model in lookup.json.' if args.raw_model else ''
     return f'''Use only the installed inferencex-api skill and public HTTP data in this clean project.
+
+The exact candidate archive is available at {archive}. Using its offline npm installer for target {target}, inspect the installed version with JSON output and save status.json. Preview a forced installation with JSON output and save preview.json. Do not perform the installation or change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files. The npm command is npm exec --yes --offline --package <archive> -- inferencex-skills <command>.
 
 For {args.model} {cutoff}, show five latest single-turn benchmark observations with {args.isl} input and {args.osl} output tokens, regardless of power validation. Save lookup.json using the installed lookup example's output shape.{raw} Do not introduce additional filters.
 
@@ -234,9 +379,9 @@ Attempt the same validated export for exactly {args.empty_isl} input and {args.e
 
 There is no repository or database access in this project. Do not read another checkout, call private services, install dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
 
-The complete response files are required deliverables: save the entire unfiltered benchmark response, the entire strict response before local filtering, and the complete diagnostic response under raw-responses/, each with its own URL and retrieval timestamp. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for the original responses. Capture the responses used by this extraction before selecting rows; do not reconstruct them from exported subsets. Before finishing, verify these response files exist alongside result.md.
+The complete response files are required deliverables. Use the exporter's built-in --evidence-dir with separate fresh directories powerx-csv-evidence, powerx-json-evidence, and unavailable-evidence for the corresponding outputs. For lookup and diagnosis, save each complete consumed body as raw-responses/lookup.response.json and raw-responses/diagnostic.response.json before selecting rows. Beside each body save a .request.json record with query_url, status, retrieved_at, and sha256 of the saved body; use that same retrieved_at value in the corresponding lookup or diagnostic output. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for original responses. Before finishing, verify these files exist alongside result.md.
 
-Each lookup, CSV export, JSON export, empty export, and diagnostic must be traceable to the complete response from the very same HTTP request it consumed. A separate request to the same URL does not satisfy this requirement. Keep installed skill files unchanged; if the exporter does not save its input response, arrange observation of that HTTP response in your project before running it. Matching row counts alone do not establish original-response capture.
+Each lookup, CSV export, JSON export, empty export, and diagnostic must be traceable to the complete response from the very same HTTP request it consumed. A separate request to the same URL does not satisfy this requirement. Keep installed skill files unchanged. Matching row counts alone do not establish original-response capture.
 '''
 
 
@@ -287,6 +432,12 @@ def main():
     report = {'status': 'running', 'mode': args.mode, 'started_at': now(), 'candidate': record,
               'new_benchmark_runs': False, 'requests': [], 'targets': [],
               'scope': {key: getattr(args, key) for key in ['model', 'date', 'isl', 'osl', 'raw_model', 'empty_isl', 'empty_osl']}}
+    deadline = time.monotonic() + PUBLIC_DEADLINE_SECONDS if args.mode == 'public' else None
+    if deadline is not None:
+        report['public_retry_policy'] = {'install_attempts_per_target': PUBLIC_INSTALL_ATTEMPTS,
+                                         'delays_seconds': PUBLIC_RETRY_DELAYS,
+                                         'total_deadline_seconds': PUBLIC_DEADLINE_SECONDS,
+                                         'retryable': 'exact requested package/version npm ETARGET only'}
     save(args.evidence / 'verification.json', report)
     try:
         if args.mode == 'check-agent':
@@ -298,71 +449,59 @@ def main():
             require(len(matches) == 1, 'Project was not prepared for this acceptance run')
             installed = args.project / ('.agents' if matches[0]['target'] == 'codex' else '.claude') / 'skills/inferencex-api'
             check_installed(installed, skill_files, record['version'])
-            source = json.loads(fetch_public(args.strict_url, args.evidence / 'strict.json', report))
-            result = check_exports(args.project, source, source, args, record['version'])
-            unfiltered = json.loads(fetch_public(args.base_url, args.evidence / 'unfiltered.json', report))
-            available = scoped(unfiltered, args.isl, args.osl, args.raw_model)
+            json_source = captured_export(args.project, 'powerx-json-evidence', 'powerx.json', args, record['version'])
+            csv_source = captured_export(args.project, 'powerx-csv-evidence', 'powerx.csv', args, record['version'])
+            result = check_exports(args.project, json_source, csv_source, args, record['version'])
             lookup = json.loads((args.project / 'lookup.json').read_text())
+            unfiltered = captured_request(args.project, 'lookup', args.base_url, lookup)
+            available = scoped(unfiltered, args.isl, args.osl, args.raw_model)
             check_lookup(lookup, available, args)
             empty = json.loads((args.project / 'unavailable.json').read_text())
+            source = captured_export(args.project, 'unavailable-evidence', 'unavailable.json', args,
+                                     record['version'], args.empty_isl, args.empty_osl)
             require(check_metadata(empty['metadata'], source, args, record['version'], args.empty_isl, args.empty_osl) == empty['rows'] == [],
                     'Empty example now has eligible observations; choose another exact unavailable workload')
-            require(not scoped(unfiltered, args.empty_isl, args.empty_osl, args.raw_model), 'Empty example has observations; review diagnostic manually')
             diagnostic = json.loads((args.project / 'diagnostic.json').read_text())
-            check_empty_diagnostic(diagnostic, empty['metadata'], len(unfiltered), args)
+            diagnostic_source = captured_request(args.project, 'diagnostic', args.base_url, diagnostic['diagnostic'])
+            require(not scoped(diagnostic_source, args.empty_isl, args.empty_osl, args.raw_model), 'Empty example has observations; review diagnostic manually')
+            check_empty_diagnostic(diagnostic, empty['metadata'], len(diagnostic_source), args)
             require((args.project / 'result.md').read_text().strip(), 'Native-agent narrative is missing')
             report.update(status='data-checks-passed', narrative_review='required', targets=[result])
             return
         if args.mode == 'public':
-            metadata = json.loads(fetch_public(f'{REGISTRY}/@semianalysisai%2finferencex-skills/{record["version"]}', args.evidence / 'registry.json', report))
+            metadata = json.loads(fetch_public(f'{REGISTRY}/@semianalysisai%2finferencex-skills/{record["version"]}', args.evidence / 'registry.json', report, deadline))
             require(metadata['name'] == PACKAGE and metadata['version'] == record['version'] and
                     metadata['dist']['integrity'] == record['integrity'], 'Public metadata differs from candidate')
-            public = fetch_public(metadata['dist']['tarball'], args.evidence / 'public-package.tgz', report)
+            public = fetch_public(metadata['dist']['tarball'], args.evidence / 'public-package.tgz', report, deadline)
             require(public == body, 'Public tarball differs from the accepted archive')
         node, npm = shutil.which('node'), shutil.which('npm')
         require(node and npm, 'Node 24 and npm must be on PATH')
         clean_root = Path(tempfile.mkdtemp(prefix='inferencex-skill-acceptance-'))
         report['clean_root'] = str(clean_root)
         for target in ['codex', 'claude']:
-            project = clean_root / target
-            project.mkdir()
-            config = clean_root / f'{target}-npm'
-            config.mkdir()
-            for name in ['user.npmrc', 'global.npmrc']:
-                (config / name).write_text('')
-            env = {'PATH': str(Path(node).parent) + os.pathsep + os.defpath, 'LANG': 'en_US.UTF-8',
-                   'npm_config_registry': REGISTRY, 'npm_config_userconfig': str(config / 'user.npmrc'),
-                   'npm_config_globalconfig': str(config / 'global.npmrc'), 'npm_config_cache': str(config / 'cache'),
-                   'npm_config_update_notifier': 'false', 'npm_config_audit': 'false', 'npm_config_fund': 'false'}
-            spec = f'{PACKAGE}@{record["version"]}' if args.mode == 'public' else str(archive)
-            offline = [] if args.mode == 'public' else ['--offline']
-            run([npm, 'exec', '--yes', *offline, '--package', spec, '--', 'inferencex-skills', 'install', '--target', target], project, env, 'install')
+            project, env = install_target(clean_root, target, node, npm, archive, record['version'],
+                                          args.mode == 'public', report, deadline)
             installed = project / ('.agents' if target == 'codex' else '.claude') / 'skills/inferencex-api'
             check_installed(installed, skill_files, record['version'])
             if args.mode == 'agents':
-                (project / 'prompt.txt').write_text(prompt(args))
+                (project / 'prompt.txt').write_text(prompt(args, target, archive))
                 report['targets'].append({'target': target, 'project': str(project), 'status': 'awaiting-native-agent'})
                 continue
-            (project / 'capture-http.mjs').write_text(CAPTURE)
             for output_format in ['json', 'csv']:
                 flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl), '--format', output_format,
-                         '--output', f'powerx.{output_format}']
+                         '--output', f'powerx.{output_format}', '--evidence-dir', f'powerx-{output_format}-evidence']
                 if args.date:
                     flags += ['--date', args.date]
                 if args.raw_model:
                     flags += ['--raw-model', args.raw_model]
-                run([node, '--import', project / 'capture-http.mjs', installed / 'scripts/export-powerx.mjs', *flags],
-                    project, env | {'INFERENCEX_CAPTURE': f'powerx-{output_format}'}, f'powerx-{output_format}')
-            sources = []
-            for output_format in ['json', 'csv']:
-                capture = json.loads((project / f'powerx-{output_format}.request.json').read_text())
-                data = (project / f'powerx-{output_format}.response.json').read_bytes()
-                require(capture['status'] == 200 and same_url(capture['query_url'], args.strict_url) and
-                        hashlib.sha256(data).hexdigest() == capture['sha256'], 'Captured HTTP evidence differs')
-                sources.append(json.loads(data))
+                run([node, installed / 'scripts/export-powerx.mjs', *flags], project, env,
+                    f'powerx-{output_format}', deadline)
+            sources = [captured_export(project, f'powerx-{fmt}-evidence', f'powerx.{fmt}', args, record['version'])
+                       for fmt in ['json', 'csv']]
             result = check_exports(project, *sources, args, record['version'])
             result.update(target=target, project=str(project))
             report['targets'].append(result)
+        remaining_seconds(deadline, PUBLIC_DEADLINE_SECONDS)
         report['status'] = 'prepared' if args.mode == 'agents' else 'passed'
         if args.mode == 'agents':
             save(clean_root / 'acceptance.json', report)

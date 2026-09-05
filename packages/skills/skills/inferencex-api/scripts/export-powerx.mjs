@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
-import { writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { lstat, mkdir, readlink, realpath, rename, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; the packed-artifact test checks this version.
-const PACKAGE_VERSION = '0.2.0';
+const PACKAGE_VERSION = '0.3.0';
 const HELP = `export-powerx — export validated single-turn PowerX observations
 
 Requires Node 24 or later.
@@ -18,6 +20,7 @@ Options:
   --raw-model <key>   Select an exact returned model key within the display bucket
   --format <format>   csv (default) or json
   --output <file>     Output file relative to the current directory; default stdout
+  --evidence-dir <dir> Save the consumed response and manifest in a new directory
   --help             Show this help without making a request
 
 Requests powerValid=strictV2 and selects the exact single-turn workload locally.
@@ -132,6 +135,27 @@ function benchmarkRow(row) {
   );
 }
 
+// Resolve existing symlink ancestors, including dangling output links, before creating evidence.
+async function physicalPath(path) {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    const entry = await lstat(path).catch((statError) => {
+      if (statError.code !== 'ENOENT') throw statError;
+      return null;
+    });
+    if (entry?.isSymbolicLink()) return physicalPath(resolve(dirname(path), await readlink(path)));
+    return join(await physicalPath(dirname(path)), basename(path));
+  }
+}
+
+async function saveManifest(evidence) {
+  const temporary = join(evidence.directory, 'manifest.tmp');
+  await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
+  await rename(temporary, join(evidence.directory, 'manifest.json'));
+}
+
 async function run(args = process.argv.slice(2)) {
   const { values } = parseArgs({
     args,
@@ -143,6 +167,7 @@ async function run(args = process.argv.slice(2)) {
       'raw-model': { type: 'string' },
       format: { type: 'string', default: 'csv' },
       output: { type: 'string' },
+      'evidence-dir': { type: 'string' },
       help: { type: 'boolean' },
     },
     allowPositionals: false,
@@ -172,20 +197,121 @@ async function run(args = process.argv.slice(2)) {
   if (values.output !== undefined && !values.output.trim()) {
     throw new Error('--output requires a file path');
   }
+  if (values['evidence-dir'] !== undefined && !values['evidence-dir'].trim()) {
+    throw new Error('--evidence-dir requires a new directory path');
+  }
 
   const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks');
   url.searchParams.set('model', values.model);
   if (values.date !== undefined) url.searchParams.set('date', values.date);
   url.searchParams.set('powerValid', 'strictV2');
+  let evidence;
+  if (values['evidence-dir'] !== undefined) {
+    const directory = resolve(values['evidence-dir']);
+    if (values.output !== undefined) {
+      // Reserve case-only aliases too, so the export is safe on case-insensitive filesystems.
+      let evidencePath = await physicalPath(directory);
+      let outputPath = await physicalPath(resolve(values.output));
+      evidencePath = evidencePath.toLowerCase();
+      outputPath = outputPath.toLowerCase();
+      const withinEvidence = relative(evidencePath, outputPath);
+      if (
+        withinEvidence === '' ||
+        ['response.json', 'manifest.json', 'manifest.tmp'].some(
+          (file) => withinEvidence === file || withinEvidence.startsWith(`${file}${sep}`),
+        ) ||
+        evidencePath.startsWith(`${outputPath}${sep}`)
+      ) {
+        throw new Error(
+          '--output collides with the evidence directory or a reserved evidence file',
+        );
+      }
+    }
+    await mkdir(dirname(directory), { recursive: true });
+    await mkdir(directory); // EEXIST also refuses empty directories and symlinks.
+    evidence = {
+      directory,
+      manifest: {
+        schema_version: 1,
+        package_version: PACKAGE_VERSION,
+        status: 'pending',
+        request: {
+          url: url.href,
+          method: 'GET',
+          filters: {
+            model: values.model,
+            date: values.date ?? null,
+            powerValid: 'strictV2',
+            benchmark_type: 'single_turn',
+            isl,
+            osl,
+            raw_model: values['raw-model'] ?? null,
+          },
+        },
+        response: null,
+        export: {
+          format: values.format,
+          destination: values.output === undefined ? 'stdout' : resolve(values.output),
+          sha256: null,
+          metadata: null,
+        },
+      },
+    };
+    await saveManifest(evidence);
+  }
+  try {
+    await exportPowerx(values, isl, osl, url, evidence);
+  } catch (error) {
+    if (evidence) {
+      evidence.manifest.status = 'failed';
+      evidence.manifest.error = error.message;
+      try {
+        await saveManifest(evidence);
+      } catch (writeError) {
+        throw new Error(
+          `${error.message}; could not save failure evidence: ${writeError.message}`,
+          {
+            cause: writeError,
+          },
+        );
+      }
+    }
+    throw error;
+  }
+}
+
+async function exportPowerx(values, isl, osl, url, evidence) {
   const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  let capturedBody;
+  if (evidence) {
+    const captured = {
+      status: response.status,
+      retrieved_at: new Date().toISOString(),
+      body_file: null,
+      sha256: null,
+      checksum_covers: 'saved decoded response body',
+    };
+    evidence.manifest.response = captured;
+    // fetch decodes HTTP compression; save and parse these same bytes, without refetching.
+    const bytes = Buffer.from(await response.arrayBuffer());
+    await writeFile(join(evidence.directory, 'response.json'), bytes, { flag: 'wx' });
+    captured.body_file = 'response.json';
+    captured.sha256 = createHash('sha256').update(bytes).digest('hex');
+    capturedBody = new TextDecoder().decode(bytes);
+  }
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
+    let body;
+    try {
+      body = capturedBody === undefined ? await response.json() : JSON.parse(capturedBody);
+    } catch {
+      body = null;
+    }
     const detail = typeof body?.error === 'string' ? `: ${body.error.slice(0, 300)}` : '';
     throw new Error(`HTTP ${response.status}${detail} (${url.href})`);
   }
   let rows;
   try {
-    rows = await response.json();
+    rows = capturedBody === undefined ? await response.json() : JSON.parse(capturedBody);
   } catch (error) {
     throw new Error(`Could not read benchmark JSON: ${error.message}`, { cause: error });
   }
@@ -217,7 +343,7 @@ async function run(args = process.argv.slice(2)) {
   const metadata = {
     package_version: PACKAGE_VERSION,
     query_url: url.href,
-    retrieved_at: new Date().toISOString(),
+    retrieved_at: evidence?.manifest.response.retrieved_at ?? new Date().toISOString(),
     requested_model: values.model,
     requested_date: values.date ?? null,
     date_selection: values.date === undefined ? 'latest' : 'as-of',
@@ -272,8 +398,22 @@ async function run(args = process.argv.slice(2)) {
     );
     output = `${[columns.join(','), ...lines].join('\r\n')}\r\n`;
   }
-  if (values.output === undefined) process.stdout.write(output);
+  if (evidence) {
+    evidence.manifest.export.sha256 = createHash('sha256').update(output).digest('hex');
+    evidence.manifest.export.metadata = metadata;
+  }
+  if (values.output === undefined && evidence) {
+    // A closed consumer is a failed export, even if response capture already succeeded.
+    process.stdout.on('error', () => {});
+    await new Promise((resolveWrite, reject) => {
+      process.stdout.write(output, (error) => (error ? reject(error) : resolveWrite()));
+    });
+  } else if (values.output === undefined) process.stdout.write(output);
   else await writeFile(values.output, output, 'utf8');
+  if (evidence) {
+    evidence.manifest.status = 'complete';
+    await saveManifest(evidence);
+  }
   process.stderr.write(`${JSON.stringify({ metadata })}\n`);
   process.stderr.write(
     `Selected ${metadata.selected_rows} of ${metadata.returned_rows} returned rows. Raw models: ${metadata.selected_models.join(', ') || '(none)'}.\n`,

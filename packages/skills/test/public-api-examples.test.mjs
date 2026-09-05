@@ -12,7 +12,31 @@ const base = 'https://inferencex.semianalysis.com';
 const installed = new Map();
 const preload = join(temporaryRoot, 'http-response.mjs');
 const schema = {
+  components: {
+    schemas: {
+      BenchmarkRows: {
+        items: {
+          properties: {
+            metrics: {
+              properties: {
+                avg_power_w: { description: 'Mean measured watts per GPU.' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   paths: {
+    '/api/v1/benchmarks/history': {
+      get: {
+        parameters: [
+          { name: 'model', schema: { enum: ['DeepSeek-V4-Pro'] } },
+          { name: 'isl' },
+          { name: 'osl' },
+        ],
+      },
+    },
     '/api/v1/evaluations': { get: { parameters: [] } },
     '/api/v1/datasets': { get: { parameters: [] } },
     '/api/v1/datasets/{slug}/conversations': {
@@ -36,7 +60,7 @@ before(() => {
         /```bash\nnode --input-type=module <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/gu,
       ),
     ];
-    assert.equal(snippets.length, 2, 'run both recipes from the installed npm archive');
+    assert.equal(snippets.length, 3, 'run all recipes from the installed npm archive');
     installed.set(
       target,
       snippets.map((snippet) => snippet.groups.code),
@@ -184,7 +208,7 @@ test('evaluation no-match is distinct from missing metrics, unavailable HTTP, or
 });
 
 test('recipes inspect live operation availability before making data requests', () => {
-  for (const index of [0, 1]) {
+  for (const index of [0, 1, 2]) {
     const result = run(index, {}, { openapi: { paths: {} } });
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
@@ -310,6 +334,85 @@ test('invalid pages and failed or mismatched details fail instead of producing f
       [`${path}?limit=3&offset=0&sort=id`]: response({ total: 1, items: [item('one')] }),
       [`${path}/one`]: detail,
     });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+  }
+});
+
+const historyRow = (id, date, overrides = {}) => ({
+  id,
+  date,
+  model: 'dsv4',
+  hardware: 'b200',
+  framework: 'vllm',
+  precision: 'fp4',
+  benchmark_type: 'single_turn',
+  isl: 8192,
+  osl: 1024,
+  conc: 16,
+  metrics: { avg_power_w: 0, output_tput_per_gpu: 12 },
+  run_url:
+    'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/9007199254740993123/attempts/2',
+  curve_date: '2026-09-05',
+  curve_workflow_run_id: '9007199254740993124',
+  workers: [{ device_id: 'GPU-001', sample: null }],
+  ...overrides,
+});
+
+test('installed history recipe keeps all scoped observations, dates, raw configuration and documented units', () => {
+  const first = historyRow('9007199254740993123', '2026-08-01');
+  const last = historyRow('last', '2026-09-04', {
+    framework: 'sglang',
+    metrics: { output_tput_per_gpu: 0 },
+  });
+  const rows = [
+    last,
+    historyRow('outside-date', '2026-07-31'),
+    historyRow('other-gpu', '2026-08-02', { hardware: 'h200' }),
+    first,
+    historyRow('other-workload', '2026-08-03', { isl: 1024 }),
+    historyRow('other-type', '2026-08-03', { benchmark_type: 'agentic_traces' }),
+    historyRow('after-range', '2026-09-05'),
+  ];
+  const path = '/api/v1/benchmarks/history?model=DeepSeek-V4-Pro&isl=8192&osl=1024';
+  for (const target of ['codex', 'claude']) {
+    const result = run(2, { [path]: response(rows) }, { target });
+    const output = succeeded(result);
+    assert.deepEqual(result.requests, [`${base}/api/openapi.json`, `${base}${path}`]);
+    assert.equal(output.returned_rows, 7);
+    assert.equal(output.selected_rows, 2);
+    assert.deepEqual(output.rows, [first, last]);
+    assert.deepEqual(output.observed_dates, ['2026-08-01', '2026-09-04']);
+    assert.deepEqual(output.available_hardware, ['b200', 'h200']);
+    assert.deepEqual(output.metric_descriptions, {
+      avg_power_w: 'Mean measured watts per GPU.',
+      output_tput_per_gpu: null,
+    });
+    assert.deepEqual(output.scope, {
+      model: 'DeepSeek-V4-Pro',
+      hardware: 'b200',
+      benchmark_type: 'single_turn',
+      isl: 8192,
+      osl: 1024,
+      date_from: '2026-08-01',
+      date_to: '2026-09-04',
+      date_field: 'date',
+    });
+  }
+  for (const input of [[], [historyRow('outside-date', '2026-07-31')]]) {
+    const output = succeeded(run(2, { [path]: response(input) }));
+    assert.equal(output.outcome, 'no_matching_observations');
+    assert.deepEqual(output.rows, []);
+    assert.equal(output.returned_rows, input.length);
+  }
+  for (const input of [
+    { status: 503, body: 'unavailable' },
+    { body: '{' },
+    response({ rows }),
+    response([historyRow('bad', '2026-02-31')]),
+    response([historyRow('bad', '2026-08-01', { metrics: null })]),
+  ]) {
+    const result = run(2, { [path]: input });
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
   }

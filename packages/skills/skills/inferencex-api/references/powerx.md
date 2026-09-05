@@ -33,6 +33,44 @@ export. Successful exports also emit a JSON metadata record to stderr; retain th
 report log so even a header-only CSV has request, scope, and package-version
 evidence. Run the script with `--help` for the complete CLI interface.
 
+## Save the response used by an export
+
+Add `--evidence-dir` when the user needs reproducible input evidence. Use a fresh
+path for each invocation, including separate CSV and JSON exports:
+
+```bash
+node "$INFERENCEX_SKILL_DIR/scripts/export-powerx.mjs" \
+  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
+  --format csv --output powerx.csv --evidence-dir './powerx evidence'
+```
+
+The exporter makes one benchmark request and saves its complete response before
+filtering. `response.json` contains the received decoded body, even when it is an
+HTTP error or malformed JSON. Its SHA-256 covers those saved decoded bytes, not
+compressed wire bytes. `manifest.json` links that response to the export:
+
+- `schema_version: 1`, `package_version`, and `status` (`pending`, `complete`, `failed`).
+- `request`: URL, GET method and all requested API/local filters.
+- `response`: HTTP status, retrieval time, body filename, SHA-256 and checksum meaning;
+  `null` means no HTTP response was received. A received but unreadable body is distinct.
+- `export`: format, absolute destination or `stdout`, output SHA-256 and the existing
+  extraction metadata. An empty successful selection still has context and evidence.
+- `error`: failure explanation when present.
+
+Only `complete` means both the requested export and evidence finished. HTTP, JSON,
+shape, output or evidence-write errors exit unsuccessfully; retain the failed or
+pending manifest and captured body for diagnosis. Existing evidence directories
+are refused; keep output paths outside the evidence directory. Use paths containing
+spaces normally, with shell quotes. Omitting this option saves no response files
+and preserves the existing CSV columns, JSON shape, and stdout/stderr roles.
+
+For verification, hash `response.json` and the actual output, compare the manifest,
+then select rows from that saved response using the recorded filters. A later API
+request is separate evidence and may return different observations. Lookup and
+empty-result diagnostics still record their own request context; if original-input
+evidence is requested for those reads, save each complete consumed response before
+selecting its rows.
+
 ## Selection and coverage
 
 The request uses `/api/v1/benchmarks` with `model`, optional `date`, and
