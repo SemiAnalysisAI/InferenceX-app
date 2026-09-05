@@ -26,6 +26,13 @@ const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
+/**
+ * Earlier run date served for the compare-history panel. Its rows carry 80% of
+ * the current throughput, so a history bar always lands below today's for the
+ * same chip and the spec can tell the two apart.
+ */
+export const PROFIT_HISTORY_DATE = '2026-07-15';
+const PROFIT_HISTORY_TPUT_SCALE = 0.8;
 
 type Curve = [conc: number, intvty: number, tput: number, e2el: number][];
 
@@ -61,7 +68,7 @@ export const PROFIT_SKUS: ProfitSku[] = [
 
 let idCursor = 800_000;
 
-export const profitBenchmarkRows = (dbKey: string = PROFIT_MODEL_DB_KEY) =>
+export const profitBenchmarkRows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
   PROFIT_SKUS.flatMap((sku) =>
     sku.curve.map(([conc, intvty, tput, e2el]) => ({
       id: idCursor++,
@@ -82,32 +89,40 @@ export const profitBenchmarkRows = (dbKey: string = PROFIT_MODEL_DB_KEY) =>
       offload_mode: 'on',
       benchmark_type: 'agentic_traces',
       image: `${sku.framework}:test`,
-      metrics: metricsFor(intvty, Math.round(tput * sku.tputScale), e2el),
+      metrics: metricsFor(
+        intvty,
+        Math.round(tput * sku.tputScale * (date === PROFIT_DATE ? 1 : PROFIT_HISTORY_TPUT_SCALE)),
+        e2el,
+      ),
       workers: null,
-      date: PROFIT_DATE,
+      date,
       run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${idCursor}`,
     })),
   );
 
 export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEYS) =>
   dbKeys.flatMap((dbKey) =>
-    PROFIT_SKUS.map((sku) => ({
-      model: dbKey,
-      isl: null,
-      osl: null,
-      precision: sku.precision,
-      hardware: sku.hardware,
-      framework: sku.framework,
-      spec_method: 'none',
-      disagg: false,
-      benchmark_type: 'agentic_traces',
-      date: PROFIT_DATE,
-    })),
+    [PROFIT_HISTORY_DATE, PROFIT_DATE].flatMap((date) =>
+      PROFIT_SKUS.map((sku) => ({
+        model: dbKey,
+        isl: null,
+        osl: null,
+        precision: sku.precision,
+        hardware: sku.hardware,
+        framework: sku.framework,
+        spec_method: 'none',
+        disagg: false,
+        benchmark_type: 'agentic_traces',
+        date,
+      })),
+    ),
   );
 
 /**
- * Intercept availability (both models) and benchmarks (the rows of whichever
- * model the request names, so a model switch never sees another model's bars).
+ * Intercept availability (both models, both dates) and benchmarks (the rows of
+ * whichever model the request names, so a model switch never sees another
+ * model's bars; the earlier date's rows when the compare-history panel asks
+ * for `?date=<PROFIT_HISTORY_DATE>`).
  */
 export const interceptProfitData = (): void => {
   cy.intercept('GET', '/api/v1/availability*', { body: profitAvailabilityRows() }).as(
@@ -115,6 +130,8 @@ export const interceptProfitData = (): void => {
   );
   cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
     const display = String(req.query['model'] ?? '');
-    req.reply({ body: profitBenchmarkRows(PROFIT_DB_KEY_BY_DISPLAY_MODEL[display]) });
+    const date =
+      String(req.query['date'] ?? '') === PROFIT_HISTORY_DATE ? PROFIT_HISTORY_DATE : PROFIT_DATE;
+    req.reply({ body: profitBenchmarkRows(PROFIT_DB_KEY_BY_DISPLAY_MODEL[display], date) });
   }).as('profit-benchmarks');
 };

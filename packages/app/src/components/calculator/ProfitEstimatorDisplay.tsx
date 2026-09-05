@@ -9,6 +9,7 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -38,7 +39,9 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
@@ -78,10 +81,22 @@ import {
   parseTokenPriceInput,
   profitModelDefaults,
   type ProfitBasis,
+  type ProfitEstimatorRow,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
 import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import {
+  buildProfitHistoryResults,
+  historyFadeShare,
+  orderProfitRowsForHistory,
+  PROFIT_HISTORY_MAX_GPUS,
+  profitHistoryAvailableDates,
+  profitHistoryChipOptions,
+  profitHistoryDateRanks,
+  shadeHistoryColor,
+} from './profit-history';
 import type { CostProvider } from './types';
+import { useProfitHistory } from './useProfitHistory';
 import { useThroughputData } from './useThroughputData';
 
 /**
@@ -242,6 +257,18 @@ const STRINGS = {
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
+    compareHistory: 'Compare history',
+    gpuConfig: 'Chip Config',
+    gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again at the start and end of the date range using the run measured on that date, so software updates show up as a change in the bar.`,
+    gpuConfigPlaceholder: 'Select a Chip Config for comparison',
+    comparisonDateRange: 'Comparison Date Range',
+    comparisonDateRangeTooltip:
+      'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above.',
+    dateRangePlaceholder: 'Select date range',
+    historyNote: (dates: string) =>
+      `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier.`,
+    historyNoData: (entries: string) => `No run at the target on ${entries}.`,
+    csvDateHeader: 'Run date',
   },
   zh: {
     title: {
@@ -330,6 +357,18 @@ const STRINGS = {
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
+    compareHistory: '对比历史趋势',
+    gpuConfig: '芯片配置',
+    gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用该日期实测的运行结果，在日期范围的起止两端重新估价，软件更新带来的差异会直接体现在柱形上。`,
+    gpuConfigPlaceholder: '选择芯片配置进行对比',
+    comparisonDateRange: '对比日期范围',
+    comparisonDateRangeTooltip:
+      '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。',
+    dateRangePlaceholder: '选择日期范围',
+    historyNote: (dates: string) =>
+      `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致。`,
+    historyNoData: (entries: string) => `${entries} 在目标处无运行结果。`,
+    csvDateHeader: '运行日期',
   },
 } as const;
 
@@ -442,8 +481,9 @@ function ProfitEstimatorInner({
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
-  const { setUrlParam } = useUrlState();
+  const { setUrlParam, getUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
+  const { resolvedTheme } = useTheme();
 
   // Precision is not a control here: `effectivePrecisions` stays in auto mode,
   // which resolves to the densest measured precision per model, so the bars
@@ -525,18 +565,102 @@ function ProfitEstimatorInner({
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
 
-  const { hardwareConfig, getResults, loading, error, hasData, availableHwKeys } =
-    useThroughputData(
-      selectedModel,
-      selectedSequence,
-      selectedPrecisions,
-      selectedRunDate,
-      undefined,
-      selectedPercentile,
-      undefined,
-      true,
-      'total',
-    );
+  const {
+    hardwareConfig,
+    getResults,
+    loading: throughputLoading,
+    error,
+    hasData,
+    availableHwKeys,
+  } = useThroughputData(
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    selectedRunDate,
+    undefined,
+    selectedPercentile,
+    undefined,
+    true,
+    'total',
+  );
+
+  // ── Compare history ───────────────────────────────────────────────────────
+  // The `/inference` panel, pinned to this page's workload: up to four chip
+  // configs and a date range. The selection lives in the same `i_gpus`,
+  // `i_dstart`, and `i_dend` URL params, so a comparison built on `/inference`
+  // pastes straight into the estimator. Hydrated after mount so the first
+  // client render matches the server one.
+  const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
+  const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
+  useEffect(() => {
+    const gpus = getUrlParam('i_gpus');
+    if (gpus) setSelectedGPUs(gpus.split(',').filter(Boolean).slice(0, PROFIT_HISTORY_MAX_GPUS));
+    const startDate = getUrlParam('i_dstart') || '';
+    const endDate = getUrlParam('i_dend') || '';
+    if (startDate && endDate) setSelectedDateRange({ startDate, endDate });
+  }, [getUrlParam]);
+
+  const dbModelKeys = useMemo<string[]>(
+    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
+    [selectedModel],
+  );
+  const historyChipOptions = useMemo(
+    () =>
+      profitHistoryChipOptions(availabilityRows, dbModelKeys, selectedPrecisions, selectedModel),
+    [availabilityRows, dbModelKeys, selectedPrecisions, selectedModel],
+  );
+  // A chip the new model (or precision) has no agentic rows for leaves the
+  // selection, the way `/inference` prunes its comparison on a model switch.
+  useEffect(() => {
+    if (!availabilityRows || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
+    const offered = new Set(historyChipOptions.map((o) => o.value));
+    const kept = selectedGPUs.filter((hw) => offered.has(hw));
+    if (kept.length !== selectedGPUs.length) {
+      setSelectedGPUs(kept);
+      setUrlParam('i_gpus', kept.join(','));
+    }
+  }, [availabilityRows, historyChipOptions, selectedGPUs, setUrlParam]);
+  const historyAvailableDates = useMemo(
+    () =>
+      profitHistoryAvailableDates(availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs),
+    [availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs],
+  );
+
+  const handleHistoryGpuChange = useCallback(
+    (next: string[]) => {
+      setSelectedGPUs(next);
+      setUrlParam('i_gpus', next.join(','));
+      if (next.length === 0) {
+        setSelectedDateRange({ startDate: '', endDate: '' });
+        setUrlParam('i_dstart', '');
+        setUrlParam('i_dend', '');
+      }
+      track('profit_history_gpu_selected', { gpus: next, count: next.length });
+    },
+    [setUrlParam],
+  );
+  const handleHistoryDateRangeChange = useCallback(
+    (range: { startDate: string; endDate: string }) => {
+      setSelectedDateRange(range);
+      setUrlParam('i_dstart', range.startDate);
+      setUrlParam('i_dend', range.endDate);
+      track('profit_history_date_range_changed', range);
+    },
+    [setUrlParam],
+  );
+
+  const history = useProfitHistory({
+    model: selectedModel,
+    sequence: selectedSequence,
+    selectedGPUs,
+    dateRange: selectedDateRange,
+    currentRunDate: selectedRunDate,
+    enabled: hasData,
+  });
+  const historyActive = history.comparisonDates.length > 0;
+  // A comparison date still in flight holds the chart, as on `/inference`, so
+  // the bars never show today's chips with the history half missing.
+  const loading = throughputLoading || history.loading;
 
   // Per-base-GPU $/GPU/hr typed by the reader; seeded from the hyperscaler
   // tier the first time each chip appears so the custom view starts identical
@@ -616,10 +740,27 @@ function ProfitEstimatorInner({
   // Price every SKU first, then build the legend from the ones that produced a
   // bar. A config the target falls outside of (or that cannot be priced) is
   // named in the caption instead of being offered as a legend chip.
+  //
+  // With a history comparison active, only the compared chips are drawn, as on
+  // `/inference`: today's bar for each, then one per comparison date priced
+  // from that date's run with the same target, prices, and TCO tier.
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const results = getResults(targetValue, mode, interpolationCostProvider);
-    return estimateProfitRows(
+    const current = getResults(targetValue, mode, interpolationCostProvider);
+    const results = historyActive
+      ? [
+          ...current.filter((r) => selectedGPUs.includes(r.hwKey)),
+          ...buildProfitHistoryResults(history.rowsByDate, {
+            selectedGPUs,
+            precisions: selectedPrecisions,
+            percentile: selectedPercentile,
+            targetValue,
+            mode,
+            costProvider: interpolationCostProvider,
+          }),
+        ]
+      : current;
+    const estimated = estimateProfitRows(
       results,
       (hwKey) => ({
         powerKwPerGpu: getGpuSpecs(hwKey).power,
@@ -628,6 +769,9 @@ function ProfitEstimatorInner({
       pricing,
       assumptions,
     );
+    return historyActive
+      ? { ...estimated, rows: orderProfitRowsForHistory(estimated.rows) }
+      : estimated;
   }, [
     hasData,
     pricing,
@@ -637,6 +781,11 @@ function ProfitEstimatorInner({
     interpolationCostProvider,
     costPerGpuHourFor,
     assumptions,
+    historyActive,
+    history.rowsByDate,
+    selectedGPUs,
+    selectedPrecisions,
+    selectedPercentile,
   ]);
 
   const legendHwKeys = useMemo(() => {
@@ -654,6 +803,27 @@ function ProfitEstimatorInner({
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
+
+  // Bar colour: the chip's vendor colour, faded toward the page background for
+  // older comparison dates (oldest lightest, today solid), the lightness ramp
+  // the `/inference` comparison uses to tell one config's dates apart.
+  const historyRanks = useMemo(
+    () => profitHistoryDateRanks(fullEstimate.rows),
+    [fullEstimate.rows],
+  );
+  const colorForRow = useCallback(
+    (row: ProfitEstimatorRow) => {
+      const base = resolveColor(row.hwKey);
+      if (!row.date) return base;
+      const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+      return shadeHistoryColor(
+        base,
+        historyFadeShare(historyRanks.rank(row.date), historyRanks.count),
+        theme,
+      );
+    },
+    [resolveColor, resolvedTheme, historyRanks],
+  );
 
   const estimate = useMemo(
     () => ({
@@ -785,6 +955,22 @@ function ProfitEstimatorInner({
       }));
   }, [legendHwKeys, visibleHwKeys, costPerGpuHourFor]);
 
+  // Compared chips with no bar on a comparison date, named in the caption so
+  // a missing bar reads as "no run that day", not as a zero.
+  const historyMissing = useMemo(() => {
+    if (!historyActive) return [];
+    const priced = new Set(fullEstimate.rows.map((row) => `${row.hwKey}~${row.date ?? ''}`));
+    const missing: string[] = [];
+    for (const date of history.comparisonDates) {
+      for (const hwKey of selectedGPUs) {
+        if (priced.has(`${hwKey}~${date}`)) continue;
+        const config = hardwareConfig[hwKey];
+        missing.push(`${config ? getDisplayLabel(config) : hwKey} • ${date}`);
+      }
+    }
+    return missing;
+  }, [historyActive, fullEstimate.rows, history.comparisonDates, selectedGPUs, hardwareConfig]);
+
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
@@ -809,6 +995,12 @@ function ProfitEstimatorInner({
           date={selectedRunDate}
           source="SemiAnalysis InferenceX™"
         />
+        {historyActive && (
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-history-note">
+            {t.historyNote(history.comparisonDates.join(locale === 'zh' ? '、' : ', '))}
+            {historyMissing.length > 0 && <> {t.historyNoData(historyMissing.join(', '))}</>}
+          </p>
+        )}
         <p
           className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
           data-testid="profit-tco-badges"
@@ -877,6 +1069,9 @@ function ProfitEstimatorInner({
     tcoBadges,
     priceSourceLabel,
     t,
+    historyActive,
+    history.comparisonDates,
+    historyMissing,
   ]);
 
   const exportFileName =
@@ -888,8 +1083,9 @@ function ProfitEstimatorInner({
     // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
     const rows = estimate.rows.map((row) => [
-      rowLabel(row, hardwareConfig),
+      rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
+      row.date ?? selectedRunDate ?? '',
       usd(row.revenue),
       usd(row.tco),
       usd(row.grossMargin),
@@ -900,10 +1096,11 @@ function ProfitEstimatorInner({
       // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
     ]);
-    exportToCsv(exportFileName, [...t.csvHeaders[basis]], rows, [
+    const [sku, precision, ...rest] = t.csvHeaders[basis];
+    exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
     ]);
-  }, [estimate.rows, hardwareConfig, exportFileName, t, assumptions, basis]);
+  }, [estimate.rows, hardwareConfig, exportFileName, t, assumptions, basis, selectedRunDate]);
 
   if (!loading && error) {
     console.error(error);
@@ -1188,6 +1385,53 @@ function ProfitEstimatorInner({
                   })}
                 </div>
               )}
+
+              <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
+                <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-history-gpu"
+                      label={t.gpuConfig}
+                      tooltip={t.gpuConfigTooltip}
+                    />
+                    <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
+                      <MultiSelect
+                        triggerId="profit-history-gpu"
+                        options={historyChipOptions}
+                        value={selectedGPUs}
+                        onChange={handleHistoryGpuChange}
+                        open={openDropdown === 'history-gpu'}
+                        onOpenChange={handleDropdownOpenChange('history-gpu')}
+                        placeholder={t.gpuConfigPlaceholder}
+                        maxSelections={PROFIT_HISTORY_MAX_GPUS}
+                        searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                        noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                        clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                        selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                      />
+                    </div>
+                  </div>
+
+                  {selectedGPUs.length > 0 && (
+                    <div
+                      className="flex min-w-0 flex-col space-y-1.5"
+                      data-testid="profit-history-date-range"
+                    >
+                      <LabelWithTooltip
+                        htmlFor="profit-history-dates"
+                        label={t.comparisonDateRange}
+                        tooltip={t.comparisonDateRangeTooltip}
+                      />
+                      <DateRangePicker
+                        dateRange={selectedDateRange}
+                        onChange={handleHistoryDateRangeChange}
+                        placeholder={t.dateRangePlaceholder}
+                        availableDates={historyAvailableDates}
+                      />
+                    </div>
+                  )}
+                </div>
+              </ControlPanel>
             </TooltipProvider>
 
             {!loading && legendItems.length > 0 && (
@@ -1247,7 +1491,7 @@ function ProfitEstimatorInner({
               <ProfitEstimatorChart
                 rows={estimate.rows}
                 hardwareConfig={hardwareConfig}
-                colorResolver={resolveColor}
+                colorResolver={colorForRow}
                 assumptions={assumptions}
                 caption={caption}
               />

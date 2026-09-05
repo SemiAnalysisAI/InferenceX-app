@@ -51,6 +51,8 @@ export interface ProfitSegment {
 const CHART_MARGIN = { top: 12, right: 24, bottom: 40, left: 116 };
 /** Bottom margin when the x labels stand upright on two lines (name / framework). */
 const X_LABEL_STACKED_BOTTOM = 64;
+/** Extra bottom margin for the third stacked line a compare-history date adds. */
+const X_LABEL_HISTORY_LINE_PX = 16;
 /** Tallest the chart gets, on a viewport with room to spare. */
 export const CHART_HEIGHT = 720;
 /** Shortest the chart gets; below this the in-bar labels start colliding. */
@@ -114,6 +116,20 @@ export function splitAxisLabel(label: string): [string, string] {
   return [label.slice(0, at), label.slice(at + 1)];
 }
 
+/** Separator between a compare-history label and its run date; matches the `/inference` legend. */
+export const HISTORY_LABEL_SEP = ' • ';
+
+/**
+ * Split a compare-history label "B200 (FP4) • 2026-06-14" into its config and
+ * date so the date can sit on its own axis line. A label without a date has
+ * an empty second half.
+ */
+export function splitHistoryLabel(label: string): [string, string] {
+  const at = label.lastIndexOf(HISTORY_LABEL_SEP);
+  if (at === -1) return [label, ''];
+  return [label.slice(0, at), label.slice(at + HISTORY_LABEL_SEP.length)];
+}
+
 /**
  * Upright two-line labels when every SKU fits in its own slot; otherwise the
  * classic slanted single line. `slotPx` is the horizontal room per tick,
@@ -123,8 +139,13 @@ export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): 
   if (labels.length === 0 || slotPx <= 0) return 'slanted';
   const widest = Math.max(
     ...labels.map((label) => {
-      const [name, detail] = splitAxisLabel(label);
-      return Math.max(estimateTextWidth(name, fontPx), estimateTextWidth(detail, fontPx));
+      const [config, date] = splitHistoryLabel(label);
+      const [name, detail] = splitAxisLabel(config);
+      return Math.max(
+        estimateTextWidth(name, fontPx),
+        estimateTextWidth(detail, fontPx),
+        estimateTextWidth(date, fontPx),
+      );
     }),
   );
   return widest + LABEL_SIDE_PAD_PX * 2 <= slotPx ? 'stacked' : 'slanted';
@@ -230,6 +251,7 @@ const STRINGS = {
     labCutShare: 'License fee share',
     ofRevenue: 'of revenue',
     dismiss: 'Click anywhere to dismiss',
+    runDate: 'Run date',
     noData: 'No SKU can be priced for the current selection.',
   },
   zh: {
@@ -254,6 +276,7 @@ const STRINGS = {
     labCutShare: '许可费比例',
     ofRevenue: '（占收入）',
     dismiss: '点击任意位置关闭',
+    runDate: '运行日期',
     noData: '当前选择下没有可定价的 SKU。',
   },
 } as const;
@@ -384,7 +407,10 @@ export function profitYDomain(
 export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
   const base = config ? getDisplayLabel(config) : row.hwKey;
-  return row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
+  const withPrecision = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
+  // A compare-history bar names the run date it was priced on, as the
+  // `/inference` legend does for its "config • date" series.
+  return row.date ? `${withPrecision}${HISTORY_LABEL_SEP}${row.date}` : withPrecision;
 }
 
 function formatPct(value: number): string {
@@ -402,7 +428,7 @@ export function generateProfitTooltipHTML(
   const t = STRINGS[locale];
   const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
   const colon = locale === 'zh' ? '：' : ':';
-  const label = escapeHtml(rowLabel(row, hardwareConfig));
+  const label = escapeHtml(splitHistoryLabel(rowLabel(row, hardwareConfig))[0]);
   const line = (name: string, value: string, color?: string, opacity = 1) =>
     `<div style="display:flex; justify-content:space-between; gap:16px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><span>${
       color
@@ -425,6 +451,7 @@ export function generateProfitTooltipHTML(
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 260px; max-width: 340px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
+      ${row.date ? line(t.runDate, escapeHtml(row.date)) : ''}
       ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, usd(row.revenue))}
       ${line(t.tco, usd(row.tco), skuColor, TCO_OPACITY)}
       ${line(t.grossMargin, usd(row.grossMargin))}
@@ -445,7 +472,11 @@ export function generateProfitTooltipHTML(
 interface ProfitEstimatorChartProps {
   rows: ProfitEstimatorRow[];
   hardwareConfig: HardwareConfig;
-  colorResolver: (hwKey: string) => string;
+  /**
+   * Colour of a row's bar. Keyed by the whole row, not just the hwKey, so a
+   * compare-history view can shade a chip's older dates lighter than today's.
+   */
+  colorResolver: (row: ProfitEstimatorRow) => string;
   assumptions: ProfitEstimatorAssumptions;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
@@ -486,7 +517,7 @@ export default function ProfitEstimatorChart({
   const fillFor = useCallback(
     (segment: ProfitSegment): string => {
       if (segment.kind === 'loss') return `url(#${lossPatternId(segment.row.resultKey)})`;
-      return colorResolver(segment.row.hwKey);
+      return colorResolver(segment.row);
     },
     [colorResolver],
   );
@@ -494,14 +525,14 @@ export default function ProfitEstimatorChart({
   /** Resting stroke: the tinted segments (TCO, license fee) and loss are outlined in the SKU colour. */
   const outlineFor = useCallback(
     (segment: ProfitSegment): string =>
-      segment.kind === 'profit' ? 'none' : colorResolver(segment.row.hwKey),
+      segment.kind === 'profit' ? 'none' : colorResolver(segment.row),
     [colorResolver],
   );
 
   /** In-segment text colour: neutral on the muted and translucent fills, luminance-picked on solid SKU fills. */
   const labelColorFor = useCallback(
     (segment: ProfitSegment): string => {
-      if (segment.kind === 'profit') return contrastingTextColor(colorResolver(segment.row.hwKey));
+      if (segment.kind === 'profit') return contrastingTextColor(colorResolver(segment.row));
       return 'var(--foreground)';
     },
     [colorResolver],
@@ -553,9 +584,9 @@ export default function ProfitEstimatorChart({
           .attr('id', (d) => lossPatternId(d.resultKey));
         patterns
           .select('.hatch-bg')
-          .attr('fill', (d) => colorResolver(d.hwKey))
+          .attr('fill', (d) => colorResolver(d))
           .attr('fill-opacity', 0.18);
-        patterns.select('.hatch-line').attr('stroke', (d) => colorResolver(d.hwKey));
+        patterns.select('.hatch-line').attr('stroke', (d) => colorResolver(d));
 
         // Zero line, drawn before the bars so loss segments sit on top of it.
         group
@@ -736,7 +767,7 @@ export default function ProfitEstimatorChart({
           state.assumptions,
           state.locale,
           isPinned,
-          colorResolver(segment.row.hwKey),
+          colorResolver(segment.row),
         );
       },
       getRulerX: () => hoveredBarXRef.current,
@@ -782,7 +813,13 @@ export default function ProfitEstimatorChart({
     return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
   }, [dimensions.width, baseMargin, rows.length, labelMap]);
   const margin = useMemo(() => {
-    if (labelLayout === 'stacked') return { ...baseMargin, bottom: X_LABEL_STACKED_BOTTOM };
+    if (labelLayout === 'stacked') {
+      const dated = [...labelMap.values()].some((label) => splitHistoryLabel(label)[1] !== '');
+      return {
+        ...baseMargin,
+        bottom: X_LABEL_STACKED_BOTTOM + (dated ? X_LABEL_HISTORY_LINE_PX : 0),
+      };
+    }
     const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
@@ -823,7 +860,8 @@ export default function ProfitEstimatorChart({
           if (labelLayout === 'stacked') {
             // Two upright lines centred on the tick: SKU name, then the
             // framework and precision in parentheses.
-            const [name, detail] = splitAxisLabel(labelMap.get(String(d)) ?? String(d));
+            const [config, date] = splitHistoryLabel(labelMap.get(String(d)) ?? String(d));
+            const [name, detail] = splitAxisLabel(config);
             text
               .attr('transform', null)
               .attr('text-anchor', 'middle')
@@ -832,6 +870,16 @@ export default function ProfitEstimatorChart({
               .text(null);
             text.append('tspan').attr('x', 0).text(name);
             if (detail) text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(detail);
+            // Compare-history bars carry their run date on a third, muted line.
+            if (date) {
+              text
+                .append('tspan')
+                .attr('x', 0)
+                .attr('dy', '1.2em')
+                .attr('class', 'history-date')
+                .style('fill', 'var(--muted-foreground)')
+                .text(date);
+            }
             return;
           }
           // One line rotated about the tick and anchored at its end, so the
