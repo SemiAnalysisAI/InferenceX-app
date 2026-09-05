@@ -6,15 +6,19 @@ import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
 import {
   type BlogPostMeta,
   blogDescription,
+  blogOgImagePath,
   blogOgImageUrl,
   buildBlogBreadcrumbJsonLd,
   buildBlogBreadcrumbJsonLdZh,
   buildBlogPostingJsonLd,
   extractHeadings,
+  formatBlogDate,
   getAdjacentPosts,
   getAllPosts,
   getPostBySlug,
+  getRelatedPosts,
   getReadingTime,
+  getTopTags,
   getWordCount,
   hasZhTranslation,
   slugify,
@@ -777,5 +781,55 @@ describe('buildBlogBreadcrumbJsonLdZh', () => {
       expect(String(el.item)).toMatch(/^https:\/\/[^/]+\/zh/u);
     }
     expect(crumb.itemListElement.map((el: any) => el.position)).toEqual([1, 2, 3]);
+  });
+});
+
+const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
+  slug,
+  title: slug,
+  subtitle: `${slug} subtitle`,
+  date,
+  tags,
+  readingTime: 3,
+});
+
+describe('article index helpers', () => {
+  // Newest first, matching getAllPosts ordering.
+  const posts = [
+    mk('newest', '2026-05-01', ['nvidia', 'b200', 'agentx']),
+    mk('mid', '2026-04-01', ['amd', 'mi355x', 'agentx']),
+    mk('old', '2026-03-01', ['nvidia', 'agentx']),
+    mk('untagged', '2026-02-01', []),
+    mk('oldest', '2026-01-01', ['sglang']),
+  ];
+
+  it('getTopTags ranks by frequency then alphabetically and respects the limit', () => {
+    expect(getTopTags(posts, 2)).toEqual(['agentx', 'nvidia']);
+    expect(getTopTags(posts, 10)).toEqual(['agentx', 'nvidia', 'amd', 'b200', 'mi355x', 'sglang']);
+    expect(getTopTags([], 5)).toEqual([]);
+  });
+
+  it('getRelatedPosts prefers the most shared tags and never returns the post itself', () => {
+    const related = getRelatedPosts('newest', posts);
+    expect(related.map((p) => p.slug)).toEqual(['old', 'mid', 'untagged']);
+    expect(related.some((p) => p.slug === 'newest')).toBe(false);
+  });
+
+  it('getRelatedPosts falls back to recency for posts with no tag overlap', () => {
+    expect(getRelatedPosts('oldest', posts).map((p) => p.slug)).toEqual(['newest', 'mid', 'old']);
+    expect(getRelatedPosts('missing', posts, 2).map((p) => p.slug)).toEqual(['newest', 'mid']);
+  });
+
+  it('formatBlogDate renders long dates per locale without timezone drift', () => {
+    expect(formatBlogDate('2026-08-19')).toBe('August 19, 2026');
+    expect(formatBlogDate('2026-08-19', 'zh')).toBe('2026年8月19日');
+    expect(formatBlogDate('2026-01-01', 'en')).toBe('January 1, 2026');
+  });
+
+  it('blogOgImagePath points at the locale-specific opengraph route', () => {
+    expect(blogOgImagePath('gb200-vs-mi355x')).toBe('/blog/gb200-vs-mi355x/opengraph-image');
+    expect(blogOgImagePath('gb200-vs-mi355x', 'zh')).toBe(
+      '/zh/blog/gb200-vs-mi355x/opengraph-image',
+    );
   });
 });
