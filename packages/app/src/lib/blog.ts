@@ -311,3 +311,60 @@ export function buildBlogBreadcrumbJsonLdZh(slug: string, title: string) {
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// Index / post-page helpers shared by the English and Chinese article pages.
+// Pure functions over `BlogPostMeta[]` so the two locales cannot drift.
+// ---------------------------------------------------------------------------
+
+/** Tags ranked by how many posts carry them (ties broken alphabetically). */
+export function getTopTags(posts: readonly Pick<BlogPostMeta, 'tags'>[], limit: number): string[] {
+  const counts = new Map<string, number>();
+  for (const post of posts) {
+    for (const tag of post.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([tag]) => tag);
+}
+
+/**
+ * Posts that share the most tags with `slug`, newest first among ties. Falls
+ * back to the most recent other posts so the strip is never short when a post
+ * has few or unusual tags.
+ */
+export function getRelatedPosts(
+  slug: string,
+  posts: readonly BlogPostMeta[],
+  limit = 3,
+): BlogPostMeta[] {
+  const current = posts.find((p) => p.slug === slug);
+  const others = posts.filter((p) => p.slug !== slug);
+  if (!current) return others.slice(0, limit);
+  const tags = new Set(current.tags);
+  const scored = others.map((post, index) => ({
+    post,
+    index,
+    shared: (post.tags ?? []).filter((tag) => tags.has(tag)).length,
+  }));
+  return scored
+    .toSorted((a, b) => b.shared - a.shared || a.index - b.index)
+    .slice(0, limit)
+    .map((s) => s.post);
+}
+
+/** Locale-aware long date (`August 19, 2026` / `2026年8月19日`) for a YYYY-MM-DD string. */
+export function formatBlogDate(date: string, locale: BlogLocale = 'en'): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** Relative URL of the post's generated Open Graph card, used as the index thumbnail. */
+export function blogOgImagePath(slug: string, locale: BlogLocale = 'en'): string {
+  return `${blogPathPrefix(locale)}/${slug}/opengraph-image`;
+}
