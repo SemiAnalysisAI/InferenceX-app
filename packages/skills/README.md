@@ -224,9 +224,9 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 上面的 npm 命令固定使用 `0.3.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
-0.3.0 新增 PowerX 原始响应保存选项 `--evidence-dir`、安装器 JSON 输出 `--json` 和
-只读安装预览 `--dry-run`，以及保留配置和原始观测日期的历史查询示例。维护者的发布后验证仅对指定包及版本的 ETARGET 安装错误
-进行有限重试，并受总时限约束。
+0.3.0 新增 PowerX 原始响应保存选项 `--evidence-dir`、安装器机器可读 JSON 输出
+`--json` 和只读安装预览 `--dry-run`，以及保留配置和原始观测日期的历史查询示例。
+维护者的发布后验证仅对指定包及版本的 ETARGET 安装错误进行有限重试，并受总时限约束。
 
 需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。从 npm 安装需要访问
 npm 仓库，查询需要访问公开 HTTPS 接口；安装后的技能无需检出本仓库，也不需要
@@ -283,9 +283,10 @@ worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态
 通过严格验证本身并不能证明具有能效优势。
 
 需要保留导出所用的完整原始响应时，添加 `--evidence-dir ./powerx-evidence`，并使用
-尚不存在的目录。目录保存同一次请求的完整解压后响应体，以及记录 SHA-256、导出结果、
-请求上下文和提取元数据的清单。该选项支持 CSV、JSON、stdout 和空结果；默认不保存响应。
-显式请求保存证据后，写入失败会导致命令失败。详细字段和校验范围见上面的响应保存说明。
+尚不存在的目录。该目录中会保存同一次请求解压后的完整响应体，以及一份清单，将该
+响应体的 SHA-256 与导出结果、请求上下文和提取元数据关联起来。
+该选项支持 CSV、JSON、stdout 和空结果；默认不保存响应。显式请求保存证据后，写入失败
+会导致命令失败。详细字段和适用范围见 [PowerX 指南中的响应保存约定](skills/inferencex-api/references/powerx.md#save-the-response-used-by-an-export)。
 
 可执行上面的 `status --target codex` 命令查看项目内已安装的技能；其他目标使用
 `--target claude` 或 `--dir`。输出会分别列出本次调用的安装器版本、目标目录中上次成功
@@ -303,7 +304,7 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 `installer_version` 是执行中的安装器版本；`installed_version` 是经版本记录和导出器
 声明核对后的已安装版本，无法确认时为 `null`。`installation_state` 分别用
 `installed`、`not_installed`、`unknown` 表示已确认安装、未安装和状态未知；
-`skill_path` 是绝对路径。`reason` 供人阅读，程序应使用结构化状态字段。
+`skill_path` 是绝对路径。`reason` 是供人阅读的说明或 `null`，程序应使用结构化状态字段。
 
 安装结果还包含 `dry_run`、`outcome`、`write_paths`、`preserves_extra_files`。
 实际结果为 `installed`、`overwritten` 或 `skipped`；预览结果为 `would_install`、
@@ -312,12 +313,13 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 
 `install --dry-run` 复用正式安装的目标路径与冲突检查，支持 `--target`、`--dir`、
 `--force` 和 `--json`。它列出将写入的路径，不创建目录、不改动文件、版本记录或权限，
-也不请求 API。不过 npm 可能在启动安装器前下载所选包。强制升级仍保留其他文件和
-不再随包提供的旧文件。
+也不请求 API。不过 npm 可能在启动安装器前下载所选包。安装会保留其他文件和
+不再随包提供的旧文件，强制升级也一样。
 
 退出码 `0` 表示操作成功，包括跳过、预览，以及对未安装或版本未知状态的正常检查；
-`2` 表示参数错误，`1` 表示操作失败。JSON 错误结果保留结构化失败信息与供人阅读的说明；
-请用退出码判断操作是否成功。
+`2` 表示参数错误，`1` 表示操作失败。失败时的 JSON 为
+`{ "schema_version": 1, "outcome": "failed", "reason": "..." }`，不包含可能已失效的
+安装状态字段；请用退出码判断操作是否成功。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
 的 `0.3.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖

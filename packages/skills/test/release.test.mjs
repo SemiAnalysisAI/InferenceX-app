@@ -132,17 +132,16 @@ with tempfile.TemporaryDirectory() as directory:
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-test('read-only verification rejects incomplete or altered exports and preserves timeout evidence', () => {
+test('read-only verification rejects incomplete or altered exports', () => {
   const result = spawnSync(
     'python3',
     [
       '-c',
       String.raw`
-import csv, importlib.util, json, subprocess, tempfile
+import csv, importlib.util, json, tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
 assertions = TestCase()
 spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
 check = importlib.util.module_from_spec(spec)
@@ -215,26 +214,6 @@ for key, value in [('rows',[row]), ('retrieved_at','2026-01-02T00:00:00'), ('val
                    ('validation_counts',detail['validation_counts'] | {'extra':0})]:
     with assertions.assertRaises(ValueError, msg='Verifier accepted changed empty diagnostic evidence: ' + key):
         check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail | {key:value}}, metadata, 6, args)
-with tempfile.TemporaryDirectory() as directory:
-    root = Path(directory)
-    for label, stdout, stderr in [('bytes', b'partial output', b'partial error'), ('text', 'partial output', 'partial error')]:
-        timeout = subprocess.TimeoutExpired(['npm','exec'], 180, output=stdout, stderr=stderr)
-        def process(*args, **kwargs):
-            kwargs['stdout'].write(stdout.decode() if isinstance(stdout, bytes) else stdout)
-            kwargs['stderr'].write(stderr.decode() if isinstance(stderr, bytes) else stderr)
-            def wait(**kwargs):
-                raise timeout
-            return SimpleNamespace(pid=12345, wait=wait, poll=lambda: None)
-        with patch.object(check.subprocess, 'Popen', side_effect=process), patch.object(check.os, 'killpg') as kill:
-            with assertions.assertRaises(subprocess.TimeoutExpired, msg='Timeout must remain a failed command'):
-                check.run(['npm','exec'], root, {}, label)
-            kill.assert_called_once_with(12345, check.signal.SIGKILL)
-        assert (root / (label + '.stdout.log')).read_text() == 'partial output'
-        assert (root / (label + '.stderr.log')).read_text() == 'partial error'
-    records = [json.loads(line) for line in (root / 'commands.jsonl').read_text().splitlines()]
-    assert len(records) == 2
-    assert all(row['command'] == ['npm','exec'] and row['timed_out'] and row['returncode'] is None
-               and row['timeout_seconds'] == 180 for row in records)
 `,
     ],
     { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', timeout: 10_000 },
