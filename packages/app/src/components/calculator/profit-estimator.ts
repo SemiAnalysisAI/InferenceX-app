@@ -72,9 +72,25 @@ export interface ProfitModelDefaults {
  * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
  * point, and the Hopper and MI300-series curves top out below it and list as
  * not priced. MiniMax M3 also opens on a 20% model license fee instead of the
- * 30% the other models assume.
+ * 30% the other models assume. DeepSeek V4 Pro opens on DeepSeek's peak-hour
+ * list price ($1.32 / $0.044 cached / $3.96 per M tok; off-peak is half that)
+ * because third-party hosts undercut it on OpenRouter, and on 24 tok/s/user,
+ * the speed DeepSeek's own API serves at. The B200, B300, and MI355X agentic
+ * curves reach that point; the GB200, GB300, and H200 curves bottom out above
+ * it and list as not priced until a lower-interactivity run lands.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.DeepSeek_V4_Pro]: {
+    interactivity: 24,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: {
+      vendor: 'DeepSeek',
+      inputPerMillion: 1.32,
+      cachedInputPerMillion: 0.044,
+      outputPerMillion: 3.96,
+      sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
+    },
+  },
   [Model.Kimi_K3]: {
     interactivity: DEFAULT_PROFIT_INTERACTIVITY,
     listPricing: null,

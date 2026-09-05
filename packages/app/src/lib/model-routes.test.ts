@@ -183,10 +183,11 @@ describe('modelRoutePathnameRewrite', () => {
 });
 
 describe('modelRoutesForTab', () => {
-  it('serves Kimi K3, GLM 5.2/5.3 and MiniMax M3 on the profit estimators and every model elsewhere', () => {
+  it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3 and DeepSeek V4 Pro on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
+        Model.DeepSeek_V4_Pro,
         Model.Kimi_K3,
         Model.MiniMax_M3,
         Model.GLM_5_2,
@@ -196,6 +197,10 @@ describe('modelRoutesForTab', () => {
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.MiniMax_M3)?.slug).toBe(
         'minimax-m3',
       );
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
+      expect(
+        modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_Pro)?.slug,
+      ).toBe('deepseek-v4');
       // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
       // release, as on the rest of the site, and `glm-5-2` 308s to it.
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
@@ -207,7 +212,10 @@ describe('modelRoutesForTab', () => {
           route: expect.objectContaining({ slug: 'glm-5-3' }),
         }),
       );
-      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(false);
+      // DeepSeek V4 Pro is the app-wide default but not the estimators'; its
+      // slugged page stays indexable there instead of folding into the bare path.
+      expect(defaultRouteModel(tab)).toBe(Model.Kimi_K3);
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_R1)).toBe(false);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
     }
     for (const tab of ['calculator', 'historical'] as const) {

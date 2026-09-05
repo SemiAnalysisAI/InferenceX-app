@@ -371,8 +371,27 @@ describe('profitModelDefaults', () => {
     });
   });
 
+  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 30% license fee', () => {
+    const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
+    expect(defaults.interactivity).toBe(24);
+    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
+    expect(defaults.listPricing).toEqual({
+      vendor: 'DeepSeek',
+      inputPerMillion: 1.32,
+      cachedInputPerMillion: 0.044,
+      outputPerMillion: 3.96,
+      sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
+    });
+    expect(listPricingToTokenRevenuePricing(defaults.listPricing!)).toEqual({
+      source: 'normalized',
+      inputPerMillion: 1.32,
+      cachedInputPerMillion: 0.044,
+      outputPerMillion: 3.96,
+    });
+  });
+
   it('falls back to 45 tok/s/user, OpenRouter, and a 30% license fee for models without an entry', () => {
-    expect(profitModelDefaults(Model.DeepSeek_V4_Pro)).toEqual({
+    expect(profitModelDefaults(Model.DeepSeek_R1)).toEqual({
       interactivity: DEFAULT_PROFIT_INTERACTIVITY,
       listPricing: null,
       labCutPct: DEFAULT_LAB_CUT_PCT,
