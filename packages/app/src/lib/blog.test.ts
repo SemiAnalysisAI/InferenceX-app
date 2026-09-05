@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -16,6 +17,7 @@ import {
   getAdjacentPosts,
   getAllPosts,
   getPostBySlug,
+  getPostThumbnail,
   getRelatedPosts,
   getReadingTime,
   getTopTags,
@@ -831,5 +833,43 @@ describe('article index helpers', () => {
     expect(blogOgImagePath('gb200-vs-mi355x', 'zh')).toBe(
       '/zh/blog/gb200-vs-mi355x/opengraph-image',
     );
+  });
+});
+
+/** Mock `public/images/post/` with the given file names; null means the folder is missing. */
+function mockFigures(files: string[] | null) {
+  vi.spyOn(fs, 'existsSync').mockImplementation(
+    (p) => files !== null && String(p).endsWith(path.join('public', 'images', 'post')),
+  );
+  vi.spyOn(fs, 'readdirSync').mockReturnValue((files ?? []) as any);
+}
+
+describe('getPostThumbnail', () => {
+  it('returns null when the folder is missing or has no raster image', () => {
+    mockFigures(null);
+    expect(getPostThumbnail('post')).toBeNull();
+    mockFigures(['notes.txt', 'diagram.svg']);
+    expect(getPostThumbnail('post')).toBeNull();
+  });
+
+  it('splits light and dark variants per theme when both exist', () => {
+    mockFigures(['specs-radar-light.png', 'benchmark-dark.png', 'benchmark-light.png']);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/benchmark-light.png',
+      dark: '/images/post/benchmark-dark.png',
+    });
+  });
+
+  it('uses the first figure by name for both themes when variants are not paired', () => {
+    mockFigures(['zeta.webp', 'Alpha.JPG', 'readme.md']);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/Alpha.JPG',
+      dark: '/images/post/Alpha.JPG',
+    });
+    mockFigures(['hbm-dark.png', 'context.png']);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/hbm-dark.png',
+      dark: '/images/post/hbm-dark.png',
+    });
   });
 });

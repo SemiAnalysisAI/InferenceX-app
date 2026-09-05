@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
-  blogOgImagePath,
+  getPostThumbnail,
   type BlogPostMeta,
   formatBlogDate,
   getAllPosts,
@@ -34,7 +34,7 @@ function cardProps(post: BlogPostMeta, locale: Locale) {
     dateLabel: formatBlogDate(post.date, locale),
     readingLabel: t.readingTime(post.readingTime),
     tags: post.tags,
-    imageSrc: blogOgImagePath(post.slug, locale),
+    thumbnail: getPostThumbnail(post.slug),
     basePath: blogIndexPath(locale),
   };
 }
