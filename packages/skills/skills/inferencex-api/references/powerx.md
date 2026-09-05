@@ -95,8 +95,11 @@ the latter does not establish an exact release for every row.
 
 Inspect `metric_coverage` for the requested measurement fields. Each field reports
 `available_rows` and `unavailable_rows`; strict row eligibility does not guarantee
-that field was measured. Keep eligible rows with their missing values, state which
-requested measurements are unavailable, and avoid zero filling or energy-advantage
+metric availability. A missing or null field does not establish whether measurement
+occurred or why the value is absent. Report it as unavailable, not as "not measured."
+Keep absent JSON keys absent and explicit nulls null; CSV uses blank cells for
+unavailable values. Keep eligible rows, state which requested measurements are
+unavailable, and avoid zero filling or energy-advantage
 claims. Partial metric coverage alone needs no additional diagnostic request.
 
 An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
