@@ -20,5 +20,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ZhEmbedModelRoute({ params, searchParams }: Props) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  return <EmbedModelPage slug={slug} searchParams={query} locale="zh" />;
+  return <EmbedModelPage slug={slug} searchParams={query} />;
 }

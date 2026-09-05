@@ -1003,7 +1003,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 return locale === 'zh' ? zhHeading(String(configured)) : configured;
                               })()}
                             </Heading>
-                            {embedded && (
+                            {embedded && !minimalChrome && (
                               <OptionInfo
                                 label={metricRowLabel(
                                   selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
