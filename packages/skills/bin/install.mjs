@@ -62,17 +62,20 @@ function installedState(destination, packageName) {
   if (!entry?.isFile()) return unknownState('SKILL.md is missing or not a regular file');
 
   let metadata;
+  let versionMatch;
   try {
     const metadataPath = join(destination, INSTALL_METADATA);
     const file = lstatSync(metadataPath, { throwIfNoEntry: false });
     if (!file) return unknownState('no installation metadata; legacy or manually copied skill');
     if (!file.isFile()) return unknownState('installation metadata is not a regular file');
     metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
-    if (
-      metadata?.package !== packageName ||
-      typeof metadata.version !== 'string' ||
-      !/^\d+\.\d+\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?$/.test(metadata.version)
-    ) {
+    versionMatch =
+      typeof metadata?.version === 'string'
+        ? /^(?<major>\d+)\.(?<minor>\d+)\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?$/.exec(
+            metadata.version,
+          )
+        : null;
+    if (metadata?.package !== packageName || !versionMatch) {
       return unknownState('invalid installation metadata');
     }
   } catch (error) {
@@ -81,27 +84,40 @@ function installedState(destination, packageName) {
       : unknownState(`could not read installation metadata: ${error.code ?? 'read error'}`);
   }
 
-  // Legacy installers retain this receipt when overwriting the skill with older files.
-  try {
-    const scripts = join(destination, 'scripts');
-    const exporter = join(scripts, 'export-powerx.mjs');
-    if (
-      !lstatSync(scripts, { throwIfNoEntry: false })?.isDirectory() ||
-      !lstatSync(exporter, { throwIfNoEntry: false })?.isFile()
-    ) {
-      return unknownState('installed exporter is missing or not a regular file');
+  // Pre-0.4 receipts predate AgentX. Ignore any newer file retained by an older
+  // merge-style forced install while continuing to validate their PowerX exporter.
+  const requiresAgentX =
+    BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= 4n;
+  const exporters = [
+    { file: 'export-powerx.mjs', name: 'exporter' },
+    ...(requiresAgentX ? [{ file: 'export-agentx.mjs', name: 'AgentX exporter' }] : []),
+  ];
+  const scripts = join(destination, 'scripts');
+  for (const exporter of exporters) {
+    try {
+      const path = join(scripts, exporter.file);
+      if (
+        !lstatSync(scripts, { throwIfNoEntry: false })?.isDirectory() ||
+        !lstatSync(path, { throwIfNoEntry: false })?.isFile()
+      ) {
+        return unknownState(`installed ${exporter.name} is missing or not a regular file`);
+      }
+      const version = readFileSync(path, 'utf8').match(
+        /^const PACKAGE_VERSION = ['"](?<version>[^'"\r\n]+)['"];$/mu,
+      )?.groups.version;
+      if (!version) return unknownState(`installed ${exporter.name} version is missing`);
+      if (version !== metadata.version) {
+        return unknownState(
+          `installation metadata disagrees with the installed ${exporter.name} version`,
+        );
+      }
+    } catch (error) {
+      return unknownState(
+        `could not read installed ${exporter.name}: ${error.code ?? 'read error'}`,
+      );
     }
-    const version = readFileSync(exporter, 'utf8').match(
-      /^const PACKAGE_VERSION = ['"](?<version>[^'"\r\n]+)['"];$/mu,
-    )?.groups.version;
-    if (!version) return unknownState('installed exporter version is missing');
-    if (version !== metadata.version) {
-      return unknownState('installation metadata disagrees with the installed exporter version');
-    }
-    return { installation_state: 'installed', installed_version: metadata.version, reason: null };
-  } catch (error) {
-    return unknownState(`could not read installed exporter: ${error.code ?? 'read error'}`);
   }
+  return { installation_state: 'installed', installed_version: metadata.version, reason: null };
 }
 
 function statusRecord(destination, packageInfo) {
