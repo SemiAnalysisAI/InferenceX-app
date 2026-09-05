@@ -381,6 +381,83 @@
   display: none;
 }
 
+/* Embed routes (/embed/model/[slug]) render one chart inside a third-party
+ * iframe. The decorative backgrounds would show through as noise behind the
+ * host page's own layout, so they are dropped; the attribute is set by
+ * EmbedFrame on mount. */
+html[data-inferencex-embed] .circuit-bg {
+  display: none;
+}
+
+/* ── Embed skin: vLLM recipes ──
+ * `/embed/model/[slug]?theme=vllm-light|vllm-dark`. Re-tokens the embed with
+ * the vLLM recipes site's palette (shadcn slate scale, oklch values copied from
+ * recipes/src/app/globals.css) plus its Inter / JetBrains Mono fonts, so the
+ * iframe reads as part of the host page. Tokens InferenceX uses differently
+ * from shadcn (`--muted` is a text color here, cards are translucent) get
+ * embed-specific values instead of a straight copy. The skin attribute is set
+ * by EmbedFrame; the theme class still comes from next-themes, so every
+ * `.dark`-keyed rule and `resolvedTheme` check keeps working. */
+html[data-inferencex-skin='vllm'] {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(0.97 0.005 265);
+  --popover-foreground: oklch(0.25 0.04 265);
+  --primary: #fdb517; /* vLLM yellow */
+  --primary-foreground: oklch(0.129 0.042 264.695);
+  --secondary: #30a2ff; /* vLLM blue */
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --brand: var(--secondary);
+  --muted: oklch(0.72 0.03 257); /* readable as text on white */
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --border: oklch(0.929 0.013 255.508);
+  --border-alt: oklch(0.96 0.008 255);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
+}
+
+html[data-inferencex-skin='vllm'].dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.245 0.016 258);
+  --popover-foreground: oklch(0.92 0.008 245);
+  --primary: #fdb517;
+  --primary-foreground: oklch(0.129 0.042 264.695);
+  --secondary: #30a2ff;
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --brand: var(--primary);
+  --muted: oklch(0.55 0.035 258); /* readable as text on slate */
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --border-alt: oklch(1 0 0 / 6%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+}
+
+/* Fonts: EmbedFrame copies --font-embed-* from the layout wrapper onto <html>. */
+html[data-inferencex-skin='vllm'] body {
+  --font-dm-sans: var(--font-embed-sans, Inter, system-ui, sans-serif);
+  --font-mono: var(--font-embed-mono, 'JetBrains Mono', ui-monospace, monospace);
+}
+
+/* Solid cards with a full-strength border, like the host's shadcn cards;
+ * InferenceX's translucent blurred card reads as a foreign object on a flat
+ * white or slate page. */
+html[data-inferencex-skin='vllm'] [data-slot='card'] {
+  background-color: var(--card);
+  border-color: var(--border);
+  backdrop-filter: none;
+}
+
 /* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
  * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
  * and lands the dragon off-screen left so the GIF stops being rendered. The

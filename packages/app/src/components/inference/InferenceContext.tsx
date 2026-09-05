@@ -60,6 +60,7 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
+import { frameworkFamily } from '@/lib/framework-family';
 import {
   getOpenRouterModelId,
   MODEL_PREFIX_MAPPING,
@@ -207,6 +208,8 @@ export function InferenceProvider({
   initialBenchmarkRows,
   initialYAxisMetric,
   autoSelectAllGpus = false,
+  lockedFrameworks,
+  minimalChrome = false,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -242,6 +245,23 @@ export function InferenceProvider({
    * auto-selection (or when the URL provided chips), user deselections stick.
    */
   autoSelectAllGpus?: boolean;
+  /**
+   * Serving-framework families (quick-filter keys such as `vllm`) the chart is
+   * pinned to. Used by the `/embed/model/[slug]` routes so a host page can
+   * scope the chart to the engine it documents. The lock replaces the
+   * user-editable framework quick filter (URL `i_fw` and dialog edits are
+   * ignored) and removes other engines' chip configs from the selectable set,
+   * so nothing outside the lock reaches the plot, legend, or changelog.
+   * `undefined` / empty = no lock.
+   */
+  lockedFrameworks?: readonly string[];
+  /**
+   * Strip the dashboard down to the chart and a plain legend: no x-axis mode
+   * selector, config changelog, chart toolbar, quick-filter chips, or legend
+   * switches/actions. Used by `/embed/model/[slug]`, where the host page owns
+   * the surrounding UI and a bare chart is what gets pasted.
+   */
+  minimalChrome?: boolean;
 }) {
   const locale = useLocale();
   const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
@@ -455,7 +475,20 @@ export function InferenceProvider({
   // inactive/disabled even while the chart filters. The URL selections are applied
   // just below, after mount.
   const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
-  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
+  const [quickFilterFrameworksState, setQuickFilterFrameworksState] = useState<string[]>([]);
+  // A framework lock pins the filter and makes edits no-ops; see the prop doc.
+  const frameworkLock = useMemo<string[] | null>(
+    () => (lockedFrameworks && lockedFrameworks.length > 0 ? [...lockedFrameworks] : null),
+    [lockedFrameworks],
+  );
+  const quickFilterFrameworks = frameworkLock ?? quickFilterFrameworksState;
+  const setQuickFilterFrameworks = useCallback(
+    (next: SetStateAction<string[]>) => {
+      if (frameworkLock) return;
+      setQuickFilterFrameworksState(next);
+    },
+    [frameworkLock],
+  );
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
   const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
@@ -476,7 +509,7 @@ export function InferenceProvider({
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
     if (power.length > 0) setQuickFilterPower(power);
-  }, [getUrlParam]);
+  }, [getUrlParam, setQuickFilterFrameworks]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
       vendors: quickFilterVendors,
@@ -743,6 +776,10 @@ export function InferenceProvider({
       if (rowToSequence(r) !== effectiveSequence) continue;
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
+      if (frameworkLock) {
+        const family = frameworkFamily(r.framework);
+        if (!family || !frameworkLock.includes(family)) continue;
+      }
       const hwKey = buildAvailabilityHwKey(
         r.hardware,
         r.framework,
@@ -758,7 +795,14 @@ export function InferenceProvider({
         value: hw,
         label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
+  }, [
+    availabilityRows,
+    dbModelKeys,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    frameworkLock,
+  ]);
 
   // One-shot auto-selection of every available chip config (see the
   // `autoSelectAllGpus` prop doc). The selection is pre-resolved through the
@@ -1710,6 +1754,8 @@ export function InferenceProvider({
       activePresetId,
       presetGuardRef,
       compareGpuPair: compareGpuPair ?? null,
+      lockedFrameworks: frameworkLock,
+      minimalChrome,
     }),
     [
       activeHwTypes,
@@ -1728,6 +1774,8 @@ export function InferenceProvider({
       userPowers,
       activePresetId,
       compareGpuPair,
+      frameworkLock,
+      minimalChrome,
     ],
   );
 

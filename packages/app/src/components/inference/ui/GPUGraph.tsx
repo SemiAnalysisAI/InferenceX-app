@@ -203,6 +203,8 @@ const GPUGraph = React.memo(
       selectedSequence,
       quickFilters,
       activeDates,
+      lockedFrameworks,
+      minimalChrome,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
@@ -244,9 +246,10 @@ const GPUGraph = React.memo(
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
-      quickFilters.frameworks.length +
+      (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
@@ -1194,6 +1197,8 @@ const GPUGraph = React.memo(
     return (
       <D3Chart<InferenceData>
         ref={chartRef}
+        // Embeds drop the zoom/pan hint line; the host page has its own caption.
+        instructions={minimalChrome ? '' : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
@@ -1584,6 +1589,7 @@ const GPUGraph = React.memo(
               },
             ]}
             hideAtomFootnote
+            readOnly={minimalChrome}
             keyIndicators={
               <>
                 {fixedLogPointId === null ? null : (

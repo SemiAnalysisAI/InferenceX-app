@@ -18,13 +18,14 @@ const STRINGS = {
 export function ActiveQuickFilters() {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { quickFilters, selectedSequence } = useInferenceFilters();
+  const { quickFilters, selectedSequence, lockedFrameworks } = useInferenceFilters();
   const actions = useInferenceActions();
+  // A framework lock (embed routes) cannot be removed, so it gets no chip.
   const filters = quickFilterSummary(
     quickFilters,
     locale,
     selectedSequence === Sequence.AgenticTraces,
-  );
+  ).filter((filter) => !(lockedFrameworks && filter.category === 'frameworks'));
   if (filters.length === 0) return null;
 
   const setCategory = (category: (typeof filters)[number]['category'], values: string[]) => {

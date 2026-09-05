@@ -10,6 +10,7 @@ import {
   estimateTextWidth,
   slantedMargins,
   splitAxisLabel,
+  splitHistoryLabel,
   xLabelLayout,
   operatorMarginLabel,
   profitYDomain,
@@ -141,6 +142,22 @@ describe('rowLabel', () => {
   it('falls back to the registry entry when the chart config lacks the key', () => {
     expect(rowLabel(row(), {} as HardwareConfig)).toBe('H200');
   });
+
+  it('names the run date of a compare-history bar after the config', () => {
+    expect(rowLabel(row({ precision: 'fp8', date: '2026-06-14' }), hardwareConfig)).toBe(
+      'H200 (FP8) • 2026-06-14',
+    );
+  });
+});
+
+describe('splitHistoryLabel', () => {
+  it('splits a dated label into its config and date', () => {
+    expect(splitHistoryLabel('B200 (FP4) • 2026-06-14')).toEqual(['B200 (FP4)', '2026-06-14']);
+  });
+
+  it('leaves an undated label whole', () => {
+    expect(splitHistoryLabel('B200 (FP4)')).toEqual(['B200 (FP4)', '']);
+  });
 });
 
 describe('generateProfitTooltipHTML', () => {
@@ -153,6 +170,22 @@ describe('generateProfitTooltipHTML', () => {
     expect(html).toContain('30%');
     expect(html).toContain('60%');
     expect(html).toContain('Profit');
+  });
+
+  it('adds a run-date line for a compare-history bar and keeps the date out of the title', () => {
+    const html = generateProfitTooltipHTML(
+      row({ date: '2026-06-14' }),
+      hardwareConfig,
+      assumptions,
+      'en',
+      false,
+    );
+    expect(html).toContain('Run date');
+    expect(html).toContain('2026-06-14');
+    expect(html).not.toContain('H200 • 2026-06-14');
+    expect(
+      generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false),
+    ).not.toContain('Run date');
   });
 
   it('labels a negative result as a loss and still lists the license fee, which is a share of revenue', () => {
@@ -265,6 +298,10 @@ describe('xLabelLayout', () => {
     expect(xLabelLayout(labels, 80, 10)).toBe('slanted');
     expect(xLabelLayout([], 200, 10)).toBe('slanted');
     expect(xLabelLayout(labels, 0, 10)).toBe('slanted');
+  });
+  it('measures a compare-history date as its own line rather than widening the detail line', () => {
+    const dated = labels.map((label) => `${label} • 2026-06-14`);
+    expect(xLabelLayout(dated, 200, 10)).toBe('stacked');
   });
 });
 

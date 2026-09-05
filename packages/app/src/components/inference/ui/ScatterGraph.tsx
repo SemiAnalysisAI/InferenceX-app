@@ -453,6 +453,8 @@ const ScatterGraph = React.memo(
       selectedRunId,
       selectedSequence,
       quickFilters,
+      lockedFrameworks,
+      minimalChrome,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
@@ -1085,9 +1087,10 @@ const ScatterGraph = React.memo(
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
-      quickFilters.frameworks.length +
+      (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
@@ -3436,6 +3439,8 @@ const ScatterGraph = React.memo(
       <>
         <D3Chart<InferenceData>
           ref={chartRef}
+          // Embeds drop the zoom/pan hint line; the host page has its own caption.
+          instructions={minimalChrome ? '' : undefined}
           chartId={chartId}
           // Stable across toggles: the render effect keys on this for "data
           // changed" rebuilds; scale domains come from x/yScaleConfig (computed
@@ -3746,6 +3751,7 @@ const ScatterGraph = React.memo(
                 },
               ]}
               hideAtomFootnote
+              readOnly={minimalChrome}
               enableTooltips={true}
             />
           }

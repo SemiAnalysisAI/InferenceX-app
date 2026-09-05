@@ -146,6 +146,17 @@ export interface ProfitEstimatorRow {
   hwKey: string;
   resultKey: string;
   precision?: string;
+  /**
+   * Comparison entry the SKU was priced on (a run date, or `date~r<runId>` for
+   * one specific run), set only for compare-history bars. Today's bars carry
+   * no date: the run date above the chart describes them.
+   */
+  date?: string;
+  /**
+   * Human label for `date` (e.g. `2026-06-14 #2` for the second run that day),
+   * as the changelog shows it. Falls back to `date` when unset.
+   */
+  dateLabel?: string;
   /** GPU-hours in the denominator: 1 per chip-hour, or what one GW-year buys for this SKU. */
   gpuHours: number;
   /** Gross $/GPU/hr at 100% utilization, before any haircut. */
@@ -178,6 +189,7 @@ export interface ProfitEstimatorSkipped {
   hwKey: string;
   resultKey: string;
   precision?: string;
+  date?: string;
   reason: ProfitEstimatorSkipReason;
 }
 
@@ -218,12 +230,17 @@ export function estimateSkuProfit(
   result: Pick<
     InterpolatedResult,
     'hwKey' | 'resultKey' | 'precision' | 'value' | 'inputTokenShare' | 'cacheHitRate' | 'clamped'
-  >,
+  > & { date?: string },
   specs: ProfitEstimatorSpecs,
   pricing: TokenRevenuePricing,
   assumptions: ProfitEstimatorAssumptions,
 ): ProfitEstimatorRow | ProfitEstimatorSkipped {
-  const base = { hwKey: result.hwKey, resultKey: result.resultKey, precision: result.precision };
+  const base = {
+    hwKey: result.hwKey,
+    resultKey: result.resultKey,
+    precision: result.precision,
+    ...(result.date ? { date: result.date } : {}),
+  };
   if (result.clamped) return { ...base, reason: 'outside-measured-range' };
   // Per chip-hour the denominator is one GPU-hour, so power never enters.
   const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);

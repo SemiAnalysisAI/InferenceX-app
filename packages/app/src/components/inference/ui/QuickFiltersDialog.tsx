@@ -146,7 +146,7 @@ export function QuickFiltersDialog({
     setQuickFilterSpec,
     setQuickFilterPower,
   } = useInferenceActions();
-  const { selectedSequence, quickFilters } = useInferenceFilters();
+  const { selectedSequence, quickFilters, lockedFrameworks } = useInferenceFilters();
   const { availableQuickFilters } = useInferenceData();
   const isAgentic = selectedSequence === Sequence.AgenticTraces;
   const help = {
@@ -196,7 +196,9 @@ export function QuickFiltersDialog({
       })),
       selected: quickFilters.vendors,
     },
-    ...(frameworkOptions.length > 0
+    // A framework lock (embed routes) is not user-editable, so its group is
+    // omitted rather than rendered as a row of disabled pills.
+    ...(frameworkOptions.length > 0 && !lockedFrameworks
       ? [
           {
             key: 'framework' as const,
