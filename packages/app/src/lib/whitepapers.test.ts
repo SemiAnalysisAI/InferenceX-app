@@ -83,7 +83,7 @@ describe('whitepaper registry', () => {
       `/whitepaper/${MI355X_SLUG}/pdf/SemiAnalysis-InferenceX-Executive-Summary_AMD-MI355X-Revenue-per-Gigawatt-Kimi-K3.pdf`,
     );
     expect(paper?.en.title).toBe(
-      'AMD MI355X Can Generate Up to $32B of Revenue per GigaWatt on Kimi K3 2.8T',
+      'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year White Paper',
     );
     expect(paper?.en.kpis.map((kpi) => kpi.value)).toEqual([
       '$32.6B',
@@ -169,7 +169,7 @@ describe('whitepaper metadata locale pairing', () => {
     });
     expect(en.title).toEqual({
       absolute:
-        'AMD MI355X Can Generate Up to $32B of Revenue per GigaWatt on Kimi K3 2.8T | InferenceX',
+        'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year White Paper | InferenceX',
     });
     expect(String((zh.title as { absolute: string }).absolute)).toMatch(HAN);
     expect(en.authors).toEqual([{ name: WHITEPAPER_AUTHORS }]);
