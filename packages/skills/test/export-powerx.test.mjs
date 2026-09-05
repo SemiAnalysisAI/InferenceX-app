@@ -218,8 +218,6 @@ test('strict flags, exact numeric workload and optional raw model are filtered l
     observation({ id: 'agentic', benchmark_type: 'agentic_traces' }),
     observation({ id: 'wrong-input', isl: 1024 }),
     observation({ id: 'wrong-output', osl: 8192 }),
-    observation({ id: 'string-input', isl: '8192' }),
-    observation({ id: 'string-output', osl: '1024' }),
   ];
   const allModels = run([...requiredArgs, '--format', 'json'], rows);
   succeeded(allModels);
@@ -228,7 +226,7 @@ test('strict flags, exact numeric workload and optional raw model are filtered l
     ['900719925474099312345', 'other-release'],
   );
   assert.deepEqual(JSON.parse(allModels.stdout).metadata.excluded_rows, {
-    outside_requested_scope: 5,
+    outside_requested_scope: 3,
     not_strict_v2: invalidFlags.length,
   });
   const result = run([...requiredArgs, '--raw-model', 'glm5.1', '--format', 'json'], rows);
@@ -410,6 +408,104 @@ test('empty selections retain request metadata and distinguish eligibility from 
     unavailable_rows: 0,
   });
   assert.ok(Number.isFinite(Date.parse(metadata.retrieved_at)));
+});
+
+test('nullable fields and absent optional provenance remain valid benchmark rows', () => {
+  const row = observation({
+    id: 42,
+    image: null,
+    run_url: null,
+    metrics: { power_valid: 1, power_metric_schema_version: 2 },
+  });
+  for (const key of [
+    'recipe_fingerprint',
+    'curve_date',
+    'curve_workflow_run_id',
+    'curve_run_started_at',
+  ])
+    delete row[key];
+  const rows = [row, observation({ id: 'null-lengths', isl: null, osl: null })];
+  const result = run([...requiredArgs, '--format', 'json'], rows);
+  succeeded(result);
+  const output = JSON.parse(result.stdout);
+  assert.deepEqual(output.rows, [row]);
+  assert.equal(output.metadata.returned_rows, 2);
+  assert.equal(output.metadata.selected_rows, 1);
+  assert.deepEqual(output.metadata.excluded_rows, { outside_requested_scope: 1, not_strict_v2: 0 });
+  assert.deepEqual(output.metadata.metric_coverage.avg_power_w, {
+    available_rows: 0,
+    unavailable_rows: 1,
+  });
+});
+
+test('every malformed required field fails before scope filtering and leaves the output untouched', () => {
+  const wrongTypes = {
+    id: null,
+    hardware: null,
+    framework: null,
+    model: null,
+    precision: null,
+    spec_method: null,
+    benchmark_type: null,
+    offload_mode: null,
+    date: null,
+    disagg: 'false',
+    is_multinode: 0,
+    prefill_dp_attention: 0,
+    decode_dp_attention: 'false',
+    prefill_tp: '8',
+    prefill_ep: 1.5,
+    prefill_num_workers: null,
+    decode_tp: '8',
+    decode_ep: 1.5,
+    decode_num_workers: null,
+    num_prefill_gpu: '0',
+    num_decode_gpu: 8.5,
+    conc: false,
+    isl: '8192',
+    osl: '1024',
+    image: 1,
+    run_url: false,
+    metrics: [],
+  };
+  const failures = Object.entries(wrongTypes).flatMap(([field, value]) => [
+    { label: `missing ${field}`, field, value: undefined },
+    { label: `wrong type ${field}`, field, value },
+  ]);
+  failures.push(
+    { label: 'empty id', field: 'id', value: '' },
+    { label: 'blank id', field: 'id', value: '  ' },
+    { label: 'fractional id', field: 'id', value: 1.5 },
+    { label: 'unsafe numeric id', field: 'id', value: Number.MAX_SAFE_INTEGER + 1 },
+    { label: 'non-finite id', field: 'id', value: '__NONFINITE__' },
+    { label: 'non-finite integer', field: 'prefill_tp', value: '__NONFINITE__' },
+    { label: 'non-finite input length', field: 'isl', value: '__NONFINITE__' },
+    { label: 'non-finite output length', field: 'osl', value: '__NONFINITE__' },
+    { label: 'impossible date', field: 'date', value: '2026-02-30' },
+    { label: 'timestamp date', field: 'date', value: '2026-09-04T00:00:00Z' },
+    { label: 'non-padded date', field: 'date', value: '2026-9-4' },
+  );
+  for (const { label, field, value } of failures) {
+    const row = observation({
+      model: 'other-release',
+      benchmark_type: 'agentic_traces',
+      [field]: value,
+    });
+    const cwd = project();
+    writeFileSync(join(cwd, 'existing.json'), 'keep this file');
+    const result = run(
+      [...requiredArgs, '--raw-model', 'glm5', '--format', 'json', '--output', 'existing.json'],
+      [row],
+      { cwd, body: JSON.stringify([row]).replace('"__NONFINITE__"', '1e400') },
+    );
+    assert.equal(result.status, 1, label);
+    assert.equal(result.requests.length, 1, label);
+    assert.equal(result.stdout, '', label);
+    assert.match(result.stderr, /response shape/i, label);
+    assert.doesNotMatch(result.stderr, /No strictV2 rows|\{"metadata":/, label);
+    assert.equal(readFileSync(join(cwd, 'existing.json'), 'utf8'), 'keep this file', label);
+    assert.deepEqual(readdirSync(cwd), ['existing.json'], label);
+  }
 });
 
 test('HTTP, malformed JSON and unexpected shapes fail without replacing an existing output', () => {

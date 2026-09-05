@@ -57,10 +57,29 @@ function strictMetadata(overrides = {}) {
 function observation(metrics = {}, overrides = {}) {
   return {
     id: '900719925474099312345',
+    hardware: 'h200_sxm',
+    framework: 'vllm',
     model: 'glm5.1',
+    precision: 'fp8',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 1,
+    num_prefill_gpu: 0,
+    num_decode_gpu: 8,
     benchmark_type: 'single_turn',
     isl: 8192,
     osl: 1024,
+    conc: 32,
+    offload_mode: 'off',
+    image: 'vllm/vllm-openai:v0.10.2',
     date: '2026-09-01',
     run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/900719925474099312345',
     metrics,
@@ -190,8 +209,6 @@ test('installed recipe makes one same-scope GET and preserves the earlier strict
     observation({}, { id: 'agentic', benchmark_type: 'agentic' }),
     observation({}, { id: 'other-isl', isl: 1024 }),
     observation({}, { id: 'other-osl', osl: 8192 }),
-    observation({}, { id: 'string-isl', isl: '8192' }),
-    observation({}, { id: 'string-osl', osl: '1024' }),
   ];
   const metadata = strictMetadata({ returned_rows: 3, returned_models: ['glm5'] });
   const result = run(rows, { metadata });
@@ -361,6 +378,84 @@ test('no observations means no rows in the original local scope', () => {
     assert.deepEqual(diagnostic.rows, []);
     assert.deepEqual(diagnostic.measurement_counts, { some_recorded: 0, missing: 0 });
     assert.ok(Object.values(diagnostic.validation_counts).every((count) => count === 0));
+  }
+});
+
+test('nullable fields and absent optional provenance stay valid during diagnosis', () => {
+  const result = run([
+    observation({}, { id: 42, image: null, run_url: null }),
+    observation({}, { id: 'null-lengths', isl: null, osl: null }),
+  ]);
+  succeeded(result);
+  const { diagnostic } = JSON.parse(result.stdout);
+  assert.equal(diagnostic.returned_rows, 2);
+  assert.equal(diagnostic.scoped_rows, 1);
+  assert.equal(diagnostic.outcome, 'classified');
+  assert.equal(diagnostic.rows[0].id, 42);
+  assert.equal(diagnostic.rows[0].run_url, null);
+  assert.equal(diagnostic.rows[0].validation, 'legacy_unverified');
+  assert.deepEqual(diagnostic.measurement_counts, { some_recorded: 0, missing: 1 });
+});
+
+test('every malformed required field fails before scope filtering instead of proving no observations', () => {
+  const wrongTypes = {
+    id: null,
+    hardware: null,
+    framework: null,
+    model: null,
+    precision: null,
+    spec_method: null,
+    benchmark_type: null,
+    offload_mode: null,
+    date: null,
+    disagg: 'false',
+    is_multinode: 0,
+    prefill_dp_attention: 0,
+    decode_dp_attention: 'false',
+    prefill_tp: '8',
+    prefill_ep: 1.5,
+    prefill_num_workers: null,
+    decode_tp: '8',
+    decode_ep: 1.5,
+    decode_num_workers: null,
+    num_prefill_gpu: '0',
+    num_decode_gpu: 8.5,
+    conc: false,
+    isl: '8192',
+    osl: '1024',
+    image: 1,
+    run_url: false,
+    metrics: [],
+  };
+  const failures = Object.entries(wrongTypes).flatMap(([field, value]) => [
+    { label: `missing ${field}`, field, value: undefined },
+    { label: `wrong type ${field}`, field, value },
+  ]);
+  failures.push(
+    { label: 'empty id', field: 'id', value: '' },
+    { label: 'blank id', field: 'id', value: '  ' },
+    { label: 'fractional id', field: 'id', value: 1.5 },
+    { label: 'unsafe numeric id', field: 'id', value: Number.MAX_SAFE_INTEGER + 1 },
+    { label: 'non-finite id', field: 'id', value: '__NONFINITE__' },
+    { label: 'non-finite integer', field: 'prefill_tp', value: '__NONFINITE__' },
+    { label: 'non-finite input length', field: 'isl', value: '__NONFINITE__' },
+    { label: 'non-finite output length', field: 'osl', value: '__NONFINITE__' },
+    { label: 'impossible date', field: 'date', value: '2026-02-30' },
+    { label: 'timestamp date', field: 'date', value: '2026-09-04T00:00:00Z' },
+    { label: 'non-padded date', field: 'date', value: '2026-9-4' },
+  );
+  for (const { label, field, value } of failures) {
+    const row = observation(
+      {},
+      { model: 'other-release', benchmark_type: 'agentic_traces', [field]: value },
+    );
+    const result = run([row], { body: JSON.stringify([row]).replace('"__NONFINITE__"', '1e400') });
+    assert.equal(result.status, 1, label);
+    assert.equal(result.requests.length, 1, label);
+    assert.equal(result.stdout, '', label);
+    assert.match(result.stderr, /response shape/i, label);
+    assert.match(result.stderr, /strict.*empty|empty.*strict/i, label);
+    assert.doesNotMatch(result.stderr, /no_observations|no benchmark observations/i, label);
   }
 });
 

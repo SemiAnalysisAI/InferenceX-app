@@ -145,9 +145,26 @@ async function diagnose() {
   if (!response.ok) throw new Error(`Diagnostic request returned HTTP ${response.status}`);
   const rows = await response.json();
   const retrievedAt = new Date().toISOString();
-  if (!Array.isArray(rows) || rows.some((row) =>
-    !object(row) || typeof row.model !== 'string' || typeof row.benchmark_type !== 'string' || !object(row.metrics)
-  )) throw new Error('Unexpected diagnostic response shape');
+  function benchmarkRow(row) {
+    if (!object(row) || !object(row.metrics)) return false;
+    const date = new Date(`${row.date}T00:00:00Z`);
+    return (
+      (Number.isSafeInteger(row.id) || (typeof row.id === 'string' && row.id.trim().length > 0)) &&
+      ['hardware', 'framework', 'model', 'precision', 'spec_method', 'benchmark_type', 'offload_mode', 'date']
+        .every((key) => typeof row[key] === 'string') &&
+      ['disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention']
+        .every((key) => typeof row[key] === 'boolean') &&
+      ['prefill_tp', 'prefill_ep', 'prefill_num_workers', 'decode_tp', 'decode_ep', 'decode_num_workers', 'num_prefill_gpu', 'num_decode_gpu', 'conc']
+        .every((key) => Number.isInteger(row[key])) &&
+      ['isl', 'osl'].every((key) => row[key] === null || Number.isFinite(row[key])) &&
+      ['image', 'run_url'].every((key) => row[key] === null || typeof row[key] === 'string') &&
+      /^\d{4}-\d{2}-\d{2}$/u.test(row.date) && Number.isFinite(date.getTime()) &&
+      date.toISOString().slice(0, 10) === row.date
+    );
+  }
+  if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row))) {
+    throw new Error('Unexpected diagnostic response shape: required benchmark fields are missing or malformed');
+  }
   const scoped = rows.filter((row) =>
     row.benchmark_type === 'single_turn' && row.isl === strict.isl && row.osl === strict.osl &&
     (strict.raw_model === null || row.model === strict.raw_model)
@@ -276,3 +293,10 @@ request URL, retrieval time, package version, and coverage summary. State that t
 is extraction of existing observations and that no new benchmark runs occurred.
 Use the recorded request and local filters to repeat the procedure; live data can
 change, so a saved URL alone does not freeze an immutable result.
+
+Both reads validate the required benchmark identity, configuration, workload and
+measurement-date fields before filtering, even on out-of-scope rows. Contract-defined
+null workload lengths, image, and run URL remain permitted. Optional producer,
+snapshot, recipe, audit and measurement fields can remain absent. Malformed required
+fields fail the read; they are not evidence of an empty workload. Numeric benchmark
+IDs must be safe integers; string IDs are retained without conversion.

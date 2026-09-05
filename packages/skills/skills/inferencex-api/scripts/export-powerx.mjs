@@ -95,6 +95,43 @@ function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function benchmarkRow(row) {
+  if (!object(row) || !object(row.metrics)) return false;
+  const date = new Date(`${row.date}T00:00:00Z`);
+  return (
+    (Number.isSafeInteger(row.id) || (typeof row.id === 'string' && row.id.trim().length > 0)) &&
+    [
+      'hardware',
+      'framework',
+      'model',
+      'precision',
+      'spec_method',
+      'benchmark_type',
+      'offload_mode',
+      'date',
+    ].every((key) => typeof row[key] === 'string') &&
+    ['disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention'].every(
+      (key) => typeof row[key] === 'boolean',
+    ) &&
+    [
+      'prefill_tp',
+      'prefill_ep',
+      'prefill_num_workers',
+      'decode_tp',
+      'decode_ep',
+      'decode_num_workers',
+      'num_prefill_gpu',
+      'num_decode_gpu',
+      'conc',
+    ].every((key) => Number.isInteger(row[key])) &&
+    ['isl', 'osl'].every((key) => row[key] === null || Number.isFinite(row[key])) &&
+    ['image', 'run_url'].every((key) => row[key] === null || typeof row[key] === 'string') &&
+    /^\d{4}-\d{2}-\d{2}$/u.test(row.date) &&
+    Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === row.date
+  );
+}
+
 async function run(args = process.argv.slice(2)) {
   const { values } = parseArgs({
     args,
@@ -152,18 +189,9 @@ async function run(args = process.argv.slice(2)) {
   } catch (error) {
     throw new Error(`Could not read benchmark JSON: ${error.message}`, { cause: error });
   }
-  if (
-    !Array.isArray(rows) ||
-    rows.some(
-      (row) =>
-        !object(row) ||
-        typeof row.model !== 'string' ||
-        typeof row.benchmark_type !== 'string' ||
-        !object(row.metrics),
-    )
-  ) {
+  if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row))) {
     throw new Error(
-      'Unexpected response shape: expected benchmark rows with model, benchmark_type, and metrics',
+      'Unexpected response shape: expected benchmark rows with required identity, configuration, workload, date, run_url, and metrics fields',
     );
   }
   const scoped = rows.filter(
