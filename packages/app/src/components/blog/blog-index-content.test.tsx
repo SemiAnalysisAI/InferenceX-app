@@ -39,6 +39,7 @@ vi.mock('@/lib/blog', async (importOriginal) => {
 
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
 
+import { BlogFeaturedPost } from './blog-featured-post';
 import { BlogIndexContent } from './blog-index-content';
 
 const HAN = /\p{Script=Han}/u;
@@ -71,6 +72,30 @@ describe('BlogIndexContent', () => {
     const tileInner = tile.slice(0, tile.indexOf('<div class="flex flex-1'));
     expect(tileInner).not.toContain('Title old');
     expect(tileInner).toContain('>nvidia<');
+    expect(tileInner).toContain('4 min read');
+    expect(html).toContain('data-layout="figure"');
+    expect(html).toContain('class="grid items-start');
+  });
+
+  it('lays the featured card out as a single text column when the post has no figure', () => {
+    const html = renderToStaticMarkup(
+      <BlogFeaturedPost
+        slug="newest"
+        title="Title newest"
+        subtitle="Subtitle newest"
+        dateLabel="May 1, 2026"
+        date="2026-05-01"
+        readingLabel="4 min read"
+        tags={['nvidia']}
+        thumbnail={null}
+        labels={{ eyebrow: 'Latest', read: 'Read article', tags: 'Tags' }}
+      />,
+    );
+    expect(html).toContain('data-layout="text"');
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('blog-thumbnail');
+    expect(html).toContain('Title newest');
+    expect(html).toContain('Read article');
   });
 
   it('keeps the ?tag= filter contract and drops the featured card when filtering', () => {

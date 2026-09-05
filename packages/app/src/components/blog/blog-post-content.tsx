@@ -190,7 +190,7 @@ export function BlogPostContent({
             <Heading as="h2" level="section" id="blog-related-heading">
               {t.moreArticles}
             </Heading>
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid items-start gap-6 md:grid-cols-3">
               {related.map((post) => (
                 <BlogPostCard
                   key={post.slug}

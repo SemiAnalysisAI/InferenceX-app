@@ -67,6 +67,7 @@ export function BlogPostCard({
       <BlogThumbnail
         thumbnail={thumbnail}
         tag={tags[0]}
+        readingLabel={readingLabel}
         priority={priority}
         className="border-b border-border/40"
       />

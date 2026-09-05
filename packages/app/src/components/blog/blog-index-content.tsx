@@ -121,7 +121,10 @@ export function BlogIndexContent({ locale, activeTag: rawTag }: BlogIndexContent
             )}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="blog-post-grid">
+          <div
+            className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3"
+            data-testid="blog-post-grid"
+          >
             {grid.map((post, index) => (
               <BlogPostCard
                 key={post.slug}
