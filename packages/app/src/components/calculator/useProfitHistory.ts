@@ -28,6 +28,8 @@ export function useProfitHistory(options: {
   dateRange: { startDate: string; endDate: string };
   /** Run date the main query already covers; never fetched twice. */
   currentRunDate: string | undefined;
+  /** Run id behind the main bars; a changelog pin of it adds no bar. */
+  currentRunId?: string;
   enabled?: boolean;
 }): {
   /** Comparison entries in fetch order (dates or `date~r<runId>` runs). */
@@ -43,12 +45,20 @@ export function useProfitHistory(options: {
     selectedDates,
     dateRange,
     currentRunDate,
+    currentRunId,
     enabled = true,
   } = options;
 
   const comparisonDates = useMemo(
-    () => buildComparisonDates([...selectedGPUs], [...selectedDates], dateRange, currentRunDate),
-    [selectedGPUs, selectedDates, dateRange, currentRunDate],
+    () =>
+      buildComparisonDates(
+        [...selectedGPUs],
+        [...selectedDates],
+        dateRange,
+        currentRunDate,
+        currentRunId,
+      ),
+    [selectedGPUs, selectedDates, dateRange, currentRunDate, currentRunId],
   );
 
   const view = useMemo(() => ({ type: 'calculator' as const, sequence }), [sequence]);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AvailabilityRow, BenchmarkRow } from '@/lib/api';
+import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
 import { Percentile } from '@/lib/data-mappings';
 
 import {
@@ -12,9 +12,12 @@ import {
   parseHistoryResultKey,
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
+  profitHistoryCurrentRunId,
   profitHistoryDateRanks,
   profitHistoryEntryDate,
   profitHistoryEntryLabel,
+  profitHistoryLegendKeys,
+  profitHistoryMissing,
   shadeHistoryColor,
 } from './profit-history';
 
@@ -321,5 +324,113 @@ describe('shadeHistoryColor', () => {
     expect(shadeHistoryColor('var(--muted-foreground)', 0.5, 'dark')).toBe(
       'var(--muted-foreground)',
     );
+  });
+});
+
+describe('profitHistoryCurrentRunId', () => {
+  const scope = {
+    modelDbKeys: ['kimik3'],
+    selectedGPUs: ['b200_sglang'],
+    selectedPrecisions: ['fp4'],
+    benchmarkType: 'agentic_traces' as const,
+  };
+  function rc(over: Partial<RunConfigRow>): RunConfigRow {
+    return {
+      github_run_id: 1,
+      run_started_at: '2026-08-10T00:00:00Z',
+      html_url: null,
+      head_sha: null,
+      model: 'kimik3',
+      precision: 'fp4',
+      hardware: 'b200',
+      framework: 'sglang',
+      spec_method: 'none',
+      disagg: false,
+      ...over,
+    };
+  }
+  const changelogs = [
+    {
+      date: '2026-08-10',
+      runConfigs: [
+        rc({ github_run_id: 27480000002, run_started_at: '2026-08-10T12:00:00Z' }),
+        rc({ github_run_id: 27480000001, run_started_at: '2026-08-10T03:00:00Z' }),
+        // Another chip's later run is not this comparison's main run.
+        rc({
+          github_run_id: 27480000009,
+          run_started_at: '2026-08-10T20:00:00Z',
+          hardware: 'h200',
+        }),
+      ],
+    },
+    { date: '2026-07-15', runConfigs: [rc({ github_run_id: 27470000001 })] },
+  ];
+
+  it('picks the latest enumerated run of the current date for the compared chips', () => {
+    expect(profitHistoryCurrentRunId(changelogs, '2026-08-10', scope, '999')).toBe('27480000002');
+  });
+
+  it('falls back to the global run id until the current date is in the changelog', () => {
+    expect(profitHistoryCurrentRunId(changelogs, '2026-08-31', scope, '999')).toBe('999');
+    expect(profitHistoryCurrentRunId([], '2026-08-10', scope, '')).toBeUndefined();
+  });
+});
+
+describe('profitHistoryLegendKeys', () => {
+  const rows = [
+    { hwKey: 'b200_sglang' },
+    { hwKey: 'gb300_sglang' },
+    // Priced only on a comparison date; today's run has no row for it.
+    { hwKey: 'mi355x_vllm' },
+  ];
+  const today = ['gb300_sglang', 'b200_sglang', 'h200_vllm'];
+
+  it("lists today's priced chips in availability order without a comparison", () => {
+    expect(profitHistoryLegendKeys(today, rows, false)).toEqual(['gb300_sglang', 'b200_sglang']);
+  });
+
+  it('keeps a chip that only priced on an earlier entry while comparing', () => {
+    expect(profitHistoryLegendKeys(today, rows, true)).toEqual([
+      'gb300_sglang',
+      'b200_sglang',
+      'mi355x_vllm',
+    ]);
+  });
+});
+
+describe('profitHistoryMissing', () => {
+  const label = (hwKey: string) => hwKey.toUpperCase();
+  const entry = (e: string) => `on ${e}`;
+
+  it('names each compared chip with no bar on an entry, the current date included', () => {
+    const rows = [
+      { hwKey: 'b200_sglang', date: undefined },
+      { hwKey: 'b200_sglang', date: '2026-07-15' },
+      { hwKey: 'mi355x_vllm', date: '2026-07-15' },
+    ];
+    expect(
+      profitHistoryMissing(
+        rows,
+        ['2026-07-15', '2026-08-10~r5'],
+        ['b200_sglang', 'mi355x_vllm'],
+        label,
+        entry,
+        '2026-08-31',
+      ),
+    ).toEqual([
+      'B200_SGLANG • on 2026-08-10~r5',
+      'MI355X_VLLM • on 2026-08-10~r5',
+      'MI355X_VLLM • 2026-08-31',
+    ]);
+  });
+
+  it('is empty when every compared chip priced everywhere', () => {
+    const rows = [
+      { hwKey: 'b200_sglang', date: undefined },
+      { hwKey: 'b200_sglang', date: '2026-07-15' },
+    ];
+    expect(
+      profitHistoryMissing(rows, ['2026-07-15'], ['b200_sglang'], label, entry, '2026-08-31'),
+    ).toEqual([]);
   });
 });

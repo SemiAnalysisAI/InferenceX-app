@@ -20,7 +20,8 @@ import {
   comparisonEntryLabel,
   comparisonEntrySortValue,
 } from '@/components/inference/utils/comparisonEntry';
-import type { AvailabilityRow, BenchmarkRow } from '@/lib/api';
+import { dataRunsForDate, type RunScope } from '@/components/inference/utils/runEnumeration';
+import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
@@ -292,4 +293,68 @@ export function shadeHistoryColor(color: string, fade: number, theme: 'light' | 
   const nextL = l + (ceiling - l) * fade;
   const nextC = c * (1 - fade * 0.5);
   return `oklch(${nextL.toFixed(3)} ${nextC.toFixed(3)} ${h})`;
+}
+
+/**
+ * The run behind the estimator's main bars, which a changelog pin must not
+ * draw twice: the latest run of the current date for the compared chips once
+ * the changelog has enumerated that date, else the global run selection.
+ * `/inference` covers this by handing `buildComparisonDates` its
+ * `selectedRunId`; the estimator's main query has no run id of its own, so
+ * the id is read back from the changelog it renders.
+ */
+export function profitHistoryCurrentRunId(
+  changelogs: readonly { date: string; runConfigs: RunConfigRow[] }[],
+  selectedRunDate: string | undefined,
+  scope: RunScope,
+  fallbackRunId: string | undefined,
+): string | undefined {
+  const today = changelogs.find((c) => c.date === selectedRunDate);
+  const runs = today ? dataRunsForDate(today.runConfigs, scope) : [];
+  return runs.at(-1)?.runId ?? (fallbackRunId || undefined);
+}
+
+/**
+ * Chips the legend lists: today's chips that priced, plus, while a
+ * comparison is active, any compared chip that only priced on an earlier
+ * entry (it still owns bars, so it is appended in registry order rather than
+ * dropped with them).
+ */
+export function profitHistoryLegendKeys(
+  availableHwKeys: readonly string[],
+  pricedRows: readonly Pick<ProfitEstimatorRow, 'hwKey'>[],
+  historyActive: boolean,
+): string[] {
+  const priced = new Set(pricedRows.map((row) => row.hwKey));
+  const keys = availableHwKeys.filter((key) => priced.has(key));
+  if (!historyActive) return keys;
+  const seen = new Set(keys);
+  const historyOnly = [...priced]
+    .filter((key) => !seen.has(key))
+    .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+  return [...keys, ...historyOnly];
+}
+
+/**
+ * Compared chips with no bar on a comparison entry, or on the current date
+ * (`''`) when the chip only priced earlier, as `chip • when` captions so a
+ * missing bar reads as "no run that day", not as a zero.
+ */
+export function profitHistoryMissing(
+  pricedRows: readonly Pick<ProfitEstimatorRow, 'hwKey' | 'date'>[],
+  comparisonDates: readonly string[],
+  selectedGPUs: readonly string[],
+  chipLabel: (hwKey: string) => string,
+  entryLabel: (entry: string) => string,
+  currentDateLabel: string,
+): string[] {
+  const priced = new Set(pricedRows.map((row) => `${row.hwKey}~${row.date ?? ''}`));
+  const missing: string[] = [];
+  for (const entry of [...comparisonDates, '']) {
+    for (const hwKey of selectedGPUs) {
+      if (priced.has(`${hwKey}~${entry}`)) continue;
+      missing.push(`${chipLabel(hwKey)} • ${entry ? entryLabel(entry) : currentDateLabel}`);
+    }
+  }
+  return missing;
 }

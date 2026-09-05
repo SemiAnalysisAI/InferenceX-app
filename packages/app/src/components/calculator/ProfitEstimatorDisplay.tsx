@@ -99,8 +99,11 @@ import {
   PROFIT_HISTORY_MAX_GPUS,
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
+  profitHistoryCurrentRunId,
   profitHistoryDateRanks,
   profitHistoryEntryLabel,
+  profitHistoryLegendKeys,
+  profitHistoryMissing,
   shadeHistoryColor,
 } from './profit-history';
 import type { CostProvider } from './types';
@@ -503,7 +506,7 @@ function ProfitEstimatorInner({
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
-  const { selectedRunDate } = useGlobalFilterRun();
+  const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
   // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3) intersected
@@ -628,13 +631,21 @@ function ProfitEstimatorInner({
   );
   // A chip the new model (or precision) has no agentic rows for leaves the
   // selection, the way `/inference` prunes its comparison on a model switch.
+  // When that empties the selection the range and pins go with it, exactly as
+  // clearing the chips by hand does, so the next chip starts a fresh comparison
+  // instead of inheriting the previous model's dates.
   useEffect(() => {
     if (!availabilityRows || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
     const offered = new Set(historyChipOptions.map((o) => o.value));
     const kept = selectedGPUs.filter((hw) => offered.has(hw));
-    if (kept.length !== selectedGPUs.length) {
-      setSelectedGPUs(kept);
-      setUrlParam('i_gpus', kept.join(','));
+    if (kept.length === selectedGPUs.length) return;
+    setSelectedGPUs(kept);
+    setUrlParam('i_gpus', kept.join(','));
+    if (kept.length === 0) {
+      setSelectedDateRange({ startDate: '', endDate: '' });
+      setSelectedDates([]);
+      setUrlParam('i_dstart', '');
+      setUrlParam('i_dend', '');
     }
   }, [availabilityRows, historyChipOptions, selectedGPUs, setUrlParam]);
   const historyAvailableDates = useMemo(
@@ -698,16 +709,6 @@ function ProfitEstimatorInner({
     [setUrlParam],
   );
 
-  const history = useProfitHistory({
-    model: selectedModel,
-    sequence: selectedSequence,
-    selectedGPUs,
-    selectedDates,
-    dateRange: selectedDateRange,
-    currentRunDate: selectedRunDate,
-    enabled: hasData,
-  });
-  const historyActive = history.comparisonDates.length > 0;
   // Config Changelog for the selected chips: one workflow-info query per
   // available date (bounded to the range once one is set), the same feed
   // `/inference` renders under its chart.
@@ -728,6 +729,33 @@ function ProfitEstimatorInner({
     }),
     [dbModelKeys, selectedGPUs, selectedPrecisions],
   );
+  // The run the main bars already show: the latest run of the current date
+  // for this model's chips once the changelog has enumerated them, else the
+  // global run selection. Pinning it from the changelog must not draw a second
+  // bar of the same data, which is why `/inference` hands `buildComparisonDates`
+  // its `selectedRunId`.
+  const historyCurrentRunId = useMemo(
+    () =>
+      profitHistoryCurrentRunId(
+        historyChangelogs.changelogs,
+        selectedRunDate,
+        historyRunScope,
+        selectedRunId,
+      ),
+    [historyChangelogs.changelogs, selectedRunDate, historyRunScope, selectedRunId],
+  );
+
+  const history = useProfitHistory({
+    model: selectedModel,
+    sequence: selectedSequence,
+    selectedGPUs,
+    selectedDates,
+    dateRange: selectedDateRange,
+    currentRunDate: selectedRunDate,
+    currentRunId: historyCurrentRunId,
+    enabled: hasData,
+  });
+  const historyActive = history.comparisonDates.length > 0;
   const historyRunNumbering = useMemo(() => {
     const numbering = new Map<string, number>();
     for (const { date, runConfigs } of historyChangelogs.changelogs) {
@@ -904,10 +932,13 @@ function ProfitEstimatorInner({
     historyEntryLabel,
   ]);
 
-  const legendHwKeys = useMemo(() => {
-    const priced = new Set(fullEstimate.rows.map((row) => row.hwKey));
-    return availableHwKeys.filter((key) => priced.has(key));
-  }, [fullEstimate.rows, availableHwKeys]);
+  // `availableHwKeys` describes today's run; with a comparison active a chip
+  // that only priced on an earlier date still owns bars, so it stays in the
+  // legend (appended in registry order) rather than being dropped with them.
+  const legendHwKeys = useMemo(
+    () => profitHistoryLegendKeys(availableHwKeys, fullEstimate.rows, historyActive),
+    [fullEstimate.rows, availableHwKeys, historyActive],
+  );
 
   const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
@@ -1071,20 +1102,22 @@ function ProfitEstimatorInner({
       }));
   }, [legendHwKeys, visibleHwKeys, costPerGpuHourFor]);
 
-  // Compared chips with no bar on a comparison date, named in the caption so
-  // a missing bar reads as "no run that day", not as a zero.
+  // Compared chips with no bar on a comparison date (or on the current date,
+  // when the chip only priced earlier), named in the caption so a missing bar
+  // reads as "no run that day", not as a zero.
   const historyMissing = useMemo(() => {
     if (!historyActive) return [];
-    const priced = new Set(fullEstimate.rows.map((row) => `${row.hwKey}~${row.date ?? ''}`));
-    const missing: string[] = [];
-    for (const entry of history.comparisonDates) {
-      for (const hwKey of selectedGPUs) {
-        if (priced.has(`${hwKey}~${entry}`)) continue;
+    return profitHistoryMissing(
+      fullEstimate.rows,
+      history.comparisonDates,
+      selectedGPUs,
+      (hwKey) => {
         const config = hardwareConfig[hwKey];
-        missing.push(`${config ? getDisplayLabel(config) : hwKey} • ${historyEntryLabel(entry)}`);
-      }
-    }
-    return missing;
+        return config ? getDisplayLabel(config) : hwKey;
+      },
+      historyEntryLabel,
+      selectedRunDate,
+    );
   }, [
     historyActive,
     fullEstimate.rows,
@@ -1092,6 +1125,7 @@ function ProfitEstimatorInner({
     selectedGPUs,
     hardwareConfig,
     historyEntryLabel,
+    selectedRunDate,
   ]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
