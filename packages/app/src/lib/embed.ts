@@ -4,7 +4,13 @@ import { toSequence } from '@/lib/compare-enum-coerce';
 import { sequenceForScenarioSegment } from '@/lib/compare-scenario-route';
 import type { Sequence } from '@/lib/data-mappings';
 
-export { EMBED_PATH_PREFIX, isEmbedPathname } from '@/lib/embed-route';
+export {
+  EMBED_PATH_PREFIX,
+  EMBED_SKIN_HEADER,
+  EMBED_THEME_HEADER,
+  isEmbedPathname,
+} from '@/lib/embed-route';
+import { EMBED_SKIN_HEADER, EMBED_THEME_HEADER } from '@/lib/embed-route';
 
 export type EmbedTheme = 'light' | 'dark';
 
@@ -132,4 +138,33 @@ export function isEmbedResizeMessage(data: unknown): data is EmbedResizeMessage 
     typeof (data as { height?: unknown }).height === 'number' &&
     Number.isFinite((data as { height: number }).height)
   );
+}
+
+/**
+ * Inline script that stamps the embed theme/skin on <html> before first
+ * paint. Rendered by the embed layouts (from the `x-inferencex-embed-theme`
+ * header the proxy forwards) so it runs ahead of `next-themes`; EmbedFrame
+ * re-applies the same state from React for client navigations.
+ * Values are validated enums, so interpolating them into JS is safe.
+ */
+export function embedBootScript(theme: EmbedTheme, skin: EmbedSkin | undefined): string {
+  const skinJs = skin ? JSON.stringify(skin) : 'null';
+  return (
+    `(function(){var h=document.documentElement;h.dataset.inferencexEmbed='';` +
+    `var s=${skinJs};if(s){h.dataset.inferencexSkin=s;}` +
+    `h.classList.remove('light','dark','minecraft');h.classList.add(${JSON.stringify(theme)});` +
+    `h.style.colorScheme=${JSON.stringify(theme)};})();`
+  );
+}
+
+/** Resolve theme + skin from the proxy-forwarded headers (same rules as `parseEmbedOptions`). */
+export function embedThemeFromHeaders(get: (name: string) => string | null | undefined): {
+  theme: EmbedTheme;
+  skin: EmbedSkin | undefined;
+} {
+  const parsed = parseEmbedTheme(get(EMBED_THEME_HEADER) ?? undefined);
+  const rawSkin = get(EMBED_SKIN_HEADER)?.trim().toLowerCase();
+  const skin =
+    parsed.skin ?? (rawSkin && SKIN_KEYS.has(rawSkin) ? (rawSkin as EmbedSkin) : undefined);
+  return { theme: parsed.theme, skin };
 }

@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { Sequence } from './data-mappings';
 import {
   EMBED_DEFAULT_Y_AXIS_METRIC,
+  EMBED_SKIN_HEADER,
+  EMBED_THEME_HEADER,
+  embedBootScript,
+  embedThemeFromHeaders,
   EMBED_RESIZE_MESSAGE_TYPE,
   isEmbedPathname,
   isEmbedResizeMessage,
@@ -99,6 +103,8 @@ describe('parseEmbedOptions', () => {
   });
 });
 
+const hdrs = (map: Record<string, string>) => (name: string) => map[name] ?? null;
+
 describe('isEmbedResizeMessage', () => {
   it('accepts only the resize shape with a finite height', () => {
     expect(isEmbedResizeMessage({ type: EMBED_RESIZE_MESSAGE_TYPE, height: 640 })).toBe(true);
@@ -108,5 +114,26 @@ describe('isEmbedResizeMessage', () => {
     expect(isEmbedResizeMessage({ type: 'other', height: 640 })).toBe(false);
     expect(isEmbedResizeMessage(null)).toBe(false);
     expect(isEmbedResizeMessage('inferencex:embed-resize')).toBe(false);
+  });
+
+  it('resolves theme and skin from the proxy-forwarded headers', () => {
+    expect(embedThemeFromHeaders(hdrs({}))).toEqual({ theme: 'dark', skin: undefined });
+    expect(embedThemeFromHeaders(hdrs({ [EMBED_THEME_HEADER]: 'vllm-light' }))).toEqual({
+      theme: 'light',
+      skin: 'vllm',
+    });
+    expect(
+      embedThemeFromHeaders(hdrs({ [EMBED_THEME_HEADER]: 'light', [EMBED_SKIN_HEADER]: 'vllm' })),
+    ).toEqual({ theme: 'light', skin: 'vllm' });
+    expect(embedThemeFromHeaders(hdrs({ [EMBED_SKIN_HEADER]: 'nope' })).skin).toBeUndefined();
+  });
+
+  it('boot script stamps the embed flag, theme class, and skin on <html>', () => {
+    const script = embedBootScript('light', 'vllm');
+    expect(script).toContain("h.dataset.inferencexEmbed=''");
+    expect(script).toContain('var s="vllm"');
+    expect(script).toContain('h.classList.add("light")');
+    expect(script).toContain('h.style.colorScheme="light"');
+    expect(embedBootScript('dark', undefined)).toContain('var s=null');
   });
 });

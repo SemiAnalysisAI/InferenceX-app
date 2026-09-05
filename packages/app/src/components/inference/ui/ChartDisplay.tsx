@@ -1231,13 +1231,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         </section>
       )}
 
-      {(selectedYAxisMetric === 'y_costUser' ||
-        selectedYAxisMetric === 'y_tokensPerDollarUser') && (
-        <section>
-          <CustomCosts loading={loading} />
-        </section>
-      )}
-      {selectedYAxisMetric === 'y_powerUser' && (
+      {!minimalChrome &&
+        (selectedYAxisMetric === 'y_costUser' ||
+          selectedYAxisMetric === 'y_tokensPerDollarUser') && (
+          <section>
+            <CustomCosts loading={loading} />
+          </section>
+        )}
+      {!minimalChrome && selectedYAxisMetric === 'y_powerUser' && (
         <section>
           <CustomPowers loading={loading} />
         </section>

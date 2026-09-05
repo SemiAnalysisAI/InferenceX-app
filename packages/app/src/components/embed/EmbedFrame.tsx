@@ -5,6 +5,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 import {
   EMBED_RESIZE_MESSAGE_TYPE,
+  embedBootScript,
   type EmbedResizeMessage,
   type EmbedSkin,
   type EmbedTheme,
@@ -44,17 +45,6 @@ const STRINGS = {
  */
 /** CSS custom properties the skin fonts are published under (see embed layout). */
 const SKIN_FONT_VARS = ['--font-embed-sans', '--font-embed-mono'] as const;
-
-function bootScript(theme: EmbedTheme, skin: EmbedSkin | undefined): string {
-  // Values are validated enums, so string interpolation into JS is safe here.
-  const skinJs = skin ? JSON.stringify(skin) : 'null';
-  return (
-    `(function(){var h=document.documentElement;h.dataset.inferencexEmbed='';` +
-    `var s=${skinJs};if(s){h.dataset.inferencexSkin=s;}` +
-    `h.classList.remove('light','dark','minecraft');h.classList.add(${JSON.stringify(theme)});` +
-    `h.style.colorScheme=${JSON.stringify(theme)};})();`
-  );
-}
 
 export default function EmbedFrame({
   theme,
@@ -132,7 +122,7 @@ export default function EmbedFrame({
 
   return (
     <div ref={rootRef} data-testid="embed-frame" className="flex flex-col gap-2 p-2 sm:p-3">
-      <script dangerouslySetInnerHTML={{ __html: bootScript(theme, skin) }} />
+      <script dangerouslySetInnerHTML={{ __html: embedBootScript(theme, skin) }} />
       {children}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
         <span data-testid="embed-scope">
