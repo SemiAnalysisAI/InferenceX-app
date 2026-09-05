@@ -1,0 +1,38 @@
+{
+  "name": "@semianalysisai/inferencex-skills",
+  "version": "0.1.0",
+  "description": "Install the InferenceX public API skill for Codex and Claude Code.",
+  "keywords": [
+    "agent-skills",
+    "api",
+    "benchmarks",
+    "claude",
+    "codex",
+    "inferencex",
+    "powerx"
+  ],
+  "homepage": "https://inferencex.semianalysis.com/api",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SemiAnalysisAI/InferenceX-app",
+    "directory": "packages/skills"
+  },
+  "bin": {
+    "inferencex-skills": "bin/install.mjs"
+  },
+  "files": [
+    "bin/install.mjs",
+    "skills/inferencex-api",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "scripts": {
+    "list": "node bin/install.mjs list",
+    "test:unit": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
