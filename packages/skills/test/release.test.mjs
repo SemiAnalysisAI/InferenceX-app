@@ -5,6 +5,7 @@ import {
   cpSync,
   existsSync,
   mkdtempSync,
+  mkdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -17,6 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { PACKAGE, requireUnpublished, verifyArchive, verifyContents } from '../scripts/release.mjs';
 
 const VERSION = '0.4.0';
+const ARCHIVE = `semianalysisai-inferencex-skills-${VERSION}.tgz`;
 const EXPECTED_FILES = [
   'LICENSE',
   'README.md',
@@ -68,18 +70,20 @@ test('release rejects changed bytes and a different reviewed archive', () => {
   const record = {
     name: PACKAGE,
     version: VERSION,
-    filename: 'package.tgz',
+    filename: ARCHIVE,
     files: EXPECTED_FILES,
     source_commit: 'a'.repeat(40),
     source_dirty: false,
-    prepared_at: '2026-09-05T00:00:00Z',
+    prepared_at: '2026-09-05T00:00:00.000Z',
     sha256: createHash('sha256').update(bytes).digest('hex'),
     integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
   };
   verifyArchive(record, bytes, record.sha256);
   assert.throws(() => verifyArchive(record, Buffer.from('changed')), /SHA-256 differs/);
   assert.throws(() => verifyArchive(record, bytes, '0'.repeat(64)), /reviewed candidate/);
-  assert.throws(() => verifyArchive({ ...record, filename: '../package.tgz' }, bytes), /beside/);
+  assert.throws(() => verifyArchive({ ...record, version: '0.4.0-rc.1' }, bytes), /stable version/);
+  assert.throws(() => verifyArchive({ ...record, version: '0.4.1' }, bytes), /filename/);
+  assert.throws(() => verifyArchive({ ...record, filename: '../package.tgz' }, bytes), /filename/);
   assert.throws(
     () => verifyArchive({ ...record, files: EXPECTED_FILES.slice(1) }, bytes),
     /differs/,
@@ -113,16 +117,17 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
   const record = {
     name: PACKAGE,
     version: VERSION,
-    filename: 'package.tgz',
+    filename: ARCHIVE,
     files: EXPECTED_FILES,
     source_commit: 'a'.repeat(40),
     source_dirty: false,
-    prepared_at: '2026-09-05T00:00:00+00:00',
+    prepared_at: '2026-09-05T00:00:00.000Z',
     sha256: createHash('sha256').update(bytes).digest('hex'),
     integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
   };
   verifyArchive(record, bytes);
   verifyArchive({ ...record, source_commit: 'b'.repeat(64) }, bytes);
+  verifyArchive({ ...record, prepared_at: '2024-02-29T23:59:59.999Z' }, bytes);
   for (const source_dirty of [true, null, undefined]) {
     assert.throws(() => verifyArchive({ ...record, source_dirty }, bytes), /source must be clean/);
   }
@@ -133,7 +138,11 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
     null,
     '2026-09-05Z',
     '2026-09-05 00:00:00Z',
+    '2026-09-05T00:00:00Z',
+    '2026-09-05T00:00:00.000+00:00',
     '2026-09-05T00:00:00',
+    '2025-02-29T00:00:00.000Z',
+    '2026-01-01T24:00:00.000Z',
     'not-a-dateZ',
     '2026-09-05T00:00:00+99:99',
   ]) {
@@ -141,7 +150,7 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
   }
 });
 
-test('prepare rejects dirty package source and packs a clean real candidate', (context) => {
+test('prepare rejects dirty or changing package source and packs one clean candidate', (context) => {
   const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-release-test-'));
   context.after(() => rmSync(temporary, { recursive: true, force: true }));
   const source = resolve(import.meta.dirname, '..');
@@ -161,8 +170,17 @@ test('prepare rejects dirty package source and packs a clean real candidate', (c
     cwd: packageRoot,
     encoding: 'utf8',
   }).trim();
+  const fetchCalls = join(temporary, 'fetch-calls.txt');
   const preload = join(temporary, 'registry-404.mjs');
-  writeFileSync(preload, 'globalThis.fetch = async () => new Response(null, { status: 404 });\n');
+  writeFileSync(
+    preload,
+    `import { appendFileSync } from 'node:fs';
+globalThis.fetch = async () => {
+  appendFileSync(${JSON.stringify(fetchCalls)}, 'fetch\\n');
+  return new Response(null, { status: 404 });
+};
+`,
+  );
   const command = [
     '--import',
     pathToFileURL(preload).href,
@@ -180,16 +198,84 @@ test('prepare rejects dirty package source and packs a clean real candidate', (c
   assert.notEqual(dirty.status, 0, `${dirty.stdout}\n${dirty.stderr}`);
   assert.match(dirty.stderr, /source must be clean/);
   assert.equal(existsSync(dirtyOutput), false);
+  assert.equal(existsSync(fetchCalls), false);
 
   execFileSync('git', ['checkout', '--quiet', '--', 'README.md'], { cwd: packageRoot });
   const output = join(temporary, 'candidate');
   const clean = spawnSync(process.execPath, [...command, output], { encoding: 'utf8' });
   assert.equal(clean.status, 0, clean.stderr);
+  assert.equal(readFileSync(fetchCalls, 'utf8'), 'fetch\n');
   const record = JSON.parse(readFileSync(join(output, 'release.json'), 'utf8'));
   assert.equal(record.source_commit, sourceCommit);
   assert.equal(record.source_dirty, false);
   assert.deepEqual([...record.files].sort(), [...EXPECTED_FILES].sort());
   verifyArchive(record, readFileSync(join(output, record.filename)));
+
+  const wrapperDirectory = join(temporary, 'bin');
+  mkdirSync(wrapperDirectory);
+  const npmWrapper = join(wrapperDirectory, 'npm');
+  writeFileSync(
+    npmWrapper,
+    `#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+const packed = spawnSync(process.env.REAL_NPM, process.argv.slice(2), { encoding: 'utf8' });
+process.stdout.write(packed.stdout ?? '');
+process.stderr.write(packed.stderr ?? '');
+if (packed.error) throw packed.error;
+if (packed.status !== 0) process.exit(packed.status ?? 1);
+if (process.env.PACK_MUTATION === 'dirty') {
+  appendFileSync(process.env.SOURCE_ROOT + '/README.md', '\\npack mutation\\n');
+} else {
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--allow-empty', '--quiet', '-m', 'pack mutation'], {
+    cwd: process.env.SOURCE_ROOT,
+    stdio: 'inherit',
+  });
+}
+`,
+    { mode: 0o755 },
+  );
+  const realNpm = execFileSync('which', ['npm'], { encoding: 'utf8' }).trim();
+  for (const mutation of ['dirty', 'head']) {
+    const mutationOutput = join(temporary, `${mutation}-during-pack`);
+    const mutated = spawnSync(process.execPath, [...command, mutationOutput], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${wrapperDirectory}:${process.env.PATH}`,
+        REAL_NPM: realNpm,
+        SOURCE_ROOT: packageRoot,
+        PACK_MUTATION: mutation,
+      },
+    });
+    assert.notEqual(mutated.status, 0, `${mutated.stdout}\n${mutated.stderr}`);
+    assert.match(mutated.stderr, mutation === 'dirty' ? /source changed/ : /commit changed/);
+    assert.equal(existsSync(join(mutationOutput, 'release.json')), false);
+    if (mutation === 'dirty') {
+      execFileSync('git', ['checkout', '--quiet', '--', 'README.md'], { cwd: packageRoot });
+    }
+  }
+});
+
+test('check validates version and archive filename before reading archive bytes', (context) => {
+  const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-release-check-'));
+  context.after(() => rmSync(temporary, { recursive: true, force: true }));
+  const manifest = join(temporary, 'release.json');
+  for (const [version, filename, message] of [
+    [VERSION, 'prompt.txt', /filename/],
+    [VERSION, '../outside.tgz', /filename/],
+    ['0.4.0-rc.1', 'missing.tgz', /stable version/],
+  ]) {
+    writeFileSync(manifest, JSON.stringify({ name: PACKAGE, version, filename }));
+    const checked = spawnSync(
+      process.execPath,
+      [resolve(import.meta.dirname, '../scripts/release.mjs'), 'check', manifest],
+      { encoding: 'utf8' },
+    );
+    assert.notEqual(checked.status, 0);
+    assert.match(checked.stderr, message);
+    assert.doesNotMatch(checked.stderr, /ENOENT/);
+  }
 });
 
 test('public verification decodes gzip HTTP JSON but preserves raw npm tarball bytes', () => {
