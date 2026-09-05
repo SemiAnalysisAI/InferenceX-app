@@ -20,10 +20,24 @@ const POSTS = [
   mk('older', '2026-02-01', ['sglang', 'vllm', 'rocm', 'cann', 'kimi', 'qwen', 'fp8']),
 ];
 
+const THUMBNAILS: Record<string, BlogLib.PostThumbnail | null> = {
+  newest: {
+    light: '/images/newest/benchmark-light.png',
+    dark: '/images/newest/benchmark-dark.png',
+  },
+  mid: { light: '/images/mid/context.png', dark: '/images/mid/context.png' },
+};
+
 vi.mock('@/lib/blog', async (importOriginal) => {
   const actual = await importOriginal<typeof BlogLib>();
-  return { ...actual, getAllPosts: () => POSTS };
+  return {
+    ...actual,
+    getAllPosts: () => POSTS,
+    getPostThumbnail: (slug: string) => THUMBNAILS[slug] ?? null,
+  };
 });
+
+vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
 
 import { BlogIndexContent } from './blog-index-content';
 
@@ -38,8 +52,25 @@ describe('BlogIndexContent', () => {
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(POSTS.length - 1);
     expect(html).toContain('InferenceX Research');
     expect(html).toContain('href="/glossary"');
-    expect(html).toContain('/blog/newest/opengraph-image');
+    expect(html).not.toContain('opengraph-image');
     expect(html).toContain('4 min read');
+  });
+
+  it('uses post figures as thumbnails and a text-free tile when a post has none', () => {
+    const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
+
+    // Paired light/dark figures go through the themed image (per-theme data attributes).
+    expect(html).toContain('data-src-light="/images/newest/benchmark-light.png"');
+    expect(html).toContain('data-src-dark="/images/newest/benchmark-dark.png"');
+    // A single theme-neutral figure renders as a plain image.
+    expect(html).toContain('src="/images/mid/context.png"');
+    // Posts without figures get the tile; the title never appears inside it.
+    expect(html.match(/data-testid="blog-thumbnail-tile"/gu)).toHaveLength(2);
+    expect(html.match(/data-testid="blog-thumbnail-figure"/gu)).toHaveLength(2);
+    const tile = html.slice(html.indexOf('data-testid="blog-thumbnail-tile"'));
+    const tileInner = tile.slice(0, tile.indexOf('<div class="flex flex-1'));
+    expect(tileInner).not.toContain('Title old');
+    expect(tileInner).toContain('>nvidia<');
   });
 
   it('keeps the ?tag= filter contract and drops the featured card when filtering', () => {
@@ -80,7 +111,7 @@ describe('BlogIndexContent', () => {
     expect(html).toContain('href="/zh/blog?tag=nvidia"');
     expect(html).toContain('href="/zh/blog/newest"');
     expect(html).toContain('href="/zh/glossary"');
-    expect(html).toContain('/zh/blog/newest/opengraph-image');
+    expect(html).toContain('href="/zh/blog/newest"');
     expect(html).toContain('文章');
     expect(html).not.toContain('min read');
     expect(html).not.toContain('More tags');

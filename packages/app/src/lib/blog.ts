@@ -368,3 +368,35 @@ export function formatBlogDate(date: string, locale: BlogLocale = 'en'): string 
 export function blogOgImagePath(slug: string, locale: BlogLocale = 'en'): string {
   return `${blogPathPrefix(locale)}/${slug}/opengraph-image`;
 }
+
+/** Card thumbnail sources for a post, one per theme. Both keys hold the same
+ *  path when the folder has a single theme-neutral figure. */
+export interface PostThumbnail {
+  light?: string;
+  dark?: string;
+}
+
+const THUMBNAIL_EXTENSIONS = new Set(['.png', '.webp', '.jpg', '.jpeg']);
+
+/**
+ * First raster figure under `public/images/<slug>/`, sorted by file name, for
+ * use as the article-card thumbnail. Files named with `light` or `dark` are
+ * split per theme when both exist; otherwise the first figure serves both.
+ * Returns null when the folder is missing or holds no raster image.
+ * Server-only (reads the filesystem).
+ */
+export function getPostThumbnail(slug: string): PostThumbnail | null {
+  const dir = path.join(process.cwd(), 'public', 'images', slug);
+  if (!fs.existsSync(dir)) return null;
+  const files = fs
+    .readdirSync(dir)
+    .filter((name) => THUMBNAIL_EXTENSIONS.has(path.extname(name).toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, 'en'));
+  if (files.length === 0) return null;
+  const url = (name: string) => `/images/${slug}/${name}`;
+  const light = files.find((name) => /light/i.test(name));
+  const dark = files.find((name) => /dark/i.test(name));
+  if (light && dark) return { light: url(light), dark: url(dark) };
+  const only = url(light ?? dark ?? files[0]);
+  return { light: only, dark: only };
+}

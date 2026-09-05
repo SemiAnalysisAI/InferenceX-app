@@ -3,10 +3,12 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import { track } from '@/lib/analytics';
+import type { PostThumbnail } from '@/lib/blog';
 
 export interface BlogFeaturedPostProps {
   slug: string;
@@ -16,7 +18,7 @@ export interface BlogFeaturedPostProps {
   date: string;
   readingLabel: string;
   tags?: string[];
-  imageSrc: string;
+  thumbnail: PostThumbnail | null;
   basePath?: string;
   /** Localized strings: eyebrow ("Latest"), CTA ("Read article"), tag-list label. */
   labels: { eyebrow: string; read: string; tags: string };
@@ -33,7 +35,7 @@ export function BlogFeaturedPost({
   date,
   readingLabel,
   tags = [],
-  imageSrc,
+  thumbnail,
   basePath = '/blog',
   labels,
 }: BlogFeaturedPostProps) {
@@ -44,18 +46,12 @@ export function BlogFeaturedPost({
       data-testid="blog-featured-post"
       className="group relative grid min-w-0 gap-6 overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 md:p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10 lg:p-7"
     >
-      <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-xl border border-border/50 bg-background">
-        <img
-          src={imageSrc}
-          alt=""
-          width={1200}
-          height={630}
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-        />
-      </div>
+      <BlogThumbnail
+        thumbnail={thumbnail}
+        tag={tags[0]}
+        priority
+        className="rounded-xl border border-border/50"
+      />
       <div className="flex min-w-0 flex-col gap-4 lg:justify-center">
         <Eyebrow as="p" wide>
           {labels.eyebrow}

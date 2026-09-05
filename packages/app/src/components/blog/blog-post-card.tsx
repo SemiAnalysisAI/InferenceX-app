@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 
+import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
 import { Heading } from '@/components/ui/heading';
 import { track } from '@/lib/analytics';
+import type { PostThumbnail } from '@/lib/blog';
 import { cn } from '@/lib/utils';
 
 export interface BlogPostCardProps {
@@ -20,8 +22,8 @@ export interface BlogPostCardProps {
   tags?: string[];
   /** Accessible label for the tag list, localized by the caller. */
   tagsLabel?: string;
-  /** Generated Open Graph card for the post, shown as the thumbnail. */
-  imageSrc: string;
+  /** Per-theme figure paths for the thumbnail; null shows the text-free tile. */
+  thumbnail: PostThumbnail | null;
   /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
   /** Where the card is rendered; separates index clicks from related-strip clicks. */
@@ -46,7 +48,7 @@ export function BlogPostCard({
   readingLabel,
   tags = [],
   tagsLabel = 'Tags',
-  imageSrc,
+  thumbnail,
   basePath = '/blog',
   placement = 'index',
   priority = false,
@@ -62,17 +64,12 @@ export function BlogPostCard({
         className,
       )}
     >
-      <div className="relative aspect-[1200/630] w-full overflow-hidden border-b border-border/40 bg-background">
-        <img
-          src={imageSrc}
-          alt=""
-          width={1200}
-          height={630}
-          loading={priority ? 'eager' : 'lazy'}
-          decoding="async"
-          className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-        />
-      </div>
+      <BlogThumbnail
+        thumbnail={thumbnail}
+        tag={tags[0]}
+        priority={priority}
+        className="border-b border-border/40"
+      />
       <div className="flex flex-1 flex-col gap-3 p-5">
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           <time dateTime={date}>{dateLabel}</time>

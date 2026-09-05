@@ -6,7 +6,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   type AdjacentPosts,
-  blogOgImagePath,
+  getPostThumbnail,
   type BlogPostMeta,
   formatBlogDate,
   type TocHeading,
@@ -202,7 +202,7 @@ export function BlogPostContent({
                   readingLabel={t.readingTime(post.readingTime)}
                   tags={post.tags}
                   tagsLabel={t.tags}
-                  imageSrc={blogOgImagePath(post.slug, locale)}
+                  thumbnail={getPostThumbnail(post.slug)}
                   basePath={basePath}
                   placement="related"
                 />
