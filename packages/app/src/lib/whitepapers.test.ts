@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -22,6 +25,7 @@ import {
 } from './whitepapers';
 
 const MI355X_SLUG = 'amd-mi355x-32b-revenue-per-gigawatt-kimi-k3';
+const PUBLIC_DIR = join(process.cwd(), 'public');
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const HAN = /\p{Script=Han}/u;
 
@@ -49,6 +53,20 @@ describe('whitepaper registry', () => {
       expect(paper.dataDate).toMatch(ISO_DATE);
       expect(paper.pageCount).toBeGreaterThan(0);
       expect(paper.tags.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('ships every referenced asset under public/', () => {
+    for (const paper of WHITEPAPERS) {
+      const paths = [
+        paper.pdfPath,
+        paper.coverImagePath,
+        paper.chipImagePath,
+        ...paper.figures.flatMap((figure) => [figure.srcLight, figure.srcDark]),
+      ];
+      for (const publicPath of paths) {
+        expect(existsSync(join(PUBLIC_DIR, publicPath)), publicPath).toBe(true);
+      }
     }
   });
 

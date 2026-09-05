@@ -117,7 +117,7 @@ Static content routes (no DB):
 
 - `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
 - `/blog/[slug]` — blog post page with MDX rendering and OG image generation
-- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/whitepapers.ts`, PDF + Figure 1 PNG under `public/whitepaper/<slug>/`)
+- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
 - `/feed.xml` — RSS 2.0 feed
 - `/llms.txt` — LLM-readable site index
 - `/llms-full.txt` — full article content for LLM ingestion
