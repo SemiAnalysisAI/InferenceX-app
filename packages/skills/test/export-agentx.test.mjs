@@ -69,11 +69,7 @@ function derived(id, value = id) {
   return { id, p75_e2e_norm_intvty: value, p90_e2e_norm_intvty: value };
 }
 
-function mapBody(entries) {
-  return `{${entries
-    .map(([key, value]) => `${JSON.stringify(String(key))}:${JSON.stringify(value)}`)
-    .join(',')}}`;
-}
+const mapBody = (entries) => JSON.stringify(Object.fromEntries(entries));
 
 const response = (body, status = 200) => ({ body, status });
 
@@ -405,6 +401,9 @@ test('malformed required shapes and unrelated enrichment IDs fail closed', () =>
   const failures = [
     { '/api/v1/benchmarks': [response('{}')] },
     { '/api/v1/benchmarks': [response('{')] },
+    {
+      '/api/v1/benchmarks': [response(JSON.stringify([observation(Number.MAX_SAFE_INTEGER + 1)]))],
+    },
     {
       ...routesFor([row], [1]),
       '/api/v1/agentic-aggregates': [response('[]')],

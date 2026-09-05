@@ -68,7 +68,7 @@ function benchmarkRow(row) {
   return (
     object(row) &&
     Object.hasOwn(row, 'id') &&
-    (typeof row.id === 'string' || (typeof row.id === 'number' && Number.isInteger(row.id))) &&
+    (typeof row.id === 'string' || (typeof row.id === 'number' && Number.isSafeInteger(row.id))) &&
     REQUIRED_STRING_FIELDS.every((key) => typeof row[key] === 'string') &&
     REQUIRED_BOOLEAN_FIELDS.every((key) => typeof row[key] === 'boolean') &&
     REQUIRED_INTEGER_FIELDS.every((key) => Number.isInteger(row[key])) &&

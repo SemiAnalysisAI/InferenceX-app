@@ -32,6 +32,25 @@ them with the [PowerX validity and unit guidance](powerx.md): do not automatical
 apply `strictV2`, turn missing measurements into zero, mix per-GPU watts with
 whole-deployment energy, or rank energy.
 
+## Export AgentX summaries
+
+Use the bundled Node 24 exporter to read the complete benchmark response, select
+AgentX observations, and join only the bounded summary enrichments. A display model
+is required; `--date` adds an as-of cutoff, and `--raw-model` selects one exact
+returned model key. The current exporter emits JSON.
+
+```bash
+node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
+  --model DeepSeek-V4-Pro --output agentx.json
+```
+
+For Claude Code, use `.claude/skills/inferencex-api/scripts/export-agentx.mjs`.
+The output retains every selected benchmark object separately from its `agentx`
+enrichment and records request URLs, retrieval context, row counts, missing
+enrichment entries, nullable groups, and trace availability. An unsupported raw ID
+remains in the export but is not sent to numeric enrichment endpoints. Do not use
+this summary workflow to bulk-read timelines, histograms, or server metrics.
+
 ## Diagnose one explicitly selected point
 
 Use this recipe only after the user has selected one result ID from a summary or
