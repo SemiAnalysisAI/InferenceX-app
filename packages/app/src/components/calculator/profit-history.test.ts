@@ -327,6 +327,25 @@ describe('shadeHistoryColor', () => {
   });
 });
 
+function rc(over: Partial<RunConfigRow>): RunConfigRow {
+  return {
+    github_run_id: 1,
+    run_started_at: '2026-08-10T00:00:00Z',
+    html_url: null,
+    head_sha: null,
+    model: 'kimik3',
+    precision: 'fp4',
+    hardware: 'b200',
+    framework: 'sglang',
+    spec_method: 'none',
+    disagg: false,
+    ...over,
+  };
+}
+
+const missingChipLabel = (hwKey: string) => hwKey.toUpperCase();
+const missingEntryLabel = (e: string) => `on ${e}`;
+
 describe('profitHistoryCurrentRunId', () => {
   const scope = {
     modelDbKeys: ['kimik3'],
@@ -334,21 +353,6 @@ describe('profitHistoryCurrentRunId', () => {
     selectedPrecisions: ['fp4'],
     benchmarkType: 'agentic_traces' as const,
   };
-  function rc(over: Partial<RunConfigRow>): RunConfigRow {
-    return {
-      github_run_id: 1,
-      run_started_at: '2026-08-10T00:00:00Z',
-      html_url: null,
-      head_sha: null,
-      model: 'kimik3',
-      precision: 'fp4',
-      hardware: 'b200',
-      framework: 'sglang',
-      spec_method: 'none',
-      disagg: false,
-      ...over,
-    };
-  }
   const changelogs = [
     {
       date: '2026-08-10',
@@ -399,9 +403,6 @@ describe('profitHistoryLegendKeys', () => {
 });
 
 describe('profitHistoryMissing', () => {
-  const label = (hwKey: string) => hwKey.toUpperCase();
-  const entry = (e: string) => `on ${e}`;
-
   it('names each compared chip with no bar on an entry, the current date included', () => {
     const rows = [
       { hwKey: 'b200_sglang', date: undefined },
@@ -413,8 +414,8 @@ describe('profitHistoryMissing', () => {
         rows,
         ['2026-07-15', '2026-08-10~r5'],
         ['b200_sglang', 'mi355x_vllm'],
-        label,
-        entry,
+        missingChipLabel,
+        missingEntryLabel,
         '2026-08-31',
       ),
     ).toEqual([
@@ -430,7 +431,14 @@ describe('profitHistoryMissing', () => {
       { hwKey: 'b200_sglang', date: '2026-07-15' },
     ];
     expect(
-      profitHistoryMissing(rows, ['2026-07-15'], ['b200_sglang'], label, entry, '2026-08-31'),
+      profitHistoryMissing(
+        rows,
+        ['2026-07-15'],
+        ['b200_sglang'],
+        missingChipLabel,
+        missingEntryLabel,
+        '2026-08-31',
+      ),
     ).toEqual([]);
   });
 });
