@@ -57,6 +57,9 @@ configuration fields unless a requested derived total has verified allocation se
    On `/api/v1/benchmarks`, a `date` query is an as-of cutoff unless `exact=true`;
    omitted date means latest available data. Neither means the observations were
    newly measured. Even an exact run snapshot can carry older observations forward.
+   The API array is not chronological: latest per configuration does not mean
+   globally newest first. For latest-observation samples, sort scoped rows by their
+   own `date` descending before applying a limit; `curve_date` is a snapshot date.
    State when no new benchmark runs occurred.
 
 Compare observations with matching workload and configuration scope. Keep metric
@@ -66,8 +69,9 @@ operation's documented metric meanings when interpreting values.
 ## Basic benchmark lookup
 
 This Node 24 example prints up to five latest available single-turn observations
-with 8192 input and 1024 output tokens. It reports the full matching count before
-sampling; the response retains each observation's actual date and provenance.
+with 8192 input and 1024 output tokens, ordered by observation date newest first.
+It reports the full matching count before limiting the sample and retains each
+observation's actual date and provenance.
 
 ```bash
 node --input-type=module <<'JS'
@@ -95,7 +99,7 @@ console.log(JSON.stringify({
   scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
   returned_models: [...new Set(selected.map((row) => row.model))],
   matching_rows: selected.length,
-  sample_rows: selected.slice(0, 5),
+  sample_rows: selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
 }, null, 2));
 JS
 ```
