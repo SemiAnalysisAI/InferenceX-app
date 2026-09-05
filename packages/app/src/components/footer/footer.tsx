@@ -2,9 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { track } from '@/lib/analytics';
+import { isEmbedPathname } from '@/lib/embed-route';
 import { useLocale } from '@/lib/use-locale';
 
 import { StarButton } from './footer-star-cta';
@@ -82,9 +84,12 @@ const STRINGS = {
 
 export const Footer = ({ starCount }: { starCount?: number | null }) => {
   const locale = useLocale();
+  const pathname = usePathname();
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
+  // Embeds render one chart inside a third-party iframe; no site chrome.
+  if (isEmbedPathname(pathname)) return null;
   return (
     <footer
       data-testid="footer"

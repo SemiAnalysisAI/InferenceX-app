@@ -203,6 +203,7 @@ const GPUGraph = React.memo(
       selectedSequence,
       quickFilters,
       activeDates,
+      lockedFrameworks,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
@@ -244,9 +245,10 @@ const GPUGraph = React.memo(
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
-      quickFilters.frameworks.length +
+      (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);

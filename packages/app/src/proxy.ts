@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const EMBED_PATH_PREFIX = '/embed/';
+import { isEmbedPathname } from '@/lib/embed-route';
+
+// `/embed/*` and `/zh/embed/*` render single charts meant to be framed by
+// third-party pages (the vLLM recipes site), so they opt out of the default
+// same-origin framing policy.
 const EMBED_CSP = 'frame-ancestors *';
 
 export function proxy(request: NextRequest) {
-  const isEmbedRoute = request.nextUrl.pathname.startsWith(EMBED_PATH_PREFIX);
+  const isEmbedRoute = isEmbedPathname(request.nextUrl.pathname);
   const requestHeaders = new Headers(request.headers);
   if (isEmbedRoute) {
     requestHeaders.set('x-inferencex-embed', '1');

@@ -291,6 +291,7 @@ export function createMockInferenceContextValues(
     setActivePresetId: namedStub('setActivePresetId'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
     compareGpuPair: null,
+    lockedFrameworks: null,
     ...overrides,
   };
 }

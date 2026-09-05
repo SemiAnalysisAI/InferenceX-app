@@ -381,6 +381,14 @@
   display: none;
 }
 
+/* Embed routes (/embed/model/[slug]) render one chart inside a third-party
+ * iframe. The decorative backgrounds would show through as noise behind the
+ * host page's own layout, so they are dropped; the attribute is set by
+ * EmbedFrame on mount. */
+html[data-inferencex-embed] .circuit-bg {
+  display: none;
+}
+
 /* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
  * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
  * and lands the dragon off-screen left so the GIF stops being rendered. The
