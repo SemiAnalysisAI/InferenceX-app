@@ -930,10 +930,18 @@ class AgentXVerifierTests(unittest.TestCase):
         scope = {'model': 'Example', 'date': None, 'isl': 8192, 'osl': 1024, 'raw_model': None,
                  'empty_isl': 7, 'empty_osl': 13, 'agentx_model': 'Example',
                  'agentx_point_id': '7', 'agentx_no_trace_id': '8'}
-        check.save(project.parent / 'acceptance.json', {'candidate': record, 'scope': scope,
-                                                       'targets': [{'target': 'codex', 'project': str(project),
-                                                                    'status': 'awaiting-native-agent',
-                                                                    'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()}]})
+        claude_project = project.parent / 'claude'
+        claude_prompt = check.prompt(self.args, 'claude', claude_project / 'candidate.tgz').encode()
+        acceptance = {
+            'status': 'prepared', 'mode': 'agents', 'started_at': '2026-09-05T00:00:00Z',
+            'candidate': record, 'new_benchmark_runs': False, 'requests': [], 'scope': scope,
+            'clean_root': str(project.parent),
+            'targets': [
+                {'target': 'codex', 'project': str(project), 'status': 'awaiting-native-agent',
+                 'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()},
+                {'target': 'claude', 'project': str(claude_project), 'status': 'awaiting-native-agent',
+                 'prompt_sha256': hashlib.sha256(claude_prompt).hexdigest()}]}
+        check.save(project.parent / 'acceptance.json', acceptance)
         check.save(project / 'lookup.json', {})
         check.save(project / 'unavailable.json', {'metadata': {}, 'rows': []})
         check.save(project / 'diagnostic.json', {'diagnostic': {}})
@@ -942,6 +950,34 @@ class AgentXVerifierTests(unittest.TestCase):
                    '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
                    '--agentx-no-trace-id', '8', '--project', str(project),
                    '--evidence', str(self.root / 'check-agent')]
+        for mutation in ['missing-status', 'running-status', 'failed-status', 'wrong-mode',
+                         'changed-target', 'missing-target', 'changed-target-status', 'same-project']:
+            with self.subTest(mutation=mutation):
+                altered = json.loads(json.dumps(acceptance))
+                if mutation == 'missing-status':
+                    del altered['status']
+                elif mutation in {'running-status', 'failed-status'}:
+                    altered['status'] = mutation.removesuffix('-status')
+                elif mutation == 'wrong-mode':
+                    altered['mode'] = 'candidate'
+                elif mutation == 'changed-target':
+                    altered['targets'][1]['target'] = 'other'
+                elif mutation == 'missing-target':
+                    altered['targets'].pop()
+                elif mutation == 'changed-target-status':
+                    altered['targets'][1]['status'] = 'complete'
+                else:
+                    altered['targets'][1]['project'] = altered['targets'][0]['project']
+                check.save(project.parent / 'acceptance.json', altered)
+                rejected = command[:-1] + [str(self.root / f'rejected-{mutation}')]
+                message = 'preparation state' if mutation in {
+                    'missing-status', 'running-status', 'failed-status', 'wrong-mode'} else 'target set'
+                with patch.object(sys, 'argv', rejected), patch.object(check, 'check_installed') as installed, \
+                        patch('builtins.print'):
+                    with self.assertRaisesRegex(ValueError, message):
+                        check.main()
+                installed.assert_not_called()
+        check.save(project.parent / 'acceptance.json', acceptance)
         (project / 'prompt.txt').write_text('changed')
         tampered = command[:-1] + [str(self.root / 'tampered-check-agent')]
         with patch.object(sys, 'argv', tampered), patch.object(check, 'check_installed') as installed, \

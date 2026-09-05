@@ -1162,15 +1162,22 @@ def main():
         if args.mode == 'check-agent':
             require(args.project is not None, '--project is required for check-agent')
             prepared = json.loads((args.project.parent / 'acceptance.json').read_text())
+            require(prepared.get('mode') == 'agents' and prepared.get('status') == 'prepared',
+                    'Acceptance preparation state differs')
             require(prepared['candidate'] == record, 'Agent project belongs to another candidate')
             require(prepared['scope'] == report['scope'], 'Check scope differs from prepared prompt')
-            matches = [target for target in prepared['targets'] if Path(target['project']).resolve() == args.project.resolve()]
+            targets = prepared.get('targets')
+            require(type(targets) is list and len(targets) == 2 and all(
+                type(target) is dict and set(target) == {'target', 'project', 'status', 'prompt_sha256'} and
+                target['target'] in {'codex', 'claude'} and target['status'] == 'awaiting-native-agent' and
+                type(target['project']) is str and type(target['prompt_sha256']) is str and
+                re.fullmatch(r'[0-9a-f]{64}', target['prompt_sha256']) is not None for target in targets) and
+                {target['target'] for target in targets} == {'codex', 'claude'} and
+                len({Path(target['project']).resolve() for target in targets}) == 2,
+                'Prepared target set differs')
+            matches = [target for target in targets if Path(target['project']).resolve() == args.project.resolve()]
             require(len(matches) == 1, 'Project was not prepared for this acceptance run')
             prepared_target = matches[0]
-            require(set(prepared_target) == {'target', 'project', 'status', 'prompt_sha256'} and
-                    prepared_target['target'] in {'codex', 'claude'} and
-                    prepared_target['status'] == 'awaiting-native-agent',
-                    'Prepared target identity differs')
             local_archive = args.project / record['filename']
             require(local_archive.read_bytes() == body, 'Native-agent archive differs from accepted candidate')
             prompt_bytes = (args.project / 'prompt.txt').read_bytes()
