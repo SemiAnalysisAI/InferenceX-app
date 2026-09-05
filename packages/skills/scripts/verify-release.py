@@ -141,7 +141,7 @@ def run(command, project, environment, label, deadline=None):
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
-                    pass
+                    pass  # The process group already exited before cleanup.
                 process.poll()  # Reap if already exited; never add an unbounded cleanup wait.
                 raise
     except Exception as caught:
@@ -215,6 +215,7 @@ def install_target(clean_root, target, node, npm, archive, version, public, repo
                 shutil.copytree(logs, project / 'npm-logs')
             save(project / 'install-attempt.json', entry)
         time.sleep(delay)
+    raise RuntimeError('Installation attempts exhausted without returning or raising')
 
 
 def scoped(rows, isl, osl, raw_model=None):
