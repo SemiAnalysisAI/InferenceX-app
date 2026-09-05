@@ -129,6 +129,9 @@ different reviewer must inspect the transcript and explanation for:
   is explained if the diagnostic request fails.
 - The installed skill actually supplied the workflow and the agent used no
   repository or private-data access. All claims have complete response evidence.
+  Confirm that the agent retained its full unfiltered, strict-before-filtering,
+  and diagnostic responses with request context. The checker's later independent
+  refetches validate data but do not replace the agent's original response capture.
 
 Record the reviewer, accepted SHA-256, agent invocations, evidence paths, and any
 limitations. A failed agent attempt remains failed; fix the source, create a new
