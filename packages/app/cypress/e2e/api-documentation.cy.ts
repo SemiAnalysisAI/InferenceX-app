@@ -2,7 +2,7 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 // The website advertises the verified public release, which can lag the source candidate.
-const PUBLISHED_SKILL = { name: '@semianalysisai/inferencex-skills', version: '0.1.0' };
+const PUBLISHED_SKILL = { name: '@semianalysisai/inferencex-skills', version: '0.2.0' };
 
 describe('API documentation', () => {
   for (const locale of [
@@ -18,6 +18,7 @@ describe('API documentation', () => {
       copy: 'Copy',
       copied: 'Copied',
       upgrade: 'replace the version in the installation command',
+      status: 'replace install with status',
       examples: 'Usage examples',
     },
     {
@@ -32,6 +33,7 @@ describe('API documentation', () => {
       copy: '复制',
       copied: '已复制',
       upgrade: '新的已发布版本',
+      status: 'install 改为 status',
       examples: '使用示例（英文）',
     },
   ]) {
@@ -73,6 +75,12 @@ describe('API documentation', () => {
       cy.get('[data-testid="api-agent-upgrade"]')
         .should('contain.text', locale.upgrade)
         .and('contain.text', '--force');
+      cy.get('[data-testid="api-agent-status"]')
+        .should('contain.text', locale.status)
+        .and('contain.text', '--target')
+        .and('contain.text', 'Installer version')
+        .and('contain.text', 'Installed version')
+        .and('contain.text', 'unknown');
       cy.get('[data-testid="api-agent-examples"]')
         .should('have.text', locale.examples)
         .and(

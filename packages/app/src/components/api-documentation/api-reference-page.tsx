@@ -24,7 +24,7 @@ const UI_COPY = {
     agentSkill: 'Use the API with your agent',
     agentSkillDescription:
       'The inferencex-api skill helps your agent navigate the public API: benchmarks, provenance, datasets, CollectiveX, and diagnostics. Validated single-turn PowerX export is the first worked example.',
-    agentVersion: 'Skill version · 0.1.0',
+    agentVersion: 'Skill version · 0.2.0',
     agentPrerequisites:
       'Requires Node 24 or later with npm and Codex or Claude Code. Installation and API queries require internet access.',
     agentInstall: 'Install in your project',
@@ -32,6 +32,8 @@ const UI_COPY = {
       'Run the command for your agent from your project directory, then start an agent session in that project.',
     agentUpgrade:
       'To upgrade, replace the version in the installation command with a new published version and rerun it with --force. Existing skills are otherwise skipped. Save local edits first: --force overwrites matching files and retains obsolete files.',
+    agentStatus:
+      'To check the copied skill version, replace install with status in the command above and keep the same --target. Installer version identifies the installer; Installed version identifies the copied skill. Older installations may report unknown.',
     agentExamples: 'Usage examples',
     agentAccess:
       'Queries use the public API without database credentials. The separate MCP server has its own setup; this skill does not require or reconfigure it.',
@@ -99,13 +101,15 @@ const UI_COPY = {
     agentSkill: '通过智能体使用 API',
     agentSkillDescription:
       'inferencex-api 技能帮助智能体查找和使用公开 API，涵盖基准测试、溯源、数据集、CollectiveX 和诊断接口。已验证的单轮请求 PowerX 导出是首个完整示例。',
-    agentVersion: '技能版本 · 0.1.0',
+    agentVersion: '技能版本 · 0.2.0',
     agentPrerequisites:
       '需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。安装和 API 查询均需联网。',
     agentInstall: '安装到项目',
     agentInstallDescription: '在项目目录中执行对应智能体的安装命令，然后在该项目中启动智能体会话。',
     agentUpgrade:
       '升级时，将安装命令中的版本号改为新的已发布版本，并加上 --force 重新执行。默认会跳过已有技能。请先保存本地修改：--force 会覆盖同名文件，但保留不再随包提供的旧文件。',
+    agentStatus:
+      '检查已复制的技能版本时，将上方命令中的 install 改为 status，并保留相同的 --target。Installer version 表示安装器版本，Installed version 表示项目内已复制技能的版本。旧版安装可能显示 unknown。',
     agentExamples: '使用示例（英文）',
     agentAccess:
       '查询通过公开 API 完成，无需数据库凭据。独立的 MCP server 有自己的配置流程；本技能不依赖它，也不会改动它的配置。',
@@ -346,7 +350,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                     locale={locale}
                     label={target === 'codex' ? 'Codex' : 'Claude Code'}
                   >
-                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.1.0 -- inferencex-skills install --target ${target}`}
+                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target ${target}`}
                   </CopyableCodeBlock>
                 </div>
               ))}
@@ -357,6 +361,12 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               className="mt-3 text-sm leading-6 text-muted-foreground"
             >
               {copy.agentUpgrade}
+            </p>
+            <p
+              data-testid="api-agent-status"
+              className="mt-3 text-sm leading-6 text-muted-foreground"
+            >
+              {copy.agentStatus}
             </p>
             <ApiAgentExamplesLink label={copy.agentExamples} locale={locale} />
 
