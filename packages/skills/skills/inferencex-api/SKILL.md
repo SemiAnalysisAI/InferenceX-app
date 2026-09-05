@@ -12,14 +12,16 @@ Public benchmark reads require HTTPS access and no credentials.
 Use the workflow below for the public operations described in OpenAPI. PowerX
 single-turn export is the first bundled worked example.
 
-For **evaluation lookups** or **dataset discovery and conversation inspection**, use
-the [public API examples](references/public-api-examples.md). They preserve raw task
-metrics and distinguish complete responses from selected samples or pages.
+For **evaluation lookups**, **dataset discovery and conversation inspection**, or
+**benchmark history by GPU, workload and date range**, use the
+[public API examples](references/public-api-examples.md). They preserve raw metrics
+and distinguish complete responses from selected samples, pages or date ranges.
 
 For **PowerX measured-power or energy exports**, read the
 [PowerX cookbook](references/powerx.md) and use the
 [bundled exporter](scripts/export-powerx.mjs). It selects validated schema-v2
-observations for an exact single-turn workload. Check `metric_coverage` for the
+observations for an exact single-turn workload. For original-response evidence,
+use its `--evidence-dir` option with a fresh directory per export. Check `metric_coverage` for the
 requested fields: an eligible row can still lack a measurement. Preserve that row
 and its missing values, report the unavailable fields, and avoid zero filling or
 energy-advantage claims. If the strict selection is empty and the user needs an

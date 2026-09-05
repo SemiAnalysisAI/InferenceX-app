@@ -5,8 +5,18 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { PACKAGE, requireUnpublished, verifyArchive, verifyContents } from '../scripts/release.mjs';
 
+test('public verification retries only exact-version ETARGET within its deadline', () => {
+  const result = spawnSync('python3', ['-B', 'test/verify-release.test.py'], {
+    cwd: resolve(import.meta.dirname, '..'),
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('release refuses mismatched or existing versions and registry failures', async () => {
-  const manifest = { name: PACKAGE, version: '0.2.0' };
+  const manifest = { name: PACKAGE, version: '0.3.0' };
   let requests = 0;
   const request = () => {
     requests++;
@@ -15,14 +25,14 @@ test('release refuses mismatched or existing versions and registry failures', as
   await assert.rejects(requireUnpublished('0.1.0', manifest, request), /differs/);
   await assert.rejects(requireUnpublished('latest', manifest, request), /exact stable version/);
   assert.equal(requests, 0, 'Invalid versions must fail before network access');
-  await requireUnpublished('0.2.0', manifest, request);
+  await requireUnpublished('0.3.0', manifest, request);
   for (const [status, message] of [
     [200, /already published/],
     [429, /Cannot establish/],
     [503, /Cannot establish/],
   ]) {
     await assert.rejects(
-      requireUnpublished('0.2.0', manifest, () => Promise.resolve(new Response(null, { status }))),
+      requireUnpublished('0.3.0', manifest, () => Promise.resolve(new Response(null, { status }))),
       message,
     );
   }
@@ -122,17 +132,16 @@ with tempfile.TemporaryDirectory() as directory:
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-test('read-only verification rejects incomplete or altered exports and preserves timeout evidence', () => {
+test('read-only verification rejects incomplete or altered exports', () => {
   const result = spawnSync(
     'python3',
     [
       '-c',
       String.raw`
-import csv, importlib.util, json, subprocess, tempfile
+import csv, importlib.util, json, tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
 assertions = TestCase()
 spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
 check = importlib.util.module_from_spec(spec)
@@ -143,7 +152,7 @@ args = SimpleNamespace(model='Example', date=None, isl=8192, osl=1024, raw_model
 row = {'id':'9007199254740993', 'model':'example', 'hardware':'h200', 'date':'2026-01-01',
        'benchmark_type':'single_turn', 'isl':8192, 'osl':1024,
        'metrics': {'power_valid':1, 'power_metric_schema_version':2, 'avg_power_w':0}}
-metadata = {'package_version':'0.2.0', 'query_url':url, 'requested_model':'Example',
+metadata = {'package_version':'0.3.0', 'query_url':url, 'requested_model':'Example',
             'requested_date':None, 'date_selection':'latest', 'benchmark_type':'single_turn',
             'isl':8192, 'osl':1024, 'raw_model':None, 'returned_rows':1, 'selected_rows':1,
             'returned_models':['example'], 'selected_models':['example'],
@@ -164,19 +173,19 @@ with tempfile.TemporaryDirectory() as directory:
             writer.writeheader()
             writer.writerow({key:record[key] for key in headers})
     write()
-    assert check.check_exports(root, [row], [row], args, '0.2.0')['selected_rows'] == 1
+    assert check.check_exports(root, [row], [row], args, '0.3.0')['selected_rows'] == 1
     for key, value in [('prefill_avg_power_w', 0), ('avg_power_w', 1), ('id', '9007199254740992')]:
         old = record[key]
         record[key] = value
         write()
         with assertions.assertRaises(ValueError, msg='Verifier accepted changed ' + key):
-            check.check_exports(root, [row], [row], args, '0.2.0')
+            check.check_exports(root, [row], [row], args, '0.3.0')
         record[key] = old
     for headers in [[key for key in columns if key != 'framework'], list(reversed(columns)), columns + ['extra']]:
         record['extra'] = 'not in the published contract'
         write(headers)
         with assertions.assertRaisesRegex(ValueError, 'CSV header', msg='Verifier accepted an incomplete or changed CSV contract'):
-            check.check_exports(root, [row], [row], args, '0.2.0')
+            check.check_exports(root, [row], [row], args, '0.3.0')
     assert not check.strict({'metrics': {'power_valid': True, 'power_metric_schema_version':2}})
     assert not check.same_url(url, url + '&date=2026-01-01')
     assert not check.same_url(url, url + '&date=')
@@ -205,19 +214,6 @@ for key, value in [('rows',[row]), ('retrieved_at','2026-01-02T00:00:00'), ('val
                    ('validation_counts',detail['validation_counts'] | {'extra':0})]:
     with assertions.assertRaises(ValueError, msg='Verifier accepted changed empty diagnostic evidence: ' + key):
         check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail | {key:value}}, metadata, 6, args)
-with tempfile.TemporaryDirectory() as directory:
-    root = Path(directory)
-    for label, stdout, stderr in [('bytes', b'partial output', b'partial error'), ('text', 'partial output', 'partial error')]:
-        timeout = subprocess.TimeoutExpired(['npm','exec'], 180, output=stdout, stderr=stderr)
-        with patch.object(check.subprocess, 'run', side_effect=timeout):
-            with assertions.assertRaises(subprocess.TimeoutExpired, msg='Timeout must remain a failed command'):
-                check.run(['npm','exec'], root, {}, label)
-        assert (root / (label + '.stdout.log')).read_text() == 'partial output'
-        assert (root / (label + '.stderr.log')).read_text() == 'partial error'
-    records = [json.loads(line) for line in (root / 'commands.jsonl').read_text().splitlines()]
-    assert len(records) == 2
-    assert all(row['command'] == ['npm','exec'] and row['timed_out'] and row['returncode'] is None
-               and row['timeout_seconds'] == 180 for row in records)
 `,
     ],
     { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', timeout: 10_000 },

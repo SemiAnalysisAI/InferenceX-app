@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -60,11 +68,15 @@ function observation(overrides = {}) {
   };
 }
 
-function run(args, rows = [], { body = JSON.stringify(rows), status = 200, cwd = project() } = {}) {
+function run(
+  args,
+  rows = [],
+  { body = JSON.stringify(rows), status = 200, cwd = project(), ...faults } = {},
+) {
   const fixtureRoot = project('response-');
   const responsePath = join(fixtureRoot, 'response.json');
   const requestPath = join(fixtureRoot, 'requests.txt');
-  writeFileSync(responsePath, JSON.stringify({ body, status }));
+  writeFileSync(responsePath, JSON.stringify({ body, status, ...faults }));
   const result = suite.node(['--import', pathToFileURL(preload).href, exporter, ...args], {
     cwd,
     env: {
@@ -89,11 +101,22 @@ before(() => {
   writeFileSync(
     preload,
     `
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const fixture = JSON.parse(readFileSync(process.env.INFERENCEX_TEST_RESPONSE, 'utf8'));
-globalThis.fetch = async (input) => {
+let calls = 0;
+if (fixture.timeout) AbortSignal.timeout = () => AbortSignal.abort(new DOMException('Timed out', 'TimeoutError'));
+if (fixture.stdoutFailure) process.stdout.write = (_output, callback) => {
+  queueMicrotask(() => callback(Object.assign(new Error('broken pipe'), { code: 'EPIPE' })));
+  return false;
+};
+globalThis.fetch = async (input, options) => {
   appendFileSync(process.env.INFERENCEX_TEST_REQUESTS, String(input.url ?? input) + '\\n');
-  return new Response(fixture.body, { status: fixture.status, headers: { 'Content-Type': 'application/json' } });
+  options.signal.throwIfAborted();
+  if (fixture.blockEvidenceFile) mkdirSync(join(fixture.evidenceDir, fixture.blockEvidenceFile));
+  if (fixture.bodyFailure) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('body interrupted')); } }));
+  const body = calls++ === 0 ? fixture.body : fixture.secondBody ?? '[]';
+  return new Response(body, { status: fixture.status, headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
 };
 `,
   );
@@ -500,6 +523,7 @@ test('invalid arguments fail before HTTP or output writes; help needs no argumen
       ['--date', '2026-9-4'],
       ['--format', 'xml'],
       ['--raw-model', ''],
+      ['--evidence-dir', ''],
     ].map((option) => [...requiredArgs, ...option]),
   ];
   for (const args of invalid) {
@@ -514,4 +538,298 @@ test('invalid arguments fail before HTTP or output writes; help needs no argumen
   assert.match(result.stdout, /--model/);
   assert.equal(result.requests.length, 0);
   assert.deepEqual(readdirSync(result.cwd), []);
+});
+
+function captured(result, directory = '证据 with spaces') {
+  const root = join(result.cwd, directory);
+  const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
+  const body = manifest.response?.body_file
+    ? readFileSync(join(root, manifest.response.body_file))
+    : null;
+  return { root, manifest, body };
+}
+
+function csvRecords(text) {
+  const records = [];
+  let record = [];
+  const matches = [...text.matchAll(/(?<cell>"(?:[^"]|"")*"|[^,"\r\n]*)(?<delimiter>,|\r\n)/gu)];
+  assert.equal(matches.map(([whole]) => whole).join(''), text, 'parse every CSV byte');
+  for (const [, raw, delimiter] of matches) {
+    record.push(raw.startsWith('"') ? raw.slice(1, -1).replaceAll('""', '"') : raw);
+    if (delimiter === '\r\n') {
+      records.push(record);
+      record = [];
+    }
+  }
+  return records;
+}
+
+test('evidence captures the sole consumed response and independently links every CSV/JSON value', () => {
+  const first = observation({
+    image: '镜像, "quoted"\nsecond line',
+    metrics: { power_valid: 1, power_metric_schema_version: 2, avg_power_w: 0 },
+    workers: [{ role: 'decode', hosts: [{ hostname: 'gpu-中文' }], energy_j: 0 }],
+    power_audit: { source: { id: '900719925474099312399', url: 'https://example.org/a?b=1&c=2' } },
+  });
+  const second = observation({
+    id: '第二条',
+    metrics: { ...observation().metrics, avg_temp_c: 0 },
+  });
+  const rows = [
+    first,
+    second,
+    observation({ id: 'outside-scope', isl: 7 }),
+    observation({
+      id: 'not-strict',
+      metrics: { power_valid: '1', power_metric_schema_version: 2 },
+    }),
+  ];
+  const body = `\uFEFF${JSON.stringify(rows, null, 4)} \n`;
+  for (const format of ['csv', 'json']) {
+    for (const file of [false, true]) {
+      const args = [
+        ...requiredArgs,
+        '--date',
+        '2026-09-04',
+        '--format',
+        format,
+        '--evidence-dir',
+        '证据 with spaces',
+      ];
+      if (file) args.push('--output', `导出 with spaces.${format}`);
+      const result = run(args, [], {
+        body,
+        secondBody: JSON.stringify([observation({ id: 'unnoticed-second-fetch' })]),
+      });
+      succeeded(result);
+      assert.equal(result.requests.length, 1, 'a refetch would receive different observations');
+      const { manifest, body: saved } = captured(result);
+      assert.deepEqual(saved, Buffer.from(body), 'preserve BOM, whitespace and UTF-8 bytes');
+      assert.deepEqual(manifest.request, {
+        url: result.requests[0],
+        method: 'GET',
+        filters: {
+          model: 'GLM-5',
+          date: '2026-09-04',
+          powerValid: 'strictV2',
+          benchmark_type: 'single_turn',
+          isl: 8192,
+          osl: 1024,
+          raw_model: null,
+        },
+      });
+      assert.equal(manifest.schema_version, 1);
+      assert.equal(manifest.package_version, version);
+      assert.equal(manifest.status, 'complete');
+      assert.equal(manifest.response.status, 200);
+      assert.equal(manifest.response.body_file, 'response.json');
+      assert.equal(manifest.response.sha256, createHash('sha256').update(saved).digest('hex'));
+      assert.equal(manifest.response.checksum_covers, 'saved decoded response body');
+      assert.ok(Number.isFinite(Date.parse(manifest.response.retrieved_at)));
+      const output = file
+        ? readFileSync(join(result.cwd, `导出 with spaces.${format}`), 'utf8')
+        : result.stdout;
+      if (file) assert.equal(result.stdout, '');
+      assert.equal(manifest.export.format, format);
+      assert.equal(
+        manifest.export.destination,
+        file ? join(result.cwd, `导出 with spaces.${format}`) : 'stdout',
+      );
+      assert.equal(manifest.export.sha256, createHash('sha256').update(output).digest('hex'));
+      assert.deepEqual(manifest.export.metadata, stderrMetadata(result));
+      assert.equal(manifest.export.metadata.retrieved_at, manifest.response.retrieved_at);
+      assert.equal(manifest.export.metadata.returned_rows, 4);
+      assert.equal(manifest.export.metadata.selected_rows, 2);
+      const originals = JSON.parse(new TextDecoder().decode(saved));
+      if (format === 'json') {
+        const exported = JSON.parse(output);
+        assert.deepEqual(exported.rows, originals.slice(0, 2));
+        assert.deepEqual(exported.metadata, manifest.export.metadata);
+        assert.equal(exported.rows[0].metrics.avg_power_w, 0);
+        assert.equal('joules_per_output_token' in exported.rows[0].metrics, false);
+        assert.deepEqual(exported.rows[0].power_audit, first.power_audit);
+      } else {
+        const [columns, ...records] = csvRecords(output);
+        assert.equal(columns.length, 54);
+        assert.equal(records.length, 2);
+        for (const [index, cells] of records.entries()) {
+          assert.equal(cells.length, 54);
+          for (const [columnIndex, key] of columns.entries()) {
+            const source =
+              columnIndex < 7
+                ? manifest.export.metadata[key]
+                : Object.hasOwn(originals[index].metrics, key)
+                  ? originals[index].metrics[key]
+                  : originals[index][key];
+            assert.equal(
+              cells[columnIndex],
+              source === null || source === undefined ? '' : String(source),
+              `${index}:${key}`,
+            );
+          }
+        }
+        assert.equal(records[0][columns.indexOf('avg_power_w')], '0');
+        assert.equal(records[0][columns.indexOf('joules_per_output_token')], '');
+      }
+      assert.deepEqual(readdirSync(captured(result).root).sort(), [
+        'manifest.json',
+        'response.json',
+      ]);
+    }
+  }
+});
+
+test('empty successful captures distinguish an empty response from an empty local selection', () => {
+  for (const format of ['csv', 'json']) {
+    for (const rows of [[], [observation({ isl: 7 })]]) {
+      const result = run(
+        [...requiredArgs, '--format', format, '--evidence-dir', '证据 with spaces'],
+        rows,
+      );
+      succeeded(result);
+      const { manifest, body } = captured(result);
+      assert.equal(manifest.status, 'complete');
+      assert.equal(manifest.response.status, 200);
+      assert.deepEqual(JSON.parse(body), rows);
+      assert.equal(manifest.export.metadata.selected_rows, 0);
+      assert.equal(manifest.export.metadata.returned_rows, rows.length);
+      assert.match(result.stderr, /No strictV2 rows matched/);
+      if (format === 'json') assert.deepEqual(JSON.parse(result.stdout).rows, []);
+      else assert.equal(csvRecords(result.stdout).length, 1);
+    }
+  }
+});
+
+test('HTTP, malformed JSON and invalid response shapes retain their complete received failure bodies', () => {
+  for (const failure of [
+    { status: 400, body: '{"error":"Unknown model 中文"}', error: /HTTP 400.*Unknown model 中文/ },
+    { status: 503, body: 'Service unavailable\n', error: /HTTP 503/ },
+    { body: '{"unfinished":', error: /JSON/ },
+    { body: '{"rows":[]}', error: /response shape/i },
+    { body: '[null]', error: /response shape/i },
+  ]) {
+    const cwd = project();
+    writeFileSync(join(cwd, 'existing.json'), 'preserve existing output');
+    const result = run(
+      [
+        ...requiredArgs,
+        '--format',
+        'json',
+        '--output',
+        'existing.json',
+        '--evidence-dir',
+        '证据 with spaces',
+      ],
+      [],
+      { cwd, ...failure },
+    );
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.equal(result.requests.length, 1);
+    assert.match(result.stderr, failure.error);
+    assert.doesNotMatch(result.stderr, /\{"metadata":|Selected \d+/);
+    const { manifest, body } = captured(result);
+    assert.equal(manifest.status, 'failed');
+    assert.equal(manifest.response.status, failure.status ?? 200);
+    assert.deepEqual(body, Buffer.from(failure.body));
+    assert.equal(manifest.response.sha256, createHash('sha256').update(body).digest('hex'));
+    assert.match(manifest.error, failure.error);
+    assert.equal(manifest.export.metadata, null);
+    assert.equal(manifest.export.sha256, null);
+    assert.equal(readFileSync(join(cwd, 'existing.json'), 'utf8'), 'preserve existing output');
+  }
+});
+
+test('timeout without a response differs from interruption after HTTP headers', () => {
+  for (const fault of [{ timeout: true }, { bodyFailure: true }]) {
+    const result = run([...requiredArgs, '--evidence-dir', '证据 with spaces'], [], fault);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.equal(result.requests.length, 1);
+    const { manifest, body } = captured(result);
+    assert.equal(manifest.status, 'failed');
+    assert.equal(body, null);
+    if (fault.timeout) {
+      assert.equal(manifest.response, null);
+      assert.match(manifest.error, /Timed out/);
+    } else {
+      assert.equal(manifest.response.status, 200);
+      assert.equal(manifest.response.body_file, null);
+      assert.equal(manifest.response.sha256, null);
+      assert.match(manifest.error, /body interrupted/);
+    }
+  }
+});
+
+test('fresh evidence directories reject reuse and output collisions before HTTP', () => {
+  const cwd = project();
+  mkdirSync(join(cwd, 'existing'));
+  writeFileSync(join(cwd, 'existing/keep'), 'original');
+  mkdirSync(join(cwd, 'empty'));
+  symlinkSync(join(cwd, 'existing'), join(cwd, 'directory-link'));
+  symlinkSync(join(cwd, 'new/response.json'), join(cwd, 'output-link'));
+  symlinkSync(cwd, join(cwd, 'parent-link'));
+  const failures = [
+    ['--evidence-dir', 'existing'],
+    ['--evidence-dir', 'empty'],
+    ['--evidence-dir', 'directory-link'],
+    ...[
+      'new',
+      'new/response.json',
+      'new/manifest.json',
+      'new/manifest.tmp',
+      'new/MANIFEST.JSON',
+      'NEW/response.json',
+      'new/response.json/child',
+      'output-link',
+      'parent-link/new/response.json',
+    ].map((path) => ['--evidence-dir', 'new', '--output', path]),
+    ['--evidence-dir', 'parent/child', '--output', 'parent'],
+  ];
+  for (const args of failures) {
+    const result = run([...requiredArgs, ...args], [observation()], { cwd });
+    assert.equal(result.status, 1, args.join(' '));
+    assert.equal(result.requests.length, 0, args.join(' '));
+    assert.equal(result.stdout, '');
+    assert.equal(existsSync(join(cwd, 'new')), false);
+    assert.equal(existsSync(join(cwd, 'parent')), false);
+  }
+  assert.equal(readFileSync(join(cwd, 'existing/keep'), 'utf8'), 'original');
+  assert.deepEqual(readdirSync(join(cwd, 'empty')), []);
+});
+
+test('requested evidence/output write failures and closed stdout never leave a successful manifest', () => {
+  for (const fault of ['response.json', 'manifest.tmp', 'output', 'stdout']) {
+    const cwd = project();
+    const args = [...requiredArgs, '--evidence-dir', '证据 with spaces'];
+    const options = { cwd };
+    if (fault === 'output') {
+      mkdirSync(join(cwd, 'output'));
+      args.push('--output', 'output');
+    } else if (fault === 'stdout') options.stdoutFailure = true;
+    else {
+      options.blockEvidenceFile = fault;
+      options.evidenceDir = join(cwd, '证据 with spaces');
+    }
+    const result = run(args, [observation()], options);
+    assert.equal(result.status, 1, fault);
+    assert.equal(result.requests.length, 1);
+    assert.doesNotMatch(result.stderr, /\{"metadata":|Selected \d+/);
+    const { manifest } = captured(result);
+    assert.notEqual(manifest.status, 'complete', fault);
+    if (fault === 'manifest.tmp') {
+      assert.equal(
+        manifest.status,
+        'pending',
+        'failed atomic finalization retains the pending manifest',
+      );
+      assert.match(result.stderr, /could not save failure evidence/);
+    } else assert.equal(manifest.status, 'failed');
+  }
+  const cwd = project();
+  writeFileSync(join(cwd, 'parent-file'), 'untouched');
+  const result = run([...requiredArgs, '--evidence-dir', 'parent-file/evidence'], [], { cwd });
+  assert.equal(result.status, 1);
+  assert.equal(result.requests.length, 0);
+  assert.equal(readFileSync(join(cwd, 'parent-file'), 'utf8'), 'untouched');
 });

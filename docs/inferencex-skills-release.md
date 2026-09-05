@@ -1,7 +1,9 @@
 # Releasing the InferenceX API skill
 
-The public package is `@semianalysisai/inferencex-skills`. Version `0.1.0` was
-published manually from a reviewed archive. It is immutable. The
+The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0` and
+`0.2.0` are immutable public releases. `0.3.0` commands below prepare a candidate;
+keep website commands pinned to the last verified public version until publication
+and public verification succeed. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
 Adding this workflow does not configure npm access or prove a successful OIDC release.
@@ -38,16 +40,17 @@ the trust relationship.
    the exporter's standalone version, installation examples, and installed-version
    expectations together. Run the package tests and the relevant repository checks.
    Review and commit the final source before preparing the accepted archive.
-2. Run the following from the repository root using Node 24/npm and Python 3.
+2. Run the following from the repository root using Node 24/npm and Python 3 on
+   Linux or macOS (the public verification deadline uses Unix process groups and timers).
    Choose a **new output directory for every attempt**. Substitute the intended
-   version; `0.2.0` below is a candidate, not a claim that it is published.
+   version; `0.3.0` below is a candidate, not a claim that it is published.
 
 ```bash
 node --test packages/skills/test/*.test.mjs
-node packages/skills/scripts/release.mjs prepare 0.2.0 /tmp/inferencex-release-0.2.0
-python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-release-0.2.0/release.json \
+node packages/skills/scripts/release.mjs prepare 0.3.0 /tmp/inferencex-release-0.3.0
+python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-release-0.3.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-candidate-check-0.2.0
+  --evidence /tmp/inferencex-candidate-check-0.3.0
 ```
 
 The preparer rejects a version mismatch, an already published version, and an
@@ -77,15 +80,18 @@ instructions, examples, installer behavior, or export semantics change, and befo
 accepting the archive for publication.
 
 ```bash
-python3 packages/skills/scripts/verify-release.py agents /tmp/inferencex-release-0.2.0/release.json \
+python3 packages/skills/scripts/verify-release.py agents /tmp/inferencex-release-0.3.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-agent-preparation-0.2.0
+  --evidence /tmp/inferencex-agent-preparation-0.3.0
 ```
 
 The output identifies a new temporary root with `codex/` and `claude/` projects.
 Each contains only the installed skill, installation logs, and `prompt.txt` with a
 natural-language lookup, PowerX export, and exact empty-workload request. These are
-prepared projects, **not completed agent runs**. Their `acceptance.json` identifies
+prepared projects, **not completed agent runs**. The prompt also requests installer
+JSON status and a forced dry-run using the exact candidate archive, while preserving
+the installed skill. Review these structured results and filesystem preservation
+independently; `check-agent` reports only its data checks. Their `acceptance.json` identifies
 the candidate archive. The empty workload defaults to 7/13 tokens; override
 `--empty-isl` and `--empty-osl` if that scope ever acquires observations.
 
@@ -103,18 +109,19 @@ into evidence or GitHub Actions secrets for this test.
 After each agent completes, independently check its generated files:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py check-agent /tmp/inferencex-release-0.2.0/release.json \
+python3 packages/skills/scripts/verify-release.py check-agent /tmp/inferencex-release-0.3.0/release.json \
   --project /tmp/inferencex-skill-acceptance-REPLACE/codex \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-codex-result-check-0.2.0
+  --evidence /tmp/inferencex-codex-result-check-0.3.0
 ```
 
 Repeat for Claude Code with a new evidence directory. Use the **same scope arguments**
-used during preparation. The checker refetches full public responses independently,
-checks all CSV values, complete JSON observations, requested scope, exclusions,
-metric coverage, latest-observation selection, and exact empty/diagnostic scope.
-If the public dataset changed between requests, keep both responses and determine
-whether that explains the difference; do not silently bless a mismatch.
+used during preparation. The checker validates the original responses captured by each operation, including
+all CSV values, complete JSON observations, requested scope, exclusions, metric
+coverage, latest-observation selection, and exact empty/diagnostic scope. It checks
+the exporter manifests, body/output hashes, and each operation's own retrieval
+time. No later refetch replaces the consumed input. A later live comparison, if
+needed, is separate evidence and may legitimately contain different observations.
 
 The checker reports `data-checks-passed`, leaving narrative review explicit. A
 different reviewer must inspect the transcript and explanation for:
@@ -130,8 +137,8 @@ different reviewer must inspect the transcript and explanation for:
 - The installed skill actually supplied the workflow and the agent used no
   repository or private-data access. All claims have complete response evidence.
   Confirm that the agent retained its full unfiltered, strict-before-filtering,
-  and diagnostic responses with request context. The checker's later independent
-  refetches validate data but do not replace the agent's original response capture.
+  and diagnostic responses with request context. The checker validates the originals;
+  a later independent refetch is separate evidence.
   A separate agent request to the same URL is also a refetch; require the response
   consumed by each operation, including separate CSV and JSON exporter invocations.
 
@@ -154,14 +161,29 @@ and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.
 
+Public verification retries only an npm install failure containing `ETARGET` and
+`No matching version found for @semianalysisai/inferencex-skills@<exact-version>.`
+Both must identify the requested package/version. It allows **three attempts per
+target**, with **5- and 10-second delays**, within **one 300-second deadline** for
+public verification. Each attempt uses a fresh project/cache and retains command
+stdout/stderr, npm debug logs, timing and error classification. The deadline bounds
+subprocess groups and the complete HTTP response read, including slow bodies.
+
+HTTP errors, authentication/authorization failures, timeouts, integrity mismatches,
+wrong versions, malformed API data and incorrect exports fail immediately. This is
+not a general retry loop. Candidate verification and `npm publish` never retry.
+The 0.2.0 ETARGET failure followed successful publication and later passed read-only
+verification; propagation delay is a plausible explanation, not a classification
+for arbitrary errors.
+
 If publication succeeds but public verification fails (for example, registry
 metadata is not yet available), the version is already immutable. Inspect the
 saved failure and rerun **only the read-only verifier**, preserving a new attempt:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py public /tmp/inferencex-release-0.2.0/release.json \
+python3 packages/skills/scripts/verify-release.py public /tmp/inferencex-release-0.3.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-public-check-0.2.0-attempt2
+  --evidence /tmp/inferencex-public-check-0.3.0-attempt2
 ```
 
 Do not rerun publication or bump the version just to hide a failed verification.
