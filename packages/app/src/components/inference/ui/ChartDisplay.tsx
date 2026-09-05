@@ -252,6 +252,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     activeDates,
     compareGpuPair,
     quickFilters,
+    minimalChrome,
   } = useInferenceFilters();
   const {
     selectedYAxisMetric,
@@ -877,79 +878,85 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0 rounded-xl">
-                  <ChartButtons
-                    chartId={`chart-${graphIndex}`}
-                    mobileVisible
-                    analyticsPrefix={
-                      isTimelineMode
-                        ? 'gpu_timeseries'
-                        : graph.chartDefinition.chartType === 'e2e'
-                          ? 'latency'
-                          : 'interactivity'
-                    }
-                    leadingControls={
-                      <>
-                        <SegmentedToggle
-                          value={getViewMode(graphIndex)}
-                          options={viewModeOptions}
-                          onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                          ariaLabel={t.viewMode}
-                          testId={`inference-view-toggle-${graphIndex}`}
-                        />
-                      </>
-                    }
-                    hideImageExport={getViewMode(graphIndex) === 'table'}
-                    setIsLegendExpanded={setIsLegendExpanded}
-                    exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
-                    onExportMp4={
-                      replayAvailable
-                        ? () => replayHandlesRef.current[graphIndex]?.open()
-                        : undefined
-                    }
-                    onExportCsv={() => {
-                      const candidateVisibleData = isTimelineMode
-                        ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                        : graph.data;
-                      const overlay = selectUnofficialOverlayForMode(
-                        selectedXAxisMode,
-                        graph.chartDefinition.chartType,
-                        overlayDataByChartType,
-                      );
-                      const {
-                        officialRows: visibleData,
-                        overlayRows: visibleOverlayRowsForExport,
-                      } = isTimelineMode
-                        ? { officialRows: candidateVisibleData, overlayRows: [] }
-                        : visibleComparisonRows(candidateVisibleData, overlay);
-                      const { headers, rows } = inferenceChartToCsv(
-                        visibleData,
-                        graph.model,
-                        graph.sequence,
-                        visibleOverlayRowsForExport,
-                        {
-                          yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
-                          yPath: (graph.chartDefinition as ChartDefinition)[
-                            selectedYAxisMetric
-                          ] as string,
-                          xHeader: resolvedXLabel,
-                        },
-                      );
-                      // Match warnings against the same series the chart annotates,
-                      // including visible unofficial-run overlay series.
-                      const issueNotes = matchKnownConfigIssues(graph.model, [
-                        ...visibleData,
-                        ...visibleOverlayRowsForExport,
-                      ]).map((issue) =>
-                        knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
-                      );
-                      exportToCsv(
-                        `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
-                        headers,
-                        rows,
-                        issueNotes,
-                      );
-                    }}
-                  />
+                  {!minimalChrome && (
+                    <ChartButtons
+                      chartId={`chart-${graphIndex}`}
+                      mobileVisible
+                      analyticsPrefix={
+                        isTimelineMode
+                          ? 'gpu_timeseries'
+                          : graph.chartDefinition.chartType === 'e2e'
+                            ? 'latency'
+                            : 'interactivity'
+                      }
+                      leadingControls={
+                        <>
+                          <SegmentedToggle
+                            value={getViewMode(graphIndex)}
+                            options={viewModeOptions}
+                            onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                            ariaLabel={t.viewMode}
+                            testId={`inference-view-toggle-${graphIndex}`}
+                          />
+                        </>
+                      }
+                      hideImageExport={getViewMode(graphIndex) === 'table'}
+                      setIsLegendExpanded={setIsLegendExpanded}
+                      exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
+                      onExportMp4={
+                        replayAvailable
+                          ? () => replayHandlesRef.current[graphIndex]?.open()
+                          : undefined
+                      }
+                      onExportCsv={() => {
+                        const candidateVisibleData = isTimelineMode
+                          ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
+                          : graph.data;
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const {
+                          officialRows: visibleData,
+                          overlayRows: visibleOverlayRowsForExport,
+                        } = isTimelineMode
+                          ? { officialRows: candidateVisibleData, overlayRows: [] }
+                          : visibleComparisonRows(candidateVisibleData, overlay);
+                        const { headers, rows } = inferenceChartToCsv(
+                          visibleData,
+                          graph.model,
+                          graph.sequence,
+                          visibleOverlayRowsForExport,
+                          {
+                            yHeader: metricLabel(
+                              graph.chartDefinition,
+                              selectedYAxisMetric,
+                              locale,
+                            ),
+                            yPath: (graph.chartDefinition as ChartDefinition)[
+                              selectedYAxisMetric
+                            ] as string,
+                            xHeader: resolvedXLabel,
+                          },
+                        );
+                        // Match warnings against the same series the chart annotates,
+                        // including visible unofficial-run overlay series.
+                        const issueNotes = matchKnownConfigIssues(graph.model, [
+                          ...visibleData,
+                          ...visibleOverlayRowsForExport,
+                        ]).map((issue) =>
+                          knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                        );
+                        exportToCsv(
+                          `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                          headers,
+                          rows,
+                          issueNotes,
+                        );
+                      }}
+                    />
+                  )}
                   <Card data-coach-mark-root="">
                     {(() => {
                       const chartCaption = (
@@ -1064,10 +1071,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 : undefined
                             }
                           />
-                          <MetricAssumptionNotes
-                            selectedYAxisMetric={selectedYAxisMetric}
-                            activeHwKeys={captionHwKeys}
-                          />
+                          {!minimalChrome && (
+                            <MetricAssumptionNotes
+                              selectedYAxisMetric={selectedYAxisMetric}
+                              activeHwKeys={captionHwKeys}
+                            />
+                          )}
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1152,7 +1161,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       );
                     })()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
-                    {replayAvailable && (
+                    {replayAvailable && !minimalChrome && (
                       <ReplayLauncher
                         ref={(handle) => {
                           replayHandlesRef.current[graphIndex] = handle;
@@ -1171,67 +1180,70 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
-      <section className="relative z-20">
-        <Card>
-          <div className="flex flex-col gap-4">
-            {!embedded && (
-              <>
-                <DashboardSectionHeader
-                  title={t.inferencePerformance}
-                  description={t.inferencePerformanceDesc}
-                  actions={<ShareButton />}
+      {!minimalChrome && (
+        <section className="relative z-20">
+          <Card>
+            <div className="flex flex-col gap-4">
+              {!embedded && (
+                <>
+                  <DashboardSectionHeader
+                    title={t.inferencePerformance}
+                    description={t.inferencePerformanceDesc}
+                    actions={<ShareButton />}
+                  />
+                  <ChartControls showXAxisMode />
+                </>
+              )}
+              {embedded && (
+                <div className="w-full max-w-sm">
+                  <XAxisModeSelector />
+                </div>
+              )}
+              {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
+              {selectedGPUs.length > 0 && (
+                <ComparisonChangelog
+                  changelogs={changelogs}
+                  selectedGPUs={selectedGPUs}
+                  selectedPrecisions={selectedPrecisions}
+                  modelDbKeys={modelDbKeys}
+                  selectedSequence={selectedSequence}
+                  defaultExpanded={!embedded}
+                  loading={changelogsLoading}
+                  totalDatesQueried={totalDatesQueried}
+                  selectedDates={selectedDates}
+                  selectedDateRange={selectedDateRange}
+                  onAddDate={(date) => {
+                    // Functional updater: adding several runs in quick succession must
+                    // each build on the latest state, not the value captured at render.
+                    setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
+                  }}
+                  onRemoveDate={(date) => {
+                    setSelectedDates((prev) => prev.filter((d) => d !== date));
+                  }}
+                  onAddAllDates={(dates) => {
+                    setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
+                  }}
+                  firstAvailableDate={dateRangeAvailableDates[0]}
                 />
-                <ChartControls showXAxisMode />
-              </>
-            )}
-            {embedded && (
-              <div className="w-full max-w-sm">
-                <XAxisModeSelector />
-              </div>
-            )}
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
-            {selectedGPUs.length > 0 && (
-              <ComparisonChangelog
-                changelogs={changelogs}
-                selectedGPUs={selectedGPUs}
-                selectedPrecisions={selectedPrecisions}
-                modelDbKeys={modelDbKeys}
-                selectedSequence={selectedSequence}
-                defaultExpanded={!embedded}
-                loading={changelogsLoading}
-                totalDatesQueried={totalDatesQueried}
-                selectedDates={selectedDates}
-                selectedDateRange={selectedDateRange}
-                onAddDate={(date) => {
-                  // Functional updater: adding several runs in quick succession must
-                  // each build on the latest state, not the value captured at render.
-                  setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
-                }}
-                onRemoveDate={(date) => {
-                  setSelectedDates((prev) => prev.filter((d) => d !== date));
-                }}
-                onAddAllDates={(dates) => {
-                  setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
-                }}
-                firstAvailableDate={dateRangeAvailableDates[0]}
-              />
-            )}
-          </div>
-        </Card>
-      </section>
-
-      {(selectedYAxisMetric === 'y_costUser' ||
-        selectedYAxisMetric === 'y_tokensPerDollarUser') && (
-        <section>
-          <CustomCosts loading={loading} />
+              )}
+            </div>
+          </Card>
         </section>
       )}
-      {selectedYAxisMetric === 'y_powerUser' && (
+
+      {!minimalChrome &&
+        (selectedYAxisMetric === 'y_costUser' ||
+          selectedYAxisMetric === 'y_tokensPerDollarUser') && (
+          <section>
+            <CustomCosts loading={loading} />
+          </section>
+        )}
+      {!minimalChrome && selectedYAxisMetric === 'y_powerUser' && (
         <section>
           <CustomPowers loading={loading} />
         </section>
       )}
-      <ActiveQuickFilters />
+      {!minimalChrome && <ActiveQuickFilters />}
       <div
         className="motion-stale flex flex-col gap-4"
         data-stale={isRefetching || undefined}

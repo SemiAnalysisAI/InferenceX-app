@@ -27,9 +27,22 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 export default function EmbeddedModelDashboard({
   displayName,
   sequence,
+  yAxisMetric = DEFAULT_Y_AXIS_METRIC,
+  lockedFrameworks,
+  minimalChrome,
 }: {
   displayName: string;
   sequence: string;
+  /** Initial y-axis metric; the dashboard default when omitted. */
+  yAxisMetric?: string;
+  /**
+   * Pin the chart to these framework families (see `InferenceProvider`). Used
+   * by `/embed/model/[slug]?framework=vllm` so a host page shows only the
+   * serving engine it documents.
+   */
+  lockedFrameworks?: readonly string[];
+  /** Chart + plain legend only; see `InferenceProvider.minimalChrome`. */
+  minimalChrome?: boolean;
 }) {
   return (
     <EphemeralUrlStateContext.Provider value={true}>
@@ -39,8 +52,10 @@ export default function EmbeddedModelDashboard({
       >
         <InferenceProvider
           activeTab="inference"
-          initialYAxisMetric={DEFAULT_Y_AXIS_METRIC}
+          initialYAxisMetric={yAxisMetric}
           autoSelectAllGpus
+          lockedFrameworks={lockedFrameworks}
+          minimalChrome={minimalChrome}
         >
           <InferenceChartDisplay embedded />
         </InferenceProvider>

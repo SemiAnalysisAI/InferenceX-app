@@ -108,6 +108,7 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(true);
     expect(hasZhSibling('/compare-spec-decode')).toBe(true);
     expect(hasZhSibling('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(true);
+    expect(hasZhSibling('/embed/model/deepseek-v4')).toBe(true);
   });
 
   it('matches the model index and model detail pages', () => {

@@ -14,6 +14,7 @@ import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { isEmbedPathname } from '@/lib/embed-route';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
 import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
@@ -188,6 +189,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     setMobileMenuOpen((prev) => !prev);
     track('header_mobile_menu_toggled');
   }, []);
+
+  // Embeds render one chart inside a third-party iframe; no site chrome.
+  if (isEmbedPathname(pathname)) return null;
 
   return (
     <header
