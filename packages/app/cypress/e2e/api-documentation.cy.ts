@@ -1,6 +1,8 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
+// The website advertises the verified public release, which can lag the source candidate.
+const PUBLISHED_SKILL = { name: '@semianalysisai/inferencex-skills', version: '0.1.0' };
 
 describe('API documentation', () => {
   for (const locale of [
@@ -15,6 +17,8 @@ describe('API documentation', () => {
       excluded: 'Explain why rows were excluded and list missing requested metrics',
       copy: 'Copy',
       copied: 'Copied',
+      upgrade: 'replace the version in the installation command',
+      examples: 'Usage examples and complete exports',
     },
     {
       path: '/zh/api',
@@ -27,6 +31,8 @@ describe('API documentation', () => {
       excluded: '说明数据行被排除的原因，并列出所请求指标的缺失项',
       copy: '复制',
       copied: '已复制',
+      upgrade: '新的已发布版本',
+      examples: '使用示例与完整导出（英文）',
     },
   ]) {
     it(`guides ${locale.path} visitors from a pinned public install to a traceable export`, () => {
@@ -44,7 +50,8 @@ describe('API documentation', () => {
         .first()
         .find('code')
         .should('contain.text', 'curl');
-      cy.readFile<{ name: string; version: string }>('../skills/package.json').then((manifest) => {
+      cy.then(() => {
+        const manifest = PUBLISHED_SKILL;
         cy.get('[data-testid="api-agent-skill"]')
           .should('contain.text', locale.heading)
           .and('contain.text', `${locale.version} · ${manifest.version}`)
@@ -60,9 +67,19 @@ describe('API documentation', () => {
             cy.contains('button', locale.copied).should('be.visible');
           });
           cy.get('@copyAgentExample').should('have.been.calledWithExactly', command);
-          cy.readFile('../skills/README.md').should('contain', command);
         }
       });
+
+      cy.get('[data-testid="api-agent-upgrade"]')
+        .should('contain.text', locale.upgrade)
+        .and('contain.text', '--force');
+      cy.get('[data-testid="api-agent-examples"]')
+        .should('have.text', locale.examples)
+        .and(
+          'have.attr',
+          'href',
+          'https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md',
+        );
 
       cy.get('[data-testid="api-agent-prompt"]').within(() => {
         cy.contains(locale.example).should('be.visible');
