@@ -17,7 +17,14 @@ Usage:
 Options:
   --date <YYYY-MM-DD>  As-of cutoff; omission selects latest available observations
   --raw-model <key>    Select an exact returned model key within the display bucket
-  --output <file>      Output JSON to a file; default stdout
+  --hardware <key>     Select an exact returned hardware key
+  --framework <key>    Select an exact returned framework key
+  --precision <key>    Select an exact returned precision key
+  --spec-method <key>  Select an exact returned speculative-method key
+  --offload-mode <key> Select an exact returned offload-mode key
+  --concurrency <n>    Select an exact positive concurrency
+  --format <format>    csv (default) or json
+  --output <file>      Output file; default stdout
   --help               Show this help without making a request
 
 The benchmark response is filtered locally to benchmark_type=agentic_traces.
@@ -53,6 +60,72 @@ const REQUIRED_INTEGER_FIELDS = [
 ];
 const AGGREGATE_GROUPS = ['isl', 'osl', 'kvCacheUtil', 'prefixCacheHitRate'];
 const PERCENTILE_FIELDS = ['mean', 'p50', 'p75', 'p90', 'p95', 'p99'];
+const FILTERS = [
+  ['raw_model', 'model'],
+  ['hardware', 'hardware'],
+  ['framework', 'framework'],
+  ['precision', 'precision'],
+  ['spec_method', 'spec_method'],
+  ['offload_mode', 'offload_mode'],
+  ['concurrency', 'conc'],
+];
+const CSV_CONTEXT_COLUMNS = [
+  'package_version',
+  'query_url',
+  'retrieved_at',
+  'requested_model',
+  'requested_date',
+  'date_selection',
+  'requested_benchmark_type',
+  ...FILTERS.map(([name]) => `filter.${name}`),
+];
+const CSV_BENCHMARK_COLUMNS = [
+  'id',
+  'model',
+  'hardware',
+  'framework',
+  'image',
+  'precision',
+  'spec_method',
+  'benchmark_type',
+  'conc',
+  'offload_mode',
+  'recipe_fingerprint',
+  'disagg',
+  'is_multinode',
+  'prefill_tp',
+  'prefill_ep',
+  'prefill_dp_attention',
+  'prefill_num_workers',
+  'decode_tp',
+  'decode_ep',
+  'decode_dp_attention',
+  'decode_num_workers',
+  'num_prefill_gpu',
+  'num_decode_gpu',
+  'isl',
+  'osl',
+  'date',
+  'workflow_run_id',
+  'run_started_at',
+  'run_url',
+  'curve_date',
+  'curve_workflow_run_id',
+  'curve_run_started_at',
+];
+const CSV_ENRICHMENT_COLUMNS = [
+  ...AGGREGATE_GROUPS.flatMap((group) =>
+    [...PERCENTILE_FIELDS, 'n'].map((field) => `aggregate.${group}.${field}`),
+  ),
+  'derived.p75_e2e_norm_intvty',
+  'derived.p90_e2e_norm_intvty',
+  'trace.available',
+  'trace.response_key_present',
+  'enrichment.status',
+  'enrichment.aggregates_status',
+  'enrichment.derived_metrics_status',
+  'enrichment.trace_availability_status',
+];
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -62,6 +135,28 @@ function validDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function positiveInteger(value, option) {
+  const number = Number(value);
+  if (!value || !/^\d+$/u.test(value) || !Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`--${option} must be a positive integer`);
+  }
+  return number;
+}
+
+function csvCell(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function scalar(value) {
+  return value === null || ['string', 'number', 'boolean'].includes(typeof value);
+}
+
+function unique(values) {
+  return [...new Set(values)].toSorted();
 }
 
 function benchmarkRow(row) {
@@ -258,6 +353,13 @@ async function run(args = process.argv.slice(2)) {
       model: { type: 'string' },
       date: { type: 'string' },
       'raw-model': { type: 'string' },
+      hardware: { type: 'string' },
+      framework: { type: 'string' },
+      precision: { type: 'string' },
+      'spec-method': { type: 'string' },
+      'offload-mode': { type: 'string' },
+      concurrency: { type: 'string' },
+      format: { type: 'string', default: 'csv' },
       output: { type: 'string' },
       help: { type: 'boolean' },
     },
@@ -272,9 +374,23 @@ async function run(args = process.argv.slice(2)) {
   if (values.date !== undefined && !validDate(values.date)) {
     throw new Error('--date must be a valid YYYY-MM-DD date');
   }
-  if (values['raw-model'] !== undefined && !values['raw-model'].trim()) {
-    throw new Error('--raw-model requires a returned model key');
+  for (const [option, description] of [
+    ['raw-model', 'a returned model key'],
+    ['hardware', 'a returned hardware key'],
+    ['framework', 'a returned framework key'],
+    ['precision', 'a returned precision key'],
+    ['spec-method', 'a returned speculative-method key'],
+    ['offload-mode', 'a returned offload-mode key'],
+  ]) {
+    if (values[option] !== undefined && !values[option].trim()) {
+      throw new Error(`--${option} requires ${description}`);
+    }
   }
+  const concurrency =
+    values.concurrency === undefined
+      ? undefined
+      : positiveInteger(values.concurrency, 'concurrency');
+  if (!['csv', 'json'].includes(values.format)) throw new Error('--format must be csv or json');
   if (values.output !== undefined && !values.output.trim()) {
     throw new Error('--output requires a file path');
   }
@@ -290,8 +406,20 @@ async function run(args = process.argv.slice(2)) {
     );
   }
   const agentxRows = benchmarks.filter((row) => row.benchmark_type === 'agentic_traces');
-  const selected = agentxRows.filter(
-    (row) => values['raw-model'] === undefined || row.model === values['raw-model'],
+  const requestedFilters = {
+    raw_model: values['raw-model'],
+    hardware: values.hardware,
+    framework: values.framework,
+    precision: values.precision,
+    spec_method: values['spec-method'],
+    offload_mode: values['offload-mode'],
+    concurrency,
+  };
+  const selected = agentxRows.filter((row) =>
+    FILTERS.every(
+      ([name, field]) =>
+        requestedFilters[name] === undefined || row[field] === requestedFilters[name],
+    ),
   );
   const ids = [...new Set(selected.map((row) => safeResultId(row.id)).filter((id) => id !== null))];
   const aggregates = await fetchChunks('agentic-aggregates', ids, 200, aggregateMap, requestUrls);
@@ -350,17 +478,32 @@ async function run(args = process.argv.slice(2)) {
       },
     };
   });
+  const retrievedAt = new Date().toISOString();
+  const benchmarkRequest = requestUrls[0].url;
+  const filters = Object.fromEntries(
+    Object.entries(requestedFilters).map(([name, value]) => [
+      name,
+      { status: value === undefined ? 'omitted' : 'applied', value: value ?? null },
+    ]),
+  );
   const metadata = {
     package_version: PACKAGE_VERSION,
-    retrieved_at: new Date().toISOString(),
+    retrieved_at: retrievedAt,
     request_urls: requestUrls,
     requested_scope: {
       display_model: values.model,
       date: values.date ?? null,
       date_selection: values.date === undefined ? 'latest' : 'as-of',
       raw_model: values['raw-model'] ?? null,
+      hardware: values.hardware ?? null,
+      framework: values.framework ?? null,
+      precision: values.precision ?? null,
+      spec_method: values['spec-method'] ?? null,
+      offload_mode: values['offload-mode'] ?? null,
+      concurrency: concurrency ?? null,
       benchmark_type: 'agentic_traces',
     },
+    filters,
     outcome:
       agentxRows.length === 0
         ? 'no_agentx_rows'
@@ -370,13 +513,84 @@ async function run(args = process.argv.slice(2)) {
     returned_rows: benchmarks.length,
     returned_agentx_rows: agentxRows.length,
     selected_rows: rows.length,
-    returned_model_keys: [...new Set(benchmarks.map((row) => row.model))].toSorted(),
-    selected_model_keys: [...new Set(selected.map((row) => row.model))].toSorted(),
+    available_filter_values: {
+      raw_model: unique(agentxRows.map((row) => row.model)),
+      hardware: unique(agentxRows.map((row) => row.hardware)),
+      framework: unique(agentxRows.map((row) => row.framework)),
+      precision: unique(agentxRows.map((row) => row.precision)),
+      spec_method: unique(agentxRows.map((row) => row.spec_method)),
+      offload_mode: unique(agentxRows.map((row) => row.offload_mode)),
+      concurrency: unique(agentxRows.map((row) => row.conc)),
+    },
+    returned_model_keys: unique(benchmarks.map((row) => row.model)),
+    selected_model_keys: unique(selected.map((row) => row.model)),
     enrichment_coverage: coverage(rows),
     non_finite_values: nonFiniteValues,
     observation_context: 'Existing observations were read; no new benchmark was run.',
   };
-  const output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
+  let output;
+  if (values.format === 'json') {
+    output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
+  } else {
+    const metricColumns = unique(
+      rows.flatMap(({ benchmark }) =>
+        Object.entries(benchmark.metrics)
+          .filter(([, value]) => scalar(value))
+          .map(([key]) => `metrics.${key}`),
+      ),
+    );
+    const columns = [
+      ...CSV_CONTEXT_COLUMNS,
+      ...CSV_BENCHMARK_COLUMNS,
+      ...metricColumns,
+      ...CSV_ENRICHMENT_COLUMNS,
+    ];
+    const context = {
+      package_version: PACKAGE_VERSION,
+      query_url: benchmarkRequest,
+      retrieved_at: retrievedAt,
+      requested_model: values.model,
+      requested_date: values.date ?? null,
+      date_selection: values.date === undefined ? 'latest' : 'as-of',
+      requested_benchmark_type: 'agentic_traces',
+      ...Object.fromEntries(
+        Object.entries(requestedFilters).map(([name, value]) => [`filter.${name}`, value ?? null]),
+      ),
+    };
+    const lines = rows.map(({ benchmark, agentx }) => {
+      const aggregateCells = Object.fromEntries(
+        AGGREGATE_GROUPS.flatMap((group) =>
+          [...PERCENTILE_FIELDS, 'n'].map((field) => [
+            `aggregate.${group}.${field}`,
+            agentx.aggregates.value?.[group]?.[field],
+          ]),
+        ),
+      );
+      const enrichment = {
+        ...aggregateCells,
+        'derived.p75_e2e_norm_intvty': agentx.derived_metrics.value?.p75_e2e_norm_intvty,
+        'derived.p90_e2e_norm_intvty': agentx.derived_metrics.value?.p90_e2e_norm_intvty,
+        'trace.available': agentx.trace_availability.value,
+        'trace.response_key_present': agentx.trace_availability.response_key_present,
+        'enrichment.status': agentx.status,
+        'enrichment.aggregates_status': agentx.aggregates.status,
+        'enrichment.derived_metrics_status': agentx.derived_metrics.status,
+        'enrichment.trace_availability_status': agentx.trace_availability.status,
+      };
+      return [
+        ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
+        ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
+        ...metricColumns.map((column) => {
+          const value = benchmark.metrics[column.slice('metrics.'.length)];
+          return scalar(value) ? value : null;
+        }),
+        ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
+      ]
+        .map(csvCell)
+        .join(',');
+    });
+    output = `${[columns.join(','), ...lines].join('\r\n')}\r\n`;
+  }
   if (values.output === undefined) process.stdout.write(output);
   else await writeFile(values.output, output, 'utf8');
   process.stderr.write(`${JSON.stringify({ metadata })}\n`);

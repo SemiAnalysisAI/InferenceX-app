@@ -105,6 +105,21 @@ function routesFor(rows, ids) {
   };
 }
 
+function metadataFrom(result) {
+  return JSON.parse(result.stderr.split('\n', 1)[0]).metadata;
+}
+
+function csvRecords(text) {
+  const [header, ...lines] = text
+    .trimEnd()
+    .split('\r\n')
+    .map((line) => line.split(','));
+  return {
+    header,
+    rows: lines.map((line) => Object.fromEntries(header.map((key, index) => [key, line[index]]))),
+  };
+}
+
 before(() => {
   writeFileSync(
     preload,
@@ -164,7 +179,10 @@ test('installed JSON exporter chunks and joins enrichments by safe result ID', (
     ],
     '/api/v1/trace-availability': [response(mapBody(traceEntries.toReversed()))],
   };
-  const result = run(['--model', 'DeepSeek-V4-Pro', '--date', '2026-09-04'], routes);
+  const result = run(
+    ['--model', 'DeepSeek-V4-Pro', '--date', '2026-09-04', '--format', 'json'],
+    routes,
+  );
   succeeded(result);
 
   const output = JSON.parse(result.stdout);
@@ -184,7 +202,22 @@ test('installed JSON exporter chunks and joins enrichments by safe result ID', (
     date: '2026-09-04',
     date_selection: 'as-of',
     raw_model: null,
+    hardware: null,
+    framework: null,
+    precision: null,
+    spec_method: null,
+    offload_mode: null,
+    concurrency: null,
     benchmark_type: 'agentic_traces',
+  });
+  assert.deepEqual(output.metadata.filters, {
+    raw_model: { status: 'omitted', value: null },
+    hardware: { status: 'omitted', value: null },
+    framework: { status: 'omitted', value: null },
+    precision: { status: 'omitted', value: null },
+    spec_method: { status: 'omitted', value: null },
+    offload_mode: { status: 'omitted', value: null },
+    concurrency: { status: 'omitted', value: null },
   });
   assert.equal(output.metadata.package_version, packageInfo.version);
   assert.equal(output.metadata.returned_rows, rows.length);
@@ -287,7 +320,16 @@ test('raw-model selection is exact and latest/as-of request context stays distin
   ];
   const cwd = project();
   const result = run(
-    ['--model', 'DeepSeek-V4-Pro', '--raw-model', 'dsv4', '--output', 'agentx.json'],
+    [
+      '--model',
+      'DeepSeek-V4-Pro',
+      '--raw-model',
+      'dsv4',
+      '--format',
+      'json',
+      '--output',
+      'agentx.json',
+    ],
     routesFor(rows, [10]),
     cwd,
   );
@@ -301,6 +343,7 @@ test('raw-model selection is exact and latest/as-of request context stays distin
   assert.equal(output.metadata.requested_scope.date, null);
   assert.equal(output.metadata.requested_scope.date_selection, 'latest');
   assert.equal(output.metadata.requested_scope.raw_model, 'dsv4');
+  assert.deepEqual(output.metadata.filters.raw_model, { status: 'applied', value: 'dsv4' });
   assert.equal(output.metadata.returned_rows, 3);
   assert.equal(output.metadata.returned_agentx_rows, 2);
   assert.equal(output.metadata.selected_rows, 1);
@@ -314,7 +357,7 @@ test('raw-model selection is exact and latest/as-of request context stays distin
 test('response order cannot move enrichment values between result IDs', () => {
   const ids = [5_000_000_001, 5_000_000_002];
   const result = run(
-    ['--model', 'DeepSeek-V4-Pro'],
+    ['--model', 'DeepSeek-V4-Pro', '--format', 'json'],
     routesFor(
       ids.map((id) => observation(String(id))),
       ids,
@@ -332,22 +375,206 @@ test('response order cannot move enrichment values between result IDs', () => {
   );
 });
 
-test('empty AgentX selections succeed without enrichment requests', () => {
+test('empty AgentX selections explain only the complete response and local filters', () => {
   for (const [rows, args, outcome] of [
     [[observation('1', { benchmark_type: 'single_turn' })], [], 'no_agentx_rows'],
     [[observation('1')], ['--raw-model', 'different'], 'no_matching_rows'],
   ]) {
-    const result = run(['--model', 'DeepSeek-V4-Pro', ...args], {
+    const result = run(['--model', 'DeepSeek-V4-Pro', '--format', 'json', ...args], {
       '/api/v1/benchmarks': [response(JSON.stringify(rows))],
     });
     succeeded(result);
     const output = JSON.parse(result.stdout);
     assert.equal(output.metadata.outcome, outcome);
     assert.equal(output.metadata.returned_rows, 1);
+    assert.equal(output.metadata.returned_agentx_rows, outcome === 'no_agentx_rows' ? 0 : 1);
     assert.equal(output.metadata.selected_rows, 0);
     assert.deepEqual(output.rows, []);
     assert.equal(result.requests.length, 1);
+    assert.deepEqual(
+      output.metadata.available_filter_values.hardware,
+      outcome === 'no_agentx_rows' ? [] : ['b300'],
+    );
+    assert.equal(output.metadata.filters.raw_model.status, args.length > 0 ? 'applied' : 'omitted');
+    assert.doesNotMatch(result.stderr, /failed run|source artifact|benchmark job/iu);
   }
+});
+
+test('all serving filters are independent, exact, case-sensitive, and composable', () => {
+  const cases = [
+    ['--raw-model', 'dsv4', { model: 'dsv4-next' }, 'raw_model'],
+    ['--hardware', 'b300', { hardware: 'b200' }, 'hardware'],
+    ['--framework', 'sglang', { framework: 'vllm' }, 'framework'],
+    ['--precision', 'fp4', { precision: 'fp8' }, 'precision'],
+    ['--spec-method', 'mtp', { spec_method: 'none' }, 'spec_method'],
+    ['--offload-mode', 'off', { offload_mode: 'on' }, 'offload_mode'],
+    ['--concurrency', '1', { conc: 2 }, 'concurrency'],
+  ];
+  for (const [option, value, differingField, metadataKey] of cases) {
+    const result = run(
+      ['--model', 'DeepSeek-V4-Pro', '--format', 'json', option, value],
+      routesFor([observation('1'), observation('2', differingField)], [1]),
+    );
+    succeeded(result);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.rows.map((row) => row.benchmark.id),
+      ['1'],
+      option,
+    );
+    assert.equal(output.metadata.filters[metadataKey].status, 'applied');
+    assert.equal(String(output.metadata.filters[metadataKey].value), value);
+  }
+
+  const combined = [
+    '--model',
+    'DeepSeek-V4-Pro',
+    '--raw-model',
+    'dsv4',
+    '--hardware',
+    'b300',
+    '--framework',
+    'sglang',
+    '--precision',
+    'fp4',
+    '--spec-method',
+    'mtp',
+    '--offload-mode',
+    'off',
+    '--concurrency',
+    '1',
+    '--format',
+    'json',
+  ];
+  const result = run(combined, routesFor([observation('1'), observation('2', { conc: 2 })], [1]));
+  succeeded(result);
+  assert.deepEqual(
+    JSON.parse(result.stdout).rows.map((row) => row.benchmark.id),
+    ['1'],
+  );
+
+  const wrongCase = run(['--model', 'DeepSeek-V4-Pro', '--hardware', 'B300'], {
+    '/api/v1/benchmarks': [response(JSON.stringify([observation('1')]))],
+  });
+  succeeded(wrongCase);
+  assert.equal(wrongCase.stdout.trimEnd().split('\r\n').length, 1);
+  assert.equal(metadataFrom(wrongCase).outcome, 'no_matching_rows');
+  assert.equal(wrongCase.requests.length, 1);
+});
+
+test('default CSV has deterministic context, dynamic scalar metrics, and fixed enrichments', () => {
+  const rows = [
+    observation('2', {
+      metrics: { z_metric: null, alpha_metric: 2, nested_metric: { value: 3 } },
+    }),
+    observation('1', {
+      metrics: {
+        z_metric: 0,
+        beta_metric: false,
+        alpha_metric: null,
+        array_metric: [1, 2],
+      },
+    }),
+  ];
+  const routes = {
+    '/api/v1/benchmarks': [response(JSON.stringify(rows))],
+    '/api/v1/agentic-aggregates': [
+      response(
+        mapBody([
+          [2, aggregate(2)],
+          [1, aggregate(1, 0)],
+        ]),
+      ),
+    ],
+    '/api/v1/derived-agentic-metrics': [
+      response(
+        mapBody([
+          [2, derived(2)],
+          [1, derived(1, 0)],
+        ]),
+      ),
+    ],
+    '/api/v1/trace-availability': [
+      response(
+        mapBody([
+          [2, true],
+          [1, false],
+        ]),
+      ),
+    ],
+  };
+  const result = run(
+    [
+      '--model',
+      'DeepSeek-V4-Pro',
+      '--hardware',
+      'b300',
+      '--framework',
+      'sglang',
+      '--precision',
+      'fp4',
+      '--spec-method',
+      'mtp',
+      '--offload-mode',
+      'off',
+      '--concurrency',
+      '1',
+    ],
+    routes,
+  );
+  succeeded(result);
+
+  const csv = csvRecords(result.stdout);
+  assert.deepEqual(
+    csv.header.filter((column) => column.startsWith('metrics.')),
+    ['metrics.alpha_metric', 'metrics.beta_metric', 'metrics.z_metric'],
+  );
+  assert.equal(csv.header.includes('metrics.array_metric'), false);
+  assert.equal(csv.header.includes('metrics.nested_metric'), false);
+  assert.ok(csv.header.indexOf('metrics.alpha_metric') < csv.header.indexOf('aggregate.isl.mean'));
+  for (const fixed of [
+    'package_version',
+    'query_url',
+    'filter.hardware',
+    'id',
+    'recipe_fingerprint',
+    'num_decode_gpu',
+    'date',
+    'workflow_run_id',
+    'curve_date',
+    'aggregate.prefixCacheHitRate.p99',
+    'derived.p90_e2e_norm_intvty',
+    'trace.available',
+    'enrichment.status',
+  ]) {
+    assert.ok(csv.header.includes(fixed), fixed);
+  }
+  assert.deepEqual(
+    csv.rows.map((row) => row.id),
+    ['2', '1'],
+  );
+  for (const row of csv.rows) {
+    assert.equal(row.package_version, packageInfo.version);
+    assert.match(row.query_url, /\/api\/v1\/benchmarks\?model=DeepSeek-V4-Pro/u);
+    assert.equal(row.requested_model, 'DeepSeek-V4-Pro');
+    assert.equal(row['filter.hardware'], 'b300');
+    assert.equal(row['filter.raw_model'], '');
+  }
+  assert.equal(csv.rows[0]['metrics.z_metric'], '');
+  assert.equal(csv.rows[0]['metrics.beta_metric'], '');
+  assert.equal(csv.rows[1]['metrics.z_metric'], '0');
+  assert.equal(csv.rows[1]['metrics.beta_metric'], 'false');
+  assert.equal(csv.rows[1]['aggregate.isl.mean'], '0');
+  assert.equal(csv.rows[1]['derived.p75_e2e_norm_intvty'], '0');
+  assert.equal(csv.rows[1]['trace.available'], 'false');
+  assert.equal(metadataFrom(result).outcome, 'selected_rows');
+
+  const reordered = run(['--model', 'DeepSeek-V4-Pro'], {
+    ...routes,
+    '/api/v1/benchmarks': [response(JSON.stringify(rows.toReversed()))],
+  });
+  succeeded(reordered);
+  assert.deepEqual(csvRecords(reordered.stdout).header, csv.header);
 });
 
 test('invalid arguments fail before HTTP or output writes; help is offline', () => {
@@ -357,6 +584,17 @@ test('invalid arguments fail before HTTP or output writes; help is offline', () 
     ['--model', 'DeepSeek-V4-Pro', '--date', '2026-02-30'],
     ['--model', 'DeepSeek-V4-Pro', '--date', '2026-9-4'],
     ['--model', 'DeepSeek-V4-Pro', '--raw-model', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--hardware', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--framework', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--precision', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--spec-method', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--offload-mode', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--concurrency', ''],
+    ['--model', 'DeepSeek-V4-Pro', '--concurrency', '0'],
+    ['--model', 'DeepSeek-V4-Pro', '--concurrency', '-1'],
+    ['--model', 'DeepSeek-V4-Pro', '--concurrency', '1.5'],
+    ['--model', 'DeepSeek-V4-Pro', '--concurrency', '9007199254740992'],
+    ['--model', 'DeepSeek-V4-Pro', '--format', 'yaml'],
     ['--model', 'DeepSeek-V4-Pro', '--output', ''],
     ['--model', 'DeepSeek-V4-Pro', '--unexpected'],
     ['--model', 'DeepSeek-V4-Pro', 'extra'],

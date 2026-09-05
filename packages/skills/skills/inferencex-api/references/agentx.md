@@ -37,19 +37,41 @@ whole-deployment energy, or rank energy.
 Use the bundled Node 24 exporter to read the complete benchmark response, select
 AgentX observations, and join only the bounded summary enrichments. A display model
 is required; `--date` adds an as-of cutoff, and `--raw-model` selects one exact
-returned model key. The current exporter emits JSON.
+returned model key. CSV is the default; request JSON explicitly with `--format
+json`.
 
 ```bash
 node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
-  --model DeepSeek-V4-Pro --output agentx.json
+  --model DeepSeek-V4-Pro --output agentx.csv
+
+node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
+  --model DeepSeek-V4-Pro --format json --output agentx.json
 ```
 
 For Claude Code, use `.claude/skills/inferencex-api/scripts/export-agentx.mjs`.
-The output retains every selected benchmark object separately from its `agentx`
-enrichment and records request URLs, retrieval context, row counts, missing
-enrichment entries, nullable groups, and trace availability. An unsupported raw ID
-remains in the export but is not sent to numeric enrichment endpoints. Do not use
-this summary workflow to bulk-read timelines, histograms, or server metrics.
+Optional `--hardware`, `--framework`, `--precision`, `--spec-method`,
+`--offload-mode`, and `--concurrency` filters use exact, case-sensitive returned
+values. Concurrency must be a positive integer. No aliases or fuzzy matching are
+applied. Metadata marks every filter as applied or omitted and lists values present
+in the returned AgentX rows so an empty exact selection can be diagnosed without
+making claims about jobs or artifacts outside that response.
+
+JSON retains every selected benchmark object separately from its `agentx`
+enrichment. CSV repeats package, request, and filter context on every row. Its
+`metrics.*` columns are the sorted union of scalar metric keys in the selected
+rows; arrays and objects are not embedded in cells. Missing and null cells stay
+blank, while real zero and `false` values remain explicit. Both formats record
+request URLs, retrieval context, row counts, missing enrichment entries, nullable
+groups, and trace availability. The first stderr line is machine-readable metadata,
+including for a header-only CSV. `no_agentx_rows` means the complete benchmark
+response contained no AgentX observations; `no_matching_rows` means exact local
+filters excluded the returned AgentX observations. Neither outcome says whether
+other benchmark jobs, failed runs, source artifacts, or data outside that response
+exist.
+
+An unsupported raw ID remains in the export but is not sent to numeric enrichment
+endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
+server metrics.
 
 ## Diagnose one explicitly selected point
 
