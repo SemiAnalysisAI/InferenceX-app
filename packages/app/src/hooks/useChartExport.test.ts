@@ -13,9 +13,6 @@ vi.mock('@jpinsonneau/html-to-image', () => ({
 import {
   getExportCaptureDimensions,
   getExportFontFamily,
-  getLogoWatermarkLayout,
-  getLogoWatermarkOpacity,
-  getLogoWatermarkSrc,
   normalizeChartSvgWidthsForExport,
   useChartExport,
 } from './useChartExport';
@@ -157,38 +154,5 @@ describe('normalizeChartSvgWidthsForExport', () => {
     expect(root.querySelector<SVGElement>('svg[data-testid="legend-info-icon"]')?.style.width).toBe(
       '14px',
     );
-  });
-});
-
-describe('logo watermark', () => {
-  it('uses the white logo on dark themes and the color logo on light themes', () => {
-    expect(getLogoWatermarkSrc(true)).toBe('/brand/logo-white.png');
-    expect(getLogoWatermarkSrc(false)).toBe('/brand/logo-color.png');
-  });
-
-  it('keeps the logo faint so plotted data stays legible', () => {
-    expect(getLogoWatermarkOpacity(false)).toBeLessThan(0.15);
-    expect(getLogoWatermarkOpacity(true)).toBeLessThan(0.15);
-  });
-
-  it('centers the logo and caps its width for wide captures', () => {
-    const layout = getLogoWatermarkLayout(
-      { width: 2000, height: 1200 },
-      { width: 1920, height: 825 },
-    );
-    // Width-bound: 60% of 2000 = 1200 wide, aspect preserved
-    expect(layout.width).toBe(1200);
-    expect(layout.height).toBe(Math.round(825 * (1200 / 1920)));
-    expect(layout.x).toBe((2000 - layout.width) / 2);
-    expect(layout.y).toBe(Math.round((1200 - layout.height) / 2));
-  });
-
-  it('caps the logo height for tall, narrow captures', () => {
-    const layout = getLogoWatermarkLayout(
-      { width: 800, height: 600 },
-      { width: 1000, height: 1000 },
-    );
-    // Height-bound: 60% of 600 = 360 tall square logo
-    expect(layout).toEqual({ x: 220, y: 120, width: 360, height: 360 });
   });
 });
