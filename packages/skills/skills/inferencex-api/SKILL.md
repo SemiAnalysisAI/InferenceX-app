@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmark data through its public HTTP API. Use when asked to look up or download InferenceX observations, check available workloads, or trace benchmark sources.
+description: Query InferenceX public benchmark data and export validated PowerX measurements. Use for InferenceX API lookups, workload/source checks, or measured power and energy CSV/JSON exports.
 ---
 
 # InferenceX API
@@ -8,6 +8,12 @@ description: Query InferenceX benchmark data through its public HTTP API. Use wh
 Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [current OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json).
 Public benchmark reads require HTTPS access and no credentials.
+
+For **PowerX measured-power or energy exports**, read the
+[PowerX cookbook](references/powerx.md) and use the
+[bundled exporter](scripts/export-powerx.mjs). It selects validated schema-v2
+observations for an exact single-turn workload. Use the workflow below for other
+public benchmark lookups.
 
 ## Query workflow
 

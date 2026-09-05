@@ -2,8 +2,9 @@
 
 One Agent Skill, `inferencex-api`, for querying the
 [InferenceX public API](https://inferencex.semianalysis.com/api) from Codex or Claude Code.
-It uses current OpenAPI discovery and a basic benchmark lookup to preserve model,
-workload, measurement dates, and source links in the result.
+It supports current OpenAPI discovery, basic benchmark lookups, and validated
+PowerX CSV/JSON exports for an exact single-turn workload, preserving measurement
+dates, model keys, and source links.
 
 **Unpublished candidate.** Use a local package archive supplied by a maintainer.
 The commands below install that archive; public npm availability has not been established.
@@ -58,6 +59,46 @@ It reads supported operations and model names from the
 Latest available data may contain historical measurements; the requested cutoff and
 each observation's date remain separate.
 
+### Export measured PowerX data
+
+Ask the installed skill:
+
+> Use inferencex-api to export measured PowerX data for DeepSeek-V4-Pro, single-turn
+> requests with 8192 input and 1024 output tokens, as CSV. Require strictV2, preserve
+> source identities and measurement dates, and report the selected scope and counts.
+
+The [PowerX cookbook](skills/inferencex-api/references/powerx.md) explains measured
+per-GPU watts, whole-deployment GPU energy, validity, and provenance. You can also
+run the bundled Node 24 exporter from your project:
+
+```bash
+# Codex installation: CSV (the default format)
+node .agents/skills/inferencex-api/scripts/export-powerx.mjs \
+  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --output powerx.csv 2> powerx-report.log
+
+# Claude Code installation: JSON with an as-of cutoff
+node .claude/skills/inferencex-api/scripts/export-powerx.mjs \
+  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
+  --date 2026-09-04 --format json --output powerx.json
+```
+
+For a custom installation, use its actual `inferencex-api/scripts/export-powerx.mjs`
+path. Output paths resolve from your current directory. `--raw-model` optionally
+narrows a returned model key; omitted `--date` means latest available observations.
+Both formats retain request and package-version metadata. JSON preserves optional
+nested worker/audit data; CSV leaves missing metrics blank and preserves real zeros.
+Status and coverage go to stderr; omitting `--output` sends the export to stdout.
+The report log includes a JSON metadata record even when CSV has no selected rows.
+
+The exporter downloads complete JSON and selects numeric validity `1`, schema `2`,
+and the exact single-turn workload. Empty results report that no strictV2 rows
+matched the requested scope; request/response failures exit unsuccessfully. These
+are existing observations, not new benchmark runs. The cookbook describes the
+measurement units and limitations; strict validity alone does not establish an
+energy-efficiency advantage.
+
+### Upgrade
+
 Repeated installation skips an existing skill. To upgrade deliberately, point
 `INFERENCEX_SKILLS_TGZ` at the new archive and add `--force`:
 
@@ -72,9 +113,9 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 ## 中文说明
 
 本包提供一个 Agent Skill（智能体技能）`inferencex-api`，供 Codex 或 Claude Code
-查询 [InferenceX 公开 API](https://inferencex.semianalysis.com/zh/api)。技能通过实时
-OpenAPI 查阅接口，并提供基础基准测试查询示例，在结果中保留模型、工作负载、测量日期
-和来源链接。
+查询 [InferenceX 公开 API](https://inferencex.semianalysis.com/zh/api)。技能支持查阅
+实时 OpenAPI、基础基准测试查询，以及指定单轮请求工作负载下的已验证 PowerX CSV/JSON
+导出，并在结果中保留测量日期、原始模型键和来源链接。
 
 **当前为尚未发布的候选版本。** 请使用维护者提供的本地 `.tgz` 产物。上面的命令安装
 该本地产物；目前尚未确认可通过公开 npm 仓库安装。
@@ -102,6 +143,29 @@ OpenAPI 查阅接口，并提供基础基准测试查询示例，在结果中保
 [实时 OpenAPI 文档](https://inferencex.semianalysis.com/api/openapi.json) 获取受支持的接口
 和模型名称。最新可用数据可能包含历史测量值；查询指定的截止日期与每条数据自身的
 测量日期是两项独立信息。
+
+也可以提出 PowerX 导出请求：
+
+> 使用 inferencex-api 将 DeepSeek-V4-Pro 的实测 PowerX 数据导出为 CSV，限定为输入
+> 8192、输出 1024 个 token 的单轮请求，并要求 strictV2。请保留来源标识和测量日期，
+> 说明筛选范围及返回、选中的数据条数。
+
+[PowerX 指南](skills/inferencex-api/references/powerx.md) 说明实测单 GPU 功率、整个
+部署的 GPU 能耗、验证状态和溯源字段。也可直接在项目目录中执行上面的 Node 24 导出
+命令：Codex 默认使用 `.agents/skills/inferencex-api/scripts/export-powerx.mjs`，
+Claude Code 使用 `.claude/skills/inferencex-api/scripts/export-powerx.mjs`；自定义
+安装则使用实际路径。输出文件路径以当前工作目录为基准。
+
+`--raw-model` 可进一步筛选响应中的原始模型键；省略 `--date` 表示查询最新可用观测值。
+默认格式为 CSV，也支持 JSON；两种格式均记录请求与包版本元数据。JSON 保留可选的嵌套
+worker/审计信息；CSV 将缺失指标留空，并保留真实零值。状态和覆盖范围输出到 stderr，
+省略 `--output` 时将导出内容写入 stdout。
+即使 CSV 没有选中任何数据行，示例中的报告日志也会包含一条 JSON 格式的元数据记录。
+
+导出器下载完整 JSON，只保留验证值为数字 `1`、schema 为数字 `2` 且满足指定单轮工作
+负载的数据。结果为空时，导出器会报告该范围内没有匹配的 strictV2 数据；请求或响应失败会以非零
+状态退出。导出使用已有观测值，不会启动新的基准测试。指标单位和限制见 PowerX 指南；
+通过严格验证本身并不能证明具有能效优势。
 
 重复安装默认跳过已有技能。需要升级时，将 `INFERENCEX_SKILLS_TGZ` 指向新产物，
 然后在对应安装命令后添加 `--force`。该选项会将包内文件合并进已有技能目录，并覆盖
