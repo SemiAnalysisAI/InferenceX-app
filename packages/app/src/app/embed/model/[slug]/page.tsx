@@ -26,5 +26,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function EmbedModelRoute({ params, searchParams }: Props) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  return <EmbedModelPage slug={slug} searchParams={query} locale="en" />;
+  return <EmbedModelPage slug={slug} searchParams={query} />;
 }

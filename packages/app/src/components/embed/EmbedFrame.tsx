@@ -10,20 +10,6 @@ import {
   type EmbedSkin,
   type EmbedTheme,
 } from '@/lib/embed';
-import type { Locale } from '@/lib/i18n';
-
-const STRINGS = {
-  en: {
-    attribution: 'Data from',
-    openDashboard: 'Open in InferenceX',
-    scope: (frameworks: string) => `Showing ${frameworks} results only`,
-  },
-  zh: {
-    attribution: '数据来源',
-    openDashboard: '在 InferenceX 中打开',
-    scope: (frameworks: string) => `仅显示 ${frameworks} 的结果`,
-  },
-} as const;
 
 /**
  * Client shell for `/embed/model/[slug]`.
@@ -41,7 +27,6 @@ const STRINGS = {
  *   picks them up too.
  * - Posts its rendered height to the parent window whenever it changes so the
  *   host can size the iframe without an inner scrollbar.
- * - Renders a compact attribution row with a link back to the dashboard.
  */
 /** CSS custom properties the skin fonts are published under (see embed layout). */
 const SKIN_FONT_VARS = ['--font-embed-sans', '--font-embed-mono'] as const;
@@ -49,23 +34,14 @@ const SKIN_FONT_VARS = ['--font-embed-sans', '--font-embed-mono'] as const;
 export default function EmbedFrame({
   theme,
   skin,
-  locale,
-  dashboardHref,
-  frameworkLabels,
   children,
 }: {
   theme: EmbedTheme;
   skin: EmbedSkin | undefined;
-  locale: Locale;
-  dashboardHref: string;
-  /** Human labels for the locked framework families, if any. */
-  frameworkLabels: readonly string[];
   children: ReactNode;
 }) {
   const { setTheme } = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
-  const t = STRINGS[locale];
-
   useEffect(() => {
     setTheme(theme);
   }, [setTheme, theme]);
@@ -124,32 +100,6 @@ export default function EmbedFrame({
     <div ref={rootRef} data-testid="embed-frame" className="flex flex-col gap-2 p-2 sm:p-3">
       <script dangerouslySetInnerHTML={{ __html: embedBootScript(theme, skin) }} />
       {children}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
-        <span data-testid="embed-scope">
-          {frameworkLabels.length > 0 ? t.scope(frameworkLabels.join(', ')) : null}
-        </span>
-        <span>
-          {t.attribution}{' '}
-          <a
-            href={dashboardHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-            data-testid="embed-dashboard-link"
-          >
-            InferenceX
-          </a>
-          {' · '}
-          <a
-            href={dashboardHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-primary"
-          >
-            {t.openDashboard}
-          </a>
-        </span>
-      </div>
     </div>
   );
 }
