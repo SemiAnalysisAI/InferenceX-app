@@ -1,9 +1,9 @@
 # Releasing the InferenceX API skill
 
-The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0` and
-`0.2.0` are immutable public releases. `0.3.0` commands below prepare a candidate;
-keep website commands pinned to the last verified public version until publication
-and public verification succeed. The
+The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
+`0.2.0`, and `0.3.0` are immutable public releases. Keep website commands pinned
+to the last verified public version until publication and public verification
+succeed. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
 Adding this workflow does not configure npm access or prove a successful OIDC release.
@@ -43,7 +43,8 @@ the trust relationship.
 2. Run the following from the repository root using Node 24/npm and Python 3 on
    Linux or macOS (the public verification deadline uses Unix process groups and timers).
    Choose a **new output directory for every attempt**. Substitute the intended
-   version; `0.3.0` below is a candidate, not a claim that it is published.
+   version. The `0.3.0` paths below record the accepted candidate used for this
+   release; preparation alone did not prove publication.
 
 ```bash
 node --test packages/skills/test/*.test.mjs
