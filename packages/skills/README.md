@@ -362,9 +362,10 @@ node .claude/skills/inferencex-api/scripts/export-agentx.mjs \
 
 `--raw-model`、`--hardware`、`--framework`、`--precision`、`--spec-method` 和
 `--offload-mode` 均为可选筛选；一经提供，必须与响应中的值完全一致并区分大小写。
-`--concurrency` 必须是精确的正整数。`--date YYYY-MM-DD` 为可选项，用于限定观测日期不
-晚于该日；省略时选择最新可用观测数据。导出器读取 `/api/v1/benchmarks`，并在本地仅选择
-`benchmark_type` 恰为 `agentic_traces` 的数据，再只通过有请求规模上限的
+`--concurrency` 必须是精确的正整数。可选的 `--date YYYY-MM-DD` 用于指定 as-of 快照
+截止日期；省略时使用最新可用快照。每条数据自身的观测日期仍按原响应保留。导出器读取
+`/api/v1/benchmarks`，并在本地仅选择 `benchmark_type` 恰为 `agentic_traces` 的数据，
+再只通过有请求规模上限的
 `/api/v1/agentic-aggregates`、`/api/v1/derived-agentic-metrics` 和
 `/api/v1/trace-availability` 三个接口补充 AgentX 汇总与 trace availability 信息。CSV
 中的缺失值和 `null` 留空，`0` 与 `false` 原样保留；JSON 将每条基准测试观测数据与其
