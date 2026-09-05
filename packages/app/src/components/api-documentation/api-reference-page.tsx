@@ -24,7 +24,7 @@ const UI_COPY = {
     agentSkill: 'Use the API with your agent',
     agentSkillDescription:
       'The inferencex-api skill helps your agent navigate the public API: benchmarks, provenance, datasets, CollectiveX, and diagnostics. Validated single-turn PowerX export is the first worked example.',
-    agentVersion: 'Skill version · 0.2.0',
+    agentVersion: 'Skill version · 0.3.0',
     agentPrerequisites:
       'Requires Node 24 or later with npm and Codex or Claude Code. Installation and API queries require internet access.',
     agentInstall: 'Install in your project',
@@ -101,7 +101,7 @@ const UI_COPY = {
     agentSkill: '通过智能体使用 API',
     agentSkillDescription:
       'inferencex-api 技能帮助智能体查找和使用公开 API，涵盖基准测试、溯源、数据集、CollectiveX 和诊断接口。已验证的单轮请求 PowerX 导出是首个完整示例。',
-    agentVersion: '技能版本 · 0.2.0',
+    agentVersion: '技能版本 · 0.3.0',
     agentPrerequisites:
       '需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。安装和 API 查询均需联网。',
     agentInstall: '安装到项目',
@@ -350,7 +350,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                     locale={locale}
                     label={target === 'codex' ? 'Codex' : 'Claude Code'}
                   >
-                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.2.0 -- inferencex-skills install --target ${target}`}
+                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target ${target}`}
                   </CopyableCodeBlock>
                 </div>
               ))}
