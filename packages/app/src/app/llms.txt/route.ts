@@ -3,6 +3,7 @@ import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
 import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/rankings';
 import { inferenceModelMeta } from '@/lib/inference-model-meta';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
+import { getAllWhitepapers } from '@/lib/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await
@@ -20,6 +21,7 @@ export async function GET() {
     `- [AgentX](${SITE_URL}/agentx)`,
     `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
+    `- [Whitepapers](${SITE_URL}/whitepaper)`,
     `- [API Reference](${SITE_URL}/api)`,
     `- [OpenAPI 3.1 Specification](${SITE_URL}/api/openapi.json)`,
     `- [RSS Feed](${SITE_URL}/feed.xml)`,
@@ -58,6 +60,13 @@ export async function GET() {
     `## Articles`,
     '',
     ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
+    '',
+    `## Whitepapers`,
+    '',
+    ...getAllWhitepapers().map(
+      (paper) =>
+        `- [${paper.en.title}](${SITE_URL}/whitepaper/${paper.slug}): ${paper.en.subtitle} (PDF: ${SITE_URL}${paper.pdfPath})`,
+    ),
   ];
 
   return new Response(lines.join('\n'), {

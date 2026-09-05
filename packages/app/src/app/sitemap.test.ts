@@ -43,6 +43,7 @@ vi.mock('@/lib/run-rankings-data.server', () => ({
 }));
 
 import { getAllRankingPageEntries } from '@/lib/rankings';
+import { getAllWhitepapers } from '@/lib/whitepapers';
 
 import sitemap from './sitemap';
 
@@ -148,6 +149,24 @@ describe('sitemap locale parity', () => {
     const urls = new Set(entries.map((entry) => entry.url));
     expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(true);
     expect(urls.has(`${SITE_URL}/zh/agentx/agentx-fixture`)).toBe(true);
+  });
+
+  it('emits both locales for the whitepaper index and every whitepaper with its hero image', async () => {
+    const entries = await sitemap();
+    const byUrl = new Map(entries.map((entry) => [entry.url, entry]));
+    expect(byUrl.has(`${SITE_URL}/whitepaper`)).toBe(true);
+    expect(byUrl.has(`${SITE_URL}${zhPath('/whitepaper')}`)).toBe(true);
+    const papers = getAllWhitepapers();
+    expect(papers.length).toBeGreaterThan(0);
+    for (const paper of papers) {
+      const enPath = `/whitepaper/${paper.slug}`;
+      const en = byUrl.get(`${SITE_URL}${enPath}`);
+      const zh = byUrl.get(`${SITE_URL}${zhPath(enPath)}`);
+      expect(en?.images).toEqual([`${SITE_URL}${paper.heroImagePath}`]);
+      expect(zh?.images).toEqual([`${SITE_URL}${paper.heroImagePath}`]);
+      expect(en?.lastModified).toBe(`${paper.publishedDate}T00:00:00.000Z`);
+      expect(en?.alternates?.languages).toEqual(zh?.alternates?.languages);
+    }
   });
 
   it('does not require a database connection in fixture mode', async () => {
