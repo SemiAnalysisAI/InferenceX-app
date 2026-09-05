@@ -364,7 +364,7 @@ class AgentXVerifierTests(unittest.TestCase):
         row = self.row()
         requested, applied = self.scope(excluded)
         selected = [] if excluded else [row]
-        benchmark_url = check.AGENTX_API + '?model=Example'
+        benchmark_url = check.API + '?model=Example'
         responses = [('benchmarks', benchmark_url, None, [row])]
         if selected:
             query = '?ids=7'
@@ -450,6 +450,92 @@ class AgentXVerifierTests(unittest.TestCase):
         check.save(evidence / 'manifest.json', manifest)
         return evidence, output, manifest
 
+    def write_multichunk_summary(self):
+        self.fixture_index += 1
+        rows = []
+        for result_id in range(1, 502):
+            row = self.row() | {'id': str(result_id)}
+            rows.append(row)
+        requested, applied = self.scope(False)
+        benchmark_url = check.API + '?model=Example'
+        responses = [('benchmarks', benchmark_url, None, rows)]
+        for operation, limit in [('agentic-aggregates', 200), ('derived-agentic-metrics', 200),
+                                 ('trace-availability', 500)]:
+            for offset in range(0, len(rows), limit):
+                chunk = list(range(offset + 1, min(offset + limit, len(rows)) + 1))
+                if operation == 'agentic-aggregates':
+                    body = {str(result_id): {'id': result_id, **dict.fromkeys(check.AGENTX_GROUPS)}
+                            for result_id in chunk if result_id != 2}
+                elif operation == 'derived-agentic-metrics':
+                    body = {str(result_id): {'id': result_id, 'p75_e2e_norm_intvty': 0,
+                                             'p90_e2e_norm_intvty': None}
+                            for result_id in chunk if result_id != 3}
+                else:
+                    body = {str(result_id): result_id == 1 for result_id in chunk if result_id != 4}
+                responses.append((operation, check.AGENTX_ORIGIN + f'/api/v1/{operation}?' +
+                                  check.urlencode({'ids': ','.join(map(str, chunk))}), chunk, body))
+        evidence = self.root / f'agentx-multichunk-{self.fixture_index}-evidence'
+        evidence.mkdir()
+        records = []
+        for number, (operation, url, chunk, body) in enumerate(responses, 1):
+            body_bytes = json.dumps(body, ensure_ascii=False, separators=(',', ':')).encode()
+            filename = f'response-{number:04d}-{operation}.json'
+            (evidence / filename).write_bytes(body_bytes)
+            records.append({'operation': operation, 'request_number': number, 'url': url, 'method': 'GET',
+                            'retrieved_at': f'2026-09-05T00:00:{number:02d}Z', 'http_status': 200,
+                            'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
+                            'requested_chunk_ids': chunk,
+                            'checksum_covers': 'saved decoded response body'})
+        enriched = []
+        for result_id, row in enumerate(rows, 1):
+            aggregates = None if result_id == 2 else {'id': result_id, **dict.fromkeys(check.AGENTX_GROUPS)}
+            derived = None if result_id == 3 else {
+                'id': result_id, 'p75_e2e_norm_intvty': 0, 'p90_e2e_norm_intvty': None}
+            trace_key = result_id != 4
+            trace = result_id == 1
+            enriched.append({'benchmark': row, 'agentx': {
+                'status': 'complete' if aggregates is not None and derived is not None else 'partial',
+                'result_id': result_id,
+                'aggregates': {'status': 'available' if aggregates is not None else 'not_returned',
+                               'value': aggregates},
+                'derived_metrics': {'status': 'available' if derived is not None else 'not_returned',
+                                    'value': derived},
+                'trace_availability': {'status': 'stored_trace' if trace else 'no_stored_trace',
+                                       'value': trace, 'response_key_present': trace_key}}})
+        counts = {'returned_rows': 501, 'returned_agentx_rows': 501, 'selected_rows': 501}
+        filters = {name: applied[name] for name, _field in check.AGENTX_FILTERS}
+        coverage = {
+            'safe_id_rows': 501, 'unsupported_id_rows': 0, 'unique_safe_ids': 501,
+            'aggregates': {group: {'available_rows': 0, 'null_rows': 500, 'missing_entry_rows': 1,
+                                   'unsupported_id_rows': 0} for group in check.AGENTX_GROUPS},
+            'derived_metrics': {'available_rows': 500, 'missing_entry_rows': 1, 'unsupported_id_rows': 0},
+            'trace_availability': {'stored_trace_rows': 1, 'no_stored_trace_rows': 500,
+                                   'response_key_rows': 500, 'missing_key_rows': 1,
+                                   'unsupported_id_rows': 0}}
+        metadata = {
+            'package_version': VERSION, 'retrieved_at': '2026-09-05T00:00:10Z',
+            'request_urls': [{'operation': record['operation'], 'url': record['url']} for record in records],
+            'requested_scope': requested, 'filters': filters, 'outcome': 'selected_rows', **counts,
+            'available_filter_values': {'raw_model': ['model-a'], 'hardware': ['h200'],
+                                        'framework': ['vllm'], 'precision': ['fp8'],
+                                        'spec_method': ['none'], 'offload_mode': ['off'], 'concurrency': [1]},
+            'returned_model_keys': ['model-a'], 'selected_model_keys': ['model-a'],
+            'enrichment_coverage': coverage, 'non_finite_values': 0,
+            'observation_context': 'Existing observations were read; no new benchmark was run.'}
+        output = self.root / f'agentx-multichunk-{self.fixture_index}.json'
+        check.save(output, {'schema_version': 1, 'metadata': metadata, 'rows': enriched})
+        manifest = {
+            'schema_version': 1, 'package_version': VERSION, 'status': 'complete',
+            'started_at': '2026-09-05T00:00:00Z', 'finished_at': '2026-09-05T00:00:11Z',
+            'outcome': 'selected_rows', 'requested_filters': requested, 'applied_filters': applied,
+            'counts': counts, 'responses': records,
+            'export': {'format': 'json', 'destination': str(output.resolve()),
+                       'sha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'metadata': metadata,
+                       'source_request_numbers': list(range(1, len(records) + 1))},
+            'error': None}
+        check.save(evidence / 'manifest.json', manifest)
+        return evidence, output, manifest
+
     @staticmethod
     def point_openapi():
         return {'paths': {path: {'get': {'parameters': [
@@ -482,11 +568,11 @@ class AgentXVerifierTests(unittest.TestCase):
             (evidence / filename).write_bytes(body_bytes)
             records.append({'operation': operation, 'request_number': number,
                             'url': check.point_url(path, parameter, selected_id), 'method': 'GET',
-                            'retrieved_at': f'2026-09-05T00:00:0{number}Z', 'http_status': 200,
+                            'retrieved_at': f'2026-09-05T00:00:{number * 2 - 1:02d}Z', 'http_status': 200,
                             'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
                             'checksum_covers': 'saved decoded response body'})
         output = self.root / f'{name}.json'
-        requests = [{'query_url': record['url'], 'retrieved_at': f'2026-09-05T00:00:1{index}Z'}
+        requests = [{'query_url': record['url'], 'retrieved_at': f'2026-09-05T00:00:{index * 2:02d}Z'}
                     for index, record in enumerate(records, 1)]
         document = {
             'schema_version': 1,
@@ -544,6 +630,17 @@ class AgentXVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'AgentX CSV value'):
             check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
 
+        evidence, output, manifest = self.write_summary('csv')
+        with output.open(newline='') as handle:
+            rows = list(csv.reader(handle))
+        rows[1].append('surplus')
+        with output.open('w', newline='') as handle:
+            csv.writer(handle, lineterminator='\r\n').writerows(rows)
+        manifest['export']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
+        check.save(evidence / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'row width'):
+            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
+
         for mutation, message in [('chunk', 'identity'), ('id', 'result ID'), ('manifest', 'manifest')]:
             with self.subTest(mutation=mutation):
                 evidence, output, manifest = self.write_summary('json')
@@ -564,6 +661,31 @@ class AgentXVerifierTests(unittest.TestCase):
         evidence, output, manifest = self.write_summary('json')
         (evidence / manifest['responses'][2]['body_file']).unlink()
         with self.assertRaises(FileNotFoundError):
+            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
+
+    def test_summary_oracle_joins_real_multichunk_responses_and_missing_states(self):
+        evidence, output, manifest = self.write_multichunk_summary()
+        operations = [record['operation'] for record in manifest['responses']]
+        self.assertEqual(operations.count('agentic-aggregates'), 3)
+        self.assertEqual(operations.count('derived-agentic-metrics'), 3)
+        self.assertEqual(operations.count('trace-availability'), 2)
+        result = check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
+        self.assertEqual(result['selected_rows'], 501)
+        rows = json.loads(output.read_text())['rows']
+        self.assertEqual(rows[1]['agentx']['aggregates']['status'], 'not_returned')
+        self.assertEqual(rows[2]['agentx']['derived_metrics']['status'], 'not_returned')
+        self.assertFalse(rows[3]['agentx']['trace_availability']['response_key_present'])
+
+        evidence, output, manifest = self.write_multichunk_summary()
+        first, second = manifest['responses'][1:3]
+        first_path, second_path = evidence / first['body_file'], evidence / second['body_file']
+        first_body, second_body = first_path.read_bytes(), second_path.read_bytes()
+        first_path.write_bytes(second_body)
+        second_path.write_bytes(first_body)
+        first['decoded_body_sha256'] = hashlib.sha256(second_body).hexdigest()
+        second['decoded_body_sha256'] = hashlib.sha256(first_body).hexdigest()
+        check.save(evidence / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'Unexpected agentic-aggregates result ID'):
             check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
 
     def test_point_oracle_accepts_bounded_trace_and_no_trace_and_rejects_invalid_diagnostics(self):
@@ -603,6 +725,48 @@ class AgentXVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'differs from complete responses'):
             check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
 
+    def test_point_oracle_requires_one_chronological_capture_request_output_chain(self):
+        for mutation in ['capture-order', 'request-before-capture', 'output-before-request',
+                         'finish-before-output']:
+            with self.subTest(mutation=mutation):
+                evidence, output, manifest, document = self.write_point(trace=False)
+                if mutation == 'capture-order':
+                    manifest['responses'][0]['retrieved_at'] = '2026-09-05T00:00:04Z'
+                elif mutation == 'request-before-capture':
+                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:00Z'
+                elif mutation == 'output-before-request':
+                    document['metadata']['retrieved_at'] = '2026-09-05T00:00:05Z'
+                else:
+                    manifest['finished_at'] = '2026-09-05T00:00:19Z'
+                check.save(output, document)
+                manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
+                check.save(evidence / 'manifest.json', manifest)
+                with self.assertRaisesRegex(ValueError, 'timestamps are not chronological'):
+                    check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
+
+    def test_point_capture_preload_rejects_effective_post_request(self):
+        node = check.shutil.which('node')
+        self.assertIsNotNone(node)
+        preload = self.root / 'capture.mjs'
+        script = self.root / 'post.mjs'
+        evidence = self.root / 'post-evidence'
+        preload.write_text(check.POINT_CAPTURE_PRELOAD)
+        script.write_text("""try {
+  await fetch(new Request('https://inferencex.semianalysis.com/api/openapi.json', { method: 'POST' }));
+  throw new Error('POST was accepted');
+} catch (error) {
+  if (!String(error).includes('allow only GET requests')) throw error;
+}
+""")
+        environment = dict(check.os.environ)
+        environment.update(INFERENCEX_POINT_EVIDENCE=str(evidence), INFERENCEX_POINT_ID='7',
+                           INFERENCEX_POINT_OUTPUT=str(self.root / 'point.json'),
+                           INFERENCEX_PACKAGE_VERSION=VERSION)
+        completed = subprocess.run([node, '--import', preload.as_uri(), script], env=environment,
+                                   capture_output=True, text=True, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads((evidence / 'manifest.json').read_text())['responses'], [])
+
     def test_installed_boundary_and_public_archive_bytes_are_exact(self):
         installed = self.root / 'installed'
         installed.mkdir()
@@ -612,6 +776,23 @@ class AgentXVerifierTests(unittest.TestCase):
         (installed / 'unexpected.txt').write_text('extra')
         with self.assertRaisesRegex(ValueError, 'Unexpected installed files'):
             check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
+        (installed / 'unexpected.txt').unlink()
+        outside_file = self.root / 'outside.txt'
+        outside_file.write_text('outside')
+        (installed / 'file-link').symlink_to(outside_file)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
+        (installed / 'file-link').unlink()
+        outside_directory = self.root / 'outside-directory'
+        outside_directory.mkdir()
+        (installed / 'directory-link').symlink_to(outside_directory, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
+        (installed / 'directory-link').unlink()
+        check.os.mkfifo(installed / 'named-pipe')
+        with self.assertRaisesRegex(ValueError, 'regular file'):
+            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
+        (installed / 'named-pipe').unlink()
 
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:
@@ -662,7 +843,7 @@ class AgentXVerifierTests(unittest.TestCase):
             return project, {}
 
         with patch.object(sys, 'argv', command), patch.object(check, 'install_target', side_effect=install) as installs, \
-                patch.object(check, 'check_installed'), patch.object(check, 'run') as runs, \
+                patch.object(check, 'check_installed') as installed_checks, patch.object(check, 'run') as runs, \
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}), \
@@ -670,12 +851,51 @@ class AgentXVerifierTests(unittest.TestCase):
                 patch('builtins.print'):
             check.main()
         self.assertEqual([call.args[1] for call in installs.call_args_list], ['codex', 'claude'])
+        self.assertEqual(installed_checks.call_count, 4)
         commands = [[str(part) for part in call.args[0]] for call in runs.call_args_list]
         for target, project in projects.items():
             target_commands = [command for command, call in zip(commands, runs.call_args_list)
                                if call.args[1] == project]
             self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in target_commands), 2, target)
             self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in target_commands), 3, target)
+
+    def test_agents_prepares_only_exact_archive_and_hashed_target_prompt(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode='w:gz') as packed:
+            entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
+            entry.size = 5
+            packed.addfile(entry, io.BytesIO(b'skill'))
+        archive = stream.getvalue()
+        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
+                  'sha256': hashlib.sha256(archive).hexdigest(),
+                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(archive).digest()).decode()}
+        (self.root / 'candidate.tgz').write_bytes(archive)
+        check.save(self.root / 'release.json', record)
+        evidence = self.root / 'agents-verification'
+        command = ['verify-release.py', 'agents', str(self.root / 'release.json'), '--model', 'Example',
+                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
+                   '--agentx-no-trace-id', '8', '--evidence', str(evidence)]
+        with patch.object(sys, 'argv', command), patch.object(check, 'install_target') as install, \
+                patch.object(check.shutil, 'which') as which, patch('builtins.print'):
+            check.main()
+        install.assert_not_called()
+        which.assert_not_called()
+        report = json.loads((evidence / 'verification.json').read_text())
+        clean_root = Path(report['clean_root'])
+        self.addCleanup(check.shutil.rmtree, clean_root, True)
+        acceptance = json.loads((clean_root / 'acceptance.json').read_text())
+        self.assertEqual(acceptance['status'], 'prepared')
+        for prepared in acceptance['targets']:
+            project = Path(prepared['project'])
+            self.assertEqual({path.name for path in project.iterdir()}, {'candidate.tgz', 'prompt.txt'})
+            self.assertEqual((project / 'candidate.tgz').read_bytes(), archive)
+            prompt_bytes = (project / 'prompt.txt').read_bytes()
+            self.assertEqual(prepared, {'target': prepared['target'], 'project': str(project),
+                                        'status': 'awaiting-native-agent',
+                                        'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()})
+            prompt_text = prompt_bytes.decode()
+            self.assertIn(f'install --target {prepared["target"]}', prompt_text)
+            self.assertIn(str(project / 'candidate.tgz'), prompt_text)
 
     def test_check_agent_runs_both_workload_and_point_oracles(self):
         stream = io.BytesIO()
@@ -691,11 +911,16 @@ class AgentXVerifierTests(unittest.TestCase):
         check.save(self.root / 'release.json', record)
         project = self.root / 'prepared/codex'
         project.mkdir(parents=True)
+        (project / 'candidate.tgz').write_bytes(archive)
+        prompt_bytes = check.prompt(self.args, 'codex', project / 'candidate.tgz').encode()
+        (project / 'prompt.txt').write_bytes(prompt_bytes)
         scope = {'model': 'Example', 'date': None, 'isl': 8192, 'osl': 1024, 'raw_model': None,
                  'empty_isl': 7, 'empty_osl': 13, 'agentx_model': 'Example',
                  'agentx_point_id': '7', 'agentx_no_trace_id': '8'}
         check.save(project.parent / 'acceptance.json', {'candidate': record, 'scope': scope,
-                                                       'targets': [{'target': 'codex', 'project': str(project)}]})
+                                                       'targets': [{'target': 'codex', 'project': str(project),
+                                                                    'status': 'awaiting-native-agent',
+                                                                    'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()}]})
         check.save(project / 'lookup.json', {})
         check.save(project / 'unavailable.json', {'metadata': {}, 'rows': []})
         check.save(project / 'diagnostic.json', {'diagnostic': {}})
@@ -704,6 +929,14 @@ class AgentXVerifierTests(unittest.TestCase):
                    '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
                    '--agentx-no-trace-id', '8', '--project', str(project),
                    '--evidence', str(self.root / 'check-agent')]
+        (project / 'prompt.txt').write_text('changed')
+        tampered = command[:-1] + [str(self.root / 'tampered-check-agent')]
+        with patch.object(sys, 'argv', tampered), patch.object(check, 'check_installed') as installed, \
+                patch('builtins.print'):
+            with self.assertRaisesRegex(ValueError, 'prompt differs'):
+                check.main()
+        installed.assert_not_called()
+        (project / 'prompt.txt').write_bytes(prompt_bytes)
         with patch.object(sys, 'argv', command), patch.object(check, 'check_installed'), \
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \

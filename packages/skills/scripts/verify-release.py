@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -28,7 +29,6 @@ PACKAGE = '@semianalysisai/inferencex-skills'
 REGISTRY = 'https://registry.npmjs.org'
 API = 'https://inferencex.semianalysis.com/api/v1/benchmarks'
 AGENTX_ORIGIN = 'https://inferencex.semianalysis.com'
-AGENTX_API = AGENTX_ORIGIN + '/api/v1/benchmarks'
 AGENTX_EXCLUDED_RAW_MODEL = '__inferencex_release_verification_no_match__'
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 # Only the exact-version npm ETARGET propagation symptom is retryable. No HTTP,
@@ -433,11 +433,7 @@ def js_text(value):
 
 
 def js_sorted(values):
-    unique = []
-    for value in values:
-        if not any(type(value) is type(item) and value == item for item in unique):
-            unique.append(value)
-    return sorted(unique, key=lambda value: js_text(value).encode('utf-16-be', errors='surrogatepass'))
+    return sorted(set(values), key=lambda value: js_text(value).encode('utf-16-be', errors='surrogatepass'))
 
 
 def strict_json(body):
@@ -623,7 +619,7 @@ def check_agentx_capture(project, name, output, args, version, excluded=False):
             'AgentX evidence filters differ')
     responses = capture['responses']
     require(type(responses) is list and responses, 'AgentX evidence has no complete response')
-    benchmark_url = AGENTX_API + '?' + urlencode({'model': args.agentx_model})
+    benchmark_url = API + '?' + urlencode({'model': args.agentx_model})
     benchmarks = agentx_response(evidence, responses[0], 1, 'benchmarks', benchmark_url, None)
     require(type(benchmarks) is list and all(agentx_benchmark(row) for row in benchmarks),
             'Unexpected AgentX benchmark response shape')
@@ -740,6 +736,9 @@ def check_agentx_capture(project, name, output, args, version, excluded=False):
             require(reader.fieldnames == columns, 'AgentX CSV header differs from published contract')
             records = list(reader)
         require(len(records) == len(rows), 'AgentX CSV row count differs from complete response')
+        require(all(None not in record and set(record) == set(columns) and
+                    all(value is not None for value in record.values()) for record in records),
+                'AgentX CSV row width differs from its header')
         context = {
             'package_version': version, 'query_url': responses[0]['url'], 'retrieved_at': retrieved_at,
             'requested_model': args.agentx_model, 'requested_date': None, 'date_selection': 'latest',
@@ -808,10 +807,14 @@ function save() {
 save();
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
-  const url = new URL(input instanceof Request ? input.url : input).href;
+  const request = new Request(input, init);
+  if (request.method !== 'GET') {
+    throw new Error(`Point diagnostics allow only GET requests, received ${request.method}`);
+  }
+  const url = request.url;
   const operation = operations.get(new URL(url).pathname);
   if (!operation) throw new Error(`Unexpected point diagnostic request: ${url}`);
-  const response = await originalFetch(input, init);
+  const response = await originalFetch(request);
   const bytes = Buffer.from(await response.clone().arrayBuffer());
   const requestNumber = manifest.responses.length + 1;
   const bodyFile = `response-${String(requestNumber).padStart(4, '0')}-${operation}.json`;
@@ -820,7 +823,7 @@ globalThis.fetch = async (input, init) => {
     operation,
     request_number: requestNumber,
     url,
-    method: 'GET',
+    method: request.method,
     retrieved_at: new Date().toISOString(),
     http_status: response.status,
     decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
@@ -918,10 +921,10 @@ def check_agentx_point(project, name, output, selected_id, version):
     require(finished >= started, 'Point evidence times are reversed')
     responses = capture['responses']
     require(type(responses) is list and len(responses) >= 3, 'Point evidence is missing required responses')
-    first_specs = POINT_OPERATIONS[:3]
     bodies = [point_response(evidence, record, number, operation,
                              point_url(path, parameter, selected_id))
-              for number, (record, (operation, path, parameter)) in enumerate(zip(responses, first_specs), 1)]
+              for number, (record, (operation, path, parameter)) in
+              enumerate(zip(responses, POINT_OPERATIONS[:3]), 1)]
     openapi, siblings, availability = bodies
     for _operation, path, parameter in POINT_OPERATIONS[1:]:
         operation = openapi.get('paths', {}).get(path, {}).get('get') if type(openapi) is dict else None
@@ -940,9 +943,10 @@ def check_agentx_point(project, name, output, selected_id, version):
     trace_available = availability.get(selected_id) is True
     specs = POINT_OPERATIONS if trace_available else POINT_OPERATIONS[:3]
     require(len(responses) == len(specs), 'Point recipe made an unexpected or missing request')
-    bodies = [point_response(evidence, record, number, operation,
-                             point_url(path, parameter, selected_id))
-              for number, (record, (operation, path, parameter)) in enumerate(zip(responses, specs), 1)]
+    bodies.extend(point_response(evidence, record, number, operation,
+                                 point_url(path, parameter, selected_id))
+                  for number, (record, (operation, path, parameter)) in
+                  enumerate(zip(responses[3:], specs[3:]), 4))
     actual_files = {str(path.relative_to(evidence)) for path in evidence.rglob('*') if path.is_file()}
     require(actual_files == {'manifest.json', *(record['body_file'] for record in responses)},
             'Unexpected or missing point evidence files')
@@ -968,14 +972,21 @@ def check_agentx_point(project, name, output, selected_id, version):
             type(metadata['requests']) is list and len(metadata['requests']) == len(responses),
             'Point diagnostic metadata differs')
     completed = timestamp(metadata['retrieved_at'], 'Point diagnostic retrieval time is invalid')
+    captured_times = [timestamp(response['retrieved_at'], 'Point capture time is invalid')
+                      for response in responses]
+    request_times = []
     for request, response in zip(metadata['requests'], responses):
-        require(set(request) == {'query_url', 'retrieved_at'} and same_url(request['query_url'], response['url']) and
-                timestamp(request['retrieved_at'], 'Point request time is invalid') >=
-                timestamp(response['retrieved_at'], 'Point capture time is invalid'),
+        request_time = timestamp(request.get('retrieved_at'), 'Point request time is invalid') \
+            if type(request) is dict else None
+        require(type(request) is dict and set(request) == {'query_url', 'retrieved_at'} and
+                same_url(request['query_url'], response['url']) and request_time is not None,
                 'Point output is not linked to its captured request')
-    require(finished >= completed and all(started <= timestamp(record['retrieved_at'], 'Point response time is invalid')
-                                          <= finished for record in responses),
-            'Point evidence times do not cover the requests and output')
+        request_times.append(request_time)
+    ordered_times = [started]
+    for captured, requested in zip(captured_times, request_times):
+        ordered_times.extend((captured, requested))
+    ordered_times.extend((completed, finished))
+    require(ordered_times == sorted(ordered_times), 'Point evidence timestamps are not chronological')
     require(same_json(document['benchmark_siblings'], siblings) and same_json(document['selected_point'], selected) and
             same_json(document['trace_availability'], {'response': availability,
                                                        'key_present': selected_id in availability,
@@ -1035,9 +1046,9 @@ def check_point_outcomes(outcomes):
 def prompt(args, target, archive):
     cutoff = f'as of {args.date}' if args.date else 'using the latest available observations'
     raw = f' Keep only the exact returned model key {args.raw_model}; record this filter as scope.raw_model in lookup.json.' if args.raw_model else ''
-    return f'''Use only the installed inferencex-api skill and public HTTP data in this clean project.
+    return f'''Use only the exact candidate archive and public HTTP data in this clean project.
 
-The exact candidate archive is available at {archive}. Using its offline npm installer for target {target}, inspect the installed version with JSON output and save status.json. Preview a forced installation with JSON output and save preview.json. Do not perform the installation or change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files. The npm command is npm exec --yes --offline --package <archive> -- inferencex-skills <command>.
+The exact candidate archive is available at {archive}. Before any API work, independently install that local archive offline for target {target} with npm exec --yes --offline --package <archive> -- inferencex-skills install --target {target}. Then inspect the installed version with JSON output and save status.json. Preview a forced reinstall with JSON output and save preview.json. Do not apply the forced reinstall or manually change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files. Use {archive} for <archive> in every npm command.
 
 For {args.model} {cutoff}, show five latest single-turn benchmark observations with {args.isl} input and {args.osl} output tokens, regardless of power validation. Save lookup.json using the installed lookup example's output shape.{raw} Do not introduce additional filters.
 
@@ -1049,7 +1060,7 @@ For {args.agentx_model} using the latest public observations, export AgentX summ
 
 Use the maintained installed one-point AgentX recipe for exactly result ID {args.agentx_point_id} and save its JSON as agentx-point.json. Run it separately for exactly result ID {args.agentx_no_trace_id} and save that JSON as agentx-second-point.json. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. The complete manifest must record schema_version 1, the package version, selected_result_id, pending/complete status and times, every ordered GET URL/status/retrieval time/decoded-body SHA-256/body filename, and the JSON output destination/hash/source request numbers. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
 
-There is no repository or database access in this project. Do not read another checkout, call private services, install dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
+There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
 
 The complete response files are required deliverables. Use the exporter's built-in --evidence-dir with separate fresh directories powerx-csv-evidence, powerx-json-evidence, and unavailable-evidence for the corresponding outputs. For lookup and diagnosis, save each complete consumed body as raw-responses/lookup.response.json and raw-responses/diagnostic.response.json before selecting rows. Beside each body save a .request.json record with query_url, status, retrieved_at, and sha256 of the saved body; use that same retrieved_at value in the corresponding lookup or diagnostic output. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for original responses. Before finishing, verify these files exist alongside result.md.
 
@@ -1058,12 +1069,36 @@ Each lookup, CSV export, JSON export, empty export, and diagnostic must be trace
 
 
 def check_installed(installed, skill_files, version):
+    require(stat.S_ISDIR(installed.lstat().st_mode), 'Installed skill root must be a real directory')
+    actual_files, actual_dirs = set(), set()
+    pending = [installed]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                entry_stat = entry.stat(follow_symlinks=False)
+                name = str(Path(entry.path).relative_to(installed))
+                require(not stat.S_ISLNK(entry_stat.st_mode), f'Installed entry must not be a symlink: {name}')
+                if stat.S_ISDIR(entry_stat.st_mode):
+                    actual_dirs.add(name)
+                    pending.append(Path(entry.path))
+                else:
+                    require(stat.S_ISREG(entry_stat.st_mode),
+                            f'Installed entry must be a regular file: {name}')
+                    actual_files.add(name)
+    expected_files = set(skill_files) | {'.inferencex-skills.json'}
+    expected_dirs = set()
+    for name in expected_files:
+        parent = Path(name).parent
+        while parent != Path('.'):
+            expected_dirs.add(str(parent))
+            parent = parent.parent
+    require(actual_files == expected_files and actual_dirs == expected_dirs,
+            'Unexpected installed files or directories')
     for name, content in skill_files.items():
         require((installed / name).read_bytes() == content, f'Installed file differs from archive: {name}')
     receipt = json.loads((installed / '.inferencex-skills.json').read_text())
     require(receipt == {'package': PACKAGE, 'version': version}, 'Installed-version receipt differs')
-    actual_files = {str(path.relative_to(installed)) for path in installed.rglob('*') if path.is_file()}
-    require(actual_files == set(skill_files) | {'.inferencex-skills.json'}, 'Unexpected installed files')
 
 
 def main():
@@ -1125,11 +1160,22 @@ def main():
         if args.mode == 'check-agent':
             require(args.project is not None, '--project is required for check-agent')
             prepared = json.loads((args.project.parent / 'acceptance.json').read_text())
-            require(prepared['candidate']['sha256'] == record['sha256'], 'Agent project belongs to another candidate')
+            require(prepared['candidate'] == record, 'Agent project belongs to another candidate')
             require(prepared['scope'] == report['scope'], 'Check scope differs from prepared prompt')
             matches = [target for target in prepared['targets'] if Path(target['project']).resolve() == args.project.resolve()]
             require(len(matches) == 1, 'Project was not prepared for this acceptance run')
-            installed = args.project / ('.agents' if matches[0]['target'] == 'codex' else '.claude') / 'skills/inferencex-api'
+            prepared_target = matches[0]
+            require(set(prepared_target) == {'target', 'project', 'status', 'prompt_sha256'} and
+                    prepared_target['target'] in {'codex', 'claude'} and
+                    prepared_target['status'] == 'awaiting-native-agent',
+                    'Prepared target identity differs')
+            local_archive = args.project / record['filename']
+            require(local_archive.read_bytes() == body, 'Native-agent archive differs from accepted candidate')
+            prompt_bytes = (args.project / 'prompt.txt').read_bytes()
+            require(prepared_target['prompt_sha256'] == hashlib.sha256(prompt_bytes).hexdigest() and
+                    prompt_bytes == prompt(args, prepared_target['target'], local_archive).encode(),
+                    'Native-agent prompt differs from prepared target')
+            installed = args.project / ('.agents' if prepared_target['target'] == 'codex' else '.claude') / 'skills/inferencex-api'
             check_installed(installed, skill_files, record['version'])
             json_source = captured_export(args.project, 'powerx-json-evidence', 'powerx.json', args, record['version'])
             csv_source = captured_export(args.project, 'powerx-csv-evidence', 'powerx.csv', args, record['version'])
@@ -1167,19 +1213,31 @@ def main():
                     metadata['dist']['integrity'] == record['integrity'], 'Public metadata differs from candidate')
             public = fetch_public(metadata['dist']['tarball'], args.evidence / 'public-package.tgz', report, deadline)
             require(public == body, 'Public tarball differs from the accepted archive')
-        node, npm = shutil.which('node'), shutil.which('npm')
-        require(node and npm, 'Node 24 and npm must be on PATH')
+        node = npm = None
+        if args.mode != 'agents':
+            node, npm = shutil.which('node'), shutil.which('npm')
+            require(node and npm, 'Node 24 and npm must be on PATH')
         clean_root = Path(tempfile.mkdtemp(prefix='inferencex-skill-acceptance-'))
         report['clean_root'] = str(clean_root)
         for target in ['codex', 'claude']:
+            if args.mode == 'agents':
+                project = clean_root / target
+                project.mkdir()
+                local_archive = project / record['filename']
+                local_archive.write_bytes(body)
+                prompt_bytes = prompt(args, target, local_archive).encode()
+                (project / 'prompt.txt').write_bytes(prompt_bytes)
+                require({path.name for path in project.iterdir()} == {record['filename'], 'prompt.txt'} and
+                        all(stat.S_ISREG(path.lstat().st_mode) for path in project.iterdir()),
+                        'Native-agent project is not a fresh prompt-and-archive boundary')
+                report['targets'].append({
+                    'target': target, 'project': str(project), 'status': 'awaiting-native-agent',
+                    'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()})
+                continue
             project, env = install_target(clean_root, target, node, npm, archive, record['version'],
                                           args.mode == 'public', report, deadline)
             installed = project / ('.agents' if target == 'codex' else '.claude') / 'skills/inferencex-api'
             check_installed(installed, skill_files, record['version'])
-            if args.mode == 'agents':
-                (project / 'prompt.txt').write_text(prompt(args, target, archive))
-                report['targets'].append({'target': target, 'project': str(project), 'status': 'awaiting-native-agent'})
-                continue
             for output_format in ['json', 'csv']:
                 flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl), '--format', output_format,
                          '--output', f'powerx.{output_format}', '--evidence-dir', f'powerx-{output_format}-evidence']
@@ -1211,6 +1269,7 @@ def main():
                           record['version'], deadline),
                 run_point(node, installed, project, env, 'agentx-second-point', args.agentx_no_trace_id,
                           record['version'], deadline)])
+            check_installed(installed, skill_files, record['version'])
             result.update(agentx=agentx, agentx_points=points)
             result.update(target=target, project=str(project))
             report['targets'].append(result)
