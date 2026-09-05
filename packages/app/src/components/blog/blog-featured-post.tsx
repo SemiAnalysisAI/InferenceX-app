@@ -3,12 +3,13 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
-import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
+import { BlogGridTexture, BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import { track } from '@/lib/analytics';
 import type { PostThumbnail } from '@/lib/blog';
+import { cn } from '@/lib/utils';
 
 export interface BlogFeaturedPostProps {
   slug: string;
@@ -44,15 +45,29 @@ export function BlogFeaturedPost({
   return (
     <article
       data-testid="blog-featured-post"
-      className="group relative grid min-w-0 gap-6 overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 md:p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10 lg:p-7"
+      data-layout={thumbnail ? 'figure' : 'text'}
+      className={cn(
+        'group relative min-w-0 overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 md:p-6 lg:p-7',
+        thumbnail
+          ? 'grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10'
+          : 'flex flex-col md:px-8 md:py-8 lg:px-10 lg:py-10',
+      )}
     >
-      <BlogThumbnail
-        thumbnail={thumbnail}
-        tag={tags[0]}
-        priority
-        className="rounded-xl border border-border/50"
-      />
-      <div className="flex min-w-0 flex-col gap-4 lg:justify-center">
+      {thumbnail ? (
+        <BlogThumbnail
+          thumbnail={thumbnail}
+          priority
+          className="rounded-xl border border-border/50"
+        />
+      ) : (
+        <BlogGridTexture variant="card" />
+      )}
+      <div
+        className={cn(
+          'relative flex min-w-0 flex-col gap-4',
+          thumbnail ? 'lg:justify-center' : 'max-w-4xl',
+        )}
+      >
         <Eyebrow as="p" wide>
           {labels.eyebrow}
         </Eyebrow>
@@ -64,7 +79,10 @@ export function BlogFeaturedPost({
         <Heading
           as="h2"
           level="page"
-          className="text-balance text-2xl leading-tight group-hover:text-brand lg:text-3xl xl:text-4xl"
+          className={cn(
+            'text-balance leading-tight group-hover:text-brand',
+            thumbnail ? 'text-2xl lg:text-3xl xl:text-4xl' : 'text-3xl md:text-4xl lg:text-5xl',
+          )}
         >
           <Link
             href={href}
@@ -74,7 +92,14 @@ export function BlogFeaturedPost({
             {title}
           </Link>
         </Heading>
-        <p className="text-base leading-7 text-muted-foreground">{subtitle}</p>
+        <p
+          className={cn(
+            'text-base leading-7 text-muted-foreground',
+            !thumbnail && 'max-w-3xl lg:text-lg lg:leading-8',
+          )}
+        >
+          {subtitle}
+        </p>
         {tags.length > 0 && (
           <ul className="flex flex-wrap gap-1.5" aria-label={labels.tags}>
             {tags.slice(0, MAX_TAGS).map((tag) => (
