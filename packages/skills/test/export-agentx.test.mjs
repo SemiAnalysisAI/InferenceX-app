@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -8,15 +9,20 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
+import { gzipSync } from 'node:zlib';
 
 import { packageInfo, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
 const { environment, project, temporaryRoot } = suite;
 const preload = join(temporaryRoot, 'agentx-http-response.mjs');
+const redirectPreload = join(temporaryRoot, 'agentx-native-fetch-redirect.mjs');
+const execFileAsync = promisify(execFile);
 let exporter;
 
 function observation(id, overrides = {}) {
@@ -101,6 +107,21 @@ function run(args, routes, cwdOrOptions = project()) {
     ? readFileSync(requestPath, 'utf8').trimEnd().split('\n')
     : [];
   return { ...result, cwd, requests };
+}
+
+async function runNative(args, origin, cwd = project()) {
+  const result = await execFileAsync(
+    process.execPath,
+    ['--import', pathToFileURL(redirectPreload).href, exporter, ...args],
+    {
+      cwd,
+      env: { ...environment, INFERENCEX_TEST_ORIGIN: origin },
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 10_000,
+    },
+  );
+  return { ...result, status: 0, cwd };
 }
 
 function routesFor(rows, ids) {
@@ -206,6 +227,17 @@ globalThis.fetch = async (input, options) => {
     }), { status: reply.status, headers });
   }
   return new Response(reply.body, { status: reply.status, headers });
+};
+`,
+  );
+  writeFileSync(
+    redirectPreload,
+    `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = (input, options) => {
+  const requested = new URL(input.url ?? input);
+  const redirected = new URL(requested.pathname + requested.search, process.env.INFERENCEX_TEST_ORIGIN);
+  return nativeFetch(redirected, options);
 };
 `,
   );
@@ -852,6 +884,52 @@ test('evidence captures every decoded response chunk once and hashes stdout byte
     readdirSync(root).sort(),
     ['manifest.json', ...manifest.responses.map((record) => record.body_file)].sort(),
   );
+});
+
+test('native fetch evidence hashes decoded gzip response bytes', async () => {
+  const decoded = Buffer.from(`\uFEFF${JSON.stringify([], null, 2)} \n`);
+  const compressed = gzipSync(decoded);
+  const requests = [];
+  const server = createServer((request, serverResponse) => {
+    requests.push(request.url);
+    serverResponse.writeHead(200, {
+      'Content-Encoding': 'gzip',
+      'Content-Length': compressed.length,
+      'Content-Type': 'application/json',
+    });
+    serverResponse.end(compressed);
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+
+  try {
+    const result = await runNative(
+      ['--model', 'DeepSeek-V4-Pro', '--format', 'json', '--evidence-dir', 'evidence'],
+      `http://127.0.0.1:${server.address().port}`,
+    );
+    succeeded(result);
+
+    const { manifest, bodies } = captured(result);
+    const saved = bodies.get(1);
+    assert.deepEqual(requests, ['/api/v1/benchmarks?model=DeepSeek-V4-Pro']);
+    assert.equal(manifest.status, 'complete');
+    assert.equal(manifest.responses.length, 1);
+    assert.deepEqual(saved, decoded);
+    assert.equal(
+      manifest.responses[0].decoded_body_sha256,
+      createHash('sha256').update(decoded).digest('hex'),
+    );
+    assert.notEqual(
+      manifest.responses[0].decoded_body_sha256,
+      createHash('sha256').update(compressed).digest('hex'),
+    );
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });
 
 test('empty evidence exports are complete, distinct, and benchmark-only', () => {

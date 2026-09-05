@@ -243,7 +243,6 @@ async function stageFileOutput(destination, bytes) {
     },
     async finish() {
       await rm(backup, { force: true }).catch(() => {});
-      await rm(temporary, { force: true }).catch(() => {});
     },
   };
 }
