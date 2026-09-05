@@ -31,6 +31,12 @@ Preserve raw topology fields with `disagg`; do not add prefill and decode GPU co
 on non-disaggregated rows, where the roles can share the same GPUs. Report raw
 configuration fields unless a requested derived total has verified allocation semantics.
 
+For **AgentX interpretation or one-point diagnostics**, read the
+[AgentX cookbook](references/agentx.md). Require the user to select one positive
+safe result ID before reading its timeline, histograms, or server metrics. Keep
+dataset and configuration identity with the result, and stop when trace availability
+does not list that ID.
+
 ## Query workflow
 
 1. Read the current OpenAPI operation before constructing a request. Use its exact
