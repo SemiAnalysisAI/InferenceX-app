@@ -64,7 +64,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics';
-import { getGpuSpecs, getModelSortIndex } from '@/lib/constants';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { exportToCsv } from '@/lib/csv-export';
 import {
   getModelLabel,
@@ -99,7 +99,7 @@ import {
   PROFIT_HISTORY_MAX_GPUS,
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
-  profitHistoryCurrentRunId,
+  profitHistoryCurrentRunIds,
   profitHistoryDateRanks,
   profitHistoryEntryLabel,
   profitHistoryLegendKeys,
@@ -506,7 +506,7 @@ function ProfitEstimatorInner({
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
-  const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
+  const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
   // This page is agentic only: the sequence is pinned, and the model list is
   // the tab's route allow-list (Kimi K3, GLM 5.2/5.3, MiniMax M3) intersected
@@ -729,20 +729,14 @@ function ProfitEstimatorInner({
     }),
     [dbModelKeys, selectedGPUs, selectedPrecisions],
   );
-  // The run the main bars already show: the latest run of the current date
-  // for this model's chips once the changelog has enumerated them, else the
-  // global run selection. Pinning it from the changelog must not draw a second
-  // bar of the same data, which is why `/inference` hands `buildComparisonDates`
-  // its `selectedRunId`.
-  const historyCurrentRunId = useMemo(
+  // Per chip, the run its current bar already shows (the main query is an
+  // as-of-date fetch, so chips can sit on different runs). Pinning that run
+  // from the changelog must not draw a second bar of the same data, the case
+  // `/inference` covers by handing `buildComparisonDates` its `selectedRunId`.
+  const historyCurrentRunIds = useMemo(
     () =>
-      profitHistoryCurrentRunId(
-        historyChangelogs.changelogs,
-        selectedRunDate,
-        historyRunScope,
-        selectedRunId,
-      ),
-    [historyChangelogs.changelogs, selectedRunDate, historyRunScope, selectedRunId],
+      profitHistoryCurrentRunIds(historyChangelogs.changelogs, selectedRunDate, historyRunScope),
+    [historyChangelogs.changelogs, selectedRunDate, historyRunScope],
   );
 
   const history = useProfitHistory({
@@ -752,7 +746,7 @@ function ProfitEstimatorInner({
     selectedDates,
     dateRange: selectedDateRange,
     currentRunDate: selectedRunDate,
-    currentRunId: historyCurrentRunId,
+    currentRunIds: historyCurrentRunIds,
     enabled: hasData,
   });
   const historyActive = history.comparisonDates.length > 0;
@@ -896,6 +890,7 @@ function ProfitEstimatorInner({
             targetValue,
             mode,
             costProvider: interpolationCostProvider,
+            currentRunIds: historyCurrentRunIds,
           }),
         ]
       : current;
@@ -926,6 +921,7 @@ function ProfitEstimatorInner({
     assumptions,
     historyActive,
     history.rowsByDate,
+    historyCurrentRunIds,
     selectedGPUs,
     selectedPrecisions,
     selectedPercentile,
@@ -1112,7 +1108,9 @@ function ProfitEstimatorInner({
       history.comparisonDates,
       selectedGPUs,
       (hwKey) => {
-        const config = hardwareConfig[hwKey];
+        // `hardwareConfig` covers today's rows only; a chip that priced
+        // earlier alone still has a registry entry to label it by.
+        const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
         return config ? getDisplayLabel(config) : hwKey;
       },
       historyEntryLabel,

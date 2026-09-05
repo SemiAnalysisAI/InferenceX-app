@@ -8,7 +8,7 @@ import { parseComparisonEntry } from '@/components/inference/utils/comparisonEnt
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
-import type { ProfitHistoryDateRows } from './profit-history';
+import { dropCurrentRunEntries, type ProfitHistoryDateRows } from './profit-history';
 
 /**
  * Fetch the benchmark rows behind a profit-estimator history comparison, the
@@ -19,6 +19,8 @@ import type { ProfitHistoryDateRows } from './profit-history';
  * The queries share the `['benchmarks', …]` cache with the inference charts, so
  * a date already compared there costs nothing here.
  */
+const EMPTY_RUN_IDS: Readonly<Record<string, string>> = {};
+
 export function useProfitHistory(options: {
   model: Model;
   sequence: Sequence;
@@ -28,8 +30,8 @@ export function useProfitHistory(options: {
   dateRange: { startDate: string; endDate: string };
   /** Run date the main query already covers; never fetched twice. */
   currentRunDate: string | undefined;
-  /** Run id behind the main bars; a changelog pin of it adds no bar. */
-  currentRunId?: string;
+  /** Per chip, the run behind its main bar; a pin that adds no bar is dropped. */
+  currentRunIds?: Readonly<Record<string, string>>;
   enabled?: boolean;
 }): {
   /** Comparison entries in fetch order (dates or `date~r<runId>` runs). */
@@ -45,20 +47,18 @@ export function useProfitHistory(options: {
     selectedDates,
     dateRange,
     currentRunDate,
-    currentRunId,
+    currentRunIds = EMPTY_RUN_IDS,
     enabled = true,
   } = options;
 
   const comparisonDates = useMemo(
     () =>
-      buildComparisonDates(
-        [...selectedGPUs],
-        [...selectedDates],
-        dateRange,
-        currentRunDate,
-        currentRunId,
+      dropCurrentRunEntries(
+        buildComparisonDates([...selectedGPUs], [...selectedDates], dateRange, currentRunDate),
+        selectedGPUs,
+        currentRunIds,
       ),
-    [selectedGPUs, selectedDates, dateRange, currentRunDate, currentRunId],
+    [selectedGPUs, selectedDates, dateRange, currentRunDate, currentRunIds],
   );
 
   const view = useMemo(() => ({ type: 'calculator' as const, sequence }), [sequence]);

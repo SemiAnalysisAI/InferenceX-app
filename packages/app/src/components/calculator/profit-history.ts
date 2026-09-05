@@ -19,6 +19,7 @@ import {
   comparisonEntryDate,
   comparisonEntryLabel,
   comparisonEntrySortValue,
+  parseComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate, type RunScope } from '@/components/inference/utils/runEnumeration';
 import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
@@ -167,13 +168,28 @@ export function buildProfitHistoryResults(
     targetValue: number;
     mode: CalculatorMode;
     costProvider: CostProvider;
+    /**
+     * Per chip, the run its current bar is built from
+     * (`profitHistoryCurrentRunIds`); a pinned run entry for that same run is
+     * skipped for that chip, since the bar is already on the chart.
+     */
+    currentRunIds?: Readonly<Record<string, string>>;
   },
 ): (InterpolatedResult & { date: string })[] {
-  const { selectedGPUs, precisions, percentile, targetValue, mode, costProvider } = options;
+  const {
+    selectedGPUs,
+    precisions,
+    percentile,
+    targetValue,
+    mode,
+    costProvider,
+    currentRunIds = {},
+  } = options;
   if (selectedGPUs.length === 0) return [];
   const multiPrecision = precisions.length > 1;
   const results: (InterpolatedResult & { date: string })[] = [];
   for (const { date, rows } of rowsByDate) {
+    const { runId } = parseComparisonEntry(date);
     const { grouped, groupMeta } = buildGpuGroups<HistoryGroupMeta>(
       dedupeAgenticHistoryRuns([...rows]),
       {
@@ -183,6 +199,7 @@ export function buildProfitHistoryResults(
         tokenType: 'total',
         classify: (hwKey, row) => {
           if (!selectedGPUs.includes(hwKey)) return null;
+          if (runId !== undefined && currentRunIds[hwKey] === runId) return null;
           const baseKey = multiPrecision ? `${hwKey}__${row.precision}` : hwKey;
           return {
             key: historyResultKey(baseKey, date),
@@ -296,22 +313,51 @@ export function shadeHistoryColor(color: string, fade: number, theme: 'light' | 
 }
 
 /**
- * The run behind the estimator's main bars, which a changelog pin must not
- * draw twice: the latest run of the current date for the compared chips once
- * the changelog has enumerated that date, else the global run selection.
- * `/inference` covers this by handing `buildComparisonDates` its
- * `selectedRunId`; the estimator's main query has no run id of its own, so
- * the id is read back from the changelog it renders.
+ * Per compared chip, the run its current bar is built from: the estimator's
+ * main query is an as-of-date fetch with no run id, and `dedupeAgenticHistoryRuns`
+ * keeps each config's latest run of the day, so two chips can sit on different
+ * runs. Read back from the changelog's enumeration of the current date, the
+ * same ordering the dedupe applies. Chips with no run that day are absent.
  */
-export function profitHistoryCurrentRunId(
+export function profitHistoryCurrentRunIds(
   changelogs: readonly { date: string; runConfigs: RunConfigRow[] }[],
   selectedRunDate: string | undefined,
   scope: RunScope,
-  fallbackRunId: string | undefined,
-): string | undefined {
+): Record<string, string> {
   const today = changelogs.find((c) => c.date === selectedRunDate);
-  const runs = today ? dataRunsForDate(today.runConfigs, scope) : [];
-  return runs.at(-1)?.runId ?? (fallbackRunId || undefined);
+  if (!today) return {};
+  const ids: Record<string, string> = {};
+  for (const hwKey of scope.selectedGPUs) {
+    const runs = dataRunsForDate(today.runConfigs, { ...scope, selectedGPUs: [hwKey] });
+    const latest = runs.at(-1);
+    if (latest) ids[hwKey] = latest.runId;
+  }
+  return ids;
+}
+
+/**
+ * Drop pinned run entries that would only redraw current bars: a run is
+ * skipped when every compared chip either shows that run today already or
+ * has no run that day at all. `/inference` covers its single main run by
+ * handing `buildComparisonDates` a `selectedRunId`; the estimator has one per
+ * chip, so the check is per entry here and per chip in
+ * `buildProfitHistoryResults`. Nothing is dropped until the current date's
+ * changelog has loaded.
+ */
+export function dropCurrentRunEntries(
+  entries: readonly string[],
+  selectedGPUs: readonly string[],
+  currentRunIds: Readonly<Record<string, string>>,
+): string[] {
+  if (Object.keys(currentRunIds).length === 0) return [...entries];
+  return entries.filter((entry) => {
+    const { runId } = parseComparisonEntry(entry);
+    if (runId === undefined) return true;
+    return selectedGPUs.some((hwKey) => {
+      const current = currentRunIds[hwKey];
+      return current !== undefined && current !== runId;
+    });
+  });
 }
 
 /**

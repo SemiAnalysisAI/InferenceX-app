@@ -12,7 +12,8 @@ import {
   parseHistoryResultKey,
   profitHistoryAvailableDates,
   profitHistoryChipOptions,
-  profitHistoryCurrentRunId,
+  dropCurrentRunEntries,
+  profitHistoryCurrentRunIds,
   profitHistoryDateRanks,
   profitHistoryEntryDate,
   profitHistoryEntryLabel,
@@ -231,6 +232,29 @@ describe('buildProfitHistoryResults', () => {
     expect(results[0]!.value).toBeLessThan(1600);
   });
 
+  it("skips a pinned run for the chip whose current bar is that run, keeping the other chip's", () => {
+    const rows = [
+      agenticRow('2026-06-14', 'b200', 40, 800),
+      agenticRow('2026-06-14', 'b200', 80, 400),
+      agenticRow('2026-06-14', 'gb300', 40, 900),
+      agenticRow('2026-06-14', 'gb300', 80, 500),
+    ];
+    const results = buildProfitHistoryResults([{ date: '2026-06-14~r200', rows }], {
+      ...options,
+      selectedGPUs: ['b200_sglang', 'gb300_sglang'],
+      currentRunIds: { b200_sglang: '200', gb300_sglang: '150' },
+    });
+    expect(results.map((r) => r.resultKey)).toEqual(['gb300_sglang|2026-06-14~r200']);
+    // A plain date entry is never a duplicate of a run.
+    expect(
+      buildProfitHistoryResults([{ date: '2026-06-14', rows }], {
+        ...options,
+        selectedGPUs: ['b200_sglang', 'gb300_sglang'],
+        currentRunIds: { b200_sglang: '200' },
+      }),
+    ).toHaveLength(2);
+  });
+
   it('returns nothing with no chip selected', () => {
     expect(
       buildProfitHistoryResults(
@@ -346,11 +370,11 @@ function rc(over: Partial<RunConfigRow>): RunConfigRow {
 const missingChipLabel = (hwKey: string) => hwKey.toUpperCase();
 const missingEntryLabel = (e: string) => `on ${e}`;
 
-describe('profitHistoryCurrentRunId', () => {
+describe('profitHistoryCurrentRunIds', () => {
   const scope = {
     modelDbKeys: ['kimik3'],
-    selectedGPUs: ['b200_sglang'],
-    selectedPrecisions: ['fp4'],
+    selectedGPUs: ['b200_sglang', 'h200_vllm', 'gb300_sglang'],
+    selectedPrecisions: ['fp4', 'fp8'],
     benchmarkType: 'agentic_traces' as const,
   };
   const changelogs = [
@@ -359,24 +383,58 @@ describe('profitHistoryCurrentRunId', () => {
       runConfigs: [
         rc({ github_run_id: 27480000002, run_started_at: '2026-08-10T12:00:00Z' }),
         rc({ github_run_id: 27480000001, run_started_at: '2026-08-10T03:00:00Z' }),
-        // Another chip's later run is not this comparison's main run.
+        // A later sparse run that only covered H200: it is H200's current run,
+        // not B200's.
         rc({
           github_run_id: 27480000009,
           run_started_at: '2026-08-10T20:00:00Z',
           hardware: 'h200',
+          framework: 'vllm',
+          precision: 'fp8',
         }),
       ],
     },
     { date: '2026-07-15', runConfigs: [rc({ github_run_id: 27470000001 })] },
   ];
 
-  it('picks the latest enumerated run of the current date for the compared chips', () => {
-    expect(profitHistoryCurrentRunId(changelogs, '2026-08-10', scope, '999')).toBe('27480000002');
+  it('maps each compared chip to the latest run of the current date that covered it', () => {
+    expect(profitHistoryCurrentRunIds(changelogs, '2026-08-10', scope)).toEqual({
+      b200_sglang: '27480000002',
+      h200_vllm: '27480000009',
+    });
   });
 
-  it('falls back to the global run id until the current date is in the changelog', () => {
-    expect(profitHistoryCurrentRunId(changelogs, '2026-08-31', scope, '999')).toBe('999');
-    expect(profitHistoryCurrentRunId([], '2026-08-10', scope, '')).toBeUndefined();
+  it('is empty until the current date is in the changelog', () => {
+    expect(profitHistoryCurrentRunIds(changelogs, '2026-08-31', scope)).toEqual({});
+    expect(profitHistoryCurrentRunIds([], '2026-08-10', scope)).toEqual({});
+  });
+});
+
+describe('dropCurrentRunEntries', () => {
+  const current = { b200_sglang: '2', h200_vllm: '9' };
+  const gpus = ['b200_sglang', 'h200_vllm', 'gb300_sglang'];
+
+  it('keeps plain dates and runs that add a bar for at least one chip', () => {
+    expect(
+      dropCurrentRunEntries(
+        ['2026-07-15', '2026-08-10~r1', '2026-08-10~r2', '2026-08-10~r9'],
+        gpus,
+        current,
+      ),
+    ).toEqual(['2026-07-15', '2026-08-10~r1', '2026-08-10~r2', '2026-08-10~r9']);
+  });
+
+  it('drops a run every compared chip already shows (chips with no run that day aside)', () => {
+    expect(
+      dropCurrentRunEntries(['2026-08-10~r2'], ['b200_sglang', 'gb300_sglang'], current),
+    ).toEqual([]);
+    expect(dropCurrentRunEntries(['2026-08-10~r2'], ['b200_sglang'], { b200_sglang: '2' })).toEqual(
+      [],
+    );
+  });
+
+  it('drops nothing before the current date has been enumerated', () => {
+    expect(dropCurrentRunEntries(['2026-08-10~r2'], gpus, {})).toEqual(['2026-08-10~r2']);
   });
 });
 
