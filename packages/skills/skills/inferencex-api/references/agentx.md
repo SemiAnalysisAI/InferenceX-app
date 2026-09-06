@@ -245,9 +245,11 @@ JS
 
 Save the JSON output with the analysis. `benchmark_siblings.sku` and
 `selected_point` retain every identity field the API supplied; absence remains
-absence. `trace_unavailable` means only that the availability response omitted the
-selected key (or returned it as false). It does not mean the benchmark never ran or
-that a source artifact never existed. Do not call the page-owned
+absence. Preserve the distinction inside `trace_availability`: `key_present: false`
+means the response omitted the selected ID, while `key_present: true` with
+`available: false` means it explicitly returned `false`. Both produce
+`trace_unavailable`; neither means the benchmark never ran or that a source artifact
+never existed. Do not call the page-owned
 `/api/v1/request-chart-data` or `/api/v1/trace-server-metric-source` operations.
 Do not repeat this recipe across a result set; ask the user to choose another single
 ID first.

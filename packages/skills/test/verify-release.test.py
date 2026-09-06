@@ -758,6 +758,36 @@ class AgentXVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'differs from complete responses'):
             check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
 
+    def test_native_point_recipe_allows_only_the_selected_id_seam(self):
+        installed = self.root / 'installed'
+        reference = installed / 'references'
+        reference.mkdir(parents=True)
+        reference.joinpath('agentx.md').write_text("""```bash
+node --input-type=module <<'JS'
+const selectedResultId = '421';
+console.log(selectedResultId);
+JS
+```
+""")
+        expected = check.point_recipe(installed, '7').encode()
+        script = self.root / 'agentx-point-recipe.mjs'
+        script.write_bytes(expected)
+        check.check_point_recipe(self.root, installed, 'agentx-point', '7')
+
+        for mutation in [expected + b'\n', expected.replace(b'\n', b'\r\n'),
+                         expected.replace(b'console.log', b'process.stdout.write')]:
+            with self.subTest(mutation=mutation):
+                script.write_bytes(mutation)
+                with self.assertRaisesRegex(ValueError, 'changed beyond its selected ID'):
+                    check.check_point_recipe(self.root, installed, 'agentx-point', '7')
+
+        outside = self.root / 'outside.mjs'
+        outside.write_bytes(expected)
+        script.unlink()
+        script.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'changed beyond its selected ID'):
+            check.check_point_recipe(self.root, installed, 'agentx-point', '7')
+
     def test_point_oracle_requires_one_chronological_capture_request_output_chain(self):
         for mutation in ['capture-order', 'request-before-capture', 'output-before-request',
                          'finish-before-output']:
@@ -971,13 +1001,19 @@ class AgentXVerifierTests(unittest.TestCase):
         installed = project / '.agents/skills/inferencex-api'
         for required in [
                 f'The prepared project root is {project}.',
+                'This prepared project is the only writable boundary',
+                'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
+                'Do not list or extract the candidate archive',
+                'must be your first three shell commands',
                 'Run all three install, status, and preview commands from that exact directory',
                 'Do not change directories or pass --dir or --cwd',
                 f'The installed skill must be exactly {installed}.',
-                f'Keep every task-created working, temporary, log, response, and redirected-output file under {project}',
-                'do not write task files to `/tmp`, `$TMPDIR`, `$HOME`, or outside that project',
                 'status --target codex --json',
                 'install --target codex --force --dry-run --json',
+                'Do not run a connectivity or schema preflight with `curl` or any other tool',
+                "The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request",
+                'only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request',
+                'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
                 'The lookup must make exactly two HTTP requests',
                 'fetch `/api/openapi.json` once and then the exact benchmark URL once',
                 'raw-responses/lookup-openapi.response.json',
@@ -993,7 +1029,6 @@ class AgentXVerifierTests(unittest.TestCase):
                 'Each request record must contain exactly query_url, status, retrieved_at, and sha256 of its saved body',
                 "The benchmark response time must also be lookup.json's retrieved_at",
                 "the diagnostic response time must be diagnostic.json's diagnostic.retrieved_at",
-                'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
                 'raw-responses contains exactly those six files',
                 '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, ',
                 '`finished_at`, `responses`, `output`, and `error`',
@@ -1004,12 +1039,19 @@ class AgentXVerifierTests(unittest.TestCase):
                 '`format`, `destination`, `sha256`, and `source_request_numbers`',
                 'The final manifest is accepted only with `status: "complete"` and `error: null`',
                 'Run the installed one-point recipe as written',
-                'Do not reimplement its request flow or reconstruct its JSON output',
+                'agentx-point-recipe.mjs',
+                'agentx-second-point-recipe.mjs',
+                'every other recipe byte must remain identical',
+                'separate Node `--import` capture preload',
+                "redirect that recipe process's stdout directly",
+                'must not write their output or evidence, replace `response.json()`, replace `console.log()`',
+                'Do not reimplement the request flow or reconstruct the JSON output',
                 "Build `metadata.requests` only after that run's final fetch has completed",
                 'one item containing exactly `query_url` and `retrieved_at`',
                 'for every manifest response in identical order (six for a traced run and three for a no-trace run)',
                 'each `query_url` must match the corresponding manifest response `url`',
                 "each `retrieved_at` must be the recipe's own request time for that fetch",
+                'Do not describe an omitted availability key as an explicit `false` value',
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, prompt_text)
@@ -1151,6 +1193,7 @@ class AgentXVerifierTests(unittest.TestCase):
                 patch.object(check, 'check_metadata', return_value=[]), \
                 patch.object(check, 'check_empty_diagnostic'), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}) as summaries, \
+                patch.object(check, 'check_point_recipe') as recipes, \
                 patch.object(check, 'check_agentx_point',
                              side_effect=['trace_diagnostics', 'trace_unavailable']) as points, \
                 patch('builtins.print'):
@@ -1161,6 +1204,7 @@ class AgentXVerifierTests(unittest.TestCase):
         self.assertEqual(requests.call_args_list[1].args, (project, 'lookup', expected_url, {}))
         self.assertEqual(requests.call_args_list[2].args, (project, 'diagnostic', expected_url, {}))
         self.assertEqual(summaries.call_count, 3)
+        self.assertEqual(recipes.call_count, 2)
         self.assertEqual(points.call_count, 2)
         report = json.loads((self.root / 'check-agent/verification.json').read_text())
         self.assertEqual(report['status'], 'data-checks-passed')

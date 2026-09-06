@@ -35,6 +35,8 @@ before(() => {
     );
     assert.ok(snippet, 'installed AgentX cookbook must contain the maintained recipe');
     assert.equal(extra.length, 0, 'AgentX cookbook must have one maintained executable recipe');
+    assert.match(cookbook, /`key_present: false`\s+means the response omitted the selected ID/u);
+    assert.match(cookbook, /`key_present: true` with\s+`available: false`/u);
     installed.set(target, snippet.groups.code);
   }
   writeFileSync(
@@ -222,6 +224,21 @@ test('installed recipe short-circuits an unavailable trace after preserving sibl
     `${base}/api/v1/benchmark-siblings?id=421`,
     `${base}/api/v1/trace-availability?ids=421`,
   ]);
+});
+
+test('installed recipe preserves explicit false separately from an omitted availability key', () => {
+  const result = run({
+    ...lightResponses,
+    '/api/v1/trace-availability?ids=421': response({ 421: false }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.outcome, 'trace_unavailable');
+  assert.deepEqual(output.trace_availability, {
+    response: { 421: false },
+    key_present: true,
+    available: false,
+  });
 });
 
 test('installed recipe reads one selected point and preserves every request phase and cancellation', () => {
