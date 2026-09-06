@@ -606,7 +606,8 @@ class AgentXVerifierTests(unittest.TestCase):
                             'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
                             'checksum_covers': 'saved decoded response body'})
         output = self.root / f'{name}.json'
-        requests = [{'query_url': record['url'], 'retrieved_at': record['retrieved_at']}
+        requests = [{'query_url': record['url'], 'retrieved_at': record['retrieved_at'],
+                     'body_utf8': (evidence / record['body_file']).read_text()}
                     for record in records]
         document = {
             'schema_version': 1,
@@ -747,6 +748,9 @@ class AgentXVerifierTests(unittest.TestCase):
         timeline['version'] = True
         timeline_path.write_text(json.dumps(timeline))
         timeline_record['decoded_body_sha256'] = hashlib.sha256(timeline_path.read_bytes()).hexdigest()
+        document['metadata']['requests'][3]['body_utf8'] = timeline_path.read_text()
+        check.save(output, document)
+        manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
         check.save(evidence / 'manifest.json', manifest)
         with self.assertRaisesRegex(ValueError, 'timeline'):
             check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
@@ -852,6 +856,83 @@ JS
             [response['retrieved_at'] for response in manifest['responses']],
             [request['retrieved_at'] for request in document['metadata']['requests']],
         )
+
+    def run_shipped_point(self, *, trace):
+        source_evidence, _output, source_manifest, _document = self.write_point(trace=trace)
+        fixtures = {}
+        for response in source_manifest['responses']:
+            body = (source_evidence / response['body_file']).read_text()
+            if response['operation'] == 'benchmark-siblings':
+                body = body.replace('"sku":{', '"sku":{"recorded_ns":9007199254740993,')
+            elif response['operation'] == 'request-timeline':
+                body = body.replace('"startNs":0', '"startNs":1000000000000000128')
+            fixtures[response['url']] = body
+        preload = self.root / f'fixture-{self.fixture_index}.mjs'
+        preload.write_text(f"""const bodies = {json.dumps(fixtures)};
+globalThis.fetch = async (input) => {{
+  const url = input instanceof Request ? input.url : String(input);
+  if (!Object.hasOwn(bodies, url)) throw new Error(`Unexpected fixture request: ${{url}}`);
+  const response = new Response(bodies[url], {{ status: 200 }});
+  Object.defineProperty(response, 'url', {{ value: url }});
+  return response;
+}};
+""")
+        installed = Path(__file__).resolve().parents[1] / 'skills/inferencex-api'
+        environment = dict(check.os.environ, NODE_OPTIONS=f'--import={preload.as_uri()}')
+        label = f'shipped-point-{self.fixture_index}'
+        outcome = check.run_point(check.shutil.which('node'), installed, self.root,
+                                  environment, label, '7', VERSION)
+        evidence, output = self.root / f'{label}-evidence', self.root / f'{label}.json'
+        return outcome, evidence, output, json.loads((evidence / 'manifest.json').read_text())
+
+    def test_shipped_point_recipe_preserves_exact_text_despite_javascript_number_rounding(self):
+        for trace in [False, True]:
+            with self.subTest(trace=trace):
+                outcome, evidence, output, capture = self.run_shipped_point(trace=trace)
+                self.assertEqual(outcome, 'trace_diagnostics' if trace else 'trace_unavailable')
+                self.assertEqual(check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION), outcome)
+                document = json.loads(output.read_text())
+                for request, response in zip(document['metadata']['requests'], capture['responses']):
+                    self.assertEqual(set(request), {'query_url', 'retrieved_at', 'body_utf8'})
+                    self.assertEqual(request['body_utf8'].encode(), (evidence / response['body_file']).read_bytes())
+                self.assertIn('9007199254740993', document['metadata']['requests'][1]['body_utf8'])
+                self.assertEqual(document['benchmark_siblings']['sku']['recorded_ns'], 9007199254740992)
+                if trace:
+                    self.assertIn('1000000000000000128', document['metadata']['requests'][3]['body_utf8'])
+                    self.assertEqual(document['timeline']['startNs'], 1000000000000000100)
+
+    def test_point_verifiers_reject_missing_or_changed_recipe_response_text(self):
+        original_run = check.run
+        for interface in ['run_point', 'check_agentx_point']:
+            for mutation in ['missing', 'not-text', 'whitespace', 'rounded-integer']:
+                with self.subTest(interface=interface, mutation=mutation):
+                    def change(stdout):
+                        document = json.loads(stdout)
+                        request = document['metadata']['requests'][1]
+                        if mutation == 'missing':
+                            del request['body_utf8']
+                        elif mutation == 'not-text':
+                            request['body_utf8'] = 1
+                        elif mutation == 'whitespace':
+                            request['body_utf8'] += ' '
+                        else:
+                            request['body_utf8'] = request['body_utf8'].replace('9007199254740993', '9007199254740992')
+                        return json.dumps(document)
+
+                    error = 'request identity differs' if mutation == 'missing' else 'raw response text differs'
+                    if interface == 'run_point':
+                        with patch.object(check, 'run', side_effect=lambda *args: change(original_run(*args))):
+                            with self.assertRaisesRegex(ValueError, error):
+                                self.run_shipped_point(trace=False)
+                        capture = self.root / f'shipped-point-{self.fixture_index}-evidence/manifest.json'
+                        self.assertEqual(json.loads(capture.read_text())['status'], 'pending')
+                    else:
+                        _outcome, evidence, output, capture = self.run_shipped_point(trace=False)
+                        output.write_text(change(output.read_text()))
+                        capture['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
+                        check.save(evidence / 'manifest.json', capture)
+                        with self.assertRaisesRegex(ValueError, error):
+                            check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
 
     def test_point_capture_preload_rejects_effective_post_request(self):
         node = check.shutil.which('node')
@@ -1142,8 +1223,10 @@ JS
                 "redirect that recipe process's stdout directly",
                 'must not write their output or evidence, replace `response.json()`, replace `console.log()`',
                 'Do not reimplement the request flow or reconstruct the JSON output',
-                "Build `metadata.requests` only after that run's final fetch has completed",
-                'one item containing exactly `query_url` and `retrieved_at`',
+                "Read the recipe-owned `metadata.requests` only after that run's final fetch has completed",
+                'Each item contains exactly `query_url`, `retrieved_at`, and `body_utf8`',
+                'its UTF-8 bytes must equal the captured response file, including large-integer digits and whitespace',
+                'Do not rebuild it from parsed JSON',
                 'for every manifest response in identical order (six for a traced run and three for a no-trace run)',
                 'each `query_url` must match the corresponding manifest response `url`',
                 "each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte",

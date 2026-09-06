@@ -457,15 +457,17 @@ def strict_json(body):
     return json.loads(body.decode('utf-8-sig'), parse_constant=reject)
 
 
-def same_json(actual, expected):
+def same_json(actual, expected, *, javascript_numbers=False):
     if finite(actual) and finite(expected):
-        return actual == expected
+        return float(actual) == float(expected) if javascript_numbers else actual == expected
     if type(actual) is not type(expected):
         return False
     if type(actual) is dict:
-        return actual.keys() == expected.keys() and all(same_json(actual[key], expected[key]) for key in actual)
+        return actual.keys() == expected.keys() and all(
+            same_json(actual[key], expected[key], javascript_numbers=javascript_numbers) for key in actual)
     if type(actual) is list:
-        return len(actual) == len(expected) and all(same_json(a, b) for a, b in zip(actual, expected))
+        return len(actual) == len(expected) and all(
+            same_json(a, b, javascript_numbers=javascript_numbers) for a, b in zip(actual, expected))
     return actual == expected
 
 
@@ -877,6 +879,16 @@ def point_response(evidence, record, number, operation, expected_url):
     return strict_json(body)
 
 
+def point_request(request, response, evidence):
+    require(type(request) is dict and set(request) == {'query_url', 'retrieved_at', 'body_utf8'} and
+            same_url(request['query_url'], response['url']),
+            'Point output request identity differs from its capture')
+    require(type(request['body_utf8']) is str and
+            request['body_utf8'].encode('utf-8') == (evidence / response['body_file']).read_bytes(),
+            'Point output raw response text differs from its capture')
+    return timestamp(request['retrieved_at'], 'Point request time is invalid')
+
+
 def check_point_shapes(selected_id, timeline, histograms, server_metrics):
     require(type(timeline) is dict and integer(timeline.get('version')) and integer(timeline.get('startNs')) and
             integer(timeline.get('endNs')) and finite(timeline.get('durationS')) and
@@ -993,16 +1005,15 @@ def check_agentx_point(project, name, output, selected_id, version):
     completed = timestamp(metadata['retrieved_at'], 'Point diagnostic retrieval time is invalid')
     request_times = []
     for request, response in zip(metadata['requests'], responses):
-        request_time = timestamp(request.get('retrieved_at'), 'Point request time is invalid') \
-            if type(request) is dict else None
-        require(type(request) is dict and set(request) == {'query_url', 'retrieved_at'} and
-                same_url(request['query_url'], response['url']) and request_time is not None and
-                request['retrieved_at'] == response['retrieved_at'],
+        request_time = point_request(request, response, evidence)
+        require(request['retrieved_at'] == response['retrieved_at'],
                 'Point output is not linked to its captured request')
         request_times.append(request_time)
     ordered_times = [started, *request_times, completed, finished]
     require(ordered_times == sorted(ordered_times), 'Point evidence timestamps are not chronological')
-    require(same_json(document['benchmark_siblings'], siblings) and same_json(document['selected_point'], selected) and
+    # Exact source integers are pinned by body_utf8 above; the parsed views use JavaScript Number.
+    require(same_json(document['benchmark_siblings'], siblings, javascript_numbers=True) and
+            same_json(document['selected_point'], selected, javascript_numbers=True) and
             same_json(document['trace_availability'], {'response': availability,
                                                        'key_present': selected_id in availability,
                                                        'available': trace_available}),
@@ -1010,8 +1021,10 @@ def check_agentx_point(project, name, output, selected_id, version):
     if trace_available:
         timeline, histograms, server_metrics = bodies[3:]
         check_point_shapes(selected_id, timeline, histograms, server_metrics)
-        require(document['outcome'] == 'trace_diagnostics' and same_json(document['timeline'], timeline) and
-                same_json(document['histograms'], histograms) and same_json(document['server_metrics'], server_metrics),
+        require(document['outcome'] == 'trace_diagnostics' and
+                same_json(document['timeline'], timeline, javascript_numbers=True) and
+                same_json(document['histograms'], histograms, javascript_numbers=True) and
+                same_json(document['server_metrics'], server_metrics, javascript_numbers=True),
                 'Trace diagnostic differs from complete responses')
     else:
         require(document['outcome'] == 'trace_unavailable' and
@@ -1055,10 +1068,7 @@ def run_point(node, installed, project, environment, label, selected_id, version
     require(type(requests) is list and len(requests) == len(capture['responses']),
             'Point output request list differs from its capture')
     for request, response in zip(requests, capture['responses']):
-        require(type(request) is dict and set(request) == {'query_url', 'retrieved_at'} and
-                same_url(request['query_url'], response['url']),
-                'Point output request identity differs from its capture')
-        timestamp(request['retrieved_at'], 'Point request time is invalid')
+        point_request(request, response, evidence)
         response['retrieved_at'] = request['retrieved_at']
     capture['status'] = 'complete'
     capture['finished_at'] = now()
@@ -1120,7 +1130,7 @@ For {args.agentx_model} using the latest public observations, export AgentX summ
 
 Run the installed one-point recipe as written for both points. Extract it exactly from {installed / 'references/agentx.md'} into agentx-point-recipe.mjs for result ID {args.agentx_point_id} and agentx-second-point-recipe.mjs for result ID {args.agentx_no_trace_id}. Extract only the bytes after the `node --input-type=module <<'JS'` line through the final `}}` before the `JS` delimiter; the file must end at that final `}}` byte with no trailing newline or other byte. Do not create an outside-project scratch copy while extracting or comparing the recipe files. In each file, change only the exact `const selectedResultId = '421';` line to its requested ID; every other recipe byte must remain identical. Run each recipe with a separate Node `--import` capture preload, and redirect that recipe process's stdout directly to agentx-point.json or agentx-second-point.json. The recipe files must not write their output or evidence, replace `response.json()`, replace `console.log()`, or contain capture logic. Do not reimplement the request flow or reconstruct the JSON output. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
 
-Build `metadata.requests` only after that run's final fetch has completed, with one item containing exactly `query_url` and `retrieved_at` for every manifest response in identical order (six for a traced run and three for a no-trace run); each `query_url` must match the corresponding manifest response `url`, and each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte. Keep the manifest pending until the redirected recipe output exists, then finalize it using those recipe-owned request times rather than a parallel capture timestamp.
+Read the recipe-owned `metadata.requests` only after that run's final fetch has completed. Each item contains exactly `query_url`, `retrieved_at`, and `body_utf8` for every manifest response in identical order (six for a traced run and three for a no-trace run); each `query_url` must match the corresponding manifest response `url`, and each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte. Preserve `body_utf8` exactly: its UTF-8 bytes must equal the captured response file, including large-integer digits and whitespace. Do not rebuild it from parsed JSON. Keep the manifest pending until the redirected recipe output exists, then finalize it using those recipe-owned request times rather than a parallel capture timestamp.
 
 Each point evidence directory must contain manifest.json with exactly these top-level fields: `schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, `finished_at`, `responses`, `output`, and `error`. Start capture with schema_version 1, the exact package version and selected ID, `status: "pending"`, `finished_at: null`, and `error: null`. The final manifest is accepted only with `status: "complete"` and `error: null`; set finished_at only after the output is complete. Do not add or rename fields, and never relabel a failed or incomplete run as complete.
 
