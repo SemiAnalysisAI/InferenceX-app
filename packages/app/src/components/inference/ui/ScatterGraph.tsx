@@ -1839,7 +1839,11 @@ const ScatterGraph = React.memo(
     const zoomConfig = useMemo(
       () => ({
         enabled: true,
-        axes: 'both' as const,
+        // X-only: the scatter chart is fundamentally an X-axis exploration
+        // (Interactivity / TTFT). Allowing vertical pan caused the y-axis tick
+        // labels to drift on drag ("sliding around"), making them look wrong
+        // relative to the visible data. Matches the TrendChart zoom behavior.
+        axes: 'x' as const,
         scaleExtent: [0.7, 20] as [number, number],
         resetEventName: zoomResetEventName,
         onReset: () => {
@@ -1847,17 +1851,13 @@ const ScatterGraph = React.memo(
         },
         constrain: (transform: d3.ZoomTransform, extent: [[number, number], [number, number]]) => {
           const width = extent[1][0];
-          const height = extent[1][1];
           let tx = transform.x;
-          let ty = transform.y;
           const k = transform.k;
           const maxTx = 0;
           const minTx = Math.min(0, width - width * k);
-          const minTy = height * (1 - k);
-          const maxTy = Math.max(minTy, 0);
           tx = Math.max(minTx, Math.min(maxTx, tx));
-          ty = Math.max(minTy, Math.min(maxTy, ty));
-          return d3.zoomIdentity.translate(tx, ty).scale(k);
+          // Lock y-translation to 0 — y-axis stays fixed during pan/zoom.
+          return d3.zoomIdentity.translate(tx, 0).scale(k);
         },
         onZoom: (_event: d3.D3ZoomEvent<SVGSVGElement, unknown>, ctx: ZoomContext) => {
           if (xScaleConfig._isLog) {
@@ -1866,10 +1866,14 @@ const ScatterGraph = React.memo(
               d3.axisBottom(newXS).ticks(10).tickFormat(logTickFormat(newXS)) as any,
             );
           }
+          // With axes: 'x' the y-scale doesn't change, but the framework still
+          // re-renders the y-axis on each zoom with the configured tickFormat.
+          // For log scale, tickFormat is `undefined` (see yAxisConfig above),
+          // so re-apply `logTickFormat` here to preserve the labels.
           if (yScaleConfig.type === 'log') {
-            const newYS = ctx.newYScale as d3.ScaleLogarithmic<number, number>;
+            const yScale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
             ctx.layout.yAxisGroup.call(
-              d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
+              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
             );
           }
           if (showPointLabels && !showGradientLabels) {

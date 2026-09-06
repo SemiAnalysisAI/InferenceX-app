@@ -1271,17 +1271,24 @@ const GPUGraph = React.memo(
         ]}
         zoom={{
           enabled: true,
-          axes: 'both',
+          // X-only: GPU time-series is a date-axis exploration. Vertical pan
+          // caused the y-axis to drift on drag, making tick labels look wrong
+          // relative to the visible data.
+          axes: 'x',
           scaleExtent: [1, 20],
           resetEventName: `gpu_timeseries_zoom_reset_${chartId}`,
           onReset: () => {
             track('interactivity_zoom_reset');
           },
           onZoom: (_event, ctx: ZoomContext) => {
+            // y-axis is locked with axes: 'x' (newYScale === yScale), but the
+            // framework re-renders axes on every zoom with the configured
+            // tickFormat. For log scale the tickFormat is `undefined` in this
+            // component, so re-apply `logTickFormat` here to preserve labels.
             if (logScale) {
-              const newYScale = ctx.newYScale as d3.ScaleLogarithmic<number, number>;
+              const yScale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
               ctx.layout.yAxisGroup.call(
-                d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)) as any,
+                d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
               );
             }
             // Zoom moves points toward the plot edges; keep their labels inside.
