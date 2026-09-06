@@ -8,8 +8,9 @@ import { isDeepStrictEqual, parseArgs } from 'node:util';
 
 const PACKAGE_VERSION = '0.7.0';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
+// History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =
-  /^(?:(?:median|mean|std|p75|p90|p95|p99|p99\.9)_(?:ttft|tpot|itl|e2el|intvty|qps)|(?:total|output|input)_tput_tps|(?:output_|input_)?tput_per_gpu)$/u;
+  /^(?:(?:median|p75|p90|p95|p99|p99\.9)_(?:ttft|tpot|itl|e2el|intvty|qps)|(?:mean|std)_qps|(?:total|output|input)_tput_tps|(?:output_|input_)?tput_per_gpu)$/u;
 const HELP = `compare-releases — investigate observed changes between explicit producer identities
 
 Requires Node 24 or later.
@@ -31,7 +32,13 @@ Dates select original observation date, never curve_date. Makes one history requ
 Reports one-to-one public-configuration matches and missing/ambiguous observations.
 The full response is retained with a SHA-256; one 30s request, 16 MiB byte budget.
 Image-to-release mapping and causal attribution remain unverified. See references/releases.md.
-Select latency, interactivity or throughput metrics. Power/energy comparisons require PowerX validation.
+Metrics retained by history, when recorded:
+  median/p75/p90/p95/p99/p99.9 of ttft/tpot/itl/e2el/intvty/qps (e.g. median_ttft)
+  mean_qps, std_qps
+  tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu
+  total_tput_tps, output_tput_tps, input_tput_tps
+History omits mean/std latency and interactivity. Retained metrics may still be missing.
+Power/energy comparisons require PowerX validation.
 `;
 const CONFIG_FIELDS = [
   'model',
@@ -272,7 +279,7 @@ async function run() {
   }
   if (!PERFORMANCE_METRIC.test(values.metric)) {
     throw new Error(
-      'Choose a latency, interactivity or throughput metric; use the PowerX cookbook for validated power and energy',
+      'Choose a metric retained by benchmark history (see --help); use the PowerX cookbook for validated power and energy',
     );
   }
   if (!['vllm', 'sglang'].includes(values.framework))

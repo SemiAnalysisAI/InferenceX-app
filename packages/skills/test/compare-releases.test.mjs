@@ -571,6 +571,52 @@ test('power, energy and audit fields are refused before reading unvalidated hist
   }
 });
 
+test('statistics stripped from history fail before HTTP or output creation', () => {
+  for (const metric of [
+    'mean_ttft',
+    'std_ttft',
+    'mean_tpot',
+    'std_tpot',
+    'mean_itl',
+    'std_itl',
+    'mean_e2el',
+    'std_e2el',
+    'mean_intvty',
+    'std_intvty',
+  ]) {
+    const args = required.map((value) => (value === 'median_ttft' ? metric : value));
+    const result = run(undefined, [...args, '--output', 'comparison.json']);
+    assert.equal(result.status, 1, metric);
+    assert.match(result.stderr, /history/u);
+    assert.deepEqual(result.requests, []);
+    assert.equal(result.stdout, '');
+    assert.deepEqual(readdirSync(result.cwd), []);
+  }
+});
+
+test('retained QPS, percentile and throughput values remain comparable', () => {
+  for (const metric of ['mean_qps', 'std_qps', 'p99.9_intvty', 'output_tput_per_gpu']) {
+    const args = required.map((value) => (value === 'median_ttft' ? metric : value));
+    const result = run(
+      [
+        observation(false, { metrics: { [metric]: 12 } }),
+        observation(true, { metrics: { [metric]: 9 } }),
+      ],
+      args,
+    );
+    succeeded(result);
+    assert.equal(result.requests.length, 1);
+    assert.deepEqual(JSON.parse(result.stdout).comparisons[0].metric, {
+      name: metric,
+      before: 12,
+      after: 9,
+      delta: -3,
+      percent_change: -25,
+      status: 'observed_change',
+    });
+  }
+});
+
 test('repeated selectors fail before silently changing the comparison scope', () => {
   const result = run(undefined, [...required, '--metric', 'output_tput_per_gpu']);
   assert.notEqual(result.status, 0);

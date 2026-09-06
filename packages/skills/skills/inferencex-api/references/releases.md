@@ -6,11 +6,16 @@ fixed ISL/OSL workload, performance metric, dates, and producer image/run identi
 The result is a descriptive comparison with coverage and confounders. It runs
 no benchmark, bisect, monitor, or statistical regression test.
 
-Supported metrics are `mean`, `median`, `std`, `p75`, `p90`, `p95`, `p99`, or
+Supported metrics, when recorded, are `median`, `p75`, `p90`, `p95`, `p99`, or
 `p99.9` statistics of `ttft`, `tpot`, `itl`, `e2el`, `intvty`, or `qps`, plus
+`mean_qps`, `std_qps`,
 `tput_per_gpu`, `output_tput_per_gpu`, `input_tput_per_gpu`, `total_tput_tps`,
-`output_tput_tps`, and `input_tput_tps`. Power, energy, telemetry, audit fields,
-and unrecognized metrics are rejected before HTTP. Ordinary history may retain
+`output_tput_tps`, and `input_tput_tps`. History removes `mean` and `std` statistics
+of `ttft`, `tpot`, `itl`, `e2el`, and `intvty`, so the helper rejects those keys
+before HTTP. Other supported metrics can still be absent from a selected row;
+report that coverage rather than treating absence as a zero or an observed change.
+Power, energy, telemetry, audit fields, and unrecognized metrics are also rejected
+before HTTP. Ordinary history may retain
 legacy or invalid power values whose semantics are not comparable. Use the
 [PowerX cookbook](powerx.md) and its strictV2 eligibility checks for those tasks;
 retaining such fields in raw evidence does not qualify them for comparison.
@@ -38,7 +43,8 @@ retaining such fields in raw evidence does not qualify them for comparison.
    `/api/v1/benchmarks/history?model=<display-name>&isl=<tokens>&osl=<tokens>`.
    This endpoint accepts neither server-side date nor hardware/framework
    filters. It returns the model/workload history across hardware and frameworks;
-   omit `view=calculator` to retain all metrics and provenance. Inspect returned
+   omit `view=calculator` to retain the metrics and provenance available from history.
+   The mean/std omissions above apply to this ordinary view too. Inspect returned
    `date`, `hardware`, `framework`, raw `model`, `image`, `run_url`, and configuration.
    Select explicit before/after observations in this response. If a required
    identity is unavailable, report what is missing instead of choosing a nearby
