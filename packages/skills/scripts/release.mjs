@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
@@ -14,13 +14,46 @@ export const REGISTRY = 'https://registry.npmjs.org';
 const packageRoot = resolve(import.meta.dirname, '..');
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') =>
   createHash(algorithm).update(bytes).digest(encoding);
+const releaseFiles = [
+  'LICENSE',
+  'README.md',
+  'bin/install.mjs',
+  'package.json',
+  'skills/inferencex-api/SKILL.md',
+  'skills/inferencex-api/references/agentx.md',
+  'skills/inferencex-api/references/powerx.md',
+  'skills/inferencex-api/references/public-api-examples.md',
+  'skills/inferencex-api/scripts/export-agentx.mjs',
+  'skills/inferencex-api/scripts/export-powerx.mjs',
+];
+const stableVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+
+function verifyIdentity(record) {
+  assert.equal(record.name, PACKAGE, 'Unexpected package name');
+  assert.match(record.version, stableVersion, 'Release version must be an exact stable version');
+  assert.equal(
+    record.filename,
+    `semianalysisai-inferencex-skills-${record.version}.tgz`,
+    'Archive filename differs from release version',
+  );
+}
+
+function sourceState() {
+  return {
+    commit: execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: packageRoot,
+      encoding: 'utf8',
+    }).trim(),
+    dirty:
+      execFileSync('git', ['status', '--porcelain', '--', '.'], {
+        cwd: packageRoot,
+        encoding: 'utf8',
+      }).trim().length > 0,
+  };
+}
 
 export async function requireUnpublished(version, manifest, request = fetch) {
-  assert.match(
-    version,
-    /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u,
-    'Use an exact stable version',
-  );
+  assert.match(version, stableVersion, 'Use an exact stable version');
   assert.equal(manifest.name, PACKAGE, 'Unexpected package name');
   assert.equal(version, manifest.version, 'Requested version differs from package.json');
   const response = await request(`${REGISTRY}/${encodeURIComponent(PACKAGE)}/${version}`, {
@@ -36,8 +69,22 @@ export async function requireUnpublished(version, manifest, request = fetch) {
 }
 
 export function verifyArchive(record, bytes, reviewedSha256) {
-  assert.equal(record.name, PACKAGE, 'Unexpected package name');
-  assert.equal(record.filename, basename(record.filename), 'Archive must be beside its manifest');
+  verifyIdentity(record);
+  verifyContents(record.files);
+  assert.equal(record.source_dirty, false, 'Package source must be clean');
+  assert.match(
+    record.source_commit,
+    /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u,
+    'Source commit must be a canonical Git object ID',
+  );
+  assert.equal(typeof record.prepared_at, 'string', 'Preparation time must be a string');
+  const preparedAt = new Date(record.prepared_at);
+  assert.ok(Number.isFinite(preparedAt.valueOf()), 'Preparation time must be valid');
+  assert.equal(
+    record.prepared_at,
+    preparedAt.toISOString(),
+    'Preparation time must be a canonical UTC timestamp',
+  );
   assert.equal(digest(bytes), record.sha256, 'Archive SHA-256 differs from release manifest');
   assert.equal(
     `sha512-${digest(bytes, 'sha512', 'base64')}`,
@@ -51,30 +98,16 @@ export function verifyArchive(record, bytes, reviewedSha256) {
 }
 
 export function verifyContents(files) {
-  const required = [
-    'package.json',
-    'README.md',
-    'LICENSE',
-    'bin/install.mjs',
-    'skills/inferencex-api/SKILL.md',
-  ];
-  for (const path of required) assert.ok(files.includes(path), `Archive is missing ${path}`);
-  for (const path of files) {
-    assert.ok(
-      !path.split('/').some((part) => part.startsWith('.')),
-      `Unexpected hidden file: ${path}`,
-    );
-    assert.ok(
-      required.includes(path) || path.startsWith('skills/inferencex-api/'),
-      `Maintainer files must not enter the public archive: ${path}`,
-    );
-  }
+  assert.ok(Array.isArray(files), 'Archive file list is missing');
+  assert.equal(new Set(files).size, files.length, 'Archive file list contains duplicates');
+  assert.deepEqual([...files].sort(), [...releaseFiles].sort(), 'Archive file list differs');
 }
 
 function main(args) {
   const [command, value, output, reviewedSha256] = args;
   if (command === 'check' && args.length >= 2 && args.length <= 3) {
     const record = JSON.parse(readFileSync(value, 'utf8'));
+    verifyIdentity(record);
     verifyArchive(record, readFileSync(join(dirname(value), record.filename)), output);
     console.log(`Verified ${record.name}@${record.version}: ${record.sha256}`);
     return;
@@ -90,6 +123,8 @@ function main(args) {
 
 async function prepare(version, output, reviewedSha256) {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+  const source = sourceState();
+  assert.equal(source.dirty, false, 'Package source must be clean before preparing a release');
   await requireUnpublished(version, manifest);
   const destination = resolve(output);
   // A new directory preserves earlier attempts, including failures.
@@ -102,10 +137,12 @@ async function prepare(version, output, reviewedSha256) {
   );
   assert.equal(packed.length, 1, 'Expected exactly one archive');
   const [archive] = packed;
-  assert.equal(archive.name, PACKAGE);
-  assert.equal(archive.version, version);
+  verifyIdentity(archive);
   verifyContents(archive.files.map((file) => file.path));
   const bytes = readFileSync(join(destination, archive.filename));
+  const packedSource = sourceState();
+  assert.equal(packedSource.commit, source.commit, 'Package source commit changed while packing');
+  assert.equal(packedSource.dirty, false, 'Package source changed while packing');
   const record = {
     name: PACKAGE,
     version,
@@ -113,15 +150,8 @@ async function prepare(version, output, reviewedSha256) {
     sha256: digest(bytes),
     integrity: archive.integrity,
     files: archive.files.map((file) => file.path),
-    source_commit: execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: packageRoot,
-      encoding: 'utf8',
-    }).trim(),
-    source_dirty:
-      execFileSync('git', ['status', '--porcelain', '--', '.'], {
-        cwd: packageRoot,
-        encoding: 'utf8',
-      }).trim().length > 0,
+    source_commit: source.commit,
+    source_dirty: source.dirty,
     prepared_at: new Date().toISOString(),
   };
   verifyArchive(record, bytes, reviewedSha256);

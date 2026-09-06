@@ -37,34 +37,37 @@ the trust relationship.
 ## Prepare and review a candidate
 
 1. Modify the source, choose a new stable version, and update package metadata,
-   the exporter's standalone version, installation examples, and installed-version
+   both exporters' standalone versions, installation examples, and installed-version
    expectations together. Run the package tests and the relevant repository checks.
-   Review and commit the final source before preparing the accepted archive.
+   Merge the reviewed source before preparing the final accepted archive.
 2. Run the following from the repository root using Node 24/npm and Python 3 on
    Linux or macOS (the public verification deadline uses Unix process groups and timers).
    Choose a **new output directory for every attempt**. Substitute the intended
-   version. The `0.3.0` paths below record the accepted candidate used for this
-   release; preparation alone did not prove publication.
+   version. The `0.4.0` paths below describe this candidate; preparation alone
+   does not prove publication.
 
 ```bash
 node --test packages/skills/test/*.test.mjs
-node packages/skills/scripts/release.mjs prepare 0.3.0 /tmp/inferencex-release-0.3.0
-python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-release-0.3.0/release.json \
+node packages/skills/scripts/release.mjs prepare 0.4.0 /tmp/inferencex-release-0.4.0
+python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-release-0.4.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-candidate-check-0.3.0
+  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --evidence /tmp/inferencex-candidate-check-0.4.0
 ```
 
-The preparer rejects a version mismatch, an already published version, and an
-unavailable registry check. It packs once, checks the public file boundary, and
-records the source commit, whether the package source was dirty, file list, SHA-256,
-and npm integrity. A dirty-source preparation is useful for iteration but is not
-the final reviewed release candidate. Maintainer tools,
+The preparer requires and records a clean package source state. It rejects dirty
+source before registry access or candidate output, and also rejects a version
+mismatch, an already published version, or an unavailable registry check. It packs
+once, checks the public file boundary, and records the source commit,
+`source_dirty: false`, file list, SHA-256, and npm integrity. Maintainer tools,
 tests, credentials, and acceptance artifacts are outside the public package.
 The verifier creates two projects outside the repository with fresh npm caches,
 empty npm configuration, and an allowlisted environment. It installs the exact
-archive for Codex and Claude Code and checks every JSON row and CSV field against
-the complete public responses actually used by the installed exporter. Missing
-metrics stay missing and real zeroes remain zero. No new benchmarks run.
+archive for Codex and Claude Code. It checks PowerX and AgentX CSV/JSON against the
+complete public responses consumed by each exporter, exercises an exact excluded
+AgentX selection, and checks one traced and one no-trace point. Missing and null
+values remain missing; real `0` and `false` values remain explicit. No new
+benchmarks run.
 
 The live check uses the requested model/workload; there is no fixed date or expected
 row count. Use `--date YYYY-MM-DD` for a reproducible cutoff and `--raw-model KEY`
@@ -81,19 +84,21 @@ instructions, examples, installer behavior, or export semantics change, and befo
 accepting the archive for publication.
 
 ```bash
-python3 packages/skills/scripts/verify-release.py agents /tmp/inferencex-release-0.3.0/release.json \
+python3 packages/skills/scripts/verify-release.py agents /tmp/inferencex-release-0.4.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-agent-preparation-0.3.0
+  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --evidence /tmp/inferencex-agent-preparation-0.4.0
 ```
 
 The output identifies a new temporary root with `codex/` and `claude/` projects.
-Each contains only the installed skill, installation logs, and `prompt.txt` with a
-natural-language lookup, PowerX export, and exact empty-workload request. These are
-prepared projects, **not completed agent runs**. The prompt also requests installer
-JSON status and a forced dry-run using the exact candidate archive, while preserving
-the installed skill. Review these structured results and filesystem preservation
-independently; `check-agent` reports only its data checks. Their `acceptance.json` identifies
-the candidate archive. The empty workload defaults to 7/13 tokens; override
+Each initially contains only the exact candidate archive and `prompt.txt`; these are
+prepared projects, **not completed agent runs**. The prompt asks the agent to install
+the archive, inspect status, preview a forced reinstall, run the lookup and PowerX
+flows, export AgentX CSV and JSON, retain an exactly excluded AgentX selection, and
+inspect one traced and one no-trace point with complete same-request evidence.
+Review installer results and filesystem preservation independently; `check-agent`
+reports only its data checks. `acceptance.json` identifies both prepared targets and
+the candidate archive. The PowerX empty workload defaults to 7/13 tokens; override
 `--empty-isl` and `--empty-osl` if that scope ever acquires observations.
 
 Start a fresh Codex or Claude Code session inside the corresponding project and
@@ -110,10 +115,11 @@ into evidence or GitHub Actions secrets for this test.
 After each agent completes, independently check its generated files:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py check-agent /tmp/inferencex-release-0.3.0/release.json \
+python3 packages/skills/scripts/verify-release.py check-agent /tmp/inferencex-release-0.4.0/release.json \
   --project /tmp/inferencex-skill-acceptance-REPLACE/codex \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-codex-result-check-0.3.0
+  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --evidence /tmp/inferencex-codex-result-check-0.4.0
 ```
 
 Repeat for Claude Code with a new evidence directory. Use the **same scope arguments**
@@ -135,6 +141,12 @@ different reviewer must inspect the transcript and explanation for:
   are not treated as proof that no benchmark jobs occurred on a date.
 - The empty result is retained, diagnosis keeps its exact scope, and uncertainty
   is explained if the diagnostic request fails.
+- AgentX filters remain exact and case-sensitive; an empty or excluded selection
+  makes no claims beyond its response. Aggregates, derived metrics and trace
+  availability are not presented as model-quality scores or rankings.
+- Each AgentX point flow uses only its selected safe-integer ID. A no-trace result
+  stops before timeline, histogram and server-metric requests; a traced result does
+  not expand to sibling IDs.
 - The installed skill actually supplied the workflow and the agent used no
   repository or private-data access. All claims have complete response evidence.
   Confirm that the agent retained its full unfiltered, strict-before-filtering,
@@ -182,9 +194,10 @@ metadata is not yet available), the version is already immutable. Inspect the
 saved failure and rerun **only the read-only verifier**, preserving a new attempt:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py public /tmp/inferencex-release-0.3.0/release.json \
+python3 packages/skills/scripts/verify-release.py public /tmp/inferencex-release-0.4.0/release.json \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --evidence /tmp/inferencex-public-check-0.3.0-attempt2
+  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --evidence /tmp/inferencex-public-check-0.4.0-attempt2
 ```
 
 Do not rerun publication or bump the version just to hide a failed verification.

@@ -21,12 +21,8 @@ const suite = packedSkillSuite();
 const { project, run } = suite;
 const metadataName = '.inferencex-skills.json';
 
-function setInstalledVersion(destination, version) {
-  writeFileSync(
-    join(destination, metadataName),
-    JSON.stringify({ package: packageInfo.name, version }),
-  );
-  const exporter = join(destination, 'scripts/export-powerx.mjs');
+function setExporterVersion(destination, name, version) {
+  const exporter = join(destination, `scripts/export-${name}.mjs`);
   writeFileSync(
     exporter,
     readFileSync(exporter, 'utf8').replace(
@@ -36,11 +32,29 @@ function setInstalledVersion(destination, version) {
   );
 }
 
+function setInstalledVersion(destination, version) {
+  writeFileSync(
+    join(destination, metadataName),
+    JSON.stringify({ package: packageInfo.name, version }),
+  );
+  setExporterVersion(destination, 'powerx', version);
+}
+
 function jsonResult(result, expectedStatus = 0) {
   assert.equal(result.status, expectedStatus, `${result.stdout}\n${result.stderr}`);
   const output = JSON.parse(result.stdout);
   assert.equal(output.schema_version, 1);
   return output;
+}
+
+function assertDuplicateVersionsRejected(cwd, exporter, reason) {
+  const matching = `const PACKAGE_VERSION = '${packageInfo.version}';`;
+  for (const second of [matching, "const PACKAGE_VERSION = '9.9.9';"]) {
+    writeFileSync(exporter, `${matching}\n${second}\n`);
+    const status = run(['status'], cwd);
+    succeeded(status);
+    assert.ok(status.stdout.includes(`Installed version: unknown (${reason})\n`));
+  }
 }
 
 function snapshot(root) {
@@ -213,6 +227,7 @@ test('status reads exporter versions without executing code and reports missing 
   const readOnly = run(['status'], cwd);
   succeeded(readOnly);
   assert.ok(readOnly.stdout.includes(`Installed version: ${packageInfo.version}\n`));
+  assertDuplicateVersionsRejected(cwd, exporter, 'installed exporter version is missing');
   writeFileSync(exporter, '// no identifiable version');
   const missingVersion = run(['status'], cwd);
   succeeded(missingVersion);
@@ -240,6 +255,138 @@ test('status reads exporter versions without executing code and reports missing 
     absent.stdout,
     /Installed version: unknown \(installed exporter is missing or not a regular file\)/u,
   );
+});
+
+test('pre-0.4 status requires only PowerX and ignores absent or stale AgentX files', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const agentx = join(destination, 'scripts/export-agentx.mjs');
+  setInstalledVersion(destination, '0.3.999+legacy');
+
+  for (const mutate of [
+    () => writeFileSync(agentx, `const PACKAGE_VERSION = '9.9.9';\nthrow new Error('stale');\n`),
+    () => rmSync(agentx),
+  ]) {
+    mutate();
+    const status = run(['status'], cwd);
+    succeeded(status);
+    assert.ok(status.stdout.includes('Installed version: 0.3.999+legacy\n'));
+  }
+
+  rmSync(join(destination, 'scripts/export-powerx.mjs'));
+  const missingPowerX = run(['status'], cwd);
+  succeeded(missingPowerX);
+  assert.match(
+    missingPowerX.stdout,
+    /Installed version: unknown \(installed exporter is missing or not a regular file\)/u,
+  );
+});
+
+test('0.4 prerelease and later receipts require matching AgentX versions', () => {
+  for (const version of ['0.4.0-rc.1+build.7', '1.0.0']) {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    setInstalledVersion(destination, version);
+    const mismatch = run(['status'], cwd);
+    succeeded(mismatch);
+    assert.match(
+      mismatch.stdout,
+      /Installed version: unknown \(installation metadata disagrees with the installed AgentX exporter version\)/u,
+    );
+    setExporterVersion(destination, 'agentx', version);
+    const matching = run(['status'], cwd);
+    succeeded(matching);
+    assert.ok(matching.stdout.includes(`Installed version: ${version}\n`));
+  }
+});
+
+test('status reads the required AgentX version without executing it and diagnoses invalid files', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const exporter = join(destination, 'scripts/export-agentx.mjs');
+  writeFileSync(
+    exporter,
+    `const PACKAGE_VERSION = '${packageInfo.version}';\nthrow new Error('Do not execute status input');\n`,
+  );
+  const readOnly = run(['status'], cwd);
+  succeeded(readOnly);
+  assert.ok(readOnly.stdout.includes(`Installed version: ${packageInfo.version}\n`));
+  assertDuplicateVersionsRejected(cwd, exporter, 'installed AgentX exporter version is missing');
+
+  for (const [name, mutate, reason, repairable] of [
+    [
+      'missing',
+      () => rmSync(exporter),
+      'installed AgentX exporter is missing or not a regular file',
+      true,
+    ],
+    [
+      'directory',
+      () => {
+        rmSync(exporter);
+        mkdirSync(exporter);
+      },
+      'installed AgentX exporter is missing or not a regular file',
+      false,
+    ],
+    [
+      'symlink',
+      () => {
+        const neighbor = join(cwd, 'matching-agentx.mjs');
+        writeFileSync(neighbor, `const PACKAGE_VERSION = '${packageInfo.version}';\n`);
+        rmSync(exporter);
+        symlinkSync(neighbor, exporter);
+      },
+      'installed AgentX exporter is missing or not a regular file',
+      false,
+    ],
+    [
+      'missing declaration',
+      () => writeFileSync(exporter, '// no identifiable version'),
+      'installed AgentX exporter version is missing',
+      true,
+    ],
+    [
+      'mismatch',
+      () => writeFileSync(exporter, "const PACKAGE_VERSION = '9.9.9';\n"),
+      'installation metadata disagrees with the installed AgentX exporter version',
+      true,
+    ],
+  ]) {
+    if (name !== 'missing') {
+      rmSync(exporter, { recursive: true, force: true });
+      writeFileSync(exporter, `const PACKAGE_VERSION = '${packageInfo.version}';\n`);
+    }
+    mutate();
+    const invalid = run(['status'], cwd);
+    succeeded(invalid);
+    assert.ok(invalid.stdout.includes(`Installed version: unknown (${reason})\n`), name);
+    if (repairable) {
+      succeeded(run(['install', '--force'], cwd));
+      const repaired = run(['status'], cwd);
+      succeeded(repaired);
+      assert.ok(repaired.stdout.includes(`Installed version: ${packageInfo.version}\n`), name);
+    }
+  }
+
+  if (process.getuid?.() !== 0) {
+    rmSync(exporter, { recursive: true, force: true });
+    writeFileSync(exporter, `const PACKAGE_VERSION = '${packageInfo.version}';\n`);
+    chmodSync(exporter, 0o000);
+    try {
+      const unreadable = run(['status'], cwd);
+      succeeded(unreadable);
+      assert.match(
+        unreadable.stdout,
+        /Installed version: unknown \(could not read installed AgentX exporter: EACCES\)/u,
+      );
+    } finally {
+      chmodSync(exporter, 0o600);
+    }
+  }
 });
 
 test('status distinguishes absent, legacy, malformed, and unreadable installation metadata', () => {
@@ -574,9 +721,11 @@ test('dry-run and install reject matching packaged conflicts and symlinks before
   for (const [relative, type] of [
     ['scripts', 'file'],
     ['scripts/export-powerx.mjs', 'directory'],
+    ['scripts/export-agentx.mjs', 'directory'],
     [metadataName, 'directory'],
     ['SKILL.md', 'symlink'],
     ['scripts', 'symlink'],
+    ['scripts/export-agentx.mjs', 'symlink'],
     [metadataName, 'symlink'],
     ['', 'file'],
     ['', 'symlink'],

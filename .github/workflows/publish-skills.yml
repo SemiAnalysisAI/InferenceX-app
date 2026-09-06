@@ -47,14 +47,14 @@ jobs:
         run: node --test packages/skills/test/*.test.mjs
       - name: Prepare the exact accepted archive
         run: node packages/skills/scripts/release.mjs prepare "$RELEASE_VERSION" "$RUNNER_TEMP/skills-release" "$REVIEWED_SHA256"
-      - name: Verify candidate installation and public API export
-        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --evidence "$RUNNER_TEMP/skills-candidate-verification"
+      - name: Verify candidate installation and public API behavior
+        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-candidate-verification"
       - name: Publish the verified archive with OIDC
         run: |
           node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
           npm publish "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" --access public --ignore-scripts --registry https://registry.npmjs.org
-      - name: Verify anonymous pinned public installation and export
-        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --evidence "$RUNNER_TEMP/skills-public-verification"
+      - name: Verify anonymous pinned public installation and behavior
+        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-public-verification"
       - name: Preserve release and verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
