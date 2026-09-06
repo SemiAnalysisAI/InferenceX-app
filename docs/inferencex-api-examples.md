@@ -8,10 +8,10 @@ constructing requests.
 
 ## Install
 
-Until 0.8.0 is published, install the reviewed local archive using the
-[package README](../packages/skills/README.md#review-a-local-archive). The npm
-commands below apply after publication; the website continues to advertise the
-last published version until its release has been verified.
+The commands below install the verified public 0.8.0 release advertised on
+[/api](https://inferencex.semianalysis.com/api) and
+[/zh/api](https://inferencex.semianalysis.com/zh/api). For a future unpublished
+candidate, use the [local archive instructions](../packages/skills/README.md#review-a-local-archive).
 
 With Node 24 or later and npm, run the command for your agent from your project:
 

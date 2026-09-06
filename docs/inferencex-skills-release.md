@@ -1,8 +1,9 @@
 # Releasing the InferenceX API skill
 
 The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
-`0.2.0`, `0.3.0`, and `0.4.0` are immutable public releases. Keep website commands pinned
-to the last verified public version until publication and public verification
+`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, and `0.8.0` are immutable
+public releases. The website advertises the verified `0.8.0` release. For later
+releases, keep website commands pinned until publication and public verification
 succeed. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
@@ -41,22 +42,27 @@ suite on Node 24 and 26 for package and skill-workflow changes. That suite also 
 Python release-verifier tests. Publication remains on Node 24 with one publisher runtime.
 
 1. Modify the source, choose a new stable version, and update package metadata,
-   both exporters' standalone versions, installation examples, and installed-version
+   all shipped helpers' standalone versions, installation examples, and installed-version
    expectations together. Run the package tests and the relevant repository checks.
    Merge the reviewed source before preparing the final accepted archive.
 2. Run the following from the repository root using Node 24/npm and Python 3 on
    Linux or macOS (the public verification deadline uses Unix process groups and timers).
-   Choose a **new output directory for every attempt**. Substitute the intended
-   version. The `0.4.0` paths below describe this candidate; preparation alone
-   does not prove publication.
+   Choose a **new output directory for every attempt**. The commands read the
+   version from the source package after its version bump; it must be an unused
+   stable version, not an already published release. Keep these shell variables
+   for the later checks. Preparation alone does not prove publication.
 
 ```bash
+skills_release_version="$(node -p "require('./packages/skills/package.json').version")"
+skills_release_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-release.XXXXXX")"
+skills_release_dir="$skills_release_attempt/candidate"
+
 node --test packages/skills/test/*.test.mjs
-node packages/skills/scripts/release.mjs prepare 0.4.0 /tmp/inferencex-release-0.4.0
-python3 packages/skills/scripts/verify-release.py candidate /tmp/inferencex-release-0.4.0/release.json \
+node packages/skills/scripts/release.mjs prepare "$skills_release_version" "$skills_release_dir"
+python3 packages/skills/scripts/verify-release.py candidate "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
   --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
-  --evidence /tmp/inferencex-candidate-check-0.4.0
+  --evidence "$skills_release_attempt/candidate-check"
 ```
 
 The preparer requires and records a clean package source state. It rejects dirty
@@ -93,10 +99,12 @@ instructions, examples, installer behavior, or export semantics change, and befo
 accepting the archive for publication.
 
 ```bash
-python3 packages/skills/scripts/verify-release.py agents /tmp/inferencex-release-0.4.0/release.json \
+python3 packages/skills/scripts/verify-release.py agents "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
   --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
-  --evidence /tmp/inferencex-agent-preparation-0.4.0
+  --evidence "$skills_release_attempt/agent-preparation"
+
+skills_agent_root="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["clean_root"])' "$skills_release_attempt/agent-preparation/verification.json")"
 ```
 
 The output identifies a new temporary root with `codex/` and `claude/` projects.
@@ -129,11 +137,11 @@ into evidence or GitHub Actions secrets for this test.
 After each agent completes, independently check its generated files:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py check-agent /tmp/inferencex-release-0.4.0/release.json \
-  --project /tmp/inferencex-skill-acceptance-REPLACE/codex \
+python3 packages/skills/scripts/verify-release.py check-agent "$skills_release_dir/release.json" \
+  --project "$skills_agent_root/codex" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
   --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
-  --evidence /tmp/inferencex-codex-result-check-0.4.0
+  --evidence "$skills_release_attempt/codex-result-check"
 ```
 
 Repeat for Claude Code with a new evidence directory. Use the **same scope arguments**
@@ -208,10 +216,11 @@ metadata is not yet available), the version is already immutable. Inspect the
 saved failure and rerun **only the read-only verifier**, preserving a new attempt:
 
 ```bash
-python3 packages/skills/scripts/verify-release.py public /tmp/inferencex-release-0.4.0/release.json \
+skills_public_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-public-check.XXXXXX")"
+python3 packages/skills/scripts/verify-release.py public "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
   --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
-  --evidence /tmp/inferencex-public-check-0.4.0-attempt2
+  --evidence "$skills_public_attempt/evidence"
 ```
 
 Do not rerun publication or bump the version just to hide a failed verification.
