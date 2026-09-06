@@ -1,7 +1,7 @@
 # Releasing the InferenceX API skill
 
 The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
-`0.2.0`, and `0.3.0` are immutable public releases. Keep website commands pinned
+`0.2.0`, `0.3.0`, and `0.4.0` are immutable public releases. Keep website commands pinned
 to the last verified public version until publication and public verification
 succeed. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
