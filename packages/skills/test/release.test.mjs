@@ -32,6 +32,7 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/collectivex.md',
+  'skills/inferencex-api/scripts/response-budget.mjs',
   'skills/inferencex-api/scripts/export-agentx.mjs',
   'skills/inferencex-api/scripts/export-powerx.mjs',
   'skills/inferencex-api/scripts/investigate-result.mjs',

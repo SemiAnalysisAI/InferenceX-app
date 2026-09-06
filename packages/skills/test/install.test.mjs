@@ -313,11 +313,23 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/compare-collectivex.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      writeFileSync(
+        join(destination, 'scripts/response-budget.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
     assert.ok(matching.stdout.includes(`Installed version: ${version}\n`));
   }
+});
+
+test('0.9 status does not claim a usable installation when its response reader is missing', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const helper = join(cwd, '.claude/skills/inferencex-api/scripts/response-budget.mjs');
+  rmSync(helper);
+  assert.equal(jsonResult(run(['status', '--json'], cwd)).installation_state, 'unknown');
 });
 
 test('0.5 status verifies the provenance helper without executing it', () => {

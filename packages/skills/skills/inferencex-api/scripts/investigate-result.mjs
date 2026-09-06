@@ -7,7 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 const HELP = `investigate-result — collect existing benchmark provenance and one bounded log window
@@ -24,6 +24,7 @@ Options:
   --log-offset <n>    Character offset, 0-2000000000 (default 0)
   --log-limit <n>     Characters to inspect, 1-262144 (default 16384)
   --output <file>     Save JSON atomically; default stdout
+  --version          Show the installed package version offline
   --help             Show help without making requests
 
 There is no full benchmark-row-by-ID endpoint. Supply the model and a scope
@@ -327,11 +328,16 @@ async function main() {
       'log-offset': { type: 'string', default: '0' },
       'log-limit': { type: 'string', default: '16384' },
       output: { type: 'string' },
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     strict: true,
     allowPositionals: false,
   });
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) {
     await saveOutput(undefined, HELP);
     return;

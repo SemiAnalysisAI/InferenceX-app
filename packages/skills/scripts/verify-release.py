@@ -1181,6 +1181,143 @@ def check_installed(installed, skill_files, version):
     require(receipt == {'package': PACKAGE, 'version': version}, 'Installed-version receipt differs')
 
 
+def workflow_identity(document, version):
+    require(document.get('schema_version') == 1, 'Workflow schema version differs')
+    actual = document.get('metadata', document).get('package_version')
+    require(actual == version, 'Workflow package version differs')
+
+
+def workflow_source(source, expected_url, body_key='body_utf8', hash_key='decoded_body_sha256',
+                    url_key='url', statuses=(200,)):
+    require(source[url_key] == expected_url, 'Workflow source URL differs')
+    require(source['http_status'] in statuses, 'Workflow source HTTP status differs')
+    datetime.fromisoformat(source['retrieved_at'].replace('Z', '+00:00'))
+    raw = source[body_key].encode('utf-8')
+    require(hashlib.sha256(raw).hexdigest() == source[hash_key], 'Workflow source checksum differs')
+    return json.loads(source[body_key].removeprefix('\ufeff'))
+
+
+def check_additional_workflows(project, version):
+    """Live smoke invariants; fixture suites cover the full domain contracts separately."""
+    documents = {name: json.loads((project / f'{name}.json').read_text())
+                 for name in ('provenance', 'tco', 'releases', 'collectivex')}
+    for document in documents.values():
+        workflow_identity(document, version)
+    provenance = documents['provenance']
+    sources = {}
+    for source in provenance['evidence']:
+        url = urlsplit(source['url'])
+        require(url.scheme == 'https' and url.netloc == 'inferencex.semianalysis.com' and
+                url.path == '/api/v1/' + source['operation'], 'Unexpected provenance endpoint')
+        sources[source['operation']] = workflow_source(source, source['url'], statuses=(200, 404))
+    selected = provenance['selected_result']
+    require(str(selected['id']) == '416696' and selected in sources['benchmarks'],
+            'Provenance result differs from consumed benchmark')
+    require(selected['date'] == '2026-05-30' and
+            selected['run_url'] == 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+            'Provenance producer identity differs')
+    require(provenance['metadata']['ran_new_benchmark'] is False and
+            provenance['producer']['github_run_id'] == '26694739752', 'Provenance scope differs')
+    require(provenance['log']['status'] == 'available' and
+            provenance['log']['response'] == sources['server-log'], 'Provenance log evidence differs')
+
+    tco = documents['tco']
+    url = AGENTX_ORIGIN + '/api/v1/tco-feed?' + urlencode(dict(
+        model='DeepSeek-V4-Pro', workloads='8192x1024', tiers='50', view='points', format='json', date='2026-09-06'))
+    source = tco['source']
+    # Query order is irrelevant; the complete parameter set and value multiplicity are not.
+    require(urlsplit(source['query_url'])._replace(query='') == urlsplit(url)._replace(query='') and
+            parse_qs(urlsplit(source['query_url']).query) == parse_qs(urlsplit(url).query), 'TCO query differs')
+    feed = workflow_source(source, source['query_url'], 'body', 'sha256', 'query_url')
+    require(source['body_bytes'] == len(source['body'].encode('utf-8')), 'TCO body length differs')
+    prices = {'b200': 3.6, 'mi355x': 1.8}  # Explicit test assumptions, not market prices.
+    require(len(tco['rows']) == 2 and {row['hardware'] for row in tco['rows']} == set(prices),
+            'TCO requested hardware coverage differs')
+    for row in tco['rows']:
+        point = row['point']
+        require(point in feed['rows'] and point['hardware'] == row['hardware'] and
+                point['workload'] == row['workload'] == '8192x1024' and point['tier'] == 50,
+                'TCO point differs from consumed feed')
+        require(row['status'] == 'available' and point['boundary'] == 'interpolated' and
+                point['output_tput_per_gpu'] > 0, 'TCO smoke point is no longer available; review scope')
+        expected = prices[row['hardware']] * 1e6 / (point['output_tput_per_gpu'] * 3600)
+        require(row['usd_per_gpu_hour'] == prices[row['hardware']] and
+                math.isclose(row['usd_per_million_output_tokens'], expected, rel_tol=1e-12), 'TCO cost differs')
+    require(tco['coverage']['available_points'] == 2, 'TCO coverage differs')
+
+    releases = documents['releases']
+    history = workflow_source(releases['evidence'][0],
+                              API + '/history?model=GLM-5&isl=8192&osl=1024')
+    require(releases['outcome'] == 'observed_comparisons' and releases['comparisons'],
+            'Release smoke pair is no longer available; review scope')
+    for side, date, run_id in [('before', '2026-05-30', '26694739752'), ('after', '2026-07-02', '28571158239')]:
+        expected_rows = [row for row in history if row['model'] == 'glm5.1' and
+                         row['hardware'] == 'mi355x' and row['framework'] == 'sglang' and
+                         row['benchmark_type'] == 'single_turn' and row['isl'] == 8192 and row['osl'] == 1024 and
+                         row['date'] == date and row['run_url'] ==
+                         f'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id}/attempts/1']
+        require(releases['selection'][side]['rows'] == expected_rows and expected_rows,
+                'Release selection differs from consumed history')
+    for pair in releases['comparisons']:
+        before = next(row for row in releases['selection']['before']['rows'] if row['id'] == pair['before_id'])
+        after = next(row for row in releases['selection']['after']['rows'] if row['id'] == pair['after_id'])
+        require(all(before[key] == after[key] == value for key, value in pair['configuration'].items()),
+                'Release public configuration differs')
+        b, a = before['metrics']['median_ttft'], after['metrics']['median_ttft']
+        metric = pair['metric']
+        require(metric['name'] == 'median_ttft' and metric['before'] == b and metric['after'] == a and
+                math.isclose(metric['delta'], a - b, rel_tol=1e-12) and
+                math.isclose(metric['percent_change'], (a - b) / b * 100, rel_tol=1e-12),
+                'Release metric arithmetic differs')
+    require(releases['metadata']['causal_attribution'] == 'not_established', 'Release overclaims causality')
+
+    collective = documents['collectivex']
+    bodies = []
+    for source in collective['responses']:
+        url = urlsplit(source['query_url'])
+        require(url.scheme == 'https' and url.netloc == 'inferencex.semianalysis.com' and
+                (url.path == '/api/openapi.json' or url.path.startswith('/api/v1/collectivex/runs')),
+                'Unexpected CollectiveX endpoint')
+        bodies.append(workflow_source(source, source['query_url'], 'body_text', url_key='query_url'))
+    require(len(collective['runs']) == 2 and len(set(collective['selection']['run_ids'])) == 2,
+            'CollectiveX smoke requires two measured runs; review scope')
+    for entry in collective['runs']:
+        require(entry['run'] == bodies[entry['response_index']]['run'], 'CollectiveX run evidence differs')
+    require(collective['comparisons'], 'CollectiveX smoke produced no rows')
+    for status, count in collective['summary'].items():
+        require(count == sum(row['status'] == status for row in collective['comparisons']),
+                'CollectiveX summary differs')
+    # Resolve every exported source pointer; a successful export must not cite nonexistent data.
+    for row in collective['comparisons']:
+        for pointer in row['left'] + row['right']:
+            value = bodies[pointer['response_index']]
+            for key in pointer['json_pointer'].split('/')[1:]:
+                key = key.replace('~1', '/').replace('~0', '~')
+                value = value[int(key)] if isinstance(value, list) else value[key]
+            require(value is not None or row['status'] == 'incomparable',
+                    'CollectiveX null source must remain incomparable')
+    return {'status': 'passed', 'provenance_result_id': str(selected['id']), 'tco_points': 2,
+            'release_pairs': len(releases['comparisons']), 'collectivex_summary': collective['summary']}
+
+
+def run_additional_workflows(node, installed, project, env, version, deadline):
+    examples = {
+        'provenance': ('investigate-result', ['--id', '416696', '--model', 'GLM-5', '--run-id', '26694739752']),
+        'tco': ('compare-tco', ['--model', 'DeepSeek-V4-Pro', '--workloads', '8192x1024', '--target', '50',
+                              '--gpu-hourly-prices', 'b200=3.6,mi355x=1.8', '--date', '2026-09-06']),
+        'releases': ('compare-releases', ['--model', 'GLM-5', '--raw-model', 'glm5.1', '--hardware', 'mi355x',
+            '--framework', 'sglang', '--isl', '8192', '--osl', '1024', '--metric', 'median_ttft',
+            '--before-date', '2026-05-30', '--after-date', '2026-07-02',
+            '--before-run-url', 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+            '--after-run-url', 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1']),
+        'collectivex': ('compare-collectivex', []),
+    }
+    for name, (helper, flags) in examples.items():
+        run([node, installed / f'scripts/{helper}.mjs', *flags, '--output', f'{name}.json'],
+            project, env, name, deadline)
+    return check_additional_workflows(project, version)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=['candidate', 'public', 'agents', 'check-agent'])
@@ -1372,6 +1509,8 @@ def main():
                           record['version'], deadline),
                 run_point(node, installed, project, env, 'agentx-second-point', args.agentx_no_trace_id,
                           record['version'], deadline)])
+            result['additional_workflows'] = run_additional_workflows(
+                node, installed, project, env, record['version'], deadline)
             check_installed(installed, skill_files, record['version'])
             result.update(agentx=agentx, agentx_points=points)
             result.update(target=target, project=str(project))

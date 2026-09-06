@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
-import { createHash } from 'node:crypto';
-import { lstat, mkdir, readlink, realpath, rename, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { lstat, mkdir, readlink, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
+import { createResponseBudget } from './response-budget.mjs';
 
 // Installed skills run independently of package.json; the packed-artifact test checks this version.
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const HELP = `export-powerx — export validated single-turn PowerX observations
 
 Requires Node 24 or later.
@@ -21,10 +22,13 @@ Options:
   --format <format>   csv (default) or json
   --output <file>     Output file relative to the current directory; default stdout
   --evidence-dir <dir> Save the consumed response and manifest in a new directory
+  --version          Show the installed package version offline
   --help             Show this help without making a request
 
 Requests powerValid=strictV2 and selects the exact single-turn workload locally.
 Data goes to stdout or --output; request metadata and coverage go to stderr.
+One 30s request; at most 32 MiB decoded bytes; strict UTF-8. No HTTP retries.
+File output is staged before replacing its destination; failed writes preserve old output.
 `;
 
 const ROW_COLUMNS = [
@@ -179,11 +183,16 @@ async function run(args = process.argv.slice(2)) {
       format: { type: 'string', default: 'csv' },
       output: { type: 'string' },
       'evidence-dir': { type: 'string' },
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     allowPositionals: false,
     strict: true,
   });
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) {
     process.stdout.write(HELP);
     return;
@@ -285,8 +294,12 @@ async function run(args = process.argv.slice(2)) {
 }
 
 async function exportPowerx(values, isl, osl, url, evidence) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-  let capturedBody;
+  const budget = createResponseBudget({
+    responseBytes: 32 * 1024 * 1024,
+    totalBytes: 32 * 1024 * 1024,
+    timeoutMs: 30_000,
+  });
+  const response = await fetch(url, { signal: budget.signal, redirect: 'error' });
   if (evidence) {
     const captured = {
       status: response.status,
@@ -297,16 +310,23 @@ async function exportPowerx(values, isl, osl, url, evidence) {
     };
     evidence.manifest.response = captured;
     // fetch decodes HTTP compression; save and parse these same bytes, without refetching.
-    const bytes = Buffer.from(await response.arrayBuffer());
+  }
+  const bytes = await budget.read(response);
+  if (evidence) {
     await writeFile(join(evidence.directory, 'response.json'), bytes, { flag: 'wx' });
-    captured.body_file = 'response.json';
-    captured.sha256 = createHash('sha256').update(bytes).digest('hex');
-    capturedBody = new TextDecoder().decode(bytes);
+    evidence.manifest.response.body_file = 'response.json';
+    evidence.manifest.response.sha256 = createHash('sha256').update(bytes).digest('hex');
+  }
+  let capturedBody;
+  try {
+    capturedBody = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch (error) {
+    throw new Error('Benchmark response is not valid UTF-8', { cause: error });
   }
   if (!response.ok) {
     let body;
     try {
-      body = capturedBody === undefined ? await response.json() : JSON.parse(capturedBody);
+      body = JSON.parse(capturedBody);
     } catch {
       body = null;
     }
@@ -315,7 +335,7 @@ async function exportPowerx(values, isl, osl, url, evidence) {
   }
   let rows;
   try {
-    rows = capturedBody === undefined ? await response.json() : JSON.parse(capturedBody);
+    rows = JSON.parse(capturedBody);
   } catch (error) {
     throw new Error(`Could not read benchmark JSON: ${error.message}`, { cause: error });
   }
@@ -406,14 +426,31 @@ async function exportPowerx(values, isl, osl, url, evidence) {
     evidence.manifest.export.sha256 = createHash('sha256').update(output).digest('hex');
     evidence.manifest.export.metadata = metadata;
   }
-  if (values.output === undefined && evidence) {
+  if (values.output === undefined) {
     // A closed consumer is a failed export, even if response capture already succeeded.
     process.stdout.on('error', () => {});
     await new Promise((resolveWrite, reject) => {
       process.stdout.write(output, (error) => (error ? reject(error) : resolveWrite()));
     });
-  } else if (values.output === undefined) process.stdout.write(output);
-  else await writeFile(values.output, output, 'utf8');
+  } else {
+    // Follow existing output symlinks, preserving the previous writeFile destination semantics.
+    const destination = await physicalPath(resolve(values.output));
+    const temporary = join(dirname(destination), `.${basename(destination)}.${randomUUID()}.tmp`);
+    let mode;
+    try {
+      const existing = await lstat(destination);
+      if (!existing.isFile()) throw new Error('--output must name a regular file');
+      mode = existing.mode & 0o777;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    try {
+      await writeFile(temporary, output, { encoding: 'utf8', flag: 'wx', mode });
+      await rename(temporary, destination);
+    } finally {
+      await rm(temporary, { force: true });
+    }
+  }
   if (evidence) {
     evidence.manifest.status = 'complete';
     await saveManifest(evidence);

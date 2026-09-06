@@ -7,7 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const ORIGIN = 'https://inferencex.semianalysis.com';
 const VERSION = 1;
 const BYTE_BUDGET = 32 * 1024 * 1024;
@@ -26,7 +26,7 @@ At most four GETs: OpenAPI, optional run list, and two run details. No retries.
 Responses share a 32 MiB decoded-body budget; each request times out after 30s.
 --output creates a new file atomically and refuses to replace an existing path.
 Without --output, print JSON after all reads and validation succeed.
---help makes no requests. See references/collectivex.md for matching and units.
+--version prints the installed package version offline. --help makes no requests. See references/collectivex.md for matching and units.
 `;
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -344,11 +344,16 @@ async function main() {
       left: { type: 'string' },
       right: { type: 'string' },
       output: { type: 'string' },
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     strict: true,
     allowPositionals: false,
   });
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) {
     process.stdout.write(HELP);
     return;

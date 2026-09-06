@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 // History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =
@@ -26,6 +26,7 @@ Each side requires an exact image, an exact producer run URL, or both:
   --before-image <text> / --after-image <text>   Match the returned image string exactly
   --raw-model <key>       Select one raw model within the requested display bucket
   --output <new-file>     Exclusively create a JSON file; default stdout
+  --version          Show the installed package version offline
   --help                 Show help offline
 
 Dates select original observation date, never curve_date. Makes one history request.
@@ -259,6 +260,7 @@ async function run() {
           'output',
         ].map((name) => [name, { type: 'string' }]),
       ),
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     allowPositionals: false,
@@ -266,6 +268,10 @@ async function run() {
   });
   const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
   if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) {
     await saveOutput(undefined, HELP);
     return;
