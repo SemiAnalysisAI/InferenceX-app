@@ -995,6 +995,26 @@ JS
                           prompt_text)
 
     def test_agent_prompt_pins_project_commands_and_exact_point_manifest_contract(self):
+        for target, install_root in [('codex', '.agents'), ('claude', '.claude')]:
+            target_project = (self.root / f'prepared/{target}').resolve()
+            target_archive = target_project / 'candidate.tgz'
+            target_prompt = check.prompt(self.args, target, target_archive)
+            commands = [
+                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills install --target {target}',
+                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills status --target {target} --json > status.json',
+                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json',
+            ]
+            with self.subTest(target=target):
+                self.assertTrue(target_prompt.startswith(
+                    'Your first three tool calls must be shell calls containing exactly these commands, one per call, in this order:\n'))
+                self.assertEqual([line[3:] for line in target_prompt.splitlines()[2:5]], commands)
+                for number, command in enumerate(commands, 1):
+                    self.assertEqual(target_prompt.count(f'\n{number}. {command}\n'), 1)
+                self.assertIn(
+                    f'The installed skill must be exactly {target_project / install_root}/skills/inferencex-api.',
+                    target_prompt,
+                )
+
         project = (self.root / 'prepared/codex').resolve()
         archive = project / 'candidate.tgz'
         prompt_text = check.prompt(self.args, 'codex', archive)
@@ -1004,8 +1024,10 @@ JS
                 'This prepared project is the only writable boundary',
                 'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
                 'Do not list or extract the candidate archive',
-                'must be your first three shell commands',
-                'Run all three install, status, and preview commands from that exact directory',
+                'Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next',
+                'Until all three finish, make no tool calls except the next required shell call',
+                'Do not prefix, suffix, or combine the commands with `pwd`, `ls`, `cat`, `&&`, `;`, a pipe, or any other command',
+                'Run the required install, status, and preview commands from that exact directory',
                 'Do not change directories or pass --dir or --cwd',
                 f'The installed skill must be exactly {installed}.',
                 'status --target codex --json',
@@ -1042,6 +1064,7 @@ JS
                 'agentx-point-recipe.mjs',
                 'agentx-second-point-recipe.mjs',
                 'every other recipe byte must remain identical',
+                'the file must end at that final `}` byte with no trailing newline or other byte',
                 'separate Node `--import` capture preload',
                 "redirect that recipe process's stdout directly",
                 'must not write their output or evidence, replace `response.json()`, replace `console.log()`',

@@ -1075,20 +1075,27 @@ def prompt(args, target, archive):
     installed = project / ('.agents' if target == 'codex' else '.claude') / 'skills/inferencex-api'
     cutoff = f'as of {args.date}' if args.date else 'using the latest available observations'
     raw = f' Keep only the exact returned model key {args.raw_model}; record this filter as scope.raw_model in lookup.json.' if args.raw_model else ''
-    return f'''Use only the exact candidate archive and public HTTP data in this clean project.
+    install_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target}'
+    status_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills status --target {target} --json > status.json'
+    preview_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json'
+    return f'''Your first three tool calls must be shell calls containing exactly these commands, one per call, in this order:
+
+1. {install_command}
+2. {status_command}
+3. {preview_command}
+
+Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next. Until all three finish, make no tool calls except the next required shell call; in particular, do not call Read, Glob, Grep, or Skill. Do not prefix, suffix, or combine the commands with `pwd`, `ls`, `cat`, `&&`, `;`, a pipe, or any other command.
+
+Use only the exact candidate archive and public HTTP data in this clean project.
 
 Before running any command, follow these acceptance boundaries:
 
 - This prepared project is the only writable boundary, even though it lives under system temp. Keep the working directory at {project}, and put every task-created temporary, log, response, script, and redirected-output file there. Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory.
-- Do not list or extract the candidate archive. The install, status, and preview commands below must be your first three shell commands; inspect only the installed skill afterward.
+- Do not list or extract the candidate archive. Inspect only the installed skill after the three required commands finish.
 - Do not run a connectivity or schema preflight with `curl` or any other tool. The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request; only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request. Do not make a preliminary, uncaptured, retry, or evidence-only repeat request for lookup or diagnosis.
 - For each AgentX point, keep the installed recipe byte-for-byte except for its one selected-result-ID line. Put response capture only in a separate Node preload and save the recipe's own stdout by shell redirection.
 
-The prepared project root is {project}. The exact candidate archive is available at {archive}. Run all three install, status, and preview commands from that exact directory. Do not change directories or pass --dir or --cwd; do not select any other installation root. Run these commands in order:
-
-1. npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target}
-2. npm exec --yes --offline --package {archive} -- inferencex-skills status --target {target} --json > status.json
-3. npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json
+The prepared project root is {project}. The exact candidate archive is available at {archive}. Run the required install, status, and preview commands from that exact directory. Do not change directories or pass --dir or --cwd; do not select any other installation root.
 
 The installed skill must be exactly {installed}. Do not apply the forced reinstall or manually change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files.
 
@@ -1102,7 +1109,7 @@ Attempt the same validated export for exactly {args.empty_isl} input and {args.e
 
 For {args.agentx_model} using the latest public observations, export AgentX summaries to agentx.csv and agentx.json with separate fresh evidence directories agentx-csv-evidence and agentx-json-evidence. Use only the display-model filter. Preserve every selected benchmark object, summary enrichment, missing state, zero, false value, request URL, and retrieval time. Also request the exact raw-model key {AGENTX_EXCLUDED_RAW_MODEL} as agentx-excluded.json with evidence in agentx-excluded-evidence, and explain the resulting empty or excluded selection without changing its scope.
 
-Run the installed one-point recipe as written for both points. Extract it exactly from {installed / 'references/agentx.md'} into agentx-point-recipe.mjs for result ID {args.agentx_point_id} and agentx-second-point-recipe.mjs for result ID {args.agentx_no_trace_id}. In each file, change only the exact `const selectedResultId = '421';` line to its requested ID; every other recipe byte must remain identical. Run each recipe with a separate Node `--import` capture preload, and redirect that recipe process's stdout directly to agentx-point.json or agentx-second-point.json. The recipe files must not write their output or evidence, replace `response.json()`, replace `console.log()`, or contain capture logic. Do not reimplement the request flow or reconstruct the JSON output. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
+Run the installed one-point recipe as written for both points. Extract it exactly from {installed / 'references/agentx.md'} into agentx-point-recipe.mjs for result ID {args.agentx_point_id} and agentx-second-point-recipe.mjs for result ID {args.agentx_no_trace_id}. Extract only the bytes after the `node --input-type=module <<'JS'` line through the final `}}` before the `JS` delimiter; the file must end at that final `}}` byte with no trailing newline or other byte. In each file, change only the exact `const selectedResultId = '421';` line to its requested ID; every other recipe byte must remain identical. Run each recipe with a separate Node `--import` capture preload, and redirect that recipe process's stdout directly to agentx-point.json or agentx-second-point.json. The recipe files must not write their output or evidence, replace `response.json()`, replace `console.log()`, or contain capture logic. Do not reimplement the request flow or reconstruct the JSON output. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
 
 Build `metadata.requests` only after that run's final fetch has completed, with one item containing exactly `query_url` and `retrieved_at` for every manifest response in identical order (six for a traced run and three for a no-trace run); each `query_url` must match the corresponding manifest response `url`, and each `retrieved_at` must be the recipe's own request time for that fetch.
 
