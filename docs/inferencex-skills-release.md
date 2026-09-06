@@ -105,6 +105,11 @@ Start a fresh Codex or Claude Code session inside the corresponding project and
 submit `prompt.txt` without adding repository context. Use the installed agent
 runtime's current supported CLI invocation or UI; record its version, exact command
 (or UI invocation), model, prompt, exit status, transcript, and final `result.md`.
+When using the Codex CLI with `workspace-write`, pass the canonical prepared project
+to `-C`, add `--skip-git-repo-check` for this non-Git project, and allow only its
+project-level skill directory with `--add-dir <canonical-prepared-project>/.agents`.
+Codex otherwise protects `.agents` from workspace writes; do not broaden the sandbox
+or install the skill under a different directory.
 Disable inherited MCP/private-data connectors and custom global instructions or
 record any unavoidable contamination. Give the agent only project files and public
 HTTP access; no repository checkout, database credentials, or previous answers.

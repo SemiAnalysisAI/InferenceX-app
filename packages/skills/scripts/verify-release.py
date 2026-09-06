@@ -1048,11 +1048,20 @@ def check_point_outcomes(outcomes):
 
 
 def prompt(args, target, archive):
+    archive = archive.resolve()
+    project = archive.parent
+    installed = project / ('.agents' if target == 'codex' else '.claude') / 'skills/inferencex-api'
     cutoff = f'as of {args.date}' if args.date else 'using the latest available observations'
     raw = f' Keep only the exact returned model key {args.raw_model}; record this filter as scope.raw_model in lookup.json.' if args.raw_model else ''
     return f'''Use only the exact candidate archive and public HTTP data in this clean project.
 
-The exact candidate archive is available at {archive}. Before any API work, independently install that local archive offline for target {target} with npm exec --yes --offline --package <archive> -- inferencex-skills install --target {target}. Then inspect the installed version with JSON output and save status.json. Preview a forced reinstall with JSON output and save preview.json. Do not apply the forced reinstall or manually change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files. Use {archive} for <archive> in every npm command.
+The prepared project root is {project}. The exact candidate archive is available at {archive}. Run all three install, status, and preview commands from that exact directory. Do not change directories or pass --dir or --cwd; do not select any other installation root. Run these commands in order:
+
+1. npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target}
+2. npm exec --yes --offline --package {archive} -- inferencex-skills status --target {target} --json > status.json
+3. npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json
+
+The installed skill must be exactly {installed}. Do not apply the forced reinstall or manually change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files.
 
 For {args.model} {cutoff}, show five latest single-turn benchmark observations with {args.isl} input and {args.osl} output tokens, regardless of power validation. Save lookup.json using the installed lookup example's output shape.{raw} Do not introduce additional filters.
 
@@ -1062,7 +1071,13 @@ Attempt the same validated export for exactly {args.empty_isl} input and {args.e
 
 For {args.agentx_model} using the latest public observations, export AgentX summaries to agentx.csv and agentx.json with separate fresh evidence directories agentx-csv-evidence and agentx-json-evidence. Use only the display-model filter. Preserve every selected benchmark object, summary enrichment, missing state, zero, false value, request URL, and retrieval time. Also request the exact raw-model key {AGENTX_EXCLUDED_RAW_MODEL} as agentx-excluded.json with evidence in agentx-excluded-evidence, and explain the resulting empty or excluded selection without changing its scope.
 
-Use the maintained installed one-point AgentX recipe for exactly result ID {args.agentx_point_id} and save its JSON as agentx-point.json. Run it separately for exactly result ID {args.agentx_no_trace_id} and save that JSON as agentx-second-point.json. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. The complete manifest must record schema_version 1, the package version, selected_result_id, pending/complete status and times, every ordered GET URL/status/retrieval time/decoded-body SHA-256/body filename, and the JSON output destination/hash/source request numbers. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
+Use the maintained installed one-point AgentX recipe for exactly result ID {args.agentx_point_id} and save its JSON as agentx-point.json. Run it separately for exactly result ID {args.agentx_no_trace_id} and save that JSON as agentx-second-point.json. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
+
+Each point evidence directory must contain manifest.json with exactly these top-level fields: `schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, `finished_at`, `responses`, `output`, and `error`. Start capture with schema_version 1, the exact package version and selected ID, `status: "pending"`, `finished_at: null`, and `error: null`. The final manifest is accepted only with `status: "complete"` and `error: null`; set finished_at only after the output is complete. Do not add or rename fields, and never relabel a failed or incomplete run as complete.
+
+Every ordered responses item must contain exactly `operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, `decoded_body_sha256`, `body_file`, and `checksum_covers`. Use one-based request numbers, method GET, integer http_status 200, and checksum_covers `saved decoded response body`. The body filename must be `response-NNNN-<operation>.json`: the first three are `response-0001-openapi.json`, `response-0002-benchmark-siblings.json`, and `response-0003-trace-availability.json`; when trace data is available, continue with `response-0004-request-timeline.json`, `response-0005-trace-histograms.json`, and `response-0006-trace-server-metrics.json`. A no-trace run must stop after response 3.
+
+The output record must contain exactly `format`, `destination`, `sha256`, and `source_request_numbers`. Use format json; set destination to the corresponding absolute resolved path {project / 'agentx-point.json'} or {project / 'agentx-second-point.json'}; hash the final output bytes; and set source_request_numbers to every one-based response number in order. While capture is pending, use sha256 null and an empty source_request_numbers list.
 
 There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
 
@@ -1230,13 +1245,13 @@ def main():
         if args.mode != 'agents':
             node, npm = shutil.which('node'), shutil.which('npm')
             require(node and npm, 'Node 24 and npm must be on PATH')
-        clean_root = Path(tempfile.mkdtemp(prefix='inferencex-skill-acceptance-'))
+        clean_root = Path(tempfile.mkdtemp(prefix='inferencex-skill-acceptance-')).resolve()
         report['clean_root'] = str(clean_root)
         for target in ['codex', 'claude']:
             if args.mode == 'agents':
-                project = clean_root / target
+                project = (clean_root / target).resolve()
                 project.mkdir()
-                local_archive = project / record['filename']
+                local_archive = (project / record['filename']).resolve()
                 local_archive.write_bytes(body)
                 prompt_bytes = prompt(args, target, local_archive).encode()
                 (project / 'prompt.txt').write_bytes(prompt_bytes)
