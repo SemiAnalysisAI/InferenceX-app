@@ -86,6 +86,10 @@ const NON_METRIC_KEYS = new Set([
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
+  // Keep structured provenance outside flat numeric metrics. Explicitly
+  // excluding the keys also blocks Number(['5']) coercion.
+  'power_invalid_reasons',
+  'power_audit',
 ]);
 
 /**
@@ -126,6 +130,21 @@ export interface WorkerPower {
   avg_mem_used_mb?: number;
 }
 
+/**
+ * Narrowed measurement-window audit. Fields are optional because malformed
+ * numerics are omitted; producer identity is null when unavailable.
+ */
+export interface PowerAudit {
+  window_start_unix?: number;
+  window_end_unix?: number;
+  expected_gpu_count?: number;
+  observed_gpu_count?: number;
+  sample_count?: number;
+  max_sample_gap_s?: number;
+  producer_sha?: string | null;
+  exporter_image_sha256?: string | null;
+}
+
 export interface BenchmarkParams {
   config: ConfigParams;
   benchmarkType: BenchmarkType;
@@ -148,6 +167,8 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
+  powerInvalidReasons?: string[];
+  powerAudit?: PowerAudit;
 }
 
 /**
@@ -357,6 +378,9 @@ export function mapBenchmarkRow(
   // narrowing — anything other than a non-empty array of objects is dropped,
   // and a withheld power verdict drops the payload entirely.
   const workers = powerWithheld ? undefined : extractWorkers(row.workers);
+  // Audit metadata is independent of the verdict so valid-row provenance is retained.
+  const powerInvalidReasons = extractPowerInvalidReasons(row.power_invalid_reasons);
+  const powerAudit = extractPowerAudit(row.power_audit);
 
   return {
     config: {
@@ -378,6 +402,8 @@ export function mapBenchmarkRow(
     recipeFingerprint,
     metrics,
     workers,
+    powerInvalidReasons,
+    powerAudit,
   };
 }
 
@@ -553,4 +579,79 @@ export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
     out.push(w);
   }
   return out.length > 0 ? out : undefined;
+}
+
+const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
+const MAX_POWER_REASON_CODES = 32;
+const MAX_POWER_REASON_LENGTH = 64;
+const MAX_POWER_AUDIT_SHA_LENGTH = 128;
+
+/**
+ * Keep at most 32 unique snake_case reason codes, each at most 64 characters.
+ * Empty results become undefined so persistence stores SQL NULL, not `[]`.
+ */
+export function extractPowerInvalidReasons(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const code = entry.trim();
+    if (code.length === 0 || code.length > MAX_POWER_REASON_LENGTH) continue;
+    if (!POWER_REASON_CODE_RE.test(code) || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+    if (out.length >= MAX_POWER_REASON_CODES) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** parseNum plus a finiteness guard: parseNum passes Infinity through. */
+function auditFiniteNum(v: unknown): number | undefined {
+  const n = parseNum(v);
+  return n !== undefined && Number.isFinite(n) ? n : undefined;
+}
+
+function auditCount(v: unknown): number | undefined {
+  const n = parseInt2(v);
+  return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+}
+
+function auditSha(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= MAX_POWER_AUDIT_SHA_LENGTH ? s : null;
+}
+
+/**
+ * Narrow to the fixed {@link PowerAudit} shape: finite window/gap values,
+ * non-negative safe-integer counts, and bounded producer identifiers. Unknown
+ * keys are dropped; an empty result becomes undefined so persistence stores
+ * SQL NULL rather than `{}`.
+ */
+export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const audit: PowerAudit = {};
+
+  const window_start_unix = auditFiniteNum(e.window_start_unix);
+  if (window_start_unix !== undefined) audit.window_start_unix = window_start_unix;
+  const window_end_unix = auditFiniteNum(e.window_end_unix);
+  if (window_end_unix !== undefined) audit.window_end_unix = window_end_unix;
+  const max_sample_gap_s = auditFiniteNum(e.max_sample_gap_s);
+  if (max_sample_gap_s !== undefined) audit.max_sample_gap_s = max_sample_gap_s;
+  const expected_gpu_count = auditCount(e.expected_gpu_count);
+  if (expected_gpu_count !== undefined) audit.expected_gpu_count = expected_gpu_count;
+  const observed_gpu_count = auditCount(e.observed_gpu_count);
+  if (observed_gpu_count !== undefined) audit.observed_gpu_count = observed_gpu_count;
+  const sample_count = auditCount(e.sample_count);
+  if (sample_count !== undefined) audit.sample_count = sample_count;
+  const hasNumericField = Object.keys(audit).length > 0;
+
+  audit.producer_sha = auditSha(e.producer_sha);
+  audit.exporter_image_sha256 = auditSha(e.exporter_image_sha256);
+  if (!hasNumericField && audit.producer_sha === null && audit.exporter_image_sha256 === null) {
+    return undefined;
+  }
+  return audit;
 }

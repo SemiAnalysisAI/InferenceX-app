@@ -217,6 +217,13 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     power_valid: m.power_valid,
+    // Narrow at the trust boundary: API rows may carry null (SQL NULL) or
+    // omit the field entirely on legacy data; only a non-empty array of
+    // producer reason codes survives.
+    power_invalid_reasons:
+      Array.isArray(row.power_invalid_reasons) && row.power_invalid_reasons.length > 0
+        ? row.power_invalid_reasons
+        : undefined,
     power_metric_schema_version: m.power_metric_schema_version,
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,

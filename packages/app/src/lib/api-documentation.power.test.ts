@@ -23,12 +23,14 @@ describe('measured-power API documentation', () => {
     }
   });
 
-  it('reserves optional power_invalid_reasons and power_audit row fields', () => {
+  it('documents optional power_invalid_reasons and power_audit row fields', () => {
     const reasons = benchmarkRowSchema?.properties?.power_invalid_reasons;
     expect(reasons?.type).toBe('array');
     expect(reasons?.items).toEqual({ type: 'string' });
+    expect(reasons?.description).not.toMatch(/reserved|forthcoming/iu);
 
     const audit = benchmarkRowSchema?.properties?.power_audit;
+    expect(audit?.description).not.toMatch(/reserved|forthcoming/iu);
     expect(Object.keys(audit?.properties ?? {}).toSorted()).toEqual(
       [
         'window_start_unix',
@@ -41,7 +43,6 @@ describe('measured-power API documentation', () => {
         'exporter_image_sha256',
       ].toSorted(),
     );
-    // Producers may emit partial audits, so individual audit fields remain optional.
     expect(audit?.required).toBeUndefined();
 
     expect(benchmarkRowSchema?.required).not.toContain('power_invalid_reasons');

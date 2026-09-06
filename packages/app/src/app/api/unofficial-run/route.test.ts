@@ -193,6 +193,40 @@ describe('normalizeArtifactRows', () => {
     },
   );
 
+  it('carries power audit provenance on overlay rows', () => {
+    const audit = {
+      window_start_unix: 1756174800,
+      window_end_unix: 1756175400,
+      expected_gpu_count: 8,
+      observed_gpu_count: 8,
+      sample_count: 4800,
+      max_sample_gap_s: 1.013,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    };
+    const [row] = normalizeArtifactRows(
+      [
+        rawRow({
+          power_valid: 0,
+          power_invalid_reasons: ['sampling_gap_exceeded'],
+          power_audit: audit,
+        }),
+      ],
+      '2026-03-01',
+    );
+
+    expect(row.power_invalid_reasons).toEqual(['sampling_gap_exceeded']);
+    expect(row.power_audit).toEqual(audit);
+    expect(row.metrics).not.toHaveProperty('power_invalid_reasons');
+    expect(row.metrics).not.toHaveProperty('power_audit');
+  });
+
+  it('leaves provenance keys undefined for rows without the contract fields', () => {
+    const [row] = normalizeArtifactRows([rawRow()], '2026-03-01');
+    expect(row.power_invalid_reasons).toBeUndefined();
+    expect(row.power_audit).toBeUndefined();
+  });
+
   it('preserves recipe identity for unofficial overlays', () => {
     const rows = normalizeArtifactRows(
       [

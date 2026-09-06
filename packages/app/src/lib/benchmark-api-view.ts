@@ -31,6 +31,8 @@ interface BenchmarkViewRow {
   osl: number | null;
   metrics: Record<string, unknown>;
   workers?: unknown;
+  power_invalid_reasons?: unknown;
+  power_audit?: unknown;
 }
 
 /**
@@ -45,7 +47,13 @@ export function toCalculatorBenchmarkRows<T extends BenchmarkViewRow>(
   return rows
     .filter((row) => rowToSequence(row) === sequence)
     .map((row) => {
-      const { workers: _workers, ...rest } = row;
+      // Omit provenance with the measured-power fields it explains.
+      const {
+        workers: _workers,
+        power_invalid_reasons: _powerInvalidReasons,
+        power_audit: _powerAudit,
+        ...rest
+      } = row;
       return {
         ...rest,
         metrics: Object.fromEntries(

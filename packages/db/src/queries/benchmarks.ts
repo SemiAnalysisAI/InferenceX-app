@@ -1,6 +1,6 @@
 import type { DbClient } from '../connection.js';
-import type { WorkerPower } from '../etl/benchmark-mapper.js';
-export type { WorkerPower } from '../etl/benchmark-mapper.js';
+import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
+export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
  * One entry in `BenchmarkRow.workers` — mirrors the runner's aggregate_power.py
@@ -47,6 +47,10 @@ export interface BenchmarkRow {
    * aggregate_power.py's multinode patch — surfaced as undefined here.
    */
   workers?: BenchmarkWorkerRow[];
+  /** Producer reason codes for withheld power; null/undefined on other rows. */
+  power_invalid_reasons?: string[] | null;
+  /** Narrowed measurement-window audit; null/undefined on legacy rows. */
+  power_audit?: PowerAudit | null;
   date: string;
   /** Producer identity and timestamp; preserved for per-point provenance. */
   workflow_run_id?: number;
@@ -256,6 +260,11 @@ function executeRecursiveBenchmarkQuery(
       br.recipe_fingerprint,
       ${plan.metricsExpression},
       br.workers,
+      -- A bare br.power_* reference fails during query planning until the next
+      -- ingest applies migration 014. The jsonb lookup returns NULL before the
+      -- migration and the stored value afterward, making deploy order safe.
+      to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons,
+      to_jsonb(br) -> 'power_audit' AS power_audit,
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
@@ -451,6 +460,10 @@ export async function getLatestBenchmarks(
       lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
+      -- latest_benchmarks lacks these fields until migration 014 recreates it;
+      -- the jsonb lookup keeps reads safe during that deploy window.
+      to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons,
+      to_jsonb(lb) -> 'power_audit' AS power_audit,
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,
