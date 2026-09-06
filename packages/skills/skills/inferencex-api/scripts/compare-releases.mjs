@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 
-const PACKAGE_VERSION = '0.7.0';
+const PACKAGE_VERSION = '0.8.0';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 // History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =
