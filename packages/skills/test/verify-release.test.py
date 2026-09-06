@@ -882,7 +882,7 @@ class AgentXVerifierTests(unittest.TestCase):
             self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in target_commands), 2, target)
             self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in target_commands), 3, target)
 
-    def test_agents_prepares_only_exact_archive_and_hashed_target_prompt(self):
+    def test_agents_prepares_canonical_projects_with_only_archive_and_hashed_prompt(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:
             entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
@@ -895,21 +895,29 @@ class AgentXVerifierTests(unittest.TestCase):
         (self.root / 'candidate.tgz').write_bytes(archive)
         check.save(self.root / 'release.json', record)
         evidence = self.root / 'agents-verification'
+        canonical_root = self.root / 'canonical-acceptance'
+        canonical_root.mkdir()
+        alias_root = self.root / 'aliased-acceptance'
+        alias_root.symlink_to(canonical_root, target_is_directory=True)
         command = ['verify-release.py', 'agents', str(self.root / 'release.json'), '--model', 'Example',
                    '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
                    '--agentx-no-trace-id', '8', '--evidence', str(evidence)]
-        with patch.object(sys, 'argv', command), patch.object(check, 'install_target') as install, \
+        with patch.object(sys, 'argv', command), \
+                patch.object(check.tempfile, 'mkdtemp', return_value=str(alias_root)), \
+                patch.object(check, 'install_target') as install, \
                 patch.object(check.shutil, 'which') as which, patch('builtins.print'):
             check.main()
         install.assert_not_called()
         which.assert_not_called()
         report = json.loads((evidence / 'verification.json').read_text())
         clean_root = Path(report['clean_root'])
+        self.assertEqual(clean_root, canonical_root.resolve())
         self.addCleanup(check.shutil.rmtree, clean_root, True)
         acceptance = json.loads((clean_root / 'acceptance.json').read_text())
         self.assertEqual(acceptance['status'], 'prepared')
         for prepared in acceptance['targets']:
             project = Path(prepared['project'])
+            self.assertEqual(project, project.resolve())
             self.assertEqual({path.name for path in project.iterdir()}, {'candidate.tgz', 'prompt.txt'})
             self.assertEqual((project / 'candidate.tgz').read_bytes(), archive)
             prompt_bytes = (project / 'prompt.txt').read_bytes()
@@ -918,7 +926,34 @@ class AgentXVerifierTests(unittest.TestCase):
                                         'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()})
             prompt_text = prompt_bytes.decode()
             self.assertIn(f'install --target {prepared["target"]}', prompt_text)
-            self.assertIn(str(project / 'candidate.tgz'), prompt_text)
+            self.assertIn(str((project / 'candidate.tgz').resolve()), prompt_text)
+            skill_root = '.agents' if prepared['target'] == 'codex' else '.claude'
+            self.assertIn(f'The installed skill must be exactly {project / skill_root}/skills/inferencex-api.',
+                          prompt_text)
+
+    def test_agent_prompt_pins_project_commands_and_exact_point_manifest_contract(self):
+        project = (self.root / 'prepared/codex').resolve()
+        archive = project / 'candidate.tgz'
+        prompt_text = check.prompt(self.args, 'codex', archive)
+        installed = project / '.agents/skills/inferencex-api'
+        for required in [
+                f'The prepared project root is {project}.',
+                'Run all three install, status, and preview commands from that exact directory',
+                'Do not change directories or pass --dir or --cwd',
+                f'The installed skill must be exactly {installed}.',
+                'status --target codex --json',
+                'install --target codex --force --dry-run --json',
+                '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, ',
+                '`finished_at`, `responses`, `output`, and `error`',
+                '`operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, ',
+                '`decoded_body_sha256`, `body_file`, and `checksum_covers`',
+                '`response-0001-openapi.json`',
+                '`response-NNNN-<operation>.json`',
+                '`format`, `destination`, `sha256`, and `source_request_numbers`',
+                'The final manifest is accepted only with `status: "complete"` and `error: null`',
+        ]:
+            with self.subTest(required=required):
+                self.assertIn(required, prompt_text)
 
     def test_agents_rejects_archive_filename_collision_before_creating_projects(self):
         record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'prompt.txt',
