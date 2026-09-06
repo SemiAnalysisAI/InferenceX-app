@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -8,9 +9,12 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
+import process from 'node:process';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 import { packageInfo, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
@@ -499,6 +503,44 @@ test('every malformed required field fails before scope filtering and leaves the
   }
 });
 
+test('optional provenance preserves exact IDs and rejects malformed values before selection', () => {
+  const row = observation({
+    workflow_run_id: '900719925474099312345',
+    curve_workflow_run_id: '0002390',
+    run_started_at: null,
+    curve_run_started_at: null,
+  });
+  const valid = run([...requiredArgs, '--format', 'json'], [row]);
+  succeeded(valid);
+  assert.deepEqual(JSON.parse(valid.stdout).rows, [row]);
+  for (const [field, value] of [
+    ['workflow_run_id', { id: '2390' }],
+    ['curve_workflow_run_id', []],
+    ['workflow_run_id', Number.MAX_SAFE_INTEGER + 1],
+    ['curve_workflow_run_id', Number.MAX_SAFE_INTEGER + 1],
+    ['run_started_at', {}],
+    ['curve_run_started_at', false],
+    ['curve_date', '2026-02-30'],
+  ]) {
+    for (const format of ['json', 'csv']) {
+      const cwd = project();
+      writeFileSync(join(cwd, 'existing'), 'keep this file');
+      const result = run(
+        [...requiredArgs, '--format', format, '--output', 'existing', '--evidence-dir', 'evidence'],
+        [observation({ isl: 7, [field]: value })],
+        { cwd },
+      );
+      assert.equal(result.status, 1, `${field}: ${format}`);
+      assert.match(result.stderr, /response shape/u);
+      assert.equal(readFileSync(join(cwd, 'existing'), 'utf8'), 'keep this file');
+      const manifest = JSON.parse(readFileSync(join(cwd, 'evidence/manifest.json'), 'utf8'));
+      assert.equal(manifest.status, 'failed');
+      assert.equal(manifest.export.sha256, null);
+      assert.equal(result.requests.length, 1);
+    }
+  }
+});
+
 test('HTTP, malformed JSON and unexpected shapes fail without replacing an existing output', () => {
   const failures = [
     { status: 400, body: '{"error":"Unknown model"}', error: /HTTP 400.*Unknown model/ },
@@ -527,6 +569,72 @@ test('HTTP, malformed JSON and unexpected shapes fail without replacing an exist
     assert.doesNotMatch(result.stderr, /\{"metadata":|Selected \d+/);
     assert.equal(readFileSync(join(cwd, 'existing.json'), 'utf8'), 'keep this file');
     assert.deepEqual(readdirSync(cwd), ['existing.json']);
+  }
+});
+
+test('native fetch rejects redirects without attributing another response to the requested URL', async () => {
+  const requests = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url);
+    if (request.url.startsWith('/api/v1/benchmarks?')) {
+      response.writeHead(302, { Location: '/different-scope' });
+      response.end();
+    } else {
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify([observation()]));
+    }
+  });
+  await new Promise((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolveListen);
+  });
+  const cwd = project();
+  const nativePreload = join(cwd, 'native-fetch.mjs');
+  writeFileSync(
+    nativePreload,
+    `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = (input, options) => {
+  const url = new URL(input);
+  return nativeFetch(new URL(url.pathname + url.search, 'http://127.0.0.1:${server.address().port}'), options);
+};
+`,
+  );
+  try {
+    for (const evidence of [false, true]) {
+      requests.length = 0;
+      writeFileSync(join(cwd, 'existing.json'), 'preserve existing output');
+      await assert.rejects(
+        promisify(execFile)(
+          process.execPath,
+          [
+            '--import',
+            pathToFileURL(nativePreload).href,
+            exporter,
+            ...requiredArgs,
+            '--format',
+            'json',
+            '--output',
+            'existing.json',
+            ...(evidence ? ['--evidence-dir', 'evidence'] : []),
+          ],
+          { cwd, env: environment, timeout: 10_000 },
+        ),
+        { code: 1 },
+      );
+      assert.deepEqual(requests, ['/api/v1/benchmarks?model=GLM-5&powerValid=strictV2']);
+      assert.equal(readFileSync(join(cwd, 'existing.json'), 'utf8'), 'preserve existing output');
+      if (evidence) {
+        const manifest = JSON.parse(readFileSync(join(cwd, 'evidence/manifest.json'), 'utf8'));
+        assert.equal(manifest.status, 'failed');
+        assert.equal(manifest.response, null);
+        assert.equal(manifest.export.sha256, null);
+      }
+    }
+  } finally {
+    await new Promise((resolveClose, reject) => {
+      server.close((error) => (error ? reject(error) : resolveClose()));
+    });
   }
 });
 
