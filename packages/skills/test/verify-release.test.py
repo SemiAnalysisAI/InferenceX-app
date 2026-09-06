@@ -943,9 +943,9 @@ class AgentXVerifierTests(unittest.TestCase):
                 f'The installed skill must be exactly {installed}.',
                 'status --target codex --json',
                 'install --target codex --force --dry-run --json',
-                '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, '
+                '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, ',
                 '`finished_at`, `responses`, `output`, and `error`',
-                '`operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, '
+                '`operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, ',
                 '`decoded_body_sha256`, `body_file`, and `checksum_covers`',
                 '`response-0001-openapi.json`',
                 '`response-NNNN-<operation>.json`',
