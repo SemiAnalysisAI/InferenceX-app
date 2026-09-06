@@ -1060,8 +1060,8 @@ JS
                     target_prompt,
                 )
                 direct_shell = (
-                    f'Every shell already starts in {target_project}; a shell call containing `cd` or a redirection '
-                    'to `/dev/null` fails acceptance even when `cd` names this exact project'
+                    f'Every shell already starts in {target_project}; a shell call containing `cd` or any path at '
+                    'or below `/dev`, including `/dev/null.txt`, fails acceptance even when `cd` names this exact project'
                 )
                 self.assertIn(direct_shell, target_prompt)
                 self.assertLess(target_prompt.index(direct_shell),
@@ -1075,7 +1075,7 @@ JS
                 f'The prepared project root is {project}.',
                 'This prepared project is the only writable boundary',
                 'Every shell redirection destination, including a throwaway check, must resolve inside this project',
-                '`/dev/null` is outside the project: do not redirect there',
+                'Every path at or below `/dev` is outside the project and forbidden',
                 'do not run `cd`, even back to this same path',
                 'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
                 'Do not list or extract the candidate archive',
@@ -1094,7 +1094,11 @@ JS
                 'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
                 'Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; ' +
                 'unavailable PowerX; diagnostic; AgentX CSV; AgentX JSON; excluded AgentX; traced point; no-trace point',
-                'Run each HTTP-producing operation only once',
+                'Before issuing an HTTP-producing command, resolve every redirect destination and use its final ' +
+                'in-project path in that first command',
+                'The first command issued for an operation consumes its only attempt, even if shell parsing, ' +
+                'redirection, preload/import, or process startup fails before any HTTP request',
+                'never issue a second command for that operation',
                 'If one fails, stop and preserve the failure; do not retry it, delete its evidence, or replace its output',
                 'The lookup must make exactly two HTTP requests',
                 'fetch `/api/openapi.json` once and then the exact benchmark URL once',
