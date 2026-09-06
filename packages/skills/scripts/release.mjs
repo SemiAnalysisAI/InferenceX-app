@@ -25,10 +25,12 @@ const releaseFiles = [
   'skills/inferencex-api/references/public-api-examples.md',
   'skills/inferencex-api/references/provenance.md',
   'skills/inferencex-api/references/tco.md',
+  'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/scripts/export-agentx.mjs',
   'skills/inferencex-api/scripts/export-powerx.mjs',
   'skills/inferencex-api/scripts/investigate-result.mjs',
   'skills/inferencex-api/scripts/compare-tco.mjs',
+  'skills/inferencex-api/scripts/compare-releases.mjs',
 ];
 const stableVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 

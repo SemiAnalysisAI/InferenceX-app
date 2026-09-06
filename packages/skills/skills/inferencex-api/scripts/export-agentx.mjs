@@ -7,7 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.6.0';
+const PACKAGE_VERSION = '0.7.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const HELP = `export-agentx — export existing AgentX observations with summary enrichments
 

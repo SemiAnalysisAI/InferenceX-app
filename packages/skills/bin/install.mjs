@@ -91,6 +91,7 @@ function installedState(destination, packageName) {
     { file: 'export-agentx.mjs', name: 'AgentX exporter', minor: 4n },
     { file: 'investigate-result.mjs', name: 'provenance helper', minor: 5n },
     { file: 'compare-tco.mjs', name: 'TCO helper', minor: 6n },
+    { file: 'compare-releases.mjs', name: 'release comparison helper', minor: 7n },
   ].filter(
     ({ minor }) =>
       BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= minor,

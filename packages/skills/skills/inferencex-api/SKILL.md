@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Also supports CollectiveX lookups.
+description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Also supports CollectiveX lookups.
 ---
 
 # InferenceX API
@@ -49,6 +49,13 @@ fixed latency target**, use the [TCO cookbook](references/tco.md) and
 [cost helper](scripts/compare-tco.mjs). Require explicit per-GPU hourly prices and
 a median interactivity target. Retain missing coverage and source dates; the feed
 pools serving configurations and does not establish full ownership cost.
+
+For **vLLM/SGLang updates, before/after changes, or regression investigation**, read
+[the release cookbook](references/releases.md) and use
+[the comparison helper](scripts/compare-releases.mjs). Select exact observation
+dates and producer identities, keep unmatched or ambiguous configurations, and
+report descriptive performance changes with confounders. Power and energy tasks
+use the PowerX workflow above. Image tags alone do not prove a release or a cause.
 
 ## Query workflow
 

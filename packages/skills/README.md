@@ -10,10 +10,20 @@ also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
 It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.6.0` and require that version to be published.
+The npm commands below pin version `0.7.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
 
-## New in 0.6.0
+## New in 0.7.0
+
+[Framework update investigations](skills/inferencex-api/references/releases.md)
+compare latency, interactivity or throughput between exact observation dates
+and producer images/runs. The helper matches public workload and configuration,
+reports missing or ambiguous pairs, and preserves the complete source response.
+Changed or unavailable recipe evidence remains a confounder; observed differences
+do not establish a causal or statistical regression verdict. Power and energy
+comparisons require the separate PowerX validation workflow.
+
+## Included from 0.6.0
 
 [TCO comparisons](skills/inferencex-api/references/tco.md) use the same fixed
 single-turn workload and median interactivity target with explicit USD/GPU-hour
@@ -56,10 +66,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -70,9 +80,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -85,7 +95,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.6.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.7.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -205,7 +215,7 @@ availability is false or omitted.
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -217,8 +227,9 @@ first; add npm's `--offline` when the selected package version is already cached
 
 Legacy installations without a version record, including `0.1.0`, report an
 unknown installed version. Invalid or unreadable records are also reported as
-unknown. For `0.6.0` and later receipts, the record must agree with the static
-version declarations in PowerX, AgentX, provenance, and TCO helpers.
+unknown. For `0.7.0` and later receipts, the record must agree with the static
+version declarations in PowerX, AgentX, provenance, TCO, and release comparison helpers.
+Receipts from `0.6.x` require the first four helpers.
 Receipts from `0.5.x` require the first three helpers.
 Receipts from `0.4.x` require PowerX and AgentX; earlier receipts require PowerX
 only. Newer helper files retained after a forced downgrade are ignored. Missing, unreadable, or disagreeing required declarations report unknown.
@@ -229,8 +240,8 @@ check is not a full integrity check and cannot detect every local edit.
 ### JSON output and installation preview
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target codex --force --dry-run --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target codex --force --dry-run --json
 ```
 
 `--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
@@ -266,11 +277,11 @@ without stale installation fields; use the exit code to determine success.
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.6.0` with the published version you intend to install:
+version. To upgrade, replace `0.7.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -289,10 +300,15 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
 抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.6.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `0.7.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
-0.6.0 新增 [TCO 比较](skills/inferencex-api/references/tco.md)：使用相同的固定单轮工作负载、
+0.7.0 新增[框架版本调查](skills/inferencex-api/references/releases.md)：按确切的观测日期和
+产生数据的 image/run，比较延迟、interactivity 或吞吐量。脚本会匹配公开的工作负载和配置，
+报告缺失或存在多个候选的数据对，并保存完整来源响应。recipe 证据发生变化或无法获取，仍是混杂因素；观测差异不足以得出因果或统计意义上的回归
+结论。功耗和能耗比较需要使用单独的 PowerX 验证流程。
+
+保留 0.6.0 的 [TCO 比较](skills/inferencex-api/references/tco.md)：使用相同的固定单轮工作负载、
 median interactivity 目标和用户明确提供的 USD/GPU-hour 价格。随附脚本会保存每百万输出
 token 的 GPU 费用估算、覆盖情况、来源日期和本次使用的原始响应。缺失、目标低于测量范围
 或无法达到目标的点，费用记为 `null`。这是按给定价格计算的硬件 frontier 估算，服务配置
@@ -416,8 +432,8 @@ histogram 和 server metrics。
 下载安装器。如指定版本已经缓存，可给 npm 加上 `--offline`。
 
 包括 `0.1.0` 在内、没有版本记录的旧安装会显示版本未知。记录无效或无法读取时，同样
-显示为未知。版本记录为 `0.6.0` 或更新时，必须与 PowerX、AgentX、溯源和 TCO 脚本中的静态
-版本声明一致；`0.5.x` 记录核对前三项，`0.4.x` 核对 PowerX 和 AgentX，更早的记录只核对 PowerX。强制降级后
+显示为未知。版本记录为 `0.7.0` 或更新时，必须与 PowerX、AgentX、溯源、TCO 和框架版本比较脚本中的静态
+版本声明一致；`0.6.x` 记录核对前四项，`0.5.x` 核对前三项，`0.4.x` 核对 PowerX 和 AgentX，更早的记录只核对 PowerX。强制降级后
 残留的较新脚本不参与旧版本的检查。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
 只读取声明，不执行任何脚本。这项检查不是完整的文件完整性校验，也不能识别所有本地
 修改。`--version` 只显示本次调用的安装器版本，不显示项目中已安装技能的版本。
@@ -445,7 +461,7 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 安装状态字段；请用退出码判断操作是否成功。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.6.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
+的 `0.7.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 
