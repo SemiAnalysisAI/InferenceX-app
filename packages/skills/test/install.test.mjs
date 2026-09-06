@@ -309,6 +309,10 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/compare-releases.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      writeFileSync(
+        join(destination, 'scripts/compare-collectivex.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
@@ -398,6 +402,39 @@ test('0.7 receipts require the release helper, while older receipts ignore retai
     assert.equal(
       jsonResult(run(['status', '--json'], cwd)).installed_version,
       version.startsWith('0.7.') ? null : version,
+    );
+  }
+});
+
+test('0.8 receipts require CollectiveX and retain compatibility with forced downgrades', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const helper = join(destination, 'scripts/compare-collectivex.mjs');
+  for (const version of ['0.8.0-rc.1', '0.7.9']) {
+    setInstalledVersion(destination, version);
+    for (const file of [
+      'export-agentx.mjs',
+      'investigate-result.mjs',
+      'compare-tco.mjs',
+      'compare-releases.mjs',
+    ]) {
+      writeFileSync(join(destination, 'scripts', file), `const PACKAGE_VERSION = '${version}';\n`);
+    }
+    writeFileSync(
+      helper,
+      `const PACKAGE_VERSION = '${version}';\nthrow new Error('must not execute');\n`,
+    );
+    assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, version);
+    writeFileSync(helper, "const PACKAGE_VERSION = '0.1.0';\n");
+    assert.equal(
+      jsonResult(run(['status', '--json'], cwd)).installation_state,
+      version.startsWith('0.8.') ? 'unknown' : 'installed',
+    );
+    rmSync(helper);
+    assert.equal(
+      jsonResult(run(['status', '--json'], cwd)).installed_version,
+      version.startsWith('0.8.') ? null : version,
     );
   }
 });

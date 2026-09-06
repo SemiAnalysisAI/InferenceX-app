@@ -1,6 +1,6 @@
 {
   "name": "@semianalysisai/inferencex-skills",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Install the InferenceX public API skill for Codex and Claude Code.",
   "keywords": [
     "agent-skills",
@@ -9,6 +9,7 @@
     "benchmarks",
     "claude",
     "codex",
+    "collectivex",
     "inferencex",
     "powerx",
     "tco"
