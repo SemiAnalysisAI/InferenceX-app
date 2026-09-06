@@ -314,11 +314,7 @@ test('status reads the required AgentX version without executing it and diagnose
   const readOnly = run(['status'], cwd);
   succeeded(readOnly);
   assert.ok(readOnly.stdout.includes(`Installed version: ${packageInfo.version}\n`));
-  assertDuplicateVersionsRejected(
-    cwd,
-    exporter,
-    'installed AgentX exporter version is missing',
-  );
+  assertDuplicateVersionsRejected(cwd, exporter, 'installed AgentX exporter version is missing');
 
   for (const [name, mutate, reason, repairable] of [
     [
