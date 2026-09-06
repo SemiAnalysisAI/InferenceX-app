@@ -1266,3 +1266,126 @@ test('evidence, output, and stdout write failures never become complete', () => 
     assert.equal(captured(result).manifest.status, 'pending');
   }
 });
+
+test('optional provenance fields retain absence, null, and exact string IDs', () => {
+  const omitted = observation('1');
+  for (const key of [
+    'workflow_run_id',
+    'run_started_at',
+    'curve_date',
+    'curve_workflow_run_id',
+    'curve_run_started_at',
+  ])
+    delete omitted[key];
+  const rows = [
+    omitted,
+    observation('2', {
+      workflow_run_id: '9007199254740993',
+      run_started_at: null,
+      curve_workflow_run_id: '0002390',
+      curve_run_started_at: null,
+    }),
+  ];
+  const routes = routesFor(rows, [1, 2]);
+  const json = run(['--model', 'DeepSeek-V4-Pro', '--format', 'json'], routes);
+  succeeded(json);
+  assert.deepEqual(
+    JSON.parse(json.stdout).rows.map((row) => row.benchmark),
+    rows,
+  );
+  const csv = run(['--model', 'DeepSeek-V4-Pro'], routes);
+  succeeded(csv);
+  const parsed = csvRecords(csv.stdout).rows;
+  assert.equal(parsed[0].workflow_run_id, '');
+  assert.equal(parsed[0].curve_date, '');
+  assert.equal(parsed[1].workflow_run_id, '9007199254740993');
+  assert.equal(parsed[1].curve_workflow_run_id, '0002390');
+  assert.equal(parsed[1].run_started_at, '');
+  assert.equal(parsed[1].curve_run_started_at, '');
+});
+
+test('malformed optional provenance cannot become a successful export', () => {
+  const cases = [
+    ['workflow_run_id', { id: '2390' }],
+    ['workflow_run_id', Number.MAX_SAFE_INTEGER + 1],
+    ['curve_workflow_run_id', ['2390']],
+    ['curve_workflow_run_id', Number.MAX_SAFE_INTEGER + 1],
+    ['run_started_at', { timestamp: '2026-09-01 17:04:07+00' }],
+    ['curve_run_started_at', false],
+    ['curve_date', '2026-02-30'],
+  ];
+  for (const [field, value] of cases) {
+    const cwd = project();
+    writeFileSync(join(cwd, 'agentx.csv'), 'keep previous export');
+    const result = run(
+      ['--model', 'DeepSeek-V4-Pro', '--output', 'agentx.csv', '--evidence-dir', 'evidence'],
+      routesFor([observation('1', { [field]: value })], [1]),
+      cwd,
+    );
+    assert.equal(result.status, 1, `${field}=${JSON.stringify(value)} must fail`);
+    assert.match(result.stderr, /Unexpected benchmarks response shape/u);
+    assert.equal(result.stdout, '');
+    assert.equal(readFileSync(join(cwd, 'agentx.csv'), 'utf8'), 'keep previous export');
+    assert.equal(result.requests.length, 1, 'reject bad provenance before enrichment');
+    assert.equal(captured(result).manifest.status, 'failed');
+  }
+});
+
+test('later enrichment chunk failures cannot publish a partial export', () => {
+  const ids = Array.from({ length: 501 }, (_, index) => index + 1);
+  const rows = ids.map((id) => observation(String(id)));
+  const chunksByOperation = {
+    'agentic-aggregates': chunks(ids, 200),
+    'derived-agentic-metrics': chunks(ids, 200),
+    'trace-availability': chunks(ids, 500),
+  };
+  const entries = {
+    'agentic-aggregates': (id) => aggregate(id),
+    'derived-agentic-metrics': (id) => derived(id),
+    'trace-availability': () => true,
+  };
+  for (const failingOperation of Object.keys(chunksByOperation)) {
+    const routes = {
+      '/api/v1/benchmarks': [response(JSON.stringify(rows))],
+      ...Object.fromEntries(
+        Object.entries(chunksByOperation).map(([operation, groups]) => [
+          `/api/v1/${operation}`,
+          groups.map((group) => response(mapBody(group.map((id) => [id, entries[operation](id)])))),
+        ]),
+      ),
+    };
+    routes[`/api/v1/${failingOperation}`][1] = response('{"error":"second chunk failed"}', 503);
+    const cwd = project();
+    writeFileSync(join(cwd, 'agentx.json'), 'keep previous export');
+    const result = run(
+      [
+        '--model',
+        'DeepSeek-V4-Pro',
+        '--format',
+        'json',
+        '--output',
+        'agentx.json',
+        '--evidence-dir',
+        'evidence',
+      ],
+      routes,
+      cwd,
+    );
+    assert.equal(result.status, 1, failingOperation);
+    assert.match(result.stderr, /HTTP 503: second chunk failed/u);
+    assert.equal(readFileSync(join(cwd, 'agentx.json'), 'utf8'), 'keep previous export');
+    assert.equal(result.stdout, '');
+    const { manifest, bodies } = captured(result);
+    assert.equal(manifest.status, 'failed');
+    assert.equal(manifest.responses.at(-1).operation, failingOperation);
+    assert.deepEqual(
+      manifest.responses.at(-1).requested_chunk_ids,
+      chunksByOperation[failingOperation][1],
+    );
+    assert.equal(manifest.responses.at(-2).operation, failingOperation);
+    assert.equal(manifest.responses.at(-2).http_status, 200);
+    assert.equal(bodies.size, manifest.responses.length);
+    assert.equal(manifest.export.sha256, null);
+    assert.deepEqual(manifest.export.source_request_numbers, []);
+  }
+});
