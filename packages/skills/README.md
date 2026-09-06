@@ -3,28 +3,29 @@
 One Agent Skill, `inferencex-api`, for querying the
 [InferenceX public API](https://inferencex.semianalysis.com/api) from Codex or Claude Code.
 It supports current OpenAPI discovery, benchmark, evaluation, dataset and history
-lookups, plus worked PowerX and AgentX exports that preserve request context,
-observation identity and source links.
+lookups, PowerX and AgentX exports, result provenance and bounded logs that preserve source evidence.
 
 The [public API cookbook](skills/inferencex-api/references/public-api-examples.md)
 also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
 It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.4.0` and require that version to be published.
+The npm commands below pin version `0.5.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
 
-## New in 0.4.0
+## New in 0.5.0
 
-AgentX summaries now export existing observations as deterministic CSV by default
-or explicit JSON. Exact, case-sensitive configuration filters and a positive
-concurrency filter are reported as applied or omitted. The exporter joins only the
-four documented summary endpoint families and can save every consumed response
-with `--evidence-dir`; missing and null values remain missing, while `0` and `false`
-remain explicit. The AgentX cookbook also provides a bounded recipe for one selected
-result ID, including an early stop before heavy trace routes when availability is
-false or the selected key is absent. These workflows do not run benchmarks or
-evaluate answer quality.
+- [Result provenance](skills/inferencex-api/references/provenance.md): find one
+  selected observation in its model/snapshot scope, resolve the actual producing
+  run, and capture one bounded log window with original response evidence.
+- An [AgentX getting-started example](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md#start-with-agentx)
+  connects dataset discovery, summary export and one selected trace.
+- A separate maintainer discovery check uses natural-language tasks in fresh
+  Codex and Claude projects, without naming the skill or its files.
+
+The provenance helper emits JSON with the exact responses it consumed. All
+workflows read existing public data and do not run benchmarks. PowerX and AgentX
+CSV/JSON exports remain available.
 
 ## Prerequisites
 
@@ -39,10 +40,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -53,9 +54,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -68,7 +69,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.4.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.5.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -80,7 +81,7 @@ internet access. The same installer commands and options apply.
 
 Open an agent session in the project and ask:
 
-> Use inferencex-api to show five latest available DeepSeek-V4-Pro observations for
+> Show five latest available DeepSeek-V4-Pro observations on InferenceX for
 > single-turn requests with 8192 input and 1024 output tokens. Include the actual
 > measurement dates, raw model keys, request URL, and source run links.
 
@@ -188,7 +189,7 @@ availability is false or omitted.
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -200,19 +201,19 @@ first; add npm's `--offline` when the selected package version is already cached
 
 Legacy installations without a version record, including `0.1.0`, report an
 unknown installed version. Invalid or unreadable records are also reported as
-unknown. For `0.4.0` and later receipts, the record must agree with the static
-version declarations in both the PowerX and AgentX exporters. Earlier receipts
-are checked against PowerX only; a stale AgentX file left by a forced downgrade is
-ignored. Missing, unreadable, or disagreeing required declarations report unknown.
-`status` reads these declarations without executing either exporter. This limited
+unknown. For `0.5.0` and later receipts, the record must agree with the static
+version declarations in PowerX, AgentX, and the provenance helper.
+Receipts from `0.4.x` require PowerX and AgentX; earlier receipts require PowerX
+only. Newer helper files retained after a forced downgrade are ignored. Missing, unreadable, or disagreeing required declarations report unknown.
+`status` reads these declarations without executing the scripts. This limited
 check is not a full integrity check and cannot detect every local edit.
 `--version` reports only the invoking installer version, not the project's installed copy.
 
 ### JSON output and installation preview
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target codex --force --dry-run --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target codex --force --dry-run --json
 ```
 
 `--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
@@ -248,11 +249,11 @@ without stale installation fields; use the exit code to determine success.
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.4.0` with the published version you intend to install:
+version. To upgrade, replace `0.5.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -264,23 +265,24 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 本包提供一个 Agent Skill（智能体技能）`inferencex-api`，供 Codex 或 Claude Code
 查询 [InferenceX 公开 API](https://inferencex.semianalysis.com/zh/api)。技能支持查阅
 实时 OpenAPI，查询基准测试、评估、数据集和历史记录，并提供 PowerX 与 AgentX
-导出示例；导出结果保留请求上下文、观测数据标识和来源链接。技能面向整个公开 API，
+导出示例，以及结果溯源和限定范围的日志读取；输出保留来源证据。技能面向整个公开 API，
 这些导出示例并不限定技能的查询范围。
 
 [公开 API 指南](skills/inferencex-api/references/public-api-examples.md) 还提供评估查询和
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
 抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.4.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `0.5.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
-0.4.0 新增 AgentX 汇总导出：默认生成行列顺序稳定的 CSV，也可显式选择 JSON；硬件、
-框架、精度、投机解码方式、offload 模式等配置筛选均区分大小写并要求精确匹配，并支持
-按精确值匹配的正整数并发数筛选。导出器会标明每项筛选是已应用还是未指定，数据只来自
-文档中列明的四类汇总接口，并可用 `--evidence-dir` 保存本次导出实际使用的全部响应。
-缺失值和 `null` 保持缺失，`0` 与 `false` 保留原值。AgentX 指南还提供范围限定为一个已选结果
-ID 的诊断流程；trace availability 为 `false` 或未返回所选 ID 时，会在读取高开销
-trace 接口前停止。这些流程只读取现有观测数据，不运行基准测试，也不评估模型回答质量。
+0.5.0 新增[结果溯源流程](skills/inferencex-api/references/provenance.md)：在指定模型和快照
+范围内定位用户选定的结果，定位并核对实际产生数据的运行记录，并保存一个限定范围的日志片段及
+本次请求的原始响应证据。本版还补充了 [AgentX 入门案例](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md#start-with-agentx)，
+串起数据集发现、汇总导出和单点 trace 检查；维护者另行在干净的 Codex 与 Claude 项目中
+进行自动发现验收，只给自然语言任务，不提示技能名称或文件路径。
+
+溯源脚本输出 JSON，并保存实际使用的响应。所有流程只读取现有公开数据，不运行新的
+基准测试；已有的 PowerX 和 AgentX CSV/JSON 导出继续保留。
 
 需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。从 npm 安装需要访问
 npm 仓库，查询需要访问公开 HTTPS 接口；安装后的技能无需检出本仓库，也不需要
@@ -300,7 +302,7 @@ Claude Code 使用 `--target claude`。本地产物没有运行时依赖，因�
 
 安装后，在该项目的智能体会话中提出请求，例如：
 
-> 使用 inferencex-api 查询 DeepSeek-V4-Pro 最新可用的五条基准测试观测数据，限定为
+> 在 InferenceX 上查询 DeepSeek-V4-Pro 最新可用的五条基准测试观测数据，限定为
 > 输入 8192、输出 1024 个 token 的单轮请求。请附上实际测量日期、原始模型键、
 > 请求 URL 和来源运行记录链接。
 
@@ -387,10 +389,10 @@ histogram 和 server metrics。
 下载安装器。如指定版本已经缓存，可给 npm 加上 `--offline`。
 
 包括 `0.1.0` 在内、没有版本记录的旧安装会显示版本未知。记录无效或无法读取时，同样
-显示为未知。版本记录为 `0.4.0` 或更新时，必须同时与 PowerX 和 AgentX 导出器中的静态
-版本声明一致；早于 `0.4.0` 的记录只核对 PowerX，强制降级后残留的 AgentX 文件不参与
-判断。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
-只读取声明，不执行任何导出器。这项检查不是完整的文件完整性校验，也不能识别所有本地
+显示为未知。版本记录为 `0.5.0` 或更新时，必须与 PowerX、AgentX 和溯源脚本中的静态
+版本声明一致；`0.4.x` 记录核对 PowerX 和 AgentX，更早的记录只核对 PowerX。强制降级后
+残留的较新脚本不参与旧版本的检查。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
+只读取声明，不执行任何脚本。这项检查不是完整的文件完整性校验，也不能识别所有本地
 修改。`--version` 只显示本次调用的安装器版本，不显示项目中已安装技能的版本。
 
 `status` 和 `install` 支持 `--json`：stdout 只输出一个 JSON 文档，诊断信息写入
@@ -416,7 +418,7 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 安装状态字段；请用退出码判断操作是否成功。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.4.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
+的 `0.5.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 

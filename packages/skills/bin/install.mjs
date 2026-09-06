@@ -88,9 +88,12 @@ function installedState(destination, packageName) {
   // merge-style forced install while continuing to validate their PowerX exporter.
   const requiresAgentX =
     BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= 4n;
+  const requiresProvenance =
+    BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= 5n;
   const exporters = [
     { file: 'export-powerx.mjs', name: 'exporter' },
     ...(requiresAgentX ? [{ file: 'export-agentx.mjs', name: 'AgentX exporter' }] : []),
+    ...(requiresProvenance ? [{ file: 'investigate-result.mjs', name: 'provenance helper' }] : []),
   ];
   const scripts = join(destination, 'scripts');
   for (const exporter of exporters) {

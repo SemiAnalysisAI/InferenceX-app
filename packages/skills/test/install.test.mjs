@@ -296,10 +296,42 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
       /Installed version: unknown \(installation metadata disagrees with the installed AgentX exporter version\)/u,
     );
     setExporterVersion(destination, 'agentx', version);
+    if (version === '1.0.0') {
+      writeFileSync(
+        join(destination, 'scripts/investigate-result.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
+    }
     const matching = run(['status'], cwd);
     succeeded(matching);
     assert.ok(matching.stdout.includes(`Installed version: ${version}\n`));
   }
+});
+
+test('0.5 status verifies the provenance helper without executing it', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const file = join(destination, 'scripts/investigate-result.mjs');
+  writeFileSync(
+    file,
+    `const PACKAGE_VERSION = '${packageInfo.version}';\nthrow new Error('must not execute');\n`,
+  );
+  assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, packageInfo.version);
+  for (const contents of [
+    "const PACKAGE_VERSION = '0.4.0';\n",
+    '// missing declaration\n',
+    `const PACKAGE_VERSION = '${packageInfo.version}';\nconst PACKAGE_VERSION = '${packageInfo.version}';\n`,
+  ]) {
+    writeFileSync(file, contents);
+    assert.equal(jsonResult(run(['status', '--json'], cwd)).installation_state, 'unknown');
+  }
+  rmSync(file);
+  assert.equal(jsonResult(run(['status', '--json'], cwd)).installation_state, 'unknown');
+  // Forced downgrades can retain newer files; 0.4 receipts require only PowerX and AgentX.
+  setInstalledVersion(destination, '0.4.9');
+  setExporterVersion(destination, 'agentx', '0.4.9');
+  assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, '0.4.9');
 });
 
 test('status reads the required AgentX version without executing it and diagnoses invalid files', () => {
