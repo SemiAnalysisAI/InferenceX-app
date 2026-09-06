@@ -98,9 +98,14 @@ function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function validDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function benchmarkRow(row) {
   if (!object(row) || !object(row.metrics)) return false;
-  const date = new Date(`${row.date}T00:00:00Z`);
   return (
     (Number.isSafeInteger(row.id) || (typeof row.id === 'string' && row.id.trim().length > 0)) &&
     [
@@ -129,9 +134,15 @@ function benchmarkRow(row) {
     ].every((key) => Number.isInteger(row[key])) &&
     ['isl', 'osl'].every((key) => row[key] === null || Number.isFinite(row[key])) &&
     ['image', 'run_url'].every((key) => row[key] === null || typeof row[key] === 'string') &&
-    /^\d{4}-\d{2}-\d{2}$/u.test(row.date) &&
-    Number.isFinite(date.getTime()) &&
-    date.toISOString().slice(0, 10) === row.date
+    validDate(row.date) &&
+    (row.curve_date === undefined || validDate(row.curve_date)) &&
+    ['workflow_run_id', 'curve_workflow_run_id'].every(
+      (key) =>
+        row[key] === undefined || typeof row[key] === 'string' || Number.isSafeInteger(row[key]),
+    ) &&
+    ['run_started_at', 'curve_run_started_at'].every(
+      (key) => row[key] === undefined || row[key] === null || typeof row[key] === 'string',
+    )
   );
 }
 
@@ -180,15 +191,8 @@ async function run(args = process.argv.slice(2)) {
   if (!values.model?.trim()) throw new Error('--model requires a display model name');
   const isl = positiveInteger(values.isl, 'isl');
   const osl = positiveInteger(values.osl, 'osl');
-  if (values.date !== undefined) {
-    const date = new Date(`${values.date}T00:00:00Z`);
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/u.test(values.date) ||
-      !Number.isFinite(date.getTime()) ||
-      date.toISOString().slice(0, 10) !== values.date
-    ) {
-      throw new Error('--date must be a valid YYYY-MM-DD date');
-    }
+  if (values.date !== undefined && !validDate(values.date)) {
+    throw new Error('--date must be a valid YYYY-MM-DD date');
   }
   if (values['raw-model'] !== undefined && !values['raw-model'].trim()) {
     throw new Error('--raw-model requires a returned model key');
@@ -281,7 +285,7 @@ async function run(args = process.argv.slice(2)) {
 }
 
 async function exportPowerx(values, isl, osl, url, evidence) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
   let capturedBody;
   if (evidence) {
     const captured = {

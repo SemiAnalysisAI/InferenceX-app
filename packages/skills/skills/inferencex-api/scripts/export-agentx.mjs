@@ -259,6 +259,14 @@ function benchmarkRow(row) {
     ['image', 'recipe_fingerprint', 'run_url'].every(
       (key) => row[key] === null || typeof row[key] === 'string',
     ) &&
+    ['workflow_run_id', 'curve_workflow_run_id'].every(
+      (key) =>
+        row[key] === undefined || typeof row[key] === 'string' || Number.isSafeInteger(row[key]),
+    ) &&
+    ['run_started_at', 'curve_run_started_at'].every(
+      (key) => row[key] === undefined || row[key] === null || typeof row[key] === 'string',
+    ) &&
+    (row.curve_date === undefined || validDate(row.curve_date)) &&
     object(row.metrics) &&
     validDate(row.date)
   );
