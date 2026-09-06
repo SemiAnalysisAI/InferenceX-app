@@ -1092,7 +1092,7 @@ JS
                 "The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request",
                 'only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request',
                 'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
-                'Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; '
+                'Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; ' +
                 'unavailable PowerX; diagnostic; AgentX CSV; AgentX JSON; excluded AgentX; traced point; no-trace point',
                 'Run each HTTP-producing operation only once',
                 'If one fails, stop and preserve the failure; do not retry it, delete its evidence, or replace its output',
