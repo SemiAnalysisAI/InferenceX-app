@@ -291,9 +291,42 @@ class RetryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CSV extraction metadata.*retrieved_at'):
             check.captured_export(self.root, evidence.name, 'powerx.csv', args, VERSION)
 
-    def test_original_lookup_context_must_match_saved_output(self):
+    def test_lookup_evidence_must_match_openapi_and_saved_output(self):
         responses = self.root / 'raw-responses'
         responses.mkdir()
+        schema = {'paths': {'/api/v1/benchmarks': {'get': {'parameters': [
+            {'name': 'model', 'in': 'query', 'schema': {'enum': ['Example']}}]}}}}
+        openapi_body = json.dumps(schema).encode()
+
+        def write_openapi(body, **changes):
+            (responses / 'lookup-openapi.response.json').write_bytes(body)
+            context = {'query_url': check.OPENAPI, 'status': 200,
+                       'retrieved_at': '2026-09-05T00:00:00Z',
+                       'sha256': hashlib.sha256(body).hexdigest()}
+            context.update(changes)
+            check.save(responses / 'lookup-openapi.request.json', context)
+
+        write_openapi(openapi_body)
+        check.check_lookup_openapi(
+            check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
+        write_openapi(openapi_body, unexpected=True)
+        with self.assertRaisesRegex(ValueError, 'Original request evidence'):
+            check.captured_request(self.root, 'lookup-openapi', check.OPENAPI)
+
+        altered = json.loads(json.dumps(schema))
+        altered['paths']['/api/v1/benchmarks']['get']['parameters'][0]['schema']['enum'] = ['Other']
+        altered_body = json.dumps(altered).encode()
+        write_openapi(altered_body)
+        with self.assertRaisesRegex(ValueError, 'OpenAPI model contract'):
+            check.check_lookup_openapi(
+                check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
+        altered['paths']['/api/v1/benchmarks']['get']['parameters'][0] |= {
+            'in': 'header', 'schema': {'enum': ['Example']}}
+        write_openapi(json.dumps(altered).encode())
+        with self.assertRaisesRegex(ValueError, 'OpenAPI model contract'):
+            check.check_lookup_openapi(
+                check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
+
         body = b'[]'
         (responses / 'lookup.response.json').write_bytes(body)
         context = {'query_url': check.API + '?model=Example', 'status': 200,
@@ -941,8 +974,27 @@ class AgentXVerifierTests(unittest.TestCase):
                 'Run all three install, status, and preview commands from that exact directory',
                 'Do not change directories or pass --dir or --cwd',
                 f'The installed skill must be exactly {installed}.',
+                f'Keep every task-created working, temporary, log, response, and redirected-output file under {project}',
+                'do not write task files to `/tmp`, `$TMPDIR`, `$HOME`, or outside that project',
                 'status --target codex --json',
                 'install --target codex --force --dry-run --json',
+                'The lookup must make exactly two HTTP requests',
+                'fetch `/api/openapi.json` once and then the exact benchmark URL once',
+                'raw-responses/lookup-openapi.response.json',
+                'raw-responses/lookup-openapi.request.json',
+                'raw-responses/lookup.response.json',
+                'raw-responses/lookup.request.json',
+                'Run the installed bounded diagnostic exactly once',
+                'It must make exactly one HTTP request in total, the unfiltered benchmark request',
+                'raw-responses/diagnostic.response.json',
+                'raw-responses/diagnostic.request.json',
+                'finish reading the body before creating `retrieved_at`',
+                'save and parse the same complete body bytes consumed by the output',
+                'Each request record must contain exactly query_url, status, retrieved_at, and sha256 of its saved body',
+                "The benchmark response time must also be lookup.json's retrieved_at",
+                "the diagnostic response time must be diagnostic.json's diagnostic.retrieved_at",
+                'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
+                'raw-responses contains exactly those six files',
                 '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, ',
                 '`finished_at`, `responses`, `output`, and `error`',
                 '`operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, ',
@@ -1011,6 +1063,12 @@ class AgentXVerifierTests(unittest.TestCase):
         check.save(project / 'unavailable.json', {'metadata': {}, 'rows': []})
         check.save(project / 'diagnostic.json', {'diagnostic': {}})
         (project / 'result.md').write_text('Checked both public workflows.')
+        raw_responses = project / 'raw-responses'
+        raw_responses.mkdir()
+        for name in ['lookup-openapi.request.json', 'lookup-openapi.response.json',
+                     'lookup.request.json', 'lookup.response.json',
+                     'diagnostic.request.json', 'diagnostic.response.json']:
+            (raw_responses / name).write_text('{}')
         command = ['verify-release.py', 'check-agent', str(self.root / 'release.json'), '--model', 'Example',
                    '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
                    '--agentx-no-trace-id', '8', '--project', str(project),
@@ -1051,10 +1109,45 @@ class AgentXVerifierTests(unittest.TestCase):
                 check.main()
         installed.assert_not_called()
         (project / 'prompt.txt').write_bytes(prompt_bytes)
+
+        def reject_inventory(label):
+            rejected = command[:-1] + [str(self.root / f'{label}-check-agent')]
+            with patch.object(sys, 'argv', rejected), patch.object(check, 'check_installed'), \
+                    patch.object(check, 'captured_export', return_value=[]), \
+                    patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
+                    patch('builtins.print'):
+                with self.assertRaisesRegex(ValueError, 'six required regular files'):
+                    check.main()
+
+        openapi_response = raw_responses / 'lookup-openapi.response.json'
+        openapi_response.unlink()
+        reject_inventory('missing-openapi')
+        openapi_response.write_text('{}')
+        extra = raw_responses / 'extra.json'
+        extra.write_text('{}')
+        reject_inventory('extra-raw-response')
+        extra.unlink()
+        outside_raw_responses = self.root / 'outside-raw-responses'
+        raw_responses.rename(outside_raw_responses)
+        raw_responses.symlink_to(outside_raw_responses, target_is_directory=True)
+        reject_inventory('raw-responses-symlink')
+        raw_responses.unlink()
+        outside_raw_responses.rename(raw_responses)
+        symlink_target = project / 'symlink-target.json'
+        symlink_target.write_text('{}')
+        openapi_response.unlink()
+        openapi_response.symlink_to(symlink_target)
+        reject_inventory('response-symlink')
+        openapi_response.unlink()
+        openapi_response.write_text('{}')
+
+        openapi = {'paths': {'/api/v1/benchmarks': {'get': {'parameters': [
+            {'name': 'model', 'in': 'query', 'schema': {'enum': ['Example']}}]}}}}
         with patch.object(sys, 'argv', command), patch.object(check, 'check_installed'), \
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
-                patch.object(check, 'captured_request', return_value=[]), patch.object(check, 'check_lookup'), \
+                patch.object(check, 'captured_request', side_effect=[openapi, [], []]) as requests, \
+                patch.object(check, 'check_lookup'), \
                 patch.object(check, 'check_metadata', return_value=[]), \
                 patch.object(check, 'check_empty_diagnostic'), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}) as summaries, \
@@ -1062,6 +1155,11 @@ class AgentXVerifierTests(unittest.TestCase):
                              side_effect=['trace_diagnostics', 'trace_unavailable']) as points, \
                 patch('builtins.print'):
             check.main()
+        self.assertEqual(requests.call_count, 3)
+        self.assertEqual(requests.call_args_list[0].args, (project, 'lookup-openapi', check.OPENAPI))
+        expected_url = check.API + '?model=Example'
+        self.assertEqual(requests.call_args_list[1].args, (project, 'lookup', expected_url, {}))
+        self.assertEqual(requests.call_args_list[2].args, (project, 'diagnostic', expected_url, {}))
         self.assertEqual(summaries.call_count, 3)
         self.assertEqual(points.call_count, 2)
         report = json.loads((self.root / 'check-agent/verification.json').read_text())
