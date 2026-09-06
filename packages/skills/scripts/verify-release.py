@@ -29,6 +29,7 @@ PACKAGE = '@semianalysisai/inferencex-skills'
 REGISTRY = 'https://registry.npmjs.org'
 API = 'https://inferencex.semianalysis.com/api/v1/benchmarks'
 AGENTX_ORIGIN = 'https://inferencex.semianalysis.com'
+OPENAPI = f'{AGENTX_ORIGIN}/api/openapi.json'
 AGENTX_EXCLUDED_RAW_MODEL = '__inferencex_release_verification_no_match__'
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 # Only the exact-version npm ETARGET propagation symptom is retryable. No HTTP,
@@ -354,16 +355,30 @@ def captured_export(project, name, output, args, version, isl=None, osl=None):
     return rows
 
 
-def captured_request(project, name, expected_url, metadata):
+def captured_request(project, name, expected_url, metadata=None):
     context = json.loads((project / 'raw-responses' / f'{name}.request.json').read_text())
     body = (project / 'raw-responses' / f'{name}.response.json').read_bytes()
-    require(context['status'] == 200 and same_url(context['query_url'], expected_url) and
+    require(type(context) is dict and set(context) == {'query_url', 'status', 'retrieved_at', 'sha256'} and
+            context['status'] == 200 and same_url(context['query_url'], expected_url) and
             context['sha256'] == hashlib.sha256(body).hexdigest(), 'Original request evidence differs')
-    require(datetime.fromisoformat(context['retrieved_at'].replace('Z', '+00:00')).tzinfo,
-            'Missing original response retrieval timezone')
-    require(same_url(metadata['query_url'], context['query_url']) and
-            metadata['retrieved_at'] == context['retrieved_at'], 'Output and original request context differ')
+    timestamp(context['retrieved_at'], 'Missing original response retrieval timezone')
+    if metadata is not None:
+        require(same_url(metadata['query_url'], context['query_url']) and
+                metadata['retrieved_at'] == context['retrieved_at'], 'Output and original request context differ')
     return json.loads(body)
+
+
+def check_lookup_openapi(document, model):
+    paths = document.get('paths') if type(document) is dict else None
+    path = paths.get('/api/v1/benchmarks') if type(paths) is dict else None
+    operation = path.get('get') if type(path) is dict else None
+    parameters = operation.get('parameters') if type(operation) is dict else None
+    model_parameters = [parameter for parameter in parameters if type(parameter) is dict and
+                        parameter.get('name') == 'model' and parameter.get('in') == 'query'] \
+        if type(parameters) is list else []
+    schema = model_parameters[0].get('schema') if len(model_parameters) == 1 else None
+    models = schema.get('enum') if type(schema) is dict else None
+    require(type(models) is list and model in models, 'Lookup OpenAPI model contract differs')
 
 
 def check_lookup(lookup, available, args):
@@ -1063,11 +1078,15 @@ The prepared project root is {project}. The exact candidate archive is available
 
 The installed skill must be exactly {installed}. Do not apply the forced reinstall or manually change the installed skill files. Explain the executing package version, installed version, proposed writes, and preserved files.
 
+Keep every task-created working, temporary, log, response, and redirected-output file under {project}; do not write task files to `/tmp`, `$TMPDIR`, `$HOME`, or outside that project.
+
 For {args.model} {cutoff}, show five latest single-turn benchmark observations with {args.isl} input and {args.osl} output tokens, regardless of power validation. Save lookup.json using the installed lookup example's output shape.{raw} Do not introduce additional filters.
+
+The lookup must make exactly two HTTP requests: fetch `/api/openapi.json` once and then the exact benchmark URL once. Save the bodies as raw-responses/lookup-openapi.response.json and raw-responses/lookup.response.json, with matching raw-responses/lookup-openapi.request.json and raw-responses/lookup.request.json records.
 
 Export validated measured PowerX data for that exact scope to powerx.csv and powerx.json. Explain mean watts per GPU, whole-deployment J/output token, prefill watts per GPU, missing requested metrics, exclusions, and extraction context. Preserve source/configuration details and real zeroes.
 
-Attempt the same validated export for exactly {args.empty_isl} input and {args.empty_osl} output tokens as unavailable.json; save its request report, retain the original result, and use the installed bounded diagnostic guidance to save diagnostic.json and explain availability without changing the requested scope.
+Attempt the same validated export for exactly {args.empty_isl} input and {args.empty_osl} output tokens as unavailable.json; save its request report and retain the original result. Run the installed bounded diagnostic exactly once. It must make exactly one HTTP request in total, the unfiltered benchmark request, save raw-responses/diagnostic.response.json and raw-responses/diagnostic.request.json, and produce diagnostic.json without changing the requested scope.
 
 For {args.agentx_model} using the latest public observations, export AgentX summaries to agentx.csv and agentx.json with separate fresh evidence directories agentx-csv-evidence and agentx-json-evidence. Use only the display-model filter. Preserve every selected benchmark object, summary enrichment, missing state, zero, false value, request URL, and retrieval time. Also request the exact raw-model key {AGENTX_EXCLUDED_RAW_MODEL} as agentx-excluded.json with evidence in agentx-excluded-evidence, and explain the resulting empty or excluded selection without changing its scope.
 
@@ -1081,9 +1100,9 @@ Every ordered responses item must contain exactly `operation`, `request_number`,
 
 The output record must contain exactly `format`, `destination`, `sha256`, and `source_request_numbers`. Use format json; set destination to the corresponding absolute resolved path {project / 'agentx-point.json'} or {project / 'agentx-second-point.json'}; hash the final output bytes; and set source_request_numbers to every one-based response number in order. While capture is pending, use sha256 null and an empty source_request_numbers list.
 
-There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times locally. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
+There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times inside the prepared project. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
 
-The complete response files are required deliverables. Use the exporter's built-in --evidence-dir with separate fresh directories powerx-csv-evidence, powerx-json-evidence, and unavailable-evidence for the corresponding outputs. For lookup and diagnosis, save each complete consumed body as raw-responses/lookup.response.json and raw-responses/diagnostic.response.json before selecting rows. Beside each body save a .request.json record with query_url, status, retrieved_at, and sha256 of the saved body; use that same retrieved_at value in the corresponding lookup or diagnostic output. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for original responses. Before finishing, verify these files exist alongside result.md.
+The complete response files are required deliverables. Use the exporter's built-in --evidence-dir with separate fresh directories powerx-csv-evidence, powerx-json-evidence, and unavailable-evidence for the corresponding outputs. For every lookup and diagnostic request, finish reading the body before creating `retrieved_at`, then save and parse the same complete body bytes consumed by the output. Each request record must contain exactly query_url, status, retrieved_at, and sha256 of its saved body. Never use a pre-fetch timestamp. The benchmark response time must also be lookup.json's retrieved_at, and the diagnostic response time must be diagnostic.json's diagnostic.retrieved_at. Do not make a preliminary, uncaptured, retry, or evidence-only repeat request for lookup or diagnosis. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for original responses. Before finishing, verify raw-responses contains exactly those six files alongside result.md.
 
 Each lookup, CSV export, JSON export, empty export, and diagnostic must be traceable to the complete response from the very same HTTP request it consumed. A separate request to the same URL does not satisfy this requirement. Keep installed skill files unchanged. Matching row counts alone do not establish original-response capture.
 '''
@@ -1210,6 +1229,18 @@ def main():
             json_source = captured_export(args.project, 'powerx-json-evidence', 'powerx.json', args, record['version'])
             csv_source = captured_export(args.project, 'powerx-csv-evidence', 'powerx.csv', args, record['version'])
             result = check_exports(args.project, json_source, csv_source, args, record['version'])
+            raw_responses = args.project / 'raw-responses'
+            raw_directory = raw_responses.is_dir() and not raw_responses.is_symlink()
+            raw_files = list(raw_responses.iterdir()) if raw_directory else []
+            expected_raw_files = {
+                'lookup-openapi.request.json', 'lookup-openapi.response.json',
+                'lookup.request.json', 'lookup.response.json',
+                'diagnostic.request.json', 'diagnostic.response.json'}
+            require(raw_directory and {path.name for path in raw_files} == expected_raw_files and
+                    all(path.is_file() and not path.is_symlink() for path in raw_files),
+                    'raw-responses must contain exactly the six required regular files')
+            openapi = captured_request(args.project, 'lookup-openapi', OPENAPI)
+            check_lookup_openapi(openapi, args.model)
             lookup = json.loads((args.project / 'lookup.json').read_text())
             unfiltered = captured_request(args.project, 'lookup', args.base_url, lookup)
             available = scoped(unfiltered, args.isl, args.osl, args.raw_model)

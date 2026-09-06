@@ -127,7 +127,7 @@ globalThis.fetch = async (input, options) => {
   assert.ok(existsSync(exporter), 'the actual npm artifact installs the exporter');
 });
 
-test('installed guidance verifies summaries and separates measured from provisioned power', () => {
+test('installed guidance verifies summaries, provenance, and measured-power boundaries', () => {
   const guidance = powerCookbook.replaceAll(/\s+/gu, ' ');
   for (const required of [
     'compute it from the complete selected export',
@@ -135,10 +135,14 @@ test('installed guidance verifies summaries and separates measured from provisio
     'verify its contributing and missing counts against `metric_coverage`',
     'Omit unrequested summaries',
     'never estimate one from samples, correlations, or any subset',
+    'Before making any all, none, or single-value claim about a categorical field such as `disagg`',
+    'check every selected row; never infer the claim from a sample or subset',
     'Every PowerX summary must state that measured per-GPU watts and whole-deployment GPU energy',
     'cover accelerator telemetry only; they exclude facility power, cooling,',
     'other non-GPU energy, and provisioned-power estimates',
     'Keep any provisioned-power estimate and its assumptions separate',
+    "Each artifact's request URL and retrieval time must come from its own metadata or manifest",
+    'never reuse either value from another artifact',
   ]) {
     assert.ok(guidance.includes(required), `missing installed guidance: ${required}`);
   }

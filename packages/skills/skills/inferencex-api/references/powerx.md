@@ -108,6 +108,9 @@ and verify its contributing and missing counts against `metric_coverage`. Omit
 unrequested summaries, and never estimate one from samples, correlations, or any
 subset of the selected rows.
 
+Before making any all, none, or single-value claim about a categorical field such
+as `disagg`, check every selected row; never infer the claim from a sample or subset.
+
 An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
 **No strictV2 rows matched the requested scope.** This establishes no eligible
 observations for that selection, not an absence of all underlying benchmarks.
@@ -318,6 +321,9 @@ query URL, retrieval time, requested display model/date, date-selection mode,
 workload, optional raw-model filter, coverage counts, model keys, and non-finite
 value count. Selected rows retain optional nested data and additional raw metrics,
 subject to the numeric sanitation described above.
+
+Each artifact's request URL and retrieval time must come from its own metadata or
+manifest; never reuse either value from another artifact.
 
 CSV repeats request/version/scope metadata beside each observation and includes
 the following original fields, plus the documented power/energy/telemetry metrics:
