@@ -1306,11 +1306,15 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             </p>
                           </>
                         )}
-                        {/* Per-token-type cost only: the input- and output-token
-                          costs are attributed to one side of a disagg config's
-                          prefill/decode split, while the total-token cost uses
+                        {/* Per-token-type only: the input- and output-token
+                          figures are attributed to one side of a disagg config's
+                          prefill/decode split, while the total-token figure uses
                           the whole chip count — the same denominator an
-                          aggregated config uses — so it needs no caveat. */}
+                          aggregated config uses — so it needs no caveat. This
+                          mirrors the cost note's `costType !== 'total'` gate and
+                          the inference chart's total tok/s/MW split (PR #862); the
+                          throughput note's own text says as much: "Total throughput
+                          is unaffected: both kinds report it per chip overall." */}
                         <div
                           className={`overflow-hidden transition-all duration-200 ease-in-out ${
                             barMetric === 'cost' && costType !== 'total'
@@ -1328,12 +1332,16 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         </div>
                         <div
                           className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                            barMetric === 'throughput' || barMetric === 'power'
+                            (barMetric === 'throughput' || barMetric === 'power') &&
+                            costType !== 'total'
                               ? 'max-h-20 opacity-100'
                               : 'max-h-0 opacity-0'
                           }`}
                         >
-                          <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+                          <p
+                            data-testid="calculator-disagg-throughput-note"
+                            className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+                          >
                             <strong>{t.note}</strong>
                             {t.disaggThroughput}
                           </p>
