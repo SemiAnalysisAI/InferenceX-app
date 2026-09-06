@@ -5,6 +5,7 @@ import { JsonLd } from '@/components/json-ld';
 import { ApiAgentExamplesLink } from './api-agent-examples-link';
 import { getApiDocumentation, type ApiDocumentationLocale } from '@/lib/api-documentation';
 import { ZH_LANG_TAG } from '@/lib/i18n';
+import PUBLISHED_SKILL from '@/lib/published-inferencex-skills.json';
 import { AUTHOR_NAME, AUTHOR_URL, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const UI_COPY = {
@@ -24,7 +25,7 @@ const UI_COPY = {
     agentSkill: 'Use the API with your agent',
     agentSkillDescription:
       'The inferencex-api skill helps your agent navigate the public API: benchmarks, provenance, datasets, CollectiveX, and diagnostics. Validated single-turn PowerX export is the first worked example.',
-    agentVersion: 'Skill version · 0.3.0',
+    agentVersion: `Skill version · ${PUBLISHED_SKILL.version}`,
     agentPrerequisites:
       'Requires Node 24 or later with npm and Codex or Claude Code. Installation and API queries require internet access.',
     agentInstall: 'Install in your project',
@@ -101,7 +102,7 @@ const UI_COPY = {
     agentSkill: '通过智能体使用 API',
     agentSkillDescription:
       'inferencex-api 技能帮助智能体查找和使用公开 API，涵盖基准测试、溯源、数据集、CollectiveX 和诊断接口。已验证的单轮请求 PowerX 导出是首个完整示例。',
-    agentVersion: '技能版本 · 0.3.0',
+    agentVersion: `技能版本 · ${PUBLISHED_SKILL.version}`,
     agentPrerequisites:
       '需要 Node 24 或更新版本、npm，以及 Codex 或 Claude Code。安装和 API 查询均需联网。',
     agentInstall: '安装到项目',
@@ -332,7 +333,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {copy.agentSkillDescription}
               </p>
-              <p className="mt-3 break-all font-mono text-xs">@semianalysisai/inferencex-skills</p>
+              <p className="mt-3 break-all font-mono text-xs">{PUBLISHED_SKILL.name}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {copy.agentPrerequisites}
               </p>
@@ -350,7 +351,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                     locale={locale}
                     label={target === 'codex' ? 'Codex' : 'Claude Code'}
                   >
-                    {`npm exec --yes --package @semianalysisai/inferencex-skills@0.3.0 -- inferencex-skills install --target ${target}`}
+                    {`npm exec --yes --package ${PUBLISHED_SKILL.name}@${PUBLISHED_SKILL.version} -- inferencex-skills install --target ${target}`}
                   </CopyableCodeBlock>
                 </div>
               ))}
