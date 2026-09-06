@@ -102,6 +102,12 @@ unavailable values. Keep eligible rows, state which requested measurements are
 unavailable, and avoid zero filling or energy-advantage
 claims. Partial metric coverage alone needs no additional diagnostic request.
 
+For any reported measurement count, range, mean, or trend, compute it from the
+complete selected export, using every selected row where that metric is finite,
+and verify its contributing and missing counts against `metric_coverage`. Omit
+unrequested summaries, and never estimate one from samples, correlations, or any
+subset of the selected rows.
+
 An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
 **No strictV2 rows matched the requested scope.** This establishes no eligible
 observations for that selection, not an absence of all underlying benchmarks.
@@ -295,9 +301,10 @@ as well as in the exported field name.
 The whole-deployment meanings above require schema version 2, including for
 disaggregated deployments. Role-prefixed energy remains role-local. Preserve the
 producer's values; dividing whole-deployment joules by GPU count changes the metric.
-Measured GPU energy does not include a measurement of facility power, cooling, or
-other non-GPU energy. Keep provisioned-power estimates and their assumptions
-separate from these measured fields.
+Every PowerX summary must state that measured per-GPU watts and whole-deployment
+GPU energy cover accelerator telemetry only; they exclude facility power, cooling,
+other non-GPU energy, and provisioned-power estimates. Keep any provisioned-power
+estimate and its assumptions separate.
 
 Preserve zero as a number and missing data as blank CSV cells or JSON null/absence.
 The exporter replaces non-finite numeric values with null, leaves their CSV cells

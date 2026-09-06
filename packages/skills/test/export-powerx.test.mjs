@@ -20,6 +20,7 @@ const preload = join(temporaryRoot, 'http-response.mjs');
 const requiredArgs = ['--model', 'GLM-5', '--isl', '8192', '--osl', '1024'];
 const version = packageInfo.version;
 let exporter;
+let powerCookbook;
 
 function observation(overrides = {}) {
   return {
@@ -120,8 +121,27 @@ globalThis.fetch = async (input, options) => {
 };
 `,
   );
-  exporter = join(suite.install('codex'), 'scripts/export-powerx.mjs');
+  const installed = suite.install('codex');
+  exporter = join(installed, 'scripts/export-powerx.mjs');
+  powerCookbook = readFileSync(join(installed, 'references/powerx.md'), 'utf8');
   assert.ok(existsSync(exporter), 'the actual npm artifact installs the exporter');
+});
+
+test('installed guidance verifies summaries and separates measured from provisioned power', () => {
+  const guidance = powerCookbook.replaceAll(/\s+/gu, ' ');
+  for (const required of [
+    'compute it from the complete selected export',
+    'using every selected row where that metric is finite',
+    'verify its contributing and missing counts against `metric_coverage`',
+    'Omit unrequested summaries',
+    'never estimate one from samples, correlations, or any subset',
+    'Every PowerX summary must state that measured per-GPU watts and whole-deployment GPU energy',
+    'cover accelerator telemetry only; they exclude facility power, cooling,',
+    'other non-GPU energy, and provisioned-power estimates',
+    'Keep any provisioned-power estimate and its assumptions separate',
+  ]) {
+    assert.ok(guidance.includes(required), `missing installed guidance: ${required}`);
+  }
 });
 
 test('installed JSON exporter preserves request, model, measurement and snapshot identities', () => {
