@@ -58,7 +58,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
+import { buildAvailabilityHwKey, reconcileGpuSelection } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
 import { frameworkFamily } from '@/lib/framework-family';
 import {
@@ -1386,13 +1386,20 @@ export function InferenceProvider({
     resolveHwSelection,
   ]);
 
-  // Remove selected GPUs only after successful availability has settled. An
+  // Reconcile selected GPUs only after successful availability has settled. An
   // empty successful scope is different from the transient empty loading state.
+  // Spec-suffixed keys (`b200_vllm_mtp`) that only exist spec-less under the
+  // agentic scope (`b200_vllm`) are remapped rather than dropped, so links built
+  // without scenario knowledge (e.g. /submissions "compare vs prev") keep their
+  // chip config and comparison date range.
   useEffect(() => {
     if (!availabilitySettled || !sequenceResolved || selectedGPUs.length === 0) return;
     const validKeys = new Set(availableGPUs.map((gpu) => gpu.value));
-    const valid = selectedGPUs.filter((gpu) => validKeys.has(gpu));
-    if (valid.length !== selectedGPUs.length) setSelectedGpuState(valid);
+    const reconciled = reconcileGpuSelection(selectedGPUs, validKeys);
+    const unchanged =
+      reconciled.length === selectedGPUs.length &&
+      reconciled.every((gpu, index) => gpu === selectedGPUs[index]);
+    if (!unchanged) setSelectedGpuState(reconciled);
   }, [availabilitySettled, sequenceResolved, availableGPUs, selectedGPUs]);
 
   useEffect(() => {
