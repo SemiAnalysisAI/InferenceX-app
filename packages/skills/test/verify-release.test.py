@@ -1059,6 +1059,13 @@ JS
                     f'The installed skill must be exactly {target_project / install_root}/skills/inferencex-api.',
                     target_prompt,
                 )
+                direct_shell = (
+                    f'Every shell already starts in {target_project}; a shell call containing `cd` or a redirection '
+                    'to `/dev/null` fails acceptance even when `cd` names this exact project'
+                )
+                self.assertIn(direct_shell, target_prompt)
+                self.assertLess(target_prompt.index(direct_shell),
+                                target_prompt.index('Use only the exact candidate archive'))
 
         project = (self.root / 'prepared/codex').resolve()
         archive = project / 'candidate.tgz'
@@ -1085,6 +1092,10 @@ JS
                 "The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request",
                 'only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request',
                 'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
+                'Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; '
+                'unavailable PowerX; diagnostic; AgentX CSV; AgentX JSON; excluded AgentX; traced point; no-trace point',
+                'Run each HTTP-producing operation only once',
+                'If one fails, stop and preserve the failure; do not retry it, delete its evidence, or replace its output',
                 'The lookup must make exactly two HTTP requests',
                 'fetch `/api/openapi.json` once and then the exact benchmark URL once',
                 'raw-responses/lookup-openapi.response.json',

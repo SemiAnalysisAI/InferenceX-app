@@ -1091,6 +1091,10 @@ def prompt(args, target, archive):
 
 Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next. Until all three finish, make no tool calls except the next required shell call; in particular, do not call Read, Glob, Grep, or Skill. Do not prefix, suffix, or combine the commands with `pwd`, `ls`, `cat`, `&&`, `;`, a pipe, or any other command.
 
+After those three calls, run every later shell call directly in the existing working directory. Every shell already starts in {project}; a shell call containing `cd` or a redirection to `/dev/null` fails acceptance even when `cd` names this exact project, so start each call with the actual operation and never prepend a project-root setup line.
+
+Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; unavailable PowerX; diagnostic; AgentX CSV; AgentX JSON; excluded AgentX; traced point; no-trace point. Run each HTTP-producing operation only once. If one fails, stop and preserve the failure; do not retry it, delete its evidence, or replace its output.
+
 Use only the exact candidate archive and public HTTP data in this clean project.
 
 Before running any command, follow these acceptance boundaries:
