@@ -5,6 +5,11 @@ interactivity target. It applies explicit user-supplied USD/GPU-hour rates to th
 public feed's output throughput. The result is a GPU rental/rate cost estimate per
 million output tokens. A full ownership TCO needs additional cost assumptions.
 
+Keep every downloaded response and temporary parsing file inside the current
+project unless the user chooses another destination. Use a separate file for each
+HTTP attempt and retain failed captures. Count actual requests, including discovery
+and retries, in the report; do not count only the final successful exports.
+
 ## Establish the comparison
 
 1. Read the current [`/api/v1/tco-feed` OpenAPI operation](https://inferencex.semianalysis.com/api/openapi.json)
@@ -21,7 +26,9 @@ million output tokens. A full ownership TCO needs additional cost assumptions.
    P90/P99 latency also require different evidence. Agentic Traces require a
    different read; this feed covers fixed single-turn workloads.
 3. Read the complete JSON `view=points&format=json` response at that model,
-   workload list, target (`tiers`), and optional date. Use exact, case-sensitive
+   workload list, target (`tiers`), and optional date. The bundled helper performs
+   this read; when the user already supplies exact hardware keys, no preliminary
+   feed download is needed. Use exact, case-sensitive
    `rows[].hardware` keys for the prices. Discover keys from this response, not
    display labels or benchmark-route aliases. At most eight distinct positive
    `<isl>x<osl>` workloads and one target in `(0, 10000]` are accepted by the helper.
@@ -89,8 +96,9 @@ or workloads to obtain a complete comparison.
 Retain `point.evidence_date` for the knot(s) backing the target, plus
 `oldest_frontier_date` and `latest_date` for the whole frontier. Report differing
 dates across GPUs. The metadata records the requested model and returned
-`db_model_keys`; a display bucket spanning multiple keys does not prove a matched
-exact model release.
+`db_model_keys`. Even a single returned raw key establishes only the API's model
+bucket, not identical checkpoint weights or an exact model revision across the
+frontier's observations. Do not turn a one-key response into a matched-release claim.
 
 The feed pools frameworks, precisions, speculative methods, and deployment
 configurations into a hardware frontier. It exposes no observation IDs or complete

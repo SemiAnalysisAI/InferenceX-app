@@ -52,7 +52,12 @@ pools serving configurations and does not establish full ownership cost.
 
 ## Query workflow
 
-1. Read the current OpenAPI operation before constructing a request. Use its exact
+1. Keep downloaded responses, temporary parsing files and exports inside the
+   current project unless the user selects another destination. Give each attempt
+   its own file; retain failed captures and count every actual HTTP request,
+   including discovery and retries. Decode HTTP compression before parsing JSON
+   (`fetch` does this; use `curl --compressed` with curl).
+   Read the current OpenAPI operation before constructing a request. Use its exact
    parameter names, model enum, response shape, and authentication requirements.
    Reuse the fetched schema during the task.
 2. Choose the operation and scope that answer the user's request. Its documented
