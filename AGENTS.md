@@ -117,6 +117,7 @@ Static content routes (no DB):
 
 - `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
 - `/blog/[slug]` — blog post page with MDX rendering and OG image generation
+- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
 - `/feed.xml` — RSS 2.0 feed
 - `/llms.txt` — LLM-readable site index
 - `/llms-full.txt` — full article content for LLM ingestion
@@ -151,7 +152,7 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
-**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `social_`
+**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
 
 ## Tab Structure
 

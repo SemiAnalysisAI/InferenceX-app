@@ -101,6 +101,8 @@ describe('hasZhSibling', () => {
 
   it('matches blog and compare child paths', () => {
     expect(hasZhSibling('/blog/some-post')).toBe(true);
+    expect(hasZhSibling('/whitepaper')).toBe(true);
+    expect(hasZhSibling('/whitepaper/some-paper')).toBe(true);
     expect(hasZhSibling('/compare')).toBe(true);
     expect(hasZhSibling('/compare/deepseek-r1-h100-vs-h200')).toBe(true);
     expect(hasZhSibling('/compare-per-dollar/deepseek-r1-h100-vs-h200')).toBe(true);

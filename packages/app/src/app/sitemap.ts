@@ -28,6 +28,7 @@ import {
 } from '@/lib/model-routes';
 import { getAllRankingPageEntries } from '@/lib/rankings';
 import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
+import { getAllWhitepapers } from '@/lib/whitepapers';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
@@ -217,6 +218,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
+    // Whitepaper landing pages. Every paper ships both locales from the same
+    // registry entry, and the Figure 1 PNG is listed so image crawlers find it
+    // next to the canonical URL (the Chinese page reuses the English asset).
+    ...localizedPair('/whitepaper', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
+    ...getAllWhitepapers().flatMap((paper) =>
+      localizedPair(`/whitepaper/${paper.slug}`, {
+        images: [`${BASE_URL}${paper.heroImagePath}`],
+        lastModified: new Date(`${paper.publishedDate}T00:00:00Z`).toISOString(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      }),
+    ),
     // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
     ...localizedPair('/model', {
       lastModified: now,

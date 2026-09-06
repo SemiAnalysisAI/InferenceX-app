@@ -1,0 +1,102 @@
+{
+  "slug": "amd-mi355x-32b-revenue-per-gigawatt-kimi-k3",
+  "title": "AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year",
+  "subtitle": "Executive Summary - Agentic Inference Serving Economics Analysis",
+  "publisher_line": "Published by SemiAnalysis InferenceX Team - September 2026",
+  "meta_line": "Published by SemiAnalysis InferenceX Team · September 2026",
+  "cover": {
+    "hardware_image": "../../../../packages/app/public/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/mi355x-transparent.png",
+    "hardware_alt": "AMD Instinct MI355X"
+  },
+  "chart": {
+    "model_logo_svg": "../../../../packages/app/public/logos/kimi-color.svg",
+    "vendor_mark": "../pipeline/assets/amd_mark.png",
+    "title": "Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity",
+    "x_label": "MI355X (vLLM)",
+    "sku": "MI355X",
+    "y_max": 45,
+    "y_step": 5,
+    "utilization": "60%",
+    "license_fee": "30%",
+    "updated": "2026-09-04",
+    "source": "SemiAnalysis InferenceX™",
+    "tco_source_title": "SemiAnalysis Market August 2026 Pricing Surveys & AI Cloud TCO Model",
+    "tco_source_href": "https://semianalysis.com/ai-cloud-tco-model/",
+    "selling_prices": "Input $3 · Cached Input $0.3 · Output $15 (OpenRouter)"
+  },
+  "kpi_notes": {
+    "revenue": "Kimi K3 at OpenRouter list price, 60% utilization",
+    "margin": "After compute expense and 30% model license fee"
+  },
+  "scenarios": [
+    {
+      "id": "owned",
+      "cost_tier": "Owning Hyperscaler",
+      "tco_badge": "1.5",
+      "cost_per_gpu_hr": 1.5,
+      "revenue": 32621903737.94257,
+      "compute": 6287081339.712919,
+      "license": 9786571121.38277,
+      "profit": 16548251276.846882,
+      "margin": 0.5072742354272719,
+      "profit_per_chip_hr": 3.9481558411655224,
+      "kpi_profit_note": "Owned at hyperscaler volume, $1.50 per chip-hour",
+      "caption": "<b>Owned at hyperscaler volume.</b> Compute is charged on every provisioned GPU-hour at $1.50; the model lab takes 30% of revenue as a license fee; the operator keeps $16.5B, or $3.95 per chip-hour."
+    },
+    {
+      "id": "rental",
+      "cost_tier": "Custom $/GPU/hr (August 2026 3-Year Rental Pricing)",
+      "tco_badge": "3",
+      "cost_per_gpu_hr": 3.0,
+      "revenue": 32621903737.94257,
+      "compute": 12574162679.425838,
+      "license": 9786571121.38277,
+      "profit": 10261169937.13396,
+      "margin": 0.3145484708545438,
+      "profit_per_chip_hr": 2.4481558411655224,
+      "kpi_profit_note": "Rented at $3.00 per chip-hour",
+      "caption": "<b>Rented at $3.00 per chip-hour.</b> Revenue and license fee are unchanged; compute expense doubles to $12.6B and profit falls to $10.3B, or $2.45 per chip-hour. The rented fleet breaks even at 33% utilization; the owned fleet at 16.5%."
+    }
+  ],
+  "summary": [
+    "InferenceX AgentX measures how many agentic-coding tokens a production serving stack delivers at a fixed interactivity target. Priced at Kimi K3's public OpenRouter rates and scaled to one gigawatt of provisioned power, the MI355X vLLM result is <b>$32.6 billion of revenue per year</b> at P90 45 tok/s/user and 60% utilization."
+  ],
+  "callout": "Owned at hyperscaler volume ($1.50 per chip-hour), the fleet keeps $16.5 billion of profit at a 50.7% margin. Rented on a 3-year contract at August 2026 pricing ($3.00 per chip-hour), it keeps $10.3 billion at 31.5%.",
+  "method_heading": "How the estimate is built",
+  "method": [
+    "<b>6,115 tok/s per GPU</b> at P90 45 tok/s/user, interpolated on the measured MI355X vLLM frontier (FP4, MTP, TP8).",
+    "<b>478,469 GPUs per gigawatt</b> at 2.09 kW all-in per chip; 60% of benchmarked throughput is sold.",
+    "<b>$0.59 per million tokens</b> blended: 99.2% of tokens are input and 93.7% of those hit the prefix cache.",
+    "<b>Profit</b> = revenue − compute (every GPU-hour, busy or idle) − 30% model license fee."
+  ],
+  "sources": [
+    {
+      "label": "inferencex.semianalysis.com/profit-estimator-per-gigawatt",
+      "href": "https://inferencex.semianalysis.com/profit-estimator-per-gigawatt"
+    },
+    {
+      "label": "inferencex.semianalysis.com/agentx",
+      "href": "https://inferencex.semianalysis.com/agentx"
+    },
+    {
+      "label": "openrouter.ai/moonshotai/kimi-k3",
+      "href": "https://openrouter.ai/moonshotai/kimi-k3"
+    },
+    {
+      "label": "semianalysis.com/ai-cloud-tco-model",
+      "href": "https://semianalysis.com/ai-cloud-tco-model/"
+    }
+  ],
+  "footnote": "Figures are estimates from benchmark throughput and public list prices, not forecasts of any operator's results.",
+  "operating_point": {
+    "target_iv": 45,
+    "tput_per_gpu": 6115.374724599756,
+    "input_share": 0.9917945256244891,
+    "cache_hit": 0.9370405371559627,
+    "rev_per_gpu_hr_gross": 12.971799621822672,
+    "gpu_hours_per_gw_year": 4191387559.808613,
+    "chips_per_gw": 478468.89952153113,
+    "power_kw": 2.09,
+    "blended_price_per_m": 0.5892161698994416
+  }
+}
