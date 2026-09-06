@@ -18,7 +18,7 @@ For review before publication, use the local archive instructions below.
 - [Result provenance](skills/inferencex-api/references/provenance.md): find one
   selected observation in its model/snapshot scope, resolve the actual producing
   run, and capture one bounded log window with original response evidence.
-- An [AgentX getting-started example](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md#start-with-agentx)
+- An [AgentX getting-started example](skills/inferencex-api/references/agentx.md#start-with-agentx)
   connects dataset discovery, summary export and one selected trace.
 - A separate maintainer discovery check uses natural-language tasks in fresh
   Codex and Claude projects, without naming the skill or its files.
@@ -277,7 +277,7 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 
 0.5.0 新增[结果溯源流程](skills/inferencex-api/references/provenance.md)：在指定模型和快照
 范围内定位用户选定的结果，定位并核对实际产生数据的运行记录，并保存一个限定范围的日志片段及
-本次请求的原始响应证据。本版还补充了 [AgentX 入门案例](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md#start-with-agentx)，
+本次请求的原始响应证据。本版还补充了 [AgentX 入门案例](skills/inferencex-api/references/agentx.md#start-with-agentx)，
 串起数据集发现、汇总导出和单点 trace 检查；维护者另行在干净的 Codex 与 Claude 项目中
 进行自动发现验收，只给自然语言任务，不提示技能名称或文件路径。
 

@@ -274,6 +274,22 @@ test('installed recipe reads one selected point and preserves every request phas
   );
 });
 
+test('installed recipe retains original timestamp digits beyond JavaScript safe integers', () => {
+  const path = '/api/v1/request-timeline?id=421';
+  const body = JSON.stringify({ ...timeline, startNs: 'EXACT_START', endNs: 'EXACT_END' }, null, 2)
+    .replace('"EXACT_START"', '1700000000000000001')
+    .replace('"EXACT_END"', '1700000001400000001');
+  const result = run({ ...heavyResponses, [path]: { body } });
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  const evidence = output.metadata.requests.find((item) => item.query_url === `${base}${path}`);
+  assert.equal(evidence.body_utf8, body);
+  assert.ok(Number.isFinite(Date.parse(evidence.retrieved_at)));
+  assert.equal(Number.isSafeInteger(output.timeline.startNs), false);
+  assert.equal(JSON.stringify(output.timeline).includes('1700000000000000001'), false);
+  assert.equal(JSON.stringify(output.timeline).includes('1700000001400000001'), false);
+});
+
 test('one positive safe result ID is required before any HTTP request', () => {
   for (const value of ['0', '1.5', '9007199254740992', '0421']) {
     const result = run(

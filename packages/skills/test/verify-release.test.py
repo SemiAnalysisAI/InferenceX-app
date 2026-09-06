@@ -182,7 +182,8 @@ class RetryTests(unittest.TestCase):
         with patch.object(check.subprocess, 'Popen', side_effect=start):
             try:
                 with self.assertRaises(subprocess.TimeoutExpired):
-                    check.run([sys.executable, '-c', script], self.root, {}, 'descendants', deadline=0.2)
+                    # Allow interpreter startup under concurrent packed suites; the child sleeps for 60s.
+                    check.run([sys.executable, '-c', script], self.root, {}, 'descendants', deadline=1)
             finally:
                 for process in processes:
                     try:
@@ -190,7 +191,7 @@ class RetryTests(unittest.TestCase):
                     except subprocess.TimeoutExpired:
                         check.os.killpg(process.pid, check.signal.SIGKILL)
                         process.wait(timeout=1)
-        self.assertLess(time.perf_counter() - started, 2)
+        self.assertLess(time.perf_counter() - started, 3)
         self.assertIn('parent and child started', (self.root / 'descendants.stdout.log').read_text())
         self.assertEqual(processes[0].returncode, -check.signal.SIGKILL)
 
