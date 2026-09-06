@@ -1022,6 +1022,8 @@ JS
         for required in [
                 f'The prepared project root is {project}.',
                 'This prepared project is the only writable boundary',
+                'Every shell redirection destination, including a throwaway check, must resolve inside this project',
+                'do not run `cd`, even back to this same path',
                 'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
                 'Do not list or extract the candidate archive',
                 'Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next',
@@ -1065,6 +1067,7 @@ JS
                 'agentx-second-point-recipe.mjs',
                 'every other recipe byte must remain identical',
                 'the file must end at that final `}` byte with no trailing newline or other byte',
+                'Do not create an outside-project scratch copy while extracting or comparing the recipe files',
                 'separate Node `--import` capture preload',
                 "redirect that recipe process's stdout directly",
                 'must not write their output or evidence, replace `response.json()`, replace `console.log()`',
