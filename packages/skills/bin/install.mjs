@@ -84,17 +84,17 @@ function installedState(destination, packageName) {
       : unknownState(`could not read installation metadata: ${error.code ?? 'read error'}`);
   }
 
-  // Pre-0.4 receipts predate AgentX. Ignore any newer file retained by an older
-  // merge-style forced install while continuing to validate their PowerX exporter.
-  const requiresAgentX =
-    BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= 4n;
-  const requiresProvenance =
-    BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= 5n;
+  // Only require helpers shipped by the receipt's version. A forced downgrade
+  // merges files and can retain newer helpers that the older package did not own.
   const exporters = [
-    { file: 'export-powerx.mjs', name: 'exporter' },
-    ...(requiresAgentX ? [{ file: 'export-agentx.mjs', name: 'AgentX exporter' }] : []),
-    ...(requiresProvenance ? [{ file: 'investigate-result.mjs', name: 'provenance helper' }] : []),
-  ];
+    { file: 'export-powerx.mjs', name: 'exporter', minor: 0n },
+    { file: 'export-agentx.mjs', name: 'AgentX exporter', minor: 4n },
+    { file: 'investigate-result.mjs', name: 'provenance helper', minor: 5n },
+    { file: 'compare-tco.mjs', name: 'TCO helper', minor: 6n },
+  ].filter(
+    ({ minor }) =>
+      BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= minor,
+  );
   const scripts = join(destination, 'scripts');
   for (const exporter of exporters) {
     try {

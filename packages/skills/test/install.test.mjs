@@ -301,6 +301,10 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/investigate-result.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      writeFileSync(
+        join(destination, 'scripts/compare-tco.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
@@ -332,6 +336,38 @@ test('0.5 status verifies the provenance helper without executing it', () => {
   setInstalledVersion(destination, '0.4.9');
   setExporterVersion(destination, 'agentx', '0.4.9');
   assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, '0.4.9');
+});
+
+test('0.6 status requires the TCO helper and ignores it after a forced downgrade', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const tco = join(destination, 'scripts/compare-tco.mjs');
+  for (const version of ['0.6.0-rc.1+build.7', '0.5.9']) {
+    setInstalledVersion(destination, version);
+    setExporterVersion(destination, 'agentx', version);
+    writeFileSync(
+      join(destination, 'scripts/investigate-result.mjs'),
+      `const PACKAGE_VERSION = '${version}';\n`,
+    );
+    writeFileSync(
+      tco,
+      `const PACKAGE_VERSION = '${version}';\nthrow new Error('must not execute');\n`,
+    );
+    assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, version);
+    for (const contents of [
+      "const PACKAGE_VERSION = '0.4.0';\n",
+      '// missing declaration\n',
+      `const PACKAGE_VERSION = '${version}';\nconst PACKAGE_VERSION = '${version}';\n`,
+    ]) {
+      writeFileSync(tco, contents);
+      const status = jsonResult(run(['status', '--json'], cwd));
+      assert.equal(status.installation_state, version.startsWith('0.6.') ? 'unknown' : 'installed');
+    }
+    rmSync(tco);
+    const status = jsonResult(run(['status', '--json'], cwd));
+    assert.equal(status.installed_version, version.startsWith('0.6.') ? null : version);
+  }
 });
 
 test('status reads the required AgentX version without executing it and diagnoses invalid files', () => {

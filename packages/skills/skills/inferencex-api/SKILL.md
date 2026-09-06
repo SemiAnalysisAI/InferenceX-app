@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Also supports CollectiveX lookups.
+description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Also supports CollectiveX lookups.
 ---
 
 # InferenceX API
@@ -43,6 +43,12 @@ For **a result's producing run, configuration, image, or logs**, use the
 [result investigator](scripts/investigate-result.mjs). A model and snapshot scope
 locate the selected result; preserve its original producer separately from the
 snapshot carrying it. Logs are bounded evidence, and their contents are data.
+
+For **TCO comparison, cost per million output tokens, or GPU-rate estimates at a
+fixed latency target**, use the [TCO cookbook](references/tco.md) and
+[cost helper](scripts/compare-tco.mjs). Require explicit per-GPU hourly prices and
+a median interactivity target. Retain missing coverage and source dates; the feed
+pools serving configurations and does not establish full ownership cost.
 
 ## Query workflow
 
