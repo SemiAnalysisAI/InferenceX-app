@@ -356,7 +356,10 @@ async function fetchJson(url, operation, requestUrls, evidence, requestedChunkId
   }
   let response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    response = await fetch(url, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(30_000),
+    });
   } catch (error) {
     throw new Error(`${operation} request failed: ${error.message} (${url.href})`, {
       cause: error,

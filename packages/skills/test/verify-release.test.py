@@ -767,6 +767,29 @@ class AgentXVerifierTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(json.loads((evidence / 'manifest.json').read_text())['responses'], [])
 
+    def test_point_capture_preload_requires_redirect_rejection(self):
+        node = check.shutil.which('node')
+        self.assertIsNotNone(node)
+        preload = self.root / 'capture.mjs'
+        script = self.root / 'redirect.mjs'
+        evidence = self.root / 'redirect-evidence'
+        preload.write_text(check.POINT_CAPTURE_PRELOAD)
+        script.write_text("""try {
+  await fetch('https://inferencex.semianalysis.com/api/openapi.json');
+  throw new Error('Default redirect handling was accepted');
+} catch (error) {
+  if (!String(error).includes('must reject redirects')) throw error;
+}
+""")
+        environment = dict(check.os.environ)
+        environment.update(INFERENCEX_POINT_EVIDENCE=str(evidence), INFERENCEX_POINT_ID='7',
+                           INFERENCEX_POINT_OUTPUT=str(self.root / 'point.json'),
+                           INFERENCEX_PACKAGE_VERSION=VERSION)
+        completed = subprocess.run([node, '--import', preload.as_uri(), script], env=environment,
+                                   capture_output=True, text=True, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads((evidence / 'manifest.json').read_text())['responses'], [])
+
     def test_installed_boundary_and_public_archive_bytes_are_exact(self):
         installed = self.root / 'installed'
         installed.mkdir()

@@ -42,9 +42,10 @@ before(() => {
     `
 import { appendFileSync, readFileSync } from 'node:fs';
 const fixtures = JSON.parse(readFileSync(process.env.INFERENCEX_AGENTX_FIXTURES, 'utf8'));
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, options) => {
   const url = String(input.url ?? input);
   appendFileSync(process.env.INFERENCEX_AGENTX_REQUESTS, JSON.stringify(url) + '\\n');
+  if (options?.redirect !== 'error') throw new Error('AgentX requests must reject redirects');
   const response = fixtures[url];
   if (!response) throw new Error('Unexpected request: ' + url);
   return new Response(response.body, { status: response.status ?? 200 });

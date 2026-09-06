@@ -811,10 +811,14 @@ globalThis.fetch = async (input, init) => {
   if (request.method !== 'GET') {
     throw new Error(`Point diagnostics allow only GET requests, received ${request.method}`);
   }
+  if (request.redirect !== 'error') {
+    throw new Error('Point diagnostics must reject redirects');
+  }
   const url = request.url;
   const operation = operations.get(new URL(url).pathname);
   if (!operation) throw new Error(`Unexpected point diagnostic request: ${url}`);
   const response = await originalFetch(request);
+  if (response.url !== url) throw new Error(`Point diagnostic response URL changed: ${response.url}`);
   const bytes = Buffer.from(await response.clone().arrayBuffer());
   const requestNumber = manifest.responses.length + 1;
   const bodyFile = `response-${String(requestNumber).padStart(4, '0')}-${operation}.json`;

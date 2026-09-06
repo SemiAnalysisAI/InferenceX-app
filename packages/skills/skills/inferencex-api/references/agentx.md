@@ -109,7 +109,10 @@ const requests = [];
 
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const response = await fetch(query_url, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(30_000),
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
   const data = await response.json();
   requests.push({ query_url, retrieved_at: new Date().toISOString() });

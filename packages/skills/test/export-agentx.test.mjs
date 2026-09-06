@@ -932,6 +932,63 @@ test('native fetch evidence hashes decoded gzip response bytes', async () => {
   }
 });
 
+test('native fetch refuses redirects before reading or replacing output', async () => {
+  const requests = [];
+  const server = createServer((request, serverResponse) => {
+    requests.push(request.url);
+    if (request.url.startsWith('/api/v1/benchmarks?')) {
+      serverResponse.writeHead(302, { Location: '/redirected' });
+      serverResponse.end();
+      return;
+    }
+    serverResponse.writeHead(200, { 'Content-Type': 'application/json' });
+    serverResponse.end('[]');
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+
+  const cwd = project();
+  writeFileSync(join(cwd, 'agentx.json'), 'keep existing output');
+  try {
+    let failure;
+    try {
+      await runNative(
+        [
+          '--model',
+          'DeepSeek-V4-Pro',
+          '--format',
+          'json',
+          '--output',
+          'agentx.json',
+          '--evidence-dir',
+          'evidence',
+        ],
+        `http://127.0.0.1:${server.address().port}`,
+        cwd,
+      );
+    } catch (error) {
+      failure = error;
+    }
+    assert.ok(failure, 'the exporter must reject a redirect response');
+    assert.equal(failure.code, 1);
+    assert.match(failure.stderr, /benchmarks request failed/u);
+    assert.deepEqual(requests, ['/api/v1/benchmarks?model=DeepSeek-V4-Pro']);
+    assert.equal(readFileSync(join(cwd, 'agentx.json'), 'utf8'), 'keep existing output');
+    const { manifest, bodies } = captured({ cwd });
+    assert.equal(manifest.status, 'failed');
+    assert.equal(manifest.responses.length, 1);
+    assert.equal(manifest.responses[0].http_status, null);
+    assert.equal(manifest.responses[0].body_file, null);
+    assert.equal(bodies.size, 0);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
 test('empty evidence exports are complete, distinct, and benchmark-only', () => {
   for (const [rows, extraArgs, outcome, destination] of [
     [[observation('1', { benchmark_type: 'single_turn' })], [], 'no_agentx_rows', null],
