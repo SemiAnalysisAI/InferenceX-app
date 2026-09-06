@@ -19,18 +19,72 @@ Do not infer values that the response omits. Closed-loop systems can progress
 through different requests during the same run window, so workload mix can drift,
 especially at low concurrency. If identity cannot be confirmed, describe the
 comparison as incomplete.
+When counting distinct images or recipe fingerprints, count known values separately
+from rows whose field is missing or null. Report the missing-row count alongside
+the known distinct count; null is not another image or fingerprint.
 
 Public timelines contain sanitized replay structure. They do not expose original
 prompts, code, or tool payloads. Preserve every phase, replay-lane field, and
 cancellation state returned by the API; do not reduce the timeline to successful
-main-agent requests. Event fields such as `start`, `ack`, and `end` are nanosecond
-offsets from the timeline's documented `startNs`, not wall-clock timestamps.
+main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosecond
+anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
+`timeline.startNs`. Keep those two timestamp roles separate. Retain the original
+response text before parsing: JavaScript `Number` can round large integer anchors,
+so reserialized parsed values cannot establish their exact original digits.
+
+Inspect each server-metric series' returned fields before calculating statistics.
+For example, `queueDepth` carries `running`, `waiting`, and `total`, while scalar
+series can use `value`. Summarize the actual fields and their missing values;
+absence of `value` alone does not mean a queue-depth sample is missing.
 
 This workflow reads existing observations and runs no new benchmark. AgentX does
 not evaluate model answer quality. If AgentX rows contain power fields, interpret
 them with the [PowerX validity and unit guidance](powerx.md): do not automatically
 apply `strictV2`, turn missing measurements into zero, mix per-GPU watts with
 whole-deployment energy, or rank energy.
+
+## Start with AgentX
+
+First discover the replay data using the installed
+[dataset cookbook](public-api-examples.md#dataset-discovery-and-conversation-inspection),
+then export available AgentX observations. Start with this request:
+
+> On InferenceX, list the available replay datasets and their exact slugs. Then
+> export the latest available AgentX summaries for DeepSeek-V4-Pro, raw model
+> dsv4, as JSON with the complete response evidence. Show up to five result IDs
+> with their actual measurement dates, hardware, configuration and trace
+> availability. Report the matching count before sampling. Explain which replay
+> dataset identities the responses establish and which are unknown.
+
+A dataset catalog entry alone does not prove that a benchmark used that dataset.
+Keep the exact returned slug and confirm the association from the selected
+observation's public metadata before comparing replay workloads. The summary
+exporter has no dataset filter; preserve unknown associations instead of selecting
+by a guessed name. A selected point's `benchmark_siblings.sku.dataset_slug` does
+not establish a dataset association for every sibling or exported row.
+
+From the project root, the equivalent summary export is:
+
+```bash
+node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
+  --model DeepSeek-V4-Pro --raw-model dsv4 --format json \
+  --output agentx.json --evidence-dir agentx-evidence
+```
+
+For Claude Code, replace `.agents/skills` with `.claude/skills`. Use a fresh evidence
+directory. The user then chooses one result ID from the output and asks (replace
+`<result ID>` with that exact ID):
+
+> Inspect AgentX result <result ID>. Check its trace availability first. If the
+> trace exists, summarize that point's request timeline, latency distributions
+> and server metrics. Preserve the dataset and configuration identity and
+> explain any missing information. Keep the original response evidence.
+
+Follow [the selected-point recipe](#diagnose-one-explicitly-selected-point) below.
+It keeps diagnostics on that result and stops when trace availability is absent.
+If no exported result advertises a trace, retain that outcome without scanning
+other points. These diagnostics describe replay serving performance, not answer
+quality, and do not create a new benchmark run.
 
 ## Export AgentX summaries
 
@@ -114,8 +168,9 @@ async function read(path) {
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
+  const body_utf8 = await response.text();
+  const data = JSON.parse(body_utf8);
+  requests.push({ query_url, retrieved_at: new Date().toISOString(), body_utf8 });
   return data;
 }
 
@@ -245,7 +300,9 @@ JS
 
 Save the JSON output with the analysis. `benchmark_siblings.sku` and
 `selected_point` retain every identity field the API supplied; absence remains
-absence. Preserve the distinction inside `trace_availability`: `key_present: false`
+absence. `metadata.requests[].body_utf8` retains response text before numeric
+parsing; use it when exact large-integer values matter. Preserve the distinction
+inside `trace_availability`: `key_present: false`
 means the response omitted the selected ID, while `key_present: true` with
 `available: false` means it explicitly returned `false`. Both produce
 `trace_unavailable`; neither means the benchmark never ran or that a source artifact

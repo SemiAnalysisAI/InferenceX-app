@@ -81,6 +81,11 @@ an available workload instead of silently passing an empty export.
 
 ## Independent native-agent acceptance
 
+Run [implicit discovery acceptance](./inferencex-skills-discovery.md) separately
+for each candidate whose routing or packaged workflows change. The explicit-use
+acceptance below validates application of known instructions; it does not prove
+that a fresh agent discovers the installed skill on its own.
+
 Deterministic Node tests, live installed-script verification, and a natural-language
 agent run are **three different checks**. The first two do not establish whether an
 agent can find and correctly apply the skill. Run this third check when skill

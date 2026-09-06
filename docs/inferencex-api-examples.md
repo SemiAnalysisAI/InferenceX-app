@@ -1,21 +1,26 @@
 # InferenceX API skill examples
 
-Use the public `@semianalysisai/inferencex-skills@0.4.0` package to query existing
+Use `@semianalysisai/inferencex-skills@0.5.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
-public API, with single-turn PowerX export as its first worked example. Read the
+public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
 constructing requests.
 
 ## Install
 
+Until 0.5.0 is published, install the reviewed local archive using the
+[package README](../packages/skills/README.md#review-a-local-archive). The npm
+commands below apply after publication; the website continues to advertise the
+last published version until its release has been verified.
+
 With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.4.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
@@ -88,3 +93,34 @@ only the strict-power filter and classifies any same-scope observations separate
 from the validated export. No matching observations in that response means none were
 returned for that scope; it does not prove that no benchmark jobs ran. Missing
 metrics on a nonempty result do not by themselves require another request.
+
+## Start with AgentX
+
+The [bundled AgentX getting-started guide](../packages/skills/skills/inferencex-api/references/agentx.md#start-with-agentx)
+connects dataset discovery, a summary export with original response evidence, and
+one explicitly selected trace. It is installed with the skill, so it remains
+available without a repository checkout.
+
+Start with this natural-language request in your project:
+
+> On InferenceX, list the available replay datasets and their exact slugs. Then
+> export the latest available AgentX summaries for DeepSeek-V4-Pro, raw model
+> dsv4, as JSON with the complete response evidence. Show up to five result IDs
+> with their actual measurement dates, hardware, configuration and trace
+> availability. Report the matching count before sampling. Explain which replay
+> dataset identities the responses establish and which are unknown.
+
+Choose one returned result ID, then follow the cookbook's single-point inspection
+step. A catalog entry alone does not establish a benchmark's replay dataset;
+unknown associations remain unknown. These workflows read existing observations
+and do not launch benchmarks or evaluate answer quality.
+
+## Investigate a result's source
+
+> Where did InferenceX result <result ID> for DeepSeek-V4-Pro come from? Show
+> its producing run, image and configuration, and read at most one 16,384-character log
+> window. Preserve the actual measurement date separately from the snapshot.
+
+Supply a date or run snapshot if the result is absent from latest data. The
+[provenance cookbook](../packages/skills/skills/inferencex-api/references/provenance.md)
+documents the required selectors, log-window units, and evidence limits.
