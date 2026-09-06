@@ -36,6 +36,10 @@ the trust relationship.
 
 ## Prepare and review a candidate
 
+The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs the packed-install
+suite on Node 24 and 26 for package and skill-workflow changes. That suite also runs the
+Python release-verifier tests. Publication remains on Node 24 with one publisher runtime.
+
 1. Modify the source, choose a new stable version, and update package metadata,
    both exporters' standalone versions, installation examples, and installed-version
    expectations together. Run the package tests and the relevant repository checks.
