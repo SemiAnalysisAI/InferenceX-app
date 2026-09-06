@@ -605,8 +605,8 @@ class AgentXVerifierTests(unittest.TestCase):
                             'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
                             'checksum_covers': 'saved decoded response body'})
         output = self.root / f'{name}.json'
-        requests = [{'query_url': record['url'], 'retrieved_at': f'2026-09-05T00:00:{index * 2:02d}Z'}
-                    for index, record in enumerate(records, 1)]
+        requests = [{'query_url': record['url'], 'retrieved_at': record['retrieved_at']}
+                    for record in records]
         document = {
             'schema_version': 1,
             'metadata': {'selected_result_id': selected_id, 'retrieved_at': '2026-09-05T00:00:20Z',
@@ -789,23 +789,68 @@ JS
             check.check_point_recipe(self.root, installed, 'agentx-point', '7')
 
     def test_point_oracle_requires_one_chronological_capture_request_output_chain(self):
-        for mutation in ['capture-order', 'request-before-capture', 'output-before-request',
+        for mutation in ['capture-order', 'request-time-mismatch', 'output-before-request',
                          'finish-before-output']:
             with self.subTest(mutation=mutation):
                 evidence, output, manifest, document = self.write_point(trace=False)
                 if mutation == 'capture-order':
                     manifest['responses'][0]['retrieved_at'] = '2026-09-05T00:00:04Z'
-                elif mutation == 'request-before-capture':
-                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:00Z'
+                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:04Z'
+                elif mutation == 'request-time-mismatch':
+                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:01+00:00'
                 elif mutation == 'output-before-request':
-                    document['metadata']['retrieved_at'] = '2026-09-05T00:00:05Z'
+                    document['metadata']['retrieved_at'] = '2026-09-05T00:00:04Z'
                 else:
                     manifest['finished_at'] = '2026-09-05T00:00:19Z'
                 check.save(output, document)
                 manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
                 check.save(evidence / 'manifest.json', manifest)
-                with self.assertRaisesRegex(ValueError, 'timestamps are not chronological'):
+                error = 'not linked' if mutation == 'request-time-mismatch' else 'timestamps are not chronological'
+                with self.assertRaisesRegex(ValueError, error):
                     check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
+
+    def test_run_point_finalizes_capture_with_recipe_owned_request_times(self):
+        source_evidence, source_output, source_manifest, document = self.write_point(trace=False)
+        installed = self.root / 'installed'
+        references = installed / 'references'
+        references.mkdir(parents=True)
+        references.joinpath('agentx.md').write_text("""```bash
+node --input-type=module <<'JS'
+const selectedResultId = '421';
+console.log(selectedResultId);
+JS
+```
+""")
+
+        def run(_command, project, environment, label, _deadline):
+            evidence = Path(environment['INFERENCEX_POINT_EVIDENCE'])
+            evidence.mkdir()
+            capture = json.loads(json.dumps(source_manifest))
+            capture.update(status='pending', finished_at=None)
+            capture['output'] = {
+                'format': 'json',
+                'destination': environment['INFERENCEX_POINT_OUTPUT'],
+                'sha256': None,
+                'source_request_numbers': [],
+            }
+            for index, response in enumerate(capture['responses'], 1):
+                response['retrieved_at'] = f'2026-09-05T00:00:{index * 2:02d}Z'
+                check.shutil.copyfile(source_evidence / response['body_file'],
+                                      evidence / response['body_file'])
+            check.save(evidence / 'manifest.json', capture)
+            self.assertEqual(project, self.root)
+            self.assertEqual(label, 'agentx-point')
+            return source_output.read_text()
+
+        with patch.object(check, 'run', side_effect=run):
+            outcome = check.run_point('node', installed, self.root, {}, 'agentx-point', '7', VERSION)
+        self.assertEqual(outcome, 'trace_unavailable')
+        manifest = json.loads((self.root / 'agentx-point-evidence/manifest.json').read_text())
+        self.assertEqual(manifest['status'], 'complete')
+        self.assertEqual(
+            [response['retrieved_at'] for response in manifest['responses']],
+            [request['retrieved_at'] for request in document['metadata']['requests']],
+        )
 
     def test_point_capture_preload_rejects_effective_post_request(self):
         node = check.shutil.which('node')
@@ -1023,9 +1068,11 @@ JS
                 f'The prepared project root is {project}.',
                 'This prepared project is the only writable boundary',
                 'Every shell redirection destination, including a throwaway check, must resolve inside this project',
+                '`/dev/null` is outside the project: do not redirect there',
                 'do not run `cd`, even back to this same path',
                 'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
                 'Do not list or extract the candidate archive',
+                'Do not recursively inventory the project or list, read, or inspect `.npm-cache`',
                 'Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next',
                 'Until all three finish, make no tool calls except the next required shell call',
                 'Do not prefix, suffix, or combine the commands with `pwd`, `ls`, `cat`, `&&`, `;`, a pipe, or any other command',
@@ -1076,8 +1123,17 @@ JS
                 'one item containing exactly `query_url` and `retrieved_at`',
                 'for every manifest response in identical order (six for a traced run and three for a no-trace run)',
                 'each `query_url` must match the corresponding manifest response `url`',
-                "each `retrieved_at` must be the recipe's own request time for that fetch",
+                "each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte",
+                'Keep the manifest pending until the redirected recipe output exists',
                 'Do not describe an omitted availability key as an explicit `false` value',
+                'report the unweighted arithmetic mean across every selected row with a finite value',
+                'together with each finite and missing count; do not substitute ranges for these means',
+                "keep the strict export's returned-row count separate from `diagnostic.json`'s unfiltered returned-row count",
+                "report every aggregate group's available, null, and missing-entry counts",
+                'do not infer coverage from one sample row',
+                'cross-check every numeric, coverage, missing-state, and request-count claim',
+                "Describe each artifact's actual number of consumed responses",
+                'do not call a multi-response artifact single-response',
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, prompt_text)

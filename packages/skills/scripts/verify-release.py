@@ -991,20 +991,16 @@ def check_agentx_point(project, name, output, selected_id, version):
             type(metadata['requests']) is list and len(metadata['requests']) == len(responses),
             'Point diagnostic metadata differs')
     completed = timestamp(metadata['retrieved_at'], 'Point diagnostic retrieval time is invalid')
-    captured_times = [timestamp(response['retrieved_at'], 'Point capture time is invalid')
-                      for response in responses]
     request_times = []
     for request, response in zip(metadata['requests'], responses):
         request_time = timestamp(request.get('retrieved_at'), 'Point request time is invalid') \
             if type(request) is dict else None
         require(type(request) is dict and set(request) == {'query_url', 'retrieved_at'} and
-                same_url(request['query_url'], response['url']) and request_time is not None,
+                same_url(request['query_url'], response['url']) and request_time is not None and
+                request['retrieved_at'] == response['retrieved_at'],
                 'Point output is not linked to its captured request')
         request_times.append(request_time)
-    ordered_times = [started]
-    for captured, requested in zip(captured_times, request_times):
-        ordered_times.extend((captured, requested))
-    ordered_times.extend((completed, finished))
+    ordered_times = [started, *request_times, completed, finished]
     require(ordered_times == sorted(ordered_times), 'Point evidence timestamps are not chronological')
     require(same_json(document['benchmark_siblings'], siblings) and same_json(document['selected_point'], selected) and
             same_json(document['trace_availability'], {'response': availability,
@@ -1052,9 +1048,18 @@ def run_point(node, installed, project, environment, label, selected_id, version
                              INFERENCEX_POINT_OUTPUT=str(output.resolve()), INFERENCEX_PACKAGE_VERSION=version)
     stdout = run([node, '--import', preload.as_uri(), script], project, point_environment, label, deadline)
     output.write_text(stdout)
-    strict_json(output.read_bytes())
+    document = strict_json(output.read_bytes())
     capture = strict_json((evidence / 'manifest.json').read_bytes())
     require(capture['status'] == 'pending', 'Point capture completed before verifier output validation')
+    requests = document.get('metadata', {}).get('requests') if type(document) is dict else None
+    require(type(requests) is list and len(requests) == len(capture['responses']),
+            'Point output request list differs from its capture')
+    for request, response in zip(requests, capture['responses']):
+        require(type(request) is dict and set(request) == {'query_url', 'retrieved_at'} and
+                same_url(request['query_url'], response['url']),
+                'Point output request identity differs from its capture')
+        timestamp(request['retrieved_at'], 'Point request time is invalid')
+        response['retrieved_at'] = request['retrieved_at']
     capture['status'] = 'complete'
     capture['finished_at'] = now()
     capture['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
@@ -1090,8 +1095,8 @@ Use only the exact candidate archive and public HTTP data in this clean project.
 
 Before running any command, follow these acceptance boundaries:
 
-- This prepared project is the only writable boundary, even though it lives under system temp. Keep the working directory at {project}, and put every task-created temporary, log, response, script, and redirected-output file there. Every shell redirection destination, including a throwaway check, must resolve inside this project. The shell already starts here; do not run `cd`, even back to this same path. Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory.
-- Do not list or extract the candidate archive. Inspect only the installed skill after the three required commands finish.
+- This prepared project is the only writable boundary, even though it lives under system temp. Keep the working directory at {project}, and put every task-created temporary, log, response, script, and redirected-output file there. Every shell redirection destination, including a throwaway check, must resolve inside this project. `/dev/null` is outside the project: do not redirect there; use a named file in the project or leave the stream attached. The shell already starts here; do not run `cd`, even back to this same path. Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory.
+- Do not list or extract the candidate archive. Inspect only the installed skill after the three required commands finish. Do not recursively inventory the project or list, read, or inspect `.npm-cache`; it contains npm's extracted package copy, not the installed skill.
 - Do not run a connectivity or schema preflight with `curl` or any other tool. The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request; only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request. Do not make a preliminary, uncaptured, retry, or evidence-only repeat request for lookup or diagnosis.
 - For each AgentX point, keep the installed recipe byte-for-byte except for its one selected-result-ID line. Put response capture only in a separate Node preload and save the recipe's own stdout by shell redirection.
 
@@ -1103,15 +1108,15 @@ For {args.model} {cutoff}, show five latest single-turn benchmark observations w
 
 The lookup must make exactly two HTTP requests: fetch `/api/openapi.json` once and then the exact benchmark URL once. Save the bodies as raw-responses/lookup-openapi.response.json and raw-responses/lookup.response.json, with matching raw-responses/lookup-openapi.request.json and raw-responses/lookup.request.json records.
 
-Export validated measured PowerX data for that exact scope to powerx.csv and powerx.json. Explain mean watts per GPU, whole-deployment J/output token, prefill watts per GPU, missing requested metrics, exclusions, and extraction context. Preserve source/configuration details and real zeroes.
+Export validated measured PowerX data for that exact scope to powerx.csv and powerx.json. In result.md, report the unweighted arithmetic mean across every selected row with a finite value for `avg_power_w`, `joules_per_output_token`, and `prefill_avg_power_w`, together with each finite and missing count; do not substitute ranges for these means. Explain their per-GPU or whole-deployment accelerator boundary. Report every other missing-metric count exactly from `powerx.json` metadata without contradictory all-missing claims. Explain exclusions and extraction context. Preserve source/configuration details and real zeroes.
 
-Attempt the same validated export for exactly {args.empty_isl} input and {args.empty_osl} output tokens as unavailable.json; save its request report and retain the original result. Run the installed bounded diagnostic exactly once. It must make exactly one HTTP request in total, the unfiltered benchmark request, save raw-responses/diagnostic.response.json and raw-responses/diagnostic.request.json, and produce diagnostic.json without changing the requested scope.
+Attempt the same validated export for exactly {args.empty_isl} input and {args.empty_osl} output tokens as unavailable.json; save its request report and retain the original result. Run the installed bounded diagnostic exactly once. It must make exactly one HTTP request in total, the unfiltered benchmark request, save raw-responses/diagnostic.response.json and raw-responses/diagnostic.request.json, and produce diagnostic.json without changing the requested scope. In result.md, keep the strict export's returned-row count separate from `diagnostic.json`'s unfiltered returned-row count and report each from its own artifact.
 
-For {args.agentx_model} using the latest public observations, export AgentX summaries to agentx.csv and agentx.json with separate fresh evidence directories agentx-csv-evidence and agentx-json-evidence. Use only the display-model filter. Preserve every selected benchmark object, summary enrichment, missing state, zero, false value, request URL, and retrieval time. Also request the exact raw-model key {AGENTX_EXCLUDED_RAW_MODEL} as agentx-excluded.json with evidence in agentx-excluded-evidence, and explain the resulting empty or excluded selection without changing its scope.
+For {args.agentx_model} using the latest public observations, export AgentX summaries to agentx.csv and agentx.json with separate fresh evidence directories agentx-csv-evidence and agentx-json-evidence. Use only the display-model filter. Preserve every selected benchmark object, summary enrichment, missing state, zero, false value, request URL, and retrieval time. In result.md, report every aggregate group's available, null, and missing-entry counts and the derived-metric and trace-availability coverage exactly from `agentx.json` metadata; do not infer coverage from one sample row. Also request the exact raw-model key {AGENTX_EXCLUDED_RAW_MODEL} as agentx-excluded.json with evidence in agentx-excluded-evidence, and explain the resulting empty or excluded selection without changing its scope.
 
 Run the installed one-point recipe as written for both points. Extract it exactly from {installed / 'references/agentx.md'} into agentx-point-recipe.mjs for result ID {args.agentx_point_id} and agentx-second-point-recipe.mjs for result ID {args.agentx_no_trace_id}. Extract only the bytes after the `node --input-type=module <<'JS'` line through the final `}}` before the `JS` delimiter; the file must end at that final `}}` byte with no trailing newline or other byte. Do not create an outside-project scratch copy while extracting or comparing the recipe files. In each file, change only the exact `const selectedResultId = '421';` line to its requested ID; every other recipe byte must remain identical. Run each recipe with a separate Node `--import` capture preload, and redirect that recipe process's stdout directly to agentx-point.json or agentx-second-point.json. The recipe files must not write their output or evidence, replace `response.json()`, replace `console.log()`, or contain capture logic. Do not reimplement the request flow or reconstruct the JSON output. Do not expand either selection to sibling IDs or make bulk diagnostic reads. For each run, transparently clone the same public fetch responses consumed by the recipe into agentx-point-evidence or agentx-second-point-evidence. Keep the full OpenAPI, sibling, availability, and any recipe-requested diagnostic response bodies; a later request to the same URL is not evidence for the recipe output.
 
-Build `metadata.requests` only after that run's final fetch has completed, with one item containing exactly `query_url` and `retrieved_at` for every manifest response in identical order (six for a traced run and three for a no-trace run); each `query_url` must match the corresponding manifest response `url`, and each `retrieved_at` must be the recipe's own request time for that fetch.
+Build `metadata.requests` only after that run's final fetch has completed, with one item containing exactly `query_url` and `retrieved_at` for every manifest response in identical order (six for a traced run and three for a no-trace run); each `query_url` must match the corresponding manifest response `url`, and each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte. Keep the manifest pending until the redirected recipe output exists, then finalize it using those recipe-owned request times rather than a parallel capture timestamp.
 
 Each point evidence directory must contain manifest.json with exactly these top-level fields: `schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, `finished_at`, `responses`, `output`, and `error`. Start capture with schema_version 1, the exact package version and selected ID, `status: "pending"`, `finished_at: null`, and `error: null`. The final manifest is accepted only with `status: "complete"` and `error: null`; set finished_at only after the output is complete. Do not add or rename fields, and never relabel a failed or incomplete run as complete.
 
@@ -1121,7 +1126,7 @@ The output record must contain exactly `format`, `destination`, `sha256`, and `s
 
 In result.md, report `trace_availability.key_present` and `trace_availability.available` exactly as each point output records them. Do not describe an omitted availability key as an explicit `false` value.
 
-There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times inside the prepared project. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Keep command output compact.
+There is no repository or database access in this project. Do not read another checkout, call private services, install other dependencies, or run benchmarks. Save complete public responses and request URLs with retrieval times inside the prepared project. Do not assume row counts or reconstruct data from webpage summaries. Write the final explanation to result.md. Before finishing it, cross-check every numeric, coverage, missing-state, and request-count claim against the corresponding JSON artifact or manifest. Describe each artifact's actual number of consumed responses; do not call a multi-response artifact single-response or claim that endpoint URLs never repeat across separate fresh artifacts. Keep command output compact.
 
 The complete response files are required deliverables. Use the exporter's built-in --evidence-dir with separate fresh directories powerx-csv-evidence, powerx-json-evidence, and unavailable-evidence for the corresponding outputs. For every lookup and diagnostic request, finish reading the body before creating `retrieved_at`, then save and parse the same complete body bytes consumed by the output. Each request record must contain exactly query_url, status, retrieved_at, and sha256 of its saved body. Never use a pre-fetch timestamp. The benchmark response time must also be lookup.json's retrieved_at, and the diagnostic response time must be diagnostic.json's diagnostic.retrieved_at. The five-row lookup, selected export rows, and diagnostic summary are not substitutes for original responses. Before finishing, verify raw-responses contains exactly those six files alongside result.md.
 
