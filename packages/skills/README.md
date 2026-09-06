@@ -276,9 +276,9 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 
 0.4.0 新增 AgentX 汇总导出：默认生成行列顺序稳定的 CSV，也可显式选择 JSON；硬件、
 框架、精度、投机解码方式、offload 模式等配置筛选均区分大小写并要求精确匹配，并支持
-精确的正整数并发数筛选。导出器会标明每项筛选是已应用还是未指定，只从四类已记录的
-汇总接口补充数据，并可用 `--evidence-dir` 保存本次导出实际使用的全部响应。缺失值和
-`null` 保持缺失，`0` 与 `false` 保留原值。AgentX 指南还提供范围限定为一个已选结果
+按精确值匹配的正整数并发数筛选。导出器会标明每项筛选是已应用还是未指定，数据只来自
+文档中列明的四类汇总接口，并可用 `--evidence-dir` 保存本次导出实际使用的全部响应。
+缺失值和 `null` 保持缺失，`0` 与 `false` 保留原值。AgentX 指南还提供范围限定为一个已选结果
 ID 的诊断流程；trace availability 为 `false` 或未返回所选 ID 时，会在读取高开销
 trace 接口前停止。这些流程只读取现有观测数据，不运行基准测试，也不评估模型回答质量。
 
@@ -362,8 +362,9 @@ node .claude/skills/inferencex-api/scripts/export-agentx.mjs \
 
 `--raw-model`、`--hardware`、`--framework`、`--precision`、`--spec-method` 和
 `--offload-mode` 均为可选筛选；一经提供，必须与响应中的值完全一致并区分大小写。
-`--concurrency` 必须是精确的正整数。可选的 `--date YYYY-MM-DD` 用于指定 as-of 快照
-截止日期；省略时使用最新可用快照。每条数据自身的观测日期仍按原响应保留。导出器读取
+`--concurrency` 必须是正整数，并按精确值匹配并发数。可选的
+`--date YYYY-MM-DD` 用于指定 as-of 快照截止日期；省略时使用最新可用快照。每条数据自身
+的观测日期仍按原响应保留。导出器读取
 `/api/v1/benchmarks`，并在本地仅选择 `benchmark_type` 恰为 `agentic_traces` 的数据，
 再只通过有请求规模上限的
 `/api/v1/agentic-aggregates`、`/api/v1/derived-agentic-metrics` 和
@@ -386,9 +387,9 @@ histogram 和 server metrics。
 下载安装器。如指定版本已经缓存，可给 npm 加上 `--offline`。
 
 包括 `0.1.0` 在内、没有版本记录的旧安装会显示版本未知。记录无效或无法读取时，同样
-显示为未知。对于 `0.4.0` 及更新版本，版本记录必须同时与 PowerX 和 AgentX 导出器中的
-静态版本声明一致；早于 `0.4.0` 的记录只核对 PowerX，强制降级后残留的 AgentX 文件不
-参与判断。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
+显示为未知。版本记录为 `0.4.0` 或更新时，必须同时与 PowerX 和 AgentX 导出器中的静态
+版本声明一致；早于 `0.4.0` 的记录只核对 PowerX，强制降级后残留的 AgentX 文件不参与
+判断。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
 只读取声明，不执行任何导出器。这项检查不是完整的文件完整性校验，也不能识别所有本地
 修改。`--version` 只显示本次调用的安装器版本，不显示项目中已安装技能的版本。
 
