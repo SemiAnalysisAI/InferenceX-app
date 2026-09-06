@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@0.7.0` to query existing
+Use `@semianalysisai/inferencex-skills@0.8.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -8,7 +8,7 @@ constructing requests.
 
 ## Install
 
-Until 0.7.0 is published, install the reviewed local archive using the
+Until 0.8.0 is published, install the reviewed local archive using the
 [package README](../packages/skills/README.md#review-a-local-archive). The npm
 commands below apply after publication; the website continues to advertise the
 last published version until its release has been verified.
@@ -17,10 +17,10 @@ With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
@@ -150,3 +150,15 @@ and confounders without assigning a causal or statistical regression verdict.
 > between two SGLang images. Discover the exact dates and producer identities,
 > preserve raw model keys, match workload and public configuration, and save
 > descriptive median TTFT differences with the source evidence and limitations.
+
+## Compare two CollectiveX runs
+
+The [CollectiveX cookbook](../packages/skills/skills/inferencex-api/references/collectivex.md)
+discovers existing communication runs and exports exact EP/KV configuration
+comparisons with source bodies, run attempts, revision context, units and coverage.
+It distinguishes missing or unmatched data from zero metrics and never launches a sweep.
+
+> Find two existing CollectiveX communication runs on InferenceX and save their
+> comparison as JSON. Match the operation, backend, precision, topology and byte
+> counts. Explain source revisions, missing coverage, latency and rate units;
+> do not interpret unmatched cases as zero performance.

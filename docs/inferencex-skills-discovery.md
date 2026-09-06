@@ -92,5 +92,5 @@ project, an explicit-use run, or unreviewed model prose as accepted discovery.
 - 0.7.0: framework-update investigation with matched observations and confounders.
 - 0.8.0: CollectiveX discovery, comparison and export cookbook.
 
-This candidate is 0.7.0 and includes 0.5.0 and 0.6.0. Version 0.8.0 remains a planned
-separate release. A local candidate does not establish npm publication.
+This candidate is 0.8.0 and includes the preceding three releases. Keep each
+version on its separate local branch and validate its exact archive. A local candidate does not establish npm publication.

@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Also supports CollectiveX lookups.
+description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Discover, compare and export CollectiveX communication benchmarks.
 ---
 
 # InferenceX API
@@ -56,6 +56,12 @@ For **vLLM/SGLang updates, before/after changes, or regression investigation**, 
 dates and producer identities, keep unmatched or ambiguous configurations, and
 report descriptive performance changes with confounders. Power and energy tasks
 use the PowerX workflow above. Image tags alone do not prove a release or a cause.
+
+For **CollectiveX communication benchmarks, two-run comparisons, or JSON exports**,
+read [the CollectiveX cookbook](references/collectivex.md) and use
+[the comparison helper](scripts/compare-collectivex.mjs). Compare exact public EP/KV
+identities, preserve units and unmatched coverage, and retain full source responses.
+A run list is bounded discovery; differing attempts and revisions remain context.
 
 ## Query workflow
 
