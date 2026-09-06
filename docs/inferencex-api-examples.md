@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@0.5.0` to query existing
+Use `@semianalysisai/inferencex-skills@0.6.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -8,7 +8,7 @@ constructing requests.
 
 ## Install
 
-Until 0.5.0 is published, install the reviewed local archive using the
+Until 0.6.0 is published, install the reviewed local archive using the
 [package README](../packages/skills/README.md#review-a-local-archive). The npm
 commands below apply after publication; the website continues to advertise the
 last published version until its release has been verified.
@@ -17,10 +17,10 @@ With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.5.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
@@ -124,3 +124,16 @@ and do not launch benchmarks or evaluate answer quality.
 Supply a date or run snapshot if the result is absent from latest data. The
 [provenance cookbook](../packages/skills/skills/inferencex-api/references/provenance.md)
 documents the required selectors, log-window units, and evidence limits.
+
+## Compare costs at one target
+
+Use the [bundled TCO cookbook](../packages/skills/skills/inferencex-api/references/tco.md)
+with explicit per-GPU hourly prices, one median output-interactivity target, and
+fixed single-turn workloads. It saves hardware-frontier cost estimates, coverage,
+source dates and exact response evidence. Configuration matching and full ownership
+costs require additional evidence and assumptions.
+
+> Compare DeepSeek-V4-Pro on InferenceX at 8192 input and 1024 output tokens and
+> 50 median output tok/s/user. Use my illustrative rates: b200 $3.60/GPU-hour,
+> mi355x $1.80/GPU-hour. Save the estimates and source response, preserve missing
+> points, and explain which comparison limits remain.
