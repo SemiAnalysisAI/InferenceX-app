@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@0.6.0` to query existing
+Use `@semianalysisai/inferencex-skills@0.7.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -8,7 +8,7 @@ constructing requests.
 
 ## Install
 
-Until 0.6.0 is published, install the reviewed local archive using the
+Until 0.7.0 is published, install the reviewed local archive using the
 [package README](../packages/skills/README.md#review-a-local-archive). The npm
 commands below apply after publication; the website continues to advertise the
 last published version until its release has been verified.
@@ -17,10 +17,10 @@ With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.6.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.7.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
@@ -137,3 +137,16 @@ costs require additional evidence and assumptions.
 > 50 median output tok/s/user. Use my illustrative rates: b200 $3.60/GPU-hour,
 > mi355x $1.80/GPU-hour. Save the estimates and source response, preserve missing
 > points, and explain which comparison limits remain.
+
+## Investigate a framework update
+
+The [release cookbook](../packages/skills/skills/inferencex-api/references/releases.md)
+connects reliability and latest-tag context, original observation dates, exact
+producer identities, matched configurations, and one selected result's provenance.
+The helper compares latency, interactivity or throughput; it reports missingness
+and confounders without assigning a causal or statistical regression verdict.
+
+> Investigate whether existing InferenceX GLM-5 observations on MI355X changed
+> between two SGLang images. Discover the exact dates and producer identities,
+> preserve raw model keys, match workload and public configuration, and save
+> descriptive median TTFT differences with the source evidence and limitations.

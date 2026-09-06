@@ -7,7 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.6.0';
+const PACKAGE_VERSION = '0.7.0';
 const HELP = `compare-tco — compare modeled GPU-hour cost at a fixed interactivity target
 
 Requires Node 24 or later. Output is JSON with the consumed API response and coverage.
