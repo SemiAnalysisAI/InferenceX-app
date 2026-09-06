@@ -3,6 +3,8 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  chmodSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -106,9 +108,19 @@ before(() => {
   writeFileSync(
     preload,
     `
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import fs, { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 const fixture = JSON.parse(readFileSync(process.env.INFERENCEX_TEST_RESPONSE, 'utf8'));
+const write = fs.promises.writeFile;
+if (fixture.partialOutputWrite) fs.promises.writeFile = async (path, data, ...rest) => {
+  if (String(path).includes('preserved.json')) {
+    await write(path, String(data).slice(0, 5), ...rest);
+    throw new Error('controlled disk full after partial write');
+  }
+  return write(path, data, ...rest);
+};
+syncBuiltinESMExports();
 let calls = 0;
 if (fixture.timeout) AbortSignal.timeout = () => AbortSignal.abort(new DOMException('Timed out', 'TimeoutError'));
 if (fixture.stdoutFailure) process.stdout.write = (_output, callback) => {
@@ -121,7 +133,8 @@ globalThis.fetch = async (input, options) => {
   if (fixture.blockEvidenceFile) mkdirSync(join(fixture.evidenceDir, fixture.blockEvidenceFile));
   if (fixture.bodyFailure) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('body interrupted')); } }));
   const body = calls++ === 0 ? fixture.body : fixture.secondBody ?? '[]';
-  return new Response(body, { status: fixture.status, headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
+  const bytes = fixture.invalidUtf8 ? Buffer.from(body.replace('glm5', 'BADBYTE')).map(byte => byte === 66 ? 255 : byte) : body;
+  return new Response(fixture.oversized ? ' '.repeat(32 * 1024 * 1024) + '[]' : bytes, { status: fixture.status, headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
 };
 `,
   );
@@ -129,6 +142,68 @@ globalThis.fetch = async (input, options) => {
   exporter = join(installed, 'scripts/export-powerx.mjs');
   powerCookbook = readFileSync(join(installed, 'references/powerx.md'), 'utf8');
   assert.ok(existsSync(exporter), 'the actual npm artifact installs the exporter');
+});
+
+test('partial destination writes preserve an existing PowerX export and remove staging files', () => {
+  const cwd = project();
+  writeFileSync(join(cwd, 'preserved.json'), 'previous complete export');
+  const result = run(
+    [...requiredArgs, '--output', 'preserved.json', '--evidence-dir', 'evidence'],
+    [observation()],
+    { cwd, partialOutputWrite: true },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /disk full/);
+  assert.equal(readFileSync(join(cwd, 'preserved.json'), 'utf8'), 'previous complete export');
+  assert.deepEqual(readdirSync(cwd).sort(), ['evidence', 'preserved.json']);
+  assert.equal(JSON.parse(readFileSync(join(cwd, 'evidence/manifest.json'))).status, 'failed');
+});
+
+test('PowerX atomic replacement retains a symlink and its target file permissions', () => {
+  const cwd = project();
+  const target = join(cwd, 'target.json');
+  writeFileSync(target, 'previous complete export');
+  chmodSync(target, 0o600);
+  symlinkSync('target.json', join(cwd, 'alias.json'));
+  const result = run(
+    [...requiredArgs, '--format', 'json', '--output', 'alias.json'],
+    [observation()],
+    { cwd },
+  );
+  succeeded(result);
+  assert.ok(lstatSync(join(cwd, 'alias.json')).isSymbolicLink());
+  assert.equal(lstatSync(target).mode & 0o777, 0o600);
+  assert.equal(JSON.parse(readFileSync(target)).rows.length, 1);
+  assert.deepEqual(readdirSync(cwd).sort(), ['alias.json', 'target.json']);
+});
+
+test('PowerX rejects invalid UTF-8 while preserving original response bytes for diagnosis', () => {
+  for (const evidence of [false, true]) {
+    const result = run(
+      [...requiredArgs, '--format', 'json', ...(evidence ? ['--evidence-dir', 'evidence'] : [])],
+      [observation()],
+      { invalidUtf8: true },
+    );
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /UTF-8/);
+    if (evidence) {
+      const root = join(result.cwd, 'evidence');
+      const manifest = JSON.parse(readFileSync(join(root, 'manifest.json')));
+      assert.equal(manifest.status, 'failed');
+      assert.ok(readFileSync(join(root, 'response.json')).includes(255));
+    }
+  }
+});
+
+test('PowerX rejects an oversized decoded body instead of exporting a truncated or empty success', () => {
+  const result = run([...requiredArgs, '--evidence-dir', 'evidence'], [], { oversized: true });
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /byte budget/);
+  const manifest = JSON.parse(readFileSync(join(result.cwd, 'evidence/manifest.json')));
+  assert.equal(manifest.status, 'failed');
+  assert.equal(manifest.response.sha256, null);
 });
 
 test('installed guidance verifies summaries, provenance, and measured-power boundaries', () => {

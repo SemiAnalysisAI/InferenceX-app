@@ -186,6 +186,10 @@ import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 const fixture = JSON.parse(readFileSync(process.env.INFERENCEX_TEST_RESPONSE, 'utf8'));
 const calls = {};
+if (fixture.shortDeadline) {
+  const timeout = AbortSignal.timeout;
+  AbortSignal.timeout = ms => timeout(ms === 120_000 ? 40 : ms);
+}
 const originalWriteFile = fs.promises.writeFile;
 let completeManifestFailure = fixture.failCompleteManifest;
 fs.promises.writeFile = async (path, data, ...rest) => {
@@ -214,6 +218,8 @@ globalThis.fetch = async (input, options) => {
   calls[url.pathname] = index + 1;
   const reply = fixture.routes[url.pathname]?.[index];
   if (!reply) return new Response('{"error":"unexpected request"}', { status: 599 });
+  if (reply.delay) await new Promise(resolve => setTimeout(resolve, reply.delay));
+  options.signal.throwIfAborted();
   if (reply.timeout) throw new DOMException('Timed out', 'TimeoutError');
   if (reply.blockEvidenceFile) mkdirSync(join(fixture.evidenceDir, reply.blockEvidenceFile));
   const headers = { 'Content-Type': 'application/json' };
@@ -226,7 +232,8 @@ globalThis.fetch = async (input, options) => {
       },
     }), { status: reply.status, headers });
   }
-  return new Response(reply.body, { status: reply.status, headers });
+  const body = reply.invalidUtf8 ? Buffer.from(reply.body.replace('dsv4', 'BADBYTE')).map(byte => byte === 66 ? 255 : byte) : reply.body;
+  return new Response(reply.oversized ? ' '.repeat(32 * 1024 * 1024) + '{}' : reply.padding ? ' '.repeat(reply.padding) + body : body, { status: reply.status, headers });
 };
 `,
   );
@@ -250,6 +257,72 @@ globalThis.fetch = (input, options) => {
     'the actual npm archive installs the AgentX exporter for Claude Code',
   );
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/scripts/export-agentx.mjs'));
+});
+
+test('AgentX rejects invalid UTF-8 in the captured benchmark body before enrichment', () => {
+  const routes = routesFor([observation(1)], [1]);
+  routes['/api/v1/benchmarks'][0].invalidUtf8 = true;
+  const result = run(['--model', 'DeepSeek-V4-Pro', '--evidence-dir', 'evidence'], routes);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /UTF-8/);
+  assert.equal(result.requests.length, 1);
+  const { manifest, bodies } = captured(result);
+  assert.equal(manifest.status, 'failed');
+  assert.ok(bodies.get(1).includes(255));
+});
+
+test('AgentX fails an oversized enrichment without overwriting a previous export', () => {
+  const cwd = project();
+  writeFileSync(join(cwd, 'previous.json'), 'previous complete export');
+  const routes = routesFor([observation(1)], [1]);
+  routes['/api/v1/derived-agentic-metrics'][0].oversized = true;
+  const result = run(
+    ['--model', 'DeepSeek-V4-Pro', '--output', 'previous.json', '--evidence-dir', 'evidence'],
+    routes,
+    cwd,
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /byte budget/);
+  assert.equal(readFileSync(join(cwd, 'previous.json'), 'utf8'), 'previous complete export');
+  const { manifest } = captured(result);
+  assert.equal(manifest.status, 'failed');
+  assert.equal(manifest.responses.at(-1).decoded_body_sha256, null);
+  assert.equal(result.requests.length, 3);
+});
+
+test('AgentX bounds total bytes across individually valid enrichment chunks', () => {
+  const ids = Array.from({ length: 201 }, (_, i) => i + 1);
+  const routes = routesFor(
+    ids.map((id) => observation(id)),
+    ids,
+  );
+  routes['/api/v1/agentic-aggregates'] = chunks(ids, 200).map((group) =>
+    response(mapBody(group.map((id) => [id, aggregate(id)]))),
+  );
+  routes['/api/v1/derived-agentic-metrics'] = chunks(ids, 200).map((group) =>
+    response(mapBody(group.map((id) => [id, derived(id)]))),
+  );
+  for (const replies of Object.values(routes))
+    for (const reply of replies) reply.padding = 31 * 1024 * 1024;
+  const result = run(['--model', 'DeepSeek-V4-Pro', '--output', 'must-not-exist.json'], routes);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /total.*byte budget/);
+  assert.equal(result.requests.length, 5);
+  assert.equal(existsSync(join(result.cwd, 'must-not-exist.json')), false);
+});
+
+test('AgentX total deadline stops enrichment even when each request is within its own timeout', () => {
+  const routes = routesFor([observation(1)], [1]);
+  for (const replies of Object.values(routes)) for (const reply of replies) reply.delay = 25;
+  const result = run(['--model', 'DeepSeek-V4-Pro', '--evidence-dir', 'evidence'], routes, {
+    shortDeadline: true,
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /timed out|timeout/i);
+  assert.equal(result.stdout, '');
+  assert.ok(result.requests.length < 4);
+  assert.equal(captured(result).manifest.status, 'failed');
 });
 
 test('installed JSON exporter chunks and joins enrichments by safe result ID', () => {

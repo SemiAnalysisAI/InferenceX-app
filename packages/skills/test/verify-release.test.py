@@ -1031,7 +1031,7 @@ globalThis.fetch = async (input) => {{
         self.assertEqual(fetch.call_count, 2)
         install.assert_not_called()
 
-    def test_candidate_orchestrates_powerx_and_agentx_for_both_targets(self):
+    def test_candidate_orchestrates_all_six_helpers_for_both_targets(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:
             content = b'skill'
@@ -1060,6 +1060,7 @@ globalThis.fetch = async (input) => {{
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}), \
+                patch.object(check, 'check_additional_workflows', return_value={'status': 'passed'}), \
                 patch.object(check, 'run_point', side_effect=['trace_diagnostics', 'trace_unavailable'] * 2), \
                 patch('builtins.print'):
             check.main()
@@ -1071,6 +1072,8 @@ globalThis.fetch = async (input) => {{
                                if call.args[1] == project]
             self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in target_commands), 2, target)
             self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in target_commands), 3, target)
+            for helper in ['investigate-result', 'compare-tco', 'compare-releases', 'compare-collectivex']:
+                self.assertEqual(sum(f'{helper}.mjs' in ' '.join(command) for command in target_commands), 1, target)
 
     def test_agents_prepares_canonical_projects_with_only_archive_and_hashed_prompt(self):
         stream = io.BytesIO()
@@ -1413,6 +1416,26 @@ globalThis.fetch = async (input) => {{
         self.assertLess(publish, public)
         for flag in ['--agentx-model', '--agentx-point-id', '--agentx-no-trace-id']:
             self.assertEqual(workflow.count(flag), 2)
+
+
+class AdditionalWorkflowEvidenceTests(unittest.TestCase):
+    def test_same_response_hash_url_status_and_time_are_required(self):
+        body = '{"observations":[1,2]}'
+        source = dict(body_utf8=body, decoded_body_sha256=hashlib.sha256(body.encode()).hexdigest(),
+                      url=check.OPENAPI, http_status=200, retrieved_at='2026-09-06T00:00:00Z')
+        self.assertEqual(check.workflow_source(source, check.OPENAPI), {'observations': [1, 2]})
+        for key, value in [('body_utf8', '{}'), ('decoded_body_sha256', '0' * 64),
+                           ('url', check.API), ('http_status', 500), ('retrieved_at', 'invalid')]:
+            with self.subTest(key=key), self.assertRaises((AssertionError, ValueError)):
+                check.workflow_source({**source, key: value}, check.OPENAPI)
+
+    def test_new_workflow_identity_cannot_be_missing_or_from_another_archive(self):
+        document = {'schema_version': 1, 'metadata': {'package_version': VERSION}}
+        check.workflow_identity(document, VERSION)
+        for changed in [{}, {'schema_version': 2, 'metadata': document['metadata']},
+                        {'schema_version': 1, 'metadata': {'package_version': 'wrong'}}]:
+            with self.assertRaises(ValueError):
+                check.workflow_identity(changed, VERSION)
 
 
 if __name__ == '__main__':

@@ -10,10 +10,35 @@ also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
 It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.8.0` and require that version to be published.
+The npm commands below pin version `0.9.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
 
-## New in 0.8.0
+## New in 0.9.0
+
+PowerX stages file output beside its destination and replaces it only after the
+write succeeds. Interrupted writes preserve the previous export. Existing output
+symlinks still address their target; evidence manifests and exports are separate
+files, not a single filesystem transaction. A failed manifest write can therefore
+coexist with a complete exported file and still produces a failing exit status.
+
+PowerX and AgentX now reject malformed UTF-8 and responses over **32 MiB of decoded
+bytes**. AgentX additionally limits all response bytes to **128 MiB** and its HTTP
+sequence to **120 seconds**, retaining the **30-second per-request timeout**.
+Limit failures do not return truncated success; completed evidence bodies remain
+available for diagnosis, while incomplete bodies have no complete-body hash.
+There are no automatic HTTP retries. Narrow the model/date scope if a limit is hit.
+
+All six installed helpers accept `--version` without network access or required
+query arguments. Existing successful JSON/CSV fields and calculations are unchanged.
+The installer checks the additional response reader when identifying 0.9+ installs.
+
+Release verification now exercises all six helpers from clean installations for
+both targets, including retained-source checks for the four newer workflows.
+These live smoke checks supplement fixture tests; they do not establish native
+agent discovery or narrative quality. Node 24/26 are checked on Linux in CI;
+macOS is checked locally. Windows compatibility is not yet qualified.
+
+## Included from 0.8.0
 
 [CollectiveX comparisons](skills/inferencex-api/references/collectivex.md) discover
 two existing communication runs or accept two exact run IDs, then export JSON
@@ -76,10 +101,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -90,9 +115,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -105,7 +130,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.8.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.9.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -225,7 +250,7 @@ availability is false or omitted.
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -251,8 +276,8 @@ check is not a full integrity check and cannot detect every local edit.
 ### JSON output and installation preview
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target codex --force --dry-run --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex --force --dry-run --json
 ```
 
 `--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
@@ -288,11 +313,11 @@ without stale installation fields; use the exit code to determine success.
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.8.0` with the published version you intend to install:
+version. To upgrade, replace `0.9.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.8.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target claude --force
 ```
 
 Force merges the packaged files into the existing skill and overwrites matching
@@ -311,10 +336,28 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
 抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.8.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `0.9.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
-0.8.0 新增 [CollectiveX 比较](skills/inferencex-api/references/collectivex.md)：发现两个现有的通信
+0.9.0 改进导出失败时的文件保护：PowerX 先在目标文件旁完整写入临时文件，写入成功后才
+替换目标；中途写入失败会保留旧结果。目标路径为符号链接时仍写入其指向的文件。导出文件
+和证据 manifest 是两个独立文件，不构成一次文件系统事务；manifest 写入失败时可能已存在
+完整导出文件，但命令仍以失败状态退出。
+
+PowerX 和 AgentX 会拒绝非法 UTF-8，以及解压后超过 **32 MiB** 的单次响应。AgentX 还将
+所有响应的总大小限制为 **128 MiB**，HTTP 请求序列限制为 **120 秒**；每个请求仍有
+**30 秒**超时。超限会明确失败，不会把截断结果当作成功导出。已完整收到的响应会保留在
+请求的证据目录中；未完整读取的响应不会记录完整响应哈希。HTTP 请求不自动重试，超限时
+可缩小模型或日期范围。
+
+六个 helper 均支持离线 `--version`，无需填写查询参数。成功导出的 JSON/CSV 字段和计算
+方法保持兼容。安装器识别 0.9+ 安装状态时，还会检查新增的响应读取模块。
+
+发布验收现覆盖两个目标的干净安装和全部六个 helper，并检查四个较新工作流保留的来源。
+这些实时 smoke 检查补充固定样本测试，不能证明原生 agent 的自动发现或解释质量。CI 在
+Linux 上检查 Node 24/26，macOS 在本地验证；Windows 兼容性尚未验收。
+
+保留 0.8.0 的 [CollectiveX 比较](skills/inferencex-api/references/collectivex.md)：发现两个现有的通信
 基准测试 run，或使用两个确切的 run ID，导出包含 EP/KV 匹配结果、单位、缺失与覆盖情况
 和完整响应证据的 JSON。匹配要求公开的操作、backend、精度和拓扑一致；EP 还需匹配 payload
 字节数，KV 还需匹配请求字节数。运行 attempt 和来源 revision 会明确保留。这些是观测差异，
@@ -478,7 +521,7 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 安装状态字段；请用退出码判断操作是否成功。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.8.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
+的 `0.9.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
 同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
 覆盖前请自行备份本地修改。
 

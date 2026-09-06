@@ -79,6 +79,22 @@ AgentX selection, and checks one traced and one no-trace point. Missing and null
 values remain missing; real `0` and `false` values remain explicit. No new
 benchmarks run.
 
+From 0.9.0, candidate and public verification also run all four newer installed
+helpers for both targets. The provenance case selects result `416696` from logical
+run `26694739752`. The release case matches GLM-5.1/MI355X/SGLang observations from
+2026-05-30 and 2026-07-02 by their exact producer attempts and checks `median_ttft`
+arithmetic. The TCO case uses the 2026-09-06 DeepSeek-V4-Pro 8192x1024 snapshot at
+50 output tok/s/user with explicit **test assumptions** of $3.60/B200 GPU-hour and
+$1.80/MI355X GPU-hour; these are not market prices. CollectiveX discovers two
+measured runs and verifies retained run identities, source pointers and summary
+counts. No comparable CollectiveX rows is a valid, explicit outcome.
+
+These are live smoke checks, not exhaustive domain or native-agent acceptance.
+Missing provenance/logs, unavailable TCO points or missing historical comparison
+pairs fail and require reviewing the case. Do not weaken the gate to silently
+accept an empty positive example. The same public verification deadline covers
+these subprocesses, and failed output and command records remain preserved.
+
 The live check uses the requested model/workload; there is no fixed date or expected
 row count. Use `--date YYYY-MM-DD` for a reproducible cutoff and `--raw-model KEY`
 when intentionally selecting a particular returned model. A positive example that

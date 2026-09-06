@@ -7,7 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const HELP = `compare-tco — compare modeled GPU-hour cost at a fixed interactivity target
 
 Requires Node 24 or later. Output is JSON with the consumed API response and coverage.
@@ -20,6 +20,7 @@ Usage:
 Options:
   --date <YYYY-MM-DD>  As-of cutoff; omission selects latest available data
   --output <file>      Atomically replace this local file; default stdout
+  --version          Show the installed package version offline
   --help              Show help without making a request
 
 Price keys select exact, case-sensitive API hardware identifiers. Prices must be
@@ -186,11 +187,16 @@ async function run() {
       'gpu-hourly-prices': { type: 'string' },
       date: { type: 'string' },
       output: { type: 'string' },
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
   const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
   if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) return writeOutput(undefined, HELP);
   if (!values.model || values.model.trim() !== values.model || /\p{Cc}/u.test(values.model)) {
     throw new Error('--model requires an exact API model key or display name');

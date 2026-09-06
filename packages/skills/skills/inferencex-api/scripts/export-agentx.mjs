@@ -5,9 +5,10 @@ import { lstat, mkdir, readlink, realpath, rename, rm, writeFile } from 'node:fs
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
+import { createResponseBudget } from './response-budget.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.8.0';
+const PACKAGE_VERSION = '0.9.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const HELP = `export-agentx — export existing AgentX observations with summary enrichments
 
@@ -28,10 +29,13 @@ Options:
   --format <format>    csv (default) or json
   --output <file>      Output file; default stdout
   --evidence-dir <dir> Save consumed responses and a manifest in a new directory
+  --version          Show the installed package version offline
   --help               Show this help without making a request
 
 The benchmark response is filtered locally to benchmark_type=agentic_traces.
 The exporter reads existing observations; it does not run a benchmark.
+Strict UTF-8; 32 MiB per response, 128 MiB total decoded bytes.
+HTTP sequence deadline: 120s; each request: 30s. No HTTP retries.
 `;
 
 const REQUIRED_STRING_FIELDS = [
@@ -342,7 +346,7 @@ function traceMap(value, requestedIds) {
   );
 }
 
-async function fetchJson(url, operation, requestUrls, evidence, requestedChunkIds = null) {
+async function fetchJson(url, operation, requestUrls, evidence, budget, requestedChunkIds = null) {
   const requestNumber = requestUrls.length + 1;
   requestUrls.push({ operation, url: url.href });
   let record;
@@ -364,9 +368,10 @@ async function fetchJson(url, operation, requestUrls, evidence, requestedChunkId
   }
   let response;
   try {
+    budget.signal.throwIfAborted();
     response = await fetch(url, {
       redirect: 'error',
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.any([budget.signal, AbortSignal.timeout(30_000)]),
     });
   } catch (error) {
     throw new Error(`${operation} request failed: ${error.message} (${url.href})`, {
@@ -379,7 +384,7 @@ async function fetchJson(url, operation, requestUrls, evidence, requestedChunkId
   }
   let bytes;
   try {
-    bytes = Buffer.from(await response.arrayBuffer());
+    bytes = await budget.read(response);
   } catch (error) {
     throw new Error(`Could not read ${operation} response body: ${error.message}`, {
       cause: error,
@@ -393,7 +398,12 @@ async function fetchJson(url, operation, requestUrls, evidence, requestedChunkId
     await saveManifest(evidence);
   }
   // Fetch has already decoded HTTP compression. Parse the same bytes saved above.
-  const body = new TextDecoder().decode(bytes);
+  let body;
+  try {
+    body = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch (error) {
+    throw new Error(`${operation} response is not valid UTF-8`, { cause: error });
+  }
   if (!response.ok) {
     let detail = '';
     try {
@@ -411,13 +421,16 @@ async function fetchJson(url, operation, requestUrls, evidence, requestedChunkId
   }
 }
 
-async function fetchChunks(operation, ids, limit, validate, requestUrls, evidence) {
+async function fetchChunks(operation, ids, limit, validate, requestUrls, evidence, budget) {
   const joined = new Map();
   for (let offset = 0; offset < ids.length; offset += limit) {
     const chunk = ids.slice(offset, offset + limit);
     const url = new URL(`/api/v1/${operation}`, API_ORIGIN);
     url.searchParams.set('ids', chunk.join(','));
-    const entries = validate(await fetchJson(url, operation, requestUrls, evidence, chunk), chunk);
+    const entries = validate(
+      await fetchJson(url, operation, requestUrls, evidence, budget, chunk),
+      chunk,
+    );
     for (const [id, value] of entries) joined.set(id, value);
   }
   return joined;
@@ -492,11 +505,16 @@ async function run(args = process.argv.slice(2)) {
       format: { type: 'string', default: 'csv' },
       output: { type: 'string' },
       'evidence-dir': { type: 'string' },
+      version: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     allowPositionals: false,
     strict: true,
   });
+  if (values.version) {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
+    return;
+  }
   if (values.help) {
     process.stdout.write(HELP);
     return;
@@ -618,10 +636,15 @@ async function run(args = process.argv.slice(2)) {
     }
 
     const requestUrls = [];
+    const budget = createResponseBudget({
+      responseBytes: 32 * 1024 * 1024,
+      totalBytes: 128 * 1024 * 1024,
+      timeoutMs: 120_000,
+    });
     const benchmarkUrl = new URL('/api/v1/benchmarks', API_ORIGIN);
     benchmarkUrl.searchParams.set('model', values.model);
     if (values.date !== undefined) benchmarkUrl.searchParams.set('date', values.date);
-    const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls, evidence);
+    const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls, evidence, budget);
     if (!Array.isArray(benchmarks) || benchmarks.some((row) => !benchmarkRow(row))) {
       throw new Error(
         'Unexpected benchmarks response shape: expected complete rows with required identity, configuration, workload, date, run_url, and metrics fields',
@@ -659,6 +682,7 @@ async function run(args = process.argv.slice(2)) {
       aggregateMap,
       requestUrls,
       evidence,
+      budget,
     );
     const derived = await fetchChunks(
       'derived-agentic-metrics',
@@ -667,6 +691,7 @@ async function run(args = process.argv.slice(2)) {
       derivedMap,
       requestUrls,
       evidence,
+      budget,
     );
     const traces = await fetchChunks(
       'trace-availability',
@@ -675,6 +700,7 @@ async function run(args = process.argv.slice(2)) {
       traceMap,
       requestUrls,
       evidence,
+      budget,
     );
     let nonFiniteValues = 0;
     const rows = selected.map((row) => {
