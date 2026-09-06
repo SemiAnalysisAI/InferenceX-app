@@ -15,11 +15,11 @@ describe('Compare precision index page', () => {
         'href',
         '/inference/kimi-k3',
       );
-      cy.get('[data-testid="compare-agentx-overview-link"]')
-        .should('contain.text', 'Overview')
-        .and('have.attr', 'href', '/overview');
+      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+        .should('contain.text', 'Token Revenue Calculator')
+        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', 'Full dashboard')
+        .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
@@ -58,11 +58,11 @@ describe('Compare precision index page', () => {
         'href',
         '/zh/inference/deepseek-v4',
       );
-      cy.get('[data-testid="compare-agentx-overview-link"]')
-        .should('contain.text', '总览')
-        .and('have.attr', 'href', '/zh/overview');
+      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+        .should('contain.text', 'Token 收入计算器')
+        .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', '查看完整仪表板')
+        .should('have.text', '仪表板')
         .and('have.attr', 'href', '/zh/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });

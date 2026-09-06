@@ -148,11 +148,11 @@ describe('First-load navigation', () => {
       // The hero owns /compare's h1; on the landing page it is a section heading.
       cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
       cy.get('h1').should('not.exist');
-      cy.get('[data-testid="compare-agentx-overview-link"]')
-        .should('contain.text', 'Overview')
-        .and('have.attr', 'href', '/overview');
+      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+        .should('contain.text', 'Token Revenue Calculator')
+        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', 'Full dashboard')
+        .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
@@ -175,8 +175,8 @@ describe('First-load navigation', () => {
         .should('have.length', 6)
         .each(($badge) => expect($badge.text()).to.equal('NEW'));
     });
-    cy.get('[data-testid="compare-agentx-overview-link"]').click();
-    cy.location('pathname').should('eq', '/overview');
+    cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
   });
 
   it('navigates to submissions from the landing CTA', () => {

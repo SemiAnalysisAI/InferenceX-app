@@ -1,5 +1,5 @@
 /**
- * Regression: the landing "Full dashboard" CTA must navigate in exactly one
+ * Regression: the landing "Dashboard" CTA must navigate in exactly one
  * transition — one router commit, one new history entry, no URL revert.
  *
  * One click used to: commit /inference/kimi-k3, get reverted to `/` by a
