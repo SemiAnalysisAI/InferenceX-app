@@ -555,20 +555,36 @@ describe('TCO Calculator', () => {
     // Metric-specific disclaimers (fresh visit to reset accumulated state)
     // -------------------------------------------------------------------------
 
-    it('shows disaggregated throughput disclaimer for throughput metric', () => {
+    // A disagg config's input/output throughput is reported per prefill or per
+    // decode chip — divided by fewer chips, it reads high on those token types.
+    // The total-token throughput divides by the whole chip count — the same
+    // denominator an aggregated config uses, and the note's own text says as
+    // much ("Total throughput is unaffected") — so it must not carry the
+    // caveat. This mirrors the cost-note test below and PR #862 on the inference
+    // chart.
+    it('shows the disaggregated throughput disclaimer only for per-token-type throughput', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'Disaggregated inference configurations',
-      );
-      cy.get('[data-testid="calculator-chart-section"]')
-        // The direction is the point of the warning, not the phrasing: on these
-        // token types a disaggregated config reads high. Asserting the old wording
-        // alone let the note be reworded into something that no longer said which
-        // way it was wrong.
-        .should('contain.text', 'per prefill chip and per decode chip')
-        .and('contain.text', 'reads faster per chip than it is');
+
+      // Token type defaults to Total Tokens.
+      cy.get('[data-testid="calculator-disagg-throughput-note"]').should('not.be.visible');
+
+      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
+        cy.get('[data-testid="calc-cost-type-selector"]').click();
+        cy.contains('[role="option"]', tokenType).click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="calculator-disagg-throughput-note"]')
+          .should('be.visible')
+          .and('contain.text', 'per prefill chip and per decode chip')
+          // Faster, specifically — the flattering direction is what a reader
+          // comparing throughput needs told.
+          .and('contain.text', 'reads faster per chip than it is');
+      }
+
+      cy.get('[data-testid="calc-cost-type-selector"]').click();
+      cy.contains('[role="option"]', 'Total Tokens').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="calculator-disagg-throughput-note"]').should('not.be.visible');
     });
 
     // A disagg config's input/output cost is attributed to only its prefill or
@@ -601,15 +617,31 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
     });
 
-    it('shows disaggregated throughput disclaimer for power metric', () => {
+    // The tok/s/MW (power) metric inherits the same per-token-type split as
+    // throughput: total tok/s/MW is per chip overall and needs no caveat, while
+    // the input/output token types do.
+    it('shows the disaggregated throughput disclaimer only for per-token-type power', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-chart-section"]')
-        // The direction is the point of the warning, not the phrasing: on these
-        // token types a disaggregated config reads high. Asserting the old wording
-        // alone let the note be reworded into something that no longer said which
-        // way it was wrong.
-        .should('contain.text', 'per prefill chip and per decode chip')
-        .and('contain.text', 'reads faster per chip than it is');
+
+      // Token type defaults to Total Tokens.
+      cy.get('[data-testid="calculator-disagg-throughput-note"]').should('not.be.visible');
+
+      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
+        cy.get('[data-testid="calc-cost-type-selector"]').click();
+        cy.contains('[role="option"]', tokenType).click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="calculator-disagg-throughput-note"]')
+          .should('be.visible')
+          .and('contain.text', 'per prefill chip and per decode chip')
+          .and('contain.text', 'reads faster per chip than it is');
+      }
+
+      cy.get('[data-testid="calc-cost-type-selector"]').click();
+      cy.contains('[role="option"]', 'Total Tokens').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="calculator-disagg-throughput-note"]').should('not.be.visible');
     });
   });
 
