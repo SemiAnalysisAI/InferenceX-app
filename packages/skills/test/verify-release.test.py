@@ -951,6 +951,13 @@ class AgentXVerifierTests(unittest.TestCase):
                 '`response-NNNN-<operation>.json`',
                 '`format`, `destination`, `sha256`, and `source_request_numbers`',
                 'The final manifest is accepted only with `status: "complete"` and `error: null`',
+                'Run the installed one-point recipe as written',
+                'Do not reimplement its request flow or reconstruct its JSON output',
+                "Build `metadata.requests` only after that run's final fetch has completed",
+                'one item containing exactly `query_url` and `retrieved_at`',
+                'for every manifest response in identical order (six for a traced run and three for a no-trace run)',
+                'each `query_url` must match the corresponding manifest response `url`',
+                "each `retrieved_at` must be the recipe's own request time for that fetch",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, prompt_text)
