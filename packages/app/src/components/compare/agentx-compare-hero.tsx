@@ -345,8 +345,8 @@ const STRINGS = {
     title: 'Compare Realistic Agentic Inference Perf',
     description:
       'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv7/v8 & Rubin NVL72 & MI455X UALoE72',
-    overview: 'Overview',
-    dashboard: 'Full dashboard',
+    revenueCalculator: 'Token Revenue Calculator',
+    dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
     newModel: 'NEW',
@@ -356,8 +356,8 @@ const STRINGS = {
     title: '真实智能体工作负载下的推理性能对比',
     description:
       '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv7/v8、Rubin NVL72 与 MI455X UALoE72。',
-    overview: '总览',
-    dashboard: '查看完整仪表板',
+    revenueCalculator: 'Token 收入计算器',
+    dashboard: '仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
     newModel: '新',
@@ -444,14 +444,14 @@ export function AgentXCompareHero({
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
-                data-testid="compare-agentx-overview-link"
-                href={`${prefix}/overview`}
-                analyticsEvent="compare_agentx_overview_clicked"
+                data-testid="compare-agentx-revenue-calculator-link"
+                href={`${prefix}/profit-estimator-per-gigawatt`}
+                analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation
                 className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
               >
-                {t.overview}
+                {t.revenueCalculator}
                 <ArrowRight
                   aria-hidden="true"
                   className="size-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"

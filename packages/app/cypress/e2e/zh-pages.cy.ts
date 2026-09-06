@@ -34,9 +34,12 @@ describe('Chinese (/zh) pages', () => {
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
-        cy.get('[data-testid="compare-agentx-overview-link"]')
-          .should('contain.text', '总览')
-          .and('have.attr', 'href', '/zh/overview');
+        cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+          .should('contain.text', 'Token 收入计算器')
+          .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
+        cy.get('[data-testid="compare-agentx-dashboard-link"]')
+          .should('have.text', '仪表板')
+          .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         // Ledger NEW pills localize to 新 on the Chinese landing page.
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
