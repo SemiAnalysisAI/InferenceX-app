@@ -178,7 +178,7 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
 
 test('integrity check is read-only and prepare rejects a clean stale manifest before network or output', (context) => {
   const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-integrity-test-'));
-  context.after(() => rmSync(temporary, { recursive: true, force: true }));
+  context.after(() => rmSync(temporary, { recursive: true, force: true, maxRetries: 3 }));
   const source = resolve(import.meta.dirname, '..');
   const packageRoot = join(temporary, 'skills');
   cpSync(source, packageRoot, { recursive: true });
@@ -253,7 +253,7 @@ globalThis.fetch = async () => {
 
 test('prepare rejects dirty or changing package source and packs one clean candidate', (context) => {
   const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-release-test-'));
-  context.after(() => rmSync(temporary, { recursive: true, force: true }));
+  context.after(() => rmSync(temporary, { recursive: true, force: true, maxRetries: 3 }));
   const source = resolve(import.meta.dirname, '..');
   const packageRoot = join(temporary, 'skills');
   cpSync(source, packageRoot, { recursive: true });
