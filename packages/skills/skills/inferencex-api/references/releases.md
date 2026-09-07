@@ -72,6 +72,9 @@ Do not scan every model or invent release dates to fill an empty scope.
 
 ## Run the installed comparison
 
+The direct-script example here is a legacy compatibility interface. New comparisons
+use `inferencex releases compare --output-dir` as shown above.
+
 Run from the project root; use `.claude/skills` for a Claude installation:
 
 ```bash

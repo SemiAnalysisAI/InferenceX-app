@@ -22,6 +22,9 @@ below remains available for legacy output compatibility.
 
 ## Run the installed exporter
 
+The direct-script examples in this section and the next are legacy compatibility
+interfaces. For a new export, use `inferencex powerx export --output-dir` above.
+
 Resolve the script relative to the loaded `SKILL.md`. From the user's project,
 the default Codex location is `.agents/skills/inferencex-api`; Claude Code uses
 `.claude/skills/inferencex-api`. Use the actual location for a custom installation.

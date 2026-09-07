@@ -83,9 +83,10 @@ not establish a dataset association for every sibling or exported row.
 From the project root, the equivalent summary export is:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
   --model DeepSeek-V4-Pro --raw-model dsv4 --format json \
-  --output agentx.json --evidence-dir agentx-evidence
+  --output-dir evidence/agentx
 ```
 
 For Claude Code, replace `.agents/skills` with `.claude/skills`. Use a fresh evidence
@@ -104,6 +105,9 @@ other points. These diagnostics describe replay serving performance, not answer
 quality, and do not create a new benchmark run.
 
 ## Export AgentX summaries
+
+The following direct-script examples are legacy compatibility interfaces. For new
+tasks, use `inferencex agentx export --output-dir` as shown above; its default is JSON.
 
 Use the bundled Node 24 exporter to read the complete benchmark response, select
 AgentX observations, and join only the bounded summary enrichments. A display model

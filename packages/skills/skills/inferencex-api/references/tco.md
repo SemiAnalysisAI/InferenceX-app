@@ -1,6 +1,6 @@
 # TCO feed: modeled GPU-rate cost at the same interactivity
 
-Use `scripts/compare-tco.mjs` for a fixed single-turn workload and a common median
+Use `inferencex tco compare` for a fixed single-turn workload and a common median
 interactivity target. It applies explicit user-supplied USD/GPU-hour rates to the
 public feed's output throughput. The result is a GPU rental/rate cost estimate per
 million output tokens. A full ownership TCO needs additional cost assumptions.
@@ -52,6 +52,9 @@ and retries, in the report; do not count only the final successful exports.
    separate: this helper produces no workload blend, weighted score, or ranking.
 
 ## Run the installed helper
+
+The direct-script example here is a legacy compatibility interface. New comparisons
+use `inferencex tco compare --output-dir` as shown above.
 
 Resolve the script relative to the loaded `SKILL.md`. Codex normally installs at
 `.agents/skills/inferencex-api`, Claude Code at `.claude/skills/inferencex-api`.

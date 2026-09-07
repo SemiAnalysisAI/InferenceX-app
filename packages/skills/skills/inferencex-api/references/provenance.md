@@ -19,6 +19,9 @@ a valid empty policy outcome. Preserve the incomplete attempt for diagnosis. See
 the [CLI contract](cli.md). The producer identity can differ from the snapshot
 that carried the row.
 
+The `investigate-result.mjs` examples below document the legacy single-file
+interface. New investigations use `inferencex result inspect --output-dir` above.
+
 ## Select an ID inside a known scope
 
 The public API has **no full benchmark-row-by-ID endpoint**. Start with the

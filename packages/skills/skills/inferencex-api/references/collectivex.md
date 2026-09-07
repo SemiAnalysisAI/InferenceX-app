@@ -28,16 +28,20 @@ cases, and explain which observations cannot be compared."
 Run from a project with the npm skill installed for Codex:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/compare-collectivex.mjs --output collectivex-comparison.json
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
 ```
 
 For Claude Code, use the corresponding installed path:
 
 ```bash
-node .claude/skills/inferencex-api/scripts/compare-collectivex.mjs --output collectivex-comparison.json
+mkdir -p evidence
+node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
 ```
 
-Requires Node 24+. The helper checks the current OpenAPI operations, reads the run
+Requires Node 24+. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
 bounded example selection, not a representative sample. A cancelled or failed
@@ -46,8 +50,21 @@ workflow can still contain measured cases; its conclusion remains in the export.
 For a requested pair, supply both exact string IDs from discovery:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/compare-collectivex.mjs --left <left-run-id> --right <right-run-id> --output collectivex-pair.json
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left <left-run-id> --right <right-run-id> --output-dir evidence/collectivex-pair
 ```
+
+The versioned command saves a formal bundle with a 120-second total deadline and
+a shared 32 MiB response budget. The explicit pair uses three logical reads;
+discovery uses at most four. Retry attempts follow the [CLI contract](cli.md). Finish any
+report in a sibling path, then run `inferencex verify` on that output directory.
+
+### Legacy direct helper
+
+Use `scripts/compare-collectivex.mjs --output comparison.json` only for an explicitly
+requested legacy single-file export. Its embedded response evidence is a different
+format from the directory required by `inferencex verify`. The following resource
+and output details describe that legacy interface.
 
 The explicit pair makes three GETs; discovery makes at most four. Each request has
 a 30-second timeout, and all decoded responses share a 32 MiB budget. There are no

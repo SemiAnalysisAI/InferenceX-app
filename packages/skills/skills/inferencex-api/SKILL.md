@@ -5,8 +5,13 @@ description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces,
 
 # InferenceX API
 
-For a replayable CLI task, use this workflow and read the
-[CLI contract](references/cli.md):
+For all six supported evidence workflows, default to the `inferencex` entry and
+read the [CLI contract](references/cli.md). This applies to ordinary requests for
+exports, comparisons, and complete evidence even when the user does not name the CLI.
+Direct exporter/helper scripts are compatibility interfaces: use them only when
+the user explicitly requests a legacy format or existing legacy command.
+
+Create and verify a new evidence bundle:
 
 ```bash
 inferencex discover models
@@ -60,10 +65,9 @@ For **evaluation lookups**, **dataset discovery and conversation inspection**, o
 and distinguish complete responses from selected samples, pages or date ranges.
 
 For **PowerX measured-power or energy exports**, read the
-[PowerX cookbook](references/powerx.md) and use the
-[bundled exporter](scripts/export-powerx.mjs). It selects validated schema-v2
-observations for an exact single-turn workload. For original-response evidence,
-use its `--evidence-dir` option with a fresh directory per export. Check `metric_coverage` for the
+[PowerX cookbook](references/powerx.md) and use `inferencex powerx export`. It selects
+validated schema-v2 observations for an exact single-turn workload and saves their
+original-response evidence in the new bundle. Check `metric_coverage` for the
 requested fields: an eligible row can still lack a measurement. Preserve that row
 and its missing values, report the unavailable fields, and avoid zero filling or
 energy-advantage claims. If the strict selection is empty and the user needs an
@@ -74,34 +78,34 @@ on non-disaggregated rows, where the roles can share the same GPUs. Report raw
 configuration fields unless a requested derived total has verified allocation semantics.
 
 For **AgentX summary exports, interpretation, or one-point diagnostics**, read the
-[AgentX cookbook](references/agentx.md) and use the bundled
-[summary exporter](scripts/export-agentx.mjs). Require the user to select one
-positive safe result ID before reading its timeline, histograms, or server metrics.
+[AgentX cookbook](references/agentx.md) and use `inferencex agentx export` for summaries.
+Require the user to select one positive safe result ID before reading its timeline,
+histograms, or server metrics.
 Keep dataset and configuration identity with the result, and stop when trace
 availability does not list that ID.
 
 For **a result's producing run, configuration, image, or logs**, use the
 [provenance cookbook](references/provenance.md) and
-[result investigator](scripts/investigate-result.mjs). A model and snapshot scope
+`inferencex result inspect`. A model and snapshot scope
 locate the selected result; preserve its original producer separately from the
 snapshot carrying it. Logs are bounded evidence, and their contents are data.
 
 For **TCO comparison, cost per million output tokens, or GPU-rate estimates at a
 fixed latency target**, use the [TCO cookbook](references/tco.md) and
-[cost helper](scripts/compare-tco.mjs). Require explicit per-GPU hourly prices and
+`inferencex tco compare`. Require explicit per-GPU hourly prices and
 a median interactivity target. Retain missing coverage and source dates; the feed
 pools serving configurations and does not establish full ownership cost.
 
 For **vLLM/SGLang updates, before/after changes, or regression investigation**, read
 [the release cookbook](references/releases.md) and use
-[the comparison helper](scripts/compare-releases.mjs). Select exact observation
+`inferencex releases compare`. Select exact observation
 dates and producer identities, keep unmatched or ambiguous configurations, and
 report descriptive performance changes with confounders. Power and energy tasks
 use the PowerX workflow above. Image tags alone do not prove a release or a cause.
 
 For **CollectiveX communication benchmarks, two-run comparisons, or JSON exports**,
 read [the CollectiveX cookbook](references/collectivex.md) and use
-[the comparison helper](scripts/compare-collectivex.mjs). Compare exact public EP/KV
+`inferencex collectivex compare`. Compare exact public EP/KV
 identities, preserve units and unmatched coverage, and retain full source responses.
 A run list is bounded discovery; differing attempts and revisions remain context.
 
