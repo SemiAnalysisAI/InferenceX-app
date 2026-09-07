@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { link, lstat, realpath, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { PACKAGE_VERSION, argumentError, outputBoundary, responseError } from './cli-contract.mjs';
+import {
+  CliError,
+  PACKAGE_VERSION,
+  argumentError,
+  outputBoundary,
+  responseError,
+} from './cli-contract.mjs';
 import { allCommandDescriptions, getOperation } from './commands.mjs';
 import { evaluatePolicy, validateCoverage } from './coverage-policy.mjs';
 import { BUNDLE_LIMITS, openReplay } from './evidence-bundle.mjs';
@@ -21,14 +27,25 @@ function stable(value) {
   return value;
 }
 
-export async function verifyBundle(directory, { signal, policy = {} } = {}) {
+export async function verifyBundle(directory, options = {}) {
+  try {
+    return await reconstructBundle(directory, options);
+  } catch (error) {
+    if (error?.code === 'INVALID_RESPONSE') {
+      throw new CliError('INVALID_EVIDENCE', error.message, { cause: error });
+    }
+    throw error;
+  }
+}
+
+async function reconstructBundle(directory, { signal, policy = {} }) {
   const replay = await openReplay(directory, { signal });
   const { manifest } = replay;
   const description = allCommandDescriptions().find(
     (candidate) => candidate.formal && candidate.kind === manifest.kind,
   );
   if (description === undefined) {
-    throw responseError(`Unsupported evidence kind: ${manifest.kind}`);
+    throw new CliError('UNSUPPORTED_CONTRACT', `Unsupported evidence kind: ${manifest.kind}`);
   }
   let operation;
   try {
@@ -37,7 +54,8 @@ export async function verifyBundle(directory, { signal, policy = {} } = {}) {
     throw responseError(`Could not load the recorded evidence contract: ${error.message}`, error);
   }
   if (manifest.contract_version !== operation.contractVersion) {
-    throw responseError(
+    throw new CliError(
+      'UNSUPPORTED_CONTRACT',
       `Unsupported ${manifest.kind} evidence contract version: ${manifest.contract_version}`,
     );
   }
@@ -52,7 +70,7 @@ export async function verifyBundle(directory, { signal, policy = {} } = {}) {
   } catch (error) {
     throw responseError(`Saved normalized arguments are invalid: ${error.message}`, error);
   }
-  if (!isDeepStrictEqual(stable(options), stable(manifest.normalized_arguments))) {
+  if (!isDeepStrictEqual(options, manifest.normalized_arguments)) {
     throw responseError('Normalized arguments do not match the recorded canonical options');
   }
   let built;
@@ -77,7 +95,7 @@ export async function verifyBundle(directory, { signal, policy = {} } = {}) {
   if (!Buffer.isBuffer(built.bytes) || built.bytes.compare(replay.resultBytes) !== 0) {
     throw responseError('Reconstructed result bytes do not match the saved result');
   }
-  if (!isDeepStrictEqual(stable(built.coverage), stable(manifest.coverage))) {
+  if (!isDeepStrictEqual(built.coverage, manifest.coverage)) {
     throw responseError('Reconstructed coverage does not match the manifest');
   }
   let recordedPolicy;
@@ -101,7 +119,7 @@ export async function verifyBundle(directory, { signal, policy = {} } = {}) {
     policy: recordedPolicy,
     output: { result: manifest.result.path, manifest: 'manifest.json' },
   };
-  if (!isDeepStrictEqual(stable(manifest.summary), stable(expectedSummary))) {
+  if (!isDeepStrictEqual(manifest.summary, expectedSummary)) {
     throw responseError('Recorded bundle summary does not match reconstructed evidence');
   }
   return {

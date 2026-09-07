@@ -55,7 +55,6 @@ test('parseOperation separates stable global arguments from domain arguments', (
       outputDir: '证据 bundle',
       policy: { requireHardware: ['h200_sxm', 'b200'], minComparablePairs: null },
       human: true,
-      errorFormat: 'text',
       timeoutMs: 5000,
       maxAttempts: 1,
     },

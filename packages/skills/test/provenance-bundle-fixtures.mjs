@@ -105,9 +105,8 @@ export function provenanceBundleFixtures() {
       'producer-differs-from-curve': {
         args,
         responses,
-        expected: { resultId: '421', producerRun: '123456789', producerAttempt: '2' },
       },
-      'missing-log': { args, responses: missingLog, expected: { resultId: '421' } },
+      'missing-log': { args, responses: missingLog },
     },
   };
 }

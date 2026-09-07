@@ -13,6 +13,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 
+import { CliError } from '../skills/inferencex-api/scripts/cli-contract.mjs';
+import { verifyBundle } from '../skills/inferencex-api/scripts/verify-bundle.mjs';
 import { evaluatePolicy } from '../skills/inferencex-api/scripts/coverage-policy.mjs';
 import { bundleSuite } from './bundle-harness.mjs';
 
@@ -39,6 +41,10 @@ test('an export policy failure commits valid evidence and its recorded summary',
   assert.equal(exported.policy.status, 'failed');
   const manifest = JSON.parse(readFileSync(join(saved.directory, 'manifest.json'), 'utf8'));
   assert.equal(manifest.summary.policy.status, 'failed');
+  assert.deepEqual(exported, {
+    ...manifest.summary,
+    output: { ...manifest.summary.output, directory: saved.directory },
+  });
   const verified = bundles.verify(saved.directory);
   assert.equal(verified.status, 0, verified.stderr);
   assert.equal(JSON.parse(verified.stdout).policy.status, 'not_requested');
@@ -152,23 +158,22 @@ test('Markdown reports are deterministic after relocation and never edit the evi
   assert.equal(readFileSync(secondReport, 'utf8'), readFileSync(firstReport, 'utf8'));
 });
 
-test('unknown kinds and malformed saved options are invalid evidence, not user arguments', () => {
-  for (const mutate of [
-    (manifest) => {
-      manifest.kind = 'unknown';
-    },
-    (manifest) => {
-      manifest.normalized_arguments.isl = '8192';
-    },
+test('offline errors distinguish unsupported contracts from invalid evidence', () => {
+  for (const [field, value, code] of [
+    ['kind', 'unknown', 'UNSUPPORTED_CONTRACT'],
+    ['contract_version', 2, 'UNSUPPORTED_CONTRACT'],
+    ['normalized_arguments', { isl: '8192' }, 'INVALID_EVIDENCE'],
   ]) {
     const saved = bundles.create('powerx', 'positive');
     const manifestPath = join(saved.directory, 'manifest.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    mutate(manifest);
+    manifest[field] = value;
     writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+    const before = bundles.fingerprint(saved.directory);
     const result = bundles.verify(saved.directory);
     assert.equal(result.status, 1, result.stderr);
-    assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_RESPONSE');
+    assert.equal(JSON.parse(result.stderr).error.code, code);
+    assert.deepEqual(bundles.fingerprint(saved.directory), before);
   }
 });
 
@@ -186,7 +191,17 @@ test('reconstruction rejects changed result bytes even when their manifest hash 
   writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
   const verified = bundles.verify(saved.directory);
   assert.equal(verified.status, 1);
+  assert.equal(JSON.parse(verified.stderr).error.code, 'INVALID_EVIDENCE');
   assert.match(JSON.parse(verified.stderr).error.message, /reconstructed result bytes/iu);
+});
+
+test('offline verification preserves cancellation instead of reporting invalid evidence', async () => {
+  const saved = bundles.create('powerx', 'positive');
+  const reason = new CliError('CANCELLED', 'cancelled verification');
+  await assert.rejects(
+    verifyBundle(saved.directory, { signal: AbortSignal.abort(reason) }),
+    (error) => error === reason,
+  );
 });
 
 test('report output rejects existing files and evidence-directory targets without mutation', () => {
@@ -240,6 +255,6 @@ test('offline verification rejects incomplete, malformed, escaping, missing and 
     mutate(saved.directory);
     const result = bundles.verify(saved.directory);
     assert.equal(result.status, 1, result.stderr);
-    assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_RESPONSE');
+    assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_EVIDENCE');
   }
 });

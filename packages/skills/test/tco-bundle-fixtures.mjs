@@ -42,21 +42,14 @@ const args = [
 const url =
   'https://inferencex.semianalysis.com/api/v1/tco-feed?model=dsv4&workloads=1024x1024&tiers=50&view=points&format=json&date=2026-09-06';
 
-const fixture = (rows, expected, fixtureArgs = args) => ({
+const fixture = (rows, fixtureArgs = args) => ({
   args: fixtureArgs,
   responses: [{ operation: 'tco-feed', url, status: 200, body: feed(rows) }],
-  expected,
 });
 
 export const TCO_BUNDLE_VARIANTS = {
-  positive: fixture([point(), point('mi355x', { output_tput_per_gpu: 500 })], {
-    costs: [1, 1],
-    valid_hardware: ['b200', 'mi355x'],
-  }),
-  partial: fixture([point()], {
-    costs: [1, null],
-    valid_hardware: ['b200'],
-  }),
+  positive: fixture([point(), point('mi355x', { output_tput_per_gpu: 500 })]),
+  partial: fixture([point()]),
   boundaries: fixture(
     [
       point('b200', {
@@ -74,7 +67,6 @@ export const TCO_BUNDLE_VARIANTS = {
       }),
       point('h200_sxm', { output_tput_per_gpu: 0 }),
     ],
-    { costs: [null, null, null], valid_hardware: [] },
     args.map((value) =>
       value === 'b200=3.6,mi355x=1.8' ? 'b200=3.6,mi355x=1.8,h200_sxm=2' : value,
     ),

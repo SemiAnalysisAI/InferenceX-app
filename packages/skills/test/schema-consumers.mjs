@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,7 +16,7 @@ import { RELEASE_ARGS, RELEASE_BUNDLE_VARIANTS } from './releases-bundle-fixture
 import { TCO_BUNDLE_VARIANTS } from './tco-bundle-fixtures.mjs';
 
 const packageRoot = resolve(import.meta.dirname, '..');
-const scratch = mkdtempSync(join(tmpdir(), 'inferencex-schema-consumers-'));
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'inferencex-schema-consumers-')));
 const validator = new Ajv2020({ strict: true, allErrors: true, validateFormats: false });
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const imported = (path) => import(pathToFileURL(path).href);
@@ -33,9 +33,10 @@ function rejectSchema(schema, value, label) {
 }
 
 function command(name, args, options = {}) {
-  const result = spawnSync(name, args, { encoding: 'utf8', ...options });
+  const { expectedStatus = 0, ...spawnOptions } = options;
+  const result = spawnSync(name, args, { encoding: 'utf8', ...spawnOptions });
   assert.ifError(result.error);
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result;
 }
 
@@ -378,6 +379,60 @@ try {
   });
   assertSchema(schemas.manifest, completed.manifest);
   assertSchema(schemas.summary, completed.manifest.summary);
+
+  const preload = join(scratch, 'summary-response.mjs');
+  writeFileSync(
+    preload,
+    `const fixture = ${JSON.stringify(powerxResponse)};
+globalThis.fetch = async (input) => {
+  if (String(input.url ?? input) !== fixture.url) throw new Error('Unexpected summary request');
+  return new Response(JSON.stringify(fixture.body), { status: 200 });
+};`,
+  );
+  for (const expectedStatus of [0, 3]) {
+    const outputDirectory = join(scratch, `stdout-summary-${expectedStatus}`);
+    const exported = command(
+      process.execPath,
+      [
+        '--import',
+        pathToFileURL(preload).href,
+        join(scripts, 'inferencex.mjs'),
+        'powerx',
+        'export',
+        '--model',
+        'GLM-5',
+        '--isl',
+        '8192',
+        '--osl',
+        '1024',
+        '--output-dir',
+        outputDirectory,
+        ...(expectedStatus === 3 ? ['--require-hardware', 'absent-hardware'] : []),
+      ],
+      { expectedStatus },
+    );
+    assert.equal(exported.stderr, '');
+    const summary = JSON.parse(exported.stdout);
+    assertSchema(schemas.summary, summary);
+    const manifest = JSON.parse(readFileSync(join(outputDirectory, 'manifest.json'), 'utf8'));
+    assertSchema(schemas.manifest, manifest);
+    const verified = command(
+      process.execPath,
+      [
+        join(scripts, 'inferencex.mjs'),
+        'verify',
+        outputDirectory,
+        ...(expectedStatus === 3 ? ['--require-hardware', 'absent-hardware'] : []),
+      ],
+      { expectedStatus },
+    );
+    assertSchema(schemas.verification, JSON.parse(verified.stdout));
+    assert.deepEqual(summary, {
+      ...manifest.summary,
+      output: { ...manifest.summary.output, directory: outputDirectory },
+    });
+  }
+
   const { verifyBundle } = await imported(join(scripts, 'verify-bundle.mjs'));
   const verification = await verifyBundle(completed.directory);
   assertSchema(schemas.verification, verification);
@@ -432,12 +487,24 @@ try {
     ambiguousCollectiveMetric,
     'CollectiveX value status with null value',
   );
+  const failedPolicy = structuredClone(completed.manifest.summary);
+  failedPolicy.policy = {
+    status: 'failed',
+    requirements: { require_hardware: ['absent-hardware'], min_comparable_pairs: null },
+    reasons: [{ code: 'REQUIRED_HARDWARE_MISSING', required: 1, actual: 0 }],
+  };
+  rejectSchema(schemas.summary, failedPolicy, 'hardware policy failure without hardware');
+  failedPolicy.policy.reasons = [{ code: 'MIN_COMPARABLE_PAIRS_UNMET', required: 2, actual: 1 }];
+  assertSchema(schemas.summary, failedPolicy);
+  failedPolicy.policy.reasons[0].actual = '1';
+  rejectSchema(schemas.summary, failedPolicy, 'policy actual value with wrong numeric type');
+
   const incompleteAttempt = structuredClone(completed.manifest);
   delete incompleteAttempt.requests[0].attempts[0].status;
   rejectSchema(schemas.manifest, incompleteAttempt, 'evidence attempt without outcome');
 
   process.stdout.write(
-    'Validated 12 public schemas, 10 packed domain outputs, and 8 negative fixtures.\n',
+    'Validated 12 public schemas, 10 packed domain outputs, 4 CLI stdout documents, and 10 negative fixtures.\n',
   );
 } finally {
   rmSync(scratch, { recursive: true, force: true });

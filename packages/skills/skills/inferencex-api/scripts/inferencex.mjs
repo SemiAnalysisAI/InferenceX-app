@@ -19,7 +19,6 @@ import {
   runCli,
   writeStdout,
 } from './cli-contract.mjs';
-import { evaluatePolicy } from './coverage-policy.mjs';
 import { reserveBundle } from './evidence-bundle.mjs';
 import { createHttpClient } from './http-client.mjs';
 import { verifyBundle, writeVerificationReport } from './verify-bundle.mjs';
@@ -154,20 +153,9 @@ async function runFormal(parsed, signal) {
       built,
       signal,
     });
-    const policy = evaluatePolicy(parsed.kind, built.coverage, parsed.policy);
     const summary = {
-      schema_version: 1,
-      command: parsed.command,
-      kind: parsed.kind,
-      package_version: PACKAGE_VERSION,
-      validity: 'valid',
-      coverage: built.coverage,
-      policy,
-      output: {
-        directory: saved.directory,
-        result: saved.manifest.result.path,
-        manifest: 'manifest.json',
-      },
+      ...saved.manifest.summary,
+      output: { ...saved.manifest.summary.output, directory: saved.directory },
     };
     // Once manifest.json exists, cancellation no longer turns the completed export into a failure.
     await emitSummary(summary, parsed.human, undefined, saved.directory);

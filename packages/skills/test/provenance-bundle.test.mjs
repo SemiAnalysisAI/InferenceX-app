@@ -65,7 +65,7 @@ test('substituting a curve producer cannot be hidden by updating the result hash
   const before = bundles.fingerprint(saved.directory);
   const verified = bundles.verify(saved.directory);
   assert.equal(verified.status, 1);
-  assert.equal(JSON.parse(verified.stderr).error.code, 'INVALID_RESPONSE');
+  assert.equal(JSON.parse(verified.stderr).error.code, 'INVALID_EVIDENCE');
   assert.deepEqual(bundles.fingerprint(saved.directory), before);
 });
 

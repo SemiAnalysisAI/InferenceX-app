@@ -70,18 +70,12 @@ const native = ['codex', 'claude'].map((runtime) => ({
   })),
 }));
 const candidate = {
-  package_version: release.version,
-  archive_sha256: hash,
-  tested_source_commit: release.source_commit,
   status: 'passed',
   mode: 'candidate',
   candidate: release,
   new_benchmark_runs: false,
   scope,
   targets: [{ target: 'codex' }, { target: 'claude' }],
-  platform_matrix: matrix,
-  native_acceptance: native,
-  known_limitations: ['NO_NEW_BENCHMARKS', 'WINDOWS_UNQUALIFIED'],
   environment: { SECRET: 'must-not-copy' },
   logs: 'must-not-copy',
 };
@@ -92,7 +86,7 @@ const qualification = {
   tested_source_commit: release.source_commit,
   platform_matrix: matrix,
   native_acceptance: native,
-  known_limitations: candidate.known_limitations,
+  known_limitations: ['NO_NEW_BENCHMARKS', 'WINDOWS_UNQUALIFIED'],
 };
 const script = fileURLToPath(new URL('../scripts/release-summary.mjs', import.meta.url));
 
@@ -102,6 +96,7 @@ function execute(publicRecord = publicVerification) {
     ['release.json', release],
     ['candidate.json', candidate],
     ['public.json', publicRecord],
+    ['qualification.json', qualification],
   ]) {
     writeFileSync(join(root, name), JSON.stringify(value));
   }
@@ -113,6 +108,7 @@ function execute(publicRecord = publicVerification) {
       join(root, 'release.json'),
       join(root, 'candidate.json'),
       join(root, 'public.json'),
+      join(root, 'qualification.json'),
       output,
     ],
     { encoding: 'utf8' },
@@ -120,8 +116,14 @@ function execute(publicRecord = publicVerification) {
   return { ...result, root, output, outputFileExists: existsSync(output) };
 }
 
+test('summary requires an explicit qualification record', () => {
+  assert.throws(() =>
+    createReleaseSummary(release, { ...candidate, ...qualification }, publicVerification),
+  );
+});
+
 test('matching passed identities produce one sanitized durable summary', () => {
-  const summary = createReleaseSummary(release, candidate, publicVerification);
+  const summary = createReleaseSummary(release, candidate, publicVerification, qualification);
   assert.equal(summary.package_version, '1.0.0');
   assert.equal(summary.archive.sha256, hash);
   assert.equal(summary.platform_matrix.length, 4);
@@ -154,18 +156,21 @@ test('mismatched archive identity and missing verdicts never create an output', 
   assert.equal(mismatchedIdentity.outputFileExists, false);
   for (const changed of [
     { ...candidate, status: 'failed' },
-    { ...candidate, platform_matrix: matrix.slice(1) },
-    { ...candidate, native_acceptance: native.slice(1) },
     { ...candidate, new_benchmark_runs: true },
   ])
-    assert.throws(() => createReleaseSummary(release, changed, publicVerification));
+    assert.throws(() => createReleaseSummary(release, changed, publicVerification, qualification));
+  for (const changed of [
+    { ...qualification, platform_matrix: matrix.slice(1) },
+    { ...qualification, native_acceptance: native.slice(1) },
+  ])
+    assert.throws(() => createReleaseSummary(release, candidate, publicVerification, changed));
 });
 
 test('summary output is create-new and platform jobs test the accepted archive', () => {
-  const changed = structuredClone(candidate);
+  const changed = structuredClone(qualification);
   changed.platform_matrix[0].archive_sha256 = 'f'.repeat(64);
   assert.throws(
-    () => createReleaseSummary(release, changed, publicVerification),
+    () => createReleaseSummary(release, candidate, publicVerification, changed),
     /different archive/u,
   );
   const first = execute();
@@ -176,6 +181,7 @@ test('summary output is create-new and platform jobs test the accepted archive',
       join(first.root, 'release.json'),
       join(first.root, 'candidate.json'),
       join(first.root, 'public.json'),
+      join(first.root, 'qualification.json'),
       first.output,
     ],
     { encoding: 'utf8' },
@@ -185,11 +191,7 @@ test('summary output is create-new and platform jobs test the accepted archive',
 
 test('qualification is validated before publication and supplied independently of live verification', () => {
   assert.equal(validateQualification(release, qualification).platform_matrix.length, 4);
-  const liveCandidate = { ...candidate };
-  delete liveCandidate.platform_matrix;
-  delete liveCandidate.native_acceptance;
-  delete liveCandidate.known_limitations;
-  const summary = createReleaseSummary(release, liveCandidate, publicVerification, qualification);
+  const summary = createReleaseSummary(release, candidate, publicVerification, qualification);
   assert.equal(summary.native_acceptance.length, 2);
   assert.equal(summary.tested_source_commit, release.source_commit);
   for (const mutate of [

@@ -88,6 +88,11 @@ Branch on the exit code before parsing stdout:
 | `1`   | Operational, response, verification, or output failure | JSON error on stderr          |
 | `130` | Cancelled before bundle commit                         | JSON error on stderr          |
 
+Offline verification reports `INVALID_EVIDENCE` for incomplete, malformed, tampered,
+or inconsistent evidence and `UNSUPPORTED_CONTRACT` for an unknown evidence kind or
+contract version. Both exit 1. Legacy direct helpers retain `INVALID_RESPONSE` for
+invalid responses and exports.
+
 The default error format is JSON; `--error-format text` is available for people.
 `--human` changes successful stdout only. If stdout fails after `manifest.json` is
 committed, the error includes `bundle_complete: true` and the directory; verify the

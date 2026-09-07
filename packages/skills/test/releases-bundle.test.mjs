@@ -1,86 +1,44 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { before, test } from 'node:test';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
 
 import { normalizeArgs } from '../skills/inferencex-api/scripts/compare-releases.mjs';
-import { packedSkillSuite, succeeded } from './packed-skill.mjs';
+import { bundleSuite } from './bundle-harness.mjs';
+import { succeeded } from './packed-skill.mjs';
 import { RELEASE_ARGS, RELEASE_BUNDLE_VARIANTS } from './releases-bundle-fixtures.mjs';
 
-const suite = packedSkillSuite();
-let installed;
-let fixturePreload;
-let offlinePreload;
-
-function files(root, directory = root) {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    return entry.isDirectory() ? [path, ...files(root, path)] : [path];
-  });
-}
-
-function fingerprint(directory) {
-  return files(directory)
-    .map((path) => {
-      const entry = lstatSync(path);
-      const bytes = entry.isFile() ? readFileSync(path) : Buffer.alloc(0);
-      return {
-        path: relative(directory, path),
-        size: entry.size,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-      };
-    })
-    .toSorted((left, right) => left.path.localeCompare(right.path));
-}
-
-function command(preload, args, cwd, env = {}) {
-  return suite.node(
-    ['--import', pathToFileURL(preload).href, join(installed, 'scripts/inferencex.mjs'), ...args],
-    { cwd, env: { ...suite.environment, ...env } },
-  );
-}
+const bundles = bundleSuite({
+  releases: Object.fromEntries(
+    Object.entries(RELEASE_BUNDLE_VARIANTS).map(([variant, fixture]) => [
+      variant,
+      {
+        args: ['releases', 'compare', ...RELEASE_ARGS],
+        responses: [
+          {
+            operation: 'history',
+            url: 'https://inferencex.semianalysis.com/api/v1/benchmarks/history?model=GLM-5&isl=8192&osl=1024',
+            body: fixture.rows,
+            status: 200,
+          },
+        ],
+        expected: fixture.expected,
+      },
+    ]),
+  ),
+});
+const { verify, fingerprint } = bundles;
 
 function create(variant) {
-  const selected = RELEASE_BUNDLE_VARIANTS[variant];
-  const cwd = suite.project('release bundle-');
-  const fixture = join(cwd, 'fixture.json');
-  const directory = join(cwd, 'evidence');
-  writeFileSync(fixture, JSON.stringify(selected.rows));
-  const result = command(
-    fixturePreload,
-    ['releases', 'compare', ...RELEASE_ARGS, '--output-dir', directory],
-    cwd,
-    { INFERENCEX_RELEASE_FIXTURE: fixture },
-  );
-  succeeded(result);
-  const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json'), 'utf8'));
-  const output = JSON.parse(readFileSync(join(directory, manifest.result.path), 'utf8'));
-  return { directory, manifest, output, expected: selected.expected };
+  const saved = bundles.create('releases', variant);
+  succeeded(saved.result);
+  return {
+    ...saved,
+    manifest: JSON.parse(readFileSync(join(saved.directory, 'manifest.json'), 'utf8')),
+    output: bundles.readResult(saved.directory),
+  };
 }
-
-function verify(directory, args = []) {
-  return command(offlinePreload, ['verify', directory, ...args], suite.project('verify release-'));
-}
-
-before(() => {
-  installed = suite.install('codex');
-  fixturePreload = join(suite.temporaryRoot, 'release-bundle-response.mjs');
-  offlinePreload = join(suite.temporaryRoot, 'release-bundle-offline.mjs');
-  writeFileSync(
-    fixturePreload,
-    `
-import { readFileSync } from 'node:fs';
-const rows = readFileSync(process.env.INFERENCEX_RELEASE_FIXTURE, 'utf8');
-globalThis.fetch = async () => new Response(rows, { headers: { 'content-type': 'application/json' } });
-`,
-  );
-  writeFileSync(
-    offlinePreload,
-    `globalThis.fetch = () => { throw new Error('release verification attempted network access'); };\n`,
-  );
-});
 
 test('release options normalize to one closed replayable object', () => {
   const canonical = normalizeArgs(RELEASE_ARGS);
@@ -145,6 +103,6 @@ test('rehashing a stronger causal claim cannot bypass offline reconstruction', (
     const checked = verify(saved.directory);
     assert.equal(checked.status, 1);
     assert.equal(checked.stdout, '');
-    assert.equal(JSON.parse(checked.stderr).error.code, 'INVALID_RESPONSE');
+    assert.equal(JSON.parse(checked.stderr).error.code, 'INVALID_EVIDENCE');
   }
 });

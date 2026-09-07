@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { createHash } from 'node:crypto';
 import { lstat, realpath } from 'node:fs/promises';
 import { join, posix, resolve } from 'node:path';
@@ -8,15 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { inspectInstallTransaction } from '../../../bin/install-transaction.mjs';
-import {
-  argumentError,
-  CliError,
-  isMain,
-  PACKAGE_NAME,
-  PACKAGE_VERSION,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, CliError, PACKAGE_NAME, PACKAGE_VERSION } from './cli-contract.mjs';
 import { createHttpClient } from './http-client.mjs';
 import { readBoundedRegular } from './local-files.mjs';
 
@@ -41,17 +31,6 @@ const OPERATIONS = [
   '/api/v1/collectivex/runs',
   '/api/v1/collectivex/runs/{runId}',
 ];
-const HELP = `inferencex doctor — inspect the runtime and one installation
-
-Usage:
-  inferencex doctor [--target codex|claude|agents | --dir <skills-root>] [--check-api]
-
-Default: inspect this executing package. --target and --dir inspect an installed skill.
---check-api opts into one OpenAPI GET with a 10 second, 4 MiB, one-attempt limit.
-Healthy diagnostics write JSON to stdout. Unhealthy diagnostics write one JSON error to stderr.
-The doctor is read-only: it never installs, repairs, recovers, or deletes files.
-Extra user-owned files are ignored. Matching local hashes do not prove publisher authenticity.
-`;
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -435,29 +414,4 @@ export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = 
     });
   }
   return report;
-}
-
-async function main(args, signal) {
-  if (args.length === 1 && args[0] === '--help') {
-    await writeStdout(HELP, { signal });
-    return;
-  }
-  if (args.length === 1 && args[0] === '--version') {
-    await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-    return;
-  }
-  const report = await diagnose(args, { signal });
-  await writeStdout(`${JSON.stringify(report, null, 2)}\n`, { signal });
-}
-
-if (isMain(import.meta.url)) {
-  const args = process.argv.slice(2);
-  await runCli({
-    command: 'doctor',
-    packageVersion: PACKAGE_VERSION,
-    args,
-    textUsageExitCode: 2,
-    defaultErrorFormat: 'json',
-    run: ({ signal }) => main(args, signal),
-  });
 }

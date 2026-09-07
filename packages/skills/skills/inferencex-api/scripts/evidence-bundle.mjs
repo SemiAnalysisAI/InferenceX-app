@@ -528,11 +528,6 @@ export async function openReplay(directory, { signal } = {}) {
       if (total > BUNDLE_LIMITS.responses) {
         throw responseError('Responses exceed the 128 MiB total byte limit');
       }
-      if (bytes.length !== request.response.size || sha256(bytes) !== request.response.sha256) {
-        throw responseError(
-          `Response ${request.response.id} size or SHA-256 does not match the manifest`,
-        );
-      }
       responseCache.set(request.response.id, bytes);
     }
     if (bytes.length !== request.response.size || sha256(bytes) !== request.response.sha256) {
@@ -542,15 +537,15 @@ export async function openReplay(directory, { signal } = {}) {
     }
     responses.push({ request, bytes, body: parseJson(bytes, `response ${request.response.id}`) });
   }
-  const consumed = new Set();
+  let consumed = 0;
   return {
     manifest,
     resultBytes,
     get(spec) {
-      try {
-        const index = responses.findIndex((_response, candidate) => !consumed.has(candidate));
-        if (index === -1) throw responseError(`No recorded response remains for ${spec.operation}`);
-        const saved = responses[index];
+      return Promise.try(() => {
+        const saved = responses[consumed];
+        if (saved === undefined)
+          throw responseError(`No recorded response remains for ${spec.operation}`);
         if (
           saved.request.operation !== spec.operation ||
           saved.request.url !== spec.url ||
@@ -558,29 +553,24 @@ export async function openReplay(directory, { signal } = {}) {
         ) {
           throw responseError(`Recorded request scope does not match ${spec.operation}`);
         }
-        consumed.add(index);
-        return Promise.resolve({
+        consumed++;
+        return {
           id: saved.request.response.id,
           status: saved.request.response.status,
           retrievedAt: saved.request.response.retrieved_at,
           bytes: saved.bytes,
           body: saved.body,
-        });
-      } catch (error) {
-        return Promise.reject(error);
-      }
+        };
+      });
     },
     assertConsumed() {
-      try {
-        if (consumed.size !== responses.length) {
+      return Promise.try(() => {
+        if (consumed !== responses.length) {
           throw responseError(
-            `${responses.length - consumed.size} recorded request(s) were not consumed`,
+            `${responses.length - consumed} recorded request(s) were not consumed`,
           );
         }
-        return Promise.resolve();
-      } catch (error) {
-        return Promise.reject(error);
-      }
+      });
     },
   };
 }

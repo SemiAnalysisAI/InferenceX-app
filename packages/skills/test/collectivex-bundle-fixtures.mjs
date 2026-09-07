@@ -131,7 +131,7 @@ const schema = {
   ),
 };
 
-function explicit(left, right, expected) {
+function explicit(left, right) {
   return {
     args: ['collectivex', 'compare', '--left', left.run.run_id, '--right', right.run.run_id],
     responses: [
@@ -149,7 +149,6 @@ function explicit(left, right, expected) {
         status: 200,
       },
     ],
-    expected,
   };
 }
 
@@ -172,10 +171,10 @@ const discoveryList = {
 };
 
 export const COLLECTIVEX_BUNDLE_VARIANTS = freeze({
-  positive: explicit(left, right, { matched: 1, comparable_pairs: 1 }),
-  'zero-denominator': explicit(zeroLeft, right, { matched: 1, comparable_pairs: 1 }),
-  'kv-positive': explicit(kvLeft, kvRight, { matched: 1, comparable_pairs: 1 }),
-  'topology-mismatch': explicit(left, topologyMismatch, { matched: 0, comparable_pairs: 0 }),
+  positive: explicit(left, right),
+  'zero-denominator': explicit(zeroLeft, right),
+  'kv-positive': explicit(kvLeft, kvRight),
+  'topology-mismatch': explicit(left, topologyMismatch),
   'one-list': {
     args: ['collectivex', 'compare'],
     responses: [
@@ -199,7 +198,6 @@ export const COLLECTIVEX_BUNDLE_VARIANTS = freeze({
         status: 200,
       },
     ],
-    expected: { matched: 1, comparable_pairs: 1 },
   },
   empty: {
     args: ['collectivex', 'compare'],
@@ -212,6 +210,5 @@ export const COLLECTIVEX_BUNDLE_VARIANTS = freeze({
         status: 200,
       },
     ],
-    expected: { matched: 0, comparable_pairs: 0 },
   },
 });

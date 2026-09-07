@@ -264,7 +264,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     command: 'discover',
     route: ['discover'],
     kind: 'discovery',
-    module: './discover.mjs',
     description: 'Discover capabilities, models, dates, datasets, and observed configs.',
     formats: ['json'],
     policies: [],
@@ -296,7 +295,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     command: 'verify',
     route: ['verify'],
     kind: 'verification',
-    module: './verify-bundle.mjs',
     description: 'Verify a completed evidence directory without network access.',
     formats: ['json'],
     policies: ['require-hardware', 'min-comparable-pairs'],
@@ -317,7 +315,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     command: 'describe',
     route: ['describe'],
     kind: 'description',
-    module: null,
     description: 'Print fixed command metadata offline.',
     formats: ['json'],
     policies: [],
@@ -334,7 +331,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     command: 'schema',
     route: ['schema'],
     kind: 'schema',
-    module: null,
     description: 'Print one public JSON Schema offline.',
     formats: ['json'],
     policies: [],
@@ -351,7 +347,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     command: 'doctor',
     route: ['doctor'],
     kind: 'doctor',
-    module: './doctor.mjs',
     description: 'Inspect the runtime and installed package; API check is opt-in.',
     formats: ['json'],
     policies: [],
@@ -500,10 +495,6 @@ export function parseOperation(argv) {
     throw argumentError(error.message, error);
   }
 
-  const errorFormat = values['error-format'] ?? 'json';
-  if (!['json', 'text'].includes(errorFormat)) {
-    throw argumentError('--error-format must be json or text.');
-  }
   const outputDir = values['output-dir'] ?? null;
   if (outputDir !== null && outputDir.trim() === '') {
     throw argumentError('--output-dir requires a non-empty directory.');
@@ -550,7 +541,6 @@ export function parseOperation(argv) {
     outputDir,
     policy: { requireHardware, minComparablePairs },
     human: values.human ?? false,
-    errorFormat,
     timeoutMs: Math.min(
       entry.network?.timeoutMs ?? 120_000,
       values['timeout-ms'] === undefined

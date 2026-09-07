@@ -238,12 +238,7 @@ export function validateQualification(release, qualification) {
   };
 }
 
-export function createReleaseSummary(
-  release,
-  candidate,
-  publicVerification,
-  qualification = candidate,
-) {
+export function createReleaseSummary(release, candidate, publicVerification, qualification) {
   const accepted = validateQualification(release, qualification);
   const releaseIdentity = identity(release);
   validateVerdict(candidate, 'candidate', releaseIdentity);
@@ -287,9 +282,9 @@ function main(args) {
     process.stdout.write(`${JSON.stringify(accepted)}\n`);
     return;
   }
-  if (![4, 5].includes(args.length)) {
+  if (args.length !== 5) {
     throw new Error(
-      'Usage: release-summary.mjs <release.json> <candidate-verification.json> <public-verification.json> [qualification.json] <new-summary.json>\n       release-summary.mjs check-qualification <release.json> <qualification.json>',
+      'Usage: release-summary.mjs <release.json> <candidate-verification.json> <public-verification.json> <qualification.json> <new-summary.json>\n       release-summary.mjs check-qualification <release.json> <qualification.json>',
     );
   }
   const [releasePath, candidatePath, publicPath] = args;
@@ -298,7 +293,7 @@ function main(args) {
     readRecord(releasePath),
     readRecord(candidatePath),
     readRecord(publicPath),
-    args.length === 5 ? readRecord(args[3]) : undefined,
+    readRecord(args[3]),
   );
   writeFileSync(outputPath, `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx' });
   process.stdout.write(`${JSON.stringify(summary)}\n`);

@@ -727,13 +727,16 @@ export function buildAgentxExport({
       2,
     )}\n`;
   } else {
-    const metricColumns = unique(
-      rows.flatMap(({ benchmark }) =>
-        Object.entries(benchmark.metrics)
-          .filter(([, value]) => scalar(value))
-          .map(([key]) => `metrics.${key}`),
-      ),
-    );
+    const metricColumns =
+      contractVersion === 1
+        ? []
+        : unique(
+            rows.flatMap(({ benchmark }) =>
+              Object.entries(benchmark.metrics)
+                .filter(([, value]) => scalar(value))
+                .map(([key]) => `metrics.${key}`),
+            ),
+          );
     const columns =
       contractVersion === 1
         ? AGENTX_CSV_COLUMNS

@@ -62,8 +62,6 @@ export const POWERX_BUNDLE_VARIANTS = freeze({
     expected: {
       selected_records: 1,
       ids: ['900719925474099312345'],
-      hardware: ['h200_sxm'],
-      valid_hardware: ['h200_sxm'],
       observation_dates: ['2026-09-01'],
       curve_dates: ['2026-09-04'],
       units: {
@@ -77,8 +75,6 @@ export const POWERX_BUNDLE_VARIANTS = freeze({
     expected: {
       selected_records: 0,
       ids: [],
-      hardware: [],
-      valid_hardware: [],
       observation_dates: [],
       curve_dates: [],
       units: {
@@ -92,8 +88,6 @@ export const POWERX_BUNDLE_VARIANTS = freeze({
     expected: {
       selected_records: 1,
       ids: ['900719925474099312345'],
-      hardware: ['h200_sxm'],
-      valid_hardware: [],
       observation_dates: ['2026-09-01'],
       curve_dates: ['2026-09-04'],
       units: {

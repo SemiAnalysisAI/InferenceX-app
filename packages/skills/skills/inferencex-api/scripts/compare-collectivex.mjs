@@ -675,41 +675,13 @@ async function main(args, signal) {
         return { body, index };
       }
       const { body: schema } = await read('/api/openapi.json');
-      for (const path of ['/api/v1/collectivex/runs', '/api/v1/collectivex/runs/{runId}']) {
-        const operation = schema.paths?.[path]?.get;
-        if (
-          !operation?.parameters
-            ?.find((parameter) => parameter.name === 'version')
-            ?.schema?.enum?.includes(VERSION) ||
-          operation.parameters.some(
-            (parameter) => parameter.required && !['version', 'runId'].includes(parameter.name),
-          )
-        ) {
-          throw new Error(
-            'Inspect the current CollectiveX OpenAPI operations before using this version-1 helper',
-          );
-        }
-      }
+      validateSchema(schema);
       let runIds = explicit ? [values.left, values.right] : [];
       let discovery = null;
       if (!explicit) {
         const { body: list, index } = await read('/api/v1/collectivex/runs?version=1');
-        if (
-          !object(list) ||
-          list.version !== VERSION ||
-          typeof list.discovery_complete !== 'boolean' ||
-          !Array.isArray(list.runs) ||
-          list.runs.some((run) => !runIdentity(run) || !count(run.measured_cases)) ||
-          new Set(list.runs.map((run) => run.run_id)).size !== list.runs.length
-        ) {
-          throw new Error('Invalid CollectiveX run list; discovery coverage is unknown');
-        }
-        runIds = list.runs
-          .filter((run) => run.measured_cases > 0)
-          .toSorted((a, b) => (BigInt(a.run_id) < BigInt(b.run_id) ? 1 : -1))
-          .slice(0, 2)
-          .map((run) => run.run_id)
-          .toReversed();
+        validateRunList(list);
+        runIds = selectRunIds(list);
         discovery = {
           response_index: index,
           returned_runs: list.runs.length,
@@ -721,41 +693,12 @@ async function main(args, signal) {
       if (runIds.length === 2) {
         for (const runId of runIds) {
           const response = await read(`/api/v1/collectivex/runs/${runId}?version=1`);
-          const data = response.body;
-          if (
-            !object(data) ||
-            data.version !== VERSION ||
-            !runIdentity(data.run) ||
-            data.run.run_id !== runId ||
-            !text(data.run.source_sha) ||
-            !Array.isArray(data.coverage) ||
-            !Array.isArray(data.series) ||
-            (data.kv !== undefined && !Array.isArray(data.kv))
-          ) {
-            throw new Error('Invalid or mismatched CollectiveX run dataset');
-          }
+          validateDataset(response.body, runId);
           datasets.push(response);
         }
       }
-      const comparisons =
-        datasets.length === 2
-          ? compare(
-              [
-                ...epRows(datasets[0].body, datasets[0].index),
-                ...kvRows(datasets[0].body, datasets[0].index),
-              ],
-              [
-                ...epRows(datasets[1].body, datasets[1].index),
-                ...kvRows(datasets[1].body, datasets[1].index),
-              ],
-            )
-          : [];
-      const summary = Object.fromEntries(
-        ['matched', 'only_left', 'only_right', 'ambiguous', 'incomparable'].map((status) => [
-          status,
-          comparisons.filter((row) => row.status === status).length,
-        ]),
-      );
+      const comparisons = comparisonRows(datasets);
+      const summary = comparisonSummary(comparisons);
       await outputJson(
         {
           schema_version: 1,

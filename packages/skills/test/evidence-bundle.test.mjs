@@ -31,6 +31,27 @@ function savedResponse(body = [{ id: 'result-1' }]) {
   };
 }
 
+function completionFixture() {
+  return {
+    kind: 'powerx',
+    contractVersion: 1,
+    options: { model: 'GLM-5', isl: 8192, osl: 1024, format: 'json' },
+    producerVersion: '1.0.0',
+    generatedAt: '2026-09-07T01:02:04.000Z',
+    built: {
+      format: 'json',
+      bytes: Buffer.from('{}\n'),
+      coverage: {
+        status: 'complete',
+        selected_records: 1,
+        comparable_pairs: null,
+        hardware: [{ hardware: 'h200_sxm', valid_records: 1 }],
+        reasons: [],
+      },
+    },
+  };
+}
+
 test('bundle completion deduplicates decoded responses and commits the manifest last', async () => {
   const root = mkdtempSync(join(tmpdir(), 'evidence-bundle-'));
   const directory = join(root, 'run');
@@ -140,24 +161,7 @@ test('replay matches exact request scope and requires every request to be consum
     },
   };
   await writer.get(spec, client);
-  await writer.complete({
-    kind: 'powerx',
-    contractVersion: 1,
-    options: { model: 'GLM-5', isl: 8192, osl: 1024, format: 'json' },
-    producerVersion: '1.0.0',
-    generatedAt: '2026-09-07T01:02:04.000Z',
-    built: {
-      format: 'json',
-      bytes: Buffer.from('{}\n'),
-      coverage: {
-        status: 'complete',
-        selected_records: 1,
-        comparable_pairs: null,
-        hardware: [{ hardware: 'h200_sxm', valid_records: 1 }],
-        reasons: [],
-      },
-    },
-  });
+  await writer.complete(completionFixture());
 
   const replay = await openReplay(directory);
   await assert.rejects(
@@ -255,27 +259,7 @@ test('completion rejects a consumed response with no request-attempt ledger', as
     allowedStatuses: [200],
   };
   await writer.get(spec, { attempts: [], get: () => response });
-  await assert.rejects(
-    writer.complete({
-      kind: 'powerx',
-      contractVersion: 1,
-      options: { model: 'GLM-5', isl: 8192, osl: 1024, format: 'json' },
-      producerVersion: '1.0.0',
-      generatedAt: '2026-09-07T01:02:04.000Z',
-      built: {
-        format: 'json',
-        bytes: Buffer.from('{}\n'),
-        coverage: {
-          status: 'complete',
-          selected_records: 1,
-          comparable_pairs: null,
-          hardware: [{ hardware: 'h200_sxm', valid_records: 1 }],
-          reasons: [],
-        },
-      },
-    }),
-    /attempt ledger/u,
-  );
+  await assert.rejects(writer.complete(completionFixture()), /attempt ledger/u);
   assert.equal(existsSync(join(directory, 'manifest.json')), false);
 });
 
@@ -307,24 +291,7 @@ test('replay checks every duplicate response reference against the cached body',
   };
   await writer.get(spec, client);
   await writer.get(spec, client);
-  const { manifest } = await writer.complete({
-    kind: 'powerx',
-    contractVersion: 1,
-    options: { model: 'GLM-5', isl: 8192, osl: 1024, format: 'json' },
-    producerVersion: '1.0.0',
-    generatedAt: '2026-09-07T01:02:04.000Z',
-    built: {
-      format: 'json',
-      bytes: Buffer.from('{}\n'),
-      coverage: {
-        status: 'complete',
-        selected_records: 1,
-        comparable_pairs: null,
-        hardware: [{ hardware: 'h200_sxm', valid_records: 1 }],
-        reasons: [],
-      },
-    },
-  });
+  const { manifest } = await writer.complete(completionFixture());
   manifest.requests[1].response.size = 0;
   manifest.requests[1].attempts[0].consumedBytes = 0;
   writeFileSync(join(directory, 'manifest.json'), `${JSON.stringify(manifest)}\n`);
@@ -358,27 +325,7 @@ test('replay rejects arbitrary request-attempt states', async () => {
     },
   };
   await writer.get(spec, client);
-  await assert.rejects(
-    writer.complete({
-      kind: 'powerx',
-      contractVersion: 1,
-      options: { model: 'GLM-5', isl: 8192, osl: 1024, format: 'json' },
-      producerVersion: '1.0.0',
-      generatedAt: '2026-09-07T01:02:04.000Z',
-      built: {
-        format: 'json',
-        bytes: Buffer.from('{}\n'),
-        coverage: {
-          status: 'complete',
-          selected_records: 1,
-          comparable_pairs: null,
-          hardware: [{ hardware: 'h200_sxm', valid_records: 1 }],
-          reasons: [],
-        },
-      },
-    }),
-    /attempt ledger/u,
-  );
+  await assert.rejects(writer.complete(completionFixture()), /attempt ledger/u);
 });
 
 test('owned response paths reject a replaced symlink ancestor before writing', async () => {

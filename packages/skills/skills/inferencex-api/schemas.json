@@ -30,6 +30,8 @@
               "NETWORK_ERROR",
               "TIMEOUT",
               "INVALID_RESPONSE",
+              "INVALID_EVIDENCE",
+              "UNSUPPORTED_CONTRACT",
               "OUTPUT_ERROR",
               "CANCELLED",
               "INSTALLATION_UNHEALTHY",
@@ -167,7 +169,39 @@
           "reasons": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "object",
+              "required": ["code", "required", "actual"],
+              "properties": {
+                "code": {
+                  "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                },
+                "required": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "if": {
+                "properties": {
+                  "code": {
+                    "const": "REQUIRED_HARDWARE_MISSING"
+                  }
+                },
+                "required": ["code"]
+              },
+              "then": {
+                "required": ["hardware"],
+                "properties": {
+                  "hardware": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": true
             }
           }
         },
@@ -429,6 +463,132 @@
         "additionalProperties": false
       },
       "coverage": {
+        "$ref": "#/$defs/coverage"
+      },
+      "summary": {
+        "title": "InferenceX summary schema 1",
+        "type": "object",
+        "required": [
+          "schema_version",
+          "command",
+          "kind",
+          "package_version",
+          "created_at",
+          "validity",
+          "coverage",
+          "policy",
+          "output"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": 1
+          },
+          "command": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
+          },
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "created_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "validity": {
+            "const": "valid"
+          },
+          "coverage": {
+            "$ref": "#/$defs/coverage"
+          },
+          "policy": {
+            "type": "object",
+            "required": ["status", "requirements", "reasons"],
+            "properties": {
+              "status": {
+                "enum": ["not_requested", "passed", "failed"]
+              },
+              "requirements": {
+                "type": "object",
+                "required": ["require_hardware", "min_comparable_pairs"],
+                "properties": {
+                  "require_hardware": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "min_comparable_pairs": {
+                    "type": ["integer", "null"],
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": true
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "required", "actual"],
+                  "properties": {
+                    "code": {
+                      "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                    },
+                    "required": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "actual": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "if": {
+                    "properties": {
+                      "code": {
+                        "const": "REQUIRED_HARDWARE_MISSING"
+                      }
+                    },
+                    "required": ["code"]
+                  },
+                  "then": {
+                    "required": ["hardware"],
+                    "properties": {
+                      "hardware": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "output": {
+            "type": "object",
+            "required": ["result", "manifest"],
+            "properties": {
+              "result": {
+                "type": "string",
+                "pattern": "^(?:result\\.(?:json|csv))$"
+              },
+              "manifest": {
+                "const": "manifest.json"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "coverage": {
         "type": "object",
         "required": ["status", "selected_records", "comparable_pairs", "hardware", "reasons"],
         "properties": {
@@ -479,146 +639,8 @@
           }
         },
         "additionalProperties": true
-      },
-      "summary": {
-        "title": "InferenceX summary schema 1",
-        "type": "object",
-        "required": [
-          "schema_version",
-          "command",
-          "kind",
-          "package_version",
-          "created_at",
-          "validity",
-          "coverage",
-          "policy",
-          "output"
-        ],
-        "properties": {
-          "schema_version": {
-            "const": 1
-          },
-          "command": {
-            "type": "string"
-          },
-          "kind": {
-            "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
-          },
-          "package_version": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
-          },
-          "created_at": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
-          },
-          "validity": {
-            "const": "valid"
-          },
-          "coverage": {
-            "type": "object",
-            "required": ["status", "selected_records", "comparable_pairs", "hardware", "reasons"],
-            "properties": {
-              "status": {
-                "enum": ["complete", "partial", "empty", "unknown"]
-              },
-              "selected_records": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "comparable_pairs": {
-                "type": ["integer", "null"],
-                "minimum": 0
-              },
-              "hardware": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["hardware", "valid_records"],
-                  "properties": {
-                    "hardware": {
-                      "type": "string"
-                    },
-                    "valid_records": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  },
-                  "additionalProperties": true
-                }
-              },
-              "reasons": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["code", "count"],
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "count": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  },
-                  "additionalProperties": true
-                }
-              }
-            },
-            "additionalProperties": true
-          },
-          "policy": {
-            "type": "object",
-            "required": ["status", "requirements", "reasons"],
-            "properties": {
-              "status": {
-                "enum": ["not_requested", "passed", "failed"]
-              },
-              "requirements": {
-                "type": "object",
-                "required": ["require_hardware", "min_comparable_pairs"],
-                "properties": {
-                  "require_hardware": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "min_comparable_pairs": {
-                    "type": ["integer", "null"],
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
-              },
-              "reasons": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "additionalProperties": true
-          },
-          "output": {
-            "type": "object",
-            "required": ["result", "manifest"],
-            "properties": {
-              "result": {
-                "type": "string",
-                "pattern": "^(?:result\\.(?:json|csv))$"
-              },
-              "manifest": {
-                "const": "manifest.json"
-              }
-            },
-            "additionalProperties": true
-          }
-        },
-        "additionalProperties": true
       }
-    },
-    "additionalProperties": true
+    }
   },
   "verification": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -731,7 +753,39 @@
           "reasons": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "object",
+              "required": ["code", "required", "actual"],
+              "properties": {
+                "code": {
+                  "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                },
+                "required": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "if": {
+                "properties": {
+                  "code": {
+                    "const": "REQUIRED_HARDWARE_MISSING"
+                  }
+                },
+                "required": ["code"]
+              },
+              "then": {
+                "required": ["hardware"],
+                "properties": {
+                  "hardware": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": true
             }
           }
         },
@@ -1210,199 +1264,43 @@
             ],
             "properties": {
               "avg_power_w": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "prefill_avg_power_w": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "decode_avg_power_w": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "joules_per_successful_query": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "joules_per_input_token": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "joules_per_output_token": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "joules_per_total_token": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "prefill_joules_per_input_token": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "decode_joules_per_output_token": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "avg_temp_c": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "peak_temp_c": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "avg_util_pct": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               },
               "avg_mem_used_mb": {
-                "type": "object",
-                "required": ["available_rows", "unavailable_rows"],
-                "properties": {
-                  "available_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "unavailable_rows": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/metricCoverage"
               }
             },
             "additionalProperties": true
@@ -1683,7 +1581,24 @@
         }
       }
     },
-    "additionalProperties": true
+    "additionalProperties": true,
+    "$defs": {
+      "metricCoverage": {
+        "type": "object",
+        "required": ["available_rows", "unavailable_rows"],
+        "properties": {
+          "available_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unavailable_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "agentx": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1823,165 +1738,25 @@
             ],
             "properties": {
               "raw_model": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "hardware": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "framework": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "precision": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "spec_method": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "offload_mode": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               },
               "concurrency": {
-                "type": "object",
-                "required": ["status", "value"],
-                "properties": {
-                  "status": {
-                    "enum": ["applied", "omitted"]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "additionalProperties": true
+                "$ref": "#/$defs/filter"
               }
             },
             "additionalProperties": true
@@ -2098,116 +1873,16 @@
                 "required": ["isl", "osl", "kvCacheUtil", "prefixCacheHitRate"],
                 "properties": {
                   "isl": {
-                    "type": "object",
-                    "required": [
-                      "available_rows",
-                      "null_rows",
-                      "missing_entry_rows",
-                      "unsupported_id_rows"
-                    ],
-                    "properties": {
-                      "available_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "null_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "missing_entry_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "unsupported_id_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "additionalProperties": true
+                    "$ref": "#/$defs/metricCoverage"
                   },
                   "osl": {
-                    "type": "object",
-                    "required": [
-                      "available_rows",
-                      "null_rows",
-                      "missing_entry_rows",
-                      "unsupported_id_rows"
-                    ],
-                    "properties": {
-                      "available_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "null_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "missing_entry_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "unsupported_id_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "additionalProperties": true
+                    "$ref": "#/$defs/metricCoverage"
                   },
                   "kvCacheUtil": {
-                    "type": "object",
-                    "required": [
-                      "available_rows",
-                      "null_rows",
-                      "missing_entry_rows",
-                      "unsupported_id_rows"
-                    ],
-                    "properties": {
-                      "available_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "null_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "missing_entry_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "unsupported_id_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "additionalProperties": true
+                    "$ref": "#/$defs/metricCoverage"
                   },
                   "prefixCacheHitRate": {
-                    "type": "object",
-                    "required": [
-                      "available_rows",
-                      "null_rows",
-                      "missing_entry_rows",
-                      "unsupported_id_rows"
-                    ],
-                    "properties": {
-                      "available_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "null_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "missing_entry_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "unsupported_id_rows": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "additionalProperties": true
+                    "$ref": "#/$defs/metricCoverage"
                   }
                 },
                 "additionalProperties": true
@@ -2476,148 +2151,16 @@
                               "type": "string"
                             },
                             "isl": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
-                                  "properties": {
-                                    "mean": {
-                                      "type": "number"
-                                    },
-                                    "p50": {
-                                      "type": "number"
-                                    },
-                                    "p75": {
-                                      "type": "number"
-                                    },
-                                    "p90": {
-                                      "type": "number"
-                                    },
-                                    "p95": {
-                                      "type": "number"
-                                    },
-                                    "p99": {
-                                      "type": "number"
-                                    },
-                                    "n": {
-                                      "type": "integer",
-                                      "minimum": 0
-                                    }
-                                  },
-                                  "additionalProperties": true
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
+                              "$ref": "#/$defs/distribution"
                             },
                             "osl": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
-                                  "properties": {
-                                    "mean": {
-                                      "type": "number"
-                                    },
-                                    "p50": {
-                                      "type": "number"
-                                    },
-                                    "p75": {
-                                      "type": "number"
-                                    },
-                                    "p90": {
-                                      "type": "number"
-                                    },
-                                    "p95": {
-                                      "type": "number"
-                                    },
-                                    "p99": {
-                                      "type": "number"
-                                    },
-                                    "n": {
-                                      "type": "integer",
-                                      "minimum": 0
-                                    }
-                                  },
-                                  "additionalProperties": true
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
+                              "$ref": "#/$defs/distribution"
                             },
                             "kvCacheUtil": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
-                                  "properties": {
-                                    "mean": {
-                                      "type": "number"
-                                    },
-                                    "p50": {
-                                      "type": "number"
-                                    },
-                                    "p75": {
-                                      "type": "number"
-                                    },
-                                    "p90": {
-                                      "type": "number"
-                                    },
-                                    "p95": {
-                                      "type": "number"
-                                    },
-                                    "p99": {
-                                      "type": "number"
-                                    },
-                                    "n": {
-                                      "type": "integer",
-                                      "minimum": 0
-                                    }
-                                  },
-                                  "additionalProperties": true
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
+                              "$ref": "#/$defs/distribution"
                             },
                             "prefixCacheHitRate": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
-                                  "properties": {
-                                    "mean": {
-                                      "type": "number"
-                                    },
-                                    "p50": {
-                                      "type": "number"
-                                    },
-                                    "p75": {
-                                      "type": "number"
-                                    },
-                                    "p90": {
-                                      "type": "number"
-                                    },
-                                    "p95": {
-                                      "type": "number"
-                                    },
-                                    "p99": {
-                                      "type": "number"
-                                    },
-                                    "n": {
-                                      "type": "integer",
-                                      "minimum": 0
-                                    }
-                                  },
-                                  "additionalProperties": true
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
+                              "$ref": "#/$defs/distribution"
                             }
                           },
                           "additionalProperties": true
@@ -2626,17 +2169,7 @@
                       "additionalProperties": true
                     },
                     {
-                      "type": "object",
-                      "required": ["status", "value"],
-                      "properties": {
-                        "status": {
-                          "enum": ["not_returned", "unsupported_id"]
-                        },
-                        "value": {
-                          "type": "null"
-                        }
-                      },
-                      "additionalProperties": true
+                      "$ref": "#/$defs/missingEnrichment"
                     }
                   ]
                 },
@@ -2669,17 +2202,7 @@
                       "additionalProperties": true
                     },
                     {
-                      "type": "object",
-                      "required": ["status", "value"],
-                      "properties": {
-                        "status": {
-                          "enum": ["not_returned", "unsupported_id"]
-                        },
-                        "value": {
-                          "type": "null"
-                        }
-                      },
-                      "additionalProperties": true
+                      "$ref": "#/$defs/missingEnrichment"
                     }
                   ]
                 },
@@ -2743,7 +2266,104 @@
         }
       }
     },
-    "additionalProperties": true
+    "additionalProperties": true,
+    "$defs": {
+      "filter": {
+        "type": "object",
+        "required": ["status", "value"],
+        "properties": {
+          "status": {
+            "enum": ["applied", "omitted"]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "distribution": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
+            "properties": {
+              "mean": {
+                "type": "number"
+              },
+              "p50": {
+                "type": "number"
+              },
+              "p75": {
+                "type": "number"
+              },
+              "p90": {
+                "type": "number"
+              },
+              "p95": {
+                "type": "number"
+              },
+              "p99": {
+                "type": "number"
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "metricCoverage": {
+        "type": "object",
+        "required": ["available_rows", "null_rows", "missing_entry_rows", "unsupported_id_rows"],
+        "properties": {
+          "available_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "null_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing_entry_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_id_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "missingEnrichment": {
+        "type": "object",
+        "required": ["status", "value"],
+        "properties": {
+          "status": {
+            "enum": ["not_returned", "unsupported_id"]
+          },
+          "value": {
+            "type": "null"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "result": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3397,82 +3017,7 @@
             "point": {
               "anyOf": [
                 {
-                  "type": "object",
-                  "required": [
-                    "hardware",
-                    "workload",
-                    "tier",
-                    "output_tput_per_gpu",
-                    "boundary",
-                    "is_interpolated",
-                    "frontier_points",
-                    "frontier_min_interactivity",
-                    "frontier_max_interactivity",
-                    "latest_date",
-                    "oldest_frontier_date",
-                    "evidence_date"
-                  ],
-                  "properties": {
-                    "hardware": {
-                      "type": "string"
-                    },
-                    "workload": {
-                      "type": "string"
-                    },
-                    "tier": {
-                      "type": "number"
-                    },
-                    "output_tput_per_gpu": {
-                      "type": "number"
-                    },
-                    "boundary": {
-                      "enum": ["exact", "interpolated", "clamped_low", "unreachable"]
-                    },
-                    "is_interpolated": {
-                      "type": "boolean"
-                    },
-                    "frontier_points": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "frontier_min_interactivity": {
-                      "type": ["number", "null"]
-                    },
-                    "frontier_max_interactivity": {
-                      "type": ["number", "null"]
-                    },
-                    "latest_date": {
-                      "type": ["string", "null"],
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "oldest_frontier_date": {
-                      "type": ["string", "null"],
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "evidence_date": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "required": ["from", "to"],
-                          "properties": {
-                            "from": {
-                              "type": ["string", "null"],
-                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                            },
-                            "to": {
-                              "type": ["string", "null"],
-                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                            }
-                          },
-                          "additionalProperties": true
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "additionalProperties": true
+                  "$ref": "#/$defs/point"
                 },
                 {
                   "type": "null"
@@ -3497,82 +3042,7 @@
                     "type": "number"
                   },
                   "point": {
-                    "type": "object",
-                    "required": [
-                      "hardware",
-                      "workload",
-                      "tier",
-                      "output_tput_per_gpu",
-                      "boundary",
-                      "is_interpolated",
-                      "frontier_points",
-                      "frontier_min_interactivity",
-                      "frontier_max_interactivity",
-                      "latest_date",
-                      "oldest_frontier_date",
-                      "evidence_date"
-                    ],
-                    "properties": {
-                      "hardware": {
-                        "type": "string"
-                      },
-                      "workload": {
-                        "type": "string"
-                      },
-                      "tier": {
-                        "type": "number"
-                      },
-                      "output_tput_per_gpu": {
-                        "type": "number"
-                      },
-                      "boundary": {
-                        "enum": ["exact", "interpolated", "clamped_low", "unreachable"]
-                      },
-                      "is_interpolated": {
-                        "type": "boolean"
-                      },
-                      "frontier_points": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "frontier_min_interactivity": {
-                        "type": ["number", "null"]
-                      },
-                      "frontier_max_interactivity": {
-                        "type": ["number", "null"]
-                      },
-                      "latest_date": {
-                        "type": ["string", "null"],
-                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                      },
-                      "oldest_frontier_date": {
-                        "type": ["string", "null"],
-                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                      },
-                      "evidence_date": {
-                        "anyOf": [
-                          {
-                            "type": "object",
-                            "required": ["from", "to"],
-                            "properties": {
-                              "from": {
-                                "type": ["string", "null"],
-                                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                              },
-                              "to": {
-                                "type": ["string", "null"],
-                                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                              }
-                            },
-                            "additionalProperties": true
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "additionalProperties": true
+                    "$ref": "#/$defs/point"
                   }
                 }
               }
@@ -3598,7 +3068,87 @@
         }
       }
     },
-    "additionalProperties": true
+    "additionalProperties": true,
+    "$defs": {
+      "point": {
+        "type": "object",
+        "required": [
+          "hardware",
+          "workload",
+          "tier",
+          "output_tput_per_gpu",
+          "boundary",
+          "is_interpolated",
+          "frontier_points",
+          "frontier_min_interactivity",
+          "frontier_max_interactivity",
+          "latest_date",
+          "oldest_frontier_date",
+          "evidence_date"
+        ],
+        "properties": {
+          "hardware": {
+            "type": "string"
+          },
+          "workload": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "number"
+          },
+          "output_tput_per_gpu": {
+            "type": "number"
+          },
+          "boundary": {
+            "enum": ["exact", "interpolated", "clamped_low", "unreachable"]
+          },
+          "is_interpolated": {
+            "type": "boolean"
+          },
+          "frontier_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "frontier_min_interactivity": {
+            "type": ["number", "null"]
+          },
+          "frontier_max_interactivity": {
+            "type": ["number", "null"]
+          },
+          "latest_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "oldest_frontier_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "evidence_date": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                  "from": {
+                    "type": ["string", "null"],
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "to": {
+                    "type": ["string", "null"],
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "releases": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3712,354 +3262,10 @@
         "required": ["before", "after"],
         "properties": {
           "before": {
-            "type": "object",
-            "required": ["rows", "excluded", "unique_observations", "snapshot_reuses"],
-            "properties": {
-              "rows": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "hardware",
-                    "framework",
-                    "model",
-                    "precision",
-                    "spec_method",
-                    "disagg",
-                    "is_multinode",
-                    "prefill_tp",
-                    "prefill_ep",
-                    "prefill_dp_attention",
-                    "prefill_num_workers",
-                    "decode_tp",
-                    "decode_ep",
-                    "decode_dp_attention",
-                    "decode_num_workers",
-                    "num_prefill_gpu",
-                    "num_decode_gpu",
-                    "benchmark_type",
-                    "isl",
-                    "osl",
-                    "conc",
-                    "offload_mode",
-                    "image",
-                    "recipe_fingerprint",
-                    "metrics",
-                    "date",
-                    "run_url"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "hardware": {
-                      "type": "string"
-                    },
-                    "framework": {
-                      "type": "string"
-                    },
-                    "model": {
-                      "type": "string"
-                    },
-                    "precision": {
-                      "type": "string"
-                    },
-                    "spec_method": {
-                      "type": "string"
-                    },
-                    "disagg": {
-                      "type": "boolean"
-                    },
-                    "is_multinode": {
-                      "type": "boolean"
-                    },
-                    "prefill_tp": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "prefill_ep": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "prefill_dp_attention": {
-                      "type": "boolean"
-                    },
-                    "prefill_num_workers": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_tp": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_ep": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_dp_attention": {
-                      "type": "boolean"
-                    },
-                    "decode_num_workers": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "num_prefill_gpu": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "num_decode_gpu": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "benchmark_type": {
-                      "type": "string"
-                    },
-                    "isl": {
-                      "type": ["integer", "null"],
-                      "minimum": 0
-                    },
-                    "osl": {
-                      "type": ["integer", "null"],
-                      "minimum": 0
-                    },
-                    "conc": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "offload_mode": {
-                      "type": "string"
-                    },
-                    "image": {
-                      "type": ["string", "null"]
-                    },
-                    "recipe_fingerprint": {
-                      "type": ["string", "null"]
-                    },
-                    "metrics": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "date": {
-                      "type": "string",
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "workflow_run_id": {
-                      "type": ["string", "null"]
-                    },
-                    "run_started_at": {
-                      "type": ["string", "null"]
-                    },
-                    "run_url": {
-                      "type": "string",
-                      "pattern": "^https?://"
-                    },
-                    "curve_date": {
-                      "type": ["string", "null"],
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "curve_workflow_run_id": {
-                      "type": ["string", "null"]
-                    },
-                    "curve_run_started_at": {
-                      "type": ["string", "null"]
-                    }
-                  },
-                  "additionalProperties": true
-                }
-              },
-              "excluded": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              },
-              "unique_observations": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "snapshot_reuses": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "additionalProperties": true
+            "$ref": "#/$defs/selection"
           },
           "after": {
-            "type": "object",
-            "required": ["rows", "excluded", "unique_observations", "snapshot_reuses"],
-            "properties": {
-              "rows": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "hardware",
-                    "framework",
-                    "model",
-                    "precision",
-                    "spec_method",
-                    "disagg",
-                    "is_multinode",
-                    "prefill_tp",
-                    "prefill_ep",
-                    "prefill_dp_attention",
-                    "prefill_num_workers",
-                    "decode_tp",
-                    "decode_ep",
-                    "decode_dp_attention",
-                    "decode_num_workers",
-                    "num_prefill_gpu",
-                    "num_decode_gpu",
-                    "benchmark_type",
-                    "isl",
-                    "osl",
-                    "conc",
-                    "offload_mode",
-                    "image",
-                    "recipe_fingerprint",
-                    "metrics",
-                    "date",
-                    "run_url"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "hardware": {
-                      "type": "string"
-                    },
-                    "framework": {
-                      "type": "string"
-                    },
-                    "model": {
-                      "type": "string"
-                    },
-                    "precision": {
-                      "type": "string"
-                    },
-                    "spec_method": {
-                      "type": "string"
-                    },
-                    "disagg": {
-                      "type": "boolean"
-                    },
-                    "is_multinode": {
-                      "type": "boolean"
-                    },
-                    "prefill_tp": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "prefill_ep": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "prefill_dp_attention": {
-                      "type": "boolean"
-                    },
-                    "prefill_num_workers": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_tp": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_ep": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "decode_dp_attention": {
-                      "type": "boolean"
-                    },
-                    "decode_num_workers": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "num_prefill_gpu": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "num_decode_gpu": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "benchmark_type": {
-                      "type": "string"
-                    },
-                    "isl": {
-                      "type": ["integer", "null"],
-                      "minimum": 0
-                    },
-                    "osl": {
-                      "type": ["integer", "null"],
-                      "minimum": 0
-                    },
-                    "conc": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "offload_mode": {
-                      "type": "string"
-                    },
-                    "image": {
-                      "type": ["string", "null"]
-                    },
-                    "recipe_fingerprint": {
-                      "type": ["string", "null"]
-                    },
-                    "metrics": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "date": {
-                      "type": "string",
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "workflow_run_id": {
-                      "type": ["string", "null"]
-                    },
-                    "run_started_at": {
-                      "type": ["string", "null"]
-                    },
-                    "run_url": {
-                      "type": "string",
-                      "pattern": "^https?://"
-                    },
-                    "curve_date": {
-                      "type": ["string", "null"],
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                    },
-                    "curve_workflow_run_id": {
-                      "type": ["string", "null"]
-                    },
-                    "curve_run_started_at": {
-                      "type": ["string", "null"]
-                    }
-                  },
-                  "additionalProperties": true
-                }
-              },
-              "excluded": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              },
-              "unique_observations": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "snapshot_reuses": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "additionalProperties": true
+            "$ref": "#/$defs/selection"
           }
         },
         "additionalProperties": true
@@ -4303,7 +3509,184 @@
         }
       }
     },
-    "additionalProperties": true
+    "additionalProperties": true,
+    "$defs": {
+      "selection": {
+        "type": "object",
+        "required": ["rows", "excluded", "unique_observations", "snapshot_reuses"],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "hardware",
+                "framework",
+                "model",
+                "precision",
+                "spec_method",
+                "disagg",
+                "is_multinode",
+                "prefill_tp",
+                "prefill_ep",
+                "prefill_dp_attention",
+                "prefill_num_workers",
+                "decode_tp",
+                "decode_ep",
+                "decode_dp_attention",
+                "decode_num_workers",
+                "num_prefill_gpu",
+                "num_decode_gpu",
+                "benchmark_type",
+                "isl",
+                "osl",
+                "conc",
+                "offload_mode",
+                "image",
+                "recipe_fingerprint",
+                "metrics",
+                "date",
+                "run_url"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "hardware": {
+                  "type": "string"
+                },
+                "framework": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "precision": {
+                  "type": "string"
+                },
+                "spec_method": {
+                  "type": "string"
+                },
+                "disagg": {
+                  "type": "boolean"
+                },
+                "is_multinode": {
+                  "type": "boolean"
+                },
+                "prefill_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_dp_attention": {
+                  "type": "boolean"
+                },
+                "prefill_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_dp_attention": {
+                  "type": "boolean"
+                },
+                "decode_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_prefill_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_decode_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "benchmark_type": {
+                  "type": "string"
+                },
+                "isl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "osl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "conc": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "offload_mode": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": ["string", "null"]
+                },
+                "recipe_fingerprint": {
+                  "type": ["string", "null"]
+                },
+                "metrics": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "run_started_at": {
+                  "type": ["string", "null"]
+                },
+                "run_url": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                "curve_date": {
+                  "type": ["string", "null"],
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "curve_workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "curve_run_started_at": {
+                  "type": ["string", "null"]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "unique_observations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snapshot_reuses": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "collectivex": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4487,40 +3870,10 @@
               }
             },
             "left": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": ["response_index", "json_pointer"],
-                "properties": {
-                  "response_index": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "json_pointer": {
-                    "type": "string",
-                    "pattern": "^/"
-                  }
-                },
-                "additionalProperties": true
-              }
+              "$ref": "#/$defs/sourcePointers"
             },
             "right": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": ["response_index", "json_pointer"],
-                "properties": {
-                  "response_index": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "json_pointer": {
-                    "type": "string",
-                    "pattern": "^/"
-                  }
-                },
-                "additionalProperties": true
-              }
+              "$ref": "#/$defs/sourcePointers"
             },
             "metrics": {
               "type": "array",
@@ -4551,84 +3904,10 @@
                     ]
                   },
                   "left": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "required": ["status", "value"],
-                        "properties": {
-                          "status": {
-                            "const": "value"
-                          },
-                          "value": {
-                            "type": "number"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": ["status", "value"],
-                        "properties": {
-                          "status": {
-                            "const": "null"
-                          },
-                          "value": {
-                            "type": "null"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": ["status"],
-                        "properties": {
-                          "status": {
-                            "const": "missing"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    ]
+                    "$ref": "#/$defs/metricValue"
                   },
                   "right": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "required": ["status", "value"],
-                        "properties": {
-                          "status": {
-                            "const": "value"
-                          },
-                          "value": {
-                            "type": "number"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": ["status", "value"],
-                        "properties": {
-                          "status": {
-                            "const": "null"
-                          },
-                          "value": {
-                            "type": "null"
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "required": ["status"],
-                        "properties": {
-                          "status": {
-                            "const": "missing"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    ]
+                    "$ref": "#/$defs/metricValue"
                   },
                   "difference_right_minus_left": {
                     "type": ["number", "null"]
@@ -4675,6 +3954,66 @@
         }
       }
     },
-    "additionalProperties": true
+    "additionalProperties": true,
+    "$defs": {
+      "metricValue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["status", "value"],
+            "properties": {
+              "status": {
+                "const": "value"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["status", "value"],
+            "properties": {
+              "status": {
+                "const": "null"
+              },
+              "value": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": {
+                "const": "missing"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "sourcePointers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["response_index", "json_pointer"],
+          "properties": {
+            "response_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "json_pointer": {
+              "type": "string",
+              "pattern": "^/"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
   }
 }

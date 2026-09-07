@@ -78,6 +78,13 @@ AGENTX_REQUIRED_STRINGS = ('hardware', 'framework', 'model', 'precision', 'spec_
 AGENTX_REQUIRED_BOOLEANS = ('disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention')
 AGENTX_REQUIRED_INTEGERS = ('prefill_tp', 'prefill_ep', 'prefill_num_workers', 'decode_tp', 'decode_ep',
                             'decode_num_workers', 'num_prefill_gpu', 'num_decode_gpu', 'conc')
+RELEASE_CONFIGURATION_FIELDS = '''model hardware framework precision spec_method benchmark_type
+isl osl conc offload_mode disagg is_multinode prefill_tp prefill_ep prefill_dp_attention
+prefill_num_workers decode_tp decode_ep decode_dp_attention decode_num_workers
+num_prefill_gpu num_decode_gpu'''.split()
+RELEASE_CONFIGURATION_METRICS = '''prefill_pp decode_pp dcp_size pcp_size prefill_dcp_size
+decode_dcp_size prefill_pcp_size decode_pcp_size kv_offloading kv_offload_backend
+kv_offload_backend_version kv_p2p_transfer router_name router_version'''.split()
 POINT_OPERATIONS = (
     ('openapi', '/api/openapi.json', None),
     ('benchmark-siblings', '/api/v1/benchmark-siblings', 'id'),
@@ -1354,22 +1361,17 @@ def _normalized_id_object(value):
             _normalized_id_object(item) for key, item in value.items()}
 
 
-def _trace_value_matches(actual, trace, result_id):
-    present = result_id in trace
-    value = trace.get(result_id)
-    expected_status = 'stored_trace' if value is True else \
-        'no_stored_trace' if value is False else 'not_returned'
-    return actual == {'status': expected_status, 'value': value if present else None,
-                      'response_key_present': present}
-
-
-def _collective_source_value(bodies, references):
+def _collective_source(bodies, requests, references, run_id):
     require(type(references) is list and len(references) == 1,
             'CollectiveX matched source reference differs')
     reference = references[0]
     index = reference.get('response_index')
     require(type(index) is int and 0 <= index < len(bodies),
             'CollectiveX source index differs')
+    require(requests[index]['operation'] == 'collectivex-run' and
+            urlsplit(requests[index]['url']).path == f'/api/v1/collectivex/runs/{run_id}' and
+            bodies[index].get('run', {}).get('run_id') == run_id,
+            'CollectiveX source belongs to a different selected run')
     value = bodies[index]
     pointer = reference.get('json_pointer')
     require(type(pointer) is str and pointer.startswith('/'),
@@ -1377,7 +1379,27 @@ def _collective_source_value(bodies, references):
     for raw_key in pointer.split('/')[1:]:
         key = raw_key.replace('~1', '/').replace('~0', '~')
         value = value[int(key)] if isinstance(value, list) else value[key]
-    return value
+    ep = re.fullmatch(r'/series/(\d+)/points/(\d+)/components/(dispatch|stage|combine|roundtrip)', pointer)
+    kv = re.fullmatch(r'/kv/(\d+)/rows/(\d+)', pointer)
+    require(ep is not None or kv is not None, 'CollectiveX source identity pointer differs')
+    if ep:
+        series = bodies[index]['series'][int(ep[1])]
+        point = series['points'][int(ep[2])]
+        identity = {'suite': 'ep',
+                    'configuration': {key: item for key, item in series.items() if key != 'points'},
+                    'operation': ep[3],
+                    **{key: item for key, item in point.items() if key not in {
+                        'components', 'roundtrip_token_rate_at_latency_percentile'}},
+                    'payload_bytes': value['payload_bytes']}
+    else:
+        case = bodies[index]['kv'][int(kv[1])]
+        identity = {'suite': 'kv',
+                    'configuration': {key: item for key, item in case.items() if key not in {
+                        'rows', 'label', 'disposition', 'outcome', 'reason', 'detail'}},
+                    'row': {key: item for key, item in value.items() if key not in {
+                        'prep_ms', 'latency_ms', 'request_ms', 'gbps_p50',
+                        'gbps_p50_incl_prep', 'verify_passed'}}}
+    return value, identity
 
 
 def _nested_metric(value, name):
@@ -1783,28 +1805,65 @@ def check_bundle(directory, version):
         derived = (len(result['rows']), None, hardware, eligible)
     elif kind == 'releases':
         source = bodies[0]
+        originals = {}
+        for row in source:
+            original = {key: value for key, value in row.items() if key not in {
+                'curve_date', 'curve_workflow_run_id', 'curve_run_started_at'}}
+            result_id = str(row['id'])
+            require(result_id not in originals or originals[result_id] == original,
+                    'Release observation identity differs between snapshots')
+            originals[result_id] = original
+        options = manifest.get('normalized_arguments', {})
+        query = parse_qs(urlsplit(requests[0]['url']).query)
+        require(query == {key: [js_text(options[key])] for key in ('model', 'isl', 'osl')},
+                'Release request scope differs')
         selection = result.get('selection', {})
-        selected_records = 0
+        selected_records, groups = 0, {}
         for side in ('before', 'after'):
             detail = selection.get(side, {})
             selected_rows = detail.get('rows')
-            require(type(selected_rows) is list and all(row in source for row in selected_rows),
-                    'Release selection differs from source')
-            unique = len({str(row.get('id')) for row in selected_rows})
-            require(detail.get('unique_observations') == unique and
-                    detail.get('snapshot_reuses') == len(selected_rows) - unique,
+            expected_rows = [row for row in source if
+                             row['benchmark_type'] == 'single_turn' and
+                             all(row[key] == options[key] for key in ('hardware', 'framework', 'isl', 'osl')) and
+                             (options['raw_model'] is None or row['model'] == options['raw_model']) and
+                             row['date'] == options[f'{side}_date'] and
+                             all(options[f'{side}_{key}'] is None or row[key] == options[f'{side}_{key}']
+                                 for key in ('image', 'run_url'))]
+            require(selected_rows == expected_rows, 'Release selection differs from saved scope')
+            unique = {str(row['id']): row for row in selected_rows}
+            require(detail.get('unique_observations') == len(unique) and
+                    detail.get('snapshot_reuses') == len(selected_rows) - len(unique),
                     'Release selection coverage differs')
-            selected_records += unique
+            selected_records += len(unique)
+            groups[side] = {}
+            for row in unique.values():
+                values = [row[field] for field in RELEASE_CONFIGURATION_FIELDS]
+                for field in RELEASE_CONFIGURATION_METRICS:
+                    values.extend((field in row['metrics'], row['metrics'].get(field)))
+                key = tuple((float if finite(value) else type(value), value) for value in values)
+                groups[side].setdefault(key, []).append(row)
+        expected_pairs = {}
+        for key in groups['before'].keys() & groups['after'].keys():
+            before, after = groups['before'][key], groups['after'][key]
+            if len(before) == len(after) == 1 and str(before[0]['id']) != str(after[0]['id']):
+                expected_pairs[(str(before[0]['id']), str(after[0]['id']))] = (before[0], after[0])
+        pair_ids = [(pair.get('before_id'), pair.get('after_id')) for pair in result['comparisons']]
+        require(len(pair_ids) == len(set(pair_ids)) and set(pair_ids) == set(expected_pairs),
+                'Release matching differs from source configuration')
         comparable = 0
         for pair in result['comparisons']:
-            before_rows = [row for row in source if str(row.get('id')) == pair.get('before_id')]
-            after_rows = [row for row in source if str(row.get('id')) == pair.get('after_id')]
-            require(len(before_rows) == len(after_rows) == 1, 'Release observation identity differs')
+            before_row, after_row = expected_pairs[(pair['before_id'], pair['after_id'])]
+            require(pair.get('configuration') == {
+                key: before_row[key] for key in RELEASE_CONFIGURATION_FIELDS} and
+                pair.get('configuration_metrics') == {
+                    key: before_row['metrics'][key] for key in RELEASE_CONFIGURATION_METRICS
+                    if key in before_row['metrics']}, 'Release matching configuration differs')
             metric = pair['metric']
             metric_name = metric['name']
             before, after = metric['before'], metric['after']
-            require(before_rows[0]['metrics'].get(metric_name) == before and
-                    after_rows[0]['metrics'].get(metric_name) == after,
+            require(metric_name == options['metric'] and
+                    before_row['metrics'].get(metric_name) == before and
+                    after_row['metrics'].get(metric_name) == after,
                     'Release metric source differs')
             if finite(before) and finite(after):
                 comparable += 1
@@ -1825,14 +1884,24 @@ def check_bundle(directory, version):
                    {} if hardware_name is None else {hardware_name: comparable}, comparable)
     elif kind == 'collectivex':
         comparisons = result['comparisons']
+        run_ids = result.get('selection', {}).get('run_ids', [])
+        if any(comparison['status'] == 'matched' for comparison in comparisons):
+            require(type(run_ids) is list and len(run_ids) == 2 and len(set(run_ids)) == 2,
+                    'CollectiveX matched comparison needs two selected runs')
+            options = manifest.get('normalized_arguments', {})
+            if options.get('left') is not None:
+                require(run_ids == [options['left'], options['right']],
+                        'CollectiveX selected run IDs differ from requested scope')
         for status, count_value in result['summary'].items():
             require(count_value == sum(row['status'] == status for row in comparisons),
                     'CollectiveX summary differs')
         for comparison in comparisons:
             if comparison['status'] != 'matched':
                 continue
-            left = _collective_source_value(bodies, comparison['left'])
-            right = _collective_source_value(bodies, comparison['right'])
+            left, left_identity = _collective_source(bodies, requests, comparison['left'], run_ids[0])
+            right, right_identity = _collective_source(bodies, requests, comparison['right'], run_ids[1])
+            require(left_identity == right_identity == comparison.get('identity'),
+                    'CollectiveX matched source identity differs')
             for metric in comparison['metrics']:
                 left_value = _nested_metric(left, metric['name'])
                 right_value = _nested_metric(right, metric['name'])
