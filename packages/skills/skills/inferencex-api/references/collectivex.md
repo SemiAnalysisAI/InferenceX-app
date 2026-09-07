@@ -132,6 +132,12 @@ Read every comparison status:
 - `incomparable`: an identity field or byte count is missing/invalid, an EP
   component is unavailable, or a KV case/verification is not successful.
 
+Determine a group's side from its non-empty `left[]` and `right[]` source-pointer
+arrays, not its status. `incomparable` and `ambiguous` groups can contain pointers
+from either or both sides. For per-run series or topology counts, count that
+selected source dataset's `series[]`; unavailable component groups do not add
+measured series.
+
 `summary` counts comparison groups, including EP operation groups, not runs or
 requested cases. Cases with **no measured rows** have no comparison group. Inspect
 the complete datasets' `coverage` and optional `kv` arrays for their outcome,
@@ -158,6 +164,11 @@ effect. Equal SHAs also do not establish identical runtime conditions.
 | EP `roundtrip_token_rate_at_latency_percentile`      | Aggregate tokens/s at the named latency percentile.                                                                                           |
 | KV `latency_ms` / `request_ms`                       | Whole-burst latency / per-request completion latency in milliseconds; `n` is sample count. A missing `request_ms` is not whole-burst latency. |
 | KV `prep_ms`, `gbps_p50`, `gbps_p50_incl_prep`       | Preparation time in ms per burst, GB/s excluding preparation, and GB/s including preparation.                                                 |
+
+`roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
+`components`. The latency, activation/payload data rates, and `payload_bytes`
+belong inside each component. Check availability at the field's documented object
+path: absence from a component does not mean a point-level metric is absent.
 
 The spelling `gbps` in field names does not mean gigabits/s. Rate-at-latency-p99 is
 a rate derived at p99 latency, not an independently measured p99 bandwidth.
