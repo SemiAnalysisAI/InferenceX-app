@@ -111,7 +111,7 @@ describe('Profit Estimator per GW', () => {
       const labels = [...$opts].map((el) => el.textContent?.trim());
       expect(labels).to.include.members([
         'Owning at Large Hyperscaler Volume',
-        '3 Year Rental',
+        'Rent - 3 Year Commit',
         'Custom $/GPU/hr',
       ]);
     });

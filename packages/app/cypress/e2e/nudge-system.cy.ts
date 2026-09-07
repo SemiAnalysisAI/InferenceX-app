@@ -14,7 +14,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-openai-rubin-banner-dismissed',
+    'inferencex-tpuv7-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -48,11 +48,8 @@ describe('Landing nudges — modals', () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', "OpenAI's Latest In House Chip verus Rubin NVL72")
-      .and(
-        'contain.text',
-        'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
-      )
+      .and('contain.text', 'TPUv7 Inference Performance')
+      .and('contain.text', 'Compare TPUv7 versus Blackwell & Blackwell Ultra')
       .and('contain.text', 'View results');
     // Banner + header-nav badges, plus the six AgentX hero ledger rows — the
     // shared pill must render at the same fixed size everywhere it appears.
@@ -165,7 +162,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -185,7 +182,7 @@ describe('Landing nudges — banner', () => {
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
 
     cy.visit('/');
@@ -363,7 +360,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-openai-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

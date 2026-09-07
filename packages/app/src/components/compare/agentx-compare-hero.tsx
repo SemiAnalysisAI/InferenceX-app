@@ -26,15 +26,17 @@ const MODEL_LOGOS: Record<string, string> = {
 
 /**
  * Full-color brand marks for the hero strip: the silicon platforms named
- * in the description (OpenAI, AMD, NVIDIA) followed by Meta, Microsoft,
- * and Oracle. The path data is copied from the shared brand assets under
+ * in the description (Google, OpenAI, AMD, NVIDIA) followed by Meta,
+ * Microsoft, and Oracle. The path data is copied from the shared brand assets under
  * `public/logos/` but inlined as SVG elements: the strip must add zero
  * `/logos/` image requests, because the mobile landing performance spec
  * budgets those fetches to the ledger's lazy `*-color.svg` model marks.
  * viewBoxes are cropped to the path content, so rendered sizes need no
  * canvas-padding compensation and the marks read optically equal.
  *
- * NVIDIA uses its official brand green (#76B900) as-is in both themes;
+ * Google is the four-color "G" in the official brand palette (blue
+ * #4285F4, red #EA4335, yellow #FBBC05, green #34A853), used as-is in both
+ * themes. NVIDIA uses its official brand green (#76B900) as-is in both themes;
  * the OpenAI and AMD marks are black by brand design (neither has a
  * color variant), so they render in `currentColor` via `text-foreground`,
  * which reproduces the official reversed-white treatment in dark mode.
@@ -63,6 +65,30 @@ const VENDOR_MARKS: readonly {
   /** Brand-color fills, or `currentColor` for marks that are monochrome by design. */
   paths: readonly { d: string; fill: string }[];
 }[] = [
+  {
+    name: 'Google',
+    viewBox: '0 0 48 48',
+    width: 22,
+    height: 22,
+    paths: [
+      {
+        d: 'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z',
+        fill: '#EA4335',
+      },
+      {
+        d: 'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z',
+        fill: '#4285F4',
+      },
+      {
+        d: 'M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z',
+        fill: '#FBBC05',
+      },
+      {
+        d: 'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z',
+        fill: '#34A853',
+      },
+    ],
+  },
   {
     name: 'OpenAI',
     viewBox: '0 0 256 260',
@@ -344,7 +370,7 @@ const STRINGS = {
     eyebrow: 'AgentX / live results',
     title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv7/v8 & Rubin NVL72 & MI455X UALoE72',
+      'Long Context Multi Turn Inference Performance. Compare Across Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv8i & Rubin NVL72 & MI455X UALoE72',
     revenueCalculator: 'Token Revenue Calculator',
     dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
@@ -355,7 +381,7 @@ const STRINGS = {
     eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
-      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv7/v8、Rubin NVL72 与 MI455X UALoE72。',
+      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 Google TPUv7 Ironwood、OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv8i、Rubin NVL72 与 MI455X UALoE72。',
     revenueCalculator: 'Token 收入计算器',
     dashboard: '仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',

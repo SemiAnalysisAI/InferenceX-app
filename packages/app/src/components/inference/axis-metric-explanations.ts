@@ -31,12 +31,12 @@ type TokenType = 'total' | 'output' | 'input';
 
 const COST_BASIS_EN: Record<CostBasis, string> = {
   h: 'all-in hourly ownership cost at large hyperscaler purchasing volume',
-  r: 'all-in hourly cost of a 3-year rental contract',
+  r: 'all-in hourly rental cost on a 3-year commit',
 };
 
 const COST_BASIS_ZH: Record<CostBasis, string> = {
   h: '按超大规模云厂商大批量采购价自有硬件的每小时全包成本',
-  r: '3 年期租赁合同的每小时全包成本',
+  r: '3 年承诺期租赁的每小时全包成本',
 };
 
 const TOKEN_TYPE_EN: Record<TokenType, string> = {
