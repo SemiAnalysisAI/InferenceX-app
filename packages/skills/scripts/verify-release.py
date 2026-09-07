@@ -125,7 +125,7 @@ def version_at_least(version, minimum):
 
 
 def contract_one_required(version):
-    return version_at_least(version, (1, 0, 0))
+    return version_at_least(version, (0, 12, 0))
 
 
 def remaining_seconds(deadline, limit):
@@ -1680,7 +1680,7 @@ def main():
     require(type(record.get('filename')) is str and
             re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*\.tgz', record['filename']) is not None and
             record['filename'] != 'prompt.txt', 'Archive filename must be a safe .tgz basename')
-    require(contract_one_required(record['version']), 'Release verifier requires version 1.0.0 or later')
+    require(contract_one_required(record['version']), 'Release verifier requires version 0.12.0 or later')
     archive = args.manifest.resolve().parent / record['filename']
     body = archive.read_bytes()
     require(record['name'] == PACKAGE and hashlib.sha256(body).hexdigest() == record['sha256'],

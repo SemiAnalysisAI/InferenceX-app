@@ -1,6 +1,6 @@
 {
   "name": "@semianalysisai/inferencex-skills",
-  "version": "1.0.0",
+  "version": "0.12.0",
   "description": "Query InferenceX benchmarks and verify replayable evidence with a CLI and agent skill.",
   "keywords": [
     "agent-skills",

@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@1.0.0` to query existing
+Use `@semianalysisai/inferencex-skills@0.12.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -8,24 +8,24 @@ constructing requests.
 
 ## Install
 
-The commands below apply after 1.0.0 is published and publicly verified. During
+The commands below apply after 0.12.0 is published and publicly verified. During
 candidate review, use the [local archive instructions](../packages/skills/README.md#review-a-local-archive).
 
 With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
 InferenceX checkout or database credentials. The skill uses HTTP directly; the
 repository's MCP server is a separate integration.
 
-The [migration guide](./inferencex-cli-compatibility.md) explains the 1.0 command
+The [migration guide](./inferencex-cli-compatibility.md) explains the 0.12.0 command
 and evidence-directory contract.
 
 To upgrade, choose a new published version and add `--force`. Existing skills are

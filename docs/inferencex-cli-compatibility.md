@@ -1,7 +1,11 @@
-# InferenceX CLI 1.0 migration
+# InferenceX CLI 0.12.0 migration
 
-InferenceX 1.0 has one query entry: `inferencex`. Formal commands create a new
+InferenceX 0.12.0 has one query entry: `inferencex`. Formal commands create a new
 contract 1 evidence directory and `inferencex verify` replays it offline.
+
+The package remains pre-1.0; CLI changes may ship in later minor releases.
+Evidence format `schema_version: 1` is separate from the package version.
+A stable 1.0 release is deferred.
 
 ## Supported contract
 
@@ -22,9 +26,9 @@ Every formal operation requires `--output-dir <new-directory>`. A directory with
 `manifest.json` is incomplete. Completed bundles are immutable; reports belong at
 sibling paths.
 
-## Move from 0.x
+## Move from 0.11 and earlier
 
-| Before 1.0                                      | 1.0                                       |
+| 0.11 and earlier                                | 0.12.0                                    |
 | ----------------------------------------------- | ----------------------------------------- |
 | `export-powerx.mjs --output x --evidence-dir e` | `inferencex powerx export --output-dir e` |
 | `export-agentx.mjs --output x --evidence-dir e` | `inferencex agentx export --output-dir e` |
@@ -34,10 +38,10 @@ sibling paths.
 | `compare-collectivex.mjs`                       | `inferencex collectivex compare`          |
 | `verify-export.mjs --export x --evidence-dir e` | `inferencex verify e`                     |
 
-The old commands and separately saved 0.x export formats are not supported query
-interfaces in 1.0. Use the pinned historical package when an old export must be
-replayed. The installer can upgrade a 0.x installation with `--force`; this upgrade
-compatibility does not promise that old query commands run under 1.0.
+The old commands and separately saved export formats from 0.11 and earlier are not supported query
+interfaces in 0.12.0. Use the pinned historical package when an old export must be
+replayed. The installer can upgrade an earlier installation with `--force`; this upgrade
+compatibility does not promise that old query commands run under 0.12.0.
 
 The installer preserves unmanaged files. An obsolete helper can therefore remain
 on disk after upgrade, but it is not part of the current package or interface.

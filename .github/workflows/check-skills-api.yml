@@ -8,7 +8,7 @@ on:
         required: true
         default: '0.11.0'
         type: string
-  # Daily scheduling stays inactive until the published 1.0.0 archive passes public verification.
+  # Daily scheduling stays inactive until the published 0.12.0 archive passes public verification.
 
 permissions:
   contents: read

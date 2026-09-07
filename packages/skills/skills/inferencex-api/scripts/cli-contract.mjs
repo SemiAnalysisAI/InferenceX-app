@@ -2,7 +2,7 @@ import { realpathSync } from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-const PACKAGE_VERSION = '1.0.0';
+const PACKAGE_VERSION = '0.12.0';
 export { PACKAGE_VERSION };
 export const PACKAGE_NAME = '@semianalysisai/inferencex-skills';
 

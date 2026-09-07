@@ -87,7 +87,7 @@ each bundle offline, and audits every result against its saved responses with an
 independent Python implementation. Missing and null values remain missing; real
 `0` and `false` values remain explicit. No new benchmarks run.
 
-For the 1.0 candidate, retain the exact four platform results (Linux/macOS by Node
+For the 0.12.0 candidate, retain the exact four platform results (Linux/macOS by Node
 24/26) and both native runtime results. Each native result covers PowerX, AgentX,
 result provenance, TCO, releases, CollectiveX, and offline replay, with archive,
 case-set, prompt transcript, and answer transcript hashes. Keep

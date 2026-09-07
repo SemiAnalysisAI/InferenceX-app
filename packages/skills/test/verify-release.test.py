@@ -247,7 +247,7 @@ class RetryTests(unittest.TestCase):
             cli.size = len(content)
             packed.addfile(cli, io.BytesIO(content))
         body = stream.getvalue()
-        version = '1.0.0'
+        version = '0.12.0'
         record = {'name': check.PACKAGE, 'version': version, 'filename': 'candidate.tgz',
                   'sha256': hashlib.sha256(body).hexdigest(),
                   'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
@@ -270,6 +270,13 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(report['public_retry_policy']['total_deadline_seconds'], 300)
 
 class UnifiedAcceptanceSurfaceTests(unittest.TestCase):
+    def test_contract_one_starts_at_012(self):
+        for version, expected in (('0.11.0', False), ('0.11.99', False),
+                                  ('0.12.0', True), ('0.12.1', True),
+                                  ('0.13.0', True), ('1.0.0', True)):
+            with self.subTest(version=version):
+                self.assertEqual(check.contract_one_required(version), expected)
+
     def test_native_prompt_uses_only_the_unified_query_entry(self):
         args = SimpleNamespace(
             model='GLM-5', date='2026-09-07', isl=8192, osl=1024,
@@ -288,7 +295,7 @@ class UnifiedAcceptanceSurfaceTests(unittest.TestCase):
 
 
 class ContractOneBundleOracleTests(unittest.TestCase):
-    VERSION = '1.0.0'
+    VERSION = '0.12.0'
 
     @classmethod
     def setUpClass(cls):
@@ -323,7 +330,7 @@ const mod = await import(`./skills/inferencex-api/scripts/${modules[fixture.kind
 const options = mod.normalizeArgs(fixture.args.slice(2));
 let cursor = 0;
 const built = await mod.collect(options, {
-  producerVersion: '1.0.0', generatedAt: '2026-09-07T00:00:00.000Z',
+  producerVersion: '0.12.0', generatedAt: '2026-09-07T00:00:00.000Z',
   async get(spec) {
     const response = fixture.responses[cursor];
     assert.equal(spec.url, response.url);

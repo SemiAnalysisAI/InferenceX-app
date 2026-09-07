@@ -120,7 +120,7 @@ outside the bundle.
   metrics stay in evidence or JSON extensions instead of creating dynamic columns.
 - IDs are strings even when they contain only digits. Dates are `YYYY-MM-DD`;
   evidence timestamps are UTC ISO strings.
-- The 1.0 entry rejects removed `--output` and `--evidence-dir` options with a
+- The 0.12.0 entry rejects removed `--output` and `--evidence-dir` options with a
   migration hint. Contract 1 bundles preserve the producer package version.
 
 ## Legacy migration
@@ -135,7 +135,7 @@ outside the bundle.
 | `compare-collectivex.mjs --output x --evidence-dir e` | `inferencex collectivex compare --output-dir e` | Add `--min-comparable-pairs` for a CI gate                |
 | `verify-export.mjs --evidence-dir e --export x`       | `inferencex verify e`                           | Contract 1 finds the result from the manifest             |
 
-The direct helpers and `verify-export.mjs` are not query interfaces in 1.0.
-Historical 0.x exports require their pinned older package; they are not contract 1
-bundles. Installer upgrades from 0.x remain supported and do not make old query
-commands part of the 1.0 interface.
+The direct helpers and `verify-export.mjs` are not query interfaces in 0.12.0.
+Exports from 0.11 and earlier require their pinned older package; they are not contract 1
+bundles. Installer upgrades from those versions remain supported and do not make old query
+commands part of the 0.12.0 interface.

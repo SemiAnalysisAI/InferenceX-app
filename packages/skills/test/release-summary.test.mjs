@@ -11,8 +11,8 @@ import { createReleaseSummary, validateQualification } from '../scripts/release-
 const hash = 'a'.repeat(64);
 const release = {
   name: '@semianalysisai/inferencex-skills',
-  version: '1.0.0',
-  filename: 'semianalysisai-inferencex-skills-1.0.0.tgz',
+  version: '0.12.0',
+  filename: 'semianalysisai-inferencex-skills-0.12.0.tgz',
   sha256: hash,
   integrity: 'sha512-example',
   source_commit: 'b'.repeat(40),
@@ -122,7 +122,7 @@ test('summary requires an explicit qualification record', () => {
 
 test('matching passed identities produce one sanitized durable summary', () => {
   const summary = createReleaseSummary(release, candidate, publicVerification, qualification);
-  assert.equal(summary.package_version, '1.0.0');
+  assert.equal(summary.package_version, '0.12.0');
   assert.equal(summary.archive.sha256, hash);
   assert.equal(summary.platform_matrix.length, 4);
   assert.equal(summary.native_acceptance.length, 2);
@@ -141,8 +141,8 @@ test('matching passed identities produce one sanitized durable summary', () => {
 
   const matchingPassedInputs = execute();
   assert.equal(matchingPassedInputs.status, 0, matchingPassedInputs.stderr);
-  assert.equal(JSON.parse(matchingPassedInputs.stdout).package_version, '1.0.0');
-  assert.equal(JSON.parse(readFileSync(matchingPassedInputs.output)).package_version, '1.0.0');
+  assert.equal(JSON.parse(matchingPassedInputs.stdout).package_version, '0.12.0');
+  assert.equal(JSON.parse(readFileSync(matchingPassedInputs.output)).package_version, '0.12.0');
 });
 
 test('mismatched archive identity and missing verdicts never create an output', () => {

@@ -1,6 +1,6 @@
-# InferenceX CLI 1.0 release checklist
+# InferenceX CLI release checklist
 
-The 1.0 candidate adds one `inferencex` entry point for discovery, six evidence
+The 0.12.0 candidate adds one `inferencex` entry point for discovery, six evidence
 workflows, offline verification, and installation diagnostics. Publication is a
 separate operation after candidate review. The website remains pinned to the last
 anonymously verified public version until that operation succeeds.
@@ -16,7 +16,7 @@ anonymously verified public version until that operation succeeds.
 
 The [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md)
 contains commands and examples. [Migration](./inferencex-cli-compatibility.md)
-defines exit codes, fixed CSV columns, JSON evolution, and the move from 0.x.
+defines exit codes, fixed CSV columns, JSON evolution, and the move from 0.11 and earlier.
 
 ## Candidate evidence
 

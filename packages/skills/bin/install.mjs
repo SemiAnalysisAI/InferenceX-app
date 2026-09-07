@@ -47,7 +47,7 @@ Install and status options:
   --error-format <mode> Failure diagnostics: text (default) or json
 
 Existing skills are skipped unless --force is supplied.
-Status identifies older installs from receipts and checks managed file integrity for 1.x installs.
+Status identifies older installs from receipts and checks managed file integrity from 0.12.0 onward.
 It never changes files or uses the network.
 Interrupted owned installs recover on the next install; status and dry-run remain read-only.
 Recovery covers process crashes, without an fsync or power-loss durability guarantee.
@@ -91,7 +91,7 @@ async function installedState(destination, packageName, signal) {
       : unknownState(`could not read installation metadata: ${error.code ?? 'read error'}`);
   }
 
-  if (BigInt(versionMatch.groups.major) >= 1n) {
+  if (BigInt(versionMatch.groups.major) >= 1n || BigInt(versionMatch.groups.minor) >= 12n) {
     try {
       await diagnose(['--dir', dirname(destination)], { signal });
     } catch (error) {

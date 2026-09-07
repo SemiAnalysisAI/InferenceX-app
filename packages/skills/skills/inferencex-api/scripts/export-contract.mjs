@@ -4,7 +4,8 @@ function validateProducer(version, format, contractVersion) {
   if (contractVersion !== 1) {
     throw responseError(`Unsupported export contract version: ${contractVersion}`);
   }
-  if (!/^1\.\d+\.\d+$/u.test(version)) {
+  const match = /^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.exec(version);
+  if (!match || (match.groups.major === '0' && BigInt(match.groups.minor) < 12n)) {
     throw responseError(`Unsupported export producer version: ${version}`);
   }
   if (!['json', 'csv'].includes(format))

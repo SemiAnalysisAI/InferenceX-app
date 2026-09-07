@@ -58,9 +58,9 @@ bundle. A completed bundle is immutable.
 Use the pinned installer to inspect the destination and preview an upgrade:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
   inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
   inferencex-skills install --target codex --force --dry-run --json
 ```
 
@@ -70,8 +70,8 @@ Before committed activation it restores the previous installation; after commit 
 keeps the new installation and finishes cleanup. Unsafe or foreign transaction
 state remains blocked for inspection.
 
-Receipts from 1.0 onward use package integrity checks. An old 0.x receipt identifies
+Receipts from 0.12.0 onward use package integrity checks. A receipt from 0.11 or earlier identifies
 the installed version only and can be upgraded with `--force`. The installer
 preserves unmanaged files, so an old helper such as `verify-export.mjs` may remain
-after upgrade; its presence does not make it a supported 1.0 command. Review local
+after upgrade; its presence does not make it a supported 0.12.0 command. Review local
 edits before overwriting packaged files.
