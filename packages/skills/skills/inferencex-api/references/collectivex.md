@@ -146,6 +146,17 @@ unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
 coverage; absence of the optional `kv` field does not imply a failed KV suite.
 
+For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
+by outcome. Reconcile their combined totals with the run's `requested_cases`,
+`terminal_cases`, `measured_cases`, `unsupported_cases`, and `failed_cases` before
+reporting them. An EP case is terminal only when all its points have a non-pending
+`terminal_status`; a KV case is terminal when its outcome is not `pending`.
+`failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
+These case counters combine EP and KV; `kv_requested_cases` and
+`kv_measured_cases` identify the KV subset, while the run's point counters are
+EP-only. A listed subset of SKUs or reasons is not the total. If the returned
+arrays and counters do not reconcile, report that inconsistency.
+
 Matching is deliberately conservative: a changed case ID remains unmatched even
 if visible labels look alike. `comparison_scope.basis=exact_public_identity`
 describes the fields exposed by this API, not proof of a controlled experiment.

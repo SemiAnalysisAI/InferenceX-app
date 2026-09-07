@@ -27,6 +27,12 @@ Keep each aggregate group's `n` with that group. Equal numbers of non-null bench
 rows do not imply equal sample counts or sample-size ranges; compute and label
 those statistics separately for each group.
 
+For a queried, supported result ID, omission from a successful complete
+trace-availability response confirms **no stored trace** in that snapshot. The
+export records `status: no_stored_trace`, `value: false`, and
+`response_key_present: false`; this is not unknown availability. Keep it separate
+from nullable aggregates or an unsupported ID that was not queried.
+
 For a replayable contract 1 summary bundle:
 
 ```bash
