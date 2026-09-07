@@ -924,7 +924,7 @@ test('a stale none contender can overlap only cleanup after recovery settles the
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
 });
 
-test('terminal cleanup claim crashes cannot block or delete a newer installation', async () => {
+test('terminal cleanup claim crashes cannot block, delete, or hide a newer installation', async () => {
   const cwd = project('terminal cleanup generation 中文 path-');
   const skillsRoot = join(cwd, '.agents/skills');
   const destination = join(skillsRoot, 'inferencex-api');
@@ -1045,6 +1045,11 @@ test('terminal cleanup claim crashes cannot block or delete a newer installation
   process.kill(-cleanupOwner.child.pid, 'SIGKILL');
   await cleanupOwner.closed;
 
+  const beforeInspection = snapshot(skillsRoot);
+  const pendingStatus = run(['status', '--target', 'codex', '--json'], cwd);
+  const pendingPreview = run(['install', '--target', 'codex', '--dry-run', '--json'], cwd);
+  const afterInspection = snapshot(skillsRoot);
+
   const terminalClaimReady = join(cwd, 'terminal-claim-interrupted');
   const terminalClaimPreload = join(project('terminal claim crash preload-'), 'preload.mjs');
   writeFileSync(
@@ -1101,6 +1106,16 @@ test('terminal cleanup claim crashes cannot block or delete a newer installation
   writeFileSync(releaseNewer, 'continue');
   const [[contenderCode], [followerCode]] = await Promise.all([contender.closed, follower.closed]);
 
+  for (const result of [pendingStatus, pendingPreview]) {
+    const pending = JSON.parse(succeeded(result).stdout);
+    assert.equal(pending.transaction_state, 'busy', result.stdout);
+    assert.equal(pending.transaction_phase, 'staging');
+    assert.equal(pending.transaction_had_destination, false);
+  }
+  assert.equal(coexistence.transaction_phase, 'staging');
+  assert.equal(JSON.parse(pendingPreview.stdout).outcome, 'would_wait_for_install');
+  assert.deepEqual(JSON.parse(pendingPreview.stdout).write_paths, []);
+  assert.deepEqual(afterInspection, beforeInspection);
   assert.equal(
     interruptedClaimNames.includes('transaction.next.json'),
     false,

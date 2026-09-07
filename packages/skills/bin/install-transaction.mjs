@@ -181,7 +181,12 @@ function readTransaction(destination, transaction, recoveryTransactionId = null)
   return { state: 'valid', identity, paths, record };
 }
 
-export function inspectInstallTransaction(destination, packageName, skillName) {
+export function inspectInstallTransaction(
+  destination,
+  packageName,
+  skillName,
+  { recoveriesFirst = false } = {},
+) {
   const locations = transactionLocations(destination);
   const canonicalEntry = lstatSync(locations.canonical, { throwIfNoEntry: false });
   const recoveries = [];
@@ -219,9 +224,15 @@ export function inspectInstallTransaction(destination, packageName, skillName) {
   ) {
     return blocked('multiple installer transaction paths require manual inspection');
   }
-  const selected =
-    recoveries[0] ??
-    (canonical ? { location: { path: locations.canonical }, inspected: canonical } : null);
+  const canonicalTransaction =
+    canonical?.state === 'valid'
+      ? { location: { path: locations.canonical }, inspected: canonical }
+      : null;
+  // Inspection describes the canonical generation; acquisition can drain older
+  // terminal cleanup before waiting on that generation.
+  const selected = recoveriesFirst
+    ? (recoveries[0] ?? canonicalTransaction)
+    : (canonicalTransaction ?? recoveries[0]);
   if (!selected) {
     return { state: 'none', phase: null, had_destination: null, reason: null };
   }
@@ -403,7 +414,9 @@ async function acquireTransaction(destination, packageName, skillName, waitMilli
   mkdirSync(dirname(destination), { recursive: true });
   for (;;) {
     await cancellationCheckpoint(signal);
-    const state = inspectInstallTransaction(destination, packageName, skillName);
+    const state = inspectInstallTransaction(destination, packageName, skillName, {
+      recoveriesFirst: true,
+    });
     if (state.state === 'blocked') {
       if (
         [
