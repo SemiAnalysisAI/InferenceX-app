@@ -144,6 +144,11 @@ function statusRecord(destination, packageInfo) {
             transaction.state === 'recoverable' ? 'recovery_needed' : transaction.state,
           transaction_phase: transaction.phase,
           transaction_had_destination: transaction.had_destination,
+          ...(transaction.cleanup_only
+            ? {
+                transaction_projected_destination_exists: transaction.projected_destination_exists,
+              }
+            : {}),
         };
   return {
     schema_version: 1,
@@ -152,6 +157,14 @@ function statusRecord(destination, packageInfo) {
     skill_path: destination,
     ...installation,
   };
+}
+
+function recoveryLeavesDestination(record) {
+  return (
+    record.transaction_phase === 'activated' ||
+    record.transaction_had_destination === true ||
+    record.transaction_projected_destination_exists === true
+  );
 }
 
 function showStatus(record) {
@@ -278,11 +291,12 @@ async function main(args, signal) {
     return;
   }
   const dryRun = values['dry-run'] ?? false;
+  const recoveredDestinationExists = recoveryLeavesDestination(record);
   const plan = dryRun
     ? record.transaction_state === undefined
       ? installationPlan(source, destination, values.force)
       : record.transaction_state === 'recovery_needed' &&
-          (values.force || !record.transaction_had_destination)
+          (values.force || !recoveredDestinationExists)
         ? installationPlan(source, destination, true)
         : { outcome: 'skipped', write_paths: [] }
     : runInstallTransaction({
@@ -302,10 +316,10 @@ async function main(args, signal) {
       ? record.transaction_state === 'recovery_needed'
         ? `would_recover_then_${
             values.force
-              ? record.transaction_had_destination
+              ? recoveredDestinationExists
                 ? 'overwrite'
                 : 'install'
-              : record.transaction_had_destination
+              : recoveredDestinationExists
                 ? 'skip'
                 : 'install'
           }`

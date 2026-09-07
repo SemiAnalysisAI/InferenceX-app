@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import {
   chmodSync,
@@ -10,6 +11,7 @@ import {
   readFileSync,
   readdirSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -23,6 +25,28 @@ import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-
 const suite = packedSkillSuite();
 const { project, run } = suite;
 const metadataName = '.inferencex-skills.json';
+
+function writeTransactionMarker(
+  transaction,
+  destination,
+  { ownerPid = 2_147_483_647, raw, ...overrides } = {},
+) {
+  const transactionId = randomUUID();
+  const record = {
+    schema_version: 1,
+    transaction_id: transactionId,
+    package: packageInfo.name,
+    skill: 'inferencex-api',
+    destination,
+    owner_pid: ownerPid,
+    phase: 'staged',
+    had_destination: true,
+    ...overrides,
+  };
+  const path = join(transaction, `owner-${transactionId}-${ownerPid}-${randomUUID()}.json`);
+  writeFileSync(path, raw ?? JSON.stringify(record));
+  return { path, record };
+}
 
 function snapshot(root) {
   return ['', ...readdirSync(root, { recursive: true })].sort().map((path) => {
@@ -204,11 +228,7 @@ test('a cleanup failure after activation keeps the complete new installation rec
       import { syncBuiltinESMExports } from 'node:module';
       const original = fs.rmSync;
       fs.rmSync = (path, options) => {
-        if (
-          path === ${JSON.stringify(transaction)} &&
-          options?.recursive &&
-          JSON.parse(fs.readFileSync(${JSON.stringify(join(transaction, 'transaction.json'))})).phase === 'activated'
-        ) {
+        if (path.endsWith('/previous') && options?.recursive) {
           throw new Error('injected cleanup failure');
         }
         return original(path, options);
@@ -268,18 +288,7 @@ test('status reports an interrupted transaction without claiming the old version
   const transaction = `${destination}.inferencex-skills-transaction`;
   mkdirSync(transaction);
   cpSync(destination, join(transaction, 'stage'), { recursive: true });
-  writeFileSync(
-    join(transaction, 'transaction.json'),
-    JSON.stringify({
-      schema_version: 1,
-      package: packageInfo.name,
-      skill: 'inferencex-api',
-      destination,
-      owner_pid: 2_147_483_647,
-      phase: 'staged',
-      had_destination: true,
-    }),
-  );
+  writeTransactionMarker(transaction, destination);
   const before = snapshot(cwd);
 
   const result = run(['status', '--json'], cwd);
@@ -301,18 +310,7 @@ test('dry-run reports required recovery without changing the transaction or inst
   const transaction = `${destination}.inferencex-skills-transaction`;
   mkdirSync(transaction);
   cpSync(destination, join(transaction, 'stage'), { recursive: true });
-  writeFileSync(
-    join(transaction, 'transaction.json'),
-    JSON.stringify({
-      schema_version: 1,
-      package: packageInfo.name,
-      skill: 'inferencex-api',
-      destination,
-      owner_pid: 2_147_483_647,
-      phase: 'staged',
-      had_destination: true,
-    }),
-  );
+  writeTransactionMarker(transaction, destination);
   const before = snapshot(cwd);
 
   const result = run(['install', '--force', '--dry-run', '--json'], cwd);
@@ -325,6 +323,33 @@ test('dry-run reports required recovery without changing the transaction or inst
   assert.equal(preview.transaction_state, 'recovery_needed');
   assert.ok(preview.write_paths.length > 0);
   assert.deepEqual(snapshot(cwd), before);
+});
+
+test('dry-run predicts a skip after recovering an activated first install', () => {
+  const cwd = project('activated first install preview 中文 path-');
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  writeTransactionMarker(transaction, destination, {
+    phase: 'activated',
+    had_destination: false,
+  });
+  const beforePreview = snapshot(cwd);
+
+  const previewResult = run(['install', '--dry-run', '--json'], cwd);
+  assert.equal(previewResult.status, 0, `${previewResult.stdout}\n${previewResult.stderr}`);
+  const preview = JSON.parse(previewResult.stdout);
+  assert.equal(preview.outcome, 'would_recover_then_skip');
+  assert.deepEqual(preview.write_paths, []);
+  assert.deepEqual(snapshot(cwd), beforePreview);
+
+  const installed = run(['install', '--json'], cwd);
+  assert.equal(installed.status, 0, `${installed.stdout}\n${installed.stderr}`);
+  assert.equal(JSON.parse(installed.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(destination), before);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
 });
 
 test('a process killed between activation renames is recovered by the next install', async () => {
@@ -400,6 +425,84 @@ test('a process killed between activation renames is recovered by the next insta
   rmSync(ready);
 });
 
+test('a process killed after committed backup cleanup leaves its owner marker recoverable', async () => {
+  const cwd = project('killed committed cleanup 中文 path-');
+  succeeded(run(['install'], cwd));
+  const skillsRoot = join(cwd, '.claude/skills');
+  const destination = join(skillsRoot, 'inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  writeFileSync(join(destination, 'SKILL.md'), 'old skill bytes\n');
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  const ready = join(cwd, 'committed-backup-removed');
+  const preload = join(project('committed cleanup kill preload-'), 'preload.mjs');
+  writeFileSync(
+    preload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.rmSync;
+      let paused = false;
+      fs.rmSync = (path, options) => {
+        if (
+          !paused &&
+          path.endsWith('/previous') &&
+          path.includes('.inferencex-skills-transaction.recovering-') &&
+          options?.recursive
+        ) {
+          paused = true;
+          const result = original(path, options);
+          fs.writeFileSync(${JSON.stringify(ready)}, 'ready');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+          return result;
+        }
+        if (!paused && path === ${JSON.stringify(transaction)} && options?.recursive) {
+          paused = true;
+          original(${JSON.stringify(join(transaction, 'previous'))}, {
+            recursive: true,
+            force: true,
+          });
+          fs.writeFileSync(${JSON.stringify(ready)}, 'ready');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const { child, output, closed } = spawnPackedInstaller(
+    ['install', '--force', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(preload).href)}`,
+  );
+  await waitForFile(ready, child);
+  process.kill(-child.pid, 'SIGKILL');
+  await closed;
+
+  const recoveryName = readdirSync(skillsRoot).find((name) =>
+    name.startsWith('inferencex-api.inferencex-skills-transaction.recovering-'),
+  );
+  const recovery = recoveryName ? join(skillsRoot, recoveryName) : transaction;
+  assert.ok(lstatSync(recovery, { throwIfNoEntry: false }), output.stderr);
+  const ownerMarker =
+    readdirSync(recovery).find((name) => name.startsWith('owner-')) ?? 'transaction.json';
+  assert.ok(ownerMarker);
+  assert.equal(JSON.parse(readFileSync(join(recovery, ownerMarker), 'utf8')).phase, 'activated');
+  assert.equal(lstatSync(join(recovery, 'previous'), { throwIfNoEntry: false }), undefined);
+
+  const pending = JSON.parse(run(['status', '--json'], cwd).stdout);
+  assert.equal(pending.transaction_state, 'recovery_needed');
+  assert.equal(pending.transaction_phase, 'activated');
+  const recovered = run(['install', '--json'], cwd);
+  assert.equal(recovered.status, 0, `${recovered.stdout}\n${recovered.stderr}`);
+  const record = JSON.parse(recovered.stdout);
+  assert.equal(record.outcome, 'skipped');
+  assert.equal(record.installation_state, 'installed');
+  assert.equal(record.installed_version, packageInfo.version);
+  assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
+  assert.deepEqual(readdirSync(skillsRoot), ['inferencex-api']);
+  assert.equal(lstatSync(transaction, { throwIfNoEntry: false }), undefined);
+});
+
 test('simultaneous installs serialize and the second observes the first result', async () => {
   const cwd = project('concurrent install 中文 path-');
   const destination = join(cwd, 'custom skills/inferencex-api');
@@ -472,7 +575,7 @@ test('a contender waits while the transaction owner writes its initial marker', 
       import { syncBuiltinESMExports } from 'node:module';
       const original = fs.writeFileSync;
       fs.writeFileSync = (path, data, options) => {
-        if (path === ${JSON.stringify(join(transaction, 'transaction.json'))}) {
+        if (path.startsWith(${JSON.stringify(`${transaction}/owner-`)})) {
           fs.writeFileSync = original;
           original(${JSON.stringify(ready)}, 'ready');
           while (!fs.existsSync(${JSON.stringify(release)})) {
@@ -506,6 +609,215 @@ test('a contender waits while the transaction owner writes its initial marker', 
   assert.equal(lstatSync(transaction, { throwIfNoEntry: false }), undefined);
 });
 
+test('simultaneous recoverers atomically claim a dead transaction before restoring files', async () => {
+  const cwd = project('concurrent recovery 中文 path-');
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const previous = join(transaction, 'previous');
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  renameSync(destination, previous);
+  cpSync(previous, destination, { recursive: true });
+  writeFileSync(join(destination, 'SKILL.md'), 'uncommitted staged destination\n');
+  writeTransactionMarker(transaction, destination, { phase: 'previous_moved' });
+  const ready = join(cwd, 'first-recoverer-ready');
+  const release = join(cwd, 'release-first-recoverer');
+  const preload = join(project('recovery race preload-'), 'preload.mjs');
+  writeFileSync(
+    preload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.rmSync;
+      let paused = false;
+      fs.rmSync = (path, options) => {
+        if (!paused && path === ${JSON.stringify(destination)} && options?.recursive) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(ready)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(release)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const first = spawnPackedInstaller(
+    ['install', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(preload).href)}`,
+  );
+  await waitForFile(ready, first.child);
+  const second = spawnPackedInstaller(['install', '--json'], cwd);
+  await new Promise((resolve) => {
+    setTimeout(resolve, 1_000);
+  });
+  const secondWasWaiting = second.child.exitCode === null;
+  writeFileSync(release, 'continue');
+  const [[firstCode], [secondCode]] = await Promise.all([first.closed, second.closed]);
+
+  assert.equal(secondWasWaiting, true, second.output.stderr);
+  assert.equal(firstCode, 0, `${first.output.stdout}\n${first.output.stderr}`);
+  assert.equal(secondCode, 0, `${second.output.stdout}\n${second.output.stderr}`);
+  assert.equal(JSON.parse(first.output.stdout).outcome, 'skipped');
+  assert.equal(JSON.parse(second.output.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(destination), before);
+  assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
+});
+
+test('a killed recovery owner leaves its exact owner token reclaimable', async () => {
+  const cwd = project('killed recovery owner 中文 path-');
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const previous = join(transaction, 'previous');
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  renameSync(destination, previous);
+  cpSync(previous, destination, { recursive: true });
+  writeFileSync(join(destination, 'SKILL.md'), 'uncommitted staged destination\n');
+  writeTransactionMarker(transaction, destination, { phase: 'previous_moved' });
+  const ready = join(cwd, 'recovery-owner-ready');
+  const preload = join(project('killed recovery owner preload-'), 'preload.mjs');
+  writeFileSync(
+    preload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.rmSync;
+      fs.rmSync = (path, options) => {
+        if (path === ${JSON.stringify(destination)} && options?.recursive) {
+          fs.writeFileSync(${JSON.stringify(ready)}, 'ready');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const { child, output, closed } = spawnPackedInstaller(
+    ['install', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(preload).href)}`,
+  );
+  await waitForFile(ready, child);
+  process.kill(-child.pid, 'SIGKILL');
+  await closed;
+
+  const pending = JSON.parse(run(['status', '--json'], cwd).stdout);
+  assert.equal(pending.transaction_state, 'recovery_needed', output.stderr);
+  assert.equal(pending.transaction_phase, 'previous_moved');
+  const recovered = run(['install', '--json'], cwd);
+  assert.equal(recovered.status, 0, `${recovered.stdout}\n${recovered.stderr}`);
+  assert.equal(JSON.parse(recovered.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(destination), before);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
+});
+
+test('a stale recovery contender cannot claim a newer transaction at the reused canonical path', async () => {
+  const cwd = project('recovery generation ABA 中文 path-');
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const previous = join(transaction, 'previous');
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  renameSync(destination, previous);
+  cpSync(previous, destination, { recursive: true });
+  writeFileSync(join(destination, 'SKILL.md'), 'uncommitted staged destination\n');
+  const { path: oldMarker } = writeTransactionMarker(transaction, destination, {
+    phase: 'previous_moved',
+  });
+
+  const staleReady = join(cwd, 'stale-contender-ready');
+  const releaseStale = join(cwd, 'release-stale-contender');
+  const stalePreload = join(project('stale contender preload-'), 'preload.mjs');
+  writeFileSync(
+    stalePreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.renameSync;
+      let paused = false;
+      fs.renameSync = (source, target) => {
+        if (!paused && source === ${JSON.stringify(oldMarker)}) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(staleReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseStale)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return original(source, target);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const stale = spawnPackedInstaller(
+    ['install', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(stalePreload).href)}`,
+  );
+  await waitForFile(staleReady, stale.child);
+
+  const recovered = run(['install', '--json'], cwd);
+  assert.equal(recovered.status, 0, `${recovered.stdout}\n${recovered.stderr}`);
+  assert.equal(JSON.parse(recovered.stdout).outcome, 'skipped');
+
+  const currentReady = join(cwd, 'current-owner-ready');
+  const releaseCurrent = join(cwd, 'release-current-owner');
+  const currentPreload = join(project('current owner preload-'), 'preload.mjs');
+  writeFileSync(
+    currentPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.cpSync;
+      let paused = false;
+      fs.cpSync = (source, target, options) => {
+        const result = original(source, target, options);
+        if (!paused && target === ${JSON.stringify(join(transaction, 'stage'))}) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(currentReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseCurrent)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const current = spawnPackedInstaller(
+    ['install', '--force', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(currentPreload).href)}`,
+  );
+  await waitForFile(currentReady, current.child);
+  writeFileSync(releaseStale, 'continue');
+  await new Promise((resolve) => {
+    setTimeout(resolve, 500);
+  });
+
+  assert.equal(stale.child.exitCode, null, stale.output.stderr);
+  const busy = JSON.parse(run(['status', '--json'], cwd).stdout);
+  assert.equal(busy.transaction_state, 'busy');
+  writeFileSync(releaseCurrent, 'continue');
+  const [[staleCode], [currentCode]] = await Promise.all([stale.closed, current.closed]);
+
+  assert.equal(currentCode, 0, `${current.output.stdout}\n${current.output.stderr}`);
+  assert.equal(staleCode, 0, `${stale.output.stdout}\n${stale.output.stderr}`);
+  assert.equal(JSON.parse(current.output.stdout).outcome, 'overwritten');
+  assert.equal(JSON.parse(stale.output.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(destination), before);
+  assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
+});
+
 test('malformed, foreign, and symlink transaction markers fail closed without deletion', () => {
   for (const kind of ['malformed', 'foreign', 'symlink']) {
     const cwd = project(`${kind} transaction-`);
@@ -518,19 +830,12 @@ test('malformed, foreign, and symlink transaction markers fail closed without de
       symlinkSync(outside, transaction);
     } else {
       mkdirSync(transaction);
-      writeFileSync(
-        join(transaction, 'transaction.json'),
+      writeTransactionMarker(
+        transaction,
+        destination,
         kind === 'malformed'
-          ? '{broken json'
-          : JSON.stringify({
-              schema_version: 1,
-              package: 'foreign-package',
-              skill: 'inferencex-api',
-              destination: outside,
-              owner_pid: 2_147_483_647,
-              phase: 'staged',
-              had_destination: true,
-            }),
+          ? { raw: '{broken json' }
+          : { package: 'foreign-package', destination: outside },
       );
     }
     const beforeProject = snapshot(cwd);
@@ -559,18 +864,7 @@ test('status and dry-run leave a live owner transaction untouched', () => {
   const transaction = `${destination}.inferencex-skills-transaction`;
   mkdirSync(transaction);
   cpSync(destination, join(transaction, 'stage'), { recursive: true });
-  writeFileSync(
-    join(transaction, 'transaction.json'),
-    JSON.stringify({
-      schema_version: 1,
-      package: packageInfo.name,
-      skill: 'inferencex-api',
-      destination,
-      owner_pid: process.pid,
-      phase: 'staged',
-      had_destination: true,
-    }),
-  );
+  writeTransactionMarker(transaction, destination, { ownerPid: process.pid });
   const before = snapshot(cwd);
 
   const status = JSON.parse(run(['status', '--json'], cwd).stdout);
