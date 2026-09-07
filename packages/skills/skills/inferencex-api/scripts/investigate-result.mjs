@@ -3,8 +3,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
 import { parseArgs } from 'node:util';
+import {
+  argumentError,
+  httpError,
+  outputBoundary,
+  requestBoundary,
+  responseBoundary,
+  responseError,
+  runCli,
+  writeStdout,
+} from './cli-contract.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
 const PACKAGE_VERSION = '0.9.0';
@@ -24,6 +33,7 @@ Options:
   --log-offset <n>    Character offset, 0-2000000000 (default 0)
   --log-limit <n>     Characters to inspect, 1-262144 (default 16384)
   --output <file>     Save JSON atomically; default stdout
+  --error-format <mode> Failure diagnostics: text (default) or json
   --version          Show the installed package version offline
   --help             Show help without making requests
 
@@ -157,22 +167,46 @@ function githubRun(value) {
   };
 }
 
-async function fetchJson(path, query, operation, evidence, budget, allowNotFound = false) {
+async function fetchJson(path, query, operation, evidence, budget, signal, allowNotFound = false) {
   const url = new URL(path, API_ORIGIN);
   for (const [key, value] of Object.entries(query))
     if (value !== undefined) url.searchParams.set(key, String(value));
-  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) });
+  const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
+  const response = await requestBoundary(
+    () =>
+      fetch(url, {
+        redirect: 'error',
+        signal: requestSignal,
+      }),
+    requestSignal,
+  );
   if (response.redirected || (response.url && response.url !== url.href)) {
     throw new Error(`Unexpected response URL for ${operation}`);
   }
-  const chunks = [];
-  for await (const chunk of response.body ?? []) {
-    budget.remaining -= chunk.byteLength;
-    if (budget.remaining < 0) throw new Error('Exceeded the 16 MiB response byte budget');
-    chunks.push(chunk);
+  let bytes;
+  try {
+    bytes = await responseBoundary(async () => {
+      const chunks = [];
+      for await (const chunk of response.body ?? []) {
+        budget.remaining -= chunk.byteLength;
+        if (budget.remaining < 0) throw new Error('Exceeded the 16 MiB response byte budget');
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks);
+    }, requestSignal);
+  } catch (error) {
+    if (!response.ok && !(allowNotFound && response.status === 404)) {
+      throw httpError(response.status, `${operation}: HTTP ${response.status} (${url.href})`);
+    }
+    throw error;
   }
-  const bytes = Buffer.concat(chunks);
-  const body = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  let body;
+  try {
+    body = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch (error) {
+    if (response.ok) throw responseError(`${operation} response is not valid UTF-8`, error);
+    body = '';
+  }
   evidence.push({
     operation,
     url: url.href,
@@ -183,7 +217,7 @@ async function fetchJson(path, query, operation, evidence, budget, allowNotFound
     checksum_covers: 'exact decoded UTF-8 response body',
   });
   if (!response.ok && !(allowNotFound && response.status === 404)) {
-    throw new Error(`${operation}: HTTP ${response.status} (${url.href})`);
+    throw httpError(response.status, `${operation}: HTTP ${response.status} (${url.href})`);
   }
   let value;
   try {
@@ -299,186 +333,202 @@ function logWindow(value, id, offset, limit, file) {
   };
 }
 
-async function saveOutput(path, bytes) {
+async function saveOutput(path, bytes, signal) {
   if (path === undefined) {
-    process.stdout.on('error', () => {});
-    await new Promise((done, reject) => {
-      process.stdout.write(bytes, (error) => (error ? reject(error) : done()));
-    });
+    await writeStdout(bytes, { signal });
     return;
   }
   const target = resolve(path);
   const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
+  await outputBoundary(async () => {
+    try {
+      await writeFile(temporary, bytes, { flag: 'wx' });
+      signal.throwIfAborted();
+      await rename(temporary, target);
+    } finally {
+      await rm(temporary, { force: true });
+    }
+  }, signal);
+}
+
+async function main(args, signal) {
+  let argumentsValidated = false;
   try {
-    await writeFile(temporary, bytes, { flag: 'wx' });
-    await rename(temporary, target);
-  } finally {
-    await rm(temporary, { force: true });
+    const { values } = parseArgs({
+      args,
+      options: {
+        id: { type: 'string' },
+        model: { type: 'string' },
+        date: { type: 'string' },
+        'run-id': { type: 'string' },
+        'log-file': { type: 'string' },
+        'log-offset': { type: 'string', default: '0' },
+        'log-limit': { type: 'string', default: '16384' },
+        output: { type: 'string' },
+        version: { type: 'boolean' },
+        help: { type: 'boolean' },
+        'error-format': { type: 'string' },
+      },
+      strict: true,
+      allowPositionals: false,
+    });
+    if (values.version) {
+      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
+      return;
+    }
+    if (values.help) {
+      await saveOutput(undefined, HELP, signal);
+      return;
+    }
+    integerOption(values.id, 'id', 1, Number.MAX_SAFE_INTEGER);
+    if (!values.model?.trim()) throw new Error('--model requires a display model name');
+    if (values.date !== undefined && !validDate(values.date))
+      throw new Error('--date must be a valid YYYY-MM-DD date');
+    if (values['run-id'] !== undefined)
+      integerOption(values['run-id'], 'run-id', 1, Number.MAX_SAFE_INTEGER);
+    if (values.date !== undefined && values['run-id'] !== undefined)
+      throw new Error('cannot combine --date and --run-id');
+    const offset = integerOption(values['log-offset'], 'log-offset', 0, 2_000_000_000);
+    const limit = integerOption(values['log-limit'], 'log-limit', 1, 262_144);
+    const file = values['log-file'];
+    if (file !== undefined && (file.length === 0 || file.length > 1024 || file.includes('\0'))) {
+      throw new Error('--log-file must contain 1-1024 characters without NUL');
+    }
+    if (values.output !== undefined && !values.output.trim())
+      throw new Error('--output requires a file path');
+    argumentsValidated = true;
+    await responseBoundary(async () => {
+      const evidence = [];
+      const budget = { remaining: RESPONSE_BYTE_BUDGET };
+      const rows = await fetchJson(
+        '/api/v1/benchmarks',
+        {
+          model: values.model,
+          date: values.date,
+          runId: values['run-id'],
+          exactRun: values['run-id'] === undefined ? undefined : true,
+        },
+        'benchmarks',
+        evidence,
+        budget,
+        signal,
+      );
+      if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row)))
+        throw new Error('Invalid benchmark row response');
+      const selected = rows.filter((row) => String(row.id) === values.id);
+      if (selected.length !== 1)
+        throw new Error(
+          `Expected exactly one result with ID ${values.id} in the supplied model/snapshot scope; found ${selected.length}`,
+        );
+      const row = selected[0];
+      if (
+        values.date !== undefined &&
+        (row.date > values.date || (row.curve_date !== undefined && row.curve_date > values.date))
+      ) {
+        throw new Error('Selected result contradicts the requested as-of cutoff');
+      }
+      if (row.curve_date !== undefined && row.curve_date < row.date) {
+        throw new Error('Selected curve snapshot predates its producer');
+      }
+      const identity = githubRun(row.run_url);
+      const limitations = [
+        'Existing public observations only; these records do not establish performance causality.',
+        'Log evidence covers one selected file window; other files and characters were not inspected.',
+        'workflow_run_id and curve_workflow_run_id are internal identities, not GitHub run IDs.',
+      ];
+      let producer = {
+        status: 'unresolved',
+        github_run_id: null,
+        run_attempt: null,
+        workflow_run: null,
+        run_configs: [],
+      };
+      if (identity) {
+        const info = await fetchJson(
+          '/api/v1/workflow-info',
+          {
+            date: row.date,
+            benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : undefined,
+          },
+          'workflow-info',
+          evidence,
+          budget,
+          signal,
+        );
+        const metadata = workflowMetadata(info, row, identity);
+        producer = {
+          status: metadata.workflow_run ? 'confirmed' : 'row_only',
+          github_run_id: identity.github_run_id,
+          run_attempt: identity.run_attempt,
+          ...metadata,
+        };
+        if (!metadata.workflow_run)
+          limitations.push(
+            'The public latest-attempt workflow listing did not confirm the producing attempt.',
+          );
+        if (metadata.run_configs.length === 0)
+          limitations.push(
+            'No matching producer config was confirmed in workflow-info; selected_result retains the original config and image.',
+          );
+      } else {
+        limitations.push(
+          'The selected run_url is null; the public response cannot identify its GitHub producer or attempt.',
+        );
+      }
+      if (row.image === null)
+        limitations.push('The selected row has no image; no image identity was inferred.');
+      const log = logWindow(
+        await fetchJson(
+          '/api/v1/server-log',
+          { id: values.id, offset, limit, file },
+          'server-log',
+          evidence,
+          budget,
+          signal,
+          true,
+        ),
+        values.id,
+        offset,
+        limit,
+        file,
+      );
+      const report = {
+        schema_version: 1,
+        metadata: {
+          package_version: PACKAGE_VERSION,
+          selected_result_id: values.id,
+          ran_new_benchmark: false,
+          scope: {
+            display_model: values.model,
+            date: values.date ?? null,
+            github_run_id: values['run-id'] ?? null,
+            selection:
+              values['run-id'] === undefined
+                ? values.date === undefined
+                  ? 'latest_snapshot'
+                  : 'as_of_snapshot'
+                : 'logical_run_snapshot',
+          },
+          log_window: { file: file ?? null, offset, limit, offset_unit: 'Unicode characters' },
+        },
+        selected_result: row,
+        producer,
+        log,
+        limitations,
+        evidence,
+      };
+      await saveOutput(values.output, `${JSON.stringify(report, null, 2)}\n`, signal);
+    }, signal);
+  } catch (error) {
+    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
+      throw argumentError(error.message, error);
+    }
+    throw error;
   }
 }
 
-async function main() {
-  const { values } = parseArgs({
-    options: {
-      id: { type: 'string' },
-      model: { type: 'string' },
-      date: { type: 'string' },
-      'run-id': { type: 'string' },
-      'log-file': { type: 'string' },
-      'log-offset': { type: 'string', default: '0' },
-      'log-limit': { type: 'string', default: '16384' },
-      output: { type: 'string' },
-      version: { type: 'boolean' },
-      help: { type: 'boolean' },
-    },
-    strict: true,
-    allowPositionals: false,
-  });
-  if (values.version) {
-    process.stdout.write(`${PACKAGE_VERSION}\n`);
-    return;
-  }
-  if (values.help) {
-    await saveOutput(undefined, HELP);
-    return;
-  }
-  integerOption(values.id, 'id', 1, Number.MAX_SAFE_INTEGER);
-  if (!values.model?.trim()) throw new Error('--model requires a display model name');
-  if (values.date !== undefined && !validDate(values.date))
-    throw new Error('--date must be a valid YYYY-MM-DD date');
-  if (values['run-id'] !== undefined)
-    integerOption(values['run-id'], 'run-id', 1, Number.MAX_SAFE_INTEGER);
-  if (values.date !== undefined && values['run-id'] !== undefined)
-    throw new Error('cannot combine --date and --run-id');
-  const offset = integerOption(values['log-offset'], 'log-offset', 0, 2_000_000_000);
-  const limit = integerOption(values['log-limit'], 'log-limit', 1, 262_144);
-  const file = values['log-file'];
-  if (file !== undefined && (file.length === 0 || file.length > 1024 || file.includes('\0'))) {
-    throw new Error('--log-file must contain 1-1024 characters without NUL');
-  }
-  if (values.output !== undefined && !values.output.trim())
-    throw new Error('--output requires a file path');
-
-  const evidence = [];
-  const budget = { remaining: RESPONSE_BYTE_BUDGET };
-  const rows = await fetchJson(
-    '/api/v1/benchmarks',
-    {
-      model: values.model,
-      date: values.date,
-      runId: values['run-id'],
-      exactRun: values['run-id'] === undefined ? undefined : true,
-    },
-    'benchmarks',
-    evidence,
-    budget,
-  );
-  if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row)))
-    throw new Error('Invalid benchmark row response');
-  const selected = rows.filter((row) => String(row.id) === values.id);
-  if (selected.length !== 1)
-    throw new Error(
-      `Expected exactly one result with ID ${values.id} in the supplied model/snapshot scope; found ${selected.length}`,
-    );
-  const row = selected[0];
-  if (
-    values.date !== undefined &&
-    (row.date > values.date || (row.curve_date !== undefined && row.curve_date > values.date))
-  ) {
-    throw new Error('Selected result contradicts the requested as-of cutoff');
-  }
-  if (row.curve_date !== undefined && row.curve_date < row.date) {
-    throw new Error('Selected curve snapshot predates its producer');
-  }
-  const identity = githubRun(row.run_url);
-  const limitations = [
-    'Existing public observations only; these records do not establish performance causality.',
-    'Log evidence covers one selected file window; other files and characters were not inspected.',
-    'workflow_run_id and curve_workflow_run_id are internal identities, not GitHub run IDs.',
-  ];
-  let producer = {
-    status: 'unresolved',
-    github_run_id: null,
-    run_attempt: null,
-    workflow_run: null,
-    run_configs: [],
-  };
-  if (identity) {
-    const info = await fetchJson(
-      '/api/v1/workflow-info',
-      {
-        date: row.date,
-        benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : undefined,
-      },
-      'workflow-info',
-      evidence,
-      budget,
-    );
-    const metadata = workflowMetadata(info, row, identity);
-    producer = {
-      status: metadata.workflow_run ? 'confirmed' : 'row_only',
-      github_run_id: identity.github_run_id,
-      run_attempt: identity.run_attempt,
-      ...metadata,
-    };
-    if (!metadata.workflow_run)
-      limitations.push(
-        'The public latest-attempt workflow listing did not confirm the producing attempt.',
-      );
-    if (metadata.run_configs.length === 0)
-      limitations.push(
-        'No matching producer config was confirmed in workflow-info; selected_result retains the original config and image.',
-      );
-  } else {
-    limitations.push(
-      'The selected run_url is null; the public response cannot identify its GitHub producer or attempt.',
-    );
-  }
-  if (row.image === null)
-    limitations.push('The selected row has no image; no image identity was inferred.');
-  const log = logWindow(
-    await fetchJson(
-      '/api/v1/server-log',
-      { id: values.id, offset, limit, file },
-      'server-log',
-      evidence,
-      budget,
-      true,
-    ),
-    values.id,
-    offset,
-    limit,
-    file,
-  );
-  const report = {
-    schema_version: 1,
-    metadata: {
-      package_version: PACKAGE_VERSION,
-      selected_result_id: values.id,
-      ran_new_benchmark: false,
-      scope: {
-        display_model: values.model,
-        date: values.date ?? null,
-        github_run_id: values['run-id'] ?? null,
-        selection:
-          values['run-id'] === undefined
-            ? values.date === undefined
-              ? 'latest_snapshot'
-              : 'as_of_snapshot'
-            : 'logical_run_snapshot',
-      },
-      log_window: { file: file ?? null, offset, limit, offset_unit: 'Unicode characters' },
-    },
-    selected_result: row,
-    producer,
-    log,
-    limitations,
-    evidence,
-  };
-  await saveOutput(values.output, `${JSON.stringify(report, null, 2)}\n`);
-}
-
-main().catch((error) => {
-  process.stderr.write(`investigate-result: ${error.message}\n`);
-  process.exitCode = 1;
+await runCli({
+  command: 'investigate-result',
+  packageVersion: PACKAGE_VERSION,
+  run: ({ args, signal }) => main(args, signal),
 });

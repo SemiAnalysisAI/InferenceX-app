@@ -317,6 +317,10 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/response-budget.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      writeFileSync(
+        join(destination, 'scripts/cli-contract.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
@@ -330,6 +334,41 @@ test('0.9 status does not claim a usable installation when its response reader i
   const helper = join(cwd, '.claude/skills/inferencex-api/scripts/response-budget.mjs');
   rmSync(helper);
   assert.equal(jsonResult(run(['status', '--json'], cwd)).installation_state, 'unknown');
+});
+
+test('0.10 status requires the shared CLI contract with a matching package version', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const scripts = join(destination, 'scripts');
+  const version = '0.10.0';
+  writeFileSync(
+    join(destination, metadataName),
+    JSON.stringify({ package: packageInfo.name, version }),
+  );
+  for (const name of readdirSync(scripts).filter((entry) => entry.endsWith('.mjs'))) {
+    const path = join(scripts, name);
+    writeFileSync(
+      path,
+      readFileSync(path, 'utf8').replace(
+        /^const PACKAGE_VERSION = .*;$/mu,
+        `const PACKAGE_VERSION = '${version}';`,
+      ),
+    );
+  }
+  const contract = join(scripts, 'cli-contract.mjs');
+  const source = readFileSync(contract);
+  rmSync(contract);
+  const missing = run(['status'], cwd);
+  succeeded(missing);
+  assert.match(
+    missing.stdout,
+    /Installed version: unknown \(installed CLI contract is missing or not a regular file\)/u,
+  );
+  writeFileSync(contract, source.toString().replace("'0.9.0'", `'${version}'`));
+  const matching = run(['status'], cwd);
+  succeeded(matching);
+  assert.match(matching.stdout, /Installed version: 0\.10\.0/u);
 });
 
 test('0.5 status verifies the provenance helper without executing it', () => {

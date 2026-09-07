@@ -3,8 +3,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { link, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
-import process from 'node:process';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
+import {
+  argumentError,
+  httpError,
+  outputBoundary,
+  requestBoundary,
+  responseBoundary,
+  runCli,
+  writeStdout,
+} from './cli-contract.mjs';
 
 const PACKAGE_VERSION = '0.9.0';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
@@ -26,6 +34,7 @@ Each side requires an exact image, an exact producer run URL, or both:
   --before-image <text> / --after-image <text>   Match the returned image string exactly
   --raw-model <key>       Select one raw model within the requested display bucket
   --output <new-file>     Exclusively create a JSON file; default stdout
+  --error-format <mode>   Failure diagnostics: text (default) or json
   --version          Show the installed package version offline
   --help                 Show help offline
 
@@ -219,303 +228,332 @@ function compareMetric(before, after, name) {
   };
 }
 
-async function saveOutput(path, output) {
+async function saveOutput(path, output, signal) {
   if (path === undefined) {
-    process.stdout.on('error', () => {});
-    await new Promise((done, reject) => {
-      process.stdout.write(output, (error) => (error ? reject(error) : done()));
-    });
+    await writeStdout(output, { signal });
     return;
   }
   const target = resolve(path);
   const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
+  await outputBoundary(async () => {
+    try {
+      await writeFile(temporary, output, { flag: 'wx' });
+      signal.throwIfAborted();
+      // Linking a complete sibling file installs it atomically and refuses existing targets/symlinks.
+      await link(temporary, target);
+    } finally {
+      await rm(temporary, { force: true });
+    }
+  }, signal);
+}
+
+async function run(args, signal) {
+  let argumentsValidated = false;
   try {
-    await writeFile(temporary, output, { flag: 'wx' });
-    // Linking a complete sibling file installs it atomically and refuses existing targets/symlinks.
-    await link(temporary, target);
-  } finally {
-    await rm(temporary, { force: true });
-  }
-}
-
-async function run() {
-  const { values, tokens } = parseArgs({
-    tokens: true,
-    options: {
-      ...Object.fromEntries(
-        [
-          'model',
-          'hardware',
-          'framework',
-          'isl',
-          'osl',
-          'metric',
-          'raw-model',
-          'before-date',
-          'after-date',
-          'before-image',
-          'after-image',
-          'before-run-url',
-          'after-run-url',
-          'output',
-        ].map((name) => [name, { type: 'string' }]),
-      ),
-      version: { type: 'boolean' },
-      help: { type: 'boolean' },
-    },
-    allowPositionals: false,
-    strict: true,
-  });
-  const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
-  if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
-  if (values.version) {
-    process.stdout.write(`${PACKAGE_VERSION}\n`);
-    return;
-  }
-  if (values.help) {
-    await saveOutput(undefined, HELP);
-    return;
-  }
-  for (const [key, value] of Object.entries(values)) {
-    if (typeof value === 'string' && !value.trim())
-      throw new Error(`--${key} requires a nonempty value`);
-  }
-  for (const key of ['model', 'hardware', 'metric']) {
-    if (!values[key]) throw new Error(`--${key} is required`);
-  }
-  if (!PERFORMANCE_METRIC.test(values.metric)) {
-    throw new Error(
-      'Choose a metric retained by benchmark history (see --help); use the PowerX cookbook for validated power and energy',
-    );
-  }
-  if (!['vllm', 'sglang'].includes(values.framework))
-    throw new Error('--framework must be vllm or sglang');
-  for (const key of ['isl', 'osl']) {
-    if (
-      !/^\d+$/u.test(values[key]) ||
-      !Number.isSafeInteger(Number(values[key])) ||
-      Number(values[key]) <= 0
-    )
-      throw new Error(`--${key} requires a positive integer`);
-  }
-  for (const side of ['before', 'after']) {
-    if (!validDate(values[`${side}-date`]))
-      throw new Error(`--${side}-date requires a valid YYYY-MM-DD date`);
-    if (values[`${side}-image`] === undefined && values[`${side}-run-url`] === undefined)
-      throw new Error(`Provide --${side}-image or --${side}-run-url`);
-    if (values[`${side}-run-url`] !== undefined && !runUrl(values[`${side}-run-url`]))
-      throw new Error(`--${side}-run-url requires an exact GitHub Actions run URL`);
-  }
-  if (values['before-date'] > values['after-date'])
-    throw new Error('--before-date must not be after --after-date');
-  const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks/history');
-  for (const name of ['model', 'isl', 'osl']) url.searchParams.set(name, values[name]);
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-  if (response.redirected || (response.url && response.url !== url.href))
-    throw new Error('Unexpected history response URL');
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url.href}`);
-  const chunks = [];
-  let received = 0;
-  for await (const chunk of response.body ?? []) {
-    received += chunk.byteLength;
-    if (received > RESPONSE_BYTE_BUDGET)
-      throw new Error('Exceeded the 16 MiB response byte budget');
-    chunks.push(chunk);
-  }
-  const bytes = Buffer.concat(chunks);
-  const body = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-  const evidence = [
-    {
-      operation: 'benchmark-history',
-      url: url.href,
-      http_status: response.status,
-      retrieved_at: new Date().toISOString(),
-      body_utf8: body,
-      decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
-      checksum_covers: 'exact decoded UTF-8 response body',
-    },
-  ];
-  const rows = JSON.parse(body.replace(/^\uFEFF/u, ''), (_key, value) => {
-    if (typeof value === 'number' && !Number.isFinite(value))
-      throw new Error('Unexpected benchmark response: non-finite number');
-    return value;
-  });
-  if (
-    !Array.isArray(rows) ||
-    rows.some(
-      (row) =>
-        !benchmarkRow(row) ||
-        (Object.hasOwn(row.metrics, values.metric) &&
-          row.metrics[values.metric] !== null &&
-          !Number.isFinite(row.metrics[values.metric])),
-    )
-  ) {
-    throw new Error(
-      'Unexpected benchmark response: invalid identity, configuration, date, or metric',
-    );
-  }
-  const originals = new Map();
-  for (const row of rows) {
-    const key = String(row.id);
-    const original = originalObservation(row);
-    if (originals.has(key) && !isDeepStrictEqual(originals.get(key), original))
-      throw new Error(`Conflicting observation for result ID ${key}`);
-    originals.set(key, original);
-  }
-  const scoped = rows.filter(
-    (row) =>
-      row.hardware === values.hardware &&
-      row.framework === values.framework &&
-      row.benchmark_type === 'single_turn' &&
-      row.isl === Number(values.isl) &&
-      row.osl === Number(values.osl) &&
-      (values['raw-model'] === undefined || row.model === values['raw-model']),
-  );
-  const selection = {};
-  const unique = {};
-  for (const side of ['before', 'after']) {
-    const selected = [];
-    const excluded = [];
-    for (const row of scoped.filter((candidate) => candidate.date === values[`${side}-date`])) {
-      const reasons = [];
-      if (values[`${side}-image`] !== undefined && row.image !== values[`${side}-image`])
-        reasons.push(row.image === null ? 'missing_image_identity' : 'image_mismatch');
-      if (values[`${side}-run-url`] !== undefined && row.run_url !== values[`${side}-run-url`])
-        reasons.push(row.run_url === null ? 'missing_run_identity' : 'run_url_mismatch');
-      if (reasons.length > 0) excluded.push({ row, reasons });
-      else selected.push(row);
-    }
-    unique[side] = [...new Map(selected.map((row) => [String(row.id), row])).values()];
-    selection[side] = {
-      rows: selected,
-      excluded,
-      unique_observations: unique[side].length,
-      snapshot_reuses: selected.length - unique[side].length,
-    };
-  }
-  const groups = Object.fromEntries(
-    ['before', 'after'].map((side) => [
-      side,
-      Map.groupBy(unique[side], (row) =>
-        JSON.stringify([
-          ...CONFIG_FIELDS.map((key) => row[key]),
-          ...CONFIG_METRICS.map((key) => [Object.hasOwn(row.metrics, key), row.metrics[key]]),
-        ]),
-      ),
-    ]),
-  );
-  const comparisons = [];
-  const unmatched = { before: [], after: [] };
-  for (const configKey of new Set([...groups.before.keys(), ...groups.after.keys()])) {
-    const before = groups.before.get(configKey) ?? [];
-    const after = groups.after.get(configKey) ?? [];
-    const reason =
-      before.length === 0 || after.length === 0
-        ? 'no_matching_configuration'
-        : before.length !== 1 || after.length !== 1
-          ? 'ambiguous_configuration'
-          : String(before[0].id) === String(after[0].id)
-            ? 'reused_observation'
-            : null;
-    if (reason) {
-      for (const [side, records] of [
-        ['before', before],
-        ['after', after],
-      ]) {
-        unmatched[side].push(...records.map((row) => ({ id: row.id, reason })));
-      }
-      continue;
-    }
-    const first = before[0];
-    const second = after[0];
-    const fingerprintMatch =
-      first.recipe_fingerprint && second.recipe_fingerprint
-        ? first.recipe_fingerprint === second.recipe_fingerprint
-        : null;
-    const unknownFields = CONFIG_METRICS.filter(
-      (key) => first.metrics[key] === null || first.metrics[key] === undefined,
-    ).map((key) => `metrics.${key}`);
-    const confounders = [
-      fingerprintMatch === false
-        ? 'recipe_fingerprint_changed_includes_image_and_unexposed_config'
-        : fingerprintMatch === null
-          ? 'recipe_fingerprint_unavailable'
-          : 'recipe_contents_not_independently_verified',
-    ];
-    if (first.image === null || second.image === null)
-      confounders.push('image_identity_unavailable');
-    if (first.run_url === null || second.run_url === null)
-      confounders.push('producer_run_identity_unavailable');
-    if (unknownFields.length > 0) confounders.push('optional_configuration_fields_unavailable');
-    comparisons.push({
-      before_id: first.id,
-      after_id: second.id,
-      configuration: Object.fromEntries(CONFIG_FIELDS.map((name) => [name, first[name]])),
-      configuration_metrics: Object.fromEntries(
-        CONFIG_METRICS.filter((key) => Object.hasOwn(first.metrics, key)).map((key) => [
-          key,
-          first.metrics[key],
-        ]),
-      ),
-      configuration_verification: 'public_fields_only',
-      configuration_completeness:
-        unknownFields.length > 0 ? 'incomplete_optional_fields' : 'known_fields_present',
-      configuration_unknown_fields: unknownFields,
-      producer: {
-        before: { image: first.image, run_url: first.run_url },
-        after: { image: second.image, run_url: second.run_url },
+    const { values, tokens } = parseArgs({
+      args,
+      tokens: true,
+      options: {
+        ...Object.fromEntries(
+          [
+            'model',
+            'hardware',
+            'framework',
+            'isl',
+            'osl',
+            'metric',
+            'raw-model',
+            'before-date',
+            'after-date',
+            'before-image',
+            'after-image',
+            'before-run-url',
+            'after-run-url',
+            'output',
+          ].map((name) => [name, { type: 'string' }]),
+        ),
+        version: { type: 'boolean' },
+        help: { type: 'boolean' },
+        'error-format': { type: 'string' },
       },
-      recipe_fingerprint_match: fingerprintMatch,
-      full_recipe_verified: false,
-      confounders,
-      metric: compareMetric(first, second, values.metric),
+      allowPositionals: false,
+      strict: true,
     });
-  }
-  const comparableValues = comparisons.filter(
-    ({ metric }) => Number.isFinite(metric.before) && Number.isFinite(metric.after),
-  ).length;
-  const output = `${JSON.stringify(
-    {
-      schema_version: 1,
-      metadata: {
-        package_version: PACKAGE_VERSION,
-        query_url: url.href,
-        retrieved_at: evidence[0].retrieved_at,
-        requested: values,
-        ran_new_benchmark: false,
-        returned_rows: rows.length,
-        outside_requested_scope: rows.length - scoped.length,
-        outside_selected_dates: scoped.filter(
-          (row) => ![values['before-date'], values['after-date']].includes(row.date),
-        ).length,
-        date_field: 'date',
-        metric_coverage: {
-          comparable_values: comparableValues,
-          missing_values: comparisons.length - comparableValues,
+    const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
+    if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
+    if (values.version) {
+      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
+      return;
+    }
+    if (values.help) {
+      await saveOutput(undefined, HELP, signal);
+      return;
+    }
+    for (const [key, value] of Object.entries(values)) {
+      if (typeof value === 'string' && !value.trim())
+        throw new Error(`--${key} requires a nonempty value`);
+    }
+    for (const key of ['model', 'hardware', 'metric']) {
+      if (!values[key]) throw new Error(`--${key} is required`);
+    }
+    if (!PERFORMANCE_METRIC.test(values.metric)) {
+      throw new Error(
+        'Choose a metric retained by benchmark history (see --help); use the PowerX cookbook for validated power and energy',
+      );
+    }
+    if (!['vllm', 'sglang'].includes(values.framework))
+      throw new Error('--framework must be vllm or sglang');
+    for (const key of ['isl', 'osl']) {
+      if (
+        !/^\d+$/u.test(values[key]) ||
+        !Number.isSafeInteger(Number(values[key])) ||
+        Number(values[key]) <= 0
+      )
+        throw new Error(`--${key} requires a positive integer`);
+    }
+    for (const side of ['before', 'after']) {
+      if (!validDate(values[`${side}-date`]))
+        throw new Error(`--${side}-date requires a valid YYYY-MM-DD date`);
+      if (values[`${side}-image`] === undefined && values[`${side}-run-url`] === undefined)
+        throw new Error(`Provide --${side}-image or --${side}-run-url`);
+      if (values[`${side}-run-url`] !== undefined && !runUrl(values[`${side}-run-url`]))
+        throw new Error(`--${side}-run-url requires an exact GitHub Actions run URL`);
+    }
+    if (values['before-date'] > values['after-date'])
+      throw new Error('--before-date must not be after --after-date');
+    argumentsValidated = true;
+    const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
+    await responseBoundary(async () => {
+      const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks/history');
+      for (const name of ['model', 'isl', 'osl']) url.searchParams.set(name, values[name]);
+      const response = await requestBoundary(
+        () =>
+          fetch(url, {
+            signal: requestSignal,
+            redirect: 'error',
+          }),
+        requestSignal,
+      );
+      if (response.redirected || (response.url && response.url !== url.href))
+        throw new Error('Unexpected history response URL');
+      if (!response.ok) throw httpError(response.status, `HTTP ${response.status}: ${url.href}`);
+      const { bytes, body } = await responseBoundary(async () => {
+        const chunks = [];
+        let received = 0;
+        for await (const chunk of response.body ?? []) {
+          received += chunk.byteLength;
+          if (received > RESPONSE_BYTE_BUDGET)
+            throw new Error('Exceeded the 16 MiB response byte budget');
+          chunks.push(chunk);
+        }
+        const responseBytes = Buffer.concat(chunks);
+        const responseBody = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+          responseBytes,
+        );
+        return { bytes: responseBytes, body: responseBody };
+      }, requestSignal);
+      const evidence = [
+        {
+          operation: 'benchmark-history',
+          url: url.href,
+          http_status: response.status,
+          retrieved_at: new Date().toISOString(),
+          body_utf8: body,
+          decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
+          checksum_covers: 'exact decoded UTF-8 response body',
         },
-        release_mapping: 'unknown',
-        causal_attribution: 'not_established',
-        statistical_verdict: 'not_established',
-      },
-      outcome: comparisons.length > 0 ? 'observed_comparisons' : 'no_comparable_pairs',
-      limitations: [
-        'Descriptive existing observations only; no causal or statistical regression verdict.',
-        'Dates select original observations; history contains latest attempts and carried curve snapshots, not every historical attempt.',
-        'Matching covers declared public configuration fields only; unavailable fields and recipe changes remain confounders.',
-        'Image strings and run URLs do not independently establish immutable images or framework release versions.',
-      ],
-      selection,
-      comparisons,
-      unmatched,
-      evidence,
-    },
-    null,
-    2,
-  )}\n`;
-  await saveOutput(values.output, output);
+      ];
+      const rows = JSON.parse(body.replace(/^\uFEFF/u, ''), (_key, value) => {
+        if (typeof value === 'number' && !Number.isFinite(value))
+          throw new Error('Unexpected benchmark response: non-finite number');
+        return value;
+      });
+      if (
+        !Array.isArray(rows) ||
+        rows.some(
+          (row) =>
+            !benchmarkRow(row) ||
+            (Object.hasOwn(row.metrics, values.metric) &&
+              row.metrics[values.metric] !== null &&
+              !Number.isFinite(row.metrics[values.metric])),
+        )
+      ) {
+        throw new Error(
+          'Unexpected benchmark response: invalid identity, configuration, date, or metric',
+        );
+      }
+      const originals = new Map();
+      for (const row of rows) {
+        const key = String(row.id);
+        const original = originalObservation(row);
+        if (originals.has(key) && !isDeepStrictEqual(originals.get(key), original))
+          throw new Error(`Conflicting observation for result ID ${key}`);
+        originals.set(key, original);
+      }
+      const scoped = rows.filter(
+        (row) =>
+          row.hardware === values.hardware &&
+          row.framework === values.framework &&
+          row.benchmark_type === 'single_turn' &&
+          row.isl === Number(values.isl) &&
+          row.osl === Number(values.osl) &&
+          (values['raw-model'] === undefined || row.model === values['raw-model']),
+      );
+      const selection = {};
+      const unique = {};
+      for (const side of ['before', 'after']) {
+        const selected = [];
+        const excluded = [];
+        for (const row of scoped.filter((candidate) => candidate.date === values[`${side}-date`])) {
+          const reasons = [];
+          if (values[`${side}-image`] !== undefined && row.image !== values[`${side}-image`])
+            reasons.push(row.image === null ? 'missing_image_identity' : 'image_mismatch');
+          if (values[`${side}-run-url`] !== undefined && row.run_url !== values[`${side}-run-url`])
+            reasons.push(row.run_url === null ? 'missing_run_identity' : 'run_url_mismatch');
+          if (reasons.length > 0) excluded.push({ row, reasons });
+          else selected.push(row);
+        }
+        unique[side] = [...new Map(selected.map((row) => [String(row.id), row])).values()];
+        selection[side] = {
+          rows: selected,
+          excluded,
+          unique_observations: unique[side].length,
+          snapshot_reuses: selected.length - unique[side].length,
+        };
+      }
+      const groups = Object.fromEntries(
+        ['before', 'after'].map((side) => [
+          side,
+          Map.groupBy(unique[side], (row) =>
+            JSON.stringify([
+              ...CONFIG_FIELDS.map((key) => row[key]),
+              ...CONFIG_METRICS.map((key) => [Object.hasOwn(row.metrics, key), row.metrics[key]]),
+            ]),
+          ),
+        ]),
+      );
+      const comparisons = [];
+      const unmatched = { before: [], after: [] };
+      for (const configKey of new Set([...groups.before.keys(), ...groups.after.keys()])) {
+        const before = groups.before.get(configKey) ?? [];
+        const after = groups.after.get(configKey) ?? [];
+        const reason =
+          before.length === 0 || after.length === 0
+            ? 'no_matching_configuration'
+            : before.length !== 1 || after.length !== 1
+              ? 'ambiguous_configuration'
+              : String(before[0].id) === String(after[0].id)
+                ? 'reused_observation'
+                : null;
+        if (reason) {
+          for (const [side, records] of [
+            ['before', before],
+            ['after', after],
+          ]) {
+            unmatched[side].push(...records.map((row) => ({ id: row.id, reason })));
+          }
+          continue;
+        }
+        const first = before[0];
+        const second = after[0];
+        const fingerprintMatch =
+          first.recipe_fingerprint && second.recipe_fingerprint
+            ? first.recipe_fingerprint === second.recipe_fingerprint
+            : null;
+        const unknownFields = CONFIG_METRICS.filter(
+          (key) => first.metrics[key] === null || first.metrics[key] === undefined,
+        ).map((key) => `metrics.${key}`);
+        const confounders = [
+          fingerprintMatch === false
+            ? 'recipe_fingerprint_changed_includes_image_and_unexposed_config'
+            : fingerprintMatch === null
+              ? 'recipe_fingerprint_unavailable'
+              : 'recipe_contents_not_independently_verified',
+        ];
+        if (first.image === null || second.image === null)
+          confounders.push('image_identity_unavailable');
+        if (first.run_url === null || second.run_url === null)
+          confounders.push('producer_run_identity_unavailable');
+        if (unknownFields.length > 0) confounders.push('optional_configuration_fields_unavailable');
+        comparisons.push({
+          before_id: first.id,
+          after_id: second.id,
+          configuration: Object.fromEntries(CONFIG_FIELDS.map((name) => [name, first[name]])),
+          configuration_metrics: Object.fromEntries(
+            CONFIG_METRICS.filter((key) => Object.hasOwn(first.metrics, key)).map((key) => [
+              key,
+              first.metrics[key],
+            ]),
+          ),
+          configuration_verification: 'public_fields_only',
+          configuration_completeness:
+            unknownFields.length > 0 ? 'incomplete_optional_fields' : 'known_fields_present',
+          configuration_unknown_fields: unknownFields,
+          producer: {
+            before: { image: first.image, run_url: first.run_url },
+            after: { image: second.image, run_url: second.run_url },
+          },
+          recipe_fingerprint_match: fingerprintMatch,
+          full_recipe_verified: false,
+          confounders,
+          metric: compareMetric(first, second, values.metric),
+        });
+      }
+      const comparableValues = comparisons.filter(
+        ({ metric }) => Number.isFinite(metric.before) && Number.isFinite(metric.after),
+      ).length;
+      const output = `${JSON.stringify(
+        {
+          schema_version: 1,
+          metadata: {
+            package_version: PACKAGE_VERSION,
+            query_url: url.href,
+            retrieved_at: evidence[0].retrieved_at,
+            requested: Object.fromEntries(
+              Object.entries(values).filter(([name]) => name !== 'error-format'),
+            ),
+            ran_new_benchmark: false,
+            returned_rows: rows.length,
+            outside_requested_scope: rows.length - scoped.length,
+            outside_selected_dates: scoped.filter(
+              (row) => ![values['before-date'], values['after-date']].includes(row.date),
+            ).length,
+            date_field: 'date',
+            metric_coverage: {
+              comparable_values: comparableValues,
+              missing_values: comparisons.length - comparableValues,
+            },
+            release_mapping: 'unknown',
+            causal_attribution: 'not_established',
+            statistical_verdict: 'not_established',
+          },
+          outcome: comparisons.length > 0 ? 'observed_comparisons' : 'no_comparable_pairs',
+          limitations: [
+            'Descriptive existing observations only; no causal or statistical regression verdict.',
+            'Dates select original observations; history contains latest attempts and carried curve snapshots, not every historical attempt.',
+            'Matching covers declared public configuration fields only; unavailable fields and recipe changes remain confounders.',
+            'Image strings and run URLs do not independently establish immutable images or framework release versions.',
+          ],
+          selection,
+          comparisons,
+          unmatched,
+          evidence,
+        },
+        null,
+        2,
+      )}\n`;
+      await saveOutput(values.output, output, signal);
+    }, signal);
+  } catch (error) {
+    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
+      throw argumentError(error.message, error);
+    }
+    throw error;
+  }
 }
 
-run().catch((error) => {
-  process.stderr.write(`compare-releases: ${error.message}\n`);
-  process.exitCode = 1;
+await runCli({
+  command: 'compare-releases',
+  packageVersion: PACKAGE_VERSION,
+  run: ({ args, signal }) => run(args, signal),
 });

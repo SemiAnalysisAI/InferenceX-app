@@ -13,6 +13,11 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
+import {
+  argumentError,
+  runCli,
+  writeStdout,
+} from '../skills/inferencex-api/scripts/cli-contract.mjs';
 
 const SKILL_NAME = 'inferencex-api';
 const INSTALL_METADATA = '.inferencex-skills.json';
@@ -41,6 +46,7 @@ Install and status options:
   --json          Emit one JSON document (schema_version: 1), without prose
   --force         Install only: overwrite packaged files; retains obsolete files
   --dry-run       Install only: preview the same preflight without changing files
+  --error-format <mode> Failure diagnostics: text (default) or json
 
 Existing skills are skipped unless --force is supplied.
 Status reads local installation metadata without changing files or using the network.
@@ -94,6 +100,7 @@ function installedState(destination, packageName) {
     { file: 'compare-releases.mjs', name: 'release comparison helper', minor: 7n },
     { file: 'compare-collectivex.mjs', name: 'CollectiveX helper', minor: 8n },
     { file: 'response-budget.mjs', name: 'response reader', minor: 9n },
+    { file: 'cli-contract.mjs', name: 'CLI contract', minor: 10n },
   ].filter(
     ({ minor }) =>
       BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= minor,
@@ -185,25 +192,12 @@ function installationPlan(source, destination, force) {
   return { outcome: existing ? 'overwritten' : 'installed', write_paths: files.sort() };
 }
 
-function fail(error, exitCode, json, command) {
-  const reason = error.message;
-  if (json) {
-    console.log(JSON.stringify({ schema_version: 1, outcome: 'failed', reason }));
-  }
-  console.error(
-    exitCode === 2
-      ? `${reason}\nRun inferencex-skills --help for usage.`
-      : `Could not ${command} the skill: ${reason}`,
-  );
-  process.exitCode = exitCode;
-}
-
-function main() {
+async function main(args, signal) {
   let command;
   let values;
-  const json = process.argv.slice(2).includes('--json');
   try {
     const parsed = parseArgs({
+      args,
       options: {
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean' },
@@ -212,6 +206,7 @@ function main() {
         force: { type: 'boolean' },
         json: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
+        'error-format': { type: 'string' },
       },
       allowPositionals: true,
     });
@@ -243,91 +238,103 @@ function main() {
       throw new Error('--json requires install or status without --help.');
     }
   } catch (error) {
-    fail(error, 2, json, command);
-    return;
+    throw argumentError(error.message, error);
   }
 
   if (command === 'help' || values.help) {
-    console.log(HELP);
+    await writeStdout(`${HELP}\n`, { signal });
     return;
   }
 
-  try {
-    if (Number(process.versions.node.split('.')[0]) < 24) {
-      throw new Error('Node 24 or later is required.');
-    }
-    const packageInfo = JSON.parse(
-      readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'),
-    );
-    if (command === 'version') {
-      console.log(`Installer version: ${packageInfo.version}`);
-      return;
-    }
-    const source = join(import.meta.dirname, '..', 'skills', SKILL_NAME);
-    readFileSync(join(source, 'SKILL.md'), 'utf8');
-    if (command === 'list') {
-      console.log(`Bundled InferenceX skill:\n  ${SKILL_NAME}`);
-      return;
-    }
+  if (Number(process.versions.node.split('.')[0]) < 24) {
+    throw new Error('Node 24 or later is required.');
+  }
+  const packageInfo = JSON.parse(
+    readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'),
+  );
+  if (command === 'version') {
+    await writeStdout(`Installer version: ${packageInfo.version}\n`, { signal });
+    return;
+  }
+  const source = join(import.meta.dirname, '..', 'skills', SKILL_NAME);
+  readFileSync(join(source, 'SKILL.md'), 'utf8');
+  if (command === 'list') {
+    await writeStdout(`Bundled InferenceX skill:\n  ${SKILL_NAME}\n`, { signal });
+    return;
+  }
 
-    const root = resolve(values.dir ?? TARGET_DIRS[values.target ?? 'claude']);
-    const destination = join(root, SKILL_NAME);
-    let record = statusRecord(destination, packageInfo);
-    if (command === 'status') {
-      if (values.json) console.log(JSON.stringify(record));
-      else showStatus(record);
-      return;
-    }
-    const plan = installationPlan(source, destination, values.force);
-    const dryRun = values['dry-run'] ?? false;
-    if (!dryRun && plan.outcome !== 'skipped') {
-      const metadataPath = join(destination, INSTALL_METADATA);
-      mkdirSync(root, { recursive: true });
-      // A failed overwrite must not leave a version stamp for partially replaced files.
-      rmSync(metadataPath, { force: true });
-      cpSync(source, destination, { recursive: true, force: true });
-      writeFileSync(
-        metadataPath,
-        `${JSON.stringify({ package: packageInfo.name, version: packageInfo.version }, null, 2)}\n`,
-        { flag: 'wx' },
-      );
-      record = statusRecord(destination, packageInfo);
-    }
-    const result = {
-      ...record,
-      dry_run: dryRun,
-      outcome: dryRun
-        ? { installed: 'would_install', overwritten: 'would_overwrite', skipped: 'would_skip' }[
-            plan.outcome
-          ]
-        : plan.outcome,
-      write_paths: plan.write_paths,
-      preserves_extra_files: true,
-    };
-    if (values.json) {
-      console.log(JSON.stringify(result));
-      return;
-    }
-    if (dryRun) {
-      console.log(
-        `Dry run: would ${{ installed: 'install', overwritten: 'overwrite', skipped: 'skip' }[plan.outcome]} ${SKILL_NAME} at ${destination}.`,
-      );
-      showStatus(record);
-      console.log(
-        `Files to write (relative to skill path, including the installation record):\n${plan.write_paths.map((path) => `  ${path}`).join('\n') || '  (none)'}`,
-      );
-      console.log('Unrelated and obsolete files remain untouched. No files were changed.');
-    } else {
-      console.log(
-        plan.outcome === 'skipped'
-          ? `Skipped ${SKILL_NAME}: already exists at ${destination}; use --force to overwrite.`
-          : `Installed ${SKILL_NAME} into ${destination}`,
-      );
-      showStatus(record);
-    }
-  } catch (error) {
-    fail(error, 1, json, command);
+  const root = resolve(values.dir ?? TARGET_DIRS[values.target ?? 'claude']);
+  const destination = join(root, SKILL_NAME);
+  let record = statusRecord(destination, packageInfo);
+  if (command === 'status') {
+    if (values.json) await writeStdout(`${JSON.stringify(record)}\n`, { signal });
+    else showStatus(record);
+    return;
+  }
+  const plan = installationPlan(source, destination, values.force);
+  const dryRun = values['dry-run'] ?? false;
+  if (!dryRun && plan.outcome !== 'skipped') {
+    const metadataPath = join(destination, INSTALL_METADATA);
+    mkdirSync(root, { recursive: true });
+    // A failed overwrite must not leave a version stamp for partially replaced files.
+    rmSync(metadataPath, { force: true });
+    cpSync(source, destination, { recursive: true, force: true });
+    writeFileSync(
+      metadataPath,
+      `${JSON.stringify({ package: packageInfo.name, version: packageInfo.version }, null, 2)}\n`,
+      { flag: 'wx' },
+    );
+    record = statusRecord(destination, packageInfo);
+  }
+  const result = {
+    ...record,
+    dry_run: dryRun,
+    outcome: dryRun
+      ? { installed: 'would_install', overwritten: 'would_overwrite', skipped: 'would_skip' }[
+          plan.outcome
+        ]
+      : plan.outcome,
+    write_paths: plan.write_paths,
+    preserves_extra_files: true,
+  };
+  if (values.json) {
+    await writeStdout(`${JSON.stringify(result)}\n`, { signal });
+    return;
+  }
+  if (dryRun) {
+    console.log(
+      `Dry run: would ${{ installed: 'install', overwritten: 'overwrite', skipped: 'skip' }[plan.outcome]} ${SKILL_NAME} at ${destination}.`,
+    );
+    showStatus(record);
+    console.log(
+      `Files to write (relative to skill path, including the installation record):\n${plan.write_paths.map((path) => `  ${path}`).join('\n') || '  (none)'}`,
+    );
+    console.log('Unrelated and obsolete files remain untouched. No files were changed.');
+  } else {
+    console.log(
+      plan.outcome === 'skipped'
+        ? `Skipped ${SKILL_NAME}: already exists at ${destination}; use --force to overwrite.`
+        : `Installed ${SKILL_NAME} into ${destination}`,
+    );
+    showStatus(record);
   }
 }
 
-main();
+const args = process.argv.slice(2);
+const command = args.find((arg) => ['install', 'status', 'list'].includes(arg)) ?? 'help';
+await runCli({
+  command: 'inferencex-skills',
+  args,
+  textUsageExitCode: 2,
+  textError(error) {
+    if (args.includes('--json')) {
+      process.stdout.write(
+        `${JSON.stringify({ schema_version: 1, outcome: 'failed', reason: error.message })}\n`,
+      );
+    }
+    return error.code === 'INVALID_ARGUMENT'
+      ? `${error.message}\nRun inferencex-skills --help for usage.`
+      : `Could not ${command} the skill: ${error.message}`;
+  },
+  run: ({ args: cliArgs, signal }) => main(cliArgs, signal),
+});
