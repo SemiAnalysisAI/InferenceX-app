@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { checkIntegrity } from './update-integrity.mjs';
 
 export const PACKAGE = '@semianalysisai/inferencex-skills';
 export const REGISTRY = 'https://registry.npmjs.org';
@@ -152,6 +153,7 @@ async function prepare(version, output, reviewedSha256) {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
   const source = sourceState();
   assert.equal(source.dirty, false, 'Package source must be clean before preparing a release');
+  await checkIntegrity();
   await requireUnpublished(version, manifest);
   const destination = resolve(output);
   // A new directory preserves earlier attempts, including failures.

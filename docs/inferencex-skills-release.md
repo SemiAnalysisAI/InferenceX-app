@@ -69,8 +69,13 @@ python3 packages/skills/scripts/verify-release.py candidate "$skills_release_dir
   --evidence "$skills_release_attempt/candidate-check"
 ```
 
+After editing packaged skill files, run `node packages/skills/scripts/update-integrity.mjs`
+and commit the refreshed `integrity.json` with the source change. The preparer
+checks this inventory without modifying files; it intentionally skips npm lifecycle
+scripts so release preparation cannot silently repair unreviewed source.
+
 The preparer requires and records a clean package source state. It rejects dirty
-source before registry access or candidate output, and also rejects a version
+source or a stale integrity inventory before registry access or candidate output, and also rejects a version
 mismatch, an already published version, or an unavailable registry check. It packs
 once, checks the public file boundary, and records the source commit,
 `source_dirty: false`, file list, SHA-256, and npm integrity. Maintainer tools,

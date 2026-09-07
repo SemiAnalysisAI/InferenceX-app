@@ -177,6 +177,68 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
   }
 });
 
+test('integrity check is read-only and prepare rejects a clean stale manifest before network or output', (context) => {
+  const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-integrity-test-'));
+  context.after(() => rmSync(temporary, { recursive: true, force: true }));
+  const source = resolve(import.meta.dirname, '..');
+  const packageRoot = join(temporary, 'skills');
+  cpSync(source, packageRoot, { recursive: true });
+  const packagePath = join(packageRoot, 'package.json');
+  const manifest = JSON.parse(readFileSync(packagePath, 'utf8'));
+  writeFileSync(packagePath, `${JSON.stringify({ ...manifest, version: VERSION }, null, 2)}\n`);
+  const updater = join(packageRoot, 'scripts/update-integrity.mjs');
+  execFileSync(process.execPath, [updater]);
+  const integrityPath = join(packageRoot, 'skills/inferencex-api/integrity.json');
+  const exactIntegrity = readFileSync(integrityPath, 'utf8');
+
+  const clean = spawnSync(process.execPath, [updater, '--check'], { encoding: 'utf8' });
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.equal(readFileSync(integrityPath, 'utf8'), exactIntegrity);
+
+  const managed = join(packageRoot, 'skills/inferencex-api/references/powerx.md');
+  writeFileSync(managed, `${readFileSync(managed, 'utf8')}\nstale fixture\n`);
+  const stale = spawnSync(process.execPath, [updater, '--check'], { encoding: 'utf8' });
+  assert.notEqual(stale.status, 0, stale.stdout);
+  assert.match(stale.stderr, /integrity manifest is stale/);
+  assert.equal(readFileSync(integrityPath, 'utf8'), exactIntegrity, 'check must not repair');
+
+  execFileSync('git', ['init', '--quiet'], { cwd: packageRoot });
+  execFileSync('git', ['config', 'user.email', 'release-test@example.com'], { cwd: packageRoot });
+  execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: packageRoot });
+  execFileSync('git', ['add', '.'], { cwd: packageRoot });
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--quiet', '-m', 'fixture'], {
+    cwd: packageRoot,
+  });
+  const fetchCalls = join(temporary, 'fetch-calls.txt');
+  const preload = join(temporary, 'registry-404.mjs');
+  writeFileSync(
+    preload,
+    `import { appendFileSync } from 'node:fs';
+globalThis.fetch = async () => {
+  appendFileSync(${JSON.stringify(fetchCalls)}, 'fetch\\n');
+  return new Response(null, { status: 404 });
+};
+`,
+  );
+  const output = join(temporary, 'candidate');
+  const prepared = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(preload).href,
+      join(packageRoot, 'scripts/release.mjs'),
+      'prepare',
+      VERSION,
+      output,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.notEqual(prepared.status, 0, prepared.stdout);
+  assert.match(prepared.stderr, /integrity manifest is stale/);
+  assert.equal(existsSync(fetchCalls), false, 'stale integrity must fail before registry access');
+  assert.equal(existsSync(output), false, 'stale integrity must fail before candidate output');
+});
+
 test('prepare rejects dirty or changing package source and packs one clean candidate', (context) => {
   const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-release-test-'));
   context.after(() => rmSync(temporary, { recursive: true, force: true }));
@@ -186,6 +248,7 @@ test('prepare rejects dirty or changing package source and packs one clean candi
   const packagePath = join(packageRoot, 'package.json');
   const manifest = JSON.parse(readFileSync(packagePath, 'utf8'));
   writeFileSync(packagePath, `${JSON.stringify({ ...manifest, version: VERSION }, null, 2)}\n`);
+  execFileSync(process.execPath, [join(packageRoot, 'scripts/update-integrity.mjs')]);
   execFileSync('git', ['init', '--quiet'], { cwd: packageRoot });
   execFileSync('git', ['config', 'user.email', 'release-test@example.com'], { cwd: packageRoot });
   execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: packageRoot });

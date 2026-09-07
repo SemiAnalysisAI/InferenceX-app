@@ -20,7 +20,9 @@ defines exit codes, fixed CSV columns, JSON evolution, and legacy migration.
 
 ## Candidate evidence
 
-- [ ] Commit the package source with normal hooks and record the reviewed commit.
+- [ ] Regenerate `integrity.json` with `update-integrity.mjs` after packaged file
+      edits. Commit it with the package source using normal hooks and record the
+      reviewed commit; `release.mjs prepare` rejects a stale inventory.
 - [ ] Pass the Node 24 packed suite, schema consumers, independent Python verifier,
       repository checks, and the required Linux/macOS × Node 24/26 matrix.
 - [ ] Prepare one Node 24 archive with `release.mjs prepare`; retain `release.json`,
