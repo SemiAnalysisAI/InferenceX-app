@@ -89,10 +89,11 @@ before(() => {
 import { writeFileSync } from 'node:fs';
 const mode = process.env.INFERENCEX_CLI_CONTRACT_MODE;
 let parseTimeoutController;
-if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'parse-timeout') {
+if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'parse-timeout' || mode === 'request-abort') {
   const timeout = AbortSignal.timeout;
   AbortSignal.timeout = milliseconds => {
     const controlled =
+      mode === 'request-abort' ||
       (mode === 'parse-timeout' && milliseconds === 120_000) ||
       (mode !== 'parse-timeout' && milliseconds === 30_000);
     if (!controlled) return timeout(milliseconds);
@@ -129,6 +130,13 @@ globalThis.fetch = async (_input, options) => {
   if (mode === 'network') throw new TypeError('controlled network failure');
   if (mode === 'timeout') throw new DOMException('controlled timeout', 'TimeoutError');
   options.signal?.throwIfAborted();
+  if (mode === 'request-abort') {
+    return await new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        reject(new DOMException('fetch aborted', 'AbortError'));
+      }, { once: true });
+    });
+  }
   if (mode === 'pending') {
     return await new Promise((_resolve, reject) => {
       const keepAlive = setInterval(() => {}, 1_000);
@@ -203,6 +211,12 @@ test('every packed entry point emits one structured INVALID_ARGUMENT diagnostic'
   const cwd = suite.project();
   const result = suite.run(['install', '--target', 'unknown', '--error-format', 'json'], cwd);
   diagnostic(result, 'INVALID_ARGUMENT', 2);
+});
+
+test('request budgets classify a generic fetch AbortError as TIMEOUT', () => {
+  for (const [name, args] of cases) {
+    diagnostic(run(name, args, 'request-abort'), 'TIMEOUT');
+  }
 });
 
 test('every packed entry point rejects an unknown error format', () => {

@@ -330,7 +330,7 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
   });
   const response = await requestBoundary(
     () => fetch(url, { signal: budget.signal, redirect: 'error' }),
-    signal,
+    budget.signal,
   );
   if (evidence) {
     const captured = {
@@ -345,7 +345,7 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
   }
   let bytes;
   try {
-    bytes = await responseBoundary(() => budget.read(response), signal);
+    bytes = await responseBoundary(() => budget.read(response), budget.signal);
   } catch (error) {
     if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
     if (!response.ok) throw httpError(response.status, `HTTP ${response.status} (${url.href})`);
