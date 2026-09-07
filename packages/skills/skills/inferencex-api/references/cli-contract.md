@@ -87,6 +87,8 @@ and fix the reported condition before choosing a fresh attempt.
 Before delivering an export command for a scheduler, run that exact command once
 with a fresh attempt path. Verify directory creation, child exit status and retained
 output files, including when the proposed command calls a wrapper you created.
+If a command was denied or only a different invocation ran, label the delivered
+command as unverified. Equivalent arguments do not prove its shell setup or wrapper ran.
 
 ## Output and cancellation limits
 
@@ -115,6 +117,13 @@ activation. Packaged files replace matching files; unrelated and obsolete files
 are retained. Supported interrupted activation is recovered by the next real
 installation. Keep transaction data intact when inspection reports a live owner,
 foreign metadata or an unsafe path; resolve that reported condition before retrying.
+
+Recovery follows the persisted commit state. Before committed activation, supported
+failure recovery restores the previous installation (or removes an unfinished first
+installation). After committed activation, cleanup failure keeps the new installation;
+a later real install finishes supported cleanup. An install error alone does not
+identify which version is active: inspect the pending state and recover it before
+claiming that the old or new version is installed.
 
 These guarantees cover detected failures and supported process interruption.
 They do not promise durability after power loss, repair arbitrary external edits,
