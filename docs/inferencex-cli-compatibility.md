@@ -1,49 +1,44 @@
-# InferenceX CLI compatibility
+# InferenceX CLI 1.0 migration
 
-Contract 1 adds one versioned `inferencex` entry while retaining the direct helper
-scripts. Formal commands create a new evidence directory, write the manifest last,
-and can be replayed offline.
+InferenceX 1.0 has one query entry: `inferencex`. Formal commands create a new
+contract 1 evidence directory and `inferencex verify` replays it offline.
 
-## Supported consumers
+## Supported contract
 
-- The release target matrix is Node 24 and 26 on Linux and macOS. Qualification
-  requires retained passes for all four jobs. Windows is not yet qualified.
-- JSON consumers may ignore additive optional fields. Required fields, nullability,
-  scoped units, and closed status enums remain contract fields.
-- PowerX and AgentX contract 1 CSV headers and order are fixed. Dynamic future API
-  metrics remain in response evidence or JSON extensions.
-- IDs are strings. Observation dates and evidence timestamps have separate fields.
-- `inferencex describe` publishes command input, schema, format, limit, and policy
-  metadata. `inferencex schema` publishes the twelve JSON Schemas.
+- Linux and macOS on Node 24 and 26 form the qualified release matrix. Windows is
+  outside this qualification.
+- Contract 1 JSON may add optional fields. Required fields, nullability, units, and
+  closed status enums remain stable within contract 1.
+- PowerX and AgentX CSV headers and order are fixed. IDs are strings; observation
+  dates and UTC evidence timestamps are separate fields.
+- `inferencex describe` publishes command metadata and `inferencex schema` publishes
+  the contract schemas.
+- Exit 0 means a completed bundle whose requested policy passed or was absent; exit
+  3 means valid evidence with an unmet policy. Exit 2 is invalid input, exit 1 is an
+  operational or verification failure, and exit 130 is pre-commit cancellation.
 
-## Automation boundary
+Every formal operation requires `--output-dir <new-directory>`. A directory without
+`manifest.json` is incomplete. Completed bundles are immutable; reports belong at
+sibling paths.
 
-Branch on exit before parsing stdout: 0 is a completed bundle whose explicit policy
-passed or was absent; 3 is a completed bundle whose explicit policy failed. Exit 2
-is invalid input, 1 is an operational or verification failure, and 130 is a
-pre-commit cancellation. Errors are JSON by default on stderr.
+## Move from 0.x
 
-Every formal operation requires `--output-dir <new-directory>`. It never overwrites
-or resumes a directory. A directory without `manifest.json` is incomplete; retain
-its saved complete responses and attempt records for diagnosis. A stdout failure can
-occur after the manifest commits. That error records `bundle_complete: true` and the
-directory, which can then be checked with `inferencex verify`.
+| Before 1.0                                      | 1.0                                       |
+| ----------------------------------------------- | ----------------------------------------- |
+| `export-powerx.mjs --output x --evidence-dir e` | `inferencex powerx export --output-dir e` |
+| `export-agentx.mjs --output x --evidence-dir e` | `inferencex agentx export --output-dir e` |
+| `investigate-result.mjs`                        | `inferencex result inspect`               |
+| `compare-tco.mjs`                               | `inferencex tco compare`                  |
+| `compare-releases.mjs`                          | `inferencex releases compare`             |
+| `compare-collectivex.mjs`                       | `inferencex collectivex compare`          |
+| `verify-export.mjs --export x --evidence-dir e` | `inferencex verify e`                     |
 
-## Legacy migration
+The old commands and separately saved 0.x export formats are not supported query
+interfaces in 1.0. Use the pinned historical package when an old export must be
+replayed. The installer can upgrade a 0.x installation with `--force`; this upgrade
+compatibility does not promise that old query commands run under 1.0.
 
-| Before contract 1                                       | Contract 1                                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Separate `--output` and `--evidence-dir`                | One create-new `--output-dir`                                                         |
-| Direct `export-powerx.mjs` / `export-agentx.mjs`        | `inferencex powerx export` / `inferencex agentx export`                               |
-| Direct result and comparison helpers                    | `inferencex result inspect`, `tco compare`, `releases compare`, `collectivex compare` |
-| `verify-export.mjs` with export plus evidence arguments | `inferencex verify <bundle-directory>`                                                |
-| Empty success interpreted by ad hoc stderr              | Manifest coverage plus optional explicit policy; unmet policy exits 3                 |
-
-Direct scripts preserve their historical interfaces, default text errors, and output
-bytes. No removal date is declared. The legacy verifier accepts only known producers
-0.9.0, 0.10.0, 0.11.0, and 1.0.0; unknown versions are rejected. New directory
-bundles dispatch by `contract_version: 1` and record producer identity separately.
-
-The installed [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md)
-contains all command examples and domain policy predicates. The six domain cookbooks
-remain authoritative for units, dates, selection, and interpretation.
+The installer preserves unmanaged files. An obsolete helper can therefore remain
+on disk after upgrade, but it is not part of the current package or interface.
+See the installed [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md)
+for commands, policy predicates, and bundle semantics.

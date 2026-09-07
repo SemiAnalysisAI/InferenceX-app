@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { inspectInstallTransaction } from '../../../bin/install-transaction.mjs';
+import { inspectInstallTransaction } from './install-transaction.mjs';
 import { argumentError, CliError, PACKAGE_NAME, PACKAGE_VERSION } from './cli-contract.mjs';
 import { createHttpClient } from './http-client.mjs';
 import { readBoundedRegular } from './local-files.mjs';

@@ -1,17 +1,10 @@
 import { responseError } from './cli-contract.mjs';
 
-// Static identity for standalone installed skills; producerVersion selects historical bytes.
-const PACKAGE_VERSION = '1.0.0';
-export { PACKAGE_VERSION };
-
 function validateProducer(version, format, contractVersion) {
-  if (contractVersion !== undefined && contractVersion !== 1) {
+  if (contractVersion !== 1) {
     throw responseError(`Unsupported export contract version: ${contractVersion}`);
   }
-  if (
-    !['0.9.0', '0.10.0', '0.11.0', '1.0.0'].includes(version) &&
-    !(contractVersion === 1 && /^1\.\d+\.\d+$/u.test(version))
-  ) {
+  if (!/^1\.\d+\.\d+$/u.test(version)) {
     throw responseError(`Unsupported export producer version: ${version}`);
   }
   if (!['json', 'csv'].includes(format))
@@ -263,10 +256,6 @@ function powerxBenchmarkRow(row) {
   );
 }
 
-function scalar(value) {
-  return value === null || ['string', 'number', 'boolean'].includes(typeof value);
-}
-
 function unique(values) {
   return [...new Set(values)].toSorted();
 }
@@ -432,7 +421,7 @@ export function buildPowerxExport({
   responseId,
 }) {
   validateProducer(producerVersion, format, contractVersion);
-  if (contractVersion === 1 && !/^[a-f\d]{64}$/u.test(responseId ?? '')) {
+  if (!/^[a-f\d]{64}$/u.test(responseId ?? '')) {
     throw responseError('PowerX contract 1 requires a captured response reference');
   }
   const rows = benchmarks;
@@ -462,11 +451,9 @@ export function buildPowerxExport({
       return value;
     }),
   );
-  if (contractVersion === 1) {
-    for (const row of observations) {
-      for (const key of ['id', 'workflow_run_id', 'curve_workflow_run_id']) {
-        if (row[key] !== undefined && row[key] !== null) row[key] = String(row[key]);
-      }
+  for (const row of observations) {
+    for (const key of ['id', 'workflow_run_id', 'curve_workflow_run_id']) {
+      if (row[key] !== undefined && row[key] !== null) row[key] = String(row[key]);
     }
   }
   const metadata = {
@@ -497,29 +484,21 @@ export function buildPowerxExport({
       }),
     ),
     non_finite_values: nonFiniteValues,
+    contract_version: 1,
+    source_response_id: responseId,
   };
-  if (contractVersion === 1) {
-    metadata.contract_version = 1;
-    metadata.source_response_id = responseId;
-  }
   let output;
   if (format === 'json') {
-    const document =
-      contractVersion === 1
-        ? { schema_version: 1, kind: 'powerx', metadata, units: POWERX_UNITS, rows: observations }
-        : producerVersion === '0.9.0'
-          ? { metadata, rows: observations }
-          : { schema_version: 1, metadata, rows: observations };
+    const document = {
+      schema_version: 1,
+      kind: 'powerx',
+      metadata,
+      units: POWERX_UNITS,
+      rows: observations,
+    };
     output = `${JSON.stringify(document, null, 2)}\n`;
   } else {
-    const requestColumns =
-      contractVersion === 1
-        ? [...POWERX_REQUEST_COLUMNS, 'source_response_id']
-        : POWERX_REQUEST_COLUMNS;
-    const columns =
-      contractVersion === 1
-        ? POWERX_CSV_COLUMNS
-        : [...requestColumns, ...ROW_COLUMNS, ...METRIC_COLUMNS];
+    const requestColumns = [...POWERX_REQUEST_COLUMNS, 'source_response_id'];
     const lines = observations.map((row) =>
       [
         ...requestColumns.map((key) => metadata[key]),
@@ -533,7 +512,7 @@ export function buildPowerxExport({
         .map(csvCell)
         .join(','),
     );
-    output = `${[columns.join(','), ...lines].join('\r\n')}\r\n`;
+    output = `${[POWERX_CSV_COLUMNS.join(','), ...lines].join('\r\n')}\r\n`;
   }
   return { metadata, rows: observations, outputBytes: Buffer.from(output) };
 }
@@ -581,7 +560,6 @@ export function buildAgentxExport({
 }) {
   validateProducer(producerVersion, format, contractVersion);
   if (
-    contractVersion === 1 &&
     requestUrls.some(
       (request) =>
         !object(request) ||
@@ -625,11 +603,9 @@ export function buildAgentxExport({
       }),
     );
     const id = safeResultId(row.id);
-    if (contractVersion === 1) {
-      for (const key of ['id', 'workflow_run_id', 'curve_workflow_run_id']) {
-        if (benchmark[key] !== undefined && benchmark[key] !== null) {
-          benchmark[key] = String(benchmark[key]);
-        }
+    for (const key of ['id', 'workflow_run_id', 'curve_workflow_run_id']) {
+      if (benchmark[key] !== undefined && benchmark[key] !== null) {
+        benchmark[key] = String(benchmark[key]);
       }
     }
     if (id === null) {
@@ -652,25 +628,15 @@ export function buildAgentxExport({
     const hasDerived = derived.has(id);
     const hasTraceKey = traces.has(id);
     const traceAvailable = hasTraceKey ? traces.get(id) : false;
-    const aggregateValue = hasAggregates
-      ? contractVersion === 1
-        ? structuredClone(aggregates.get(id))
-        : aggregates.get(id)
-      : null;
-    const derivedValue = hasDerived
-      ? contractVersion === 1
-        ? structuredClone(derived.get(id))
-        : derived.get(id)
-      : null;
-    if (contractVersion === 1) {
-      if (aggregateValue !== null) aggregateValue.id = String(aggregateValue.id);
-      if (derivedValue !== null) derivedValue.id = String(derivedValue.id);
-    }
+    const aggregateValue = hasAggregates ? structuredClone(aggregates.get(id)) : null;
+    const derivedValue = hasDerived ? structuredClone(derived.get(id)) : null;
+    if (aggregateValue !== null) aggregateValue.id = String(aggregateValue.id);
+    if (derivedValue !== null) derivedValue.id = String(derivedValue.id);
     return {
       benchmark,
       agentx: {
         status: hasAggregates && hasDerived ? 'complete' : 'partial',
-        result_id: contractVersion === 1 ? String(id) : id,
+        result_id: String(id),
         aggregates: {
           status: hasAggregates ? 'available' : 'not_returned',
           value: aggregateValue,
@@ -712,40 +678,13 @@ export function buildAgentxExport({
     enrichment_coverage: coverage(rows),
     non_finite_values: nonFiniteValues,
     observation_context: 'Existing observations were read; no new benchmark was run.',
+    contract_version: 1,
+    source_response_ids: requestUrls.map((request) => request.response_id),
   };
-  if (contractVersion === 1) {
-    metadata.contract_version = 1;
-    metadata.source_response_ids = requestUrls.map((request) => request.response_id);
-  }
   let output;
   if (format === 'json') {
-    output = `${JSON.stringify(
-      contractVersion === 1
-        ? { schema_version: 1, kind: 'agentx', metadata, rows }
-        : { schema_version: 1, metadata, rows },
-      null,
-      2,
-    )}\n`;
+    output = `${JSON.stringify({ schema_version: 1, kind: 'agentx', metadata, rows }, null, 2)}\n`;
   } else {
-    const metricColumns =
-      contractVersion === 1
-        ? []
-        : unique(
-            rows.flatMap(({ benchmark }) =>
-              Object.entries(benchmark.metrics)
-                .filter(([, value]) => scalar(value))
-                .map(([key]) => `metrics.${key}`),
-            ),
-          );
-    const columns =
-      contractVersion === 1
-        ? AGENTX_CSV_COLUMNS
-        : [
-            ...CSV_CONTEXT_COLUMNS,
-            ...CSV_BENCHMARK_COLUMNS,
-            ...metricColumns,
-            ...CSV_ENRICHMENT_COLUMNS,
-          ];
     const context = {
       package_version: producerVersion,
       query_url: benchmarkRequest,
@@ -755,8 +694,7 @@ export function buildAgentxExport({
       date_selection: scope.date === null ? 'latest' : 'as-of',
       requested_benchmark_type: 'agentic_traces',
       ...Object.fromEntries(FILTERS.map(([name]) => [`filter.${name}`, scope[name] ?? null])),
-      source_response_ids:
-        contractVersion === 1 ? JSON.stringify(metadata.source_response_ids) : null,
+      source_response_ids: JSON.stringify(metadata.source_response_ids),
     };
     const lines = rows.map(({ benchmark, agentx }) => {
       const aggregateCells = Object.fromEntries(
@@ -778,27 +716,16 @@ export function buildAgentxExport({
         'enrichment.derived_metrics_status': agentx.derived_metrics.status,
         'enrichment.trace_availability_status': agentx.trace_availability.status,
       };
-      const cells =
-        contractVersion === 1
-          ? [
-              ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
-              context.source_response_ids,
-              ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
-              JSON.stringify(benchmark.metrics),
-              ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
-            ]
-          : [
-              ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
-              ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
-              ...metricColumns.map((column) => {
-                const value = benchmark.metrics[column.slice('metrics.'.length)];
-                return scalar(value) ? value : null;
-              }),
-              ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
-            ];
+      const cells = [
+        ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
+        context.source_response_ids,
+        ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
+        JSON.stringify(benchmark.metrics),
+        ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
+      ];
       return cells.map(csvCell).join(',');
     });
-    output = `${[columns.map(csvCell).join(','), ...lines].join('\r\n')}\r\n`;
+    output = `${[AGENTX_CSV_COLUMNS.map(csvCell).join(','), ...lines].join('\r\n')}\r\n`;
   }
   const outputBytes = Buffer.from(output);
   return { metadata, rows, outputBytes };

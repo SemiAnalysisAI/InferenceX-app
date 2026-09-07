@@ -56,15 +56,18 @@ before(() => {
     const root = suite.install(target);
     const cookbook = readFileSync(join(root, 'references/public-api-examples.md'), 'utf8');
     const snippets = [
-      ...cookbook.matchAll(
-        /```bash\nnode --input-type=module <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/gu,
-      ),
-    ];
-    assert.equal(snippets.length, 3, 'run all recipes from the installed npm archive');
-    installed.set(
-      target,
-      snippets.map((snippet) => snippet.groups.code),
-    );
+      'Evaluation lookup',
+      'Dataset discovery and conversation inspection',
+      'Benchmark history for a GPU and workload',
+    ].map((heading) => {
+      const section = cookbook.split(`## ${heading}\n`)[1]?.split('\n## ')[0];
+      const snippet = section?.match(
+        /```bash\nnode --input-type=module <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/u,
+      );
+      assert.ok(snippet, `execute the installed ${heading} recipe`);
+      return snippet.groups.code;
+    });
+    installed.set(target, snippets);
   }
   writeFileSync(
     preload,

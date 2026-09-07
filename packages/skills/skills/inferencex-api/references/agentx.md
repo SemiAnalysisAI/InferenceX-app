@@ -112,24 +112,11 @@ quality, and do not create a new benchmark run.
 
 ## Export AgentX summaries
 
-The following direct-script examples are legacy compatibility interfaces. For new
-tasks, use `inferencex agentx export --output-dir` as shown above; its default is JSON.
+`inferencex agentx export` reads the complete benchmark response, selects AgentX
+observations, and joins only the bounded summary enrichments. A display model is
+required; `--date` adds an as-of cutoff, `--raw-model` selects one exact returned
+model key, and JSON is the default. Add `--format csv` when needed.
 
-Use the bundled Node 24 exporter to read the complete benchmark response, select
-AgentX observations, and join only the bounded summary enrichments. A display model
-is required; `--date` adds an as-of cutoff, and `--raw-model` selects one exact
-returned model key. CSV is the default; request JSON explicitly with `--format
-json`.
-
-```bash
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
-  --model DeepSeek-V4-Pro --output agentx.csv
-
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
-  --model DeepSeek-V4-Pro --format json --output agentx.json
-```
-
-For Claude Code, use `.claude/skills/inferencex-api/scripts/export-agentx.mjs`.
 Optional `--hardware`, `--framework`, `--precision`, `--spec-method`,
 `--offload-mode`, and `--concurrency` filters use exact, case-sensitive returned
 values. Concurrency must be a positive integer. No aliases or fuzzy matching are
@@ -137,9 +124,8 @@ applied. Metadata marks every filter as applied or omitted and lists values pres
 in the returned AgentX rows so an empty exact selection can be diagnosed without
 making claims about jobs or artifacts outside that response.
 
-Add `--evidence-dir agentx-evidence` with a path that does not exist to save every
-decoded response consumed by the export and an atomic manifest linking those
-responses to the output hash. Keep the evidence directory separate from `--output`.
+The new `--output-dir` is the evidence bundle. It contains every decoded response,
+the result, and a manifest linking their hashes.
 
 JSON retains every selected benchmark object separately from its `agentx`
 enrichment. CSV repeats package, request, and filter context on every row. Its

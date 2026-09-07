@@ -88,4 +88,11 @@ export const RELEASE_BUNDLE_VARIANTS = freeze({
     ],
     expected: { comparable_pairs: 0, comparisons: 0, unmatched: 3 },
   },
+  'producer-mismatch': {
+    rows: [
+      releaseObservation(false, { image: 'vllm/vllm-openai:other' }),
+      releaseObservation(true),
+    ],
+    expected: { comparable_pairs: 0, comparisons: 0, unmatched: 1 },
+  },
 });

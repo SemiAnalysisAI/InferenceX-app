@@ -44,8 +44,8 @@ packed outputs. The suite also runs the Python release-verifier tests. Publicati
 remains on Node 24 with one publisher runtime.
 
 1. Modify the source, choose a new stable version, and update package metadata,
-   all shipped helpers' standalone versions, installation examples, and installed-version
-   expectations together. Run the package tests and the relevant repository checks.
+   the unified CLI version, installation examples, and installed-version
+   expectations together. Run the package tests and relevant repository checks.
    Merge the reviewed source before preparing the final accepted archive.
 2. Run the following from the repository root using Node 24/npm and Python 3 on
    Linux or macOS (the public verification deadline uses Unix process groups and timers).
@@ -65,7 +65,7 @@ node packages/skills/test/schema-consumers.mjs
 node packages/skills/scripts/release.mjs prepare "$skills_release_version" "$skills_release_dir"
 python3 packages/skills/scripts/verify-release.py candidate "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/candidate-check"
 ```
 
@@ -82,11 +82,10 @@ once, checks the public file boundary, and records the source commit,
 tests, credentials, and acceptance artifacts are outside the public package.
 The verifier creates two projects outside the repository with fresh npm caches,
 empty npm configuration, and an allowlisted environment. It installs the exact
-archive for Codex and Claude Code. It checks PowerX and AgentX CSV/JSON against the
-complete public responses consumed by each exporter, exercises an exact excluded
-AgentX selection, and checks one traced and one no-trace point. Missing and null
-values remain missing; real `0` and `false` values remain explicit. No new
-benchmarks run.
+archive for Codex and Claude Code, runs all six formal `inferencex` families, replays
+each bundle offline, and audits every result against its saved responses with an
+independent Python implementation. Missing and null values remain missing; real
+`0` and `false` values remain explicit. No new benchmarks run.
 
 For the 1.0 candidate, retain the exact four platform results (Linux/macOS by Node
 24/26) and both native runtime results. Each native result covers PowerX, AgentX,
@@ -108,15 +107,11 @@ it is not cryptographic proof that the declared executions occurred. Preserve th
 underlying Actions artifacts and native transcripts so reviewers can inspect the
 evidence behind each declaration.
 
-From 0.9.0, candidate and public verification also run all four newer installed
-helpers for both targets. The provenance case selects result `416696` from logical
-run `26694739752`. The release case matches GLM-5.1/MI355X/SGLang observations from
-2026-05-30 and 2026-07-02 by their exact producer attempts and checks `median_ttft`
-arithmetic. The TCO case uses the 2026-09-06 DeepSeek-V4-Pro 8192x1024 snapshot at
-50 output tok/s/user with explicit **test assumptions** of $3.60/B200 GPU-hour and
-$1.80/MI355X GPU-hour; these are not market prices. CollectiveX discovers two
-measured runs and verifies retained run identities, source pointers and summary
-counts. No comparable CollectiveX rows is a valid, explicit outcome.
+The maintained positive scopes cover one strict-v2 PowerX configuration, AgentX
+summaries, its result provenance, the dated GLM-5.1/MI355X/SGLang comparison,
+explicit TCO test assumptions, and an exact CollectiveX pair. The verifier also
+keeps a valid empty PowerX bundle and an exit-3 policy result. These scopes are
+release fixtures, not market prices or causal performance claims.
 
 These are live smoke checks, not exhaustive domain or native-agent acceptance.
 Missing provenance/logs, unavailable TCO points or missing historical comparison
@@ -130,16 +125,10 @@ when intentionally selecting a particular returned model. A positive example tha
 no longer returns validated observations fails visibly; review the API and choose
 an available workload instead of silently passing an empty export.
 
-From 0.11.0, candidate and public verification also replay five saved captures per
-target with the installed offline verifier: PowerX JSON/CSV, AgentX summary JSON/CSV,
-and the excluded AgentX JSON selection. The independent Python oracle still checks
-their source data and exports first. Each capture is replayed twice
-for each target, totaling 20 runs across Codex and Claude Code per verification.
-The replay subprocesses reject `fetch` calls and must exit successfully. Each
-Markdown report pair must be nonempty and byte-identical; export/evidence file
-lists, modes, sizes and SHA-256 fingerprints must remain unchanged. These automatic
-checks supplement the live checks and native discovery acceptance; they do not
-replace either.
+Every formal bundle is verified with network access disabled. The independent
+oracle checks the six domain derivations, fixed CSV columns, IDs, dates, units,
+provenance, coverage and policy decisions from the exact saved bytes. These checks
+supplement native discovery acceptance; they do not replace narrative review.
 
 ## Independent native-agent acceptance
 
@@ -157,7 +146,7 @@ accepting the archive for publication.
 ```bash
 python3 packages/skills/scripts/verify-release.py agents "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/agent-preparation"
 
 skills_agent_root="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["clean_root"])' "$skills_release_attempt/agent-preparation/verification.json")"
@@ -166,9 +155,8 @@ skills_agent_root="$(python3 -c 'import json, sys; print(json.load(open(sys.argv
 The output identifies a new temporary root with `codex/` and `claude/` projects.
 Each initially contains only the exact candidate archive and `prompt.txt`; these are
 prepared projects, **not completed agent runs**. The prompt asks the agent to install
-the archive, inspect status, preview a forced reinstall, run the lookup and PowerX
-flows, export AgentX CSV and JSON, retain an exactly excluded AgentX selection, and
-inspect one traced and one no-trace point with complete same-request evidence.
+the archive, inspect status, preview a forced reinstall, run all six formal families,
+and verify each resulting directory offline.
 Review installer results and filesystem preservation independently; `check-agent`
 reports only its data checks. `acceptance.json` identifies both prepared targets and
 the candidate archive. The PowerX empty workload defaults to 7/13 tokens; override
@@ -196,17 +184,15 @@ After each agent completes, independently check its generated files:
 python3 packages/skills/scripts/verify-release.py check-agent "$skills_release_dir/release.json" \
   --project "$skills_agent_root/codex" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/codex-result-check"
 ```
 
 Repeat for Claude Code with a new evidence directory. Use the **same scope arguments**
-used during preparation. The checker validates the original responses captured by each operation, including
-all CSV values, complete JSON observations, requested scope, exclusions, metric
-coverage, latest-observation selection, and exact empty/diagnostic scope. It checks
-the exporter manifests, body/output hashes, and each operation's own retrieval
-time. No later refetch replaces the consumed input. A later live comparison, if
-needed, is separate evidence and may legitimately contain different observations.
+used during preparation. The checker independently reconstructs all six bundle
+families from their original response bytes and validates the manifests, hashes,
+scope, coverage, policy, dates, units, and provenance. No later refetch replaces
+the consumed input.
 
 The checker reports `data-checks-passed`, leaving narrative review explicit. A
 different reviewer must inspect the transcript and explanation for:
@@ -217,21 +203,13 @@ different reviewer must inspect the transcript and explanation for:
 - Original observation dates remain separate from snapshot dates and retrieval
   time. API reads are not described as new benchmark runs, and absent observations
   are not treated as proof that no benchmark jobs occurred on a date.
-- The empty result is retained, diagnosis keeps its exact scope, and uncertainty
-  is explained if the diagnostic request fails.
 - AgentX filters remain exact and case-sensitive; an empty or excluded selection
   makes no claims beyond its response. Aggregates, derived metrics and trace
   availability are not presented as model-quality scores or rankings.
-- Each AgentX point flow uses only its selected safe-integer ID. A no-trace result
-  stops before timeline, histogram and server-metric requests; a traced result does
-  not expand to sibling IDs.
-- The installed skill actually supplied the workflow and the agent used no
-  repository or private-data access. All claims have complete response evidence.
-  Confirm that the agent retained its full unfiltered, strict-before-filtering,
-  and diagnostic responses with request context. The checker validates the originals;
-  a later independent refetch is separate evidence.
-  A separate agent request to the same URL is also a refetch; require the response
-  consumed by each operation, including separate CSV and JSON exporter invocations.
+- The installed skill actually supplied the workflow, the agent used no repository
+  or private-data access, and every claim has complete response evidence.
+- The checker validates the original consumed responses. A later independent
+  refetch is separate evidence and may legitimately contain different observations.
 
 Record the reviewer, accepted SHA-256, agent invocations, evidence paths, and any
 limitations. A failed agent attempt remains failed; identify and address the cause,
@@ -291,7 +269,7 @@ saved failure and rerun **only the read-only verifier**, preserving a new attemp
 skills_public_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-public-check.XXXXXX")"
 python3 packages/skills/scripts/verify-release.py public "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_public_attempt/evidence"
 ```
 
@@ -300,14 +278,11 @@ Announce availability only after the public verification passes. A prepared
 workflow, saved npm settings, and a successful upload each establish less than a
 successful end-to-end release.
 
-## Structured failures and recoverable upgrades from 0.10
+## Structured failures and recoverable upgrades
 
-The six data helpers and installer share an opt-in `--error-format json`
-failure contract. Candidate and public verification deliberately run invalid
-arguments against every entry point for both installation targets. These checks
-retain command, stdout, stderr and exit code; they require exit 2, empty stdout,
-and the exact package/version/command identity with `INVALID_ARGUMENT`.
-PowerX JSON must also carry `schema_version: 1` from this version onward.
+The unified CLI emits machine-readable failures by default. Candidate and public
+verification cover its invalid-input, operational, cancellation, bundle-completion,
+and policy exit codes through the packed suite and six installed workflows.
 
 Packed tests cover operational error categories, graceful cancellation and output
 rollback, the five-second stdout deadline, failed staging and receipt writes,

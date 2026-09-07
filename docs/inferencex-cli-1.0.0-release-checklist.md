@@ -15,8 +15,8 @@ anonymously verified public version until that operation succeeds.
    explicit hardware or comparable-pair requirement for CI.
 
 The [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md)
-contains commands and examples. [Compatibility](./inferencex-cli-compatibility.md)
-defines exit codes, fixed CSV columns, JSON evolution, and legacy migration.
+contains commands and examples. [Migration](./inferencex-cli-compatibility.md)
+defines exit codes, fixed CSV columns, JSON evolution, and the move from 0.x.
 
 ## Candidate evidence
 

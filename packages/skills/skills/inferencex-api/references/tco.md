@@ -51,25 +51,11 @@ and retries, in the report; do not count only the final successful exports.
    evidence may be older. Omission selects latest available data. Keep workloads
    separate: this helper produces no workload blend, weighted score, or ranking.
 
-## Run the installed helper
+## Run the comparison
 
-The direct-script example here is a legacy compatibility interface. New comparisons
-use `inferencex tco compare --output-dir` as shown above.
-
-Resolve the script relative to the loaded `SKILL.md`. Codex normally installs at
-`.agents/skills/inferencex-api`, Claude Code at `.claude/skills/inferencex-api`.
-Use the actual location for a custom installation and Node 24 or later.
-
-The prices and cutoff below are **illustrative inputs**, not current price quotes.
-Replace them with the user's explicit assumptions and discovered hardware keys.
-
-```bash
-INFERENCEX_SKILL_DIR='.agents/skills/inferencex-api'
-node "$INFERENCEX_SKILL_DIR/scripts/compare-tco.mjs" \
-  --model dsv4 --workloads 1024x1024,8192x1024 --target 50 \
-  --gpu-hourly-prices b200=3.60,mi355x=1.80 \
-  --date 2026-09-06 --output tco-comparison.json
-```
+Use `inferencex tco compare --output-dir` as shown above. Prices and cutoffs are
+inputs, not current price quotes; use the user's assumptions and exact returned
+hardware keys.
 
 Only priced hardware is selected for costing. The complete source response stays
 in the export so missing keys can be checked against returned hardware. Price

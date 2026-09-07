@@ -7,7 +7,12 @@ import { test } from 'node:test';
 
 import * as collectivex from '../skills/inferencex-api/scripts/compare-collectivex.mjs';
 import { bundleSuite } from './bundle-harness.mjs';
-import { COLLECTIVEX_BUNDLE_VARIANTS } from './collectivex-bundle-fixtures.mjs';
+import {
+  COLLECTIVEX_BUNDLE_VARIANTS,
+  COLLECTIVEX_IDS,
+  collectivexDataset,
+  collectivexKvDataset,
+} from './collectivex-bundle-fixtures.mjs';
 
 const bundles = bundleSuite({ collectivex: COLLECTIVEX_BUNDLE_VARIANTS });
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -35,6 +40,31 @@ function replaceResponse(directory, requestIndex, body) {
   };
   request.attempts.at(-1).consumedBytes = bytes.length;
   saveManifest(directory, value);
+}
+
+function savedResponse(body, index = 0) {
+  const bytes = Buffer.from(JSON.stringify(body));
+  return {
+    id: String(index).padStart(64, '0'),
+    status: 200,
+    retrievedAt: '2026-09-07T00:00:00.000Z',
+    bytes,
+    body,
+  };
+}
+
+async function collectDatasets(left, right) {
+  const responses = [COLLECTIVEX_BUNDLE_VARIANTS.positive.responses[0].body, left, right];
+  let cursor = 0;
+  const collected = await collectivex.collect(
+    collectivex.normalizeArgs(['--left', COLLECTIVEX_IDS[0], '--right', COLLECTIVEX_IDS[1]]),
+    {
+      producerVersion: '1.0.0',
+      get: () => Promise.resolve(savedResponse(responses[cursor], cursor++)),
+    },
+  );
+  assert.equal(cursor, 3);
+  return JSON.parse(collected.bytes);
 }
 
 test('CollectiveX exposes the formal collector', () => {
@@ -188,18 +218,158 @@ test('an unavailable required explicit run leaves incomplete evidence', () => {
   assert.equal(existsSync(directory), true);
   assert.equal(existsSync(join(directory, 'manifest.json')), false);
 });
-test('malformed CollectiveX source contracts are response failures', async () => {
-  await assert.rejects(
-    collectivex.collect(collectivex.normalizeArgs(['--left', '101', '--right', '102']), {
-      get: () =>
-        Promise.resolve({
-          id: '0'.repeat(64),
-          status: 200,
-          retrievedAt: '2026-09-07T00:00:00.000Z',
-          bytes: Buffer.from('{}'),
-          body: {},
-        }),
-    }),
-    { code: 'INVALID_RESPONSE' },
+test('malformed CollectiveX lists and details fail after valid OpenAPI validation', async () => {
+  const schema = COLLECTIVEX_BUNDLE_VARIANTS.positive.responses[0].body;
+  for (const { name, options, responses, expectedRequests } of [
+    {
+      name: 'malformed run list',
+      options: collectivex.normalizeArgs([]),
+      responses: [schema, {}],
+      expectedRequests: 2,
+    },
+    {
+      name: 'malformed run detail',
+      options: collectivex.normalizeArgs(['--left', '101', '--right', '102']),
+      responses: [schema, {}],
+      expectedRequests: 2,
+    },
+    {
+      name: 'mismatched requested run identity',
+      options: collectivex.normalizeArgs(['--left', '101', '--right', '102']),
+      responses: [schema, collectivexDataset('103')],
+      expectedRequests: 2,
+    },
+  ]) {
+    let cursor = 0;
+    await assert.rejects(
+      collectivex.collect(options, {
+        producerVersion: '1.0.0',
+        get: () => Promise.resolve(savedResponse(responses[cursor], cursor++)),
+      }),
+      (error) => error.code === 'INVALID_RESPONSE',
+      name,
+    );
+    assert.equal(cursor, expectedRequests, name);
+  }
+});
+
+test('CollectiveX EP and KV identity dimensions never acquire cross-configuration metrics', async () => {
+  const epChanges = [
+    ['backend', (data) => (data.series[0].backend = 'uccl')],
+    ['precision', (data) => (data.series[0].precision = 'fp8')],
+    ['phase', (data) => (data.series[0].phase = 'prefill')],
+    ['mode', (data) => (data.series[0].mode = 'low-latency')],
+    ['series ID', (data) => (data.series[0].series_id = 'different-case')],
+    ['hardware SKU', (data) => (data.series[0].system.sku = 'b200')],
+    [
+      'EP rank topology',
+      (data) => {
+        data.series[0].system.ep_size = 16;
+        data.series[0].points[0].global_tokens = 512;
+      },
+    ],
+    ['node topology', (data) => (data.series[0].system.nodes = 2)],
+    [
+      'transport topology',
+      (data) => (data.series[0].system.scale_up_transport = 'different-fabric'),
+    ],
+    [
+      'tokens per rank',
+      (data) => {
+        data.series[0].points[0].tokens_per_rank = 64;
+        data.series[0].points[0].global_tokens = 512;
+      },
+    ],
+    [
+      'payload bytes',
+      (data) => (data.series[0].points[0].components.dispatch.payload_bytes = 16_384),
+    ],
+    [
+      'future point configuration',
+      (data) => (data.series[0].points[0].future_configuration = 'different'),
+    ],
+    [
+      'operation',
+      (data) => {
+        data.series[0].points[0].components.combine = data.series[0].points[0].components.dispatch;
+        data.series[0].points[0].components.dispatch = null;
+      },
+    ],
+  ];
+  for (const [name, change] of epChanges) {
+    const left = collectivexDataset(COLLECTIVEX_IDS[0]);
+    const right = collectivexDataset(COLLECTIVEX_IDS[1], 10);
+    change(right);
+    const report = await collectDatasets(left, right);
+    assert.equal(report.summary.matched, 0, name);
+    assert.ok(report.summary.only_left > 0, name);
+    assert.ok(report.summary.only_right > 0, name);
+    assert.ok(
+      report.comparisons.every((row) => row.metrics.length === 0),
+      name,
+    );
+  }
+
+  const kvChanges = [
+    ['request bytes', (data) => (data.kv[0].rows[0].req_bytes = 2_000_000)],
+    ['batch', (data) => (data.kv[0].rows[0].batch = 8)],
+    ['operation', (data) => (data.kv[0].rows[0].op = 'push')],
+    ['page size', (data) => (data.kv[0].rows[0].page_tokens = 32)],
+    ['fabric', (data) => (data.kv[0].fabric = 'mnnvl')],
+    ['workload', (data) => (data.kv[0].workload = 'kv-other')],
+    ['future row configuration', (data) => (data.kv[0].rows[0].future_configuration = 'different')],
+  ];
+  for (const [name, change] of kvChanges) {
+    const left = collectivexKvDataset(COLLECTIVEX_IDS[0]);
+    const right = collectivexKvDataset(COLLECTIVEX_IDS[1], 2);
+    change(right);
+    const report = await collectDatasets(left, right);
+    assert.equal(report.summary.matched, 0, name);
+    assert.equal(report.summary.only_left, 1, name);
+    assert.equal(report.summary.only_right, 1, name);
+    assert.ok(
+      report.comparisons.every((row) => row.metrics.length === 0),
+      name,
+    );
+  }
+});
+
+test('CollectiveX metrics distinguish omitted, null, zero and positive values', async () => {
+  const left = collectivexDataset(COLLECTIVEX_IDS[0], 0);
+  const right = collectivexDataset(COLLECTIVEX_IDS[1], 10);
+  left.series[0].points[0].components.dispatch.latency_us.p90 = null;
+  delete left.series[0].points[0].components.dispatch.latency_us.p95;
+  left.series[0].points[0].components.dispatch.latency_us.p99 = 5;
+  right.series[0].points[0].components.dispatch.latency_us.p99 = 15;
+  const report = await collectDatasets(left, right);
+  const metrics = report.comparisons.find((row) => row.status === 'matched').metrics;
+  assert.deepEqual(
+    metrics.find((row) => row.name === 'latency_us.p50'),
+    {
+      name: 'latency_us.p50',
+      unit: 'us',
+      left: { status: 'value', value: 0 },
+      right: { status: 'value', value: 10 },
+      difference_right_minus_left: 10,
+      ratio_right_over_left: null,
+    },
+  );
+  assert.deepEqual(metrics.find((row) => row.name === 'latency_us.p90').left, {
+    status: 'null',
+    value: null,
+  });
+  assert.deepEqual(metrics.find((row) => row.name === 'latency_us.p95').left, {
+    status: 'missing',
+  });
+  assert.deepEqual(
+    metrics.find((row) => row.name === 'latency_us.p99'),
+    {
+      name: 'latency_us.p99',
+      unit: 'us',
+      left: { status: 'value', value: 5 },
+      right: { status: 'value', value: 15 },
+      difference_right_minus_left: 10,
+      ratio_right_over_left: 3,
+    },
   );
 });

@@ -100,6 +100,18 @@ export function provenanceBundleFixtures() {
   ];
   const missingLog = structuredClone(responses);
   missingLog[2] = { ...missingLog[2], status: 404, body: { error: 'Log not found' } };
+  const sparseRow = { ...row, image: null, run_url: null };
+  for (const key of [
+    'workflow_run_id',
+    'run_started_at',
+    'curve_date',
+    'curve_workflow_run_id',
+    'curve_run_started_at',
+    'recipe_fingerprint',
+  ]) {
+    delete sparseRow[key];
+  }
+  const sparse = [{ ...responses[0], body: [sparseRow] }, { ...responses[2] }];
   return {
     result: {
       'producer-differs-from-curve': {
@@ -107,6 +119,7 @@ export function provenanceBundleFixtures() {
         responses,
       },
       'missing-log': { args, responses: missingLog },
+      'missing-optional-provenance': { args, responses: sparse },
     },
   };
 }

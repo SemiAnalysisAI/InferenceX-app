@@ -59,20 +59,11 @@ a shared 32 MiB response budget. The explicit pair uses three logical reads;
 discovery uses at most four. Retry attempts follow the [CLI contract](cli.md). Finish any
 report in a sibling path, then run `inferencex verify` on that output directory.
 
-### Legacy direct helper
+### Request boundary
 
-Use `scripts/compare-collectivex.mjs --output comparison.json` only for an explicitly
-requested legacy single-file export. Its embedded response evidence is a different
-format from the directory required by `inferencex verify`. The following resource
-and output details describe that legacy interface.
-
-The explicit pair makes three GETs; discovery makes at most four. Each request has
-a 30-second timeout, and all decoded responses share a 32 MiB budget. There are no
-retries or polling. The output is JSON only. `--output` requires an existing parent
-directory and a **new file path**; it refuses to overwrite a file, directory, or
-symlink. It publishes the file only after every read and comparison succeeds.
-Omitting `--output` writes to stdout; shell redirection can truncate a destination
-before the helper runs, so use `--output` when preserving files matters.
+The explicit pair makes three logical reads; discovery makes at most four. The CLI
+applies its shared deadline, decoded-byte budget, retry ledger, and create-new bundle
+rules. It never substitutes a different run after a failed read.
 
 The public operations require `version=1`:
 

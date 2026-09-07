@@ -27,8 +27,6 @@ const scope = {
   empty_isl: 7,
   empty_osl: 13,
   agentx_model: 'DeepSeek-V4-Pro',
-  agentx_point_id: '441083',
-  agentx_no_trace_id: '440998',
 };
 const caseIds = [
   'powerx-live',

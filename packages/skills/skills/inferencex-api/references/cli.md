@@ -90,8 +90,7 @@ Branch on the exit code before parsing stdout:
 
 Offline verification reports `INVALID_EVIDENCE` for incomplete, malformed, tampered,
 or inconsistent evidence and `UNSUPPORTED_CONTRACT` for an unknown evidence kind or
-contract version. Both exit 1. Legacy direct helpers retain `INVALID_RESPONSE` for
-invalid responses and exports.
+contract version. Both exit 1.
 
 The default error format is JSON; `--error-format text` is available for people.
 `--human` changes successful stdout only. If stdout fails after `manifest.json` is
@@ -121,12 +120,8 @@ outside the bundle.
   metrics stay in evidence or JSON extensions instead of creating dynamic columns.
 - IDs are strings even when they contain only digits. Dates are `YYYY-MM-DD`;
   evidence timestamps are UTC ISO strings.
-- Legacy direct scripts keep their historical interfaces and text default. The new
-  entry rejects `--output` and `--evidence-dir` with a migration hint. No legacy
-  removal date is declared in contract 1.
-- The offline legacy verifier accepts only the explicit producer set 0.9.0, 0.10.0,
-  0.11.0, and 1.0.0. New bundles dispatch by `contract_version: 1` and preserve the
-  producer package version separately.
+- The 1.0 entry rejects removed `--output` and `--evidence-dir` options with a
+  migration hint. Contract 1 bundles preserve the producer package version.
 
 ## Legacy migration
 
@@ -140,6 +135,7 @@ outside the bundle.
 | `compare-collectivex.mjs --output x --evidence-dir e` | `inferencex collectivex compare --output-dir e` | Add `--min-comparable-pairs` for a CI gate                |
 | `verify-export.mjs --evidence-dir e --export x`       | `inferencex verify e`                           | Contract 1 finds the result from the manifest             |
 
-Legacy output bytes and helper behavior remain available for compatibility. New
-automation should use the versioned entry, schemas, fixed bundle layout, and exit 3
-policy result.
+The direct helpers and `verify-export.mjs` are not query interfaces in 1.0.
+Historical 0.x exports require their pinned older package; they are not contract 1
+bundles. Installer upgrades from 0.x remain supported and do not make old query
+commands part of the 1.0 interface.

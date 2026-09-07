@@ -12,15 +12,17 @@ const preload = join(suite.temporaryRoot, 'cli-contract-preload.mjs');
 let scripts;
 
 const cases = [
-  ['export-powerx', ['--model', 'x', '--isl', '1', '--osl', '1']],
-  ['export-agentx', ['--model', 'x']],
-  ['investigate-result', ['--id', '1', '--model', 'x']],
+  ['export-powerx', ['powerx', 'export'], ['--model', 'x', '--isl', '1', '--osl', '1']],
+  ['export-agentx', ['agentx', 'export'], ['--model', 'x']],
+  ['investigate-result', ['result', 'inspect'], ['--id', '1', '--model', 'x']],
   [
     'compare-tco',
+    ['tco', 'compare'],
     ['--model', 'x', '--workloads', '1x1', '--target', '1', '--gpu-hourly-prices', 'b200=1'],
   ],
   [
     'compare-releases',
+    ['releases', 'compare'],
     [
       '--model',
       'x',
@@ -44,13 +46,26 @@ const cases = [
       'after',
     ],
   ],
-  ['compare-collectivex', [], ['--left', '1']],
+  ['compare-collectivex', ['collectivex', 'compare'], [], ['--left', '1']],
 ];
 
 function run(name, args, mode = 'network') {
+  const cwd = suite.project();
+  const route = cases.find(([candidate]) => candidate === name)[1];
+  const output = args.includes('--help') ? [] : ['--output-dir', join(cwd, 'bundle')];
   return suite.node(
-    ['--import', pathToFileURL(preload).href, scripts[name], ...args, '--error-format', 'json'],
+    [
+      '--import',
+      pathToFileURL(preload).href,
+      scripts,
+      ...route,
+      ...args,
+      ...output,
+      '--error-format',
+      'json',
+    ],
     {
+      cwd,
       env: { ...suite.environment, INFERENCEX_CLI_CONTRACT_MODE: mode },
     },
   );
@@ -89,7 +104,7 @@ before(() => {
 import { writeFileSync } from 'node:fs';
 const mode = process.env.INFERENCEX_CLI_CONTRACT_MODE;
 let parseTimeoutController;
-if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'parse-timeout' || mode === 'request-abort') {
+if (mode === 'body-timeout' || mode === 'parse-timeout' || mode === 'request-abort') {
   const timeout = AbortSignal.timeout;
   AbortSignal.timeout = milliseconds => {
     const controlled =
@@ -148,7 +163,7 @@ globalThis.fetch = async (_input, options) => {
       if (options.signal.aborted) reject(options.signal.reason);
     });
   }
-  if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'http-body-pending') {
+  if (mode === 'body-timeout' || mode === 'http-body-stall' || mode === 'http-body-pending') {
     return new Response(new ReadableStream({
       start(controller) {
         if (mode === 'http-body-pending') {
@@ -179,14 +194,11 @@ globalThis.fetch = async (_input, options) => {
 `,
   );
   const installed = suite.install('codex');
-  scripts = Object.fromEntries(
-    cases.map(([name]) => [name, join(installed, 'scripts', `${name}.mjs`)]),
-  );
-  scripts.installer = join(installed, '..', '..', '..', 'node_modules', '.bin', 'unused');
+  scripts = join(installed, 'scripts/inferencex.mjs');
 });
 
 test('the packed shared contract exports the typed error and boundary helpers', async () => {
-  const contract = join(scripts['export-powerx'], '..', 'cli-contract.mjs');
+  const contract = join(scripts, '..', 'cli-contract.mjs');
   assert.ok(existsSync(contract));
   const module = await import(pathToFileURL(contract));
   for (const name of [
@@ -204,8 +216,8 @@ test('the packed shared contract exports the typed error and boundary helpers', 
   }
 });
 
-test('every packed entry point emits one structured INVALID_ARGUMENT diagnostic', () => {
-  for (const [name, _validArgs, invalidArgs = []] of cases) {
+test('every formal route emits one structured INVALID_ARGUMENT diagnostic', () => {
+  for (const [name, _route, _validArgs, invalidArgs = []] of cases) {
     diagnostic(run(name, invalidArgs), 'INVALID_ARGUMENT', 2);
   }
   const cwd = suite.project();
@@ -214,14 +226,14 @@ test('every packed entry point emits one structured INVALID_ARGUMENT diagnostic'
 });
 
 test('request budgets classify a generic fetch AbortError as TIMEOUT', () => {
-  for (const [name, args] of cases) {
+  for (const [name, _route, args] of cases) {
     diagnostic(run(name, args, 'request-abort'), 'TIMEOUT');
   }
 });
 
-test('every packed entry point rejects an unknown error format', () => {
-  for (const [name] of cases) {
-    const result = suite.node([scripts[name], '--error-format', 'yaml']);
+test('every formal route rejects an unknown error format', () => {
+  for (const [name, route] of cases) {
+    const result = suite.node([scripts, ...route, '--error-format', 'yaml']);
     assert.notEqual(result.status, 0, name);
     assert.equal(result.stdout, '');
     assert.match(result.stderr, /--error-format.*json.*text/iu, name);
@@ -243,54 +255,11 @@ test('an explicit JSON error format survives duplicate or conflicting format arg
     ['--error-format', '--error-format', 'json'],
   ];
   for (const args of formats) {
-    for (const [name] of cases) {
-      diagnostic(suite.node([scripts[name], '--help', ...args]), 'INVALID_ARGUMENT', 2);
+    for (const [, route] of cases) {
+      diagnostic(suite.node([scripts, ...route, '--help', ...args]), 'INVALID_ARGUMENT', 2);
     }
     diagnostic(suite.run(['install', ...args], suite.project()), 'INVALID_ARGUMENT', 2);
   }
-});
-
-for (const [name, args] of cases.slice(0, 2)) {
-  test(`${name} classifies an unwritable evidence parent as OUTPUT_ERROR`, () => {
-    const parent = join(suite.project(), 'unwritable');
-    mkdirSync(parent, { mode: 0o500 });
-    try {
-      diagnostic(run(name, [...args, '--evidence-dir', join(parent, 'evidence')]), 'OUTPUT_ERROR');
-      assert.equal(existsSync(join(parent, 'evidence')), false);
-    } finally {
-      chmodSync(parent, 0o700);
-    }
-  });
-
-  test(`${name} classifies evidence/output collisions as INVALID_ARGUMENT`, () => {
-    const evidence = join(suite.project(), 'evidence');
-    diagnostic(
-      run(name, [...args, '--evidence-dir', evidence, '--output', join(evidence, 'manifest.json')]),
-      'INVALID_ARGUMENT',
-      2,
-    );
-    assert.equal(existsSync(evidence), false);
-  });
-}
-
-test('CollectiveX distinguishes output preflight I/O failures from invalid destinations', () => {
-  const cwd = suite.project();
-  diagnostic(
-    run('compare-collectivex', ['--output', join(cwd, 'missing/out.json')]),
-    'OUTPUT_ERROR',
-  );
-  const parent = join(cwd, 'inaccessible');
-  mkdirSync(parent, { mode: 0o000 });
-  try {
-    diagnostic(run('compare-collectivex', ['--output', join(parent, 'out.json')]), 'OUTPUT_ERROR');
-  } finally {
-    chmodSync(parent, 0o700);
-  }
-  writeFileSync(join(cwd, 'file'), 'untouched');
-  for (const output of ['file', 'file/out.json']) {
-    diagnostic(run('compare-collectivex', ['--output', join(cwd, output)]), 'INVALID_ARGUMENT', 2);
-  }
-  assert.equal(readFileSync(join(cwd, 'file'), 'utf8'), 'untouched');
 });
 
 test('installer filesystem write failures are OUTPUT_ERROR and retain the installed skill', () => {
@@ -326,8 +295,8 @@ test('installer transaction protocol failures remain INTERNAL_ERROR', () => {
   assert.equal(readFileSync(join(transaction, 'unknown'), 'utf8'), 'untouched');
 });
 
-test('every data helper classifies request, response, HTTP, and stdout boundaries', () => {
-  for (const [name, args] of cases) {
+test('every formal route classifies request, response, HTTP, and stdout boundaries', () => {
+  for (const [name, _route, args] of cases) {
     diagnostic(run(name, args, 'network'), 'NETWORK_ERROR');
     diagnostic(run(name, args, 'timeout'), 'TIMEOUT');
     diagnostic(run(name, args, 'invalid'), 'INVALID_RESPONSE');
@@ -337,19 +306,6 @@ test('every data helper classifies request, response, HTTP, and stdout boundarie
   }
 });
 
-test('PowerX JSON success is additive and preserves a truthful empty selection', () => {
-  const result = run(
-    'export-powerx',
-    ['--model', 'x', '--isl', '1', '--osl', '1', '--format', 'json'],
-    'empty',
-  );
-  assert.equal(result.status, 0, result.stderr);
-  const output = JSON.parse(result.stdout);
-  assert.equal(output.schema_version, 1);
-  assert.deepEqual(output.rows, []);
-  assert.equal(output.metadata.selected_rows, 0);
-});
-
 test('a timeout while reading a response body remains TIMEOUT', () => {
   diagnostic(
     run('export-powerx', ['--model', 'x', '--isl', '1', '--osl', '1'], 'body-timeout'),
@@ -357,9 +313,10 @@ test('a timeout while reading a response body remains TIMEOUT', () => {
   );
 });
 
-test('a non-2xx stalled response body preserves TIMEOUT in each affected reader', () => {
-  for (const [name, args] of cases.slice(0, 3)) {
-    diagnostic(run(name, args, 'http-body-timeout'), 'TIMEOUT');
+test('every formal route discards a stalled rejected body and reports its HTTP status', () => {
+  for (const [name, _route, args] of cases) {
+    const value = diagnostic(run(name, args, 'http-body-stall'), 'HTTP_ERROR');
+    assert.equal(value.error.http_status, 503, name);
   }
 });
 
@@ -376,17 +333,18 @@ test('stdout writes fail within a bounded interval when the consumer never drain
   assert.ok(Date.now() - started < 8_000, `stdout failure took ${Date.now() - started}ms`);
 });
 
-test('SIGTERM aborts an active request, preserves output, and leaves failed evidence', async () => {
+test('SIGTERM aborts an active unified request and leaves no completed manifest', async () => {
   const cwd = suite.project();
   const ready = join(cwd, 'ready');
-  const output = join(cwd, 'power.json');
-  writeFileSync(output, 'previous complete export');
+  const output = join(cwd, 'evidence');
   const child = spawn(
     process.execPath,
     [
       '--import',
       pathToFileURL(preload).href,
-      scripts['export-powerx'],
+      scripts,
+      'powerx',
+      'export',
       '--model',
       'x',
       '--isl',
@@ -395,10 +353,8 @@ test('SIGTERM aborts an active request, preserves output, and leaves failed evid
       '1',
       '--format',
       'json',
-      '--output',
+      '--output-dir',
       output,
-      '--evidence-dir',
-      'evidence',
       '--error-format',
       'json',
     ],
@@ -432,20 +388,28 @@ test('SIGTERM aborts an active request, preserves output, and leaves failed evid
   assert.equal(status, 130, stderr);
   assert.equal(stdout, '');
   assert.equal(JSON.parse(stderr).error.code, 'CANCELLED');
-  assert.equal(readFileSync(output, 'utf8'), 'previous complete export');
-  const manifest = JSON.parse(readFileSync(join(cwd, 'evidence', 'manifest.json'), 'utf8'));
-  assert.equal(manifest.status, 'failed');
-  assert.match(manifest.error, /SIGTERM/u);
-  assert.equal(manifest.export.sha256, null);
+  assert.equal(existsSync(output), true);
+  assert.equal(existsSync(join(output, 'manifest.json')), false);
 });
 
 test('SIGTERM after non-2xx headers remains CANCELLED in each affected reader', async () => {
-  for (const [name, args] of cases.slice(0, 3)) {
+  for (const [name, route, args] of cases.slice(0, 3)) {
     const cwd = suite.project();
     const ready = join(cwd, `${name}-ready`);
+    const output = join(cwd, 'bundle');
     const child = spawn(
       process.execPath,
-      ['--import', pathToFileURL(preload).href, scripts[name], ...args, '--error-format', 'json'],
+      [
+        '--import',
+        pathToFileURL(preload).href,
+        scripts,
+        ...route,
+        ...args,
+        '--output-dir',
+        output,
+        '--error-format',
+        'json',
+      ],
       {
         cwd,
         env: {

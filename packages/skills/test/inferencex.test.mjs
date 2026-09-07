@@ -33,6 +33,25 @@ test('offline help lists the fixed public command surface', () => {
   assert.equal(result.stderr, '');
 });
 
+test('the installed skill exposes only inferencex as its query entry', () => {
+  const skill = suite.install('codex', suite.project());
+  for (const [name, route] of [
+    ['export-powerx', 'powerx export'],
+    ['export-agentx', 'agentx export'],
+    ['investigate-result', 'result inspect'],
+    ['compare-tco', 'tco compare'],
+    ['compare-releases', 'releases compare'],
+    ['compare-collectivex', 'collectivex compare'],
+  ]) {
+    const result = suite.node([join(skill, 'scripts', `${name}.mjs`), '--help']);
+    assert.equal(result.status, 2, name);
+    assert.equal(result.stdout, '', name);
+    assert.match(result.stderr, new RegExp(`Use inferencex ${route} instead\\.`, 'u'), name);
+  }
+  assert.equal(existsSync(join(skill, 'scripts', 'verify-export.mjs')), false);
+  assert.equal(existsSync(join(skill, 'scripts', 'inferencex.mjs')), true);
+});
+
 test('command help exposes the required business inputs offline', () => {
   const powerx = succeeded(suite.query(['powerx', 'export', '--help'], suite.project()));
   for (const option of ['--model', '--isl', '--osl', '--output-dir']) {

@@ -49,14 +49,10 @@ test('the published 0.11 archive upgrades without deleting user-owned files', ()
   assert.equal(readFileSync(join(neighboring, 'SKILL.md'), 'utf8'), 'neighbor');
   assert.ok(existsSync(join(skill, 'scripts/inferencex.mjs')));
   assert.ok(existsSync(join(skill, 'scripts/export-powerx.mjs')));
-  assert.ok(existsSync(join(skill, 'scripts/verify-export.mjs')));
   assert.equal(existsSync(transaction), false);
 
   const directHelp = suite.node([join(skill, 'scripts/export-powerx.mjs'), '--help']);
-  assert.equal(directHelp.status, 0, directHelp.stderr);
-  assert.match(directHelp.stdout, /export-powerx/u);
-  const legacyText = suite.node([join(skill, 'scripts/verify-export.mjs')]);
-  assert.equal(legacyText.status, 2);
-  assert.equal(legacyText.stdout, '');
-  assert.match(legacyText.stderr, /^verify-export:/u);
+  assert.equal(directHelp.status, 2, directHelp.stderr);
+  assert.equal(directHelp.stdout, '');
+  assert.match(directHelp.stderr, /Use inferencex powerx export instead\./u);
 });

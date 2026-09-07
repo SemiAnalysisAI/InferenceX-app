@@ -27,7 +27,6 @@
   },
   "files": [
     "bin/install.mjs",
-    "bin/install-transaction.mjs",
     "skills/inferencex-api",
     "README.md",
     "LICENSE"

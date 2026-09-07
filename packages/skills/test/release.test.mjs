@@ -23,7 +23,6 @@ const EXPECTED_FILES = [
   'LICENSE',
   'README.md',
   'bin/install.mjs',
-  'bin/install-transaction.mjs',
   'package.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/integrity.json',
@@ -52,11 +51,11 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/scripts/export-powerx.mjs',
   'skills/inferencex-api/scripts/http-client.mjs',
   'skills/inferencex-api/scripts/inferencex.mjs',
+  'skills/inferencex-api/scripts/install-transaction.mjs',
   'skills/inferencex-api/scripts/investigate-result.mjs',
   'skills/inferencex-api/scripts/local-files.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
-  'skills/inferencex-api/scripts/verify-export.mjs',
 ];
 
 test('read-only release verification rejects altered evidence and unsafe retries', () => {
@@ -206,9 +205,22 @@ test('integrity check is read-only and prepare rejects a clean stale manifest be
   execFileSync('git', ['config', 'user.email', 'release-test@example.com'], { cwd: packageRoot });
   execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: packageRoot });
   execFileSync('git', ['add', '.'], { cwd: packageRoot });
-  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--quiet', '-m', 'fixture'], {
-    cwd: packageRoot,
-  });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'commit.gpgSign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'test: prepare release fixture',
+      '-m',
+      '中文：准备发布测试夹具',
+    ],
+    {
+      cwd: packageRoot,
+    },
+  );
   const fetchCalls = join(temporary, 'fetch-calls.txt');
   const preload = join(temporary, 'registry-404.mjs');
   writeFileSync(
@@ -253,9 +265,22 @@ test('prepare rejects dirty or changing package source and packs one clean candi
   execFileSync('git', ['config', 'user.email', 'release-test@example.com'], { cwd: packageRoot });
   execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: packageRoot });
   execFileSync('git', ['add', '.'], { cwd: packageRoot });
-  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--quiet', '-m', 'fixture'], {
-    cwd: packageRoot,
-  });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'commit.gpgSign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'test: prepare release fixture',
+      '-m',
+      '中文：准备发布测试夹具',
+    ],
+    {
+      cwd: packageRoot,
+    },
+  );
   const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: packageRoot,
     encoding: 'utf8',
@@ -317,7 +342,7 @@ if (packed.status !== 0) process.exit(packed.status ?? 1);
 if (process.env.PACK_MUTATION === 'dirty') {
   appendFileSync(process.env.SOURCE_ROOT + '/README.md', '\\npack mutation\\n');
 } else {
-  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--allow-empty', '--quiet', '-m', 'pack mutation'], {
+  execFileSync('git', ['-c', 'commit.gpgSign=false', 'commit', '--allow-empty', '--quiet', '-m', 'test: record package mutation', '-m', '中文：记录打包期间的提交变化'], {
     cwd: process.env.SOURCE_ROOT,
     stdio: 'inherit',
   });
@@ -419,96 +444,6 @@ with tempfile.TemporaryDirectory() as directory:
                 check.fetch_public(url, root / ('bad-' + encoding), report)
         assert Path(report['requests'][0]['wire_response_file']).read_bytes() == wire
         assert 'response_file' not in report['requests'][0]
-`,
-    ],
-    { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', timeout: 10_000 },
-  );
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-});
-
-test('read-only verification rejects incomplete or altered exports', () => {
-  const result = spawnSync(
-    'python3',
-    [
-      '-c',
-      String.raw`
-import csv, importlib.util, json, tempfile
-from pathlib import Path
-from types import SimpleNamespace
-from unittest import TestCase
-assertions = TestCase()
-spec = importlib.util.spec_from_file_location('release_check', 'scripts/verify-release.py')
-check = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(check)
-url = check.API + '?model=Example&powerValid=strictV2'
-args = SimpleNamespace(model='Example', date=None, isl=8192, osl=1024, raw_model=None, strict_url=url,
-                       base_url=check.API + '?model=Example', empty_isl=7, empty_osl=13)
-row = {'id':'9007199254740993', 'model':'example', 'hardware':'h200', 'date':'2026-01-01',
-       'benchmark_type':'single_turn', 'isl':8192, 'osl':1024,
-       'metrics': {'power_valid':1, 'power_metric_schema_version':2, 'avg_power_w':0}}
-metadata = {'package_version':'0.4.0', 'query_url':url, 'requested_model':'Example',
-            'requested_date':None, 'date_selection':'latest', 'benchmark_type':'single_turn',
-            'isl':8192, 'osl':1024, 'raw_model':None, 'returned_rows':1, 'selected_rows':1,
-            'returned_models':['example'], 'selected_models':['example'],
-            'excluded_rows':{'outside_requested_scope':0, 'not_strict_v2':0},
-            'retrieved_at':'2026-01-02T00:00:00Z', 'metric_coverage':{}}
-for key in check.METRIC_COLUMNS - {'power_valid', 'power_metric_schema_version'}:
-    count = int(key == 'avg_power_w')
-    metadata['metric_coverage'][key] = {'available_rows':count, 'unavailable_rows':1-count}
-with tempfile.TemporaryDirectory() as directory:
-    root = Path(directory)
-    check.save(root / 'powerx.json', {'metadata':metadata, 'rows':[row]})
-    columns = check.CSV_COLUMNS
-    record = {key: metadata.get(key) if key in check.REQUEST_COLUMNS else
-              row['metrics'].get(key) if key in check.METRIC_COLUMNS else row.get(key) for key in columns}
-    def write(headers=columns):
-        with (root / 'powerx.csv').open('w', newline='') as handle:
-            writer = csv.DictWriter(handle, fieldnames=headers)
-            writer.writeheader()
-            writer.writerow({key:record[key] for key in headers})
-    write()
-    assert check.check_exports(root, [row], [row], args, '0.4.0')['selected_rows'] == 1
-    for key, value in [('prefill_avg_power_w', 0), ('avg_power_w', 1), ('id', '9007199254740992')]:
-        old = record[key]
-        record[key] = value
-        write()
-        with assertions.assertRaises(ValueError, msg='Verifier accepted changed ' + key):
-            check.check_exports(root, [row], [row], args, '0.4.0')
-        record[key] = old
-    for headers in [[key for key in columns if key != 'framework'], list(reversed(columns)), columns + ['extra']]:
-        record['extra'] = 'not in the published contract'
-        write(headers)
-        with assertions.assertRaisesRegex(ValueError, 'CSV header', msg='Verifier accepted an incomplete or changed CSV contract'):
-            check.check_exports(root, [row], [row], args, '0.4.0')
-    assert not check.strict({'metrics': {'power_valid': True, 'power_metric_schema_version':2}})
-    assert not check.same_url(url, url + '&date=2026-01-01')
-    assert not check.same_url(url, url + '&date=')
-available = [{'id':str(i), 'date':'2026-01-01', 'model':'example'} for i in range(6)]
-lookup = {'matching_rows':6, 'sample_rows':available[:5], 'query_url':args.base_url,
-          'retrieved_at':'2026-01-02T00:00:00Z', 'requested_model':'Example', 'returned_models':['example'],
-          'scope':{'date':'latest available', 'benchmark_type':'single_turn', 'isl':8192, 'osl':1024}}
-check.check_lookup(lookup, available, args)
-for sample in [[available[0]] * 5, list(reversed(available[:5])), available[1:6]]:
-    with assertions.assertRaises(ValueError, msg='Verifier accepted repeated or incorrectly ordered lookup observations'):
-        check.check_lookup(lookup | {'sample_rows':sample}, available, args)
-for key, value in [('query_url',url), ('retrieved_at','2026-01-02T00:00:00'), ('requested_model','Other'),
-                   ('returned_models',[]), ('returned_models',['example','example']),
-                   ('scope',lookup['scope'] | {'isl':1024}), ('scope',lookup['scope'] | {'date':'2026-01-01'})]:
-    with assertions.assertRaises(ValueError, msg='Verifier accepted changed lookup provenance: ' + key):
-        check.check_lookup(lookup | {key:value}, available, args)
-detail = {'outcome':'no_observations', 'scoped_rows':0, 'rows':[], 'query_url':args.base_url,
-          'retrieved_at':'2026-01-02T00:00:00+00:00', 'returned_rows':6,
-          'scope':{'requested_model':'Example', 'requested_date':None, 'raw_model':None,
-                   'benchmark_type':'single_turn','isl':7,'osl':13},
-          'validation_counts':{'invalid':0,'unknown':0,'unsupported_schema':0,'legacy_unverified':0,'strictV2_eligible':0},
-          'measurement_counts':{'some_recorded':0,'missing':0}}
-check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail}, metadata, 6, args)
-for key, value in [('rows',[row]), ('retrieved_at','2026-01-02T00:00:00'), ('validation_counts',{}),
-                   ('validation_counts',detail['validation_counts'] | {'invalid':False}),
-                   ('validation_counts',detail['validation_counts'] | {'extra':0})]:
-    with assertions.assertRaises(ValueError, msg='Verifier accepted changed empty diagnostic evidence: ' + key):
-        check.check_empty_diagnostic({'strict':metadata,'diagnostic':detail | {key:value}}, metadata, 6, args)
 `,
     ],
     { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', timeout: 10_000 },

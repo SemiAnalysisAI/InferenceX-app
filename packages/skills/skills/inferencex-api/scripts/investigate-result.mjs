@@ -1,51 +1,8 @@
-#!/usr/bin/env node
-
-import { createHash, randomUUID } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
-import {
-  argumentError,
-  CliError,
-  httpError,
-  isMain,
-  outputBoundary,
-  requestBoundary,
-  responseBoundary,
-  responseError,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, isMain, responseBoundary, responseError } from './cli-contract.mjs';
 
-// Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '1.0.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
-const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
-const HELP = `investigate-result — collect existing benchmark provenance and one bounded log window
-
-Requires Node 24 or later. No credentials or new benchmarks.
-
-Usage:
-  node investigate-result.mjs --id <result-id> --model <display-name> [options]
-
-Options:
-  --date <YYYY-MM-DD>  As-of benchmark scope; omission selects the latest snapshot
-  --run-id <id>       Logical run snapshot (exactRun=true); cannot combine with date
-  --log-file <name>   Exact artifact-relative name from server-log-files
-  --log-offset <n>    Character offset, 0-2000000000 (default 0)
-  --log-limit <n>     Characters to inspect, 1-262144 (default 16384)
-  --output <file>     Save JSON atomically; default stdout
-  --error-format <mode> Failure diagnostics: text (default) or json
-  --version          Show the installed package version offline
-  --help             Show help without making requests
-
-There is no full benchmark-row-by-ID endpoint. Supply the model and a scope
-that contains the selected ID; the collector never substitutes a nearby result.
-An exactRun snapshot may carry older points. Producer identity comes from the
-selected row's run_url and date, never curve_* fields or internal workflow IDs.
-Only one log chunk is read. No search, download, pagination, or causal analysis.
-Responses share a 16 MiB decoded byte budget and each request has a 30s timeout.
-`;
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -169,73 +126,6 @@ function githubRun(value) {
   };
 }
 
-async function fetchJson(path, query, operation, evidence, budget, signal, allowNotFound = false) {
-  const url = new URL(path, API_ORIGIN);
-  for (const [key, value] of Object.entries(query))
-    if (value !== undefined) url.searchParams.set(key, String(value));
-  const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
-  const response = await requestBoundary(
-    () =>
-      fetch(url, {
-        redirect: 'error',
-        signal: requestSignal,
-      }),
-    requestSignal,
-  );
-  if (response.redirected || (response.url && response.url !== url.href)) {
-    throw new Error(`Unexpected response URL for ${operation}`);
-  }
-  let bytes;
-  try {
-    bytes = await responseBoundary(async () => {
-      const chunks = [];
-      for await (const chunk of response.body ?? []) {
-        budget.remaining -= chunk.byteLength;
-        if (budget.remaining < 0) throw new Error('Exceeded the 16 MiB response byte budget');
-        chunks.push(chunk);
-      }
-      return Buffer.concat(chunks);
-    }, requestSignal);
-  } catch (error) {
-    if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
-    if (!response.ok && !(allowNotFound && response.status === 404)) {
-      throw httpError(response.status, `${operation}: HTTP ${response.status} (${url.href})`);
-    }
-    throw error;
-  }
-  let body;
-  try {
-    body = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-  } catch (error) {
-    if (response.ok) throw responseError(`${operation} response is not valid UTF-8`, error);
-    body = '';
-  }
-  evidence.push({
-    operation,
-    url: url.href,
-    retrieved_at: new Date().toISOString(),
-    http_status: response.status,
-    body_utf8: body,
-    decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
-    checksum_covers: 'exact decoded UTF-8 response body',
-  });
-  if (!response.ok && !(allowNotFound && response.status === 404)) {
-    throw httpError(response.status, `${operation}: HTTP ${response.status} (${url.href})`);
-  }
-  let value;
-  try {
-    value = JSON.parse(body.replace(/^\uFEFF/u, ''));
-  } catch {
-    throw new Error(`Invalid JSON from ${operation}`);
-  }
-  if (response.status === 404) {
-    if (!object(value) || typeof value.error !== 'string')
-      throw new Error(`Invalid ${operation} 404 response`);
-    return null;
-  }
-  return value;
-}
-
 function workflowMetadata(value, row, producer) {
   if (
     !object(value) ||
@@ -334,24 +224,6 @@ function logWindow(value, id, offset, limit, file) {
     inspected_characters: count,
     response: value,
   };
-}
-
-async function saveOutput(path, bytes, signal) {
-  if (path === undefined) {
-    await writeStdout(bytes, { signal });
-    return;
-  }
-  const target = resolve(path);
-  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
-  await outputBoundary(async () => {
-    try {
-      await writeFile(temporary, bytes, { flag: 'wx' });
-      signal.throwIfAborted();
-      await rename(temporary, target);
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  }, signal);
 }
 
 async function buildInvestigation(values, packageVersion, getJson, evidence) {
@@ -640,76 +512,9 @@ export function collect(options, context) {
   }, context.signal);
 }
 
-async function main(args, signal) {
-  let argumentsValidated = false;
-  try {
-    const { values } = parseArgs({
-      args,
-      options: {
-        id: { type: 'string' },
-        model: { type: 'string' },
-        date: { type: 'string' },
-        'run-id': { type: 'string' },
-        'log-file': { type: 'string' },
-        'log-offset': { type: 'string', default: '0' },
-        'log-limit': { type: 'string', default: '16384' },
-        output: { type: 'string' },
-        version: { type: 'boolean' },
-        help: { type: 'boolean' },
-        'error-format': { type: 'string' },
-      },
-      strict: true,
-      allowPositionals: false,
-    });
-    if (values.version) {
-      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-      return;
-    }
-    if (values.help) {
-      await saveOutput(undefined, HELP, signal);
-      return;
-    }
-    integerOption(values.id, 'id', 1, Number.MAX_SAFE_INTEGER);
-    if (!values.model?.trim()) throw new Error('--model requires a display model name');
-    if (values.date !== undefined && !validDate(values.date))
-      throw new Error('--date must be a valid YYYY-MM-DD date');
-    if (values['run-id'] !== undefined)
-      integerOption(values['run-id'], 'run-id', 1, Number.MAX_SAFE_INTEGER);
-    if (values.date !== undefined && values['run-id'] !== undefined)
-      throw new Error('cannot combine --date and --run-id');
-    integerOption(values['log-offset'], 'log-offset', 0, 2_000_000_000);
-    integerOption(values['log-limit'], 'log-limit', 1, 262_144);
-    const file = values['log-file'];
-    if (file !== undefined && (file.length === 0 || file.length > 1024 || file.includes('\0'))) {
-      throw new Error('--log-file must contain 1-1024 characters without NUL');
-    }
-    if (values.output !== undefined && !values.output.trim())
-      throw new Error('--output requires a file path');
-    argumentsValidated = true;
-    await responseBoundary(async () => {
-      const evidence = [];
-      const budget = { remaining: RESPONSE_BYTE_BUDGET };
-      const report = await buildInvestigation(
-        values,
-        PACKAGE_VERSION,
-        (path, query, operation, allowNotFound = false) =>
-          fetchJson(path, query, operation, evidence, budget, signal, allowNotFound),
-        evidence,
-      );
-      await saveOutput(values.output, `${JSON.stringify(report, null, 2)}\n`, signal);
-    }, signal);
-  } catch (error) {
-    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
-      throw argumentError(error.message, error);
-    }
-    throw error;
-  }
-}
-
 if (isMain(import.meta.url)) {
-  await runCli({
-    command: 'investigate-result',
-    packageVersion: PACKAGE_VERSION,
-    run: ({ args, signal }) => main(args, signal),
-  });
+  process.stderr.write(
+    'investigate-result.mjs is internal. Use inferencex result inspect instead.\n',
+  );
+  process.exitCode = 2;
 }

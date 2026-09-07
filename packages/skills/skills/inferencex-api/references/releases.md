@@ -70,24 +70,10 @@ They do not fold in `dynamo-sglang`, `mori-sglang`, or other wrappers. A display
 model can contain several raw model keys; `--raw-model` narrows to an exact key.
 Do not scan every model or invent release dates to fill an empty scope.
 
-## Run the installed comparison
+## Run the comparison
 
-The direct-script example here is a legacy compatibility interface. New comparisons
-use `inferencex releases compare --output-dir` as shown above.
-
-Run from the project root; use `.claude/skills` for a Claude installation:
-
-```bash
-node .agents/skills/inferencex-api/scripts/compare-releases.mjs \
-  --model GLM-5 --raw-model glm5.1 --hardware mi355x --framework sglang \
-  --isl 8192 --osl 1024 --metric median_ttft \
-  --before-date 2026-05-30 --after-date 2026-07-02 \
-  --before-image lmsysorg/sglang-rocm:v0.5.12.post1-rocm720-mi35x-20260529 \
-  --after-image lmsysorg/sglang-rocm:v0.5.13.post1-rocm720-mi35x-20260622 \
-  --before-run-url https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1 \
-  --after-run-url https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1 \
-  --output release-comparison.json
-```
+Use `inferencex releases compare --output-dir` as shown above. Select each side by
+an exact image, an exact run URL, or both.
 
 These selectors were observed in public history; refresh discovery before
 reusing them. The image tags are exact returned strings, not a verified assertion

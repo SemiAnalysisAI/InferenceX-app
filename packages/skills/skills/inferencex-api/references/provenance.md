@@ -19,9 +19,6 @@ a valid empty policy outcome. Preserve the incomplete attempt for diagnosis. See
 the [CLI contract](cli.md). The producer identity can differ from the snapshot
 that carried the row.
 
-The `investigate-result.mjs` examples below document the legacy single-file
-interface. New investigations use `inferencex result inspect --output-dir` above.
-
 ## Select an ID inside a known scope
 
 The public API has **no full benchmark-row-by-ID endpoint**. Start with the
@@ -67,26 +64,11 @@ return the complete original benchmark row, image, or producing attempt. Keep
 that distinction in the answer even when it identifies an otherwise unavailable
 historical result.
 
-Run the installed collector from the project root (use `.claude/skills` for a
-Claude installation):
-
-```bash
-node .agents/skills/inferencex-api/scripts/investigate-result.mjs \
-  --id 421 --model DeepSeek-R1-0528 --date 2026-08-09 \
-  --output result-421.json
-```
-
 The IDs and dates here are illustrative. Substitute the selected row's actual
 values and original query scope. `--date` is an **as-of cutoff**, not a claim that
 every returned point was produced on that date. Omit it for the latest available
 snapshot. An old ID may have fallen out of that snapshot; supply its original
-date scope or known logical run snapshot instead:
-
-```bash
-node .agents/skills/inferencex-api/scripts/investigate-result.mjs \
-  --id 421 --model DeepSeek-R1-0528 --run-id 123456789 \
-  --output result-421.json
-```
+date scope or known logical run snapshot with `--run-id` instead.
 
 `--run-id` sends `runId=<id>&exactRun=true`. It selects a logical run snapshot,
 which can carry older same-image points forward. It cannot be combined with
@@ -145,10 +127,10 @@ select an exact filename returned by `/api/v1/server-log-files?id=<selected-id>`
 and provide the offset and limit:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/investigate-result.mjs \
+node .agents/skills/inferencex-api/scripts/inferencex.mjs result inspect \
   --id 421 --model DeepSeek-R1-0528 --date 2026-08-09 \
   --log-file results/router.log --log-offset 65536 --log-limit 4096 \
-  --output result-421-router-window.json
+  --output-dir evidence/result-421-router-window
 ```
 
 Offsets count Unicode characters, not bytes or lines. Limits are 1–262,144

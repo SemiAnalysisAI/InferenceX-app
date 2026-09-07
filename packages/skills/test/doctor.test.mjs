@@ -83,6 +83,15 @@ test('packed doctor is healthy and offline by default', () => {
   assert.ok(expected.every((path) => !path.includes('\\')));
 });
 
+test('doctor runs from the copied skill without a neighboring package installation', () => {
+  const { cwd, skill } = installed();
+  const result = suite.node([join(skill, 'scripts/inferencex.mjs'), 'doctor'], { cwd });
+  const report = JSON.parse(succeeded(result).stdout);
+  assert.equal(report.healthy, true);
+  assert.equal(report.selected_installation.skill_path, skill);
+  assert.deepEqual(report.failures, []);
+});
+
 test('changed and missing managed files are unhealthy while extra files are ignored', () => {
   for (const mode of ['changed', 'missing']) {
     const { cwd, skill, skillsRoot } = installed();

@@ -37,7 +37,6 @@ ${COMMANDS.map(({ command, description }) => `  ${command.padEnd(22)} ${descript
 
 Help, version, describe, and schema work offline. Machine output and errors default to JSON.
 Use --human for concise successful output or --error-format text for text errors.
-Legacy helper scripts remain available with their existing --output and --evidence-dir options.
 The inferencex entry requires --output-dir for formal exports and never launches benchmarks.
 `;
 

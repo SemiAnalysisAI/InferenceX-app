@@ -358,15 +358,7 @@ test('a process killed between activation renames is recovered by the next insta
   const destination = join(cwd, '.claude/skills/inferencex-api');
   const transaction = `${destination}.inferencex-skills-transaction`;
   const receipt = join(destination, metadataName);
-  const powerx = join(destination, 'scripts/export-powerx.mjs');
   writeFileSync(receipt, JSON.stringify({ package: packageInfo.name, version: '0.1.99' }));
-  writeFileSync(
-    powerx,
-    readFileSync(powerx, 'utf8').replace(
-      /^const PACKAGE_VERSION = .*;$/mu,
-      "const PACKAGE_VERSION = '0.1.99';",
-    ),
-  );
   writeFileSync(join(destination, 'SKILL.md'), 'old skill bytes survive the killed process\n');
   writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
   const oldReceipt = readFileSync(receipt);

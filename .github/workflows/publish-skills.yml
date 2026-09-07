@@ -65,13 +65,13 @@ jobs:
             exit 1
           fi
       - name: Verify candidate installation and public API behavior
-        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-candidate-verification"
+        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-candidate-verification"
       - name: Publish the verified archive with OIDC
         run: |
           node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
           npm publish "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" --access public --ignore-scripts --registry https://registry.npmjs.org
       - name: Verify anonymous pinned public installation and behavior
-        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-public-verification"
+        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-public-verification"
       - name: Create the sanitized durable release summary
         run: >-
           node packages/skills/scripts/release-summary.mjs

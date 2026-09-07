@@ -49,6 +49,12 @@ test('TCO exposes closed canonical options with explicit units', () => {
   assert.throws(() => tco.normalizeArgs([...TCO_BUNDLE_ARGS.slice(2), '--target', '75']), {
     code: 'INVALID_ARGUMENT',
   });
+  const priceIndex = TCO_BUNDLE_ARGS.indexOf('b200=3.6,mi355x=1.8');
+  for (const prices of ['b200=0', 'b200=-1', 'b200=Infinity', 'b200=3,b200=4', 'b200=3,mi355x']) {
+    assert.throws(() => tco.normalizeArgs(TCO_BUNDLE_ARGS.slice(2).with(priceIndex - 2, prices)), {
+      code: 'INVALID_ARGUMENT',
+    });
+  }
 });
 
 test('packed TCO bundles hand-check costs and reference the exact saved feed', () => {
@@ -145,6 +151,122 @@ test('an altered feed date is a response-envelope failure distinct from request 
     }),
     (error) => error.code === 'INVALID_RESPONSE' && /response envelope/u.test(error.message),
   );
+});
+
+test('TCO rejects mismatched, duplicate and contradictory frontier provenance', async () => {
+  const options = tco.normalizeArgs(TCO_BUNDLE_ARGS.slice(2));
+  for (const { name, body } of [
+    { name: 'model mismatch', body: tcoFeed([], { model: 'dsr1' }) },
+    { name: 'workload mismatch', body: tcoFeed([], { workloads: ['8192x1024'] }) },
+    { name: 'tier mismatch', body: tcoFeed([], { tiers: [75] }) },
+    { name: 'duplicate point', body: tcoFeed([tcoPoint(), tcoPoint()]) },
+    {
+      name: 'negative throughput',
+      body: tcoFeed([tcoPoint('b200', { output_tput_per_gpu: -1 })]),
+    },
+    {
+      name: 'non-finite throughput',
+      body: tcoFeed([tcoPoint('b200', { output_tput_per_gpu: Infinity })]),
+    },
+    {
+      name: 'string throughput',
+      body: tcoFeed([tcoPoint('b200', { output_tput_per_gpu: '1000' })]),
+    },
+    {
+      name: 'future evidence date',
+      body: tcoFeed([tcoPoint('b200', { latest_date: '2026-09-07' })]),
+    },
+    {
+      name: 'contradictory single knot',
+      body: tcoFeed([
+        tcoPoint('b200', {
+          is_interpolated: false,
+          frontier_points: 1,
+          frontier_min_interactivity: 50,
+          frontier_max_interactivity: 60,
+          oldest_frontier_date: '2026-09-02',
+          latest_date: '2026-09-02',
+          evidence_date: { from: '2026-09-02', to: '2026-09-02' },
+        }),
+      ]),
+    },
+    {
+      name: 'contradictory clamped boundary',
+      body: tcoFeed([
+        tcoPoint('b200', {
+          boundary: 'clamped_low',
+          is_interpolated: false,
+          frontier_min_interactivity: 25,
+          evidence_date: { from: '2026-09-02', to: '2026-09-02' },
+        }),
+      ]),
+    },
+    {
+      name: 'unreachable point with evidence',
+      body: tcoFeed([
+        tcoPoint('b200', {
+          boundary: 'unreachable',
+          is_interpolated: false,
+          frontier_max_interactivity: 40,
+          output_tput_per_gpu: 0,
+        }),
+      ]),
+    },
+  ]) {
+    let requests = 0;
+    await assert.rejects(
+      tco.collect(options, {
+        producerVersion: '1.0.0',
+        get: () => {
+          requests += 1;
+          return Promise.resolve({
+            id: 'b'.repeat(64),
+            status: 200,
+            retrievedAt: '2026-09-07T00:00:00.000Z',
+            bytes: Buffer.from(JSON.stringify(body)),
+            body,
+          });
+        },
+      }),
+      (error) => error.code === 'INVALID_RESPONSE',
+      name,
+    );
+    assert.equal(requests, 1, name);
+  }
+});
+
+test('finite TCO inputs that overflow or underflow modeled cost fail at numeric range', async () => {
+  const base = tco.normalizeArgs(TCO_BUNDLE_ARGS.slice(2));
+  for (const { name, price, throughput } of [
+    { name: 'price overflow', price: 1e308, throughput: 1000 },
+    { name: 'throughput underflow', price: 3.6, throughput: Number.MIN_VALUE },
+    { name: 'cost underflow', price: 3.6, throughput: 1e308 },
+  ]) {
+    const options = tco.normalizeArgs({
+      ...base,
+      gpu_hourly_prices_usd: { b200: price },
+    });
+    const body = tcoFeed([tcoPoint('b200', { output_tput_per_gpu: throughput })]);
+    let requests = 0;
+    await assert.rejects(
+      tco.collect(options, {
+        producerVersion: '1.0.0',
+        get: () => {
+          requests += 1;
+          return Promise.resolve({
+            id: 'c'.repeat(64),
+            status: 200,
+            retrievedAt: '2026-09-07T00:00:00.000Z',
+            bytes: Buffer.from(JSON.stringify(body)),
+            body,
+          });
+        },
+      }),
+      (error) => error.code === 'INVALID_RESPONSE' && /numeric range/u.test(error.message),
+      name,
+    );
+    assert.equal(requests, 1, name);
+  }
 });
 
 test('result records API interpolation as saved input rather than replayed methodology', () => {

@@ -1,57 +1,10 @@
-#!/usr/bin/env node
-
-import { createHash, randomUUID } from 'node:crypto';
-import { link, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
-import {
-  argumentError,
-  httpError,
-  isMain,
-  outputBoundary,
-  requestBoundary,
-  responseError,
-  responseBoundary,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, isMain, responseError } from './cli-contract.mjs';
 
-const PACKAGE_VERSION = '1.0.0';
-const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 // History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =
   /^(?:(?:median|p75|p90|p95|p99|p99\.9)_(?:ttft|tpot|itl|e2el|intvty|qps)|(?:mean|std)_qps|(?:total|output|input)_tput_tps|(?:output_|input_)?tput_per_gpu)$/u;
-const HELP = `compare-releases — investigate observed changes between explicit producer identities
-
-Requires Node 24 or later.
-
-Usage:
-  node compare-releases.mjs --model <display-name> --hardware <raw-key> \\
-    --framework <vllm|sglang> --isl <tokens> --osl <tokens> --metric <raw-key> \\
-    --before-date <YYYY-MM-DD> --after-date <YYYY-MM-DD> \\
-    --before-image <exact-image> --after-image <exact-image> [options]
-
-Each side requires an exact image, an exact producer run URL, or both:
-  --before-run-url <url> / --after-run-url <url>  Use the returned run_url, including attempt
-  --before-image <text> / --after-image <text>   Match the returned image string exactly
-  --raw-model <key>       Select one raw model within the requested display bucket
-  --output <new-file>     Exclusively create a JSON file; default stdout
-  --error-format <mode>   Failure diagnostics: text (default) or json
-  --version          Show the installed package version offline
-  --help                 Show help offline
-
-Dates select original observation date, never curve_date. Makes one history request.
-Reports one-to-one public-configuration matches and missing/ambiguous observations.
-The full response is retained with a SHA-256; one 30s request, 16 MiB byte budget.
-Image-to-release mapping and causal attribution remain unverified. See references/releases.md.
-Metrics retained by history, when recorded:
-  median/p75/p90/p95/p99/p99.9 of ttft/tpot/itl/e2el/intvty/qps (e.g. median_ttft)
-  mean_qps, std_qps
-  tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu
-  total_tput_tps, output_tput_tps, input_tput_tps
-History omits mean/std latency and interactivity. Retained metrics may still be missing.
-Power/energy comparisons require PowerX validation.
-`;
 const CONFIG_FIELDS = [
   'model',
   'hardware',
@@ -379,15 +332,8 @@ function validateRows(rows, metric) {
   }
 }
 
-function buildReleaseComparison({
-  scope,
-  rows,
-  source,
-  packageVersion,
-  requested = scope,
-  stringifyIds = true,
-}) {
-  const resultId = (value) => (stringifyIds ? String(value) : value);
+function buildReleaseComparison({ scope, rows, source, packageVersion }) {
+  const resultId = String;
   validateRows(rows, scope.metric);
   const originals = new Map();
   for (const row of rows) {
@@ -526,7 +472,7 @@ function buildReleaseComparison({
       package_version: packageVersion,
       query_url: source.url,
       retrieved_at: source.retrievedAt,
-      requested,
+      requested: scope,
       ran_new_benchmark: false,
       returned_rows: rows.length,
       outside_requested_scope: rows.length - scoped.length,
@@ -613,193 +559,9 @@ export async function collect(options, context) {
   };
 }
 
-async function saveOutput(path, output, signal) {
-  if (path === undefined) {
-    await writeStdout(output, { signal });
-    return;
-  }
-  const target = resolve(path);
-  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
-  await outputBoundary(async () => {
-    try {
-      await writeFile(temporary, output, { flag: 'wx' });
-      signal.throwIfAborted();
-      // Linking a complete sibling file installs it atomically and refuses existing targets/symlinks.
-      await link(temporary, target);
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  }, signal);
-}
-
-async function run(args, signal) {
-  let argumentsValidated = false;
-  try {
-    const { values, tokens } = parseArgs({
-      args,
-      tokens: true,
-      options: {
-        ...Object.fromEntries(
-          [
-            'model',
-            'hardware',
-            'framework',
-            'isl',
-            'osl',
-            'metric',
-            'raw-model',
-            'before-date',
-            'after-date',
-            'before-image',
-            'after-image',
-            'before-run-url',
-            'after-run-url',
-            'output',
-          ].map((name) => [name, { type: 'string' }]),
-        ),
-        version: { type: 'boolean' },
-        help: { type: 'boolean' },
-        'error-format': { type: 'string' },
-      },
-      allowPositionals: false,
-      strict: true,
-    });
-    const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
-    if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
-    if (values.version) {
-      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-      return;
-    }
-    if (values.help) {
-      await saveOutput(undefined, HELP, signal);
-      return;
-    }
-    for (const [key, value] of Object.entries(values)) {
-      if (typeof value === 'string' && !value.trim())
-        throw new Error(`--${key} requires a nonempty value`);
-    }
-    for (const key of ['model', 'hardware', 'metric']) {
-      if (!values[key]) throw new Error(`--${key} is required`);
-    }
-    if (!PERFORMANCE_METRIC.test(values.metric)) {
-      throw new Error(
-        'Choose a metric retained by benchmark history (see --help); use the PowerX cookbook for validated power and energy',
-      );
-    }
-    if (!['vllm', 'sglang'].includes(values.framework))
-      throw new Error('--framework must be vllm or sglang');
-    for (const key of ['isl', 'osl']) {
-      if (
-        !/^\d+$/u.test(values[key]) ||
-        !Number.isSafeInteger(Number(values[key])) ||
-        Number(values[key]) <= 0
-      )
-        throw new Error(`--${key} requires a positive integer`);
-    }
-    for (const side of ['before', 'after']) {
-      if (!validDate(values[`${side}-date`]))
-        throw new Error(`--${side}-date requires a valid YYYY-MM-DD date`);
-      if (values[`${side}-image`] === undefined && values[`${side}-run-url`] === undefined)
-        throw new Error(`Provide --${side}-image or --${side}-run-url`);
-      if (values[`${side}-run-url`] !== undefined && !runUrl(values[`${side}-run-url`]))
-        throw new Error(`--${side}-run-url requires an exact GitHub Actions run URL`);
-    }
-    if (values['before-date'] > values['after-date'])
-      throw new Error('--before-date must not be after --after-date');
-    argumentsValidated = true;
-    const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
-    await responseBoundary(async () => {
-      const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks/history');
-      for (const name of ['model', 'isl', 'osl']) url.searchParams.set(name, values[name]);
-      const response = await requestBoundary(
-        () =>
-          fetch(url, {
-            signal: requestSignal,
-            redirect: 'error',
-          }),
-        requestSignal,
-      );
-      if (response.redirected || (response.url && response.url !== url.href))
-        throw new Error('Unexpected history response URL');
-      if (!response.ok) throw httpError(response.status, `HTTP ${response.status}: ${url.href}`);
-      const { bytes, body } = await responseBoundary(async () => {
-        const chunks = [];
-        let received = 0;
-        for await (const chunk of response.body ?? []) {
-          received += chunk.byteLength;
-          if (received > RESPONSE_BYTE_BUDGET)
-            throw new Error('Exceeded the 16 MiB response byte budget');
-          chunks.push(chunk);
-        }
-        const responseBytes = Buffer.concat(chunks);
-        const responseBody = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
-          responseBytes,
-        );
-        return { bytes: responseBytes, body: responseBody };
-      }, requestSignal);
-      const evidence = [
-        {
-          operation: 'benchmark-history',
-          url: url.href,
-          http_status: response.status,
-          retrieved_at: new Date().toISOString(),
-          body_utf8: body,
-          decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
-          checksum_covers: 'exact decoded UTF-8 response body',
-        },
-      ];
-      const rows = JSON.parse(body.replace(/^\uFEFF/u, ''), (_key, value) => {
-        if (typeof value === 'number' && !Number.isFinite(value))
-          throw new Error('Unexpected benchmark response: non-finite number');
-        return value;
-      });
-      const scope = {
-        model: values.model,
-        hardware: values.hardware,
-        framework: values.framework,
-        isl: Number(values.isl),
-        osl: Number(values.osl),
-        metric: values.metric,
-        raw_model: values['raw-model'] ?? null,
-        before_date: values['before-date'],
-        after_date: values['after-date'],
-        before_image: values['before-image'] ?? null,
-        after_image: values['after-image'] ?? null,
-        before_run_url: values['before-run-url'] ?? null,
-        after_run_url: values['after-run-url'] ?? null,
-      };
-      const built = buildReleaseComparison({
-        scope,
-        rows,
-        source: {
-          responseId: evidence[0].decoded_body_sha256,
-          status: response.status,
-          retrievedAt: evidence[0].retrieved_at,
-          url: url.href,
-        },
-        packageVersion: PACKAGE_VERSION,
-        requested: Object.fromEntries(
-          Object.entries(values).filter(([name]) => name !== 'error-format'),
-        ),
-        stringifyIds: false,
-      });
-      delete built.result.sources;
-      built.result.evidence = evidence;
-      const output = `${JSON.stringify(built.result, null, 2)}\n`;
-      await saveOutput(values.output, output, signal);
-    }, signal);
-  } catch (error) {
-    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
-      throw argumentError(error.message, error);
-    }
-    throw error;
-  }
-}
-
 if (isMain(import.meta.url)) {
-  await runCli({
-    command: 'compare-releases',
-    packageVersion: PACKAGE_VERSION,
-    run: ({ args, signal }) => run(args, signal),
-  });
+  process.stderr.write(
+    'compare-releases.mjs is internal. Use inferencex releases compare instead.\n',
+  );
+  process.exitCode = 2;
 }

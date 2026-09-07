@@ -19,7 +19,6 @@ const releaseFiles = [
   'LICENSE',
   'README.md',
   'bin/install.mjs',
-  'bin/install-transaction.mjs',
   'package.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/integrity.json',
@@ -48,11 +47,11 @@ const releaseFiles = [
   'skills/inferencex-api/scripts/export-powerx.mjs',
   'skills/inferencex-api/scripts/http-client.mjs',
   'skills/inferencex-api/scripts/inferencex.mjs',
+  'skills/inferencex-api/scripts/install-transaction.mjs',
   'skills/inferencex-api/scripts/investigate-result.mjs',
   'skills/inferencex-api/scripts/local-files.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
-  'skills/inferencex-api/scripts/verify-export.mjs',
 ];
 const stableVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 

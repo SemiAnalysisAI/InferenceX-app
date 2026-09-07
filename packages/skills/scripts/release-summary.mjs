@@ -41,8 +41,6 @@ const SCOPE_KEYS = [
   'empty_isl',
   'empty_osl',
   'agentx_model',
-  'agentx_point_id',
-  'agentx_no_trace_id',
 ];
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
 

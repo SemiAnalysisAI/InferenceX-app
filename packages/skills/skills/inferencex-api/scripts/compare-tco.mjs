@@ -1,47 +1,9 @@
-#!/usr/bin/env node
-
-import { createHash, randomUUID } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
-import {
-  argumentError,
-  httpError,
-  isMain,
-  outputBoundary,
-  requestBoundary,
-  responseBoundary,
-  responseError,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, isMain, responseError } from './cli-contract.mjs';
 
-// Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '1.0.0';
-const HELP = `compare-tco — compare modeled GPU-hour cost at a fixed interactivity target
-
-Requires Node 24 or later. Output is JSON with the consumed API response and coverage.
-Uses single-turn median interactivity, with one request limited to 30 seconds / 4 MiB.
-
-Usage:
-  node compare-tco.mjs --model <key-or-display-name> --workloads <isl>x<osl>[,...] \\
-    --target <output-tok/s/user> --gpu-hourly-prices <hardware>=<USD/GPU-hour>[,...]
-
-Options:
-  --date <YYYY-MM-DD>  As-of cutoff; omission selects latest available data
-  --output <file>      Atomically replace this local file; default stdout
-  --error-format <mode> Failure diagnostics: text (default) or json
-  --version          Show the installed package version offline
-  --help              Show help without making a request
-
-Price keys select exact, case-sensitive API hardware identifiers. Prices must be
-user supplied. Costs use API output throughput; no local interpolation or ranking.
-Clamped, unreachable, zero-throughput and missing points have null costs.
-The feed combines configurations and is not a total ownership-cost model.
-`;
 const KEY = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
 const DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u;
-const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const TCO_UNITS = Object.freeze({
   gpu_hourly_price: 'USD per GPU-hour',
   target_output_throughput: 'output tokens per second per user',
@@ -274,7 +236,7 @@ function calculateRows(priceEntries, workloads, points) {
 function comparisonMetadata({ producerVersion, scope, feed, contractVersion }) {
   return {
     package_version: producerVersion,
-    ...(contractVersion === undefined ? {} : { contract_version: contractVersion }),
+    contract_version: contractVersion,
     requested_model: scope.model,
     db_model_keys: feed.db_model_keys,
     requested_date: scope.date,
@@ -292,12 +254,8 @@ function comparisonMetadata({ producerVersion, scope, feed, contractVersion }) {
     cost_scope: 'Supplied GPU hourly rate only; not total purchase or ownership cost',
     frontier_scope:
       'API frontier across frameworks, precisions, speculative methods and deployment configurations; no observation IDs or matched-configuration proof',
-    ...(contractVersion === undefined
-      ? {}
-      : {
-          offline_verification_scope:
-            'Saved API interpolation is an input; offline verification recalculates costs from saved points and does not independently revalidate benchmark frontier interpolation methodology.',
-        }),
+    offline_verification_scope:
+      'Saved API interpolation is an input; offline verification recalculates costs from saved points and does not independently revalidate benchmark frontier interpolation methodology.',
   };
 }
 
@@ -482,133 +440,7 @@ function validateFeed(feed, values, workloads, target) {
   return points;
 }
 
-async function writeOutput(destination, bytes, signal) {
-  if (destination === undefined) {
-    await writeStdout(bytes, { signal });
-    return;
-  }
-  const target = resolve(destination);
-  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
-  await outputBoundary(async () => {
-    try {
-      await writeFile(temporary, bytes, { flag: 'wx' });
-      signal.throwIfAborted();
-      await rename(temporary, target);
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  }, signal);
-}
-
-async function run(args, signal) {
-  let argumentsValidated = false;
-  try {
-    const { values, tokens } = parseArgs({
-      args,
-      tokens: true,
-      options: {
-        model: { type: 'string' },
-        workloads: { type: 'string' },
-        target: { type: 'string' },
-        'gpu-hourly-prices': { type: 'string' },
-        date: { type: 'string' },
-        output: { type: 'string' },
-        version: { type: 'boolean' },
-        help: { type: 'boolean' },
-        'error-format': { type: 'string' },
-      },
-    });
-    const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
-    if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
-    if (values.version) {
-      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-      return;
-    }
-    if (values.help) return writeOutput(undefined, HELP, signal);
-    validateModel(values.model);
-    if (values.date !== undefined && !validDate(values.date))
-      throw new Error('--date requires a real YYYY-MM-DD date');
-    if (values.output !== undefined && values.output.trim() === '')
-      throw new Error('--output must name a file');
-    const target = positiveDecimal(values.target, 'target');
-    if (target > 10_000) throw new Error('--target must be at most 10000');
-    const workloads = workloadsFrom(values.workloads);
-    const priceEntries = priceEntriesFrom(values['gpu-hourly-prices']);
-    const prices = Object.fromEntries(priceEntries);
-    const scope = {
-      model: values.model,
-      date: values.date ?? null,
-      workloads,
-      target_output_tokens_per_second_per_user: target,
-      gpu_hourly_prices_usd: prices,
-    };
-    argumentsValidated = true;
-    const url = comparisonUrl(scope);
-    const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
-    const response = await requestBoundary(
-      () =>
-        fetch(url, {
-          redirect: 'error',
-          signal: requestSignal,
-        }),
-      requestSignal,
-    );
-    if (!response.ok) throw httpError(response.status, `HTTP ${response.status}: ${url}`);
-    const { bytes, body, bodyBytes, feed, points } = await responseBoundary(async () => {
-      if (!/^application\/json(?:\s*;|$)/iu.test(response.headers.get('content-type') ?? '')) {
-        throw new Error('Expected an application/json TCO response');
-      }
-      if (!response.body) throw new Error('Missing TCO response body');
-      const chunks = [];
-      let receivedBytes = 0;
-      for await (const chunk of response.body) {
-        receivedBytes += chunk.byteLength;
-        if (receivedBytes > MAX_RESPONSE_BYTES) throw new Error('TCO response exceeds 4 MiB');
-        chunks.push(chunk);
-      }
-      const responseBytes = Buffer.concat(chunks);
-      // Fetch decodes HTTP compression. Strict UTF-8 keeps the recorded body reversible to these bytes.
-      const responseBody = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
-        responseBytes,
-      );
-      const parsedFeed = JSON.parse(responseBody);
-      return {
-        bytes: responseBytes,
-        body: responseBody,
-        bodyBytes: receivedBytes,
-        feed: parsedFeed,
-        points: validateFeed(parsedFeed, values, workloads, target),
-      };
-    }, requestSignal);
-    const { rows, statusCounts } = calculateRows(priceEntries, workloads, points);
-    const document = {
-      schema_version: 1,
-      metadata: comparisonMetadata({ producerVersion: PACKAGE_VERSION, scope, feed }),
-      source: {
-        query_url: url.href,
-        retrieved_at: new Date().toISOString(),
-        http_status: response.status,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-        body_encoding: 'utf8',
-        body_bytes: bodyBytes,
-        body,
-      },
-      coverage: domainCoverage(rows, feed, statusCounts),
-      rows,
-    };
-    await writeOutput(values.output, `${JSON.stringify(document, null, 2)}\n`, signal);
-  } catch (error) {
-    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
-      throw argumentError(error.message, error);
-    }
-    throw error;
-  }
-}
-
 if (isMain(import.meta.url)) {
-  await runCli({
-    command: 'compare-tco',
-    packageVersion: PACKAGE_VERSION,
-    run: ({ args, signal }) => run(args, signal),
-  });
+  process.stderr.write('compare-tco.mjs is internal. Use inferencex tco compare instead.\n');
+  process.exitCode = 2;
 }

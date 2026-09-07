@@ -11,6 +11,48 @@ The versioned CLI can list supported capabilities and public model scopes with
 [CLI contract](cli.md). The recipes below remain useful for API operations that
 do not have a formal evidence-bundle command.
 
+## Basic benchmark lookup
+
+This Node 24 example prints up to five latest available single-turn observations
+with 8192 input and 1024 output tokens, ordered by observation date newest first.
+It reports the full matching count before limiting the sample and retains each
+observation's actual date and provenance.
+
+```bash
+node --input-type=module <<'JS'
+const base = 'https://inferencex.semianalysis.com';
+async function read(url) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+  return response.json();
+}
+const schema = await read(`${base}/api/openapi.json`);
+const operation = schema.paths['/api/v1/benchmarks']?.get;
+const models = operation?.parameters.find((p) => p.name === 'model')?.schema.enum;
+const model = 'DeepSeek-V4-Pro';
+if (!models?.includes(model)) throw new Error('Check the current model enum in OpenAPI');
+const url = new URL('/api/v1/benchmarks', base);
+url.searchParams.set('model', model);
+const rows = await read(url);
+if (!Array.isArray(rows)) throw new Error('Expected a benchmark row array');
+const selected = rows.filter((row) =>
+  row.benchmark_type === 'single_turn' && row.isl === 8192 && row.osl === 1024);
+console.log(JSON.stringify({
+  query_url: url.href,
+  retrieved_at: new Date().toISOString(),
+  requested_model: model,
+  scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
+  returned_models: [...new Set(selected.map((row) => row.model))],
+  matching_rows: selected.length,
+  sample_rows: selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+}, null, 2));
+JS
+```
+
+For a dated lookup, add the documented `date` parameter to the URL and record it in
+`scope.date` as the exact `YYYY-MM-DD` query value, without explanatory text inside
+that value. Retain the rows' own dates and source links in the answer.
+
 ## Evaluation lookup
 
 Example request: "Show up to five recent evaluation observations for raw model

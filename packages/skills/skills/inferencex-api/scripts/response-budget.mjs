@@ -1,9 +1,6 @@
 // Count decompressed bytes from fetch's stream; Content-Length may describe compressed data.
 import { responseError } from './cli-contract.mjs';
 
-const PACKAGE_VERSION = '1.0.0';
-export { PACKAGE_VERSION };
-
 export function createResponseBudget({
   responseBytes,
   totalBytes,

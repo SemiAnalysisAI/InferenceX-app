@@ -17,53 +17,19 @@ node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
 ```
 
 A valid empty scope exits 0 unless the explicit hardware predicate fails, which
-commits the bundle and exits 3. See the [CLI contract](cli.md). The direct helper
-below remains available for legacy output compatibility.
+commits the bundle and exits 3. See the [CLI contract](cli.md).
 
 ## Run the installed exporter
 
-The direct-script examples in this section and the next are legacy compatibility
-interfaces. For a new export, use `inferencex powerx export --output-dir` above.
-
-Resolve the script relative to the loaded `SKILL.md`. From the user's project,
-the default Codex location is `.agents/skills/inferencex-api`; Claude Code uses
-`.claude/skills/inferencex-api`. Use the actual location for a custom installation.
-Output paths are relative to the caller's working directory.
-
-```bash
-INFERENCEX_SKILL_DIR='.agents/skills/inferencex-api'
-node "$INFERENCEX_SKILL_DIR/scripts/export-powerx.mjs" \
-  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --date 2026-09-04 --format csv --output powerx.csv 2> powerx-report.log
-```
-
-For JSON, use `--format json --output powerx.json`. The date above is an example
-as-of cutoff; source observations can be older. Omit `--date` for latest available
-data. Require the user's display model and positive integer input/output lengths;
-`--raw-model` optionally narrows the returned raw model key within a display bucket.
-Discover that key from current responses instead of guessing an alias.
-
-`--format` defaults to CSV. Without `--output`, data goes to stdout. Coverage and
-error messages go to stderr, so redirecting stdout does not mix them into the
-export. Successful exports also emit a JSON metadata record to stderr; retain the
-report log so even a header-only CSV has request, scope, and package-version
-evidence. Run the script with `--help` for the complete CLI interface.
+Use `inferencex powerx export`. JSON is the default; add `--format csv` when needed.
+`--date` is an as-of cutoff and source observations can be older. `--raw-model`
+optionally narrows the returned raw key within a display bucket; discover that key
+from current responses.
 
 ## Save the response used by an export
 
-Add `--evidence-dir` when the user needs reproducible input evidence. Use a fresh
-path for each invocation, including separate CSV and JSON exports:
-
-```bash
-node "$INFERENCEX_SKILL_DIR/scripts/export-powerx.mjs" \
-  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --format csv --output powerx.csv --evidence-dir './powerx evidence'
-```
-
-The exporter makes one benchmark request and saves its complete response before
-filtering. `response.json` contains the received decoded body, even when it is an
-HTTP error or malformed JSON. Its SHA-256 covers those saved decoded bytes, not
-compressed wire bytes. `manifest.json` links that response to the export:
+The required `--output-dir` is a new evidence bundle. The exporter saves each
+complete decoded response before filtering. `manifest.json` links it to the result:
 
 - `schema_version: 1`, `package_version`, and `status` (`pending`, `complete`, `failed`).
 - `request`: URL, GET method and all requested API/local filters.
@@ -73,19 +39,12 @@ compressed wire bytes. `manifest.json` links that response to the export:
   extraction metadata. An empty successful selection still has context and evidence.
 - `error`: failure explanation when present.
 
-Only `complete` means both the requested export and evidence finished. HTTP, JSON,
-shape, output or evidence-write errors exit unsuccessfully; retain the failed or
-pending manifest and captured body for diagnosis. Existing evidence directories
-are refused; keep output paths outside the evidence directory. Use paths containing
-spaces normally, with shell quotes. Omitting this option saves no response files
-and preserves the existing CSV columns, JSON shape, and stdout/stderr roles.
+Only a manifest committed last means the bundle completed. HTTP, JSON, shape, or
+write errors exit unsuccessfully; retain the incomplete directory for diagnosis.
+Existing output directories are refused.
 
-For verification, hash `response.json` and the actual output, compare the manifest,
-then select rows from that saved response using the recorded filters. A later API
-request is separate evidence and may return different observations. Lookup and
-empty-result diagnostics still record their own request context; if original-input
-evidence is requested for those reads, save each complete consumed response before
-selecting its rows.
+Use `inferencex verify <directory>` to reconstruct the result from the saved
+responses. A later API request is separate evidence and may return different data.
 
 ## Selection and coverage
 

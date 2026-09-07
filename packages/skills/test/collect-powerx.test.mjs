@@ -96,6 +96,98 @@ test('PowerX strict coverage excludes invalid measurements without silently coun
   assert.equal(csv.split('\r\n').length, 2);
 });
 
+test('PowerX strict markers and workload selection are exact without coercion', async () => {
+  const invalidMarkers = [
+    { power_valid: '1' },
+    { power_valid: true },
+    { power_valid: 0 },
+    { power_valid: null },
+    { power_valid: undefined },
+    { power_metric_schema_version: '2' },
+    { power_metric_schema_version: true },
+    { power_metric_schema_version: 3 },
+    { power_metric_schema_version: undefined },
+  ];
+  const rows = [
+    observation({ id: 'selected' }),
+    ...invalidMarkers.map((markers, index) =>
+      observation({
+        id: `invalid-marker-${index}`,
+        metrics: { ...observation().metrics, ...markers },
+      }),
+    ),
+    observation({ id: 'agentic', benchmark_type: 'agentic_traces' }),
+    observation({ id: 'wrong-isl', isl: 1024 }),
+    observation({ id: 'wrong-osl', osl: 8192 }),
+  ];
+  const { built } = await collect(rows);
+  const document = JSON.parse(built.bytes);
+  assert.deepEqual(
+    document.rows.map((row) => row.id),
+    ['selected'],
+  );
+  assert.deepEqual(document.metadata.excluded_rows, {
+    outside_requested_scope: 3,
+    not_strict_v2: invalidMarkers.length,
+  });
+});
+
+test('PowerX raw-model selection is exact and retains its complete response scope', async () => {
+  const rows = [
+    observation({ id: 'glm5-row' }),
+    observation({ id: 'glm5.1-row', model: 'glm5.1' }),
+  ];
+  const { built, requests } = await collect(rows, ['--raw-model', 'glm5.1']);
+  const document = JSON.parse(built.bytes);
+  assert.deepEqual(
+    document.rows.map((row) => row.id),
+    ['glm5.1-row'],
+  );
+  assert.equal(document.metadata.raw_model, 'glm5.1');
+  assert.equal(document.metadata.returned_rows, 2);
+  assert.equal(document.metadata.selected_rows, 1);
+  assert.deepEqual(document.metadata.returned_models, ['glm5', 'glm5.1']);
+  assert.deepEqual(document.metadata.selected_models, ['glm5.1']);
+  assert.deepEqual(document.metadata.excluded_rows, {
+    outside_requested_scope: 1,
+    not_strict_v2: 0,
+  });
+  assert.equal(requests.length, 1);
+});
+
+test('PowerX validates complete rows before filtering by workload or raw model', async () => {
+  const malformed = [
+    ['unsafe numeric id', 'id', Number.MAX_SAFE_INTEGER + 1],
+    ['string input length', 'isl', '8192'],
+    ['string output length', 'osl', '1024'],
+    ['impossible date', 'date', '2026-02-30'],
+    ['object workflow ID', 'workflow_run_id', { id: '42' }],
+    ['unsafe curve workflow ID', 'curve_workflow_run_id', Number.MAX_SAFE_INTEGER + 1],
+    ['object producer timestamp', 'run_started_at', {}],
+    ['boolean curve timestamp', 'curve_run_started_at', false],
+    ['impossible curve date', 'curve_date', '2026-02-30'],
+  ];
+  for (const [label, field, value] of malformed) {
+    await assert.rejects(
+      collect(
+        [
+          observation({
+            id: `outside-scope-${field}`,
+            model: 'other-model',
+            benchmark_type: 'agentic_traces',
+            isl: 1,
+            osl: 1,
+            [field]: value,
+          }),
+        ],
+        ['--raw-model', 'glm5.1'],
+      ),
+      { code: 'INVALID_RESPONSE' },
+      label,
+    );
+  }
+});
+
 test('PowerX validates malformed rows even outside the selected workload', async () => {
   assert.equal(typeof powerx.collect, 'function');
   await assert.rejects(collect([observation(), { isl: 1, osl: 1 }]), { code: 'INVALID_RESPONSE' });
