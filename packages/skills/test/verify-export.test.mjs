@@ -477,7 +477,7 @@ test('the packed offline verifier exposes help and version without evidence', ()
 
   const version = suite.node([verifier, '--version']);
   assert.equal(version.status, 0, version.stderr);
-  assert.equal(version.stdout, '0.10.0\n');
+  assert.equal(version.stdout, `${packageInfo.version}\n`);
 });
 
 test('PowerX verification is offline, source-qualified, and portable across moved roots', () => {

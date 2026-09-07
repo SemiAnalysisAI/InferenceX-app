@@ -33,7 +33,7 @@ import {
   validateAgentxChunk,
 } from './export-contract.mjs';
 
-const PACKAGE_VERSION = '0.10.0';
+const PACKAGE_VERSION = '0.11.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const MANIFEST_LIMIT = 1024 * 1024;
 const RESPONSE_LIMIT = 32 * 1024 * 1024;

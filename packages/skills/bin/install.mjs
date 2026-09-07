@@ -97,6 +97,8 @@ function installedState(destination, packageName) {
     { file: 'compare-collectivex.mjs', name: 'CollectiveX helper', minor: 8n },
     { file: 'response-budget.mjs', name: 'response reader', minor: 9n },
     { file: 'cli-contract.mjs', name: 'CLI contract', minor: 10n },
+    { file: 'export-contract.mjs', name: 'export contract', minor: 11n },
+    { file: 'verify-export.mjs', name: 'offline verifier', minor: 11n },
   ].filter(
     ({ minor }) =>
       BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= minor,

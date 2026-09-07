@@ -327,6 +327,12 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/cli-contract.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      for (const name of ['export-contract.mjs', 'verify-export.mjs']) {
+        writeFileSync(
+          join(destination, 'scripts', name),
+          `const PACKAGE_VERSION = '${version}';\n`,
+        );
+      }
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
@@ -375,6 +381,43 @@ test('0.10 status requires the shared CLI contract with a matching package versi
   const matching = run(['status'], cwd);
   succeeded(matching);
   assert.match(matching.stdout, /Installed version: 0\.10\.0/u);
+});
+
+test('0.11 receipts require both offline modules while older receipts ignore retained modules', () => {
+  for (const version of ['0.10.0', '0.11.0', '0.11.0-rc.1', '1.0.0']) {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const scripts = join(destination, 'scripts');
+    writeFileSync(
+      join(destination, metadataName),
+      JSON.stringify({ package: packageInfo.name, version }),
+    );
+    for (const name of new Set([
+      ...readdirSync(scripts),
+      'export-contract.mjs',
+      'verify-export.mjs',
+    ])) {
+      writeFileSync(
+        join(scripts, name),
+        `const PACKAGE_VERSION = '${version}';\nthrow new Error('must not execute status input');\n`,
+      );
+    }
+    assert.equal(jsonResult(run(['status', '--json'], cwd)).installed_version, version);
+    for (const name of ['export-contract.mjs', 'verify-export.mjs']) {
+      const file = join(scripts, name);
+      for (const source of [null, "const PACKAGE_VERSION = '9.9.9';\n", '// no version\n']) {
+        if (source === null) rmSync(file);
+        else writeFileSync(file, source);
+        assert.equal(
+          jsonResult(run(['status', '--json'], cwd)).installed_version,
+          version === '0.10.0' ? version : null,
+          `${version}: ${name}: ${source}`,
+        );
+      }
+      writeFileSync(file, `const PACKAGE_VERSION = '${version}';\n`);
+    }
+  }
 });
 
 test('0.5 status verifies the provenance helper without executing it', () => {

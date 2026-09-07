@@ -22,6 +22,7 @@ before(() => {
   'compare-tco',
   'compare-releases',
   'compare-collectivex',
+  'verify-export',
 ].forEach((name) => {
   test(`${name} reports the installed package version offline without required arguments or output files`, () => {
     const cwd = suite.project();

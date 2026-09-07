@@ -20,7 +20,7 @@ import { createResponseBudget } from './response-budget.mjs';
 import { buildAgentxExport, selectAgentxRows, validateAgentxChunk } from './export-contract.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.10.0';
+const PACKAGE_VERSION = '0.11.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const HELP = `export-agentx — export existing AgentX observations with summary enrichments
 

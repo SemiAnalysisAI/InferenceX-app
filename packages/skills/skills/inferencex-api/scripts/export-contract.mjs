@@ -1,7 +1,8 @@
 import { responseError } from './cli-contract.mjs';
 
 // Static identity for standalone installed skills; producerVersion selects historical bytes.
-export const PACKAGE_VERSION = '0.10.0';
+const PACKAGE_VERSION = '0.11.0';
+export { PACKAGE_VERSION };
 
 function validateProducer(version, format) {
   if (!['0.9.0', '0.10.0', '0.11.0'].includes(version)) {
