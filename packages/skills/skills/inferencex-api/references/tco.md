@@ -69,9 +69,15 @@ node "$INFERENCEX_SKILL_DIR/scripts/compare-tco.mjs" \
 ```
 
 Only priced hardware is selected for costing. The complete source response stays
-in the export so missing keys can be checked against returned hardware. A price is
-per GPU per billed hour, not per server or cluster. Normalize a server quote only
-when the GPU count and billing scope are known and show that conversion.
+in the export so missing keys can be checked against returned hardware. Price
+selection and point availability are independent: unpriced hardware can still be
+unreachable at the requested target. Before describing excluded hardware, inspect
+its retained source point for each workload and preserve `boundary`, throughput,
+and `evidence_date`. The selected rows' complete coverage says nothing about those
+excluded points. If they were not checked, report only that they were not priced.
+
+A price is per GPU per billed hour, not per server or cluster. Normalize a server
+quote only when the GPU count and billing scope are known and show that conversion.
 
 The helper makes one HTTPS GET to the public points feed. It uses the server's
 interpolation, then computes:

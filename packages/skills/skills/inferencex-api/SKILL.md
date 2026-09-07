@@ -27,6 +27,8 @@ a missing usable PowerX measurement or AgentX aggregate does not satisfy it.
 For every stated count or range, use a verified summary value or compute and print
 the scalar from the exact selected rows. Copy that value into the explanation;
 do not visually count object keys or table rows.
+Keep status claims within the rows actually checked. Selection or exclusion alone
+does not establish availability; a selected-row summary cannot describe other rows.
 
 A completed bundle is immutable. Leave every entry under it unchanged: never add,
 edit, or delete files there. Write explanations and reports to sibling paths outside
