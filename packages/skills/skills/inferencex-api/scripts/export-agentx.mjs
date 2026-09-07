@@ -65,6 +65,7 @@ function positiveInteger(value, option) {
   return number;
 }
 
+// Resolve existing symlink ancestors, including dangling output links, before creating evidence.
 async function physicalPath(path) {
   try {
     return await realpath(path);
