@@ -1,9 +1,16 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Discover, compare and export CollectiveX communication benchmarks.
+description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Discover, compare and export CollectiveX communication benchmarks. Verify saved PowerX or AgentX exports offline and produce evidence reports.
 ---
 
 # InferenceX API
+
+For **saved PowerX or AgentX exports, offline verification, or evidence reports**,
+read [the offline cookbook](references/offline-exports.md) and use the installed
+[verifier](scripts/verify-export.mjs). It checks an intact export plus its saved
+evidence and writes deterministic Markdown without HTTP requests or OpenAPI discovery.
+Treat a failed verification as a failure; preserve the original files and diagnostic.
+Matching saved evidence establishes consistency, not publisher authenticity.
 
 Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [current OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json).

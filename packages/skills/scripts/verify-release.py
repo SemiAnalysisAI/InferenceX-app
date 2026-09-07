@@ -82,6 +82,12 @@ POINT_OPERATIONS = (
 DATA_HELPERS = (
     'export-powerx', 'export-agentx', 'investigate-result', 'compare-tco',
     'compare-releases', 'compare-collectivex')
+OFFLINE_CAPTURES = (
+    ('powerx-json', 'powerx-json-evidence', 'powerx.json'),
+    ('powerx-csv', 'powerx-csv-evidence', 'powerx.csv'),
+    ('agentx-json', 'agentx-json-evidence', 'agentx.json'),
+    ('agentx-csv', 'agentx-csv-evidence', 'agentx.csv'),
+    ('agentx-excluded', 'agentx-excluded-evidence', 'agentx-excluded.json'))
 
 
 def now():
@@ -101,10 +107,18 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def structured_errors_required(version):
+def version_at_least(version, minimum):
     match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?', version)
     require(match is not None, 'Package version must be semantic')
-    return tuple(map(int, match.groups())) >= (0, 10, 0)
+    return tuple(map(int, match.groups())) >= minimum
+
+
+def structured_errors_required(version):
+    return version_at_least(version, (0, 10, 0))
+
+
+def offline_verifier_required(version):
+    return version_at_least(version, (0, 11, 0))
 
 
 def check_powerx_schema(document, version):
@@ -162,6 +176,64 @@ def check_structured_errors(node, npm, installed, project, environment, archive,
                          'stderr_file': str(project / f'{label}.stderr.log'),
                          'envelope': envelope})
     return evidence
+
+
+def file_fingerprint(path, label):
+    entry = path.lstat()
+    require(stat.S_ISREG(entry.st_mode), f'{label} must be a regular file')
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(64 * 1024), b''):
+            digest.update(chunk)
+    after = path.lstat()
+    require((entry.st_dev, entry.st_ino, entry.st_mode, entry.st_size, entry.st_mtime_ns) ==
+            (after.st_dev, after.st_ino, after.st_mode, after.st_size, after.st_mtime_ns),
+            f'{label} changed while it was inspected')
+    return {'mode': stat.S_IMODE(entry.st_mode), 'bytes': entry.st_size,
+            'sha256': digest.hexdigest()}
+
+
+def saved_export_fingerprint(evidence, output, label):
+    entry = evidence.lstat()
+    require(stat.S_ISDIR(entry.st_mode), f'{label} evidence must be a real directory')
+    files = {}
+    with os.scandir(evidence) as entries:
+        for item in entries:
+            item_stat = item.stat(follow_symlinks=False)
+            require(stat.S_ISREG(item_stat.st_mode),
+                    f'{label} evidence entry must be a regular file: {item.name}')
+            files[item.name] = file_fingerprint(Path(item.path), f'{label} evidence {item.name}')
+    return {'evidence_mode': stat.S_IMODE(entry.st_mode), 'evidence_files': files,
+            'export': file_fingerprint(output, f'{label} export')}
+
+
+def verify_saved_exports(node, installed, project, environment, version, deadline=None):
+    if not offline_verifier_required(version):
+        return []
+    verifier = installed / 'scripts/verify-export.mjs'
+    require(verifier.is_file() and not verifier.is_symlink(), 'The installed offline verifier is missing')
+    denial = project / 'verify-export-deny-network.mjs'
+    denial.write_text("globalThis.fetch = () => { throw new Error('offline verifier attempted HTTP'); };\n")
+    results = []
+    for label, evidence_name, output_name in OFFLINE_CAPTURES:
+        evidence, output = project / evidence_name, project / output_name
+        before = saved_export_fingerprint(evidence, output, label)
+        reports, stdout_files = [], []
+        for attempt in (1, 2):
+            run_label = f'verify-{label}-{attempt}'
+            run([node, '--import', denial, verifier, '--evidence-dir', evidence, '--export', output],
+                project, environment, run_label, deadline)
+            stdout = project / f'{run_label}.stdout.log'
+            reports.append(stdout.read_bytes())
+            stdout_files.append(str(stdout))
+            require(saved_export_fingerprint(evidence, output, label) == before,
+                    f'Offline verifier modified {label} inputs')
+        require(reports[0] and reports[0] == reports[1],
+                f'Offline verifier report is not deterministic for {label}')
+        results.append({'capture': label, 'runs': 2, 'report_bytes': len(reports[0]),
+                        'report_sha256': hashlib.sha256(reports[0]).hexdigest(),
+                        'stdout_files': stdout_files})
+    return results
 
 
 def same_url(actual, expected):
@@ -1574,6 +1646,8 @@ def main():
                 project, env, 'agentx-excluded', deadline)
             agentx.append(check_agentx_capture(project, 'agentx-excluded-evidence', 'agentx-excluded.json',
                                                args, record['version'], excluded=True))
+            offline_verification = verify_saved_exports(
+                node, installed, project, env, record['version'], deadline)
             points = check_point_outcomes([
                 run_point(node, installed, project, env, 'agentx-point', args.agentx_point_id,
                           record['version'], deadline),
@@ -1583,6 +1657,8 @@ def main():
                 node, installed, project, env, record['version'], deadline)
             check_installed(installed, skill_files, record['version'])
             result.update(agentx=agentx, agentx_points=points, structured_errors=structured_errors)
+            if offline_verification:
+                result['offline_verification'] = offline_verification
             result.update(target=target, project=str(project))
             report['targets'].append(result)
         remaining_seconds(deadline, PUBLIC_DEADLINE_SECONDS)

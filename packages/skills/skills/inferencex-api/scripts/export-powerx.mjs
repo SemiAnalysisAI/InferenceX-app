@@ -17,9 +17,10 @@ import {
   writeStdout,
 } from './cli-contract.mjs';
 import { createResponseBudget } from './response-budget.mjs';
+import { buildPowerxExport } from './export-contract.mjs';
 
 // Installed skills run independently of package.json; the packed-artifact test checks this version.
-const PACKAGE_VERSION = '0.10.0';
+const PACKAGE_VERSION = '0.11.0';
 const HELP = `export-powerx — export validated single-turn PowerX observations
 
 Requires Node 24 or later.
@@ -43,59 +44,6 @@ One 30s request; at most 32 MiB decoded bytes; strict UTF-8. No HTTP retries.
 File output is staged before replacing its destination; failed writes preserve old output.
 `;
 
-const ROW_COLUMNS = [
-  'id',
-  'model',
-  'hardware',
-  'framework',
-  'image',
-  'precision',
-  'spec_method',
-  'benchmark_type',
-  'isl',
-  'osl',
-  'conc',
-  'disagg',
-  'is_multinode',
-  'offload_mode',
-  'recipe_fingerprint',
-  'prefill_tp',
-  'prefill_ep',
-  'prefill_dp_attention',
-  'prefill_num_workers',
-  'decode_tp',
-  'decode_ep',
-  'decode_dp_attention',
-  'decode_num_workers',
-  'num_prefill_gpu',
-  'num_decode_gpu',
-  'date',
-  'workflow_run_id',
-  'run_started_at',
-  'run_url',
-  'curve_date',
-  'curve_workflow_run_id',
-  'curve_run_started_at',
-];
-
-const METRIC_COLUMNS = [
-  'power_valid',
-  'power_metric_schema_version',
-  'avg_power_w',
-  'prefill_avg_power_w',
-  'decode_avg_power_w',
-  'joules_per_successful_query',
-  'joules_per_input_token',
-  'joules_per_output_token',
-  'joules_per_total_token',
-  'prefill_joules_per_input_token',
-  'decode_joules_per_output_token',
-  'avg_temp_c',
-  'peak_temp_c',
-  'avg_util_pct',
-  'avg_mem_used_mb',
-];
-
 function positiveInteger(value, option) {
   const number = Number(value);
   if (!value || !/^\d+$/u.test(value) || !Number.isSafeInteger(number) || number <= 0) {
@@ -104,62 +52,10 @@ function positiveInteger(value, option) {
   return number;
 }
 
-function csvCell(value) {
-  if (value === null || value === undefined) return '';
-  const text = String(value);
-  return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function object(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function validDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function benchmarkRow(row) {
-  if (!object(row) || !object(row.metrics)) return false;
-  return (
-    (Number.isSafeInteger(row.id) || (typeof row.id === 'string' && row.id.trim().length > 0)) &&
-    [
-      'hardware',
-      'framework',
-      'model',
-      'precision',
-      'spec_method',
-      'benchmark_type',
-      'offload_mode',
-      'date',
-    ].every((key) => typeof row[key] === 'string') &&
-    ['disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention'].every(
-      (key) => typeof row[key] === 'boolean',
-    ) &&
-    [
-      'prefill_tp',
-      'prefill_ep',
-      'prefill_num_workers',
-      'decode_tp',
-      'decode_ep',
-      'decode_num_workers',
-      'num_prefill_gpu',
-      'num_decode_gpu',
-      'conc',
-    ].every((key) => Number.isInteger(row[key])) &&
-    ['isl', 'osl'].every((key) => row[key] === null || Number.isFinite(row[key])) &&
-    ['image', 'run_url'].every((key) => row[key] === null || typeof row[key] === 'string') &&
-    validDate(row.date) &&
-    (row.curve_date === undefined || validDate(row.curve_date)) &&
-    ['workflow_run_id', 'curve_workflow_run_id'].every(
-      (key) =>
-        row[key] === undefined || typeof row[key] === 'string' || Number.isSafeInteger(row[key]),
-    ) &&
-    ['run_started_at', 'curve_run_started_at'].every(
-      (key) => row[key] === undefined || row[key] === null || typeof row[key] === 'string',
-    )
-  );
 }
 
 // Resolve existing symlink ancestors, including dangling output links, before creating evidence.
@@ -383,91 +279,26 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
     } catch (error) {
       throw new Error(`Could not read benchmark JSON: ${error.message}`, { cause: error });
     }
-    if (!Array.isArray(parsed) || parsed.some((row) => !benchmarkRow(row))) {
-      throw new Error(
-        'Unexpected response shape: expected benchmark rows with required identity, configuration, workload, date, run_url, and metrics fields',
-      );
-    }
     return parsed;
   }, signal);
-  const scoped = rows.filter(
-    (row) =>
-      row.benchmark_type === 'single_turn' &&
-      row.isl === isl &&
-      row.osl === osl &&
-      (values['raw-model'] === undefined || row.model === values['raw-model']),
-  );
-  const selected = scoped.filter(
-    (row) => row.metrics.power_valid === 1 && row.metrics.power_metric_schema_version === 2,
-  );
-  let nonFiniteValues = 0;
-  const observations = JSON.parse(
-    JSON.stringify(selected, (_key, value) => {
-      if (typeof value === 'number' && !Number.isFinite(value)) {
-        nonFiniteValues++;
-        return null;
-      }
-      return value;
-    }),
-  );
-  const metadata = {
-    package_version: PACKAGE_VERSION,
-    query_url: url.href,
-    retrieved_at: evidence?.manifest.response.retrieved_at ?? new Date().toISOString(),
-    requested_model: values.model,
-    requested_date: values.date ?? null,
-    date_selection: values.date === undefined ? 'latest' : 'as-of',
-    benchmark_type: 'single_turn',
-    isl,
-    osl,
-    raw_model: values['raw-model'] ?? null,
-    returned_rows: rows.length,
-    selected_rows: observations.length,
-    returned_models: [...new Set(rows.map((row) => row.model))].toSorted(),
-    selected_models: [...new Set(observations.map((row) => row.model))].toSorted(),
-    excluded_rows: {
-      outside_requested_scope: rows.length - scoped.length,
-      not_strict_v2: scoped.length - selected.length,
+  const {
+    metadata,
+    rows: observations,
+    outputBytes: output,
+  } = buildPowerxExport({
+    producerVersion: PACKAGE_VERSION,
+    format: values.format,
+    benchmarks: rows,
+    scope: {
+      model: values.model,
+      date: values.date ?? null,
+      isl,
+      osl,
+      raw_model: values['raw-model'] ?? null,
     },
-    metric_coverage: Object.fromEntries(
-      METRIC_COLUMNS.filter(
-        (key) => !['power_valid', 'power_metric_schema_version'].includes(key),
-      ).map((key) => {
-        const available = selected.filter((row) => Number.isFinite(row.metrics[key])).length;
-        return [key, { available_rows: available, unavailable_rows: selected.length - available }];
-      }),
-    ),
-    non_finite_values: nonFiniteValues,
-  };
-  let output;
-  if (values.format === 'json') {
-    output = `${JSON.stringify({ schema_version: 1, metadata, rows: observations }, null, 2)}\n`;
-  } else {
-    const requestColumns = [
-      'package_version',
-      'query_url',
-      'retrieved_at',
-      'requested_model',
-      'requested_date',
-      'date_selection',
-      'raw_model',
-    ];
-    const columns = [...requestColumns, ...ROW_COLUMNS, ...METRIC_COLUMNS];
-    const lines = observations.map((row) =>
-      [
-        ...requestColumns.map((key) => metadata[key]),
-        ...ROW_COLUMNS.map((key) => row[key]),
-        ...METRIC_COLUMNS.map((key) =>
-          typeof row.metrics[key] === 'number' && Number.isFinite(row.metrics[key])
-            ? row.metrics[key]
-            : null,
-        ),
-      ]
-        .map(csvCell)
-        .join(','),
-    );
-    output = `${[columns.join(','), ...lines].join('\r\n')}\r\n`;
-  }
+    queryUrl: url.href,
+    retrievedAt: evidence?.manifest.response.retrieved_at ?? new Date().toISOString(),
+  });
   if (evidence) {
     evidence.manifest.export.sha256 = createHash('sha256').update(output).digest('hex');
     evidence.manifest.export.metadata = metadata;
@@ -518,9 +349,9 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
   if (observations.length === 0) {
     process.stderr.write('No strictV2 rows matched the requested scope.\n');
   }
-  if (nonFiniteValues > 0) {
+  if (metadata.non_finite_values > 0) {
     process.stderr.write(
-      `Unavailable non-finite values: ${nonFiniteValues}; exported as null or blank.\n`,
+      `Unavailable non-finite values: ${metadata.non_finite_values}; exported as null or blank.\n`,
     );
   }
 }
