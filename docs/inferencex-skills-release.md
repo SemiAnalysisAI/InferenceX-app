@@ -37,9 +37,11 @@ the trust relationship.
 
 ## Prepare and review a candidate
 
-The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs the packed-install
-suite on Node 24 and 26 for package and skill-workflow changes. That suite also runs the
-Python release-verifier tests. Publication remains on Node 24 with one publisher runtime.
+The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs one exact
+packed archive on Node 24 and 26 across Linux and macOS. A separate schema-consumer
+step installs the pinned development dependency from `bun.lock` and validates actual
+packed outputs. The suite also runs the Python release-verifier tests. Publication
+remains on Node 24 with one publisher runtime.
 
 1. Modify the source, choose a new stable version, and update package metadata,
    all shipped helpers' standalone versions, installation examples, and installed-version
@@ -58,6 +60,8 @@ skills_release_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-release.XXXXXX")
 skills_release_dir="$skills_release_attempt/candidate"
 
 node --test packages/skills/test/*.test.mjs
+bun install --frozen-lockfile
+node packages/skills/test/schema-consumers.mjs
 node packages/skills/scripts/release.mjs prepare "$skills_release_version" "$skills_release_dir"
 python3 packages/skills/scripts/verify-release.py candidate "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
@@ -78,6 +82,26 @@ complete public responses consumed by each exporter, exercises an exact excluded
 AgentX selection, and checks one traced and one no-trace point. Missing and null
 values remain missing; real `0` and `false` values remain explicit. No new
 benchmarks run.
+
+For the 1.0 candidate, retain the exact four platform results (Linux/macOS by Node
+24/26) and both native runtime results. Each native result covers PowerX, AgentX,
+result provenance, TCO, releases, CollectiveX, and offline replay, with archive,
+case-set, prompt transcript, and answer transcript hashes. Keep
+`tested_source_commit` separate from the archive identity; merging and repreparing
+identical bytes must not rewrite which source was actually tested.
+
+Each platform entry also records the Actions run and attempt as numeric strings,
+the tested 40-hex commit SHA, the exact matrix job name, and the matching
+`SemiAnalysisAI/InferenceX-app` Actions evidence URL. Each native entry retains its
+aggregate hashes and seven maintained case records; every case records its case ID,
+runtime and assessor pass statuses, and prompt/answer transcript hashes. Known
+limitations use the maintained stable codes with descriptions.
+
+The qualification JSON is a reviewed evidence declaration. Its validation checks
+the declared archive, matrix, scopes, identities, and hashes before npm mutation;
+it is not cryptographic proof that the declared executions occurred. Preserve the
+underlying Actions artifacts and native transcripts so reviewers can inspect the
+evidence behind each declaration.
 
 From 0.9.0, candidate and public verification also run all four newer installed
 helpers for both targets. The provenance case selects result `416696` from logical
@@ -215,10 +239,26 @@ packed-example tests and should also be exercised naturally when they change.
 ## Publish and verify
 
 After source integration, dispatch **Publish InferenceX skills** on the repository's
-default branch. Supply the manifest version and the SHA-256 from the accepted
-archive. A different branch is refused. CI runs packed-interface tests, repacks the
-source, and requires byte-for-byte identity with the reviewed SHA-256 before any
-publication. It performs a clean candidate install/export, checks the digest again,
+default branch. Supply the manifest version, accepted archive SHA-256, and reviewed
+qualification JSON. Avoid expanding the large nested JSON directly in the command.
+Build a workflow-input file and let `gh` read it from standard input:
+
+```bash
+export SKILLS_RELEASE_VERSION="$skills_release_version"
+export SKILLS_REVIEWED_SHA256='<accepted archive sha256>'
+jq -n --rawfile qualification qualification.json \
+  '{version: env.SKILLS_RELEASE_VERSION,
+    reviewed_sha256: env.SKILLS_REVIEWED_SHA256,
+    qualification_json: $qualification}' > publish-inputs.json
+gh workflow run publish-skills.yml --ref master --json < publish-inputs.json
+```
+
+Inspect and retain `publish-inputs.json` before dispatch. A different branch is
+refused. CI runs packed-interface tests, prepares the source archive, and requires
+byte-for-byte identity with the reviewed SHA-256. Before npm mutation, it validates
+the record's exact archive, four platform jobs, two native runtimes, seven assessed
+cases per runtime, hashes, and known limitations.
+It performs a clean candidate install/export, checks the digest again,
 and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.

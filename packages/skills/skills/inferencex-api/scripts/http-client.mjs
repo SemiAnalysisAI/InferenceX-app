@@ -128,10 +128,12 @@ export function createHttpClient({
     failure,
     { request, ordinal, attemptStartedAt, consumedBefore, status },
   ) {
+    const cancelled = failure instanceof CliError && failure.code === 'CANCELLED';
     const delayMs = Math.round(
       (BACKOFF_MS[ordinal - 1] ?? 0) * (1 + Math.max(0, Math.min(1, random())) * 0.2),
     );
-    const canRetry = ordinal < maxAttempts && delayMs > 0 && delayMs < deadline - now();
+    const canRetry =
+      !cancelled && ordinal < maxAttempts && delayMs > 0 && delayMs < deadline - now();
     attempts.push({
       operation: request.operation,
       url: request.url,
@@ -142,12 +144,14 @@ export function createHttpClient({
       networkCode: transportCode(failure),
       consumedBytes: budget.consumedBytes - consumedBefore,
       retry: {
-        decision: canRetry ? 'retry' : 'stop',
-        reason: canRetry
-          ? 'transient_network_error'
-          : ordinal === maxAttempts
-            ? 'attempts_exhausted'
-            : 'deadline_exceeded',
+        decision: canRetry ? 'retry' : cancelled ? 'not_retryable' : 'stop',
+        reason: cancelled
+          ? failure.code
+          : canRetry
+            ? 'transient_network_error'
+            : ordinal === maxAttempts
+              ? 'attempts_exhausted'
+              : 'deadline_exceeded',
         ...(canRetry ? { delayMs } : {}),
       },
     });

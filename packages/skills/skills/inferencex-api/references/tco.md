@@ -5,6 +5,20 @@ interactivity target. It applies explicit user-supplied USD/GPU-hour rates to th
 public feed's output throughput. The result is a GPU rental/rate cost estimate per
 million output tokens. A full ownership TCO needs additional cost assumptions.
 
+For a replayable contract 1 comparison:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs tco compare \
+  --model dsv4 --workloads 1024x1024 --target 50 \
+  --gpu-hourly-prices b200=3.6,mi355x=1.8 --output-dir evidence/tco \
+  --require-hardware b200 --require-hardware mi355x
+```
+
+These prices are illustrative inputs. Missing, clamped, unreachable, and zero
+throughput rows keep null modeled costs. Without a predicate they are valid scoped
+output; a required hardware miss commits the bundle and exits 3. See the
+[CLI contract](cli.md).
+
 Keep every downloaded response and temporary parsing file inside the current
 project unless the user chooses another destination. Use a separate file for each
 HTTP attempt and retain failed captures. Count actual requests, including discovery

@@ -8,6 +8,7 @@ import {
   argumentError,
   CliError,
   httpError,
+  isMain,
   outputBoundary,
   requestBoundary,
   responseBoundary,
@@ -17,7 +18,7 @@ import {
 } from './cli-contract.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.11.0';
+const PACKAGE_VERSION = '1.0.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 const HELP = `investigate-result — collect existing benchmark provenance and one bounded log window
@@ -353,6 +354,292 @@ async function saveOutput(path, bytes, signal) {
   }, signal);
 }
 
+async function buildInvestigation(values, packageVersion, getJson, evidence) {
+  const offset = Number(values['log-offset']);
+  const limit = Number(values['log-limit']);
+  const file = values['log-file'];
+  const rows = await getJson(
+    '/api/v1/benchmarks',
+    {
+      model: values.model,
+      date: values.date,
+      runId: values['run-id'],
+      exactRun: values['run-id'] === undefined ? undefined : true,
+    },
+    'benchmarks',
+  );
+  if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row)))
+    throw new Error('Invalid benchmark row response');
+  const selected = rows.filter((row) => String(row.id) === values.id);
+  if (selected.length !== 1)
+    throw new Error(
+      `Expected exactly one result with ID ${values.id} in the supplied model/snapshot scope; found ${selected.length}`,
+    );
+  const row = selected[0];
+  if (
+    values.date !== undefined &&
+    (row.date > values.date || (row.curve_date !== undefined && row.curve_date > values.date))
+  ) {
+    throw new Error('Selected result contradicts the requested as-of cutoff');
+  }
+  if (row.curve_date !== undefined && row.curve_date < row.date) {
+    throw new Error('Selected curve snapshot predates its producer');
+  }
+  const identity = githubRun(row.run_url);
+  const limitations = [
+    'Existing public observations only; these records do not establish performance causality.',
+    'Log evidence covers one selected file window; other files and characters were not inspected.',
+    'workflow_run_id and curve_workflow_run_id are internal identities, not GitHub run IDs.',
+  ];
+  let producer = {
+    status: 'unresolved',
+    github_run_id: null,
+    run_attempt: null,
+    workflow_run: null,
+    run_configs: [],
+  };
+  if (identity) {
+    const info = await getJson(
+      '/api/v1/workflow-info',
+      {
+        date: row.date,
+        benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : undefined,
+      },
+      'workflow-info',
+    );
+    const metadata = workflowMetadata(info, row, identity);
+    producer = {
+      status: metadata.workflow_run ? 'confirmed' : 'row_only',
+      github_run_id: identity.github_run_id,
+      run_attempt: identity.run_attempt,
+      ...metadata,
+    };
+    if (!metadata.workflow_run)
+      limitations.push(
+        'The public latest-attempt workflow listing did not confirm the producing attempt.',
+      );
+    if (metadata.run_configs.length === 0)
+      limitations.push(
+        'No matching producer config was confirmed in workflow-info; selected_result retains the original config and image.',
+      );
+  } else {
+    limitations.push(
+      'The selected run_url is null; the public response cannot identify its GitHub producer or attempt.',
+    );
+  }
+  if (row.image === null)
+    limitations.push('The selected row has no image; no image identity was inferred.');
+  const log = logWindow(
+    await getJson('/api/v1/server-log', { id: values.id, offset, limit, file }, 'server-log', true),
+    values.id,
+    offset,
+    limit,
+    file,
+  );
+  return {
+    schema_version: 1,
+    metadata: {
+      package_version: packageVersion,
+      selected_result_id: values.id,
+      ran_new_benchmark: false,
+      scope: {
+        display_model: values.model,
+        date: values.date ?? null,
+        github_run_id: values['run-id'] ?? null,
+        selection:
+          values['run-id'] === undefined
+            ? values.date === undefined
+              ? 'latest_snapshot'
+              : 'as_of_snapshot'
+            : 'logical_run_snapshot',
+      },
+      log_window: { file: file ?? null, offset, limit, offset_unit: 'Unicode characters' },
+    },
+    selected_result: row,
+    producer,
+    log,
+    limitations,
+    evidence,
+  };
+}
+
+export function normalizeArgs(args) {
+  try {
+    let options;
+    if (Array.isArray(args)) {
+      const parsed = parseArgs({
+        args,
+        options: {
+          id: { type: 'string' },
+          model: { type: 'string' },
+          date: { type: 'string' },
+          'run-id': { type: 'string' },
+          'log-file': { type: 'string' },
+          'log-offset': { type: 'string' },
+          'log-limit': { type: 'string' },
+        },
+        tokens: true,
+        strict: true,
+        allowPositionals: false,
+      });
+      const names = parsed.tokens.map((token) => token.name);
+      if (new Set(names).size !== names.length)
+        throw new Error('Specify each result option only once');
+      const values = parsed.values;
+      options = {
+        id: values.id,
+        model: values.model,
+        date: values.date ?? null,
+        run_id: values['run-id'] ?? null,
+        log_file: values['log-file'] ?? null,
+        log_offset: integerOption(values['log-offset'] ?? '0', 'log-offset', 0, 2_000_000_000),
+        log_limit: integerOption(values['log-limit'] ?? '16384', 'log-limit', 1, 262_144),
+      };
+    } else {
+      const keys = ['id', 'model', 'date', 'run_id', 'log_file', 'log_offset', 'log_limit'];
+      if (
+        !object(args) ||
+        Object.keys(args).length !== keys.length ||
+        keys.some((key) => !Object.hasOwn(args, key))
+      ) {
+        throw new Error('Invalid saved result options');
+      }
+      options = { ...args };
+    }
+    integerOption(options.id, 'id', 1, Number.MAX_SAFE_INTEGER);
+    if (typeof options.model !== 'string' || !options.model.trim())
+      throw new Error('--model requires a display model name');
+    if (options.date !== null && !validDate(options.date))
+      throw new Error('--date must be a valid YYYY-MM-DD date');
+    if (options.run_id !== null)
+      integerOption(options.run_id, 'run-id', 1, Number.MAX_SAFE_INTEGER);
+    if (options.date !== null && options.run_id !== null)
+      throw new Error('cannot combine --date and --run-id');
+    if (
+      !Number.isSafeInteger(options.log_offset) ||
+      options.log_offset < 0 ||
+      options.log_offset > 2_000_000_000
+    ) {
+      throw new Error('--log-offset must be an integer from 0 to 2000000000');
+    }
+    if (
+      !Number.isSafeInteger(options.log_limit) ||
+      options.log_limit < 1 ||
+      options.log_limit > 262_144
+    ) {
+      throw new Error('--log-limit must be an integer from 1 to 262144');
+    }
+    if (
+      options.log_file !== null &&
+      (typeof options.log_file !== 'string' ||
+        options.log_file.length === 0 ||
+        options.log_file.length > 1024 ||
+        options.log_file.includes('\0'))
+    ) {
+      throw new Error('--log-file must contain 1-1024 characters without NUL');
+    }
+    return options;
+  } catch (error) {
+    throw argumentError(error.message, error);
+  }
+}
+
+function stringIdentities(record) {
+  if (record === null) return null;
+  const result = { ...record };
+  for (const key of [
+    'id',
+    'workflow_run_id',
+    'curve_workflow_run_id',
+    'github_run_id',
+    'run_attempt',
+  ]) {
+    if (result[key] !== undefined && result[key] !== null) result[key] = String(result[key]);
+  }
+  return result;
+}
+
+export function collect(options, context) {
+  const normalized = normalizeArgs(options);
+  return responseBoundary(async () => {
+    const evidence = [];
+    const report = await buildInvestigation(
+      {
+        id: normalized.id,
+        model: normalized.model,
+        date: normalized.date ?? undefined,
+        'run-id': normalized.run_id ?? undefined,
+        'log-file': normalized.log_file ?? undefined,
+        'log-offset': normalized.log_offset,
+        'log-limit': normalized.log_limit,
+      },
+      context.producerVersion,
+      async (path, query, operation, allowNotFound = false) => {
+        const url = new URL(path, API_ORIGIN);
+        for (const [key, value] of Object.entries(query)) {
+          if (value !== undefined) url.searchParams.set(key, String(value));
+        }
+        const saved = await context.get({
+          operation,
+          url: url.href,
+          allowedStatuses: allowNotFound ? [200, 404] : [200],
+        });
+        evidence.push({
+          operation,
+          url: url.href,
+          response_id: saved.id,
+          http_status: saved.status,
+          retrieved_at: saved.retrievedAt,
+        });
+        if (saved.status === 404) {
+          if (!object(saved.body) || typeof saved.body.error !== 'string')
+            throw responseError(`Invalid ${operation} 404 response`);
+          return null;
+        }
+        return saved.body;
+      },
+      evidence,
+    );
+    report.kind = 'result';
+    report.metadata.contract_version = 1;
+    report.metadata.generated_at = context.generatedAt;
+    report.selected_result = stringIdentities(report.selected_result);
+    report.producer.workflow_run = stringIdentities(report.producer.workflow_run);
+    report.producer.run_configs = report.producer.run_configs.map(stringIdentities);
+    const window = report.log.response;
+    report.log = {
+      status: report.log.status,
+      partial: report.log.partial ?? null,
+      more_available: report.log.more_available ?? null,
+      inspected_characters: report.log.inspected_characters ?? 0,
+      file_name: window?.fileName ?? null,
+      offset: window?.offset ?? normalized.log_offset,
+      next_offset: window?.nextOffset ?? null,
+      text: window?.serverLog ?? null,
+      source_response_id: evidence.at(-1).response_id,
+    };
+    const reasons = [];
+    if (report.producer.status !== 'confirmed')
+      reasons.push({ code: 'producer_unconfirmed', count: 1 });
+    if (report.producer.run_configs.length === 0)
+      reasons.push({ code: 'producer_config_unconfirmed', count: 1 });
+    if (report.selected_result.image === null)
+      reasons.push({ code: 'image_unavailable', count: 1 });
+    if (report.log.status !== 'available') reasons.push({ code: 'log_unavailable', count: 1 });
+    return {
+      format: 'json',
+      bytes: Buffer.from(`${JSON.stringify(report, null, 2)}\n`),
+      coverage: {
+        status: reasons.length === 0 ? 'complete' : 'partial',
+        selected_records: 1,
+        comparable_pairs: null,
+        hardware: [{ hardware: report.selected_result.hardware, valid_records: 1 }],
+        reasons,
+      },
+    };
+  }, context.signal);
+}
+
 async function main(args, signal) {
   let argumentsValidated = false;
   try {
@@ -390,8 +677,8 @@ async function main(args, signal) {
       integerOption(values['run-id'], 'run-id', 1, Number.MAX_SAFE_INTEGER);
     if (values.date !== undefined && values['run-id'] !== undefined)
       throw new Error('cannot combine --date and --run-id');
-    const offset = integerOption(values['log-offset'], 'log-offset', 0, 2_000_000_000);
-    const limit = integerOption(values['log-limit'], 'log-limit', 1, 262_144);
+    integerOption(values['log-offset'], 'log-offset', 0, 2_000_000_000);
+    integerOption(values['log-limit'], 'log-limit', 1, 262_144);
     const file = values['log-file'];
     if (file !== undefined && (file.length === 0 || file.length > 1024 || file.includes('\0'))) {
       throw new Error('--log-file must contain 1-1024 characters without NUL');
@@ -402,123 +689,13 @@ async function main(args, signal) {
     await responseBoundary(async () => {
       const evidence = [];
       const budget = { remaining: RESPONSE_BYTE_BUDGET };
-      const rows = await fetchJson(
-        '/api/v1/benchmarks',
-        {
-          model: values.model,
-          date: values.date,
-          runId: values['run-id'],
-          exactRun: values['run-id'] === undefined ? undefined : true,
-        },
-        'benchmarks',
+      const report = await buildInvestigation(
+        values,
+        PACKAGE_VERSION,
+        (path, query, operation, allowNotFound = false) =>
+          fetchJson(path, query, operation, evidence, budget, signal, allowNotFound),
         evidence,
-        budget,
-        signal,
       );
-      if (!Array.isArray(rows) || rows.some((row) => !benchmarkRow(row)))
-        throw new Error('Invalid benchmark row response');
-      const selected = rows.filter((row) => String(row.id) === values.id);
-      if (selected.length !== 1)
-        throw new Error(
-          `Expected exactly one result with ID ${values.id} in the supplied model/snapshot scope; found ${selected.length}`,
-        );
-      const row = selected[0];
-      if (
-        values.date !== undefined &&
-        (row.date > values.date || (row.curve_date !== undefined && row.curve_date > values.date))
-      ) {
-        throw new Error('Selected result contradicts the requested as-of cutoff');
-      }
-      if (row.curve_date !== undefined && row.curve_date < row.date) {
-        throw new Error('Selected curve snapshot predates its producer');
-      }
-      const identity = githubRun(row.run_url);
-      const limitations = [
-        'Existing public observations only; these records do not establish performance causality.',
-        'Log evidence covers one selected file window; other files and characters were not inspected.',
-        'workflow_run_id and curve_workflow_run_id are internal identities, not GitHub run IDs.',
-      ];
-      let producer = {
-        status: 'unresolved',
-        github_run_id: null,
-        run_attempt: null,
-        workflow_run: null,
-        run_configs: [],
-      };
-      if (identity) {
-        const info = await fetchJson(
-          '/api/v1/workflow-info',
-          {
-            date: row.date,
-            benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : undefined,
-          },
-          'workflow-info',
-          evidence,
-          budget,
-          signal,
-        );
-        const metadata = workflowMetadata(info, row, identity);
-        producer = {
-          status: metadata.workflow_run ? 'confirmed' : 'row_only',
-          github_run_id: identity.github_run_id,
-          run_attempt: identity.run_attempt,
-          ...metadata,
-        };
-        if (!metadata.workflow_run)
-          limitations.push(
-            'The public latest-attempt workflow listing did not confirm the producing attempt.',
-          );
-        if (metadata.run_configs.length === 0)
-          limitations.push(
-            'No matching producer config was confirmed in workflow-info; selected_result retains the original config and image.',
-          );
-      } else {
-        limitations.push(
-          'The selected run_url is null; the public response cannot identify its GitHub producer or attempt.',
-        );
-      }
-      if (row.image === null)
-        limitations.push('The selected row has no image; no image identity was inferred.');
-      const log = logWindow(
-        await fetchJson(
-          '/api/v1/server-log',
-          { id: values.id, offset, limit, file },
-          'server-log',
-          evidence,
-          budget,
-          signal,
-          true,
-        ),
-        values.id,
-        offset,
-        limit,
-        file,
-      );
-      const report = {
-        schema_version: 1,
-        metadata: {
-          package_version: PACKAGE_VERSION,
-          selected_result_id: values.id,
-          ran_new_benchmark: false,
-          scope: {
-            display_model: values.model,
-            date: values.date ?? null,
-            github_run_id: values['run-id'] ?? null,
-            selection:
-              values['run-id'] === undefined
-                ? values.date === undefined
-                  ? 'latest_snapshot'
-                  : 'as_of_snapshot'
-                : 'logical_run_snapshot',
-          },
-          log_window: { file: file ?? null, offset, limit, offset_unit: 'Unicode characters' },
-        },
-        selected_result: row,
-        producer,
-        log,
-        limitations,
-        evidence,
-      };
       await saveOutput(values.output, `${JSON.stringify(report, null, 2)}\n`, signal);
     }, signal);
   } catch (error) {
@@ -529,8 +706,10 @@ async function main(args, signal) {
   }
 }
 
-await runCli({
-  command: 'investigate-result',
-  packageVersion: PACKAGE_VERSION,
-  run: ({ args, signal }) => main(args, signal),
-});
+if (isMain(import.meta.url)) {
+  await runCli({
+    command: 'investigate-result',
+    packageVersion: PACKAGE_VERSION,
+    run: ({ args, signal }) => main(args, signal),
+  });
+}

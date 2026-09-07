@@ -346,6 +346,34 @@ test('cancellation before a request is classified without an attempt', async () 
   assert.deepEqual(client.attempts, []);
 });
 
+test('cancellation during a request is never recorded or delayed as a retry', async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  let waits = 0;
+  const client = createHttpClient({
+    timeoutMs: 1_000,
+    responseBytes: 1_024,
+    totalBytes: 2_048,
+    signal: controller.signal,
+    fetchImpl: (_url, { signal }) =>
+      new Promise((_resolve, reject) => {
+        calls++;
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        controller.abort();
+      }),
+    sleep: () => {
+      waits++;
+    },
+  });
+  await assert.rejects(client.get(request), { code: 'CANCELLED' });
+  assert.equal(calls, 1);
+  assert.equal(waits, 0);
+  assert.deepEqual(client.attempts[0].retry, {
+    decision: 'not_retryable',
+    reason: 'CANCELLED',
+  });
+});
+
 test('the total deadline is shared across logical requests', async () => {
   let current = 0;
   const client = createHttpClient({

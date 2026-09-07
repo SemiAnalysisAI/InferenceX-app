@@ -6,6 +6,20 @@ fixed ISL/OSL workload, performance metric, dates, and producer image/run identi
 The result is a descriptive comparison with coverage and confounders. It runs
 no benchmark, bisect, monitor, or statistical regression test.
 
+For a replayable contract 1 comparison, use the versioned entry and require at
+least one eligible pair when CI needs positive coverage:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs releases compare \
+  --model GLM-5 --hardware h200_sxm --framework vllm --isl 8192 --osl 1024 \
+  --metric median_ttft --before-date 2026-09-01 --after-date 2026-09-02 \
+  --before-image vllm:before --after-image vllm:after \
+  --output-dir evidence/releases --min-comparable-pairs 1
+```
+
+No comparable pair is valid scoped output without the predicate. With it, the
+bundle is retained and the command exits 3. See the [CLI contract](cli.md).
+
 Supported metrics, when recorded, are `median`, `p75`, `p90`, `p95`, `p99`, or
 `p99.9` statistics of `ttft`, `tpot`, `itl`, `e2el`, `intvty`, or `qps`, plus
 `mean_qps`, `std_qps`,

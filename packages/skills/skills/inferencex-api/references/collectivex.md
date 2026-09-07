@@ -6,6 +6,18 @@ is run. Public GETs can populate the service's documented lazy cache from existi
 GitHub artifacts. No database credentials, admin operations, or launch tools are
 needed.
 
+For a replayable contract 1 comparison:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left 90071992547409930001 --right 90071992547409930002 \
+  --output-dir evidence/collectivex --min-comparable-pairs 1
+```
+
+No comparable rows is valid scoped output without the predicate. With it, the
+bundle is retained and the command exits 3. Keep run attempts, revisions, source
+pointers, and units with the comparison. See the [CLI contract](cli.md).
+
 ## 1. Discover and export
 
 Example request: "Find two recent measured communication runs and compare their

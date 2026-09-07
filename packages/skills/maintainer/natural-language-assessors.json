@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "case_set": "natural-language-cases.json",
+  "outside_agent_projects": true,
+  "expectations": {
+    "powerx-live": [
+      "existing observations only",
+      "strict measured power",
+      "correct per-GPU and whole-deployment units",
+      "missing values preserved"
+    ],
+    "agentx-live": [
+      "summary endpoints only",
+      "no full trace request",
+      "aggregate and trace-availability states distinguished"
+    ],
+    "result-live": [
+      "exact result and run identity",
+      "producer claims bounded by captured evidence",
+      "unavailable provenance remains unavailable"
+    ],
+    "tco-live": [
+      "prices treated as user assumptions",
+      "target and workload preserved",
+      "null unavailable costs are not zero"
+    ],
+    "releases-live": [
+      "exact public identity matching",
+      "before and after run identities retained",
+      "no causal or statistical claim"
+    ],
+    "collectivex-live": [
+      "one bounded run list",
+      "exact EP and KV topology identity",
+      "units and missing metrics preserved"
+    ],
+    "offline-six-family": [
+      "no network access",
+      "all six families attempted",
+      "validity separated from coverage and policy",
+      "tampered inputs rejected",
+      "inputs unchanged"
+    ]
+  },
+  "verdicts": ["passed", "failed", "needs-review"],
+  "rule": "Assess the original transcript and answer. Never edit either artifact to manufacture a passing result."
+}

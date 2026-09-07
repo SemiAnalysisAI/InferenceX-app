@@ -1,9 +1,25 @@
 ---
 name: inferencex-api
-description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Trace a selected result to its producing run, configuration, image, and bounded logs using the public API. Compare fixed-target GPU-rate costs with explicit prices. Investigate vLLM or SGLang changes between matched observations. Discover, compare and export CollectiveX communication benchmarks. Verify saved PowerX or AgentX exports offline and produce evidence reports.
+description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces, evaluations, and datasets. Use the versioned CLI to discover public scopes, create replayable evidence bundles, verify them offline, trace result provenance, compare explicit TCO assumptions, investigate framework releases, and compare CollectiveX runs.
 ---
 
 # InferenceX API
+
+For a replayable CLI task, use these three actions and read the
+[CLI contract](references/cli.md):
+
+```bash
+inferencex discover models
+inferencex powerx export --model GLM-5 --isl 8192 --osl 1024 \
+  --output-dir evidence/powerx --require-hardware h200_sxm
+inferencex verify evidence/powerx --require-hardware h200_sxm
+```
+
+Formal commands require a new `--output-dir`. Exit 0 means the bundle completed;
+exit 3 means it completed but an explicit coverage predicate failed. Branch on the
+exit code before parsing stdout. Preserve empty results and missing values as scoped
+evidence. Use the six domain cookbooks below for units, dates, source identity, and
+interpretation.
 
 For **saved PowerX or AgentX exports, offline verification, or evidence reports**,
 read [the offline cookbook](references/offline-exports.md) and use the installed

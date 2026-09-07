@@ -903,7 +903,7 @@ test('unsupported, incomplete, ambiguous, and future manifests fail explicitly',
   }
 });
 
-test('historical 0.9 PowerX and planned 0.11 AgentX producer contracts are explicit', () => {
+test('legacy renderer compatibility is explicit for 0.9, 0.11, and 1.0 producers', () => {
   const power = powerxBundle('json');
   const powerManifest = manifest(power.evidence);
   const powerDocument = JSON.parse(readFileSync(power.output, 'utf8'));
@@ -930,6 +930,24 @@ test('historical 0.9 PowerX and planned 0.11 AgentX producer contracts are expli
   saveManifest(agent.evidence, agentManifest);
   const futureResult = runVerifier(['--evidence-dir', agent.evidence, '--export', agent.output]);
   assert.equal(futureResult.status, 0, futureResult.stderr);
+
+  const current = powerxBundle('json');
+  const currentManifest = manifest(current.evidence);
+  const currentDocument = JSON.parse(readFileSync(current.output, 'utf8'));
+  currentDocument.metadata.package_version = '1.0.0';
+  const currentBytes = Buffer.from(`${JSON.stringify(currentDocument, null, 2)}\n`);
+  writeFileSync(current.output, currentBytes);
+  currentManifest.package_version = '1.0.0';
+  currentManifest.export.metadata.package_version = '1.0.0';
+  currentManifest.export.sha256 = sha256(currentBytes);
+  saveManifest(current.evidence, currentManifest);
+  const currentResult = runVerifier([
+    '--evidence-dir',
+    current.evidence,
+    '--export',
+    current.output,
+  ]);
+  assert.equal(currentResult.status, 0, currentResult.stderr);
 });
 
 test('AgentX validates the exact chunk ledger and permits omitted complete-response entries', () => {

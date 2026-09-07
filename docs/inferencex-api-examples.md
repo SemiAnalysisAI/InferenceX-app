@@ -27,6 +27,11 @@ Start an agent session in that project. Queries need public HTTPS access, with n
 InferenceX checkout or database credentials. The skill uses HTTP directly; the
 repository's MCP server is a separate integration.
 
+The 1.0 candidate adds the versioned `inferencex` entry and replayable evidence
+directories. Its command and migration guide is
+[InferenceX CLI compatibility](./inferencex-cli-compatibility.md). Keep the npm
+commands above pinned to 0.11.0 until 1.0 publication and public verification pass.
+
 To upgrade, choose a new published version and add `--force`. Existing skills are
 otherwise skipped. Save local edits first: force overwrites matching files and
 retains obsolete files. Installed copies do not update automatically.

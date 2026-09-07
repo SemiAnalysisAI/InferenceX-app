@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "public_package_version": "0.11.0",
+  "scope_checked_on": "2026-09-07",
+  "runtimes": ["codex", "claude"],
+  "cases": [
+    {
+      "id": "powerx-live",
+      "family": "powerx",
+      "prompt": "Export the existing measured power observations for DeepSeek-V4-Pro at 8192 input tokens and 1024 output tokens. Save the result and complete source evidence in a new project-local directory, then explain the units and any missing measurements. Do not run a benchmark."
+    },
+    {
+      "id": "agentx-live",
+      "family": "agentx",
+      "prompt": "Export the existing AgentX summary observations for DeepSeek-V4-Pro. Save the result and complete source evidence in a new project-local directory, distinguish unavailable aggregates from a confirmed absence of stored trace data, and do not fetch any full conversation trace."
+    },
+    {
+      "id": "result-live",
+      "family": "result",
+      "prompt": "Inspect benchmark result 416696 for GLM-5 and logical run 26694739752. Save the result and complete source evidence in a new project-local directory, and distinguish confirmed producer facts from unavailable provenance."
+    },
+    {
+      "id": "tco-live",
+      "family": "tco",
+      "prompt": "Compare existing DeepSeek-V4-Pro observations for workload 8192x1024 at a target of 50 output tokens per second per user, using my assumptions of $3.60 per GPU-hour for b200 and $1.80 per GPU-hour for mi355x, as of 2026-09-06. Save the result and evidence, preserve unavailable points, and do not present my prices as market data."
+    },
+    {
+      "id": "releases-live",
+      "family": "releases",
+      "prompt": "Compare GLM-5 raw model glm5.1 on mi355x with sglang at 8192 input and 1024 output tokens using median_ttft. Use 2026-05-30 with run https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1 as the before observation and 2026-07-02 with run https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1 as the after observation. Save evidence and describe observed differences without claiming causality."
+    },
+    {
+      "id": "collectivex-live",
+      "family": "collectivex",
+      "prompt": "Use one current public run listing to select the two newest measured CollectiveX runs, compare their exact EP and KV identities, and save the result and complete source evidence in a new project-local directory. Explain topology mismatches and missing metric values without pairing rows by display label alone."
+    },
+    {
+      "id": "offline-six-family",
+      "family": "offline",
+      "prompt": "This project contains intact, partial, and tampered evidence directories for PowerX, AgentX, result provenance, TCO, release comparison, and CollectiveX. Verify every directory without network access. Require b200 where the result identifies hardware and at least one comparable pair for comparison families. Preserve every input, save any optional reports outside the evidence directories, and separate valid partial evidence, policy failures, and invalid tampering."
+    }
+  ],
+  "execution": {
+    "fresh_project_per_case": true,
+    "preserve_raw_transcript_and_answer": true,
+    "assessor_file": "natural-language-assessors.json"
+  }
+}

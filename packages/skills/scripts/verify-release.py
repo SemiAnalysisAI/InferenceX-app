@@ -67,6 +67,10 @@ AGENTX_ENRICHMENT_COLUMNS = [
     'derived.p75_e2e_norm_intvty', 'derived.p90_e2e_norm_intvty', 'trace.available',
     'trace.response_key_present', 'enrichment.status', 'enrichment.aggregates_status',
     'enrichment.derived_metrics_status', 'enrichment.trace_availability_status']
+CONTRACT_POWERX_CSV_COLUMNS = [*CSV_COLUMNS[:7], 'source_response_id', *CSV_COLUMNS[7:]]
+CONTRACT_AGENTX_CSV_COLUMNS = [
+    *AGENTX_CONTEXT_COLUMNS, 'source_response_ids', *AGENTX_BENCHMARK_COLUMNS,
+    'metrics_json', *AGENTX_ENRICHMENT_COLUMNS]
 AGENTX_REQUIRED_STRINGS = ('hardware', 'framework', 'model', 'precision', 'spec_method',
                            'benchmark_type', 'offload_mode', 'date')
 AGENTX_REQUIRED_BOOLEANS = ('disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention')
@@ -119,6 +123,10 @@ def structured_errors_required(version):
 
 def offline_verifier_required(version):
     return version_at_least(version, (0, 11, 0))
+
+
+def contract_one_required(version):
+    return version_at_least(version, (1, 0, 0))
 
 
 def check_powerx_schema(document, version):
@@ -1232,7 +1240,7 @@ def prompt(args, target, archive):
     install_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target}'
     status_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills status --target {target} --json > status.json'
     preview_command = f'npm exec --yes --offline --package {archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json'
-    return f'''Your first three tool calls must be shell calls containing exactly these commands, one per call, in this order:
+    base = f'''Your first three tool calls must be shell calls containing exactly these commands, one per call, in this order:
 
 1. {install_command}
 2. {status_command}
@@ -1285,6 +1293,12 @@ The complete response files are required deliverables. Use the exporter's built-
 
 Each lookup, CSV export, JSON export, empty export, and diagnostic must be traceable to the complete response from the very same HTTP request it consumed. A separate request to the same URL does not satisfy this requirement. Keep installed skill files unchanged. Matching row counts alone do not establish original-response capture.
 '''
+    if getattr(args, 'contract_one', False):
+        base += f'''
+
+After completing the compatibility workflow, exercise the installed 1.0 `inferencex` entry. First run `discover configs --model {args.model}` and preserve its JSON. Select an actually observed strict-v2 single-turn config with exactly {args.isl} input and {args.osl} output tokens; do not invent a result ID, model key, hardware, date, topology, or image. Create exactly these six new bundle directories under `bundles`: `powerx`, `agentx`, `result`, `tco`, `releases`, and `collectivex`. Use the matching formal command for each family and `--output-dir`; use the discovered result ID for `result inspect`, the explicit PowerX scope above, the AgentX display model above, the documented TCO prices b200=3.6 and mi355x=1.8, the existing GLM-5 dated release comparison, and the newest two measured CollectiveX runs. Run `inferencex verify` once against each completed directory without network access. Keep every bundle's original `manifest.json`, `result.json` or CSV, and `responses/*.body` files unchanged. Add the exact six bundle summaries and policy outcomes to result.md.
+'''
+    return base
 
 
 def check_installed(installed, skill_files, version):
@@ -1324,6 +1338,545 @@ def workflow_identity(document, version):
     require(document.get('schema_version') == 1, 'Workflow schema version differs')
     actual = document.get('metadata', document).get('package_version')
     require(actual == version, 'Workflow package version differs')
+
+
+def _normalized_id_object(value):
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [_normalized_id_object(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    identity_keys = {'id', 'workflow_run_id', 'curve_workflow_run_id', 'github_run_id', 'run_attempt'}
+    return {key: str(item) if key in identity_keys and item is not None else
+            _normalized_id_object(item) for key, item in value.items()}
+
+
+def _trace_value_matches(actual, trace, result_id):
+    present = result_id in trace
+    value = trace.get(result_id)
+    expected_status = 'stored_trace' if value is True else \
+        'no_stored_trace' if value is False else 'not_returned'
+    return actual == {'status': expected_status, 'value': value if present else None,
+                      'response_key_present': present}
+
+
+def _collective_source_value(bodies, references):
+    require(type(references) is list and len(references) == 1,
+            'CollectiveX matched source reference differs')
+    reference = references[0]
+    index = reference.get('response_index')
+    require(type(index) is int and 0 <= index < len(bodies),
+            'CollectiveX source index differs')
+    value = bodies[index]
+    pointer = reference.get('json_pointer')
+    require(type(pointer) is str and pointer.startswith('/'),
+            'CollectiveX source pointer differs')
+    for raw_key in pointer.split('/')[1:]:
+        key = raw_key.replace('~1', '/').replace('~0', '~')
+        value = value[int(key)] if isinstance(value, list) else value[key]
+    return value
+
+
+def _nested_metric(value, name):
+    for key in name.split('.'):
+        if value is None:
+            return None
+        value = value.get(key)
+    return value
+
+
+def _string_export_identities(row):
+    clean, _changed = sanitized(row)
+    clean = dict(clean)
+    for key in ('id', 'workflow_run_id', 'curve_workflow_run_id'):
+        if clean.get(key) is not None:
+            clean[key] = str(clean[key])
+    return clean
+
+
+def _csv_cell_matches(cell, value, location):
+    if value is None:
+        require(cell == '', f'Bundle CSV value differs: {location}')
+    elif type(value) is bool:
+        require(cell == str(value).lower(), f'Bundle CSV value differs: {location}')
+    elif finite(value):
+        try:
+            matches = float(cell) == value
+        except ValueError:
+            matches = False
+        require(matches, f'Bundle CSV value differs: {location}')
+    else:
+        require(cell == str(value), f'Bundle CSV value differs: {location}')
+
+
+def _powerx_expected(manifest, requests, bodies, response_ids, rows):
+    options = manifest.get('normalized_arguments')
+    require(type(options) is dict and set(options) == {
+        'model', 'date', 'isl', 'osl', 'raw_model', 'format'},
+        'PowerX saved options differ')
+    require(options['format'] == manifest['result']['format'], 'PowerX saved format differs')
+    query = parse_qs(urlsplit(requests[0]['url']).query)
+    require(query.get('model') == [options['model']] and
+            query.get('powerValid') == ['strictV2'] and
+            query.get('date', []) == ([] if options['date'] is None else [options['date']]),
+            'PowerX request scope differs')
+    source = bodies[0]
+    require(type(source) is list and all(type(row) is dict and type(row.get('metrics')) is dict
+                                         for row in source),
+            'PowerX response shape differs')
+    selected = [row for row in scoped(source, options['isl'], options['osl'], options['raw_model'])
+                if strict(row)]
+    expected = [_string_export_identities(row) for row in selected]
+    if manifest['result']['format'] == 'json':
+        require(rows == expected, 'PowerX derivation differs')
+    else:
+        require(len(rows) == len(expected), 'PowerX CSV row count differs')
+        context = {
+            'package_version': manifest['producer']['package_version'],
+            'query_url': requests[0]['url'],
+            'retrieved_at': requests[0]['response']['retrieved_at'],
+            'requested_model': options['model'],
+            'requested_date': options['date'],
+            'date_selection': 'latest' if options['date'] is None else 'as-of',
+            'raw_model': options['raw_model'],
+            'source_response_id': response_ids[0],
+        }
+        for index, (record, expected_row) in enumerate(zip(rows, expected), 1):
+            for column in CONTRACT_POWERX_CSV_COLUMNS:
+                value = expected_row['metrics'].get(column) if column in METRIC_COLUMNS else \
+                    context.get(column, expected_row.get(column))
+                _csv_cell_matches(record[column], value, f'powerx row {index} {column}')
+    hardware = {}
+    eligible = 0
+    for row in expected:
+        measured = any((key.find('power_w') >= 0 or key.find('joules_per_') >= 0) and
+                       finite(row['metrics'].get(key)) and row['metrics'][key] >= 0
+                       for key in METRIC_COLUMNS)
+        hardware.setdefault(row.get('hardware'), 0)
+        hardware[row.get('hardware')] += int(measured)
+        eligible += int(measured)
+    return len(expected), None, hardware, eligible
+
+
+def _agentx_expected(manifest, requests, bodies, response_ids, rows):
+    options = manifest.get('normalized_arguments')
+    required = {'model', 'date', 'raw_model', 'hardware', 'framework', 'precision',
+                'spec_method', 'offload_mode', 'concurrency', 'format'}
+    require(type(options) is dict and set(options) == required,
+            'AgentX saved options differ')
+    require(options['format'] == manifest['result']['format'], 'AgentX saved format differs')
+    query = parse_qs(urlsplit(requests[0]['url']).query)
+    require(query.get('model') == [options['model']] and
+            query.get('date', []) == ([] if options['date'] is None else [options['date']]),
+            'AgentX request scope differs')
+    benchmarks = bodies[0]
+    require(type(benchmarks) is list and all(agentx_benchmark(row) for row in benchmarks),
+            'AgentX benchmark response shape differs')
+    selected = [row for row in benchmarks if row['benchmark_type'] == 'agentic_traces' and all(
+        options[name] is None or row[field] == options[name]
+        for name, field in AGENTX_FILTERS)]
+    joined = {name: {} for name in
+              ('agentic-aggregates', 'derived-agentic-metrics', 'trace-availability')}
+    for request, body in zip(requests[1:], bodies[1:]):
+        operation = request['operation']
+        ids = parse_qs(urlsplit(request['url']).query).get('ids', [''])[0].split(',')
+        requested = [int(value) for value in ids if value]
+        joined[operation].update(agentx_map(body, requested, operation))
+    expected = []
+    for source in selected:
+        benchmark = _string_export_identities(source)
+        result_id = safe_result_id(source['id'])
+        if result_id is None:
+            agentx = {'status': 'unsupported_id', 'result_id': None,
+                      'aggregates': {'status': 'unsupported_id', 'value': None},
+                      'derived_metrics': {'status': 'unsupported_id', 'value': None},
+                      'trace_availability': {'status': 'unsupported_id', 'value': None,
+                                             'response_key_present': None}}
+        else:
+            aggregate = joined['agentic-aggregates'].get(result_id)
+            derived = joined['derived-agentic-metrics'].get(result_id)
+            trace_present = result_id in joined['trace-availability']
+            trace = joined['trace-availability'].get(result_id, False)
+            agentx = {
+                'status': 'complete' if aggregate is not None and derived is not None else 'partial',
+                'result_id': str(result_id),
+                'aggregates': {'status': 'available' if aggregate is not None else 'not_returned',
+                               'value': _normalized_id_object(aggregate)},
+                'derived_metrics': {'status': 'available' if derived is not None else 'not_returned',
+                                    'value': _normalized_id_object(derived)},
+                'trace_availability': {'status': 'stored_trace' if trace else 'no_stored_trace',
+                                       'value': trace, 'response_key_present': trace_present},
+            }
+        expected.append({'benchmark': benchmark, 'agentx': agentx})
+    if manifest['result']['format'] == 'json':
+        require(rows == expected, 'AgentX join differs')
+    else:
+        require(len(rows) == len(expected), 'AgentX CSV row count differs')
+        context = {
+            'package_version': manifest['producer']['package_version'],
+            'query_url': requests[0]['url'],
+            'retrieved_at': requests[0]['response']['retrieved_at'],
+            'requested_model': options['model'],
+            'requested_date': options['date'],
+            'date_selection': 'latest' if options['date'] is None else 'as-of',
+            'requested_benchmark_type': 'agentic_traces',
+            **{f'filter.{name}': options[name] for name, _field in AGENTX_FILTERS},
+            'source_response_ids': json.dumps(response_ids, separators=(',', ':')),
+        }
+        for index, (record, expected_row) in enumerate(zip(rows, expected), 1):
+            benchmark, agentx = expected_row['benchmark'], expected_row['agentx']
+            aggregate = agentx['aggregates']['value'] or {}
+            enrichment = {
+                **{f'aggregate.{group}.{field}': (aggregate.get(group) or {}).get(field)
+                   for group in AGENTX_GROUPS for field in (*AGENTX_PERCENTILES, 'n')},
+                'derived.p75_e2e_norm_intvty':
+                    (agentx['derived_metrics']['value'] or {}).get('p75_e2e_norm_intvty'),
+                'derived.p90_e2e_norm_intvty':
+                    (agentx['derived_metrics']['value'] or {}).get('p90_e2e_norm_intvty'),
+                'trace.available': agentx['trace_availability']['value'],
+                'trace.response_key_present': agentx['trace_availability']['response_key_present'],
+                'enrichment.status': agentx['status'],
+                'enrichment.aggregates_status': agentx['aggregates']['status'],
+                'enrichment.derived_metrics_status': agentx['derived_metrics']['status'],
+                'enrichment.trace_availability_status': agentx['trace_availability']['status'],
+            }
+            for column in CONTRACT_AGENTX_CSV_COLUMNS:
+                value = context.get(column, benchmark.get(column))
+                if column == 'metrics_json':
+                    value = json.dumps(benchmark['metrics'], separators=(',', ':'))
+                elif column in enrichment:
+                    value = enrichment[column]
+                _csv_cell_matches(record[column], value, f'agentx row {index} {column}')
+    hardware, eligible = {}, 0
+    for row in expected:
+        aggregate = row['agentx']['aggregates']
+        groups = aggregate.get('value') or {}
+        usable = aggregate.get('status') == 'available' and any(
+            type(groups.get(name)) is dict and groups[name].get('n', 0) > 0
+            for name in AGENTX_GROUPS)
+        name = row['benchmark']['hardware']
+        hardware[name] = hardware.get(name, 0) + int(usable)
+        eligible += int(usable)
+    return len(expected), None, hardware, eligible
+
+
+def check_bundle(directory, version):
+    """Independent contract-1 bundle audit; never invokes the JavaScript renderer."""
+    supplied = Path(directory)
+    require(supplied.is_dir() and not supplied.is_symlink(),
+            'Bundle root must be a regular directory')
+    root = supplied.resolve()
+
+    def regular(relative, label):
+        require(type(relative) is str and relative and not Path(relative).is_absolute() and
+                '..' not in Path(relative).parts, f'{label} path is not canonical')
+        path = root / relative
+        require(path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(root),
+                f'{label} is missing or unsafe')
+        return path.read_bytes()
+
+    manifest = json.loads(regular('manifest.json', 'Manifest').decode('utf-8'))
+    require(manifest.get('schema_version') == manifest.get('contract_version') == 1,
+            'Bundle contract version differs')
+    require(manifest.get('producer', {}).get('package_version') == version,
+            'Bundle producer version differs')
+    kind = manifest.get('kind')
+    require(kind in {'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'},
+            'Bundle family differs')
+    result_record = manifest.get('result', {})
+    result_bytes = regular(result_record.get('path'), 'Result')
+    require(result_record.get('size') == len(result_bytes) and
+            result_record.get('sha256') == hashlib.sha256(result_bytes).hexdigest(),
+            'Bundle result identity differs')
+    require(result_record.get('format') in {'json', 'csv'}, 'Bundle result format differs')
+    requests, bodies, response_ids = manifest.get('requests'), [], []
+    require(type(requests) is list and requests, 'Bundle request ledger is missing')
+    endpoints = {
+        'powerx': {'benchmarks': {'/api/v1/benchmarks'}},
+        'agentx': {'benchmarks': {'/api/v1/benchmarks'},
+                   'agentic-aggregates': {'/api/v1/agentic-aggregates'},
+                   'derived-agentic-metrics': {'/api/v1/derived-agentic-metrics'},
+                   'trace-availability': {'/api/v1/trace-availability'}},
+        'result': {'benchmarks': {'/api/v1/benchmarks'},
+                   'workflow-info': {'/api/v1/workflow-info'},
+                   'server-log': {'/api/v1/server-log'}},
+        'tco': {'tco-feed': {'/api/v1/tco-feed'}},
+        'releases': {'benchmark-history': {'/api/v1/benchmarks/history'}},
+        'collectivex': {'openapi': {'/api/openapi.json'},
+                        'collectivex-runs': {'/api/v1/collectivex/runs'},
+                        'collectivex-run': set()},
+    }
+    for request in requests:
+        url = urlsplit(request.get('url', ''))
+        operation = request.get('operation')
+        allowed = url.path in endpoints[kind].get(operation, set()) or (
+            kind == 'collectivex' and operation == 'collectivex-run' and
+            url.path.startswith('/api/v1/collectivex/runs/'))
+        require(url.scheme == 'https' and url.netloc == 'inferencex.semianalysis.com' and allowed,
+                'Bundle request scope differs')
+        response = request.get('response', {})
+        raw = regular(response.get('path'), 'Response')
+        response_id = hashlib.sha256(raw).hexdigest()
+        require(response.get('id') == response.get('sha256') == response_id and
+                response.get('size') == len(raw) and response.get('encoding') == 'decoded',
+                'Bundle response identity differs')
+        require(response.get('status') in request.get('allowed_statuses', []),
+                'Bundle response status differs')
+        require(type(request.get('attempts')) is list and request['attempts'],
+                'Bundle attempt ledger is missing')
+        require(type(request.get('operation')) is str and request['operation'] and
+                request['operation'] == request['attempts'][-1].get('operation') and
+                request['url'] == request['attempts'][-1].get('url'),
+                'Bundle request and attempt scope differ')
+        accepted = request['attempts'][-1]
+        require(accepted.get('status') == response.get('status') and
+                accepted.get('consumedBytes') == len(raw) and
+                accepted.get('retry', {}).get('decision') == 'accepted',
+                'Bundle accepted attempt differs from saved response')
+        datetime.fromisoformat(response['retrieved_at'].replace('Z', '+00:00'))
+        bodies.append(strict_json(raw))
+        response_ids.append(response_id)
+    require(len(response_ids) == len(requests), 'Bundle response ledger differs')
+    expected_root = {'manifest.json', result_record['path'].split('/')[0], 'responses'}
+    require({entry.name for entry in root.iterdir()} == expected_root and
+            all(not entry.is_symlink() for entry in root.iterdir()),
+            'Bundle file inventory differs')
+    response_root = root / 'responses'
+    require(response_root.is_dir() and not response_root.is_symlink() and
+            {entry.name for entry in response_root.iterdir()} ==
+            {f'{response_id}.body' for response_id in response_ids} and
+            all(entry.is_file() and not entry.is_symlink() for entry in response_root.iterdir()),
+            'Bundle response inventory differs')
+    coverage = manifest.get('coverage', {})
+    require(coverage.get('status') in {'complete', 'partial', 'empty'}, 'Bundle coverage differs')
+    require(type(coverage.get('selected_records')) is int and coverage['selected_records'] >= 0,
+            'Bundle selected-record coverage differs')
+    summary = manifest.get('summary', {})
+    require(summary.get('schema_version') == 1 and summary.get('kind') == kind and
+            summary.get('package_version') == version and summary.get('validity') == 'valid' and
+            summary.get('coverage') == coverage and
+            summary.get('output') == {'result': result_record.get('path'), 'manifest': 'manifest.json'},
+            'Bundle summary differs')
+    policy = summary.get('policy', {})
+    requirements = policy.get('requirements', {})
+    require(set(requirements) == {'require_hardware', 'min_comparable_pairs'} and
+            type(requirements['require_hardware']) is list and
+            all(type(item) is str and item for item in requirements['require_hardware']) and
+            (requirements['min_comparable_pairs'] is None or
+             type(requirements['min_comparable_pairs']) is int and
+             requirements['min_comparable_pairs'] >= 0), 'Bundle policy requirements differ')
+    if result_record['format'] == 'csv':
+        require(kind in {'powerx', 'agentx'} and result_bytes.endswith(b'\r\n'),
+                'Bundle CSV contract differs')
+        rows = list(csv.DictReader(io.StringIO(result_bytes.decode('utf-8'), newline='')))
+        columns = CONTRACT_POWERX_CSV_COLUMNS if kind == 'powerx' else CONTRACT_AGENTX_CSV_COLUMNS
+        require((list(rows[0]) if rows else next(csv.reader(
+            io.StringIO(result_bytes.decode('utf-8'), newline='')))) == columns,
+            'Bundle CSV header differs from fixed contract')
+        derived = (_powerx_expected if kind == 'powerx' else _agentx_expected)(
+            manifest, requests, bodies, response_ids, rows)
+        result = None
+    else:
+        result = strict_json(result_bytes)
+        require(result.get('schema_version') == 1, 'Bundle result schema differs')
+        require(result.get('kind', kind) == kind, 'Bundle result family differs')
+        encoded = json.dumps(result, separators=(',', ':'))
+        require(all(response_id in encoded for response_id in set(response_ids)),
+                'Bundle result omits a consumed response reference')
+        if kind == 'powerx':
+            derived = _powerx_expected(
+                manifest, requests, bodies, response_ids, result['rows'])
+        elif kind == 'agentx':
+            derived = _agentx_expected(
+                manifest, requests, bodies, response_ids, result['rows'])
+        elif kind == 'result':
+            derived = None
+
+    if kind == 'result':
+        selected = result['selected_result']
+        matches = [_string_export_identities(row) for row in bodies[0]
+                   if str(row.get('id')) == str(selected.get('id'))]
+        require(len(matches) == 1 and selected == matches[0], 'Provenance selection differs')
+        metadata = result.get('metadata', {})
+        require(metadata.get('selected_result_id') == selected['id'] and
+                metadata.get('ran_new_benchmark') is False,
+                'Provenance metadata differs')
+        producer = result.get('producer', {})
+        run_url = selected.get('run_url')
+        if run_url is None:
+            require(producer.get('status') == 'unresolved' and
+                    producer.get('github_run_id') is None and
+                    producer.get('run_attempt') is None,
+                    'Provenance producer meaning differs')
+        else:
+            match = re.fullmatch(
+                r'https://github\.com/[\w.-]+/[\w.-]+/actions/runs/([1-9]\d*)'
+                r'(?:/attempts/([1-9]\d*))?', run_url)
+            require(match is not None and producer.get('github_run_id') == match.group(1) and
+                    producer.get('run_attempt') == match.group(2),
+                    'Provenance producer meaning differs')
+            workflow_runs = bodies[1].get('runs', []) if type(bodies[1]) is dict else []
+            matching_runs = [item for item in workflow_runs
+                             if str(item.get('github_run_id')) == match.group(1)]
+            expected_status = 'confirmed' if match.group(2) is not None and matching_runs else 'row_only'
+            require(producer.get('status') == expected_status,
+                    'Provenance producer confirmation differs')
+        evidence = result.get('evidence', [])
+        require([entry.get('response_id') for entry in evidence] == response_ids and
+                result.get('log', {}).get('source_response_id') == response_ids[-1],
+                'Provenance response references differ')
+        log = result.get('log', {})
+        if requests[-1]['response']['status'] == 404:
+            require(log.get('status') == 'not_found' and log.get('text') is None,
+                    'Provenance missing-log state differs')
+        else:
+            saved_log = bodies[-1]
+            require(log.get('status') == 'available' and
+                    str(saved_log.get('id')) == selected['id'] and
+                    log.get('text') == saved_log.get('serverLog'),
+                    'Provenance log differs from source')
+        derived = (1, None, {selected['hardware']: 1}, 1)
+    elif kind == 'tco':
+        feed = bodies[0]
+        options = manifest.get('normalized_arguments', {})
+        prices = options.get('gpu_hourly_prices_usd')
+        workloads = options.get('workloads')
+        require(type(prices) is dict and prices and type(workloads) is list and workloads and
+                len(result['rows']) == len(prices) * len(workloads) and
+                {(row.get('hardware'), row.get('workload')) for row in result['rows']} ==
+                {(hardware_name, workload) for hardware_name in prices for workload in workloads},
+                'TCO saved scope differs from result')
+        eligible, hardware = 0, {}
+        for row in result['rows']:
+            require(row.get('usd_per_gpu_hour') == prices[row['hardware']],
+                    'TCO saved price differs from result')
+            point = row.get('point')
+            if point is None:
+                require(row['status'] == 'missing_point' and
+                        not any(item.get('hardware') == row.get('hardware') and
+                                item.get('workload') == row.get('workload')
+                                for item in feed['rows']),
+                        'TCO missing point differs from consumed feed')
+            else:
+                require(point in feed['rows'], 'TCO point differs from consumed feed')
+                expected_status = ('zero_throughput' if point.get('boundary') == 'interpolated' and
+                                   point.get('output_tput_per_gpu') == 0 else
+                                   'available' if point.get('boundary') == 'interpolated' else
+                                   point.get('boundary'))
+                require(row['status'] == expected_status, 'TCO point status differs')
+            if row['status'] == 'available':
+                require(finite(point.get('output_tput_per_gpu')) and
+                        point['output_tput_per_gpu'] > 0 and finite(row.get('usd_per_gpu_hour')),
+                        'TCO available point differs')
+                expected = row['usd_per_gpu_hour'] * 1e6 / (point['output_tput_per_gpu'] * 3600)
+                require(math.isclose(row['usd_per_million_output_tokens'], expected, rel_tol=1e-12),
+                        'TCO arithmetic differs')
+                eligible += 1
+            else:
+                require(row.get('usd_per_million_output_tokens') is None,
+                        'TCO unavailable point has a modeled cost')
+            hardware.setdefault(row['hardware'], 0)
+            hardware[row['hardware']] += int(row['status'] == 'available')
+        derived = (len(result['rows']), None, hardware, eligible)
+    elif kind == 'releases':
+        source = bodies[0]
+        selection = result.get('selection', {})
+        selected_records = 0
+        for side in ('before', 'after'):
+            detail = selection.get(side, {})
+            selected_rows = detail.get('rows')
+            require(type(selected_rows) is list and all(row in source for row in selected_rows),
+                    'Release selection differs from source')
+            unique = len({str(row.get('id')) for row in selected_rows})
+            require(detail.get('unique_observations') == unique and
+                    detail.get('snapshot_reuses') == len(selected_rows) - unique,
+                    'Release selection coverage differs')
+            selected_records += unique
+        comparable = 0
+        for pair in result['comparisons']:
+            before_rows = [row for row in source if str(row.get('id')) == pair.get('before_id')]
+            after_rows = [row for row in source if str(row.get('id')) == pair.get('after_id')]
+            require(len(before_rows) == len(after_rows) == 1, 'Release observation identity differs')
+            metric = pair['metric']
+            metric_name = metric['name']
+            before, after = metric['before'], metric['after']
+            require(before_rows[0]['metrics'].get(metric_name) == before and
+                    after_rows[0]['metrics'].get(metric_name) == after,
+                    'Release metric source differs')
+            if finite(before) and finite(after):
+                comparable += 1
+                require(math.isclose(metric['delta'], after - before, rel_tol=1e-12),
+                        'Release difference differs')
+            else:
+                require(metric.get('delta') is None and metric.get('percent_change') is None,
+                        'Release missing metric differs')
+            if finite(before) and finite(after) and before != 0:
+                require(math.isclose(metric['percent_change'], (after - before) / before * 100,
+                                     rel_tol=1e-12), 'Release percent change differs')
+        require(result['metadata']['causal_attribution'] == 'not_established',
+                'Release result overclaims causality')
+        require(result['metadata'].get('statistical_verdict') == 'not_established',
+                'Release statistical verdict differs')
+        hardware_name = manifest.get('normalized_arguments', {}).get('hardware')
+        derived = (selected_records, comparable,
+                   {} if hardware_name is None else {hardware_name: comparable}, comparable)
+    elif kind == 'collectivex':
+        comparisons = result['comparisons']
+        for status, count_value in result['summary'].items():
+            require(count_value == sum(row['status'] == status for row in comparisons),
+                    'CollectiveX summary differs')
+        for comparison in comparisons:
+            if comparison['status'] != 'matched':
+                continue
+            left = _collective_source_value(bodies, comparison['left'])
+            right = _collective_source_value(bodies, comparison['right'])
+            for metric in comparison['metrics']:
+                left_value = _nested_metric(left, metric['name'])
+                right_value = _nested_metric(right, metric['name'])
+                require(metric['left']['value'] == left_value and
+                        metric['right']['value'] == right_value,
+                        'CollectiveX metric source differs')
+                difference = None if left_value is None or right_value is None else right_value - left_value
+                ratio = None if left_value in (None, 0) or right_value is None else right_value / left_value
+                require(metric['difference_right_minus_left'] == difference and
+                        metric['ratio_right_over_left'] == ratio,
+                        'CollectiveX metric arithmetic differs')
+        comparable = sum(comparison['status'] == 'matched' and any(
+            metric.get('left', {}).get('status') == 'value' and
+            metric.get('right', {}).get('status') == 'value'
+            for metric in comparison.get('metrics', [])) for comparison in comparisons)
+        derived = (len(comparisons), comparable, {}, comparable)
+
+    selected_records, comparable, derived_hardware, eligible_records = derived
+    require(coverage['selected_records'] == selected_records,
+            'Bundle selected-record coverage differs from result')
+    require(coverage.get('comparable_pairs') == comparable,
+            'Bundle comparable-pair coverage differs from result')
+    hardware_entries = coverage.get('hardware')
+    require(type(hardware_entries) is list and
+            all(type(entry) is dict and type(entry.get('hardware')) is str and
+                type(entry.get('valid_records')) is int and entry['valid_records'] >= 0
+                for entry in hardware_entries) and
+            len({entry['hardware'] for entry in hardware_entries}) == len(hardware_entries),
+            'Bundle hardware coverage differs')
+    hardware = {entry['hardware']: entry['valid_records'] for entry in hardware_entries}
+    require(hardware == derived_hardware, 'Bundle hardware validity differs from result')
+    policy_requested = bool(requirements['require_hardware']) or \
+        requirements['min_comparable_pairs'] is not None
+    policy_passes = all(derived_hardware.get(item, 0) > 0
+                        for item in requirements['require_hardware']) and \
+        (requirements['min_comparable_pairs'] is None or
+         comparable >= requirements['min_comparable_pairs'])
+    expected_policy = 'not_requested' if not policy_requested else 'passed' if policy_passes else 'failed'
+    require(policy.get('status') == expected_policy and type(policy.get('reasons')) is list and
+            (expected_policy != 'failed' or bool(policy['reasons'])),
+            'Bundle policy decision differs')
+    policy_exit_code = 3 if expected_policy == 'failed' else 0
+    return {'kind': kind, 'status': 'passed', 'selected_records': coverage['selected_records'],
+            'eligible_records': eligible_records, 'comparable_pairs': comparable,
+            'response_ids': response_ids,
+            'policy_status': expected_policy, 'policy_exit_code': policy_exit_code}
 
 
 def workflow_source(source, expected_url, body_key='body_utf8', hash_key='decoded_body_sha256',
@@ -1457,6 +2010,106 @@ def run_additional_workflows(node, installed, project, env, version, deadline):
     return check_additional_workflows(project, version)
 
 
+def run_contract_one_workflows(node, installed, project, env, args, version, deadline):
+    """Exercise the installed 1.0 entry while Python independently audits its saved inputs."""
+    if not contract_one_required(version):
+        return None
+    cli = installed / 'scripts/inferencex.mjs'
+    require(cli.is_file() and not cli.is_symlink(), 'The installed inferencex entry is missing')
+    discovery_flags = ['discover', 'configs', '--model', args.model, '--limit', '1000',
+                       '--max-attempts', '3']
+    if args.date:
+        discovery_flags += ['--date', args.date]
+    discovery = json.loads(run([node, cli, *discovery_flags], project, env,
+                               'contract-one-discovery', deadline))
+    require(discovery.get('schema_version') == 1 and discovery.get('kind') == 'configs' and
+            type(discovery.get('items')) is list and discovery['items'] and
+            discovery.get('scope', {}).get('requested_model') == args.model and
+            discovery.get('coverage', {}).get('available_items', 0) > 0,
+            'Discovery did not return a usable public scope')
+    candidates = [item for item in discovery['items']
+                  if item.get('workload') == {'benchmark_type': 'single_turn',
+                                               'input_tokens': args.isl,
+                                               'output_tokens': args.osl} and
+                  item.get('power', {}).get('strict_v2') == 'eligible' and
+                  (args.raw_model is None or item.get('raw_model') == args.raw_model)]
+    require(candidates, 'Discovered scope has no strict-v2 PowerX observation; choose another scope')
+    selected = candidates[0]
+    pin = {'model': args.model, 'date': args.date, 'result_id': selected['result_id'],
+           'raw_model': selected['raw_model'], 'hardware': selected['hardware'],
+           'workload': selected['workload'], 'discovery_sources': discovery.get('sources')}
+    save(project / 'contract-one-scope.json', pin)
+
+    bundle_root = project / 'contract-one-bundles'
+    bundle_root.mkdir()
+    power_flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl)]
+    if args.date:
+        power_flags += ['--date', args.date]
+    if args.raw_model:
+        power_flags += ['--raw-model', args.raw_model]
+    result_flags = ['--id', selected['result_id'], '--model', args.model]
+    if args.date:
+        result_flags += ['--date', args.date]
+    commands = {
+        'powerx': ['powerx', 'export', *power_flags],
+        'agentx': ['agentx', 'export', '--model', args.agentx_model],
+        'result': ['result', 'inspect', *result_flags],
+        'tco': ['tco', 'compare', '--model', 'DeepSeek-V4-Pro', '--workloads', '8192x1024',
+                '--target', '50', '--gpu-hourly-prices', 'b200=3.6,mi355x=1.8',
+                '--date', '2026-09-06'],
+        'releases': ['releases', 'compare', '--model', 'GLM-5', '--raw-model', 'glm5.1',
+                     '--hardware', 'mi355x', '--framework', 'sglang', '--isl', '8192',
+                     '--osl', '1024', '--metric', 'median_ttft', '--before-date', '2026-05-30',
+                     '--after-date', '2026-07-02', '--before-run-url',
+                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+                     '--after-run-url',
+                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'],
+        'collectivex': ['collectivex', 'compare'],
+    }
+    reports = {}
+    denial = project / 'contract-one-deny-network.mjs'
+    denial.write_text("globalThis.fetch = () => { throw new Error('offline verification attempted HTTP'); };\n")
+    for kind, flags in commands.items():
+        directory = bundle_root / kind
+        run([node, cli, *flags, '--output-dir', directory, '--max-attempts', '3'],
+            project, env, f'contract-one-{kind}', deadline)
+        reports[kind] = check_bundle(directory, version)
+        require(reports[kind]['eligible_records'] > 0 and
+                (kind not in {'releases', 'collectivex'} or
+                 reports[kind]['comparable_pairs'] > 0),
+                f'{kind} positive bundle is no longer positive; choose another scope')
+        run([node, '--import', denial, cli, 'verify', directory], project, env,
+            f'contract-one-verify-{kind}', deadline)
+
+    empty = bundle_root / 'powerx-empty'
+    empty_flags = ['--model', args.model, '--isl', str(args.empty_isl), '--osl', str(args.empty_osl)]
+    if args.date:
+        empty_flags += ['--date', args.date]
+    if args.raw_model:
+        empty_flags += ['--raw-model', args.raw_model]
+    run([node, cli, 'powerx', 'export', *empty_flags,
+         '--output-dir', empty, '--max-attempts', '3'],
+        project, env, 'contract-one-powerx-empty', deadline)
+    empty_report = check_bundle(empty, version)
+    require(empty_report['selected_records'] == 0, 'PowerX negative scope is no longer empty')
+    run([node, '--import', denial, cli, 'verify', empty], project, env,
+        'contract-one-verify-powerx-empty', deadline)
+    try:
+        run([node, '--import', denial, cli, 'verify', empty, '--require-hardware',
+             '__release_verifier_missing_hardware__'], project, env,
+            'contract-one-policy-exit-3', deadline)
+    except subprocess.CalledProcessError as error:
+        require(error.returncode == 3 and error.stderr == '', 'Policy failure must exit 3 only')
+        policy = json.loads(error.output)
+        require(policy.get('validity') == 'valid' and
+                policy.get('policy', {}).get('status') == 'failed',
+                'Policy exit 3 summary differs')
+    else:
+        raise ValueError('Missing required hardware unexpectedly satisfied policy')
+    return {'status': 'passed', 'discovery': pin, 'bundles': reports,
+            'negative': empty_report, 'policy_exit_code': 3}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=['candidate', 'public', 'agents', 'check-agent'])
@@ -1490,6 +2143,7 @@ def main():
     body = archive.read_bytes()
     require(record['name'] == PACKAGE and hashlib.sha256(body).hexdigest() == record['sha256'], 'Candidate identity mismatch')
     require('sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode() == record['integrity'], 'Candidate integrity mismatch')
+    args.contract_one = contract_one_required(record['version'])
     with tarfile.open(fileobj=io.BytesIO(body), mode='r:gz') as packed:
         prefix = 'package/skills/inferencex-api/'
         skill_files = {member.name.removeprefix(prefix): packed.extractfile(member).read()
@@ -1584,6 +2238,15 @@ def main():
                                    args.agentx_no_trace_id, record['version'])])
             require((args.project / 'result.md').read_text().strip(), 'Native-agent narrative is missing')
             result.update(agentx=agentx, agentx_points=points)
+            if args.contract_one:
+                bundles = args.project / 'bundles'
+                expected = {'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'}
+                require(bundles.is_dir() and not bundles.is_symlink() and
+                        {path.name for path in bundles.iterdir()} == expected and
+                        all(path.is_dir() and not path.is_symlink() for path in bundles.iterdir()),
+                        'Native-agent contract-1 bundle inventory differs')
+                result['contract_one_bundles'] = {
+                    kind: check_bundle(bundles / kind, record['version']) for kind in sorted(expected)}
             report.update(status='data-checks-passed', narrative_review='required', targets=[result])
             return
         if args.mode == 'public':
@@ -1655,6 +2318,9 @@ def main():
                           record['version'], deadline)])
             result['additional_workflows'] = run_additional_workflows(
                 node, installed, project, env, record['version'], deadline)
+            if args.contract_one:
+                result['contract_one'] = run_contract_one_workflows(
+                    node, installed, project, env, args, record['version'], deadline)
             check_installed(installed, skill_files, record['version'])
             result.update(agentx=agentx, agentx_points=points, structured_errors=structured_errors)
             if offline_verification:

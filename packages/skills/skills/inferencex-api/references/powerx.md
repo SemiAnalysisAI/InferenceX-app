@@ -7,6 +7,18 @@ for supported display models and metric descriptions. The exporter consumes the
 complete public JSON response; an extracted web-page summary cannot establish
 coverage or supply missing observations.
 
+For a replayable contract 1 bundle, prefer the versioned entry:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
+  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --format csv \
+  --output-dir evidence/powerx --require-hardware b200
+```
+
+A valid empty scope exits 0 unless the explicit hardware predicate fails, which
+commits the bundle and exits 3. See the [CLI contract](cli.md). The direct helper
+below remains available for legacy output compatibility.
+
 ## Run the installed exporter
 
 Resolve the script relative to the loaded `SKILL.md`. From the user's project,

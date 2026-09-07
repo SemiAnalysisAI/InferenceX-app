@@ -110,9 +110,13 @@ project, an explicit-use run, or unreviewed model prose as accepted discovery.
   helper `--version` checks.
 - 0.10.0: structured CLI failures and supported installer process-crash recovery.
 - 0.11.0: offline PowerX/AgentX summary verification and deterministic Markdown reports.
+- 1.0.0 candidate: versioned discovery, six formal evidence-bundle families,
+  contract 1 schemas and CSV columns, offline bundle replay, coverage predicates,
+  and read-only installation diagnostics.
 
 Versions 0.5.0 through 0.11.0 are published releases; 0.11.0 includes these cumulative
-capabilities. Accept live-query and offline discovery with tasks that exercise each
+capabilities. The 1.0.0 entry remains a candidate until publication and public
+verification succeed. Accept live-query and offline discovery with tasks that exercise each
 workflow; one task does not establish discovery of every capability. For future
 candidates, validate the exact archive; local acceptance alone does not establish
 npm publication.

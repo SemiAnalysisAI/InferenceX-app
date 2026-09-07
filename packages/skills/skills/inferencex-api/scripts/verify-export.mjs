@@ -33,14 +33,19 @@ import {
   validateAgentxChunk,
 } from './export-contract.mjs';
 
-const PACKAGE_VERSION = '0.11.0';
+const PACKAGE_VERSION = '1.0.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const MANIFEST_LIMIT = 1024 * 1024;
 const RESPONSE_LIMIT = 32 * 1024 * 1024;
 const RESPONSE_TOTAL_LIMIT = 128 * 1024 * 1024;
 const EXPORT_LIMIT = 256 * 1024 * 1024;
 const REPORT_LIMIT = 1024 * 1024;
-const SUPPORTED_PRODUCERS = new Set(['0.9.0', '0.10.0', '0.11.0']);
+const LEGACY_RENDERERS_BY_PRODUCER = new Map([
+  ['0.9.0', { powerx: 'powerx-0.9' }],
+  ['0.10.0', { powerx: 'powerx-0.10', agentx: 'agentx-0.10' }],
+  ['0.11.0', { powerx: 'powerx-0.11', agentx: 'agentx-0.11' }],
+  ['1.0.0', { powerx: 'powerx-0.11', agentx: 'agentx-0.11' }],
+]);
 const AGENTX_OPERATIONS = [
   ['agentic-aggregates', 200],
   ['derived-agentic-metrics', 200],
@@ -251,10 +256,11 @@ function validateReportPath(reportArgument, evidence, physicalExport) {
   return physicalReport;
 }
 
-function validateCommonManifest(record) {
+function validateCommonManifest(record, kind) {
   verify(record.schema_version === 1, 'Unsupported capture schema version');
+  const renderers = LEGACY_RENDERERS_BY_PRODUCER.get(record.package_version);
   verify(
-    typeof record.package_version === 'string' && SUPPORTED_PRODUCERS.has(record.package_version),
+    typeof record.package_version === 'string' && renderers?.[kind] !== undefined,
     'Unsupported capture producer version',
   );
   verify(record.status === 'complete', 'Evidence capture is not complete');
@@ -315,7 +321,7 @@ function validatePowerx(record, evidence, exportBytes) {
     ['schema_version', 'package_version', 'status', 'request', 'response', 'export'],
     'PowerX manifest',
   );
-  validateCommonManifest(record);
+  validateCommonManifest(record, 'powerx');
   exactKeys(record.request, ['url', 'method', 'filters'], 'PowerX request');
   exactKeys(
     record.request.filters,
@@ -535,7 +541,7 @@ function validateAgentx(record, evidence, exportBytes) {
     ],
     'AgentX manifest',
   );
-  validateCommonManifest(record);
+  validateCommonManifest(record, 'agentx');
   verify(record.error === null, 'AgentX complete evidence must not contain an error');
   const started = timestamp(record.started_at, 'AgentX capture start time');
   const finished = timestamp(record.finished_at, 'AgentX capture finish time');

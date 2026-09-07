@@ -295,6 +295,7 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
     succeeded(run(['install'], cwd));
     const destination = join(cwd, '.claude/skills/inferencex-api');
     setInstalledVersion(destination, version);
+    setExporterVersion(destination, 'agentx', '9.9.9');
     const mismatch = run(['status'], cwd);
     succeeded(mismatch);
     assert.match(

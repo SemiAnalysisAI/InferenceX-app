@@ -1650,5 +1650,680 @@ class AdditionalWorkflowEvidenceTests(unittest.TestCase):
                 check.workflow_identity(changed, VERSION)
 
 
+class ContractOneBundleOracleTests(unittest.TestCase):
+    VERSION = '1.0.0'
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.serial = 0
+
+    def bundle(self, kind, responses, build_result, coverage=None, requirements=None,
+               result_format='json', normalized_arguments=None):
+        self.serial += 1
+        root = self.root / f'{kind}-{self.serial}'
+        response_root = root / 'responses'
+        response_root.mkdir(parents=True)
+        ledger, response_ids = [], []
+        for operation, url, body, status in responses:
+            raw = json.dumps(body, separators=(',', ':')).encode()
+            response_id = hashlib.sha256(raw).hexdigest()
+            (response_root / f'{response_id}.body').write_bytes(raw)
+            response_ids.append(response_id)
+            ledger.append({
+                'operation': operation,
+                'url': url,
+                'allowed_statuses': [200, 404] if status == 404 else [200],
+                'attempts': [{
+                    'operation': operation,
+                    'url': url,
+                    'ordinal': 1,
+                    'startedAt': '2026-09-07T00:00:00.000Z',
+                    'endedAt': '2026-09-07T00:00:01.000Z',
+                    'status': status,
+                    'consumedBytes': len(raw),
+                    'retry': {'decision': 'accepted', 'reason': 'allowed_status'},
+                }],
+                'response': {
+                    'encoding': 'decoded',
+                    'id': response_id,
+                    'path': f'responses/{response_id}.body',
+                    'retrieved_at': '2026-09-07T00:00:01.000Z',
+                    'sha256': response_id,
+                    'size': len(raw),
+                    'status': status,
+                },
+            })
+        result = build_result(response_ids)
+        result_bytes = result.encode() if result_format == 'csv' else \
+            (json.dumps(result, indent=2) + '\n').encode()
+        (root / f'result.{result_format}').write_bytes(result_bytes)
+        coverage = coverage or {
+            'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+            'hardware': [], 'reasons': []}
+        requirements = requirements or {'require_hardware': [], 'min_comparable_pairs': None}
+        requested = bool(requirements['require_hardware']) or \
+            requirements['min_comparable_pairs'] is not None
+        hardware = {entry['hardware']: entry['valid_records'] for entry in coverage['hardware']}
+        passed = all(hardware.get(name, 0) > 0 for name in requirements['require_hardware']) and \
+            (requirements['min_comparable_pairs'] is None or
+             (coverage['comparable_pairs'] or 0) >= requirements['min_comparable_pairs'])
+        policy_status = 'not_requested' if not requested else 'passed' if passed else 'failed'
+        if normalized_arguments is None:
+            normalized_arguments = {
+                'powerx': {'model': 'GLM-5', 'date': None, 'isl': 8192, 'osl': 1024,
+                           'raw_model': None, 'format': result_format},
+                'agentx': {'model': 'DeepSeek-V4-Pro', 'date': None, 'raw_model': None,
+                           'hardware': None, 'framework': None, 'precision': None,
+                           'spec_method': None, 'offload_mode': None, 'concurrency': None,
+                           'format': result_format},
+                'tco': {'model': 'dsv4', 'date': None, 'workloads': ['1024x1024'],
+                        'target_output_tokens_per_second_per_user': 50,
+                        'gpu_hourly_prices_usd': {'b200': 3.6}, 'units': {}},
+                'releases': {'hardware': 'h200_sxm'},
+            }.get(kind, {})
+        manifest = {
+            'schema_version': 1,
+            'contract_version': 1,
+            'kind': kind,
+            'producer': {'package_version': self.VERSION},
+            'normalized_arguments': normalized_arguments,
+            'result': {
+                'format': result_format, 'path': f'result.{result_format}', 'size': len(result_bytes),
+                'sha256': hashlib.sha256(result_bytes).hexdigest()},
+            'requests': ledger,
+            'coverage': coverage,
+            'summary': {
+                'schema_version': 1,
+                'command': f'{kind} test',
+                'kind': kind,
+                'package_version': self.VERSION,
+                'created_at': '2026-09-07T00:00:02.000Z',
+                'validity': 'valid',
+                'coverage': coverage,
+                'policy': {'status': policy_status, 'requirements': requirements, 'reasons': []},
+                'output': {'result': f'result.{result_format}', 'manifest': 'manifest.json'},
+            },
+        }
+        check.save(root / 'manifest.json', manifest)
+        return root
+
+    def fixtures(self):
+        origin = 'https://inferencex.semianalysis.com'
+        base = {
+            'model': 'glm5', 'hardware': 'h200_sxm', 'framework': 'sglang',
+            'image': None, 'precision': 'fp8', 'spec_method': 'none',
+            'benchmark_type': 'single_turn', 'isl': 8192, 'osl': 1024, 'conc': 1,
+            'disagg': False, 'is_multinode': False, 'offload_mode': 'none',
+            'recipe_fingerprint': None, 'prefill_tp': 1, 'prefill_ep': 1,
+            'prefill_dp_attention': False, 'prefill_num_workers': 1,
+            'decode_tp': 1, 'decode_ep': 1, 'decode_dp_attention': False,
+            'decode_num_workers': 1, 'num_prefill_gpu': 1, 'num_decode_gpu': 1,
+            'date': '2026-09-07', 'workflow_run_id': '101', 'run_started_at': None,
+            'run_url': None, 'curve_date': '2026-09-07',
+            'curve_workflow_run_id': '101', 'curve_run_started_at': None,
+        }
+        power_row = {**base, 'id': 1,
+                     'metrics': {'power_valid': 1, 'power_metric_schema_version': 2,
+                                 'avg_power_w': 700}}
+        power = self.bundle(
+            'powerx', [('benchmarks', origin +
+                        '/api/v1/benchmarks?model=GLM-5&powerValid=strictV2', [power_row], 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'powerx',
+                         'metadata': {'source_response_id': ids[0]},
+                         'rows': [{**power_row, 'id': '1'}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
+
+        benchmark = {**base, 'id': 2, 'hardware': 'b300',
+                     'benchmark_type': 'agentic_traces', 'metrics': {'median_ttft': 10}}
+        group = {'mean': 10, 'p50': 10, 'p75': 11, 'p90': 12, 'p95': 13, 'p99': 14, 'n': 1}
+        aggregate = {'id': 2, 'isl': group, 'osl': None, 'kvCacheUtil': None,
+                     'prefixCacheHitRate': None}
+        derived = {'id': 2, 'p75_e2e_norm_intvty': 4, 'p90_e2e_norm_intvty': 5}
+        agent_responses = [
+            ('benchmarks', origin + '/api/v1/benchmarks?model=DeepSeek-V4-Pro', [benchmark], 200),
+            ('agentic-aggregates', origin + '/api/v1/agentic-aggregates?ids=2',
+             {'2': aggregate}, 200),
+            ('derived-agentic-metrics', origin + '/api/v1/derived-agentic-metrics?ids=2',
+             {'2': derived}, 200),
+            ('trace-availability', origin + '/api/v1/trace-availability?ids=2', {'2': False}, 200),
+        ]
+        agent = self.bundle(
+            'agentx', agent_responses,
+            lambda ids: {'schema_version': 1, 'kind': 'agentx',
+                         'metadata': {'request_urls': [
+                             {'response_id': response_id} for response_id in ids]},
+                         'rows': [{'benchmark': {**benchmark, 'id': '2'}, 'agentx': {
+                             'status': 'complete', 'result_id': '2',
+                             'aggregates': {'status': 'available', 'value': {**aggregate, 'id': '2'}},
+                             'derived_metrics': {'status': 'available', 'value': {**derived, 'id': '2'}},
+                             'trace_availability': {'status': 'no_stored_trace', 'value': False,
+                                                    'response_key_present': True}}}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b300', 'valid_records': 1}], 'reasons': []})
+
+        provenance_responses = [
+            ('benchmarks', origin + '/api/v1/benchmarks?model=GLM-5',
+            [{**base, 'id': 3, 'metrics': {}}], 200),
+            ('workflow-info', origin + '/api/v1/workflow-info?date=2026-09-07', {'runs': []}, 200),
+            ('server-log', origin + '/api/v1/server-log?id=3', {'id': 3, 'serverLog': 'ready'}, 200),
+        ]
+        provenance = self.bundle(
+            'result', provenance_responses,
+            lambda ids: {'schema_version': 1, 'kind': 'result',
+                         'metadata': {'package_version': self.VERSION,
+                                      'selected_result_id': '3', 'ran_new_benchmark': False},
+                         'selected_result': {**base, 'id': '3', 'metrics': {}},
+                         'producer': {'status': 'unresolved', 'github_run_id': None,
+                                      'run_attempt': None, 'workflow_run': None,
+                                      'run_configs': []},
+                         'evidence': [{'response_id': item} for item in ids],
+                         'log': {'status': 'available', 'text': 'ready',
+                                 'source_response_id': ids[-1]}},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
+
+        point = {'hardware': 'b200', 'workload': '1024x1024', 'tier': 50,
+                 'boundary': 'interpolated',
+                 'output_tput_per_gpu': 1000}
+        tco = self.bundle(
+            'tco', [('tco-feed', origin + '/api/v1/tco-feed?model=dsv4',
+                     {'rows': [point]}, 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'tco',
+                         'source': {'response_id': ids[0]},
+                         'rows': [{'hardware': 'b200', 'workload': '1024x1024',
+                                   'status': 'available', 'usd_per_gpu_hour': 3.6,
+                                   'usd_per_million_output_tokens': 1, 'point': point}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b200', 'valid_records': 1}], 'reasons': []})
+
+        history = [{**base, 'id': 4, 'metrics': {'median_ttft': 10}},
+                   {**base, 'id': 5, 'metrics': {'median_ttft': 15}}]
+        releases = self.bundle(
+            'releases', [('benchmark-history', origin +
+                          '/api/v1/benchmarks/history?model=GLM-5', history, 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'releases',
+                         'metadata': {'causal_attribution': 'not_established',
+                                      'statistical_verdict': 'not_established'},
+                         'sources': [{'response_id': ids[0]}],
+                         'selection': {
+                             'before': {'rows': [history[0]], 'excluded': [],
+                                        'unique_observations': 1, 'snapshot_reuses': 0},
+                             'after': {'rows': [history[1]], 'excluded': [],
+                                       'unique_observations': 1, 'snapshot_reuses': 0}},
+                         'comparisons': [{'before_id': '4', 'after_id': '5', 'metric': {
+                             'name': 'median_ttft', 'before': 10, 'after': 15,
+                             'delta': 5, 'percent_change': 50}}]},
+            {'status': 'complete', 'selected_records': 2, 'comparable_pairs': 1,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
+
+        left = {'component': {'latency_us': {'p50': 20}}}
+        right = {'component': {'latency_us': {'p50': 10}}}
+        collective_responses = [
+            ('openapi', origin + '/api/openapi.json', {}, 200),
+            ('collectivex-run', origin + '/api/v1/collectivex/runs/90071992547409930001', left, 200),
+            ('collectivex-run', origin + '/api/v1/collectivex/runs/90071992547409930002', right, 200),
+        ]
+        collective = self.bundle(
+            'collectivex', collective_responses,
+            lambda ids: {'schema_version': 1, 'kind': 'collectivex',
+                         'sources': [{'response_id': item} for item in ids],
+                         'summary': {'matched': 1, 'only_left': 0, 'only_right': 0,
+                                     'ambiguous': 0, 'incomparable': 0},
+                         'comparisons': [{'status': 'matched',
+                                         'left': [{'response_index': 1,
+                                                   'json_pointer': '/component'}],
+                                         'right': [{'response_index': 2,
+                                                    'json_pointer': '/component'}],
+                                         'metrics': [{'name': 'latency_us.p50', 'unit': 'us',
+                                                      'left': {'status': 'value', 'value': 20},
+                                                      'right': {'status': 'value', 'value': 10},
+                                                      'difference_right_minus_left': -10,
+                                                      'ratio_right_over_left': 0.5}]}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': 1,
+             'hardware': [], 'reasons': []})
+        return {name: value for name, value in (
+            ('powerx', power), ('agentx', agent), ('result', provenance), ('tco', tco),
+            ('releases', releases), ('collectivex', collective))}
+
+    def rehash_result(self, directory, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        result = json.loads(result_path.read_text())
+        mutate(result)
+        raw = (json.dumps(result, indent=2) + '\n').encode()
+        result_path.write_bytes(raw)
+        manifest['result']['size'] = len(raw)
+        manifest['result']['sha256'] = hashlib.sha256(raw).hexdigest()
+        check.save(manifest_path, manifest)
+
+    def rehash_response(self, directory, index, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        response = manifest['requests'][index]['response']
+        old_id = response['id']
+        old_path = directory / response['path']
+        body = json.loads(old_path.read_text())
+        mutate(body)
+        raw = json.dumps(body, separators=(',', ':')).encode()
+        new_id = hashlib.sha256(raw).hexdigest()
+        new_path = directory / 'responses' / f'{new_id}.body'
+        new_path.write_bytes(raw)
+        old_path.unlink()
+        response.update(id=new_id, sha256=new_id, path=f'responses/{new_id}.body', size=len(raw))
+        manifest['requests'][index]['attempts'][-1]['consumedBytes'] = len(raw)
+        result_path = directory / manifest['result']['path']
+        result = json.loads(result_path.read_text())
+
+        def replace(value):
+            if value == old_id:
+                return new_id
+            if type(value) is list:
+                return [replace(item) for item in value]
+            if type(value) is dict:
+                return {key: replace(item) for key, item in value.items()}
+            return value
+
+        result = replace(result)
+        result_raw = (json.dumps(result, indent=2) + '\n').encode()
+        result_path.write_bytes(result_raw)
+        manifest['result']['size'] = len(result_raw)
+        manifest['result']['sha256'] = hashlib.sha256(result_raw).hexdigest()
+        check.save(manifest_path, manifest)
+
+    def forge_coverage(self, directory, *, selected=None, pairs=None, hardware=None,
+                       requirements=None):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        coverage = manifest['coverage']
+        if selected is not None:
+            coverage['selected_records'] = selected
+        if pairs is not None:
+            coverage['comparable_pairs'] = pairs
+        if hardware is not None:
+            coverage['hardware'] = hardware
+        manifest['summary']['coverage'] = coverage
+        if requirements is not None:
+            manifest['summary']['policy'] = {
+                'status': 'passed', 'requirements': requirements, 'reasons': []}
+        check.save(manifest_path, manifest)
+
+    def convert_to_csv(self, directory, kind):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        document = json.loads(result_path.read_text())
+        records = []
+        if kind == 'powerx':
+            for row in document['rows']:
+                records.append({
+                    'package_version': self.VERSION,
+                    'query_url': manifest['requests'][0]['url'],
+                    'retrieved_at': manifest['requests'][0]['response']['retrieved_at'],
+                    'requested_model': manifest['normalized_arguments']['model'],
+                    'requested_date': manifest['normalized_arguments']['date'],
+                    'date_selection': 'latest',
+                    'raw_model': manifest['normalized_arguments']['raw_model'],
+                    'source_response_id': manifest['requests'][0]['response']['id'],
+                    **row, **row['metrics'],
+                })
+            columns = check.CONTRACT_POWERX_CSV_COLUMNS
+        else:
+            source_ids = [request['response']['id'] for request in manifest['requests']]
+            options = manifest['normalized_arguments']
+            for row in document['rows']:
+                benchmark, agentx = row['benchmark'], row['agentx']
+                aggregate = agentx['aggregates']['value'] or {}
+                enrichment = {
+                    **{f'aggregate.{group}.{field}': (aggregate.get(group) or {}).get(field)
+                       for group in check.AGENTX_GROUPS
+                       for field in (*check.AGENTX_PERCENTILES, 'n')},
+                    'derived.p75_e2e_norm_intvty':
+                        (agentx['derived_metrics']['value'] or {}).get('p75_e2e_norm_intvty'),
+                    'derived.p90_e2e_norm_intvty':
+                        (agentx['derived_metrics']['value'] or {}).get('p90_e2e_norm_intvty'),
+                    'trace.available': agentx['trace_availability']['value'],
+                    'trace.response_key_present': agentx['trace_availability']['response_key_present'],
+                    'enrichment.status': agentx['status'],
+                    'enrichment.aggregates_status': agentx['aggregates']['status'],
+                    'enrichment.derived_metrics_status': agentx['derived_metrics']['status'],
+                    'enrichment.trace_availability_status': agentx['trace_availability']['status'],
+                }
+                records.append({
+                    'package_version': self.VERSION,
+                    'query_url': manifest['requests'][0]['url'],
+                    'retrieved_at': manifest['requests'][0]['response']['retrieved_at'],
+                    'requested_model': options['model'], 'requested_date': options['date'],
+                    'date_selection': 'latest', 'requested_benchmark_type': 'agentic_traces',
+                    **{f'filter.{name}': options[name] for name, _field in check.AGENTX_FILTERS},
+                    'source_response_ids': json.dumps(source_ids, separators=(',', ':')),
+                    **benchmark, 'metrics_json': json.dumps(benchmark['metrics'], separators=(',', ':')),
+                    **enrichment,
+                })
+            columns = check.CONTRACT_AGENTX_CSV_COLUMNS
+        output = io.StringIO(newline='')
+        writer = csv.DictWriter(output, fieldnames=columns, lineterminator='\r\n', extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows({key: str(value).lower() if type(value) is bool else value
+                          for key, value in record.items()} for record in records)
+        raw = output.getvalue().encode()
+        csv_path = directory / 'result.csv'
+        csv_path.write_bytes(raw)
+        result_path.unlink()
+        manifest['normalized_arguments']['format'] = 'csv'
+        manifest['result'].update(path='result.csv', format='csv', size=len(raw),
+                                  sha256=hashlib.sha256(raw).hexdigest())
+        manifest['summary']['output']['result'] = 'result.csv'
+        check.save(manifest_path, manifest)
+        return directory
+
+    def mutate_csv(self, directory, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        with result_path.open(newline='') as handle:
+            reader = csv.DictReader(handle)
+            columns, records = reader.fieldnames, list(reader)
+        mutate(records)
+        output = io.StringIO(newline='')
+        writer = csv.DictWriter(output, fieldnames=columns, lineterminator='\r\n')
+        writer.writeheader()
+        writer.writerows(records)
+        raw = output.getvalue().encode()
+        result_path.write_bytes(raw)
+        manifest['result']['size'] = len(raw)
+        manifest['result']['sha256'] = hashlib.sha256(raw).hexdigest()
+        check.save(manifest_path, manifest)
+
+    def test_six_family_bundles_are_checked_against_consumed_responses(self):
+        reports = {kind: check.check_bundle(directory, self.VERSION)
+                   for kind, directory in self.fixtures().items()}
+        self.assertEqual(set(reports), {
+            'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'})
+        self.assertTrue(all(report['status'] == 'passed' for report in reports.values()))
+        self.assertEqual(reports['collectivex']['comparable_pairs'], 1)
+
+    def test_partial_agentx_evidence_remains_valid_with_zero_usable_hardware(self):
+        origin = 'https://inferencex.semianalysis.com'
+        seed = self.fixtures()['agentx']
+        seed_manifest = json.loads((seed / 'manifest.json').read_text())
+        benchmark = json.loads((seed / seed_manifest['requests'][0]['response']['path']).read_text())[0]
+        benchmark['id'] = 8
+        responses = [
+            ('benchmarks', origin + '/api/v1/benchmarks?model=DeepSeek-V4-Pro',
+             [benchmark], 200),
+            ('agentic-aggregates', origin + '/api/v1/agentic-aggregates?ids=8', {}, 200),
+            ('derived-agentic-metrics', origin + '/api/v1/derived-agentic-metrics?ids=8', {}, 200),
+            ('trace-availability', origin + '/api/v1/trace-availability?ids=8', {}, 200),
+        ]
+        directory = self.bundle(
+            'agentx', responses,
+            lambda ids: {'schema_version': 1, 'kind': 'agentx',
+                         'metadata': {'responses': ids}, 'rows': [{
+                             'benchmark': {**benchmark, 'id': '8'},
+                             'agentx': {'status': 'partial', 'result_id': '8',
+                                        'aggregates': {'status': 'not_returned', 'value': None},
+                                        'derived_metrics': {'status': 'not_returned', 'value': None},
+                                        'trace_availability': {'status': 'no_stored_trace', 'value': False,
+                                                               'response_key_present': False}}}]},
+            {'status': 'partial', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b300', 'valid_records': 0}],
+             'reasons': [{'code': 'missing_aggregate', 'count': 1}]})
+        report = check.check_bundle(directory, self.VERSION)
+        self.assertEqual(report['selected_records'], 1)
+
+    def test_rehashed_tco_derivation_tamper_is_rejected(self):
+        directory = self.fixtures()['tco']
+        self.rehash_result(directory, lambda result:
+                           result['rows'][0].update(usd_per_million_output_tokens=2))
+        with self.assertRaisesRegex(ValueError, 'TCO arithmetic'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_contract_csv_rows_and_response_references_are_source_derived(self):
+        fixtures = self.fixtures()
+        power = self.convert_to_csv(fixtures['powerx'], 'powerx')
+        agent = self.convert_to_csv(fixtures['agentx'], 'agentx')
+        self.assertEqual(check.check_bundle(power, self.VERSION)['eligible_records'], 1)
+        self.assertEqual(check.check_bundle(agent, self.VERSION)['eligible_records'], 1)
+
+        forged_reference = self.convert_to_csv(self.fixtures()['powerx'], 'powerx')
+        self.mutate_csv(
+            forged_reference,
+            lambda rows: rows[0].update(source_response_id='f' * 64))
+        with self.assertRaisesRegex(ValueError, 'CSV value'):
+            check.check_bundle(forged_reference, self.VERSION)
+
+        bogus_value = self.convert_to_csv(self.fixtures()['agentx'], 'agentx')
+        self.mutate_csv(bogus_value, lambda rows: rows[0].update(**{'aggregate.isl.mean': '999'}))
+        with self.assertRaisesRegex(ValueError, 'CSV value'):
+            check.check_bundle(bogus_value, self.VERSION)
+
+        fabricated = self.convert_to_csv(self.fixtures()['powerx'], 'powerx')
+        self.mutate_csv(fabricated, lambda rows: rows.append({**rows[0], 'id': '999'}))
+        self.forge_coverage(
+            fabricated, selected=2,
+            hardware=[{'hardware': 'h200_sxm', 'valid_records': 2}])
+        with self.assertRaisesRegex(ValueError, 'row count|derivation'):
+            check.check_bundle(fabricated, self.VERSION)
+
+    def test_incomplete_bundle_and_wrong_request_scope_are_rejected(self):
+        fixtures = self.fixtures()
+        (fixtures['result'] / 'manifest.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'Manifest'):
+            check.check_bundle(fixtures['result'], self.VERSION)
+        directory = fixtures['powerx']
+        manifest = json.loads((directory / 'manifest.json').read_text())
+        changed = 'https://inferencex.semianalysis.com/api/v1/evaluations'
+        manifest['requests'][0]['url'] = changed
+        manifest['requests'][0]['attempts'][-1]['url'] = changed
+        check.save(directory / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'request scope'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_failed_policy_is_valid_evidence_and_maps_to_exit_three(self):
+        power = self.fixtures()['powerx']
+        manifest = json.loads((power / 'manifest.json').read_text())
+        manifest['summary']['policy'] = {
+            'status': 'failed',
+            'requirements': {'require_hardware': ['mi355x'], 'min_comparable_pairs': None},
+            'reasons': [{'code': 'required_hardware_missing', 'hardware': 'mi355x'}],
+        }
+        check.save(power / 'manifest.json', manifest)
+        report = check.check_bundle(power, self.VERSION)
+        self.assertEqual((report['policy_status'], report['policy_exit_code']), ('failed', 3))
+        manifest['summary']['policy']['status'] = 'passed'
+        check.save(power / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'policy decision'):
+            check.check_bundle(power, self.VERSION)
+
+    def test_manifest_cannot_forge_eligible_hardware_or_comparable_pairs(self):
+        fixtures = self.fixtures()
+        self.rehash_response(
+            fixtures['powerx'], 0,
+            lambda body: body[0]['metrics'].update(avg_power_w=None))
+        self.rehash_result(
+            fixtures['powerx'],
+            lambda result: result['rows'][0]['metrics'].update(avg_power_w=None))
+        self.forge_coverage(
+            fixtures['powerx'], hardware=[{'hardware': 'h200_sxm', 'valid_records': 1}],
+            requirements={'require_hardware': ['h200_sxm'], 'min_comparable_pairs': None})
+        self.rehash_response(
+            fixtures['agentx'], 1,
+            lambda body: body['2']['isl'].update(n=0))
+        self.rehash_result(
+            fixtures['agentx'],
+            lambda result: result['rows'][0]['agentx']['aggregates']['value']['isl'].update(n=0))
+        self.forge_coverage(
+            fixtures['agentx'], hardware=[{'hardware': 'b300', 'valid_records': 1}],
+            requirements={'require_hardware': ['b300'], 'min_comparable_pairs': None})
+        self.rehash_response(
+            fixtures['tco'], 0,
+            lambda body: body['rows'][0].update(boundary='unreachable'))
+        self.rehash_result(fixtures['tco'], lambda result: result['rows'][0].update(
+            status='unreachable', usd_per_million_output_tokens=None,
+            point={**result['rows'][0]['point'], 'boundary': 'unreachable'}))
+        self.forge_coverage(
+            fixtures['tco'], hardware=[{'hardware': 'b200', 'valid_records': 1}],
+            requirements={'require_hardware': ['b200'], 'min_comparable_pairs': None})
+        self.rehash_result(fixtures['releases'], lambda result: result.update(comparisons=[]))
+        self.forge_coverage(
+            fixtures['releases'], pairs=1,
+            requirements={'require_hardware': [], 'min_comparable_pairs': 1})
+        self.rehash_result(
+            fixtures['collectivex'],
+            lambda result: result['comparisons'][0].update(metrics=[]))
+        self.forge_coverage(
+            fixtures['collectivex'], pairs=1,
+            requirements={'require_hardware': [], 'min_comparable_pairs': 1})
+        for kind in ['powerx', 'agentx', 'tco', 'releases', 'collectivex']:
+            with self.subTest(kind=kind), self.assertRaisesRegex(
+                    ValueError, 'coverage|validity|comparable|point|policy'):
+                check.check_bundle(fixtures[kind], self.VERSION)
+
+    def test_result_source_fields_and_release_claims_cannot_be_rehashed(self):
+        fixtures = self.fixtures()
+        self.rehash_result(
+            fixtures['result'],
+            lambda result: result['selected_result'].update(hardware='forged-gpu'))
+        with self.assertRaisesRegex(ValueError, 'Provenance'):
+            check.check_bundle(fixtures['result'], self.VERSION)
+        producer = self.fixtures()['result']
+        self.rehash_result(
+            producer,
+            lambda result: result['producer'].update(
+                status='confirmed', github_run_id='123', run_attempt='1'))
+        with self.assertRaisesRegex(ValueError, 'producer meaning'):
+            check.check_bundle(producer, self.VERSION)
+        self.rehash_result(
+            fixtures['releases'],
+            lambda result: result['metadata'].update(statistical_verdict='regression'))
+        with self.assertRaisesRegex(ValueError, 'statistical'):
+            check.check_bundle(fixtures['releases'], self.VERSION)
+
+    def test_valid_partial_domain_evidence_keeps_zero_eligibility(self):
+        fixtures = self.fixtures()
+        self.rehash_response(fixtures['tco'], 0, lambda body: body.update(rows=[]))
+        self.rehash_result(fixtures['tco'], lambda result: result['rows'][0].update(
+            status='missing_point', point=None, usd_per_million_output_tokens=None))
+        self.forge_coverage(
+            fixtures['tco'], hardware=[{'hardware': 'b200', 'valid_records': 0}])
+        self.rehash_response(
+            fixtures['releases'], 0,
+            lambda body: body[1]['metrics'].update(median_ttft=None))
+        self.rehash_result(
+            fixtures['releases'],
+            lambda result: (
+                result['comparisons'][0]['metric'].update(
+                    after=None, delta=None, percent_change=None, status='missing_after'),
+                result['selection']['after']['rows'][0]['metrics'].update(median_ttft=None)))
+        self.forge_coverage(fixtures['releases'], pairs=0,
+                            hardware=[{'hardware': 'h200_sxm', 'valid_records': 0}])
+        self.rehash_result(
+            fixtures['collectivex'],
+            lambda result: result['comparisons'][0].update(
+                status='incomparable', issues=['topology_mismatch'], metrics=[]))
+        self.rehash_result(
+            fixtures['collectivex'],
+            lambda result: result.update(summary={
+                'matched': 0, 'only_left': 0, 'only_right': 0,
+                'ambiguous': 0, 'incomparable': 1}))
+        self.forge_coverage(fixtures['collectivex'], pairs=0)
+        for kind in ['tco', 'releases', 'collectivex']:
+            report = check.check_bundle(fixtures[kind], self.VERSION)
+            self.assertEqual(report['eligible_records'], 0)
+
+    def test_result_missing_log_is_valid_partial_evidence(self):
+        seed = self.fixtures()['result']
+        seed_manifest = json.loads((seed / 'manifest.json').read_text())
+        benchmark_body = json.loads(
+            (seed / seed_manifest['requests'][0]['response']['path']).read_text())
+        origin = 'https://inferencex.semianalysis.com'
+        directory = self.bundle(
+            'result', [
+                ('benchmarks', origin + '/api/v1/benchmarks?model=GLM-5', benchmark_body, 200),
+                ('workflow-info', origin + '/api/v1/workflow-info?date=2026-09-07',
+                 {'runs': [], 'changelogs': [], 'configs': [], 'runConfigs': []}, 200),
+                ('server-log', origin + '/api/v1/server-log?id=3', {'error': 'not found'}, 404),
+            ],
+            lambda ids: {
+                'schema_version': 1, 'kind': 'result',
+                'metadata': {'package_version': self.VERSION, 'selected_result_id': '3',
+                             'ran_new_benchmark': False},
+                'selected_result': {**benchmark_body[0], 'id': '3'},
+                'producer': {'status': 'unresolved', 'github_run_id': None, 'run_attempt': None,
+                             'workflow_run': None, 'run_configs': []},
+                'evidence': [{'response_id': item} for item in ids],
+                'log': {'status': 'not_found', 'text': None, 'source_response_id': ids[-1]},
+            },
+            {'status': 'partial', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}],
+             'reasons': [{'code': 'log_unavailable', 'count': 1}]})
+        report = check.check_bundle(directory, self.VERSION)
+        self.assertEqual(report['eligible_records'], 1)
+
+    def test_contract_one_candidate_runs_six_bundles_offline_and_an_exit_three_policy(self):
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        args = SimpleNamespace(model='GLM-5', date='2026-09-07', isl=8192, osl=1024,
+                               raw_model='glm5', agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+        calls = []
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            calls.append(([str(part) for part in command], label))
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'},
+                    'coverage': {'available_items': 1},
+                    'sources': [{'response_id': 'a' * 64}],
+                    'items': [{'result_id': '41', 'raw_model': 'glm5', 'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}],
+                })
+            if label == 'contract-one-policy-exit-3':
+                output = json.dumps({'validity': 'valid', 'policy': {'status': 'failed'}})
+                raise subprocess.CalledProcessError(3, command, output=output, stderr='')
+            return '{}\n'
+
+        def audit(directory, version):
+            self.assertEqual(version, self.VERSION)
+            name = Path(directory).name
+            return {'kind': 'powerx' if name == 'powerx-empty' else name,
+                    'status': 'passed', 'selected_records': 0 if name == 'powerx-empty' else 1,
+                    'eligible_records': 0 if name == 'powerx-empty' else 1,
+                    'comparable_pairs': 1 if name in {'releases', 'collectivex'} else None,
+                    'response_ids': ['a' * 64], 'policy_status': 'not_requested',
+                    'policy_exit_code': 0}
+
+        with patch.object(check, 'run', side_effect=execute), \
+                patch.object(check, 'check_bundle', side_effect=audit) as audits:
+            report = check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
+        self.assertEqual(report['status'], 'passed')
+        self.assertEqual(report['policy_exit_code'], 3)
+        self.assertEqual(report['discovery']['result_id'], '41')
+        self.assertEqual(audits.call_count, 7)
+        commands = [command for command, _label in calls]
+        self.assertEqual(sum('--output-dir' in command for command in commands), 7)
+        self.assertEqual(sum('verify' in command for command in commands), 8)
+        self.assertTrue(all('--import' in command for command in commands if 'verify' in command))
+        pinned = json.loads((project / 'contract-one-scope.json').read_text())
+        self.assertEqual(pinned['raw_model'], 'glm5')
+        empty_command = next(command for command, label in calls
+                             if label == 'contract-one-powerx-empty')
+        self.assertIn('--date', empty_command)
+        self.assertEqual(empty_command[empty_command.index('--date') + 1], '2026-09-07')
+        self.assertIn('--raw-model', empty_command)
+        self.assertEqual(empty_command[empty_command.index('--raw-model') + 1], 'glm5')
+
+
 if __name__ == '__main__':
     unittest.main()

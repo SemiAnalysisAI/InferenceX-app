@@ -1,5 +1,10 @@
 # Command errors and unattended exports
 
+This page preserves the direct helpers' historical scheduler and installer
+contract. New automation should use the versioned entry and
+[contract 1 reference](cli.md), including exit 3 for a committed bundle whose
+explicit coverage predicate failed.
+
 Read this when a scheduler consumes an InferenceX helper, a command fails, or an
 installed skill needs an upgrade. Domain selection, units and interpretation stay
 in the relevant PowerX, AgentX or comparison cookbook.

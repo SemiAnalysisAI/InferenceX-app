@@ -6,6 +6,11 @@ are needed. Each prints JSON only after successful reads and records each reques
 URL and retrieval time. Save the output with the answer. HTTP errors, malformed
 JSON, and unexpected response shapes are failures, not empty results.
 
+The versioned CLI can list supported capabilities and public model scopes with
+`inferencex discover capabilities` and `inferencex discover models`. See the
+[CLI contract](cli.md). The recipes below remain useful for API operations that
+do not have a formal evidence-bundle command.
+
 ## Evaluation lookup
 
 Example request: "Show up to five recent evaluation observations for raw model

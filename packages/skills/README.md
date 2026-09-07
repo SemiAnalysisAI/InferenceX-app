@@ -4,21 +4,56 @@ One Agent Skill, `inferencex-api`, for querying the
 [InferenceX public API](https://inferencex.semianalysis.com/api) from Codex or Claude Code.
 It supports current OpenAPI discovery, benchmark, evaluation, dataset and history
 lookups, PowerX and AgentX exports, result provenance and bounded logs that preserve source evidence.
-It also verifies saved PowerX/AgentX summary exports offline and produces Markdown reports.
+Its versioned CLI also creates and verifies replayable evidence bundles for PowerX,
+AgentX, result provenance, TCO, release, and CollectiveX workflows.
 
 The [public API cookbook](skills/inferencex-api/references/public-api-examples.md)
 also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
 It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.11.0` and require that version to be published.
+The npm commands below pin version `1.0.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
+
+## CLI 1.0 quick start
+
+These commands describe the unpublished 1.0 candidate; the public installation
+commands below remain unusable until 1.0.0 publication verification passes. After
+installing the candidate archive, use the entry point under `.agents` for Codex
+or `.claude` for Claude Code:
+
+```bash
+inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
+node "$inferencex_cli" discover models
+node "$inferencex_cli" powerx export --model GLM-5 --isl 8192 --osl 1024 \
+  --output-dir evidence/powerx --require-hardware h200_sxm
+node "$inferencex_cli" verify evidence/powerx --require-hardware h200_sxm
+```
+
+The export creates a new directory with the result, decoded responses, request
+ledger, hashes, coverage, and manifest. Verification replays it without network
+access. Exit 0 means the bundle completed and any explicit policy passed. Exit 3
+means the bundle completed but an explicit policy failed. Branch on the exit code
+before parsing stdout. See the [CLI contract](skills/inferencex-api/references/cli.md)
+for all six command families, schemas, limits, and compatibility rules.
+
+| Legacy command                                     | Versioned command                                     | Main migration                                                               |
+| -------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `export-powerx.mjs` / `export-agentx.mjs`          | `inferencex powerx export` / `agentx export`          | Replace separate `--output` and `--evidence-dir` with one new `--output-dir` |
+| `investigate-result.mjs`                           | `inferencex result inspect`                           | Result, bounded log, and source responses become one replayable bundle       |
+| `compare-tco.mjs`                                  | `inferencex tco compare`                              | Arithmetic is retained; source data moves to evidence                        |
+| `compare-releases.mjs` / `compare-collectivex.mjs` | `inferencex releases compare` / `collectivex compare` | Add `--min-comparable-pairs` when CI requires coverage                       |
+| `verify-export.mjs`                                | `inferencex verify <directory>`                       | The contract 1 manifest identifies the result                                |
+
+The direct scripts remain available with their historical interfaces and text
+errors. No removal date is declared. New automation should consume contract 1
+schemas and fixed CSV columns.
 
 ## New in 0.11.0
 
 [Offline verification](skills/inferencex-api/references/offline-exports.md) checks saved
 PowerX JSON/CSV and AgentX summary JSON/CSV against their complete response evidence.
-The installed `verify-export.mjs` accepts producers `0.9.0`, `0.10.0`, and `0.11.0`,
+The installed `verify-export.mjs` accepts producers `0.9.0`, `0.10.0`, `0.11.0`, and `1.0.0`,
 reconstructs the exact export bytes, and writes a deterministic Markdown report.
 It makes no network requests and runs no benchmarks. Reports preserve source scope,
 dates, units and missing-data coverage; they establish saved-bundle consistency,
@@ -77,7 +112,9 @@ bytes**. AgentX additionally limits all response bytes to **128 MiB** and its HT
 sequence to **120 seconds**, retaining the **30-second per-request timeout**.
 Limit failures do not return truncated success; completed evidence bodies remain
 available for diagnosis, while incomplete bodies have no complete-body hash.
-There are no automatic HTTP retries. Narrow the model/date scope if a limit is hit.
+These legacy direct helpers do not retry HTTP. The versioned 1.0 entry accepts one
+to three bounded attempts and records every attempt. Narrow the model/date scope if
+a limit is hit.
 
 All six installed helpers accept `--version` without network access or required
 query arguments. Existing successful JSON/CSV fields and calculations are unchanged.
@@ -86,8 +123,9 @@ The installer checks the additional response reader when identifying 0.9+ instal
 Release verification now exercises all six helpers from clean installations for
 both targets, including retained-source checks for the four newer workflows.
 These live smoke checks supplement fixture tests; they do not establish native
-agent discovery or narrative quality. Node 24/26 are checked on Linux in CI;
-macOS is checked locally. Windows compatibility is not yet qualified.
+agent discovery or narrative quality. The 1.0 candidate targets a Linux/macOS by
+Node 24/26 CI matrix; qualification requires retained results for all four jobs.
+Windows compatibility is not yet qualified.
 
 ## Included from 0.8.0
 
@@ -152,10 +190,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -166,9 +204,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -181,7 +219,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.11.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-1.0.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -301,7 +339,7 @@ availability is false or omitted.
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -330,8 +368,8 @@ check is not a full integrity check and cannot detect every local edit.
 ### JSON output and installation preview
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target codex --force --dry-run --json
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target codex --force --dry-run --json
 ```
 
 `--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
@@ -377,11 +415,11 @@ leave stdout empty. The success/status JSON contract above is unchanged.
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.11.0` with the published version you intend to install:
+version. To upgrade, replace `1.0.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target claude --force
 ```
 
 Force stages the existing directory and overlays the packaged files before activation.
@@ -403,12 +441,12 @@ malformed, foreign or unsafe transaction data blocks automatic recovery.
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
 抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.11.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `1.0.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
 0.11.0 新增[离线校验流程](skills/inferencex-api/references/offline-exports.md)：使用完整保存的
 响应证据校验 PowerX JSON/CSV 和 AgentX summary JSON/CSV。安装后的 `verify-export.mjs`
-支持由 `0.9.0`、`0.10.0` 和 `0.11.0` 生成的导出，重建并逐字节核对导出内容，再生成确定性的
+支持由 `0.9.0`、`0.10.0`、`0.11.0` 和 `1.0.0` 生成的导出，重建并逐字节核对导出内容，再生成确定性的
 Markdown 报告。整个过程不请求网络，也不运行新的基准测试。报告保留数据范围、日期、单位和
 缺失值覆盖情况；它确认的是保存文件之间的一致性，不能证明发布者身份或性能差异的原因。
 
@@ -625,7 +663,7 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 共享的 stderr 错误文档，stdout 保持为空；成功和状态查询的 JSON 格式不变。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.11.0` 改为计划安装的已发布版本。该选项先暂存已有目录，再合并包内文件并切换安装；
+的 `1.0.0` 改为计划安装的已发布版本。该选项先暂存已有目录，再合并包内文件并切换安装；
 同名文件会被覆盖，相邻的其他技能不受影响，已不再随包提供的旧文件也不会删除。
 覆盖前请自行备份本地修改。事务中断后，保留事务目录并重新执行实际安装以恢复；`status`
 和 `--dry-run` 只检查状态。事务仍有存活的持有进程时可以等待其完成；事务数据格式异常、

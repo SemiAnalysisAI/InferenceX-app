@@ -7,6 +7,7 @@ import { parseArgs } from 'node:util';
 import {
   argumentError,
   httpError,
+  isMain,
   outputBoundary,
   requestBoundary,
   responseBoundary,
@@ -15,7 +16,7 @@ import {
 } from './cli-contract.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.11.0';
+const PACKAGE_VERSION = '1.0.0';
 const ORIGIN = 'https://inferencex.semianalysis.com';
 const VERSION = 1;
 const BYTE_BUDGET = 32 * 1024 * 1024;
@@ -328,6 +329,238 @@ function compare(left, right) {
   });
 }
 
+function validateSchema(schema) {
+  for (const path of ['/api/v1/collectivex/runs', '/api/v1/collectivex/runs/{runId}']) {
+    const operation = schema.paths?.[path]?.get;
+    if (
+      !operation?.parameters
+        ?.find((parameter) => parameter.name === 'version')
+        ?.schema?.enum?.includes(VERSION) ||
+      operation.parameters.some(
+        (parameter) => parameter.required && !['version', 'runId'].includes(parameter.name),
+      )
+    ) {
+      throw new Error(
+        'Inspect the current CollectiveX OpenAPI operations before using this version-1 helper',
+      );
+    }
+  }
+}
+
+function validateRunList(list) {
+  if (
+    !object(list) ||
+    list.version !== VERSION ||
+    typeof list.discovery_complete !== 'boolean' ||
+    !Array.isArray(list.runs) ||
+    list.runs.some((run) => !runIdentity(run) || !count(run.measured_cases)) ||
+    new Set(list.runs.map((run) => run.run_id)).size !== list.runs.length
+  ) {
+    throw new Error('Invalid CollectiveX run list; discovery coverage is unknown');
+  }
+}
+
+function selectRunIds(list) {
+  return list.runs
+    .filter((run) => run.measured_cases > 0)
+    .toSorted((a, b) => (BigInt(a.run_id) < BigInt(b.run_id) ? 1 : -1))
+    .slice(0, 2)
+    .map((run) => run.run_id)
+    .toReversed();
+}
+
+function validateDataset(data, runId) {
+  if (
+    !object(data) ||
+    data.version !== VERSION ||
+    !runIdentity(data.run) ||
+    data.run.run_id !== runId ||
+    !text(data.run.source_sha) ||
+    !Array.isArray(data.coverage) ||
+    !Array.isArray(data.series) ||
+    (data.kv !== undefined && !Array.isArray(data.kv))
+  ) {
+    throw new Error('Invalid or mismatched CollectiveX run dataset');
+  }
+}
+
+function comparisonRows(datasets) {
+  if (datasets.length !== 2) return [];
+  return compare(
+    [
+      ...epRows(datasets[0].body, datasets[0].index),
+      ...kvRows(datasets[0].body, datasets[0].index),
+    ],
+    [
+      ...epRows(datasets[1].body, datasets[1].index),
+      ...kvRows(datasets[1].body, datasets[1].index),
+    ],
+  );
+}
+
+function comparisonSummary(comparisons) {
+  return Object.fromEntries(
+    ['matched', 'only_left', 'only_right', 'ambiguous', 'incomparable'].map((status) => [
+      status,
+      comparisons.filter((row) => row.status === status).length,
+    ]),
+  );
+}
+
+export function normalizeArgs(args) {
+  try {
+    let values;
+    if (Array.isArray(args)) {
+      const parsed = parseArgs({
+        args,
+        options: { left: { type: 'string' }, right: { type: 'string' } },
+        tokens: true,
+        strict: true,
+        allowPositionals: false,
+      });
+      const seen = new Set();
+      for (const token of parsed.tokens) {
+        if (seen.has(token.name)) throw new Error(`Duplicate option --${token.name}`);
+        seen.add(token.name);
+      }
+      values = { left: parsed.values.left ?? null, right: parsed.values.right ?? null };
+    } else {
+      const keys = ['left', 'right'];
+      if (
+        !object(args) ||
+        Object.keys(args).length !== keys.length ||
+        keys.some((key) => !Object.hasOwn(args, key))
+      ) {
+        throw new Error('Invalid saved CollectiveX options');
+      }
+      values = { ...args };
+    }
+    const explicit = values.left !== null || values.right !== null;
+    if (explicit && (!id(values.left) || !id(values.right) || values.left === values.right)) {
+      throw new Error('--left and --right require two distinct positive decimal run-ID strings');
+    }
+    return values;
+  } catch (error) {
+    throw argumentError(error.message, error);
+  }
+}
+
+export function collect(options, context) {
+  const normalized = normalizeArgs(options);
+  return responseBoundary(async () => {
+    const sources = [];
+    async function read(operation, url) {
+      const saved = await context.get({ operation, url, allowedStatuses: [200] });
+      const index = sources.length;
+      sources.push({
+        operation,
+        url,
+        response_id: saved.id,
+        retrieved_at: saved.retrievedAt,
+        http_status: saved.status,
+      });
+      return { body: saved.body, index };
+    }
+
+    const schema = await read('openapi', `${ORIGIN}/api/openapi.json`);
+    validateSchema(schema.body);
+    const explicit = normalized.left !== null;
+    let runIds = explicit ? [normalized.left, normalized.right] : [];
+    let discovery = null;
+    if (!explicit) {
+      const listed = await read('collectivex-runs', `${ORIGIN}/api/v1/collectivex/runs?version=1`);
+      validateRunList(listed.body);
+      runIds = selectRunIds(listed.body);
+      discovery = {
+        response_index: listed.index,
+        response_id: sources[listed.index].response_id,
+        returned_runs: listed.body.runs.length,
+        discovery_complete: listed.body.discovery_complete,
+        history_complete: false,
+      };
+    }
+    const datasets = [];
+    if (runIds.length === 2) {
+      for (const runId of runIds) {
+        const response = await read(
+          'collectivex-run',
+          `${ORIGIN}/api/v1/collectivex/runs/${runId}?version=1`,
+        );
+        validateDataset(response.body, runId);
+        datasets.push(response);
+      }
+    }
+    const comparisons = comparisonRows(datasets);
+    const summary = comparisonSummary(comparisons);
+    const comparablePairs = comparisons.filter(
+      (row) =>
+        row.status === 'matched' &&
+        row.metrics.some(
+          (metricValue) =>
+            metricValue.left.status === 'value' && metricValue.right.status === 'value',
+        ),
+    ).length;
+    const outcome =
+      datasets.length < 2
+        ? 'fewer_than_two_measured_runs'
+        : summary.matched
+          ? 'compared'
+          : 'no_comparable_rows';
+    const document = {
+      schema_version: 1,
+      kind: 'collectivex',
+      package_version: context.producerVersion,
+      contract_version: 1,
+      selection: {
+        mode: explicit ? 'explicit_run_ids' : 'newest_two_measured_from_one_list',
+        run_ids: runIds,
+      },
+      outcome,
+      discovery,
+      comparison_scope: {
+        contract_version: VERSION,
+        basis: 'exact_public_identity',
+        source_sha_equal:
+          datasets.length === 2
+            ? datasets[0].body.run.source_sha === datasets[1].body.run.source_sha
+            : null,
+      },
+      runs: datasets.map(({ body, index }) => ({
+        run: body.run,
+        response_index: index,
+        response_id: sources[index].response_id,
+      })),
+      summary,
+      comparisons,
+      sources,
+      observation_context: 'Existing observations were read; no new benchmark was run.',
+    };
+    const reasons = ['only_left', 'only_right', 'ambiguous', 'incomparable']
+      .filter((status) => summary[status] > 0)
+      .map((status) => ({ code: status, count: summary[status] }));
+    const matchedWithoutValues = summary.matched - comparablePairs;
+    if (matchedWithoutValues > 0) {
+      reasons.push({ code: 'matched_without_usable_metric', count: matchedWithoutValues });
+    }
+    return {
+      format: 'json',
+      bytes: Buffer.from(`${JSON.stringify(document, null, 2)}\n`),
+      coverage: {
+        status:
+          datasets.length < 2 || comparisons.length === 0
+            ? 'empty'
+            : comparablePairs === comparisons.length
+              ? 'complete'
+              : 'partial',
+        selected_records: comparisons.length,
+        comparable_pairs: comparablePairs,
+        hardware: [],
+        reasons,
+      },
+    };
+  }, context.signal);
+}
+
 async function outputJson(output, path, signal) {
   const bytes = `${JSON.stringify(output, null, 2)}\n`;
   if (path === null) {
@@ -564,8 +797,10 @@ async function main(args, signal) {
   }
 }
 
-await runCli({
-  command: 'compare-collectivex',
-  packageVersion: PACKAGE_VERSION,
-  run: ({ args, signal }) => main(args, signal),
-});
+if (isMain(import.meta.url)) {
+  await runCli({
+    command: 'compare-collectivex',
+    packageVersion: PACKAGE_VERSION,
+    run: ({ args, signal }) => main(args, signal),
+  });
+}

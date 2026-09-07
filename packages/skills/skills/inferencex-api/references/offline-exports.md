@@ -2,11 +2,20 @@
 
 Use this workflow when the user already has a PowerX or AgentX summary export and its evidence directory. The installed `verify-export.mjs` checks the saved bundle and creates a deterministic Markdown report. It makes no HTTP requests, including OpenAPI discovery, and runs no benchmarks.
 
+For a contract 1 directory created by the versioned entry, run
+`inferencex verify <directory>` instead; see the [CLI contract](cli.md). The
+legacy command below remains for separately saved exports and manifests.
+
 ## Required files
 
 Keep the original export and the entire original evidence directory. The evidence directory must contain the complete manifest and every response body listed by that manifest. Keep the export outside the evidence directory; place new reports outside both inputs. Do not edit a manifest, replace a missing response, or recalculate a stored hash to make verification pass.
 
-Supported producers are exactly `0.9.0`, `0.10.0`, and `0.11.0`. Supported outputs are PowerX JSON/CSV and AgentX summary JSON/CSV. An AgentX point diagnostic, an incomplete capture, or an unsupported producer version fails explicitly. A bare CSV or JSON file without its source evidence cannot establish the full verification chain.
+Supported producers are exactly `0.9.0`, `0.10.0`, `0.11.0`, and `1.0.0`.
+Producer 1.0.0 maps explicitly to the retained 0.11 legacy rendering contract;
+this does not accept arbitrary 1.x producers. Supported outputs are PowerX
+JSON/CSV and AgentX summary JSON/CSV. An AgentX point diagnostic, an incomplete
+capture, or an unsupported producer version fails explicitly. A bare CSV or JSON
+file without its source evidence cannot establish the full verification chain.
 
 ## Run verification
 

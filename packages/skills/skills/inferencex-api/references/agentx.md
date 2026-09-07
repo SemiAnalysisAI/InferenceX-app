@@ -23,6 +23,18 @@ When counting distinct images or recipe fingerprints, count known values separat
 from rows whose field is missing or null. Report the missing-row count alongside
 the known distinct count; null is not another image or fingerprint.
 
+For a replayable contract 1 summary bundle:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
+  --model DeepSeek-V4-Pro --hardware b300 --output-dir evidence/agentx \
+  --require-hardware b300
+```
+
+A valid empty selection exits 0; the explicit hardware predicate commits that
+bundle and exits 3 when no usable b300 summary exists. See the
+[CLI contract](cli.md) for exit and verification handling.
+
 Public timelines contain sanitized replay structure. They do not expose original
 prompts, code, or tool payloads. Preserve every phase, replay-lane field, and
 cancellation state returned by the API; do not reduce the timeline to successful
