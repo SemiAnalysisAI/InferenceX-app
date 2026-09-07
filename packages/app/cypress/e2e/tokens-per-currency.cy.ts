@@ -16,7 +16,7 @@ describe('Tokens per dollar and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     // The default axis derives from measured throughput and TCO alone, so the
     // token sale price source does not apply and stays hidden.

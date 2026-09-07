@@ -79,7 +79,7 @@ export interface RunTierRead {
   tier: OverviewTier;
   /** Tokens/s per GPU at this interactivity tier; null when unreachable. */
   throughputPerGpu: number | null;
-  /** $ per million total tokens at hyperscaler $/GPU/hr; null when unknown. */
+  /** $ per million total tokens at large-hyperscaler-volume ownership $/GPU/hr; null when unknown. */
   costPerMtok: number | null;
   precision: string | null;
   framework: string | null;
@@ -87,7 +87,7 @@ export interface RunTierRead {
 }
 
 export interface RunCostTier {
-  tierLabel: 'hyperscaler' | 'neocloud' | 'retail';
+  tierLabel: 'hyperscaler' | 'retail';
   costPerGpuHour: number;
   costPerMtok: number;
 }
@@ -175,7 +175,6 @@ function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageDat
       ? (
           [
             ['hyperscaler', hw.costh],
-            ['neocloud', hw.costn],
             ['retail', hw.costr],
           ] as const
         )

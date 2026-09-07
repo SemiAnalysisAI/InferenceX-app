@@ -7,7 +7,7 @@ export interface ResultContextProps {
   workload?: string;
   precision?: string;
   metric?: string;
-  /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning Hyperscaler"). */
+  /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning at Large Hyperscaler Volume"). */
   costTier?: string;
   /** Fleet utilization the revenue figures assume (e.g. "60%"). */
   utilization?: string;

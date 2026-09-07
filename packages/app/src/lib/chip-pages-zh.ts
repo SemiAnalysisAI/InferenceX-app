@@ -226,7 +226,7 @@ export const CHIP_VS_HIGHLIGHT_LABELS_ZH: Readonly<Record<ChipVsHighlight['key']
   fp8: '稠密 FP8 算力',
   fp4: '稠密 FP4 算力',
   tdp: 'TDP',
-  costNeocloud: '小时租价（neocloud 档）',
+  costHyperscaler: '小时成本（自有 - 超大规模云大批量）',
   scaleUpWorldSize: 'Scale-up 域规模',
 };
 
@@ -251,7 +251,7 @@ export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   return [
     {
       question: `${entry.label} 云端租用每小时多少钱？`,
-      answer: `按 SemiAnalysis AI Cloud TCO 模型，${entry.label} 在超大规模云约 $${hw.costh.toFixed(2)}/小时，neocloud 档约 $${hw.costn.toFixed(2)}/小时，零售档约 $${hw.costr.toFixed(2)}/小时。InferenceX 的每美元性能页面即使用这些费率将实测吞吐量换算为每百万 token 成本。`,
+      answer: `按 SemiAnalysis AI Cloud TCO 模型，${entry.label} 按超大规模云厂商大批量采购价自有约 $${hw.costh.toFixed(2)}/小时，零售档约 $${hw.costr.toFixed(2)}/小时。InferenceX 的每美元性能页面即使用这些费率将实测吞吐量换算为每百万 token 成本。`,
     },
     {
       question: `${entry.label} 有多少显存？`,
@@ -278,7 +278,7 @@ export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
 export function buildZhChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   const highlights = buildChipVsHighlights(page);
   const memory = highlights.find((h) => h.key === 'memory');
-  const cost = highlights.find((h) => h.key === 'costNeocloud');
+  const cost = highlights.find((h) => h.key === 'costHyperscaler');
   const fp8 = highlights.find((h) => h.key === 'fp8');
   return [
     {
@@ -287,7 +287,7 @@ export function buildZhChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
     },
     {
       question: `${page.a.label} 和 ${page.b.label} 的价格怎么比？`,
-      answer: `按 SemiAnalysis TCO 模型 neocloud 档费率，${page.a.label} 约 ${cost?.aValue}，${page.b.label} 约 ${cost?.bValue}。单看小时租价容易误导：每美元性能对比页面会用实测吞吐量除以这些费率。`,
+      answer: `按 SemiAnalysis TCO 模型超大规模云大批量自有档费率，${page.a.label} 约 ${cost?.aValue}，${page.b.label} 约 ${cost?.bValue}。单看小时租价容易误导：每美元性能对比页面会用实测吞吐量除以这些费率。`,
     },
     {
       question: `${page.a.label} 的 LLM 推理速度比 ${page.b.label} 快吗？`,

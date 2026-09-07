@@ -107,7 +107,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
     cy.contains(
       '[data-slot="select-item"]',
-      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
     ).click({
       force: true,
     });

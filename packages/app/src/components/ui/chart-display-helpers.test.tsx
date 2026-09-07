@@ -131,10 +131,8 @@ describe('MetricAssumptionNotes', () => {
   // config does, so it must not carry the caveat.
   it.each([
     'y_outputTokensPerDollarH',
-    'y_outputTokensPerDollarN',
     'y_outputTokensPerDollarR',
     'y_inputTokensPerDollarH',
-    'y_inputTokensPerDollarN',
     'y_inputTokensPerDollarR',
   ])('shows the purchasing-power caveat for per-token-type metric %s', (metric) => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
@@ -144,7 +142,7 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
-  it.each(['y_costhOutput', 'y_costnOutput', 'y_costrOutput', 'y_costhi', 'y_costni', 'y_costri'])(
+  it.each(['y_costhOutput', 'y_costrOutput', 'y_costhi', 'y_costri'])(
     'shows the token-cost caveat for per-token-type metric %s',
     (metric) => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
@@ -155,24 +153,20 @@ describe('MetricAssumptionNotes', () => {
     },
   );
 
-  it.each([
-    'y_costh',
-    'y_costn',
-    'y_costr',
-    'y_tokensPerDollarH',
-    'y_tokensPerDollarN',
-    'y_tokensPerDollarR',
-  ])('hides the purchasing-power caveat for total-token metric %s', (metric) => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+  it.each(['y_costh', 'y_costr', 'y_tokensPerDollarH', 'y_tokensPerDollarR'])(
+    'hides the purchasing-power caveat for total-token metric %s',
+    (metric) => {
+      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
-    // The TCO badges and source attribution still explain the hourly-price input.
-    expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
-    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
-    expect(getVisibleCaveatText()).not.toContain(
-      'calculate tokens per $1 USD per decode chip or per prefill chip',
-    );
-  });
+      // The TCO badges and source attribution still explain the hourly-price input.
+      expect(getVisibleText()).toContain('TCO $/chip/hr:');
+      expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
+      expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
+      expect(getVisibleCaveatText()).not.toContain(
+        'calculate tokens per $1 USD per decode chip or per prefill chip',
+      );
+    },
+  );
 
   it('narrows the TCO badges to the base GPUs of the active legend selection', () => {
     renderUi(

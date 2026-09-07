@@ -246,37 +246,34 @@ describe('Inference ChartControls cost metrics', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains(
       '[data-slot="select-item"]',
-      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
     ).should('exist');
     cy.contains(
       '[data-slot="select-item"]',
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     ).should('exist');
     cy.contains(
       '[data-slot="select-item"]',
-      'Output Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Output Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     ).should('exist');
     cy.contains(
       '[data-slot="select-item"]',
-      'Input Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Input Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     ).should('exist');
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
-    ).click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarN');
+    cy.contains('[data-slot="select-item"]', 'Total Tokens per $1 TCO (3 Year Rental)').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarR');
   });
 });
 
 describe('Inference ChartControls infrastructure tokens per dollar', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
-      inference: { selectedYAxisMetric: 'y_tokensPerDollarN' },
+      inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },
     });
   });
 
@@ -452,30 +449,30 @@ describe('Axis option help', () => {
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('Neocloud Giant');
+    cy.get('input[aria-label="Search options"]').type('3 Year Rental');
     cy.clock();
-    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').trigger('pointerover', {
+    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').trigger('pointerover', {
       pointerType: 'mouse',
     });
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').should('be.visible');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').should('be.visible');
     cy.get('input[aria-label="Search options"]').should('have.focus');
-    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').trigger('pointerout', {
+    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').trigger('pointerout', {
       pointerType: 'mouse',
     });
     cy.tick(100);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').trigger('pointerover', {
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').trigger('pointerover', {
       pointerType: 'mouse',
     });
     cy.tick(300);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]')
       .should('be.visible')
       .and('contain.text', 'infrastructure spend')
       .trigger('pointerout', { pointerType: 'mouse' });
     cy.tick(300);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').should('not.exist');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').should('not.exist');
     cy.get('input[aria-label="Search options"]')
       .should('have.focus')
-      .and('have.value', 'Neocloud Giant');
+      .and('have.value', '3 Year Rental');
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
   });
@@ -542,20 +539,20 @@ describe('Axis option help', () => {
 
   it('opens descriptions and formulas without selecting an option or losing the search', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('Neocloud Giant');
-    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+    cy.get('input[aria-label="Search options"]').type('3 Year Rental');
+    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').click();
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]')
       .should('be.visible')
       .and('contain.text', 'infrastructure spend')
       .find('code')
       .should('have.text', 'tok/$ = (total tok/s/chip × 3,600) ÷ all-in cost per chip-hour ($)');
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]').type('{esc}');
-    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').should('have.focus');
-    cy.get('input[aria-label="Search options"]').should('have.value', 'Neocloud Giant');
-    cy.get('[data-select-option][data-value="y_tokensPerDollarN"]').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarN');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').type('{esc}');
+    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').should('have.focus');
+    cy.get('input[aria-label="Search options"]').should('have.value', '3 Year Rental');
+    cy.get('[data-select-option][data-value="y_tokensPerDollarR"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarR');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'false');
   });
 
@@ -597,10 +594,10 @@ describe('Axis option help', () => {
 
   it('exposes separate accessible selection and help actions', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('[data-testid="option-help-y_tokensPerDollarN"]').click();
+    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').click();
     cy.injectAxe();
     cy.checkA11y(
-      '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarN"]',
+      '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarR"]',
       {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
       },

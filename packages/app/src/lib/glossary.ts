@@ -1180,11 +1180,11 @@ const entries = [
     definition:
       'Total tokens per dollar divides total tokens produced per chip-hour by the modeled all-in infrastructure cost per chip-hour.',
     explanation:
-      'The Hyperscaler ownership, Neocloud ownership, and three-year rental variants use their corresponding TCO hourly rates. Historical Trends interpolates the matching total, input, or output throughput and then applies the hourly-cost multiplier.',
+      'The Owning at Large Hyperscaler Volume and three-year rental variants use their corresponding TCO hourly rates. Historical Trends interpolates the matching total, input, or output throughput and then applies the hourly-cost multiplier.',
     significance:
       'The metric measures hardware and software cost efficiency, so comparisons must use the same model, workload, interactivity target, token type, and infrastructure cost basis.',
     benchmarkContext:
-      'InferenceX exposes separate total-token axes for Hyperscaler ownership, Neocloud ownership, and three-year rental costs. The Hyperscaler ownership axis is the dashboard default y-axis. Token Revenue per GPU Hour is the separate metric that uses normalized or OpenRouter token sale prices.',
+      'InferenceX exposes separate total-token axes for Owning at Large Hyperscaler Volume and three-year rental costs. The Owning at Large Hyperscaler Volume axis is the dashboard default y-axis. Token Revenue per GPU Hour is the separate metric that uses normalized or OpenRouter token sale prices.',
     measurement: { label: 'Typical unit', value: 'tokens per $1 TCO (tok/$)' },
     relatedTerms: [
       'cost-per-million-tokens',

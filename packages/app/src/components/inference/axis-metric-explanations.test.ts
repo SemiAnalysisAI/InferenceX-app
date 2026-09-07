@@ -41,13 +41,10 @@ describe('METRIC_EXPLANATIONS completeness', () => {
   it('cost metrics show the $/Mtok formula', () => {
     for (const key of [
       'costh',
-      'costn',
       'costr',
       'costhOutput',
-      'costnOutput',
       'costrOutput',
       'costhi',
-      'costni',
       'costri',
       'costUser',
     ] as const) {
@@ -73,11 +70,11 @@ describe('METRIC_EXPLANATIONS completeness', () => {
   });
 
   it('defines total tokens per dollar as infrastructure purchasing power', () => {
-    const explanation = METRIC_EXPLANATIONS.tokensPerDollarN;
+    const explanation = METRIC_EXPLANATIONS.tokensPerDollarH;
     expect(explanation.description.en).toContain('infrastructure spend');
-    expect(explanation.description.en).toContain('Neocloud Giant');
+    expect(explanation.description.en).toContain('large hyperscaler purchasing volume');
     expect(explanation.description.zh).toContain('基础设施开支');
-    expect(explanation.description.zh).toContain('Neocloud Giant');
+    expect(explanation.description.zh).toContain('超大规模云厂商大批量采购价');
     expect(explanation.formula.en).toContain('all-in cost per chip-hour');
     expect(explanation.description.en).not.toContain('—');
     expect(explanation.description.zh).not.toContain('—');
@@ -165,8 +162,8 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
-    expect(metricRowLabel('tokensPerDollarN', 'zh')).toBe(
-      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
+    expect(metricRowLabel('tokensPerDollarH', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模云大批量）',
     );
   });
 });

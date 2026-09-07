@@ -26,18 +26,17 @@ When comparing FP4 vs FP8 for the same GPU, each precision needs its own Pareto 
 
 ## Cost Field Matrix (3x3)
 
-9 combinations of cost provider x token type because:
+6 combinations of cost provider x token type because:
 
-- **Cost providers** (Hyperscaler/Neocloud/3yr Rental) have different $/GPU/hr rates per GPU
+- **Cost providers** (Owning at Large Hyperscaler Volume/3yr Rental) have different $/GPU/hr rates per GPU
 - **Token types** (Total/Input/Output) have different throughput denominators
 
 |                         | Total   | Input    | Output        |
 | ----------------------- | ------- | -------- | ------------- |
 | **Hyperscaler (costh)** | `costh` | `costhi` | `costhOutput` |
-| **Neocloud (costn)**    | `costn` | `costni` | `costnOutput` |
 | **3yr Rental (costr)**  | `costr` | `costri` | `costrOutput` |
 
-`getCostField()` maps `(provider, tokenType)` → field name, avoiding a 9-way switch in every rendering path.
+`getCostField()` maps `(provider, tokenType)` → field name, avoiding a 6-way switch in every rendering path.
 
 ## Token Type — Most Common Bug
 
@@ -1137,7 +1136,7 @@ price`, next to OpenRouter and Custom; the caption names the source in force and
 - **TCO badges track the legend.** The `TCO $/chip/hr:` line lists one badge per base
   chip whose bar is currently drawn; isolating a SKU in the legend leaves only its badge.
 - **Cost provider names match `/inference`.** The selector reuses `COST_TIER_LABELS[...].option`
-  (Owning - Hyperscaler, Owning - Neocloud Giant, 3 Year Rental) plus Custom $/GPU/hr.
+  (Owning at Large Hyperscaler Volume, 3 Year Rental) plus Custom $/GPU/hr.
 - **Chart height follows the viewport.** `chartHeightForViewport(window.innerHeight)` is
   the full 720px only when the window has room; otherwise it is the viewport minus
   `CHART_VIEWPORT_RESERVE` (260px: sticky nav, card header, padding), never below

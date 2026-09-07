@@ -104,13 +104,10 @@ export function rowToLightweightPoint(
 const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
   costh: 'tpPerGpu',
-  costn: 'tpPerGpu',
   costr: 'tpPerGpu',
   costhOutput: 'outputTputPerGpu',
-  costnOutput: 'outputTputPerGpu',
   costrOutput: 'outputTputPerGpu',
   costhi: 'inputTputPerGpu',
-  costni: 'inputTputPerGpu',
   costri: 'inputTputPerGpu',
   // J/token = W / (tok/s)
   jTotal: 'tpPerGpu',
@@ -127,13 +124,10 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokenRevenuePerGpuHour: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
-  tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',
   outputTokensPerDollarH: 'outputTputPerGpu',
-  outputTokensPerDollarN: 'outputTputPerGpu',
   outputTokensPerDollarR: 'outputTputPerGpu',
   inputTokensPerDollarH: 'inputTputPerGpu',
-  inputTokensPerDollarN: 'inputTputPerGpu',
   inputTokensPerDollarR: 'inputTputPerGpu',
 };
 

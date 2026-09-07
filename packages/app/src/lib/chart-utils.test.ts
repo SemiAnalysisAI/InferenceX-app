@@ -30,7 +30,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
   };
 });
 
@@ -64,10 +64,8 @@ function pt(
     tpPerGpu: { y: tpPerGpuY, roof: false },
     tpPerMw: { y: 5, roof: false },
     costh: { y: opts.costhY ?? 1, roof: false },
-    costn: { y: 1.5, roof: false },
     costr: { y: 1.2, roof: false },
     costhi: { y: 2, roof: false },
-    costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
     ...(opts.outputTputY === undefined
       ? {}
@@ -138,10 +136,8 @@ function paretoPt(x: number, y: number, overrides: Partial<InferenceData> = {}):
     tpPerGpu: { y: 100, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   };
@@ -744,10 +740,8 @@ describe('createChartDataPoint', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
-    expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
     expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
-    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
   });
 
@@ -755,7 +749,6 @@ describe('createChartDataPoint', () => {
     const e = entry({ tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBe(0);
-    expect(point.costn.y).toBe(0);
     expect(point.costr.y).toBe(0);
   });
 
@@ -765,7 +758,6 @@ describe('createChartDataPoint', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
     expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
-    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
     expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
   });
 
@@ -775,7 +767,6 @@ describe('createChartDataPoint', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
     expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
-    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
     expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 
@@ -871,11 +862,11 @@ describe('buildDerivedChartFields', () => {
 
   it('selectively derives infrastructure total tokens per dollar', () => {
     const historicalFields = buildDerivedChartFields(entry({ tput_per_gpu: 1250 }), 'h100', [
-      'tokensPerDollarN',
+      'tokensPerDollarH',
     ]);
 
     expect(historicalFields).toEqual({
-      tokensPerDollarN: { y: 4_500_000 / 1.4, roof: false },
+      tokensPerDollarH: { y: 4_500_000 / 2.8, roof: false },
     });
   });
 
@@ -1263,7 +1254,6 @@ describe('createChartDataPoint output cost edge cases', () => {
     const e = entry({ output_tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBe(0);
-    expect(point.costnOutput!.y).toBe(0);
     expect(point.costrOutput!.y).toBe(0);
   });
 
@@ -1271,7 +1261,6 @@ describe('createChartDataPoint output cost edge cases', () => {
     const e = entry({ input_tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBe(0);
-    expect(point.costni.y).toBe(0);
     expect(point.costri.y).toBe(0);
   });
 
@@ -1284,17 +1273,14 @@ describe('createChartDataPoint output cost edge cases', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
 
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
-    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
 
     // Output: outputTokensPerHour = 500 * 3600 = 1,800,000
     expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
-    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
     expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
 
     // Input: inputTokensPerHour = 200 * 3600 = 720,000
     expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
-    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
     expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 });
@@ -1758,7 +1744,7 @@ describe('metricChartTitle', () => {
       'Total Tokens per $1 TCO',
     );
     expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
       '每 1 美元 TCO 对应的总 token 数',

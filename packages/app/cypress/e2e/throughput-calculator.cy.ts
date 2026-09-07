@@ -373,14 +373,13 @@ describe('TCO Calculator', () => {
       cy.get('#calc-sequence').should('be.focused');
     });
 
-    it('cost provider selector appears and has all three options', () => {
+    it('cost provider selector appears and has both options', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').should('have.length', 3);
-      cy.get('[role="option"]').eq(0).should('contain.text', 'Hyperscaler');
-      cy.get('[role="option"]').eq(1).should('contain.text', 'Neocloud');
-      cy.get('[role="option"]').eq(2).should('contain.text', '3yr Rental');
+      cy.get('[role="option"]').should('have.length', 2);
+      cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at Large Hyperscaler Volume');
+      cy.get('[role="option"]').eq(1).should('contain.text', '3yr Rental');
       cy.get('body').type('{esc}');
     });
 
@@ -438,14 +437,14 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Owning - Hyperscaler');
+        .should('contain.text', 'Owning at Large Hyperscaler Volume');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').contains('Neocloud').click();
+      cy.get('[role="option"]').contains('3yr Rental').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Owning - Neocloud');
+        .should('contain.text', 'Renting - 3yr Rental');
     });
 
     // -------------------------------------------------------------------------

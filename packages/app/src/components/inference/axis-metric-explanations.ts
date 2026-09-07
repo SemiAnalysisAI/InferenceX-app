@@ -26,18 +26,16 @@ export interface MetricExplanation {
 }
 
 /** Cost-basis flavor shared by the $ and cost-per-million metric families. */
-type CostBasis = 'h' | 'n' | 'r';
+type CostBasis = 'h' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
 const COST_BASIS_EN: Record<CostBasis, string> = {
-  h: 'all-in hourly ownership cost of a hyperscaler operator',
-  n: 'all-in hourly ownership cost of a Neocloud Giant operator',
+  h: 'all-in hourly ownership cost at large hyperscaler purchasing volume',
   r: 'all-in hourly cost of a 3-year rental contract',
 };
 
 const COST_BASIS_ZH: Record<CostBasis, string> = {
-  h: '超大规模云厂商自有硬件的每小时全包成本',
-  n: 'Neocloud Giant 自有硬件的每小时全包成本',
+  h: '按超大规模云厂商大批量采购价自有硬件的每小时全包成本',
   r: '3 年期租赁合同的每小时全包成本',
 };
 
@@ -298,22 +296,16 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
   costh: costPerMillion('h', 'total'),
-  costn: costPerMillion('n', 'total'),
   costr: costPerMillion('r', 'total'),
   costhOutput: costPerMillion('h', 'output'),
-  costnOutput: costPerMillion('n', 'output'),
   costrOutput: costPerMillion('r', 'output'),
   costhi: costPerMillion('h', 'input'),
-  costni: costPerMillion('n', 'input'),
   costri: costPerMillion('r', 'input'),
   tokensPerDollarH: tokensPerDollar('h', 'total'),
-  tokensPerDollarN: tokensPerDollar('n', 'total'),
   tokensPerDollarR: tokensPerDollar('r', 'total'),
   outputTokensPerDollarH: tokensPerDollar('h', 'output'),
-  outputTokensPerDollarN: tokensPerDollar('n', 'output'),
   outputTokensPerDollarR: tokensPerDollar('r', 'output'),
   inputTokensPerDollarH: tokensPerDollar('h', 'input'),
-  inputTokensPerDollarN: tokensPerDollar('n', 'input'),
   inputTokensPerDollarR: tokensPerDollar('r', 'input'),
   costUser: {
     description: {

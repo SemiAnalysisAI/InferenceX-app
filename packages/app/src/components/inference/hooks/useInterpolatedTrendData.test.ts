@@ -27,10 +27,8 @@ function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1.2, roof: false },
-    costn: { y: 0.9, roof: false },
     costr: { y: 0.7, roof: false },
     costhi: { y: 0.5, roof: false },
-    costni: { y: 0.4, roof: false },
     costri: { y: 0.3, roof: false },
     ...overrides,
   } as InferenceData;
@@ -135,15 +133,12 @@ describe('rowToLightweightPoint', () => {
   it('derives infrastructure total tokens per dollar from throughput and hourly cost', () => {
     const point = rowToLightweightPoint(makeBenchmarkRow(), [
       'tokensPerDollarH',
-      'tokensPerDollarN',
       'tokensPerDollarR',
       'costh',
-      'costn',
       'costr',
     ]);
 
     expect(point!.tokensPerDollarH!.y * point!.costh!.y).toBeCloseTo(1_000_000, 8);
-    expect(point!.tokensPerDollarN!.y * point!.costn!.y).toBeCloseTo(1_000_000, 8);
     expect(point!.tokensPerDollarR!.y * point!.costr!.y).toBeCloseTo(1_000_000, 8);
   });
 });
@@ -340,17 +335,17 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({
         x: 20,
         tpPerGpu: { y: 800, roof: false },
-        tokensPerDollarN: { y: 2_000_000, roof: false },
+        tokensPerDollarH: { y: 2_000_000, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 400, roof: false },
-        tokensPerDollarN: { y: 1_000_000, roof: false },
+        tokensPerDollarH: { y: 1_000_000, roof: false },
       }),
     ];
 
     const throughput = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
-    const purchasingPower = interpolateMetricAtInteractivity(points, 40, 'tokensPerDollarN');
+    const purchasingPower = interpolateMetricAtInteractivity(points, 40, 'tokensPerDollarH');
     expect(purchasingPower).toBeCloseTo(throughput! * 2_500, 10);
   });
 
@@ -532,7 +527,7 @@ describe('trendMetricDependencies', () => {
   });
 
   it('loads total throughput with infrastructure purchasing power', () => {
-    expect(trendMetricDependencies('tokensPerDollarN')).toEqual(['tpPerGpu', 'tokensPerDollarN']);
+    expect(trendMetricDependencies('tokensPerDollarH')).toEqual(['tpPerGpu', 'tokensPerDollarH']);
   });
 
   it('does not route custom user metrics through benchmark-derived history fields', () => {

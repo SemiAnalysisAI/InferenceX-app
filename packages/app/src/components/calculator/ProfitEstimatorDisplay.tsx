@@ -122,20 +122,19 @@ function defaultPriceSource(model: Model): PriceSource {
   return profitModelDefaults(model).listPricing ? 'list' : 'openrouter';
 }
 
-/** The three published TCO tiers plus a per-chip $/GPU/hr the reader types. */
+/** The two published TCO tiers plus a per-chip $/GPU/hr the reader types. */
 type ProfitCostProvider = CostProvider | 'custom';
 
 const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   costh: 'hyperscaler',
-  costn: 'neocloud',
   costr: 'rental',
   custom: 'custom',
 };
 
 // The published tiers use the same option labels as the /inference y-axis
-// selector (Owning - Hyperscaler, Owning - Neocloud Giant, 3 Year Rental).
+// selector (Owning at Large Hyperscaler Volume, 3 Year Rental).
 const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
-  ...(['costh', 'costn', 'costr'] as const).map((value) => ({
+  ...(['costh', 'costr'] as const).map((value) => ({
     value,
     label: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].option,
     labelZh: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].optionZh,
@@ -188,7 +187,7 @@ const STRINGS = {
     },
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The TCO tier used for the compute-expense segment: Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
+      'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or 3-year rental, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
     priceSourceLabel: 'Token Price',
@@ -288,7 +287,7 @@ const STRINGS = {
     },
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '算力支出分段采用的 TCO 层级：Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
+      '算力支出分段采用的 TCO 层级：按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: '成本供应商',
     priceSourceLabel: 'Token 售价',

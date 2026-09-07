@@ -210,10 +210,8 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
   return data.map((item) => {
     if (
       item.costhOutput &&
-      item.costnOutput &&
       item.costrOutput &&
       item.outputTokensPerDollarH &&
-      item.outputTokensPerDollarN &&
       item.outputTokensPerDollarR
     ) {
       return item;
@@ -229,8 +227,6 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
     const costhOutput =
       millionOutputTokensPerHour > 0 ? specs.costh / millionOutputTokensPerHour : 0;
-    const costnOutput =
-      millionOutputTokensPerHour > 0 ? specs.costn / millionOutputTokensPerHour : 0;
     const costrOutput =
       millionOutputTokensPerHour > 0 ? specs.costr / millionOutputTokensPerHour : 0;
 
@@ -240,20 +236,12 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
         y: parseFloat(costhOutput.toFixed(3)),
         roof: false,
       },
-      costnOutput: item.costnOutput ?? {
-        y: parseFloat(costnOutput.toFixed(3)),
-        roof: false,
-      },
       costrOutput: item.costrOutput ?? {
         y: parseFloat(costrOutput.toFixed(3)),
         roof: false,
       },
       outputTokensPerDollarH: item.outputTokensPerDollarH ?? {
         y: specs.costh > 0 ? outputTokensPerHour / specs.costh : 0,
-        roof: false,
-      },
-      outputTokensPerDollarN: item.outputTokensPerDollarN ?? {
-        y: specs.costn > 0 ? outputTokensPerHour / specs.costn : 0,
         roof: false,
       },
       outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
@@ -391,14 +379,7 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
 export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
   return data.map((item) => {
-    if (
-      item.costhi &&
-      item.costni &&
-      item.costri &&
-      item.inputTokensPerDollarH &&
-      item.inputTokensPerDollarN &&
-      item.inputTokensPerDollarR
-    ) {
+    if (item.costhi && item.costri && item.inputTokensPerDollarH && item.inputTokensPerDollarR) {
       return item;
     }
 
@@ -411,7 +392,6 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
     const inputTokensPerHour = inputTputPerGpu * 3600;
     const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
     const costhi = millionInputTokensPerHour > 0 ? specs.costh / millionInputTokensPerHour : 0;
-    const costni = millionInputTokensPerHour > 0 ? specs.costn / millionInputTokensPerHour : 0;
     const costri = millionInputTokensPerHour > 0 ? specs.costr / millionInputTokensPerHour : 0;
 
     return {
@@ -420,20 +400,12 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
         y: parseFloat(costhi.toFixed(3)),
         roof: false,
       },
-      costni: item.costni ?? {
-        y: parseFloat(costni.toFixed(3)),
-        roof: false,
-      },
       costri: item.costri ?? {
         y: parseFloat(costri.toFixed(3)),
         roof: false,
       },
       inputTokensPerDollarH: item.inputTokensPerDollarH ?? {
         y: specs.costh > 0 ? inputTokensPerHour / specs.costh : 0,
-        roof: false,
-      },
-      inputTokensPerDollarN: item.inputTokensPerDollarN ?? {
-        y: specs.costn > 0 ? inputTokensPerHour / specs.costn : 0,
         roof: false,
       },
       inputTokensPerDollarR: item.inputTokensPerDollarR ?? {

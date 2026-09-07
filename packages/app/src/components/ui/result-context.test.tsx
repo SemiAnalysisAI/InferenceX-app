@@ -52,7 +52,7 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           precision="FP8"
-          costTier="Owning Hyperscaler"
+          costTier="Owning at Large Hyperscaler Volume"
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
         />,
@@ -60,14 +60,14 @@ describe('ResultContext', () => {
     });
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
-    expect(text).toContain('Cost Tier: Owning Hyperscaler');
+    expect(text).toContain('Cost Tier: Owning at Large Hyperscaler Volume');
     expect(text).toContain('Updated: 2026-09-01');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
     expect(text).not.toContain('Metric:');
     expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
-      'Owning Hyperscaler',
+      'Owning at Large Hyperscaler Volume',
     );
   });
 
@@ -91,10 +91,10 @@ describe('ResultContext', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
-        <ResultContext locale="zh" costTier="自有（超大规模）" date="2026-09-01" />,
+        <ResultContext locale="zh" costTier="自有（超大规模云大批量）" date="2026-09-01" />,
       );
     });
-    expect(container.textContent).toContain('成本层级: 自有（超大规模）');
+    expect(container.textContent).toContain('成本层级: 自有（超大规模云大批量）');
     expect(container.textContent).not.toContain('模型:');
   });
 

@@ -27,10 +27,8 @@ function point(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 2_000, roof: false },
     tpPerMw: { y: 1_000, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   } as InferenceData;
@@ -46,7 +44,7 @@ const openRouterPricing: TokenRevenuePricing = {
 describe('token revenue', () => {
   it('scopes the token price source to revenue', () => {
     expect(usesTokenSalePricing('y_tokenRevenuePerGpuHour')).toBe(true);
-    expect(usesTokenSalePricing('y_tokensPerDollarN')).toBe(false);
+    expect(usesTokenSalePricing('y_tokensPerDollarH')).toBe(false);
     expect(usesTokenSalePricing('y_outputTokensPerDollarH')).toBe(false);
   });
 
@@ -184,13 +182,13 @@ describe('token revenue', () => {
   it('removes the normalized placeholder when OpenRouter pricing is unavailable', () => {
     const original = point({
       tokenRevenuePerGpuHour: { y: 7.2, roof: false },
-      tokensPerDollarN: { y: 2_000_000, roof: false },
+      tokensPerDollarH: { y: 2_000_000, roof: false },
     });
     const [cleared] = applyTokenRevenuePricing([original], null);
     expect(cleared).not.toHaveProperty('tokenRevenuePerGpuHour');
-    expect(cleared.tokensPerDollarN).toEqual({ y: 2_000_000, roof: false });
+    expect(cleared.tokensPerDollarH).toEqual({ y: 2_000_000, roof: false });
     expect(original.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
-    expect(original.tokensPerDollarN).toEqual({ y: 2_000_000, roof: false });
+    expect(original.tokensPerDollarH).toEqual({ y: 2_000_000, roof: false });
   });
 
   it('does not invent OpenRouter revenue when the token mix is unavailable', () => {

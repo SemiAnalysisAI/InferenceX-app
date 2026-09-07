@@ -104,12 +104,13 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     bars().should('have.length.greaterThan', 0);
     // Cost tiers carry the same names as the /inference y-axis selector.
-    cy.get('button#profit-cost').should('contain.text', 'Owning - Hyperscaler').click();
+    cy.get('button#profit-cost')
+      .should('contain.text', 'Owning at Large Hyperscaler Volume')
+      .click();
     cy.get('[role="option"]').then(($opts) => {
       const labels = [...$opts].map((el) => el.textContent?.trim());
       expect(labels).to.include.members([
-        'Owning - Hyperscaler',
-        'Owning - Neocloud Giant',
+        'Owning at Large Hyperscaler Volume',
         '3 Year Rental',
         'Custom $/GPU/hr',
       ]);
@@ -122,7 +123,10 @@ describe('Profit Estimator per GW', () => {
       'contain.text',
       'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
     );
-    cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
+    cy.get('[data-testid="result-context-cost-tier"]').should(
+      'contain.text',
+      'Owning at Large Hyperscaler Volume',
+    );
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '30%');
     cy.get('[data-testid="profit-caption"]').should('contain.text', 'TCO $/chip/hr');
@@ -345,10 +349,13 @@ describe('Profit Estimator per GW', () => {
       });
 
     cy.get('button#profit-cost').click();
-    cy.contains('[role="option"]', 'Owning - Hyperscaler').click();
+    cy.contains('[role="option"]', 'Owning at Large Hyperscaler Volume').click();
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
-    cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Owning Hyperscaler');
+    cy.get('[data-testid="result-context-cost-tier"]').should(
+      'contain.text',
+      'Owning at Large Hyperscaler Volume',
+    );
   });
 
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {

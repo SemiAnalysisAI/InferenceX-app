@@ -18,11 +18,10 @@ export interface GpuSpecs {
   tdp: number;
   power: number;
   costh: number;
-  costn: number;
   costr: number;
 }
 
-const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costn: 0, costr: 0 };
+const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
@@ -36,7 +35,6 @@ export function getGpuSpecs(hwKey: string): GpuSpecs {
     tdp: entry.tdp,
     power: entry.power,
     costh: entry.costh,
-    costn: entry.costn,
     costr: entry.costr,
   };
 }
