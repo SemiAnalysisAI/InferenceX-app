@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-import { checkPublicApi } from '../scripts/check-public-api.mjs';
+import { checkPublicApi, resolvePackage } from '../scripts/check-public-api.mjs';
 
 const identity = {
   package: '@semianalysisai/inferencex-skills',
@@ -107,6 +112,48 @@ async function run(overrides = {}) {
   });
   return { result, calls };
 }
+
+test('resolver uses the published installer version command', () => {
+  const calls = [];
+  const resolved = resolvePackage('0.11.0', (file, args) => {
+    calls.push({ file, args });
+    return args[0] === 'exec'
+      ? 'Installer version: 0.11.0\n'
+      : JSON.stringify({
+          name: identity.package,
+          version: identity.version,
+          dist: {
+            tarball: identity.tarball,
+            integrity: identity.integrity,
+            shasum: identity.shasum,
+          },
+        });
+  });
+  assert.equal(resolved.version, '0.11.0');
+  assert.deepEqual(calls[0].args.slice(-3), ['--', 'inferencex-skills', '--version']);
+});
+
+test('immutable published 0.11 fixture supports the installer version command', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'inferencex-0.11-version-'));
+  try {
+    const fixture = fileURLToPath(
+      new URL('fixtures/semianalysisai-inferencex-skills-0.11.0.tgz', import.meta.url),
+    );
+    const version = execFileSync(
+      'npm',
+      ['exec', '--yes', '--offline', '--package', fixture, '--', 'inferencex-skills', '--version'],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        timeout: 30_000,
+        env: { ...process.env, npm_config_cache: join(directory, 'npm-cache') },
+      },
+    );
+    assert.equal(version.trim(), 'Installer version: 0.11.0');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test('monitor consumes exactly four shapes once under fixed ceilings', async () => {
   const { result, calls } = await run();

@@ -21,18 +21,20 @@ const date = (value) => {
   return Number.isFinite(parsed.valueOf()) && parsed.toISOString().startsWith(value);
 };
 
-function resolvePackage(packageVersion) {
+export function resolvePackage(packageVersion, execute = execFileSync) {
   const directory = mkdtempSync(join(tmpdir(), 'inferencex-public-check-'));
   try {
     const spec = `${PACKAGE}@${packageVersion}`;
-    const version = execFileSync(
+    const version = execute(
       'npm',
-      ['exec', '--yes', '--package', spec, '--', 'inferencex', '--version'],
+      ['exec', '--yes', '--package', spec, '--', 'inferencex-skills', '--version'],
       { cwd: directory, encoding: 'utf8', timeout: 30_000 },
     ).trim();
-    if (version !== packageVersion) throw new Error('Resolved executable version differs');
+    if (version !== `Installer version: ${packageVersion}`) {
+      throw new Error('Resolved executable version differs');
+    }
     const metadata = JSON.parse(
-      execFileSync('npm', ['view', spec, 'name', 'version', 'dist', '--json'], {
+      execute('npm', ['view', spec, 'name', 'version', 'dist', '--json'], {
         cwd: directory,
         encoding: 'utf8',
         timeout: 30_000,
