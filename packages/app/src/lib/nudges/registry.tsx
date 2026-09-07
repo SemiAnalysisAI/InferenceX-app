@@ -52,6 +52,8 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
+const TPU_NEWSLETTER_URL = 'https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam';
+
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
@@ -320,7 +322,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
-    id: 'openai-rubin-comparison-banner',
+    id: 'tpuv7-inference-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -331,33 +333,29 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: "OpenAI's Latest In House Chip verus Rubin NVL72",
-      titleZh: 'OpenAI 最新自研芯片对比 Rubin NVL72',
-      description:
-        'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
-      descriptionZh:
-        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
+      title: 'TPUv7 Inference Performance',
+      titleZh: 'TPUv7 推理性能',
+      description: 'Compare TPUv7 versus Blackwell & Blackwell Ultra',
+      descriptionZh: '对比 TPUv7 与 Blackwell 及 Blackwell Ultra 的推理性能',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
+      // External destination: the newsletter write-up rather than a dashboard
+      // route, so no locale prefixing applies.
+      href: TPU_NEWSLETTER_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(
-          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
-        );
+        window.location.href = TPU_NEWSLETTER_URL;
       },
     },
     analytics: {
-      shown: 'inference_rubin_comparison_banner_shown',
-      dismissed: 'inference_rubin_comparison_banner_dismissed',
-      action: 'inference_rubin_comparison_banner_clicked',
+      shown: 'inference_tpuv7_banner_shown',
+      dismissed: 'inference_tpuv7_banner_dismissed',
+      action: 'inference_tpuv7_banner_clicked',
       properties: {
-        banner_id: 'openai-rubin-comparison',
-        scenario: '8k/1k',
-        model: 'DeepSeek-R1-0528',
-        metric: 'y_outputTputPerMw',
+        banner_id: 'tpuv7-inference',
+        destination: 'newsletter',
       },
     },
   },
