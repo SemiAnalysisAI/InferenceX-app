@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   cpSync,
@@ -10,6 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import process from 'node:process';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
@@ -19,6 +21,7 @@ const suite = packedSkillSuite();
 const { environment, project, temporaryRoot } = suite;
 const responsePreload = join(temporaryRoot, 'offline-verifier-responses.mjs');
 const denyPreload = join(temporaryRoot, 'offline-verifier-deny-io.mjs');
+const pauseReadPreload = join(temporaryRoot, 'offline-verifier-pause-read.mjs');
 let verifier;
 let powerxExporter;
 let agentxExporter;
@@ -256,6 +259,19 @@ function copyBundle(bundle) {
   return { cwd, evidence, output };
 }
 
+function waitForFile(path, timeoutMs = 5_000) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const poll = () => {
+      if (existsSync(path)) resolve();
+      else if (Date.now() - started >= timeoutMs)
+        reject(new Error(`Timed out waiting for ${path}`));
+      else setTimeout(poll, 10);
+    };
+    poll();
+  });
+}
+
 before(() => {
   writeFileSync(
     responsePreload,
@@ -288,6 +304,27 @@ before(() => {
       for (const name of ['exec', 'execFile', 'fork', 'spawn', 'execSync', 'execFileSync', 'spawnSync']) {
         childProcess[name] = denied(name);
       }
+      syncBuiltinESMExports();
+    `,
+  );
+  writeFileSync(
+    pauseReadPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.readFileSync;
+      let paused = false;
+      fs.readFileSync = function(path, ...rest) {
+        if (!paused && typeof path === 'number') {
+          paused = true;
+          fs.writeFileSync(process.env.INFERENCEX_OFFLINE_READY, 'ready');
+          const view = new Int32Array(new SharedArrayBuffer(4));
+          while (!fs.existsSync(process.env.INFERENCEX_OFFLINE_RELEASE)) {
+            Atomics.wait(view, 0, 0, 10);
+          }
+        }
+        return original.call(this, path, ...rest);
+      };
       syncBuiltinESMExports();
     `,
   );
@@ -456,19 +493,36 @@ test('missing, extra, traversing, and symlinked evidence files fail closed', () 
 });
 
 test('manifest metadata, URLs, source coverage, and timestamp order are reconstructed', () => {
-  for (const kind of ['metadata', 'url', 'sources', 'time']) {
+  for (const kind of ['metadata', 'url', 'sources', 'time', 'invalid-date', 'response-order']) {
     const bundle = agentxBundle('json');
     const record = manifest(bundle.evidence);
     if (kind === 'metadata') record.export.metadata.selected_rows++;
     if (kind === 'url') record.responses[1].url += '&ids=999';
     if (kind === 'sources') record.export.source_request_numbers.pop();
     if (kind === 'time') record.finished_at = '2020-01-01T00:00:00Z';
+    if (kind === 'invalid-date') record.started_at = '2026-02-30T00:00:00.000Z';
+    if (kind === 'response-order') {
+      record.responses[1].retrieved_at = record.export.metadata.retrieved_at;
+      record.responses[2].retrieved_at = record.started_at;
+    }
     saveManifest(bundle.evidence, record);
     const result = runVerifier(['--evidence-dir', bundle.evidence, '--export', bundle.output]);
     assert.equal(result.status, 1, kind);
     assert.equal(result.stdout, '');
-    assert.match(result.stderr, /metadata|URL|source request|time|reversed|cover/iu);
+    assert.match(result.stderr, /metadata|URL|source request|time|timestamp|reversed|cover/iu);
   }
+});
+
+test('capture events emitted within the same millisecond retain equal timestamps', () => {
+  const bundle = agentxBundle('json');
+  const record = manifest(bundle.evidence);
+  const instant = record.export.metadata.retrieved_at;
+  record.started_at = instant;
+  record.finished_at = instant;
+  for (const response of record.responses) response.retrieved_at = instant;
+  saveManifest(bundle.evidence, record);
+  const result = runVerifier(['--evidence-dir', bundle.evidence, '--export', bundle.output]);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('a changed export cannot pass by changing its recorded hash too', () => {
@@ -659,6 +713,90 @@ test('untrusted report values are escaped without changing Markdown structure', 
   assert.match(result.stdout, /``2026-09-01` <script>alert\(1\)<\/script>\\nnext \| heading``/u);
   assert.equal(result.stdout.includes('</script>\nnext'), false);
   assert.equal(result.stdout.match(/^## /gmu)?.length, 7);
+});
+
+test('leading and repeated backticks cannot escape the report code span or exhaust the stack', () => {
+  const leading = powerxBundle('json', [
+    powerxObservation({ run_started_at: '`<img src=x onerror=alert(1)>' }),
+  ]);
+  const leadingResult = runVerifier([
+    '--evidence-dir',
+    leading.evidence,
+    '--export',
+    leading.output,
+  ]);
+  assert.equal(leadingResult.status, 0, leadingResult.stderr);
+  assert.match(
+    leadingResult.stdout,
+    /Producer run starts: `` `<img src=x onerror=alert\(1\)> `` \(1\)/u,
+  );
+  assert.doesNotMatch(leadingResult.stdout, /: ```<img/u);
+
+  const repeated = powerxBundle('json', [
+    powerxObservation({ run_started_at: '`x'.repeat(150_000) }),
+  ]);
+  const repeatedResult = runVerifier([
+    '--evidence-dir',
+    repeated.evidence,
+    '--export',
+    repeated.output,
+  ]);
+  assert.equal(repeatedResult.status, 0, repeatedResult.stderr);
+  assert.doesNotMatch(repeatedResult.stderr, /INTERNAL_ERROR|call stack/iu);
+});
+
+test('SIGTERM queued during a synchronous input read cancels before report publication', async () => {
+  const bundle = powerxBundle();
+  const report = join(bundle.cwd, 'must not be published.md');
+  const ready = join(bundle.cwd, 'read-ready');
+  const release = join(bundle.cwd, 'read-release');
+  const violations = join(bundle.cwd, 'offline-violations');
+  const child = spawn(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(pauseReadPreload).href,
+      '--import',
+      pathToFileURL(denyPreload).href,
+      verifier,
+      '--evidence-dir',
+      bundle.evidence,
+      '--export',
+      bundle.output,
+      '--report',
+      report,
+    ],
+    {
+      cwd: bundle.cwd,
+      env: {
+        ...environment,
+        INFERENCEX_OFFLINE_READY: ready,
+        INFERENCEX_OFFLINE_RELEASE: release,
+        INFERENCEX_OFFLINE_VIOLATIONS: violations,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const stdout = [];
+  const stderr = [];
+  child.stdout.on('data', (chunk) => stdout.push(chunk));
+  child.stderr.on('data', (chunk) => stderr.push(chunk));
+  await waitForFile(ready);
+  assert.equal(child.kill('SIGTERM'), true);
+  await new Promise((resolve) => {
+    setTimeout(resolve, 50);
+  });
+  writeFileSync(release, 'release');
+  const exit = await new Promise((resolve) => {
+    child.once('exit', (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
+  assert.deepEqual(exit, { code: 130, signal: null });
+  assert.equal(Buffer.concat(stdout).toString(), '');
+  assert.match(Buffer.concat(stderr).toString(), /Cancelled by SIGTERM/);
+  assert.equal(existsSync(report), false);
+  assert.equal(existsSync(violations), false);
 });
 
 test('JSON diagnostics preserve 0.10 exit semantics for invalid arguments', () => {

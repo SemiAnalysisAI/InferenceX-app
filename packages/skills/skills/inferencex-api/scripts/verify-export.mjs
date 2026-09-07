@@ -107,13 +107,15 @@ function hashValue(value, label) {
 }
 
 function timestamp(value, label) {
+  const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   verify(
     typeof value === 'string' &&
-      /(?:Z|[+-]\d{2}:\d{2})$/u.test(value) &&
-      Number.isFinite(Date.parse(value)),
-    `${label} is not a timezone-qualified timestamp`,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value) &&
+      Number.isFinite(parsed) &&
+      new Date(parsed).toISOString() === value,
+    `${label} is not a canonical ISO timestamp`,
   );
-  return Date.parse(value);
+  return parsed;
 }
 
 function validDate(value) {
@@ -612,11 +614,17 @@ function validateAgentx(record, evidence, exportBytes) {
   );
   const retrievedAt = record.export.metadata.retrieved_at;
   const retrieved = timestamp(retrievedAt, 'AgentX export retrieval time');
+  const responseTimes = record.responses.map(({ retrieved_at: responseTime }) =>
+    timestamp(responseTime, 'AgentX response retrieval time'),
+  );
   verify(
-    record.responses.every(({ retrieved_at: responseTime }) => {
-      const time = timestamp(responseTime, 'AgentX response retrieval time');
-      return started <= time && time <= retrieved && retrieved <= finished;
-    }),
+    responseTimes.every(
+      (time, index) =>
+        started <= time &&
+        (index === 0 || responseTimes[index - 1] <= time) &&
+        time <= retrieved &&
+        retrieved <= finished,
+    ),
     'AgentX capture times do not cover every response and the export',
   );
   const requestUrls = record.responses.map(({ operation, url }) => ({ operation, url }));
@@ -663,8 +671,16 @@ function loadVerification(evidence, exportBytes) {
 
 function inlineCode(value) {
   let text = '';
+  let currentBackticks = 0;
+  let longestBackticks = 0;
   for (const character of String(value)) {
     const code = character.codePointAt(0);
+    if (character === '`') {
+      currentBackticks++;
+      longestBackticks = Math.max(longestBackticks, currentBackticks);
+    } else {
+      currentBackticks = 0;
+    }
     if (character === '\\') text += String.raw`\\`;
     else if (character === '\r') text += String.raw`\r`;
     else if (character === '\n') text += String.raw`\n`;
@@ -672,9 +688,9 @@ function inlineCode(value) {
     else if (code < 32 || code === 127) text += String.raw`\u${code.toString(16).padStart(4, '0')}`;
     else text += character;
   }
-  const longest = Math.max(0, ...[...text.matchAll(/`+/gu)].map(([ticks]) => ticks.length));
-  const fence = '`'.repeat(longest + 1);
-  return `${fence}${text}${fence}`;
+  const fence = '`'.repeat(longestBackticks + 1);
+  const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${fence}${padding}${text}${padding}${fence}`;
 }
 
 function countValues(rows, field) {
@@ -930,6 +946,9 @@ async function main(args, signal) {
   signal.throwIfAborted();
   const verification = loadVerification(paths.evidence, paths.exportBytes);
   const report = renderReport(verification);
+  await new Promise((done) => {
+    setImmediate(done);
+  });
   signal.throwIfAborted();
   await (reportPath === null
     ? writeStdout(report, { signal })
