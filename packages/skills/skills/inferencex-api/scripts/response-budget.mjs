@@ -1,9 +1,16 @@
 // Count decompressed bytes from fetch's stream; Content-Length may describe compressed data.
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 export { PACKAGE_VERSION };
 
-export function createResponseBudget({ responseBytes, totalBytes, timeoutMs }) {
-  const signal = AbortSignal.timeout(timeoutMs);
+export function createResponseBudget({
+  responseBytes,
+  totalBytes,
+  timeoutMs,
+  signal: cancellation,
+}) {
+  const signal = cancellation
+    ? AbortSignal.any([AbortSignal.timeout(timeoutMs), cancellation])
+    : AbortSignal.timeout(timeoutMs);
   let total = 0;
   return {
     signal,

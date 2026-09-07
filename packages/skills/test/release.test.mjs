@@ -23,15 +23,18 @@ const EXPECTED_FILES = [
   'LICENSE',
   'README.md',
   'bin/install.mjs',
+  'bin/install-transaction.mjs',
   'package.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/references/agentx.md',
+  'skills/inferencex-api/references/cli-contract.md',
   'skills/inferencex-api/references/powerx.md',
   'skills/inferencex-api/references/public-api-examples.md',
   'skills/inferencex-api/references/provenance.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/collectivex.md',
+  'skills/inferencex-api/scripts/cli-contract.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
   'skills/inferencex-api/scripts/export-agentx.mjs',
   'skills/inferencex-api/scripts/export-powerx.mjs',
@@ -100,7 +103,7 @@ test('release rejects changed bytes and a different reviewed archive', () => {
   assert.throws(() => verifyArchive({ ...record, integrity: 'sha512-other' }, bytes), /integrity/);
 });
 
-test('release content boundary is the exact independent twelve-file contract', () => {
+test('release content boundary is the exact independent file contract', () => {
   verifyContents(EXPECTED_FILES.toReversed());
   for (const missing of EXPECTED_FILES) {
     assert.throws(

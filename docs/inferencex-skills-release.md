@@ -1,7 +1,7 @@
 # Releasing the InferenceX API skill
 
 The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
-`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, and `0.8.0` are immutable
+`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, `0.8.0`, and `0.9.0` are immutable
 public releases. The website advertises the verified `0.8.0` release. For later
 releases, keep website commands pinned until publication and public verification
 succeed. The
@@ -243,6 +243,29 @@ Do not rerun publication or bump the version just to hide a failed verification.
 Announce availability only after the public verification passes. A prepared
 workflow, saved npm settings, and a successful upload each establish less than a
 successful end-to-end release.
+
+## Structured failures and recoverable upgrades from 0.10
+
+The six data helpers and installer share an opt-in `--error-format json`
+failure contract. Candidate and public verification deliberately run invalid
+arguments against every entry point for both installation targets. These checks
+retain command, stdout, stderr and exit code; they require exit 2, empty stdout,
+and the exact package/version/command identity with `INVALID_ARGUMENT`.
+PowerX JSON must also carry `schema_version: 1` from this version onward.
+
+Packed tests cover operational error categories, graceful cancellation and output
+rollback, the five-second stdout deadline, failed staging and receipt writes,
+interrupted activation/cleanup, and concurrent installation/recovery. Preserve
+failed attempts and inspect the exact archive after any package-byte change.
+A local source test or a successful installer invocation does not establish
+native skill discovery; run the natural-language acceptance separately.
+
+The installer stages a merged destination and receipt before activation, then
+recovers supported owned process-crash states on the next actual installation.
+`status` and `--dry-run` inspect recovery without changing files. These checks do
+not establish fsync/power-loss durability or repair arbitrary external edits.
+The installed [command cookbook](../packages/skills/skills/inferencex-api/references/cli-contract.md)
+defines the error envelope, exit policy, read-only inspection and recovery limits.
 
 ## User upgrades
 

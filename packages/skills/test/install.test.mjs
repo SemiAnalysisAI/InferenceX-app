@@ -82,12 +82,18 @@ test('the real npm archive installs the single skill with all bundled resources'
   assert.ok(suite.packedFiles.includes('README.md'));
   assert.ok(suite.packedFiles.includes('LICENSE'));
   assert.ok(suite.packedFiles.includes('bin/install.mjs'));
+  assert.ok(suite.packedFiles.includes('bin/install-transaction.mjs'));
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/SKILL.md'));
   assert.ok(
     suite.packedFiles.every(
       (path) =>
-        ['package.json', 'README.md', 'LICENSE', 'bin/install.mjs'].includes(path) ||
-        path.startsWith('skills/inferencex-api/'),
+        [
+          'package.json',
+          'README.md',
+          'LICENSE',
+          'bin/install.mjs',
+          'bin/install-transaction.mjs',
+        ].includes(path) || path.startsWith('skills/inferencex-api/'),
     ),
   );
   for (const path of suite.packedFiles.filter((entry) => entry.startsWith('skills/'))) {
@@ -317,6 +323,10 @@ test('0.4 prerelease and later receipts require matching AgentX versions', () =>
         join(destination, 'scripts/response-budget.mjs'),
         `const PACKAGE_VERSION = '${version}';\n`,
       );
+      writeFileSync(
+        join(destination, 'scripts/cli-contract.mjs'),
+        `const PACKAGE_VERSION = '${version}';\n`,
+      );
     }
     const matching = run(['status'], cwd);
     succeeded(matching);
@@ -330,6 +340,41 @@ test('0.9 status does not claim a usable installation when its response reader i
   const helper = join(cwd, '.claude/skills/inferencex-api/scripts/response-budget.mjs');
   rmSync(helper);
   assert.equal(jsonResult(run(['status', '--json'], cwd)).installation_state, 'unknown');
+});
+
+test('0.10 status requires the shared CLI contract with a matching package version', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const scripts = join(destination, 'scripts');
+  const version = '0.10.0';
+  writeFileSync(
+    join(destination, metadataName),
+    JSON.stringify({ package: packageInfo.name, version }),
+  );
+  for (const name of readdirSync(scripts).filter((entry) => entry.endsWith('.mjs'))) {
+    const path = join(scripts, name);
+    writeFileSync(
+      path,
+      readFileSync(path, 'utf8').replace(
+        /^const PACKAGE_VERSION = .*;$/mu,
+        `const PACKAGE_VERSION = '${version}';`,
+      ),
+    );
+  }
+  const contract = join(scripts, 'cli-contract.mjs');
+  const source = readFileSync(contract);
+  rmSync(contract);
+  const missing = run(['status'], cwd);
+  succeeded(missing);
+  assert.match(
+    missing.stdout,
+    /Installed version: unknown \(installed CLI contract is missing or not a regular file\)/u,
+  );
+  writeFileSync(contract, source);
+  const matching = run(['status'], cwd);
+  succeeded(matching);
+  assert.match(matching.stdout, /Installed version: 0\.10\.0/u);
 });
 
 test('0.5 status verifies the provenance helper without executing it', () => {
@@ -961,10 +1006,11 @@ test('JSON usage failures stay one document and preserve exit code 2 without wri
   }
 });
 
-test('an operational copy failure removes the receipt instead of reporting a successful JSON installation', () => {
+test('an operational staging failure preserves the prior receipt and installed state', () => {
   const cwd = project();
   succeeded(run(['install'], cwd));
   const destination = join(cwd, '.claude/skills/inferencex-api');
+  const before = snapshot(destination);
   const preload = join(project(), 'fail-copy.mjs');
   writeFileSync(
     preload,
@@ -973,8 +1019,11 @@ test('an operational copy failure removes the receipt instead of reporting a suc
     import { syncBuiltinESMExports } from 'node:module';
     const copy = fs.cpSync;
     fs.cpSync = (source, target, options) => {
-      if (target === ${JSON.stringify(destination)}) throw new Error('injected copy failure');
-      return copy(source, target, options);
+      const result = copy(source, target, options);
+      if (target === ${JSON.stringify(`${destination}.inferencex-skills-transaction/stage`)}) {
+        throw new Error('injected copy failure');
+      }
+      return result;
     };
     syncBuiltinESMExports();
   `,
@@ -986,10 +1035,10 @@ test('an operational copy failure removes the receipt instead of reporting a suc
     const error = jsonResult(failed, 1);
     assert.equal(error.outcome, 'failed');
     assert.match(failed.stderr, /Could not install the skill: injected copy failure/);
-    assert.equal(lstatSync(join(destination, metadataName), { throwIfNoEntry: false }), undefined);
+    assert.deepEqual(snapshot(destination), before);
     const status = jsonResult(run(['status', '--json'], cwd));
-    assert.equal(status.installation_state, 'unknown');
-    assert.equal(status.installed_version, null);
+    assert.equal(status.installation_state, 'installed');
+    assert.equal(status.installed_version, packageInfo.version);
   } finally {
     if (priorOptions === undefined) delete suite.environment.NODE_OPTIONS;
     else suite.environment.NODE_OPTIONS = priorOptions;

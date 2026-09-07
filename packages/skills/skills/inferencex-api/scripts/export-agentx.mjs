@@ -5,10 +5,21 @@ import { lstat, mkdir, readlink, realpath, rename, rm, writeFile } from 'node:fs
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
+import {
+  argumentError,
+  CliError,
+  httpError,
+  outputBoundary,
+  requestBoundary,
+  responseBoundary,
+  responseError,
+  runCli,
+  writeStdout as writeCliStdout,
+} from './cli-contract.mjs';
 import { createResponseBudget } from './response-budget.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const HELP = `export-agentx — export existing AgentX observations with summary enrichments
 
@@ -29,6 +40,7 @@ Options:
   --format <format>    csv (default) or json
   --output <file>      Output file; default stdout
   --evidence-dir <dir> Save consumed responses and a manifest in a new directory
+  --error-format <mode> Failure diagnostics: text (default) or json
   --version          Show the installed package version offline
   --help               Show this help without making a request
 
@@ -191,20 +203,14 @@ function sha256(bytes) {
 }
 
 async function saveManifest(evidence) {
-  const temporary = join(evidence.directory, 'manifest.tmp');
-  await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
-  await rename(temporary, join(evidence.directory, 'manifest.json'));
-}
-
-async function writeStdout(bytes) {
-  // The callback reports a closed consumer after write() has accepted the buffer.
-  process.stdout.on('error', () => {});
-  await new Promise((resolveWrite, reject) => {
-    process.stdout.write(bytes, (error) => (error ? reject(error) : resolveWrite()));
+  await outputBoundary(async () => {
+    const temporary = join(evidence.directory, 'manifest.tmp');
+    await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
+    await rename(temporary, join(evidence.directory, 'manifest.json'));
   });
 }
 
-async function stageFileOutput(destination, bytes) {
+async function stageFileOutput(destination, bytes, signal) {
   const target = resolve(destination);
   const suffix = `${process.pid}-${randomUUID()}`;
   const temporary = join(dirname(target), `.${basename(target)}.${suffix}.tmp`);
@@ -229,6 +235,7 @@ async function stageFileOutput(destination, bytes) {
         await rename(target, backup);
         original = true;
       }
+      signal.throwIfAborted();
       await rename(temporary, target);
       installed = true;
     },
@@ -367,13 +374,25 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
     await saveManifest(evidence);
   }
   let response;
+  const requestSignal = AbortSignal.any([budget.signal, AbortSignal.timeout(30_000)]);
   try {
     budget.signal.throwIfAborted();
-    response = await fetch(url, {
-      redirect: 'error',
-      signal: AbortSignal.any([budget.signal, AbortSignal.timeout(30_000)]),
-    });
+    response = await requestBoundary(
+      () =>
+        fetch(url, {
+          redirect: 'error',
+          signal: requestSignal,
+        }),
+      requestSignal,
+    );
   } catch (error) {
+    if (error?.code) {
+      throw new CliError(
+        error.code,
+        `${operation} request failed: ${error.message} (${url.href})`,
+        { cause: error, httpStatus: error.httpStatus },
+      );
+    }
     throw new Error(`${operation} request failed: ${error.message} (${url.href})`, {
       cause: error,
     });
@@ -384,15 +403,30 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
   }
   let bytes;
   try {
-    bytes = await budget.read(response);
+    bytes = await responseBoundary(() => budget.read(response), requestSignal);
   } catch (error) {
+    if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
+    if (!response.ok) throw httpError(response.status, `HTTP ${response.status} (${url.href})`);
+    if (error?.code) {
+      throw new CliError(
+        error.code,
+        `Could not read ${operation} response body: ${error.message}`,
+        {
+          cause: error,
+          httpStatus: error.httpStatus,
+        },
+      );
+    }
     throw new Error(`Could not read ${operation} response body: ${error.message}`, {
       cause: error,
     });
   }
   if (record) {
     const filename = `response-${String(requestNumber).padStart(4, '0')}-${operation}.json`;
-    await writeFile(join(evidence.directory, filename), bytes, { flag: 'wx' });
+    await outputBoundary(
+      () => writeFile(join(evidence.directory, filename), bytes, { flag: 'wx' }),
+      budget.signal,
+    );
     record.decoded_body_sha256 = sha256(bytes);
     record.body_file = filename;
     await saveManifest(evidence);
@@ -402,7 +436,8 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
   try {
     body = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (error) {
-    throw new Error(`${operation} response is not valid UTF-8`, { cause: error });
+    if (response.ok) throw responseError(`${operation} response is not valid UTF-8`, error);
+    body = '';
   }
   if (!response.ok) {
     let detail = '';
@@ -412,13 +447,15 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
     } catch {
       // The HTTP status is authoritative when an error body is not JSON.
     }
-    throw new Error(`HTTP ${response.status}${detail} (${url.href})`);
+    throw httpError(response.status, `HTTP ${response.status}${detail} (${url.href})`);
   }
-  try {
-    return JSON.parse(body);
-  } catch (error) {
-    throw new Error(`Could not read ${operation} JSON: ${error.message}`, { cause: error });
-  }
+  return responseBoundary(() => {
+    try {
+      return JSON.parse(body);
+    } catch (error) {
+      throw responseError(`Could not read ${operation} JSON: ${error.message}`, error);
+    }
+  }, budget.signal);
 }
 
 async function fetchChunks(operation, ids, limit, validate, requestUrls, evidence, budget) {
@@ -427,9 +464,10 @@ async function fetchChunks(operation, ids, limit, validate, requestUrls, evidenc
     const chunk = ids.slice(offset, offset + limit);
     const url = new URL(`/api/v1/${operation}`, API_ORIGIN);
     url.searchParams.set('ids', chunk.join(','));
-    const entries = validate(
-      await fetchJson(url, operation, requestUrls, evidence, budget, chunk),
-      chunk,
+    const entries = await responseBoundary(
+      async () =>
+        validate(await fetchJson(url, operation, requestUrls, evidence, budget, chunk), chunk),
+      budget.signal,
     );
     for (const [id, value] of entries) joined.set(id, value);
   }
@@ -489,430 +527,451 @@ function coverage(rows) {
   };
 }
 
-async function run(args = process.argv.slice(2)) {
-  const { values } = parseArgs({
-    args,
-    options: {
-      model: { type: 'string' },
-      date: { type: 'string' },
-      'raw-model': { type: 'string' },
-      hardware: { type: 'string' },
-      framework: { type: 'string' },
-      precision: { type: 'string' },
-      'spec-method': { type: 'string' },
-      'offload-mode': { type: 'string' },
-      concurrency: { type: 'string' },
-      format: { type: 'string', default: 'csv' },
-      output: { type: 'string' },
-      'evidence-dir': { type: 'string' },
-      version: { type: 'boolean' },
-      help: { type: 'boolean' },
-    },
-    allowPositionals: false,
-    strict: true,
-  });
-  if (values.version) {
-    process.stdout.write(`${PACKAGE_VERSION}\n`);
-    return;
-  }
-  if (values.help) {
-    process.stdout.write(HELP);
-    return;
-  }
-  if (!values.model?.trim()) throw new Error('--model requires a display model name');
-  if (values.date !== undefined && !validDate(values.date)) {
-    throw new Error('--date must be a valid YYYY-MM-DD date');
-  }
-  for (const [option, description] of [
-    ['raw-model', 'a returned model key'],
-    ['hardware', 'a returned hardware key'],
-    ['framework', 'a returned framework key'],
-    ['precision', 'a returned precision key'],
-    ['spec-method', 'a returned speculative-method key'],
-    ['offload-mode', 'a returned offload-mode key'],
-  ]) {
-    if (values[option] !== undefined && !values[option].trim()) {
-      throw new Error(`--${option} requires ${description}`);
-    }
-  }
-  const concurrency =
-    values.concurrency === undefined
-      ? undefined
-      : positiveInteger(values.concurrency, 'concurrency');
-  if (!['csv', 'json'].includes(values.format)) throw new Error('--format must be csv or json');
-  if (values.output !== undefined && !values.output.trim()) {
-    throw new Error('--output requires a file path');
-  }
-  if (values['evidence-dir'] !== undefined && !values['evidence-dir'].trim()) {
-    throw new Error('--evidence-dir requires a new directory path');
-  }
-
-  const requestedFilters = {
-    raw_model: values['raw-model'],
-    hardware: values.hardware,
-    framework: values.framework,
-    precision: values.precision,
-    spec_method: values['spec-method'],
-    offload_mode: values['offload-mode'],
-    concurrency,
-  };
-  const filters = Object.fromEntries(
-    Object.entries(requestedFilters).map(([name, value]) => [
-      name,
-      { status: value === undefined ? 'omitted' : 'applied', value: value ?? null },
-    ]),
-  );
-  const requestedScope = {
-    display_model: values.model,
-    date: values.date ?? null,
-    date_selection: values.date === undefined ? 'latest' : 'as-of',
-    raw_model: values['raw-model'] ?? null,
-    hardware: values.hardware ?? null,
-    framework: values.framework ?? null,
-    precision: values.precision ?? null,
-    spec_method: values['spec-method'] ?? null,
-    offload_mode: values['offload-mode'] ?? null,
-    concurrency: concurrency ?? null,
-    benchmark_type: 'agentic_traces',
-  };
-  const appliedFilters = {
-    display_model: { status: 'applied', value: values.model },
-    date: {
-      status: values.date === undefined ? 'omitted' : 'applied',
-      value: values.date ?? null,
-    },
-    benchmark_type: { status: 'applied', value: 'agentic_traces' },
-    ...filters,
-  };
-  const outputPath = values.output === undefined ? null : resolve(values.output);
-  let evidence;
-  let outputTransaction;
-
+async function run(args, signal) {
+  let argumentsValidated = false;
   try {
-    if (values['evidence-dir'] !== undefined) {
-      const directory = resolve(values['evidence-dir']);
-      if (outputPath !== null) {
-        const physicalEvidencePath = await physicalPath(directory);
-        const physicalOutputPath = await physicalPath(outputPath);
-        const evidencePath = physicalEvidencePath.toLowerCase();
-        const physicalOutput = physicalOutputPath.toLowerCase();
-        if (
-          containsPath(evidencePath, physicalOutput) ||
-          containsPath(physicalOutput, evidencePath)
-        ) {
-          throw new Error('--output collides with the evidence directory');
-        }
-      }
-      await mkdir(dirname(directory), { recursive: true });
-      await mkdir(directory); // EEXIST also rejects empty directories and symlinks.
-      evidence = {
-        directory,
-        manifest: {
-          schema_version: 1,
-          package_version: PACKAGE_VERSION,
-          status: 'pending',
-          started_at: new Date().toISOString(),
-          finished_at: null,
-          outcome: null,
-          requested_filters: requestedScope,
-          applied_filters: appliedFilters,
-          counts: {
-            returned_rows: null,
-            returned_agentx_rows: null,
-            selected_rows: null,
-          },
-          responses: [],
-          export: {
-            format: values.format,
-            destination: outputPath ?? 'stdout',
-            sha256: null,
-            metadata: null,
-            source_request_numbers: [],
-          },
-          error: null,
-        },
-      };
-      await saveManifest(evidence);
-    }
-
-    const requestUrls = [];
-    const budget = createResponseBudget({
-      responseBytes: 32 * 1024 * 1024,
-      totalBytes: 128 * 1024 * 1024,
-      timeoutMs: 120_000,
+    const { values } = parseArgs({
+      args,
+      options: {
+        model: { type: 'string' },
+        date: { type: 'string' },
+        'raw-model': { type: 'string' },
+        hardware: { type: 'string' },
+        framework: { type: 'string' },
+        precision: { type: 'string' },
+        'spec-method': { type: 'string' },
+        'offload-mode': { type: 'string' },
+        concurrency: { type: 'string' },
+        format: { type: 'string', default: 'csv' },
+        output: { type: 'string' },
+        'evidence-dir': { type: 'string' },
+        version: { type: 'boolean' },
+        help: { type: 'boolean' },
+        'error-format': { type: 'string' },
+      },
+      allowPositionals: false,
+      strict: true,
     });
-    const benchmarkUrl = new URL('/api/v1/benchmarks', API_ORIGIN);
-    benchmarkUrl.searchParams.set('model', values.model);
-    if (values.date !== undefined) benchmarkUrl.searchParams.set('date', values.date);
-    const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls, evidence, budget);
-    if (!Array.isArray(benchmarks) || benchmarks.some((row) => !benchmarkRow(row))) {
-      throw new Error(
-        'Unexpected benchmarks response shape: expected complete rows with required identity, configuration, workload, date, run_url, and metrics fields',
-      );
+    if (values.version) {
+      await writeCliStdout(`${PACKAGE_VERSION}\n`, { signal });
+      return;
     }
-    const agentxRows = benchmarks.filter((row) => row.benchmark_type === 'agentic_traces');
-    const selected = agentxRows.filter((row) =>
-      FILTERS.every(
-        ([name, field]) =>
-          requestedFilters[name] === undefined || row[field] === requestedFilters[name],
-      ),
-    );
-    const outcome =
-      agentxRows.length === 0
-        ? 'no_agentx_rows'
-        : selected.length === 0
-          ? 'no_matching_rows'
-          : 'selected_rows';
-    if (evidence) {
-      evidence.manifest.outcome = outcome;
-      evidence.manifest.counts = {
-        returned_rows: benchmarks.length,
-        returned_agentx_rows: agentxRows.length,
-        selected_rows: selected.length,
-      };
-      await saveManifest(evidence);
+    if (values.help) {
+      await writeCliStdout(HELP, { signal });
+      return;
     }
-    const ids = [
-      ...new Set(selected.map((row) => safeResultId(row.id)).filter((id) => id !== null)),
-    ];
-    const aggregates = await fetchChunks(
-      'agentic-aggregates',
-      ids,
-      200,
-      aggregateMap,
-      requestUrls,
-      evidence,
-      budget,
+    if (!values.model?.trim()) throw new Error('--model requires a display model name');
+    if (values.date !== undefined && !validDate(values.date)) {
+      throw new Error('--date must be a valid YYYY-MM-DD date');
+    }
+    for (const [option, description] of [
+      ['raw-model', 'a returned model key'],
+      ['hardware', 'a returned hardware key'],
+      ['framework', 'a returned framework key'],
+      ['precision', 'a returned precision key'],
+      ['spec-method', 'a returned speculative-method key'],
+      ['offload-mode', 'a returned offload-mode key'],
+    ]) {
+      if (values[option] !== undefined && !values[option].trim()) {
+        throw new Error(`--${option} requires ${description}`);
+      }
+    }
+    const concurrency =
+      values.concurrency === undefined
+        ? undefined
+        : positiveInteger(values.concurrency, 'concurrency');
+    if (!['csv', 'json'].includes(values.format)) throw new Error('--format must be csv or json');
+    if (values.output !== undefined && !values.output.trim()) {
+      throw new Error('--output requires a file path');
+    }
+    if (values['evidence-dir'] !== undefined && !values['evidence-dir'].trim()) {
+      throw new Error('--evidence-dir requires a new directory path');
+    }
+    argumentsValidated = true;
+
+    const requestedFilters = {
+      raw_model: values['raw-model'],
+      hardware: values.hardware,
+      framework: values.framework,
+      precision: values.precision,
+      spec_method: values['spec-method'],
+      offload_mode: values['offload-mode'],
+      concurrency,
+    };
+    const filters = Object.fromEntries(
+      Object.entries(requestedFilters).map(([name, value]) => [
+        name,
+        { status: value === undefined ? 'omitted' : 'applied', value: value ?? null },
+      ]),
     );
-    const derived = await fetchChunks(
-      'derived-agentic-metrics',
-      ids,
-      200,
-      derivedMap,
-      requestUrls,
-      evidence,
-      budget,
-    );
-    const traces = await fetchChunks(
-      'trace-availability',
-      ids,
-      500,
-      traceMap,
-      requestUrls,
-      evidence,
-      budget,
-    );
-    let nonFiniteValues = 0;
-    const rows = selected.map((row) => {
-      const benchmark = JSON.parse(
-        JSON.stringify(row, (_key, value) => {
-          if (typeof value === 'number' && !Number.isFinite(value)) {
-            nonFiniteValues++;
-            return null;
+    const requestedScope = {
+      display_model: values.model,
+      date: values.date ?? null,
+      date_selection: values.date === undefined ? 'latest' : 'as-of',
+      raw_model: values['raw-model'] ?? null,
+      hardware: values.hardware ?? null,
+      framework: values.framework ?? null,
+      precision: values.precision ?? null,
+      spec_method: values['spec-method'] ?? null,
+      offload_mode: values['offload-mode'] ?? null,
+      concurrency: concurrency ?? null,
+      benchmark_type: 'agentic_traces',
+    };
+    const appliedFilters = {
+      display_model: { status: 'applied', value: values.model },
+      date: {
+        status: values.date === undefined ? 'omitted' : 'applied',
+        value: values.date ?? null,
+      },
+      benchmark_type: { status: 'applied', value: 'agentic_traces' },
+      ...filters,
+    };
+    const outputPath = values.output === undefined ? null : resolve(values.output);
+    let evidence;
+    let outputTransaction;
+
+    try {
+      if (values['evidence-dir'] !== undefined) {
+        const directory = resolve(values['evidence-dir']);
+        if (outputPath !== null) {
+          const physicalEvidencePath = await outputBoundary(() => physicalPath(directory), signal);
+          const physicalOutputPath = await outputBoundary(() => physicalPath(outputPath), signal);
+          const evidencePath = physicalEvidencePath.toLowerCase();
+          const physicalOutput = physicalOutputPath.toLowerCase();
+          if (
+            containsPath(evidencePath, physicalOutput) ||
+            containsPath(physicalOutput, evidencePath)
+          ) {
+            throw argumentError('--output collides with the evidence directory');
           }
-          return value;
-        }),
+        }
+        await outputBoundary(async () => {
+          await mkdir(dirname(directory), { recursive: true });
+          await mkdir(directory); // EEXIST also rejects empty directories and symlinks.
+        }, signal);
+        evidence = {
+          directory,
+          manifest: {
+            schema_version: 1,
+            package_version: PACKAGE_VERSION,
+            status: 'pending',
+            started_at: new Date().toISOString(),
+            finished_at: null,
+            outcome: null,
+            requested_filters: requestedScope,
+            applied_filters: appliedFilters,
+            counts: {
+              returned_rows: null,
+              returned_agentx_rows: null,
+              selected_rows: null,
+            },
+            responses: [],
+            export: {
+              format: values.format,
+              destination: outputPath ?? 'stdout',
+              sha256: null,
+              metadata: null,
+              source_request_numbers: [],
+            },
+            error: null,
+          },
+        };
+        await saveManifest(evidence);
+      }
+
+      const requestUrls = [];
+      const budget = createResponseBudget({
+        responseBytes: 32 * 1024 * 1024,
+        totalBytes: 128 * 1024 * 1024,
+        timeoutMs: 120_000,
+        signal,
+      });
+      const benchmarkUrl = new URL('/api/v1/benchmarks', API_ORIGIN);
+      benchmarkUrl.searchParams.set('model', values.model);
+      if (values.date !== undefined) benchmarkUrl.searchParams.set('date', values.date);
+      const benchmarks = await fetchJson(benchmarkUrl, 'benchmarks', requestUrls, evidence, budget);
+      if (!Array.isArray(benchmarks) || benchmarks.some((row) => !benchmarkRow(row))) {
+        throw responseError(
+          'Unexpected benchmarks response shape: expected complete rows with required identity, configuration, workload, date, run_url, and metrics fields',
+        );
+      }
+      const agentxRows = benchmarks.filter((row) => row.benchmark_type === 'agentic_traces');
+      const selected = agentxRows.filter((row) =>
+        FILTERS.every(
+          ([name, field]) =>
+            requestedFilters[name] === undefined || row[field] === requestedFilters[name],
+        ),
       );
-      const id = safeResultId(row.id);
-      if (id === null) {
+      const outcome =
+        agentxRows.length === 0
+          ? 'no_agentx_rows'
+          : selected.length === 0
+            ? 'no_matching_rows'
+            : 'selected_rows';
+      if (evidence) {
+        evidence.manifest.outcome = outcome;
+        evidence.manifest.counts = {
+          returned_rows: benchmarks.length,
+          returned_agentx_rows: agentxRows.length,
+          selected_rows: selected.length,
+        };
+        await saveManifest(evidence);
+      }
+      const ids = [
+        ...new Set(selected.map((row) => safeResultId(row.id)).filter((id) => id !== null)),
+      ];
+      const aggregates = await fetchChunks(
+        'agentic-aggregates',
+        ids,
+        200,
+        aggregateMap,
+        requestUrls,
+        evidence,
+        budget,
+      );
+      const derived = await fetchChunks(
+        'derived-agentic-metrics',
+        ids,
+        200,
+        derivedMap,
+        requestUrls,
+        evidence,
+        budget,
+      );
+      const traces = await fetchChunks(
+        'trace-availability',
+        ids,
+        500,
+        traceMap,
+        requestUrls,
+        evidence,
+        budget,
+      );
+      let nonFiniteValues = 0;
+      const rows = selected.map((row) => {
+        const benchmark = JSON.parse(
+          JSON.stringify(row, (_key, value) => {
+            if (typeof value === 'number' && !Number.isFinite(value)) {
+              nonFiniteValues++;
+              return null;
+            }
+            return value;
+          }),
+        );
+        const id = safeResultId(row.id);
+        if (id === null) {
+          return {
+            benchmark,
+            agentx: {
+              status: 'unsupported_id',
+              result_id: null,
+              aggregates: { status: 'unsupported_id', value: null },
+              derived_metrics: { status: 'unsupported_id', value: null },
+              trace_availability: {
+                status: 'unsupported_id',
+                value: null,
+                response_key_present: null,
+              },
+            },
+          };
+        }
+        const hasAggregates = aggregates.has(id);
+        const hasDerived = derived.has(id);
+        const hasTraceKey = traces.has(id);
+        const traceAvailable = hasTraceKey ? traces.get(id) : false;
         return {
           benchmark,
           agentx: {
-            status: 'unsupported_id',
-            result_id: null,
-            aggregates: { status: 'unsupported_id', value: null },
-            derived_metrics: { status: 'unsupported_id', value: null },
+            status: hasAggregates && hasDerived ? 'complete' : 'partial',
+            result_id: id,
+            aggregates: {
+              status: hasAggregates ? 'available' : 'not_returned',
+              value: hasAggregates ? aggregates.get(id) : null,
+            },
+            derived_metrics: {
+              status: hasDerived ? 'available' : 'not_returned',
+              value: hasDerived ? derived.get(id) : null,
+            },
             trace_availability: {
-              status: 'unsupported_id',
-              value: null,
-              response_key_present: null,
+              status: traceAvailable ? 'stored_trace' : 'no_stored_trace',
+              value: traceAvailable,
+              response_key_present: hasTraceKey,
             },
           },
         };
-      }
-      const hasAggregates = aggregates.has(id);
-      const hasDerived = derived.has(id);
-      const hasTraceKey = traces.has(id);
-      const traceAvailable = hasTraceKey ? traces.get(id) : false;
-      return {
-        benchmark,
-        agentx: {
-          status: hasAggregates && hasDerived ? 'complete' : 'partial',
-          result_id: id,
-          aggregates: {
-            status: hasAggregates ? 'available' : 'not_returned',
-            value: hasAggregates ? aggregates.get(id) : null,
-          },
-          derived_metrics: {
-            status: hasDerived ? 'available' : 'not_returned',
-            value: hasDerived ? derived.get(id) : null,
-          },
-          trace_availability: {
-            status: traceAvailable ? 'stored_trace' : 'no_stored_trace',
-            value: traceAvailable,
-            response_key_present: hasTraceKey,
-          },
-        },
-      };
-    });
-    const retrievedAt = new Date().toISOString();
-    const benchmarkRequest = requestUrls[0].url;
-    const metadata = {
-      package_version: PACKAGE_VERSION,
-      retrieved_at: retrievedAt,
-      request_urls: requestUrls,
-      requested_scope: requestedScope,
-      filters,
-      outcome,
-      returned_rows: benchmarks.length,
-      returned_agentx_rows: agentxRows.length,
-      selected_rows: rows.length,
-      available_filter_values: {
-        raw_model: unique(agentxRows.map((row) => row.model)),
-        hardware: unique(agentxRows.map((row) => row.hardware)),
-        framework: unique(agentxRows.map((row) => row.framework)),
-        precision: unique(agentxRows.map((row) => row.precision)),
-        spec_method: unique(agentxRows.map((row) => row.spec_method)),
-        offload_mode: unique(agentxRows.map((row) => row.offload_mode)),
-        concurrency: unique(agentxRows.map((row) => row.conc)),
-      },
-      returned_model_keys: unique(benchmarks.map((row) => row.model)),
-      selected_model_keys: unique(selected.map((row) => row.model)),
-      enrichment_coverage: coverage(rows),
-      non_finite_values: nonFiniteValues,
-      observation_context: 'Existing observations were read; no new benchmark was run.',
-    };
-    let output;
-    if (values.format === 'json') {
-      output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
-    } else {
-      const metricColumns = unique(
-        rows.flatMap(({ benchmark }) =>
-          Object.entries(benchmark.metrics)
-            .filter(([, value]) => scalar(value))
-            .map(([key]) => `metrics.${key}`),
-        ),
-      );
-      const columns = [
-        ...CSV_CONTEXT_COLUMNS,
-        ...CSV_BENCHMARK_COLUMNS,
-        ...metricColumns,
-        ...CSV_ENRICHMENT_COLUMNS,
-      ];
-      const context = {
+      });
+      const retrievedAt = new Date().toISOString();
+      const benchmarkRequest = requestUrls[0].url;
+      const metadata = {
         package_version: PACKAGE_VERSION,
-        query_url: benchmarkRequest,
         retrieved_at: retrievedAt,
-        requested_model: values.model,
-        requested_date: values.date ?? null,
-        date_selection: values.date === undefined ? 'latest' : 'as-of',
-        requested_benchmark_type: 'agentic_traces',
-        ...Object.fromEntries(
-          Object.entries(requestedFilters).map(([name, value]) => [
-            `filter.${name}`,
-            value ?? null,
-          ]),
-        ),
+        request_urls: requestUrls,
+        requested_scope: requestedScope,
+        filters,
+        outcome,
+        returned_rows: benchmarks.length,
+        returned_agentx_rows: agentxRows.length,
+        selected_rows: rows.length,
+        available_filter_values: {
+          raw_model: unique(agentxRows.map((row) => row.model)),
+          hardware: unique(agentxRows.map((row) => row.hardware)),
+          framework: unique(agentxRows.map((row) => row.framework)),
+          precision: unique(agentxRows.map((row) => row.precision)),
+          spec_method: unique(agentxRows.map((row) => row.spec_method)),
+          offload_mode: unique(agentxRows.map((row) => row.offload_mode)),
+          concurrency: unique(agentxRows.map((row) => row.conc)),
+        },
+        returned_model_keys: unique(benchmarks.map((row) => row.model)),
+        selected_model_keys: unique(selected.map((row) => row.model)),
+        enrichment_coverage: coverage(rows),
+        non_finite_values: nonFiniteValues,
+        observation_context: 'Existing observations were read; no new benchmark was run.',
       };
-      const lines = rows.map(({ benchmark, agentx }) => {
-        const aggregateCells = Object.fromEntries(
-          AGGREGATE_GROUPS.flatMap((group) =>
-            [...PERCENTILE_FIELDS, 'n'].map((field) => [
-              `aggregate.${group}.${field}`,
-              agentx.aggregates.value?.[group]?.[field],
-            ]),
+      let output;
+      if (values.format === 'json') {
+        output = `${JSON.stringify({ schema_version: 1, metadata, rows }, null, 2)}\n`;
+      } else {
+        const metricColumns = unique(
+          rows.flatMap(({ benchmark }) =>
+            Object.entries(benchmark.metrics)
+              .filter(([, value]) => scalar(value))
+              .map(([key]) => `metrics.${key}`),
           ),
         );
-        const enrichment = {
-          ...aggregateCells,
-          'derived.p75_e2e_norm_intvty': agentx.derived_metrics.value?.p75_e2e_norm_intvty,
-          'derived.p90_e2e_norm_intvty': agentx.derived_metrics.value?.p90_e2e_norm_intvty,
-          'trace.available': agentx.trace_availability.value,
-          'trace.response_key_present': agentx.trace_availability.response_key_present,
-          'enrichment.status': agentx.status,
-          'enrichment.aggregates_status': agentx.aggregates.status,
-          'enrichment.derived_metrics_status': agentx.derived_metrics.status,
-          'enrichment.trace_availability_status': agentx.trace_availability.status,
+        const columns = [
+          ...CSV_CONTEXT_COLUMNS,
+          ...CSV_BENCHMARK_COLUMNS,
+          ...metricColumns,
+          ...CSV_ENRICHMENT_COLUMNS,
+        ];
+        const context = {
+          package_version: PACKAGE_VERSION,
+          query_url: benchmarkRequest,
+          retrieved_at: retrievedAt,
+          requested_model: values.model,
+          requested_date: values.date ?? null,
+          date_selection: values.date === undefined ? 'latest' : 'as-of',
+          requested_benchmark_type: 'agentic_traces',
+          ...Object.fromEntries(
+            Object.entries(requestedFilters).map(([name, value]) => [
+              `filter.${name}`,
+              value ?? null,
+            ]),
+          ),
         };
-        return [
-          ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
-          ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
-          ...metricColumns.map((column) => {
-            const value = benchmark.metrics[column.slice('metrics.'.length)];
-            return scalar(value) ? value : null;
-          }),
-          ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
-        ]
-          .map(csvCell)
-          .join(',');
-      });
-      output = `${[columns.map(csvCell).join(','), ...lines].join('\r\n')}\r\n`;
-    }
-    const outputBytes = Buffer.from(output);
-    if (evidence) {
-      const sourceRequestNumbers = evidence.manifest.responses
-        .filter((record) => record.body_file !== null)
-        .map((record) => record.request_number);
-      if (sourceRequestNumbers.length !== evidence.manifest.responses.length) {
-        throw new Error('Cannot complete evidence with an uncaptured response');
+        const lines = rows.map(({ benchmark, agentx }) => {
+          const aggregateCells = Object.fromEntries(
+            AGGREGATE_GROUPS.flatMap((group) =>
+              [...PERCENTILE_FIELDS, 'n'].map((field) => [
+                `aggregate.${group}.${field}`,
+                agentx.aggregates.value?.[group]?.[field],
+              ]),
+            ),
+          );
+          const enrichment = {
+            ...aggregateCells,
+            'derived.p75_e2e_norm_intvty': agentx.derived_metrics.value?.p75_e2e_norm_intvty,
+            'derived.p90_e2e_norm_intvty': agentx.derived_metrics.value?.p90_e2e_norm_intvty,
+            'trace.available': agentx.trace_availability.value,
+            'trace.response_key_present': agentx.trace_availability.response_key_present,
+            'enrichment.status': agentx.status,
+            'enrichment.aggregates_status': agentx.aggregates.status,
+            'enrichment.derived_metrics_status': agentx.derived_metrics.status,
+            'enrichment.trace_availability_status': agentx.trace_availability.status,
+          };
+          return [
+            ...CSV_CONTEXT_COLUMNS.map((column) => context[column]),
+            ...CSV_BENCHMARK_COLUMNS.map((column) => benchmark[column]),
+            ...metricColumns.map((column) => {
+              const value = benchmark.metrics[column.slice('metrics.'.length)];
+              return scalar(value) ? value : null;
+            }),
+            ...CSV_ENRICHMENT_COLUMNS.map((column) => enrichment[column]),
+          ]
+            .map(csvCell)
+            .join(',');
+        });
+        output = `${[columns.map(csvCell).join(','), ...lines].join('\r\n')}\r\n`;
       }
-      evidence.manifest.export.metadata = metadata;
-      evidence.manifest.export.source_request_numbers = sourceRequestNumbers;
-      await saveManifest(evidence);
-    }
-    if (outputPath === null) {
-      await writeStdout(outputBytes);
-    } else {
-      outputTransaction = await stageFileOutput(outputPath, outputBytes);
-      await outputTransaction.commit();
-    }
-    if (evidence) {
-      evidence.manifest.export.sha256 = sha256(outputBytes);
-      evidence.manifest.status = 'complete';
-      evidence.manifest.finished_at = new Date().toISOString();
-      await saveManifest(evidence);
-    }
-    if (outputTransaction) {
-      await outputTransaction.finish();
-      outputTransaction = null;
-    }
-    process.stderr.write(`${JSON.stringify({ metadata })}\n`);
-    process.stderr.write(
-      `Selected ${metadata.selected_rows} AgentX rows from ${metadata.returned_rows} complete benchmark rows (${metadata.returned_agentx_rows} AgentX before exact-filter selection).\n`,
-    );
-  } catch (error) {
-    let failure = error;
-    if (outputTransaction) {
-      try {
-        await outputTransaction.rollback();
-      } catch (rollbackError) {
-        failure = new Error(
-          `${error.message}; could not restore the previous output: ${rollbackError.message}`,
-          { cause: error },
-        );
-      }
-    }
-    if (evidence) {
-      evidence.manifest.status = 'failed';
-      evidence.manifest.finished_at = new Date().toISOString();
-      evidence.manifest.outcome = 'failed';
-      evidence.manifest.error = failure.message;
-      evidence.manifest.export.sha256 = null;
-      evidence.manifest.export.source_request_numbers = [];
-      try {
+      const outputBytes = Buffer.from(output);
+      if (evidence) {
+        const sourceRequestNumbers = evidence.manifest.responses
+          .filter((record) => record.body_file !== null)
+          .map((record) => record.request_number);
+        if (sourceRequestNumbers.length !== evidence.manifest.responses.length) {
+          throw new Error('Cannot complete evidence with an uncaptured response');
+        }
+        evidence.manifest.export.metadata = metadata;
+        evidence.manifest.export.source_request_numbers = sourceRequestNumbers;
         await saveManifest(evidence);
-      } catch (writeError) {
-        throw new Error(
-          `${failure.message}; could not save failure evidence: ${writeError.message}`,
-          { cause: writeError },
-        );
       }
+      if (outputPath === null) {
+        await writeCliStdout(outputBytes, { signal });
+      } else {
+        outputTransaction = await outputBoundary(
+          () => stageFileOutput(outputPath, outputBytes, signal),
+          signal,
+        );
+        await outputBoundary(() => outputTransaction.commit(), signal);
+      }
+      signal.throwIfAborted();
+      if (evidence) {
+        evidence.manifest.export.sha256 = sha256(outputBytes);
+        evidence.manifest.status = 'complete';
+        evidence.manifest.finished_at = new Date().toISOString();
+        await saveManifest(evidence);
+      }
+      if (outputTransaction) {
+        signal.throwIfAborted();
+        await outputTransaction.finish();
+        outputTransaction = null;
+      }
+      process.stderr.write(`${JSON.stringify({ metadata })}\n`);
+      process.stderr.write(
+        `Selected ${metadata.selected_rows} AgentX rows from ${metadata.returned_rows} complete benchmark rows (${metadata.returned_agentx_rows} AgentX before exact-filter selection).\n`,
+      );
+    } catch (error) {
+      let failure = error;
+      if (outputTransaction) {
+        try {
+          await outputTransaction.rollback();
+        } catch (rollbackError) {
+          failure = new CliError(
+            error instanceof CliError ? error.code : 'INTERNAL_ERROR',
+            `${error.message}; could not restore the previous output: ${rollbackError.message}`,
+            { cause: error, httpStatus: error.httpStatus },
+          );
+        }
+      }
+      if (evidence) {
+        evidence.manifest.status = 'failed';
+        evidence.manifest.finished_at = new Date().toISOString();
+        evidence.manifest.outcome = 'failed';
+        evidence.manifest.error = failure.message;
+        evidence.manifest.export.sha256 = null;
+        evidence.manifest.export.source_request_numbers = [];
+        try {
+          await saveManifest(evidence);
+        } catch (writeError) {
+          throw new CliError(
+            failure instanceof CliError ? failure.code : 'INTERNAL_ERROR',
+            `${failure.message}; could not save failure evidence: ${writeError.message}`,
+            { cause: failure, httpStatus: failure.httpStatus },
+          );
+        }
+      }
+      throw failure;
     }
-    throw failure;
+  } catch (error) {
+    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
+      throw argumentError(error.message, error);
+    }
+    throw error;
   }
 }
 
-run().catch((error) => {
-  process.stderr.write(`export-agentx: ${error.message}\n`);
-  process.exitCode = 1;
+await runCli({
+  command: 'export-agentx',
+  packageVersion: PACKAGE_VERSION,
+  run: ({ args, signal }) => run(args, signal),
 });

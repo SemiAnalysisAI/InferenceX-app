@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -192,9 +192,19 @@ if (fixture.shortDeadline) {
 }
 const originalWriteFile = fs.promises.writeFile;
 let completeManifestFailure = fixture.failCompleteManifest;
+if (fixture.pauseCompleteManifest) process.once('SIGTERM', () => {
+  fs.writeFileSync(fixture.pauseCompleteManifest.received, 'received');
+});
 fs.promises.writeFile = async (path, data, ...rest) => {
   const text = String(data);
   if (String(path).endsWith('manifest.tmp')) {
+    if (fixture.pauseCompleteManifest && text.includes('"status": "complete"')) {
+      fs.writeFileSync(fixture.pauseCompleteManifest.ready, 'ready');
+      while (!fs.existsSync(fixture.pauseCompleteManifest.release)) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+    if (fixture.failInitialManifest) throw new Error('controlled initial manifest failure');
     if (completeManifestFailure && text.includes('"status": "complete"')) {
       completeManifestFailure = false;
       throw new Error('controlled complete manifest failure');
@@ -1336,6 +1346,158 @@ test('evidence, output, and stdout write failures never become complete', () => 
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /broken pipe.*could not save failure evidence/isu);
+    assert.equal(captured(result).manifest.status, 'pending');
+  }
+});
+
+test('SIGTERM during the final manifest write restores output and records failed evidence', async () => {
+  const cwd = project();
+  const gate = Object.fromEntries(
+    ['ready', 'received', 'release'].map((name) => [name, join(cwd, name)]),
+  );
+  const fixturePath = join(cwd, 'fixture.json');
+  writeFileSync(
+    fixturePath,
+    JSON.stringify({
+      routes: { '/api/v1/benchmarks': [response('[]')] },
+      pauseCompleteManifest: gate,
+    }),
+  );
+  writeFileSync(join(cwd, 'agentx.json'), 'previous complete export');
+  const child = spawn(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(preload).href,
+      exporter,
+      '--model',
+      'DeepSeek-V4-Pro',
+      '--output',
+      'agentx.json',
+      '--evidence-dir',
+      'evidence',
+      '--error-format',
+      'json',
+    ],
+    {
+      cwd,
+      env: {
+        ...environment,
+        INFERENCEX_TEST_RESPONSE: fixturePath,
+        INFERENCEX_TEST_REQUESTS: join(cwd, 'requests.txt'),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10_000,
+      killSignal: 'SIGKILL',
+    },
+  );
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8').on('data', (chunk) => (stdout += chunk));
+  child.stderr.setEncoding('utf8').on('data', (chunk) => (stderr += chunk));
+  const closed = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal }));
+  });
+  async function waitForFile(path) {
+    const deadline = Date.now() + 5_000;
+    while (!existsSync(path) && Date.now() < deadline) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+    assert.ok(existsSync(path), `did not reach ${path}: ${stderr}`);
+  }
+  try {
+    await waitForFile(gate.ready);
+    assert.ok(readdirSync(cwd).some((name) => name.endsWith('.backup')));
+    assert.equal(child.kill('SIGTERM'), true);
+    await waitForFile(gate.received);
+    writeFileSync(gate.release, 'release');
+    const result = await closed;
+    assert.deepEqual(result, { status: 130, signal: null }, stderr);
+    assert.equal(stdout, '');
+    assert.equal(JSON.parse(stderr).error.code, 'CANCELLED');
+    assert.equal(readFileSync(join(cwd, 'agentx.json'), 'utf8'), 'previous complete export');
+    const { manifest, bodies } = captured({ cwd });
+    assert.equal(manifest.status, 'failed');
+    assert.match(manifest.error, /SIGTERM/u);
+    assert.equal(manifest.export.sha256, null);
+    assert.deepEqual(manifest.export.source_request_numbers, []);
+    assert.equal(bodies.size, 1);
+    assert.deepEqual(
+      readdirSync(cwd).filter((name) => /\.(?:backup|tmp)$/u.test(name)),
+      [],
+    );
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGKILL');
+      await closed;
+    }
+  }
+});
+
+for (const fault of [
+  'initial-manifest',
+  'enrichment-response',
+  'enrichment-manifest',
+  'complete-manifest',
+]) {
+  test(`JSON diagnostics classify ${fault} evidence failures as OUTPUT_ERROR`, () => {
+    const cwd = project();
+    const evidenceDir = join(cwd, 'evidence');
+    const routes = routesFor([observation('1')], [1]);
+    const options = { cwd, evidenceDir };
+    if (fault === 'initial-manifest') options.failInitialManifest = true;
+    else if (fault === 'complete-manifest') options.failCompleteManifest = true;
+    else {
+      routes['/api/v1/agentic-aggregates'][0].blockEvidenceFile =
+        fault === 'enrichment-response' ? 'response-0002-agentic-aggregates.json' : 'manifest.tmp';
+    }
+    writeFileSync(join(cwd, 'agentx.json'), 'previous complete export');
+    const result = run(
+      [
+        '--model',
+        'DeepSeek-V4-Pro',
+        '--output',
+        'agentx.json',
+        '--evidence-dir',
+        'evidence',
+        '--error-format',
+        'json',
+      ],
+      routes,
+      options,
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(JSON.parse(result.stderr).error.code, 'OUTPUT_ERROR', fault);
+    assert.equal(readFileSync(join(cwd, 'agentx.json'), 'utf8'), 'previous complete export');
+    if (fault !== 'initial-manifest') {
+      assert.equal(
+        captured(result).manifest.status,
+        fault === 'enrichment-manifest' ? 'pending' : 'failed',
+      );
+    }
+  });
+}
+
+test('failed evidence recording preserves the original AgentX HTTP and timeout codes', () => {
+  for (const [reply, code] of [
+    [response('unavailable', 503), 'HTTP_ERROR'],
+    [response('', 200, { timeout: true }), 'TIMEOUT'],
+  ]) {
+    const result = run(
+      ['--model', 'DeepSeek-V4-Pro', '--evidence-dir', 'evidence', '--error-format', 'json'],
+      { '/api/v1/benchmarks': [reply] },
+      { failFailureManifest: true },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    const error = JSON.parse(result.stderr).error;
+    assert.equal(error.code, code);
+    if (code === 'HTTP_ERROR') assert.equal(error.http_status, 503);
+    assert.match(error.message, /could not save failure evidence/u);
     assert.equal(captured(result).manifest.status, 'pending');
   }
 });

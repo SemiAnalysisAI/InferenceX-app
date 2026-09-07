@@ -338,6 +338,86 @@ class RetryTests(unittest.TestCase):
             check.captured_request(self.root, 'lookup', context['query_url'], context | {'retrieved_at': '2026-09-06T00:00:00Z'})
 
 
+class StructuredErrorVerifierTests(unittest.TestCase):
+    @staticmethod
+    def envelope(**changes):
+        document = {
+            'schema_version': 1,
+            'package': check.PACKAGE,
+            'package_version': '0.10.0',
+            'command': 'export-powerx',
+            'error': {'code': 'INVALID_ARGUMENT', 'message': 'Unknown option --invalid-argument'},
+        }
+        document.update(changes)
+        return document
+
+    @staticmethod
+    def failure(document, *, returncode=2, stdout='', extra_stderr=''):
+        return subprocess.CalledProcessError(
+            returncode,
+            ['node', 'export-powerx.mjs'],
+            output=stdout,
+            stderr=json.dumps(document, separators=(',', ':')) + '\n' + extra_stderr,
+        )
+
+    def test_structured_error_requires_exact_process_and_envelope_contract(self):
+        expected = self.envelope()
+        self.assertEqual(
+            check.check_structured_error(self.failure(expected), 'export-powerx', '0.10.0'),
+            expected,
+        )
+        mutations = [
+            ('missing schema', {key: value for key, value in self.envelope().items()
+                                if key != 'schema_version'}),
+            ('malformed schema', self.envelope(schema_version='1')),
+            ('wrong schema', self.envelope(schema_version=2)),
+            ('wrong version', self.envelope(package_version='0.10.1')),
+            ('wrong command', self.envelope(command='export-agentx')),
+            ('wrong code', self.envelope(error={'code': 'INTERNAL_ERROR', 'message': 'bad'})),
+            ('empty message', self.envelope(error={'code': 'INVALID_ARGUMENT', 'message': ''})),
+            ('extra envelope field', self.envelope(debug=True)),
+        ]
+        for name, document in mutations:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                check.check_structured_error(self.failure(document), 'export-powerx', '0.10.0')
+        for name, failure in [
+            ('nonempty stdout', self.failure(expected, stdout='diagnostic\n')),
+            ('extra stderr diagnostic', self.failure(expected, extra_stderr='debug\n')),
+            ('wrong exit code', self.failure(expected, returncode=1)),
+        ]:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                check.check_structured_error(failure, 'export-powerx', '0.10.0')
+
+    def test_structured_contract_is_explicitly_gated_to_0_10_and_later(self):
+        self.assertFalse(check.structured_errors_required('0.4.0'))
+        self.assertFalse(check.structured_errors_required('0.9.9'))
+        self.assertTrue(check.structured_errors_required('0.10.0'))
+        self.assertTrue(check.structured_errors_required('1.0.0'))
+
+    def test_powerx_schema_is_additive_from_0_10(self):
+        legacy = {'metadata': {'package_version': '0.9.9'}, 'rows': []}
+        check.check_powerx_schema(legacy, '0.9.9')
+        current = {'schema_version': 1, 'metadata': {'package_version': '0.10.0'}, 'rows': []}
+        check.check_powerx_schema(current, '0.10.0')
+        for name, document in [
+            ('missing', legacy),
+            ('malformed', current | {'schema_version': '1'}),
+            ('wrong', current | {'schema_version': 2}),
+            ('extra field', current | {'debug': True}),
+        ]:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                check.check_powerx_schema(document, '0.10.0')
+
+    def test_powerx_export_check_enforces_the_0_10_schema_before_payload_checks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            check.save(project / 'powerx.json', {'metadata': {}, 'rows': []})
+            with patch.object(check, 'check_metadata') as metadata, \
+                    self.assertRaisesRegex(ValueError, 'PowerX JSON schema version'):
+                check.check_exports(project, [], [], SimpleNamespace(), '0.10.0')
+        metadata.assert_not_called()
+
+
 class AgentXVerifierTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -1032,6 +1112,7 @@ globalThis.fetch = async (input) => {{
         install.assert_not_called()
 
     def test_candidate_orchestrates_all_six_helpers_for_both_targets(self):
+        contract_version = '0.10.0'
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:
             content = b'skill'
@@ -1039,7 +1120,7 @@ globalThis.fetch = async (input) => {{
             entry.size = len(content)
             packed.addfile(entry, io.BytesIO(content))
         body = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
+        record = {'name': check.PACKAGE, 'version': contract_version, 'filename': 'candidate.tgz',
                   'sha256': hashlib.sha256(body).hexdigest(),
                   'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
         (self.root / 'candidate.tgz').write_bytes(body)
@@ -1055,8 +1136,24 @@ globalThis.fetch = async (input) => {{
             projects[target] = project
             return project, {}
 
+        def execute(command, *_args):
+            command = [str(part) for part in command]
+            if '--invalid-argument' not in command:
+                return ''
+            helper = 'inferencex-skills' if 'inferencex-skills' in command else Path(command[1]).stem
+            envelope = {
+                'schema_version': 1,
+                'package': check.PACKAGE,
+                'package_version': contract_version,
+                'command': helper,
+                'error': {'code': 'INVALID_ARGUMENT', 'message': 'Unknown option --invalid-argument'},
+            }
+            raise subprocess.CalledProcessError(
+                2, command, output='', stderr=json.dumps(envelope, separators=(',', ':')) + '\n')
+
         with patch.object(sys, 'argv', command), patch.object(check, 'install_target', side_effect=install) as installs, \
-                patch.object(check, 'check_installed') as installed_checks, patch.object(check, 'run') as runs, \
+                patch.object(check, 'check_installed') as installed_checks, \
+                patch.object(check, 'run', side_effect=execute) as runs, \
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}), \
@@ -1070,10 +1167,24 @@ globalThis.fetch = async (input) => {{
         for target, project in projects.items():
             target_commands = [command for command, call in zip(commands, runs.call_args_list)
                                if call.args[1] == project]
-            self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in target_commands), 2, target)
-            self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in target_commands), 3, target)
+            positive_commands = [command for command in target_commands if '--invalid-argument' not in command]
+            self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in positive_commands), 2, target)
+            self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in positive_commands), 3, target)
             for helper in ['investigate-result', 'compare-tco', 'compare-releases', 'compare-collectivex']:
-                self.assertEqual(sum(f'{helper}.mjs' in ' '.join(command) for command in target_commands), 1, target)
+                self.assertEqual(sum(f'{helper}.mjs' in ' '.join(command) for command in positive_commands), 1, target)
+            negatives = [command for command in target_commands if '--invalid-argument' in command]
+            self.assertEqual(len(negatives), 7, target)
+            self.assertTrue(all(command[-3:] == ['--error-format', 'json', '--invalid-argument']
+                                for command in negatives), target)
+            helper_names = {
+                'inferencex-skills' if 'inferencex-skills' in command else Path(command[1]).stem
+                for command in negatives
+            }
+            self.assertEqual(helper_names, {
+                'export-powerx', 'export-agentx', 'investigate-result', 'compare-tco',
+                'compare-releases', 'compare-collectivex', 'inferencex-skills'}, target)
+            installer, = [command for command in negatives if 'inferencex-skills' in command]
+            self.assertIn('--offline', installer)
 
     def test_agents_prepares_canonical_projects_with_only_archive_and_hashed_prompt(self):
         stream = io.BytesIO()

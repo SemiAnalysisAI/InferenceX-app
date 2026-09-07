@@ -65,6 +65,7 @@ export function packedSkillSuite() {
     );
     const [packed] = JSON.parse(result.stdout);
     archive = join(temporaryRoot, packed.filename);
+    suite.archive = archive;
     suite.packedFiles = packed.files.map((file) => file.path);
   });
   after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
