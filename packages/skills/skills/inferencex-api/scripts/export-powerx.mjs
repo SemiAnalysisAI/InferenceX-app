@@ -178,9 +178,11 @@ async function physicalPath(path) {
 }
 
 async function saveManifest(evidence) {
-  const temporary = join(evidence.directory, 'manifest.tmp');
-  await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
-  await rename(temporary, join(evidence.directory, 'manifest.json'));
+  await outputBoundary(async () => {
+    const temporary = join(evidence.directory, 'manifest.tmp');
+    await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
+    await rename(temporary, join(evidence.directory, 'manifest.json'));
+  });
 }
 
 async function run(args, signal) {
@@ -239,8 +241,8 @@ async function run(args, signal) {
       const directory = resolve(values['evidence-dir']);
       if (values.output !== undefined) {
         // Reserve case-only aliases too, so the export is safe on case-insensitive filesystems.
-        let evidencePath = await physicalPath(directory);
-        let outputPath = await physicalPath(resolve(values.output));
+        let evidencePath = await outputBoundary(() => physicalPath(directory), signal);
+        let outputPath = await outputBoundary(() => physicalPath(resolve(values.output)), signal);
         evidencePath = evidencePath.toLowerCase();
         outputPath = outputPath.toLowerCase();
         const withinEvidence = relative(evidencePath, outputPath);
@@ -251,13 +253,15 @@ async function run(args, signal) {
           ) ||
           evidencePath.startsWith(`${outputPath}${sep}`)
         ) {
-          throw new Error(
+          throw argumentError(
             '--output collides with the evidence directory or a reserved evidence file',
           );
         }
       }
-      await mkdir(dirname(directory), { recursive: true });
-      await mkdir(directory); // EEXIST also refuses empty directories and symlinks.
+      await outputBoundary(async () => {
+        await mkdir(dirname(directory), { recursive: true });
+        await mkdir(directory); // EEXIST also refuses empty directories and symlinks.
+      }, signal);
       evidence = {
         directory,
         manifest: {
@@ -297,10 +301,12 @@ async function run(args, signal) {
         try {
           await saveManifest(evidence);
         } catch (writeError) {
-          throw new Error(
+          throw new CliError(
+            error instanceof CliError ? error.code : 'INTERNAL_ERROR',
             `${error.message}; could not save failure evidence: ${writeError.message}`,
             {
-              cause: writeError,
+              cause: error,
+              httpStatus: error.httpStatus,
             },
           );
         }
@@ -346,7 +352,10 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
     throw error;
   }
   if (evidence) {
-    await writeFile(join(evidence.directory, 'response.json'), bytes, { flag: 'wx' });
+    await outputBoundary(
+      () => writeFile(join(evidence.directory, 'response.json'), bytes, { flag: 'wx' }),
+      signal,
+    );
     evidence.manifest.response.body_file = 'response.json';
     evidence.manifest.response.sha256 = createHash('sha256').update(bytes).digest('hex');
   }
@@ -463,31 +472,32 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
     evidence.manifest.export.sha256 = createHash('sha256').update(output).digest('hex');
     evidence.manifest.export.metadata = metadata;
   }
-  if (values.output === undefined) {
-    // A closed consumer is a failed export, even if response capture already succeeded.
-    await writeStdout(output, { signal });
-  } else {
-    // Follow existing output symlinks, preserving the previous writeFile destination semantics.
-    const destination = await physicalPath(resolve(values.output));
-    const temporary = join(dirname(destination), `.${basename(destination)}.${randomUUID()}.tmp`);
-    let mode;
-    try {
-      const existing = await lstat(destination);
-      if (!existing.isFile()) throw new Error('--output must name a regular file');
-      mode = existing.mode & 0o777;
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-    await outputBoundary(async () => {
-      try {
-        await writeFile(temporary, output, { encoding: 'utf8', flag: 'wx', mode });
-        signal.throwIfAborted();
-        await rename(temporary, destination);
-      } finally {
-        await rm(temporary, { force: true });
-      }
-    }, signal);
-  }
+  // A closed consumer is a failed export, even if response capture already succeeded.
+  await (values.output === undefined
+    ? writeStdout(output, { signal })
+    : outputBoundary(async () => {
+        // Follow existing output symlinks, preserving the previous writeFile destination semantics.
+        const destination = await physicalPath(resolve(values.output));
+        const temporary = join(
+          dirname(destination),
+          `.${basename(destination)}.${randomUUID()}.tmp`,
+        );
+        let mode;
+        try {
+          const existing = await lstat(destination);
+          if (!existing.isFile()) throw new Error('--output must name a regular file');
+          mode = existing.mode & 0o777;
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+        try {
+          await writeFile(temporary, output, { encoding: 'utf8', flag: 'wx', mode });
+          signal.throwIfAborted();
+          await rename(temporary, destination);
+        } finally {
+          await rm(temporary, { force: true });
+        }
+      }, signal));
   if (evidence) {
     signal.throwIfAborted();
     evidence.manifest.status = 'complete';

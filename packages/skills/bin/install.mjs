@@ -6,6 +6,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 import {
   argumentError,
+  CliError,
   runCli,
   writeStdout,
 } from '../skills/inferencex-api/scripts/cli-contract.mjs';
@@ -211,6 +212,25 @@ function installationPlan(source, destination, force) {
   return { outcome: existing ? 'overwritten' : 'installed', write_paths: files.sort() };
 }
 
+function installTransaction(options) {
+  try {
+    return runInstallTransaction(options);
+  } catch (error) {
+    // Protocol failures are internal errors; Node filesystem failures carry these fields.
+    for (let cause = error; cause instanceof Error; cause = cause.cause) {
+      if (
+        Number.isInteger(cause.errno) &&
+        typeof cause.code === 'string' &&
+        typeof cause.syscall === 'string' &&
+        typeof cause.path === 'string'
+      ) {
+        throw new CliError('OUTPUT_ERROR', error.message, { cause: error });
+      }
+    }
+    throw error;
+  }
+}
+
 async function main(args, signal) {
   let command;
   let values;
@@ -299,7 +319,7 @@ async function main(args, signal) {
           (values.force || !recoveredDestinationExists)
         ? installationPlan(source, destination, true)
         : { outcome: 'skipped', write_paths: [] }
-    : runInstallTransaction({
+    : installTransaction({
         source,
         destination,
         packageName: packageInfo.name,

@@ -195,6 +195,7 @@ let completeManifestFailure = fixture.failCompleteManifest;
 fs.promises.writeFile = async (path, data, ...rest) => {
   const text = String(data);
   if (String(path).endsWith('manifest.tmp')) {
+    if (fixture.failInitialManifest) throw new Error('controlled initial manifest failure');
     if (completeManifestFailure && text.includes('"status": "complete"')) {
       completeManifestFailure = false;
       throw new Error('controlled complete manifest failure');
@@ -1336,6 +1337,71 @@ test('evidence, output, and stdout write failures never become complete', () => 
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /broken pipe.*could not save failure evidence/isu);
+    assert.equal(captured(result).manifest.status, 'pending');
+  }
+});
+
+for (const fault of [
+  'initial-manifest',
+  'enrichment-response',
+  'enrichment-manifest',
+  'complete-manifest',
+]) {
+  test(`JSON diagnostics classify ${fault} evidence failures as OUTPUT_ERROR`, () => {
+    const cwd = project();
+    const evidenceDir = join(cwd, 'evidence');
+    const routes = routesFor([observation('1')], [1]);
+    const options = { cwd, evidenceDir };
+    if (fault === 'initial-manifest') options.failInitialManifest = true;
+    else if (fault === 'complete-manifest') options.failCompleteManifest = true;
+    else {
+      routes['/api/v1/agentic-aggregates'][0].blockEvidenceFile =
+        fault === 'enrichment-response' ? 'response-0002-agentic-aggregates.json' : 'manifest.tmp';
+    }
+    writeFileSync(join(cwd, 'agentx.json'), 'previous complete export');
+    const result = run(
+      [
+        '--model',
+        'DeepSeek-V4-Pro',
+        '--output',
+        'agentx.json',
+        '--evidence-dir',
+        'evidence',
+        '--error-format',
+        'json',
+      ],
+      routes,
+      options,
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(JSON.parse(result.stderr).error.code, 'OUTPUT_ERROR', fault);
+    assert.equal(readFileSync(join(cwd, 'agentx.json'), 'utf8'), 'previous complete export');
+    if (fault !== 'initial-manifest') {
+      assert.equal(
+        captured(result).manifest.status,
+        fault === 'enrichment-manifest' ? 'pending' : 'failed',
+      );
+    }
+  });
+}
+
+test('failed evidence recording preserves the original AgentX HTTP and timeout codes', () => {
+  for (const [reply, code] of [
+    [response('unavailable', 503), 'HTTP_ERROR'],
+    [response('', 200, { timeout: true }), 'TIMEOUT'],
+  ]) {
+    const result = run(
+      ['--model', 'DeepSeek-V4-Pro', '--evidence-dir', 'evidence', '--error-format', 'json'],
+      { '/api/v1/benchmarks': [reply] },
+      { failFailureManifest: true },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    const error = JSON.parse(result.stderr).error;
+    assert.equal(error.code, code);
+    if (code === 'HTTP_ERROR') assert.equal(error.http_status, 503);
+    assert.match(error.message, /could not save failure evidence/u);
     assert.equal(captured(result).manifest.status, 'pending');
   }
 });

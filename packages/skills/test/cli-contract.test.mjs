@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -216,6 +216,100 @@ test('every packed entry point rejects an unknown error format', () => {
   assert.equal(result.status, 2);
   assert.equal(result.stdout, '');
   assert.match(result.stderr, /--error-format.*json.*text/iu);
+});
+
+test('an explicit JSON error format survives duplicate or conflicting format arguments', () => {
+  const formats = [
+    ['--error-format', 'json', '--error-format', 'json'],
+    ['--error-format=json', '--error-format=text'],
+    ['--error-format=text', '--error-format=json'],
+    ['--error-format=yaml', '--error-format=json'],
+    ['--error-format=json', '--error-format'],
+    ['--error-format', '--error-format=json'],
+    ['--error-format', '--error-format', 'json'],
+  ];
+  for (const args of formats) {
+    for (const [name] of cases) {
+      diagnostic(suite.node([scripts[name], '--help', ...args]), 'INVALID_ARGUMENT', 2);
+    }
+    diagnostic(suite.run(['install', ...args], suite.project()), 'INVALID_ARGUMENT', 2);
+  }
+});
+
+for (const [name, args] of cases.slice(0, 2)) {
+  test(`${name} classifies an unwritable evidence parent as OUTPUT_ERROR`, () => {
+    const parent = join(suite.project(), 'unwritable');
+    mkdirSync(parent, { mode: 0o500 });
+    try {
+      diagnostic(run(name, [...args, '--evidence-dir', join(parent, 'evidence')]), 'OUTPUT_ERROR');
+      assert.equal(existsSync(join(parent, 'evidence')), false);
+    } finally {
+      chmodSync(parent, 0o700);
+    }
+  });
+
+  test(`${name} classifies evidence/output collisions as INVALID_ARGUMENT`, () => {
+    const evidence = join(suite.project(), 'evidence');
+    diagnostic(
+      run(name, [...args, '--evidence-dir', evidence, '--output', join(evidence, 'manifest.json')]),
+      'INVALID_ARGUMENT',
+      2,
+    );
+    assert.equal(existsSync(evidence), false);
+  });
+}
+
+test('CollectiveX distinguishes output preflight I/O failures from invalid destinations', () => {
+  const cwd = suite.project();
+  diagnostic(
+    run('compare-collectivex', ['--output', join(cwd, 'missing/out.json')]),
+    'OUTPUT_ERROR',
+  );
+  const parent = join(cwd, 'inaccessible');
+  mkdirSync(parent, { mode: 0o000 });
+  try {
+    diagnostic(run('compare-collectivex', ['--output', join(parent, 'out.json')]), 'OUTPUT_ERROR');
+  } finally {
+    chmodSync(parent, 0o700);
+  }
+  writeFileSync(join(cwd, 'file'), 'untouched');
+  for (const output of ['file', 'file/out.json']) {
+    diagnostic(run('compare-collectivex', ['--output', join(cwd, output)]), 'INVALID_ARGUMENT', 2);
+  }
+  assert.equal(readFileSync(join(cwd, 'file'), 'utf8'), 'untouched');
+});
+
+test('installer filesystem write failures are OUTPUT_ERROR and retain the installed skill', () => {
+  const cwd = suite.project();
+  const installed = suite.install('codex', cwd);
+  const root = join(installed, '..');
+  const receipt = readFileSync(join(installed, '.inferencex-skills.json'));
+  writeFileSync(join(installed, 'keep.txt'), 'untouched');
+  chmodSync(root, 0o500);
+  try {
+    diagnostic(
+      suite.run(['install', '--target', 'codex', '--force', '--error-format', 'json'], cwd),
+      'OUTPUT_ERROR',
+    );
+    assert.deepEqual(readFileSync(join(installed, '.inferencex-skills.json')), receipt);
+    assert.equal(readFileSync(join(installed, 'keep.txt'), 'utf8'), 'untouched');
+    assert.equal(existsSync(`${installed}.inferencex-skills-transaction`), false);
+  } finally {
+    chmodSync(root, 0o700);
+  }
+});
+
+test('installer transaction protocol failures remain INTERNAL_ERROR', () => {
+  const cwd = suite.project();
+  const installed = suite.install('codex', cwd);
+  const transaction = `${installed}.inferencex-skills-transaction`;
+  mkdirSync(transaction);
+  writeFileSync(join(transaction, 'unknown'), 'untouched');
+  diagnostic(
+    suite.run(['install', '--target', 'codex', '--force', '--error-format', 'json'], cwd),
+    'INTERNAL_ERROR',
+  );
+  assert.equal(readFileSync(join(transaction, 'unknown'), 'utf8'), 'untouched');
 });
 
 test('every data helper classifies request, response, HTTP, and stdout boundaries', () => {

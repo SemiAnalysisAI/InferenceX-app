@@ -203,9 +203,11 @@ function sha256(bytes) {
 }
 
 async function saveManifest(evidence) {
-  const temporary = join(evidence.directory, 'manifest.tmp');
-  await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
-  await rename(temporary, join(evidence.directory, 'manifest.json'));
+  await outputBoundary(async () => {
+    const temporary = join(evidence.directory, 'manifest.tmp');
+    await writeFile(temporary, `${JSON.stringify(evidence.manifest, null, 2)}\n`, 'utf8');
+    await rename(temporary, join(evidence.directory, 'manifest.json'));
+  });
 }
 
 async function stageFileOutput(destination, bytes, signal) {
@@ -421,7 +423,10 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
   }
   if (record) {
     const filename = `response-${String(requestNumber).padStart(4, '0')}-${operation}.json`;
-    await writeFile(join(evidence.directory, filename), bytes, { flag: 'wx' });
+    await outputBoundary(
+      () => writeFile(join(evidence.directory, filename), bytes, { flag: 'wx' }),
+      budget.signal,
+    );
     record.decoded_body_sha256 = sha256(bytes);
     record.body_file = filename;
     await saveManifest(evidence);
@@ -629,19 +634,21 @@ async function run(args, signal) {
       if (values['evidence-dir'] !== undefined) {
         const directory = resolve(values['evidence-dir']);
         if (outputPath !== null) {
-          const physicalEvidencePath = await physicalPath(directory);
-          const physicalOutputPath = await physicalPath(outputPath);
+          const physicalEvidencePath = await outputBoundary(() => physicalPath(directory), signal);
+          const physicalOutputPath = await outputBoundary(() => physicalPath(outputPath), signal);
           const evidencePath = physicalEvidencePath.toLowerCase();
           const physicalOutput = physicalOutputPath.toLowerCase();
           if (
             containsPath(evidencePath, physicalOutput) ||
             containsPath(physicalOutput, evidencePath)
           ) {
-            throw new Error('--output collides with the evidence directory');
+            throw argumentError('--output collides with the evidence directory');
           }
         }
-        await mkdir(dirname(directory), { recursive: true });
-        await mkdir(directory); // EEXIST also rejects empty directories and symlinks.
+        await outputBoundary(async () => {
+          await mkdir(dirname(directory), { recursive: true });
+          await mkdir(directory); // EEXIST also rejects empty directories and symlinks.
+        }, signal);
         evidence = {
           directory,
           manifest: {
@@ -928,9 +935,10 @@ async function run(args, signal) {
         try {
           await outputTransaction.rollback();
         } catch (rollbackError) {
-          failure = new Error(
+          failure = new CliError(
+            error instanceof CliError ? error.code : 'INTERNAL_ERROR',
             `${error.message}; could not restore the previous output: ${rollbackError.message}`,
-            { cause: error },
+            { cause: error, httpStatus: error.httpStatus },
           );
         }
       }
@@ -944,9 +952,10 @@ async function run(args, signal) {
         try {
           await saveManifest(evidence);
         } catch (writeError) {
-          throw new Error(
+          throw new CliError(
+            failure instanceof CliError ? failure.code : 'INTERNAL_ERROR',
             `${failure.message}; could not save failure evidence: ${writeError.message}`,
-            { cause: writeError },
+            { cause: failure, httpStatus: failure.httpStatus },
           );
         }
       }

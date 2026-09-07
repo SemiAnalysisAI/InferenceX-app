@@ -380,14 +380,19 @@ async function main(args, signal) {
     const outputPath = values.output === undefined ? null : resolve(values.output);
     if (outputPath !== null) {
       if (
-        await lstat(outputPath).catch((error) => {
-          if (error.code === 'ENOENT') return null;
-          throw error;
-        })
+        await outputBoundary(
+          () =>
+            lstat(outputPath).catch((error) => {
+              if (error.code === 'ENOENT') return null;
+              if (error.code === 'ENOTDIR') throw argumentError(error.message, error);
+              throw error;
+            }),
+          signal,
+        )
       ) {
         throw new Error('--output already exists; choose a new file');
       }
-      const parent = await stat(dirname(outputPath));
+      const parent = await outputBoundary(() => stat(dirname(outputPath)), signal);
       if (!parent.isDirectory()) throw new Error('--output parent must be a directory');
     }
     argumentsValidated = true;

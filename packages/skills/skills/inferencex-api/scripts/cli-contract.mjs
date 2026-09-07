@@ -119,7 +119,7 @@ export function writeStdout(bytes, { signal, timeoutMs = 5_000 } = {}) {
   );
 }
 
-function requestedErrorFormat(args) {
+function requestedErrorFormats(args) {
   const values = [];
   for (let index = 0; index < args.length; index++) {
     const value = args[index];
@@ -127,14 +127,7 @@ function requestedErrorFormat(args) {
     else if (value.startsWith('--error-format='))
       values.push(value.slice('--error-format='.length));
   }
-  if (values.length !== 1 && values.length > 0) {
-    throw argumentError('Specify --error-format only once; choose json or text.');
-  }
-  const [format = 'text'] = values;
-  if (!['json', 'text'].includes(format)) {
-    throw argumentError('--error-format must be json or text.');
-  }
-  return format;
+  return values;
 }
 
 export function diagnostic(error, command, packageVersion = PACKAGE_VERSION) {
@@ -181,7 +174,22 @@ export async function runCli({
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   try {
-    format = requestedErrorFormat(args);
+    const formats = requestedErrorFormats(args);
+    // Retain an explicit JSON request even when format validation itself fails.
+    if (
+      args.some(
+        (arg, index) =>
+          arg === '--error-format=json' || (arg === '--error-format' && args[index + 1] === 'json'),
+      )
+    ) {
+      format = 'json';
+    }
+    if (formats.length > 1) {
+      throw argumentError('Specify --error-format only once; choose json or text.');
+    }
+    if (formats.length === 1 && !['json', 'text'].includes(formats[0] ?? 'text')) {
+      throw argumentError('--error-format must be json or text.');
+    }
     await run({ args, signal: controller.signal, errorFormat: format });
   } catch (error) {
     const normalized = normalize(error);

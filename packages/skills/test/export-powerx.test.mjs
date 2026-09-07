@@ -113,6 +113,12 @@ import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 const fixture = JSON.parse(readFileSync(process.env.INFERENCEX_TEST_RESPONSE, 'utf8'));
 const write = fs.promises.writeFile;
+if (fixture.failInitialManifest || fixture.failFailureManifest) fs.promises.writeFile = async (path, data, ...rest) => {
+  if (String(path).endsWith('manifest.tmp') && (fixture.failInitialManifest || String(data).includes('"status": "failed"'))) {
+    throw new Error('controlled manifest failure');
+  }
+  return write(path, data, ...rest);
+};
 if (fixture.partialOutputWrite) fs.promises.writeFile = async (path, data, ...rest) => {
   if (String(path).includes('preserved.json')) {
     await write(path, String(data).slice(0, 5), ...rest);
@@ -1039,4 +1045,47 @@ test('requested evidence/output write failures and closed stdout never leave a s
   assert.equal(result.status, 1);
   assert.equal(result.requests.length, 0);
   assert.equal(readFileSync(join(cwd, 'parent-file'), 'utf8'), 'untouched');
+});
+
+for (const fault of ['initial-manifest', 'response.json', 'manifest.tmp', 'output']) {
+  test(`JSON diagnostics classify ${fault} filesystem failures as OUTPUT_ERROR`, () => {
+    const cwd = project();
+    const evidenceDir = join(cwd, 'evidence');
+    const args = [...requiredArgs, '--evidence-dir', evidenceDir, '--error-format', 'json'];
+    const options = { cwd, evidenceDir };
+    if (fault === 'initial-manifest') options.failInitialManifest = true;
+    else if (fault === 'output') {
+      mkdirSync(join(cwd, 'output'));
+      args.push('--output', 'output');
+    } else options.blockEvidenceFile = fault;
+    const result = run(args, [observation()], options);
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(JSON.parse(result.stderr).error.code, 'OUTPUT_ERROR', fault);
+    assert.equal(result.requests.length, fault === 'initial-manifest' ? 0 : 1);
+    if (fault !== 'initial-manifest') {
+      const manifest = JSON.parse(readFileSync(join(evidenceDir, 'manifest.json'), 'utf8'));
+      assert.equal(manifest.status, fault === 'manifest.tmp' ? 'pending' : 'failed');
+    }
+  });
+}
+
+test('failed evidence recording preserves the original PowerX HTTP and timeout codes', () => {
+  for (const [fault, code] of [
+    [{ status: 503 }, 'HTTP_ERROR'],
+    [{ timeout: true }, 'TIMEOUT'],
+  ]) {
+    const cwd = project();
+    const result = run(
+      [...requiredArgs, '--evidence-dir', 'evidence', '--error-format', 'json'],
+      [],
+      { cwd, ...fault, failFailureManifest: true },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    const error = JSON.parse(result.stderr).error;
+    assert.equal(error.code, code);
+    if (code === 'HTTP_ERROR') assert.equal(error.http_status, 503);
+    assert.match(error.message, /could not save failure evidence/u);
+    assert.equal(JSON.parse(readFileSync(join(cwd, 'evidence/manifest.json'))).status, 'pending');
+  }
 });
