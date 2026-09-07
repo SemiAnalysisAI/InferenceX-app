@@ -84,6 +84,9 @@ print(f"Selected observations: {len(export['rows'])}")
 Use the `.claude/skills` path for a Claude installation. The helpers do not retry
 HTTP automatically. After an operational failure, inspect the retained evidence
 and fix the reported condition before choosing a fresh attempt.
+Before delivering an export command for a scheduler, run that exact command once
+with a fresh attempt path. Verify directory creation, child exit status and retained
+output files, including when the proposed command calls a wrapper you created.
 
 ## Output and cancellation limits
 
@@ -95,7 +98,9 @@ Graceful `SIGINT`/`SIGTERM` cancellation aborts active HTTP work and follows the
 helper's existing output rollback. Stdout must finish writing within five seconds; a stalled consumer yields
 `OUTPUT_ERROR`. A consumer may already
 have received part of a failed stdout stream: accept the export only after exit 0. A file export and its evidence manifest remain separate writes; verify both
-before treating an evidence bundle as complete. `SIGKILL` cannot run cleanup.
+before treating an evidence bundle as complete. `SIGKILL` prevents immediate cleanup
+in the killed process. A later installer invocation can still recover supported
+persisted installation transactions after `SIGKILL`, as described below.
 
 ## Inspect and recover an installation
 
