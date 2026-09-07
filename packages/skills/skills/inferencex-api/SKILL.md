@@ -63,6 +63,10 @@ read [the CollectiveX cookbook](references/collectivex.md) and use
 identities, preserve units and unmatched coverage, and retain full source responses.
 A run list is bounded discovery; differing attempts and revisions remain context.
 
+For **scheduled exports, machine-readable failures, cancellation, or installation
+recovery**, read [the command cookbook](references/cli-contract.md). Check the exit
+code before parsing output and retain failed attempts separately from complete exports.
+
 ## Query workflow
 
 1. Keep downloaded responses, temporary parsing files and exports inside the

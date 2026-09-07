@@ -10,10 +10,32 @@ also provides evaluation lookups and dataset-to-conversation inspection, with
 request context, exact identifiers, missing values, and page/sample boundaries.
 It also covers benchmark history filtered by GPU, workload and observation-date range.
 
-The npm commands below pin version `0.9.0` and require that version to be published.
+The npm commands below pin version `0.10.0` and require that version to be published.
 For review before publication, use the local archive instructions below.
 
-## New in 0.9.0
+## New in 0.10.0
+
+All six data helpers and the installer accept `--error-format json` for one
+structured failure document on stderr. In that mode, argument errors exit `2`,
+operational failures exit `1`, and graceful cancellation exits `130`. Successful
+empty selections still exit `0`. Default text behavior remains compatible;
+PowerX JSON adds `schema_version: 1` beside its existing metadata and rows.
+See the [command cookbook](skills/inferencex-api/references/cli-contract.md)
+for error codes, scheduler handling and output limits.
+
+Upgrades stage the complete merged directory and version receipt before activation.
+Detected failures preserve or restore the prior installation; the next real install
+recovers supported interrupted transactions. Concurrent installs are serialized.
+`status` and `--dry-run` report pending recovery without changing files. Unknown
+transaction data is preserved for inspection. Process-crash recovery does not
+promise durability after power loss.
+
+Graceful `SIGINT`/`SIGTERM` cancels active HTTP work. A stdout write must complete
+within five seconds; a stalled consumer produces `OUTPUT_ERROR`. Failed stdout
+may already contain partial bytes, so accept an export only after exit `0`.
+File exports and evidence manifests retain their separate-write limits.
+
+## Included from 0.9.0
 
 PowerX stages file output beside its destination and replaces it only after the
 write succeeds. Interrupted writes preserve the previous export. Existing output
@@ -101,10 +123,10 @@ Run the command for your agent from the project where it should discover the ski
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --target claude
 ```
 
 | Target              | Skill location relative to the current project |
@@ -115,9 +137,9 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-s
 For an explicit skills-root directory or inspection:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --dir './my project/.agents/skills'
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills list
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills --help
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --dir './my project/.agents/skills'
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills list
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills --help
 ```
 
 `--dir` selects the parent skills directory; the installer appends `inferencex-api`.
@@ -130,7 +152,7 @@ To review a maintainer-supplied `.tgz` before publication, replace the path with
 actual archive and run from the target project. Use `--target claude` for Claude Code.
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.9.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.10.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- inferencex-skills install --target codex
 ```
 
@@ -250,7 +272,7 @@ availability is false or omitted.
 ### Inspect the installed version
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills status --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills status --target codex
 ```
 
 Use `--target claude` or `--dir './my project/.agents/skills'` to inspect another
@@ -264,6 +286,8 @@ Legacy installations without a version record, including `0.1.0`, report an
 unknown installed version. Invalid or unreadable records are also reported as
 unknown. For `0.8.0` and later receipts, the record must agree with the static
 version declarations in PowerX, AgentX, provenance, TCO, release comparison, and CollectiveX helpers.
+Receipts from `0.10.0` and later additionally require the shared CLI contract declaration;
+`0.9.0` and later require the response reader.
 Receipts from `0.7.x` require the first five helpers.
 Receipts from `0.6.x` require the first four helpers.
 Receipts from `0.5.x` require the first three helpers.
@@ -276,8 +300,8 @@ check is not a full integrity check and cannot detect every local edit.
 ### JSON output and installation preview
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex --force --dry-run --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --target codex --force --dry-run --json
 ```
 
 `--json` on `status` or `install` emits one JSON document to stdout; diagnostics go
@@ -299,6 +323,14 @@ relative to `skill_path` and include the version receipt; skip writes nothing.
 A skipped install and a preview report the existing installation's state, not the
 version that the executing package would install.
 
+Pending transactions additionally expose `transaction_state` (`recovery_needed`,
+`busy`, or `blocked`), `transaction_phase`, and `transaction_had_destination`.
+They report `installation_state: "unknown"` and `installed_version: null` until
+recovery is complete. Recovery previews use `would_recover_then_install`,
+`would_recover_then_overwrite`, or `would_recover_then_skip`; active and blocked
+transactions use `would_wait_for_install` and `blocked_by_transaction`.
+Use the `write_paths` array itself when reporting the number of planned writes.
+
 `--dry-run` uses the same destination and conflict checks as installation, supports
 `--target`, `--dir`, and `--force`, and lists the packaged paths it would write.
 It changes no files, directories, receipts or permissions and makes no API request.
@@ -309,20 +341,25 @@ Exit codes: `0` for successful installation, skip, preview or inspection (includ
 unknown/absent installations); `2` for invalid arguments; `1` for operational
 failure. JSON failures use `{ "schema_version": 1, "outcome": "failed", "reason": "..." }`
 without stale installation fields; use the exit code to determine success.
+With `--error-format json`, failures instead use the shared stderr envelope and
+leave stdout empty. The success/status JSON contract above is unchanged.
 
 ### Upgrade
 
 Repeated installation skips an existing skill. Add `--force` to reinstall a pinned
-version. To upgrade, replace `0.9.0` with the published version you intend to install:
+version. To upgrade, replace `0.10.0` with the published version you intend to install:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target codex --force
-npm exec --yes --package @semianalysisai/inferencex-skills@0.9.0 -- inferencex-skills install --target claude --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --target codex --force
+npm exec --yes --package @semianalysisai/inferencex-skills@0.10.0 -- inferencex-skills install --target claude --force
 ```
 
-Force merges the packaged files into the existing skill and overwrites matching
-files. It preserves unrelated neighboring skills and leaves obsolete files in the
-skill directory. Keep a copy of local edits before choosing an overwrite.
+Force stages the existing directory and overlays the packaged files before activation.
+It preserves unrelated neighboring skills and leaves obsolete files in the skill
+directory. Keep a copy of local edits before choosing an overwrite. For an interrupted
+transaction, preserve the transaction directory and rerun the real installer to recover
+it; `status` and `--dry-run` only inspect it. A live owner can be waited on, while
+malformed, foreign or unsafe transaction data blocks automatic recovery.
 
 ## 中文说明
 
@@ -336,10 +373,25 @@ skill directory. Keep a copy of local edits before choosing an overwrite.
 数据集到会话详情的完整示例，说明如何保留请求上下文、原始标识符、缺失值，以及分页和
 抽样范围；还提供按 GPU、工作负载和观测日期范围筛选历史基准测试数据的示例。
 
-上面的 npm 命令固定使用 `0.9.0`，需在该版本发布后执行。发布前审阅请使用本地产物
+上面的 npm 命令固定使用 `0.10.0`，需在该版本发布后执行。发布前审阅请使用本地产物
 安装流程。
 
-0.9.0 改进导出失败时的文件保护：PowerX 先在目标文件旁完整写入临时文件，写入成功后才
+0.10.0 为六个数据 helper 和安装器统一增加 `--error-format json`：失败时只向 stderr
+写入一个结构化错误文档。在该模式下，参数错误退出码为 `2`，操作失败为 `1`，正常处理
+取消信号后为 `130`；查询成功但没有符合条件的结果仍返回 `0`。默认的文本输出行为保持兼容，
+PowerX JSON 在已有 metadata 和 rows 之外增加 `schema_version: 1`。
+[命令使用指南](skills/inferencex-api/references/cli-contract.md) 说明错误码、在调度器中运行时的处理方式和输出限制。
+
+升级会先在暂存目录中准备好合并后的完整技能目录和版本记录，再切换到新安装。检测到失败时
+保留或恢复旧安装；下次实际安装会恢复支持的中断事务。并发安装按顺序执行。`status` 和
+`--dry-run` 只读取并报告待恢复状态，不修改文件；无法识别的事务数据会原样保留，供人工检查。
+这些保证针对进程中断，不承诺断电后的持久性。
+
+正常处理 `SIGINT`/`SIGTERM` 时会取消正在进行的 HTTP 请求。stdout 写入须在五秒内完成；
+下游停止读取导致超时后，命令返回 `OUTPUT_ERROR`。失败的 stdout 可能已有部分内容，
+因此只有退出码为 `0` 时才能接受导出结果。导出文件和证据 manifest 仍受分别写入的限制。
+
+保留 0.9.0 的导出保护：PowerX 先在目标文件旁完整写入临时文件，写入成功后才
 替换目标；中途写入失败会保留旧结果。目标路径为符号链接时仍写入其指向的文件。导出文件
 和证据 manifest 是两个独立文件，不构成一次文件系统事务；manifest 写入失败时可能已存在
 完整导出文件，但命令仍以失败状态退出。
@@ -493,7 +545,7 @@ histogram 和 server metrics。
 
 包括 `0.1.0` 在内、没有版本记录的旧安装会显示版本未知。记录无效或无法读取时，同样
 显示为未知。版本记录为 `0.8.0` 或更新时，必须与 PowerX、AgentX、溯源、TCO、框架版本比较和 CollectiveX
-脚本中的静态版本声明一致；`0.7.x` 记录核对前五项，`0.6.x` 核对前四项，`0.5.x` 核对前三项，`0.4.x` 核对 PowerX 和 AgentX，更早的记录只核对 PowerX。强制降级后
+脚本中的静态版本声明一致；`0.10.0` 起还需核对共享 CLI 契约模块中的版本声明，`0.9.0` 起需核对响应读取模块中的版本声明。`0.7.x` 记录核对前五项，`0.6.x` 核对前四项，`0.5.x` 核对前三项，`0.4.x` 核对 PowerX 和 AgentX，更早的记录只核对 PowerX。强制降级后
 残留的较新脚本不参与旧版本的检查。需要核对的声明缺失、无法读取或版本不一致时，状态也会显示为未知。`status`
 只读取声明，不执行任何脚本。这项检查不是完整的文件完整性校验，也不能识别所有本地
 修改。`--version` 只显示本次调用的安装器版本，不显示项目中已安装技能的版本。
@@ -510,6 +562,13 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 `would_overwrite` 或 `would_skip`。`write_paths` 相对于技能目录，包含版本记录文件；
 跳过安装时为空。预览和跳过安装均报告目标目录的实际状态，不将安装器版本当作已安装版本。
 
+存在待处理事务时，还会返回 `transaction_state`（`recovery_needed`、`busy` 或 `blocked`）、
+`transaction_phase`、`transaction_had_destination`。恢复完成前，`installation_state` 为 `unknown`，
+`installed_version` 为 `null`。恢复预览使用 `would_recover_then_install`、
+`would_recover_then_overwrite` 或 `would_recover_then_skip`；活动事务与被阻止的事务分别使用
+`would_wait_for_install` 和 `blocked_by_transaction`。报告计划写入的文件数量时，直接统计
+`write_paths` 中的条目。
+
 `install --dry-run` 复用正式安装的目标路径与冲突检查，支持 `--target`、`--dir`、
 `--force` 和 `--json`。它列出将写入的路径，不创建目录、不改动文件、版本记录或权限，
 也不请求 API。不过 npm 可能在启动安装器前下载所选包。安装会保留其他文件和
@@ -518,12 +577,15 @@ stderr。不加该选项时保留原有文字输出。上表定义 `schema_versi
 退出码 `0` 表示操作成功，包括跳过、预览，以及对未安装或版本未知状态的正常检查；
 `2` 表示参数错误，`1` 表示操作失败。失败时的 JSON 为
 `{ "schema_version": 1, "outcome": "failed", "reason": "..." }`，不包含可能已失效的
-安装状态字段；请用退出码判断操作是否成功。
+安装状态字段；请用退出码判断操作是否成功。显式使用 `--error-format json` 后，失败改用
+共享的 stderr 错误文档，stdout 保持为空；成功和状态查询的 JSON 格式不变。
 
 重复安装默认跳过已有技能。添加 `--force` 可重新安装指定版本；需要升级时，将命令中
-的 `0.9.0` 改为计划安装的已发布版本。该选项会将包内文件合并进已有技能目录，并覆盖
-同名文件；相邻的其他技能不受影响，技能目录中已不再随包提供的旧文件也不会被删除。
-覆盖前请自行备份本地修改。
+的 `0.10.0` 改为计划安装的已发布版本。该选项先暂存已有目录，再合并包内文件并切换安装；
+同名文件会被覆盖，相邻的其他技能不受影响，已不再随包提供的旧文件也不会删除。
+覆盖前请自行备份本地修改。事务中断后，保留事务目录并重新执行实际安装以恢复；`status`
+和 `--dry-run` 只检查状态。事务仍有存活的持有进程时可以等待其完成；事务数据格式异常、
+归属不符或存在不安全内容时，会阻止自动恢复。
 
 ## License / 许可证
 

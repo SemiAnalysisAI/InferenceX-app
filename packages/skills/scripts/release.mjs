@@ -21,6 +21,7 @@ const releaseFiles = [
   'package.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/references/agentx.md',
+  'skills/inferencex-api/references/cli-contract.md',
   'skills/inferencex-api/references/powerx.md',
   'skills/inferencex-api/references/public-api-examples.md',
   'skills/inferencex-api/references/provenance.md',

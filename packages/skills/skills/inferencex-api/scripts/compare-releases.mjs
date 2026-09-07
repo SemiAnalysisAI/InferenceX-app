@@ -14,7 +14,7 @@ import {
   writeStdout,
 } from './cli-contract.mjs';
 
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 // History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =

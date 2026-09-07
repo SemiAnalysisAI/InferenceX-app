@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 export { PACKAGE_VERSION };
 export const PACKAGE_NAME = '@semianalysisai/inferencex-skills';
 

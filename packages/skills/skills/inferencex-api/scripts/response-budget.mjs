@@ -1,5 +1,5 @@
 // Count decompressed bytes from fetch's stream; Content-Length may describe compressed data.
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 export { PACKAGE_VERSION };
 
 export function createResponseBudget({

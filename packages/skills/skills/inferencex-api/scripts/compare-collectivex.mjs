@@ -15,7 +15,7 @@ import {
 } from './cli-contract.mjs';
 
 // Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.9.0';
+const PACKAGE_VERSION = '0.10.0';
 const ORIGIN = 'https://inferencex.semianalysis.com';
 const VERSION = 1;
 const BYTE_BUDGET = 32 * 1024 * 1024;

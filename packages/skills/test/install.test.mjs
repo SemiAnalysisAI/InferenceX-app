@@ -365,7 +365,7 @@ test('0.10 status requires the shared CLI contract with a matching package versi
     missing.stdout,
     /Installed version: unknown \(installed CLI contract is missing or not a regular file\)/u,
   );
-  writeFileSync(contract, source.toString().replace("'0.9.0'", `'${version}'`));
+  writeFileSync(contract, source);
   const matching = run(['status'], cwd);
   succeeded(matching);
   assert.match(matching.stdout, /Installed version: 0\.10\.0/u);
