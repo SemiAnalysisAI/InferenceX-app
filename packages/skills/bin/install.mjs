@@ -1,15 +1,6 @@
 #!/usr/bin/env node
 
-import {
-  cpSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
@@ -18,6 +9,8 @@ import {
   runCli,
   writeStdout,
 } from '../skills/inferencex-api/scripts/cli-contract.mjs';
+
+import { inspectInstallTransaction, runInstallTransaction } from './install-transaction.mjs';
 
 const SKILL_NAME = 'inferencex-api';
 const INSTALL_METADATA = '.inferencex-skills.json';
@@ -50,6 +43,8 @@ Install and status options:
 
 Existing skills are skipped unless --force is supplied.
 Status reads local installation metadata without changing files or using the network.
+Interrupted owned installs recover on the next install; status and dry-run remain read-only.
+Recovery covers process crashes, without an fsync or power-loss durability guarantee.
 --version reports the executing installer, not an installed skill.
 Bundled skill: inferencex-api
 `;
@@ -139,12 +134,23 @@ function installedState(destination, packageName) {
 }
 
 function statusRecord(destination, packageInfo) {
+  const transaction = inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
+  const installation =
+    transaction.state === 'none'
+      ? installedState(destination, packageInfo.name)
+      : {
+          ...unknownState(transaction.reason),
+          transaction_state:
+            transaction.state === 'recoverable' ? 'recovery_needed' : transaction.state,
+          transaction_phase: transaction.phase,
+          transaction_had_destination: transaction.had_destination,
+        };
   return {
     schema_version: 1,
     package: packageInfo.name,
     installer_version: packageInfo.version,
     skill_path: destination,
-    ...installedState(destination, packageInfo.name),
+    ...installation,
   };
 }
 
@@ -271,28 +277,47 @@ async function main(args, signal) {
     else showStatus(record);
     return;
   }
-  const plan = installationPlan(source, destination, values.force);
   const dryRun = values['dry-run'] ?? false;
-  if (!dryRun && plan.outcome !== 'skipped') {
-    const metadataPath = join(destination, INSTALL_METADATA);
-    mkdirSync(root, { recursive: true });
-    // A failed overwrite must not leave a version stamp for partially replaced files.
-    rmSync(metadataPath, { force: true });
-    cpSync(source, destination, { recursive: true, force: true });
-    writeFileSync(
-      metadataPath,
-      `${JSON.stringify({ package: packageInfo.name, version: packageInfo.version }, null, 2)}\n`,
-      { flag: 'wx' },
-    );
-    record = statusRecord(destination, packageInfo);
-  }
+  const plan = dryRun
+    ? record.transaction_state === undefined
+      ? installationPlan(source, destination, values.force)
+      : record.transaction_state === 'recovery_needed' &&
+          (values.force || !record.transaction_had_destination)
+        ? installationPlan(source, destination, true)
+        : { outcome: 'skipped', write_paths: [] }
+    : runInstallTransaction({
+        source,
+        destination,
+        packageName: packageInfo.name,
+        packageVersion: packageInfo.version,
+        skillName: SKILL_NAME,
+        receiptName: INSTALL_METADATA,
+        prepare: () => installationPlan(source, destination, values.force),
+      });
+  if (!dryRun) record = statusRecord(destination, packageInfo);
   const result = {
     ...record,
     dry_run: dryRun,
     outcome: dryRun
-      ? { installed: 'would_install', overwritten: 'would_overwrite', skipped: 'would_skip' }[
-          plan.outcome
-        ]
+      ? record.transaction_state === 'recovery_needed'
+        ? `would_recover_then_${
+            values.force
+              ? record.transaction_had_destination
+                ? 'overwrite'
+                : 'install'
+              : record.transaction_had_destination
+                ? 'skip'
+                : 'install'
+          }`
+        : record.transaction_state === 'busy'
+          ? 'would_wait_for_install'
+          : record.transaction_state === 'blocked'
+            ? 'blocked_by_transaction'
+            : {
+                installed: 'would_install',
+                overwritten: 'would_overwrite',
+                skipped: 'would_skip',
+              }[plan.outcome]
       : plan.outcome,
     write_paths: plan.write_paths,
     preserves_extra_files: true,
@@ -302,9 +327,17 @@ async function main(args, signal) {
     return;
   }
   if (dryRun) {
-    console.log(
-      `Dry run: would ${{ installed: 'install', overwritten: 'overwrite', skipped: 'skip' }[plan.outcome]} ${SKILL_NAME} at ${destination}.`,
-    );
+    const description = {
+      would_install: `would install ${SKILL_NAME} at ${destination}`,
+      would_overwrite: `would overwrite ${SKILL_NAME} at ${destination}`,
+      would_skip: `would skip ${SKILL_NAME} at ${destination}`,
+      would_recover_then_install: `would recover the interrupted transaction, then install ${SKILL_NAME} at ${destination}`,
+      would_recover_then_overwrite: `would recover the interrupted transaction, then overwrite ${SKILL_NAME} at ${destination}`,
+      would_recover_then_skip: `would recover the interrupted transaction, then skip ${SKILL_NAME} at ${destination}`,
+      would_wait_for_install: `would wait for the active installer transaction at ${destination}`,
+      blocked_by_transaction: `is blocked by untrusted installer transaction data at ${destination}`,
+    }[result.outcome];
+    console.log(`Dry run: ${description}.`);
     showStatus(record);
     console.log(
       `Files to write (relative to skill path, including the installation record):\n${plan.write_paths.map((path) => `  ${path}`).join('\n') || '  (none)'}`,

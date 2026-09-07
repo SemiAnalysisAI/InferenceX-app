@@ -18,6 +18,7 @@ const releaseFiles = [
   'LICENSE',
   'README.md',
   'bin/install.mjs',
+  'bin/install-transaction.mjs',
   'package.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/references/agentx.md',

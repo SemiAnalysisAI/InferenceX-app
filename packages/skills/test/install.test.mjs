@@ -82,12 +82,18 @@ test('the real npm archive installs the single skill with all bundled resources'
   assert.ok(suite.packedFiles.includes('README.md'));
   assert.ok(suite.packedFiles.includes('LICENSE'));
   assert.ok(suite.packedFiles.includes('bin/install.mjs'));
+  assert.ok(suite.packedFiles.includes('bin/install-transaction.mjs'));
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/SKILL.md'));
   assert.ok(
     suite.packedFiles.every(
       (path) =>
-        ['package.json', 'README.md', 'LICENSE', 'bin/install.mjs'].includes(path) ||
-        path.startsWith('skills/inferencex-api/'),
+        [
+          'package.json',
+          'README.md',
+          'LICENSE',
+          'bin/install.mjs',
+          'bin/install-transaction.mjs',
+        ].includes(path) || path.startsWith('skills/inferencex-api/'),
     ),
   );
   for (const path of suite.packedFiles.filter((entry) => entry.startsWith('skills/'))) {
@@ -1000,10 +1006,11 @@ test('JSON usage failures stay one document and preserve exit code 2 without wri
   }
 });
 
-test('an operational copy failure removes the receipt instead of reporting a successful JSON installation', () => {
+test('an operational staging failure preserves the prior receipt and installed state', () => {
   const cwd = project();
   succeeded(run(['install'], cwd));
   const destination = join(cwd, '.claude/skills/inferencex-api');
+  const before = snapshot(destination);
   const preload = join(project(), 'fail-copy.mjs');
   writeFileSync(
     preload,
@@ -1012,8 +1019,11 @@ test('an operational copy failure removes the receipt instead of reporting a suc
     import { syncBuiltinESMExports } from 'node:module';
     const copy = fs.cpSync;
     fs.cpSync = (source, target, options) => {
-      if (target === ${JSON.stringify(destination)}) throw new Error('injected copy failure');
-      return copy(source, target, options);
+      const result = copy(source, target, options);
+      if (target === ${JSON.stringify(`${destination}.inferencex-skills-transaction/stage`)}) {
+        throw new Error('injected copy failure');
+      }
+      return result;
     };
     syncBuiltinESMExports();
   `,
@@ -1025,10 +1035,10 @@ test('an operational copy failure removes the receipt instead of reporting a suc
     const error = jsonResult(failed, 1);
     assert.equal(error.outcome, 'failed');
     assert.match(failed.stderr, /Could not install the skill: injected copy failure/);
-    assert.equal(lstatSync(join(destination, metadataName), { throwIfNoEntry: false }), undefined);
+    assert.deepEqual(snapshot(destination), before);
     const status = jsonResult(run(['status', '--json'], cwd));
-    assert.equal(status.installation_state, 'unknown');
-    assert.equal(status.installed_version, null);
+    assert.equal(status.installation_state, 'installed');
+    assert.equal(status.installed_version, packageInfo.version);
   } finally {
     if (priorOptions === undefined) delete suite.environment.NODE_OPTIONS;
     else suite.environment.NODE_OPTIONS = priorOptions;
