@@ -418,6 +418,102 @@ class StructuredErrorVerifierTests(unittest.TestCase):
         metadata.assert_not_called()
 
 
+class OfflineVerifierReleaseTests(unittest.TestCase):
+    CAPTURES = (
+        ('powerx-json', 'powerx-json-evidence', 'powerx.json'),
+        ('powerx-csv', 'powerx-csv-evidence', 'powerx.csv'),
+        ('agentx-json', 'agentx-json-evidence', 'agentx.json'),
+        ('agentx-csv', 'agentx-csv-evidence', 'agentx.csv'),
+        ('agentx-excluded', 'agentx-excluded-evidence', 'agentx-excluded.json'),
+    )
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.installed = self.root / 'installed'
+        (self.installed / 'scripts').mkdir(parents=True)
+        (self.installed / 'scripts/verify-export.mjs').write_text('installed verifier')
+        for label, evidence_name, output_name in self.CAPTURES:
+            evidence = self.root / evidence_name
+            evidence.mkdir()
+            (evidence / 'manifest.json').write_text(f'{label} manifest')
+            (evidence / 'response.json').write_text(f'{label} response')
+            (self.root / output_name).write_text(f'{label} output')
+
+    def test_replays_all_five_captures_twice_with_deterministic_reports(self):
+        def input_bytes():
+            paths = []
+            for _label, evidence_name, output_name in self.CAPTURES:
+                paths.extend((self.root / evidence_name).iterdir())
+                paths.append(self.root / output_name)
+            return {str(path.relative_to(self.root)): path.read_bytes() for path in paths}
+
+        before = input_bytes()
+
+        def execute(command, project, _environment, label, _deadline):
+            self.assertEqual(project, self.root)
+            evidence = Path(command[command.index('--evidence-dir') + 1])
+            output = Path(command[command.index('--export') + 1])
+            self.assertTrue(evidence.is_dir())
+            self.assertTrue(output.is_file())
+            report = f'# Verified {output.name}\n'
+            (project / f'{label}.stdout.log').write_text(report)
+            (project / f'{label}.stderr.log').write_text('')
+            return report
+
+        with patch.object(check, 'run', side_effect=execute) as run:
+            reports = check.verify_saved_exports(
+                '/runtime/node', self.installed, self.root, {'PATH': '/runtime'}, '0.11.0')
+
+        self.assertEqual([report['capture'] for report in reports],
+                         [capture[0] for capture in self.CAPTURES])
+        self.assertEqual(run.call_count, 10)
+        for call in run.call_args_list:
+            command = [str(part) for part in call.args[0]]
+            self.assertEqual(command[0], '/runtime/node')
+            self.assertEqual(command[1], '--import')
+            self.assertEqual(command[3], str(self.installed / 'scripts/verify-export.mjs'))
+            self.assertIn('--evidence-dir', command)
+            self.assertIn('--export', command)
+        denial = self.root / 'verify-export-deny-network.mjs'
+        self.assertIn('globalThis.fetch', denial.read_text())
+        self.assertEqual(input_bytes(), before)
+
+    def test_rejects_input_mutation_and_nondeterministic_reports(self):
+        def mutate(*_args):
+            (self.root / 'powerx.json').write_text('changed')
+            (self.root / 'verify-powerx-json-1.stdout.log').write_text('# Verified\n')
+            return '# Verified\n'
+
+        with patch.object(check, 'run', side_effect=mutate), \
+                self.assertRaisesRegex(ValueError, 'modified.*powerx-json'):
+            check.verify_saved_exports(
+                '/runtime/node', self.installed, self.root, {}, '0.11.0')
+
+        (self.root / 'powerx.json').write_text('powerx-json output')
+        reports = iter([b'# first\n', b'# second\n'])
+
+        def nondeterministic(_command, project, _environment, label, _deadline):
+            report = next(reports)
+            (project / f'{label}.stdout.log').write_bytes(report)
+            return report.decode()
+
+        with patch.object(check, 'run', side_effect=nondeterministic), \
+                self.assertRaisesRegex(ValueError, 'deterministic.*powerx-json'):
+            check.verify_saved_exports(
+                '/runtime/node', self.installed, self.root, {}, '0.11.0')
+
+    def test_is_required_only_from_0_11(self):
+        with patch.object(check, 'run') as run:
+            self.assertEqual(check.verify_saved_exports(
+                '/runtime/node', self.installed, self.root, {}, '0.10.0'), [])
+        run.assert_not_called()
+        (self.installed / 'scripts/verify-export.mjs').unlink()
+        with self.assertRaisesRegex(ValueError, 'installed offline verifier is missing'):
+            check.verify_saved_exports('/runtime/node', self.installed, self.root, {}, '0.11.0')
+
+
 class AgentXVerifierTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -1112,7 +1208,7 @@ globalThis.fetch = async (input) => {{
         install.assert_not_called()
 
     def test_candidate_orchestrates_all_six_helpers_for_both_targets(self):
-        contract_version = '0.10.0'
+        contract_version = '0.11.0'
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode='w:gz') as packed:
             content = b'skill'
@@ -1157,12 +1253,14 @@ globalThis.fetch = async (input) => {{
                 patch.object(check, 'captured_export', return_value=[]), \
                 patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
                 patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}), \
+                patch.object(check, 'verify_saved_exports', return_value=[{'capture': 'verified'}]) as offline, \
                 patch.object(check, 'check_additional_workflows', return_value={'status': 'passed'}), \
                 patch.object(check, 'run_point', side_effect=['trace_diagnostics', 'trace_unavailable'] * 2), \
                 patch('builtins.print'):
             check.main()
         self.assertEqual([call.args[1] for call in installs.call_args_list], ['codex', 'claude'])
         self.assertEqual(installed_checks.call_count, 4)
+        self.assertEqual(offline.call_count, 2)
         commands = [[str(part) for part in call.args[0]] for call in runs.call_args_list]
         for target, project in projects.items():
             target_commands = [command for command, call in zip(commands, runs.call_args_list)
@@ -1185,6 +1283,9 @@ globalThis.fetch = async (input) => {{
                 'compare-releases', 'compare-collectivex', 'inferencex-skills'}, target)
             installer, = [command for command in negatives if 'inferencex-skills' in command]
             self.assertIn('--offline', installer)
+        report = json.loads((self.root / 'verification/verification.json').read_text())
+        self.assertTrue(all(target['offline_verification'] == [{'capture': 'verified'}]
+                            for target in report['targets']))
 
     def test_agents_prepares_canonical_projects_with_only_archive_and_hashed_prompt(self):
         stream = io.BytesIO()
