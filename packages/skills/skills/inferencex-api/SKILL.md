@@ -24,6 +24,10 @@ below for units, dates, source identity, and interpretation.
 `--require-hardware` needs a usable record for that hardware; a matching label with
 a missing usable PowerX measurement or AgentX aggregate does not satisfy it.
 
+For every stated count or range, use a verified summary value or compute and print
+the scalar from the exact selected rows. Copy that value into the explanation;
+do not visually count object keys or table rows.
+
 A completed bundle is immutable. Leave every entry under it unchanged: never add,
 edit, or delete files there. Write explanations and reports to sibling paths outside
 the bundle, finish all task writes, and then run `inferencex verify` as the final step.
