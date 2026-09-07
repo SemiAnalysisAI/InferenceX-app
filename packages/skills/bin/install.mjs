@@ -212,9 +212,9 @@ function installationPlan(source, destination, force) {
   return { outcome: existing ? 'overwritten' : 'installed', write_paths: files.sort() };
 }
 
-function installTransaction(options) {
+async function installTransaction(options) {
   try {
-    return runInstallTransaction(options);
+    return await runInstallTransaction(options);
   } catch (error) {
     // Protocol failures are internal errors; Node filesystem failures carry these fields.
     for (let cause = error; cause instanceof Error; cause = cause.cause) {
@@ -319,13 +319,14 @@ async function main(args, signal) {
           (values.force || !recoveredDestinationExists)
         ? installationPlan(source, destination, true)
         : { outcome: 'skipped', write_paths: [] }
-    : installTransaction({
+    : await installTransaction({
         source,
         destination,
         packageName: packageInfo.name,
         packageVersion: packageInfo.version,
         skillName: SKILL_NAME,
         receiptName: INSTALL_METADATA,
+        signal,
         prepare: () => installationPlan(source, destination, values.force),
       });
   if (!dryRun) record = statusRecord(destination, packageInfo);
@@ -357,7 +358,7 @@ async function main(args, signal) {
     preserves_extra_files: true,
   };
   if (values.json) {
-    await writeStdout(`${JSON.stringify(result)}\n`, { signal });
+    await writeStdout(`${JSON.stringify(result)}\n`, { signal: dryRun ? signal : undefined });
     return;
   }
   if (dryRun) {

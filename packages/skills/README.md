@@ -24,14 +24,19 @@ See the [command cookbook](skills/inferencex-api/references/cli-contract.md)
 for error codes, scheduler handling and output limits.
 
 Upgrades stage the complete merged directory and version receipt before activation.
-Detected failures preserve or restore the prior installation; the next real install
-recovers supported interrupted transactions. Concurrent installs are serialized.
+Before committed activation, detected failures preserve or restore the prior installation.
+After committed activation, cleanup failures retain the new installation. The next real
+install recovers supported interrupted transactions. Concurrent installs are serialized.
 `status` and `--dry-run` report pending recovery without changing files. Unknown
 transaction data is preserved for inspection. Process-crash recovery does not
 promise durability after power loss.
 
-Graceful `SIGINT`/`SIGTERM` cancels active HTTP work. A stdout write must complete
-within five seconds; a stalled consumer produces `OUTPUT_ERROR`. Failed stdout
+Graceful `SIGINT`/`SIGTERM` cancels active HTTP work. The installer observes cancellation
+between filesystem phases and while waiting for another installer; an in-progress
+synchronous filesystem operation finishes first. Cancellation before committed activation
+rolls back. After committed activation, the installer finishes cleanup and reports its result.
+A stdout write must complete within five seconds; a stalled consumer produces
+`OUTPUT_ERROR`. Failed stdout
 may already contain partial bytes, so accept an export only after exit `0`.
 File exports and evidence manifests retain their separate-write limits.
 
@@ -382,12 +387,15 @@ malformed, foreign or unsafe transaction data blocks automatic recovery.
 PowerX JSON 在已有 metadata 和 rows 之外增加 `schema_version: 1`。
 [命令使用指南](skills/inferencex-api/references/cli-contract.md) 说明错误码、在调度器中运行时的处理方式和输出限制。
 
-升级会先在暂存目录中准备好合并后的完整技能目录和版本记录，再切换到新安装。检测到失败时
-保留或恢复旧安装；下次实际安装会恢复支持的中断事务。并发安装按顺序执行。`status` 和
+升级会先在暂存目录中准备好合并后的完整技能目录和版本记录，再切换到新安装。切换正式生效前
+检测到失败时保留或恢复旧安装；生效之后清理失败则保留新安装。下次实际安装会恢复支持的
+中断事务。并发安装按顺序执行。`status` 和
 `--dry-run` 只读取并报告待恢复状态，不修改文件；无法识别的事务数据会原样保留，供人工检查。
 这些保证针对进程中断，不承诺断电后的持久性。
 
-正常处理 `SIGINT`/`SIGTERM` 时会取消正在进行的 HTTP 请求。stdout 写入须在五秒内完成；
+正常处理 `SIGINT`/`SIGTERM` 时会取消正在进行的 HTTP 请求。安装器在文件操作阶段之间，
+以及等待另一个安装进程时处理取消信号；正在执行的同步文件操作会先完成。切换正式生效前
+取消会回滚；生效之后收到取消信号则完成清理并报告安装结果。stdout 写入须在五秒内完成；
 下游停止读取导致超时后，命令返回 `OUTPUT_ERROR`。失败的 stdout 可能已有部分内容，
 因此只有退出码为 `0` 时才能接受导出结果。导出文件和证据 manifest 仍受分别写入的限制。
 

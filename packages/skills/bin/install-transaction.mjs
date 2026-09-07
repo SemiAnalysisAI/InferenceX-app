@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import process from 'node:process';
+import { setImmediate, setTimeout } from 'node:timers/promises';
 
 const TRANSACTION_SUFFIX = '.inferencex-skills-transaction';
 const RECOVERY_SUFFIX = '.recovering-';
@@ -24,7 +25,11 @@ const OWNER_PATTERN = new RegExp(
   `^owner-(?<transactionId>${UUID_PATTERN})-(?<pid>[1-9]\\d*)-(?<claimId>${UUID_PATTERN})\\.json$`,
   'u',
 );
-const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+
+async function cancellationCheckpoint(signal) {
+  await setImmediate();
+  signal?.throwIfAborted();
+}
 
 function canonicalPath(destination) {
   return `${destination}${TRANSACTION_SUFFIX}`;
@@ -392,11 +397,12 @@ function claimRecovery(destination, packageName, skillName, state) {
   return { cleanupOnly: false, paths: inspected.paths, record };
 }
 
-function acquireTransaction(destination, packageName, skillName, waitMilliseconds) {
+async function acquireTransaction(destination, packageName, skillName, waitMilliseconds, signal) {
   const deadline = Date.now() + waitMilliseconds;
   let unmarkedDeadline;
   mkdirSync(dirname(destination), { recursive: true });
   for (;;) {
+    await cancellationCheckpoint(signal);
     const state = inspectInstallTransaction(destination, packageName, skillName);
     if (state.state === 'blocked') {
       if (
@@ -407,7 +413,7 @@ function acquireTransaction(destination, packageName, skillName, waitMillisecond
       ) {
         unmarkedDeadline ??= Date.now() + 2_000;
         if (Date.now() < Math.min(deadline, unmarkedDeadline)) {
-          Atomics.wait(sleepBuffer, 0, 0, 25);
+          await setTimeout(25);
           continue;
         }
       }
@@ -424,7 +430,7 @@ function acquireTransaction(destination, packageName, skillName, waitMillisecond
     }
     if (state.state === 'busy') {
       if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${state.reason}.`);
-      Atomics.wait(sleepBuffer, 0, 0, 25);
+      await setTimeout(25);
       continue;
     }
 
@@ -460,7 +466,7 @@ function acquireTransaction(destination, packageName, skillName, waitMillisecond
   }
 }
 
-export function runInstallTransaction({
+export async function runInstallTransaction({
   source,
   destination,
   packageName,
@@ -468,20 +474,29 @@ export function runInstallTransaction({
   skillName,
   receiptName,
   prepare,
+  signal,
   waitMilliseconds = 30_000,
 }) {
+  await cancellationCheckpoint(signal);
   const pending = inspectInstallTransaction(destination, packageName, skillName);
   if (pending.state === 'none') {
     const initialPlan = prepare();
     if (initialPlan.outcome === 'skipped') return initialPlan;
   }
-  const acquired = acquireTransaction(destination, packageName, skillName, waitMilliseconds);
+  const acquired = await acquireTransaction(
+    destination,
+    packageName,
+    skillName,
+    waitMilliseconds,
+    signal,
+  );
   const { paths } = acquired;
   let { record } = acquired;
   let destinationMoved = false;
   let stageMoved = false;
   let committed = false;
   try {
+    await cancellationCheckpoint(signal);
     const plan = prepare();
     if (plan.outcome === 'skipped') {
       finishCleanup(destination, paths, record);
@@ -494,6 +509,7 @@ export function runInstallTransaction({
         preserveTimestamps: true,
         verbatimSymlinks: true,
       });
+      await cancellationCheckpoint(signal);
     }
     cpSync(source, paths.stage, {
       recursive: true,
@@ -501,6 +517,7 @@ export function runInstallTransaction({
       preserveTimestamps: true,
       verbatimSymlinks: true,
     });
+    await cancellationCheckpoint(signal);
     const stagedReceipt = join(paths.stage, receiptName);
     rmSync(stagedReceipt, { force: true });
     writeFileSync(
@@ -510,19 +527,24 @@ export function runInstallTransaction({
     );
     record = { ...record, phase: 'staged' };
     updateMarker(paths, record);
+    await cancellationCheckpoint(signal);
 
     if (record.had_destination) {
       renameSync(destination, paths.previous);
       destinationMoved = true;
       record = { ...record, phase: 'previous_moved' };
       updateMarker(paths, record);
+      await cancellationCheckpoint(signal);
     }
     renameSync(paths.stage, destination);
     stageMoved = true;
+    await cancellationCheckpoint(signal);
     record = { ...record, phase: 'activated' };
     updateMarker(paths, record);
     committed = true;
+    await setImmediate();
     cleanupCommittedTransaction(destination, paths, record);
+    await setImmediate();
     return plan;
   } catch (error) {
     if (committed) throw error;

@@ -97,7 +97,12 @@ PowerX JSON carries `schema_version: 1` from package 0.10.0; its `metadata` and
 their own schema and domain fields. CSV contracts are unchanged.
 
 Graceful `SIGINT`/`SIGTERM` cancellation aborts active HTTP work and follows the
-helper's existing output rollback. Stdout must finish writing within five seconds; a stalled consumer yields
+helper's existing output rollback. The installer checks cancellation between filesystem
+phases and while waiting for another installer; each synchronous filesystem operation
+finishes before cancellation is observed. Before committed activation, cancellation rolls
+back and exits 130. Once activation is committed, the installer finishes cleanup and reports
+the completed installation instead of reporting cancellation for an already installed version.
+Stdout must finish writing within five seconds; a stalled consumer yields
 `OUTPUT_ERROR`. A consumer may already
 have received part of a failed stdout stream: accept the export only after exit 0. A file export and its evidence manifest remain separate writes; verify both
 before treating an evidence bundle as complete. `SIGKILL` prevents immediate cleanup
