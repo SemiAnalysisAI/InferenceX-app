@@ -2,10 +2,10 @@
   "schema_version": 1,
   "package_version": "1.0.0",
   "files": {
-    "SKILL.md": "a51e88e966cd7acda6cab7db823614ed843258ec4591409c4b0250151e4aa3a1",
+    "SKILL.md": "3c4e48b716c13741c13f0c332ee1f12d2f907dddc5740e4bea2f679e440f344c",
     "references/agentx.md": "84e9346167ab8a25d23708ab504152bd23ea5b5d6dd44f4c368d33e874cf5f93",
     "references/cli-contract.md": "9234b1c9b683cc8f35131ac2d2a52c0ceec6cec8309ecea1316e5a28141803e7",
-    "references/cli.md": "1b95712cd1901947e997e1a2ff9736832b21002f93f19c16c1e53169da1d2f07",
+    "references/cli.md": "921b1d677595459462aa2a4fb7d91184bf906c3b03a97e9f78807876910e6271",
     "references/collectivex.md": "533b20df571430e978f79d8a1c493bc95c276feeaccc46783259e88ee6ef126a",
     "references/offline-exports.md": "9f027135d653341ad7c50120b3ad65e57a896f9a5fdb38356172adb307499279",
     "references/powerx.md": "6fecd2939c30bbc2c4beb4d5298a5cb9e2378ec00361602025cace639df44ff7",

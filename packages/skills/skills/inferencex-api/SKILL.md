@@ -23,6 +23,9 @@ empty results and missing values as scoped evidence. Use the six domain cookbook
 below for units, dates, source identity, and interpretation.
 `--require-hardware` needs a usable record for that hardware; a matching label with
 a missing usable PowerX measurement or AgentX aggregate does not satisfy it.
+Explain a policy failure from the current command's `policy.reasons`, including the
+requested hardware or pair count and its actual value. Keep `coverage.reasons`
+separate: partial coverage alone does not determine whether a predicate passes.
 
 For every stated count or range, use a verified summary value or compute and print
 the scalar from the exact selected rows. Copy that value into the explanation;

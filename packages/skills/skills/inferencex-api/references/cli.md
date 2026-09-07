@@ -69,6 +69,13 @@ selected row merely has that hardware label. It passes only when the requested
 hardware has `valid_records > 0`. A retained PowerX row without a usable measured
 value or AgentX row without a usable aggregate therefore cannot satisfy this policy.
 
+Explain the current invocation's failure from `policy.reasons` and its recorded
+requirements and actual values. `coverage.reasons` describe missing evidence in the
+whole selection, which can be independent of that failed predicate. For example,
+an absent result log makes coverage partial while the result can still count as a
+usable hardware observation. Read the reported count for the requested key; do not
+infer it from a missing optional field or another hardware's count.
+
 ## Exit and output handling
 
 Branch on the exit code before parsing stdout:
