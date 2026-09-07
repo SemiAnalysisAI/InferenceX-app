@@ -10,6 +10,8 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TPU_NEWSLETTER_URL = 'https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam';
+
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
@@ -95,17 +97,14 @@ describe('Landing nudges — modals', () => {
       });
   });
 
-  it('localizes the Rubin comparison banner title in Chinese', () => {
+  it('localizes the TPUv7 inference banner in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'OpenAI 最新自研芯片对比 Rubin NVL72')
-      .and(
-        'contain.text',
-        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
-      )
+      .and('contain.text', 'TPUv7 推理性能')
+      .and('contain.text', '对比 TPUv7 与 Blackwell 及 Blackwell Ultra 的推理性能')
       .and('contain.text', '查看结果');
   });
 
@@ -167,25 +166,26 @@ describe('Landing nudges — banner', () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
+    cy.intercept('GET', TPU_NEWSLETTER_URL, (request) => {
+      request.redirect(`${Cypress.config('baseUrl')}/`);
+    }).as('tpuNewsletter');
+
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="launch-banner"]').click();
-    cy.location('pathname', { timeout: 10000 }).should('eq', '/inference');
-    cy.location('search')
-      .should('include', 'g_model=DeepSeek-R1-0528')
-      .and('include', 'i_seq=8k%2F1k')
-      .and('include', 'i_prec=fp4')
-      .and('include', 'i_metric=y_outputTputPerMw');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('have.attr', 'href', TPU_NEWSLETTER_URL)
+      .click();
 
-    // Body click must not write the dismissal key — the banner should still
-    // render on a fresh visit to landing.
+    cy.wait('@tpuNewsletter').its('request.url').should('eq', TPU_NEWSLETTER_URL);
+    cy.location('pathname').should('eq', '/');
+
+    // The intercepted redirect produces a fresh landing-page document. The
+    // banner remaining visible proves that the body click did not dismiss it.
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
-
-    cy.visit('/');
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
 });
