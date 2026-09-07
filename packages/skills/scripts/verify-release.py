@@ -79,6 +79,9 @@ POINT_OPERATIONS = (
     ('request-timeline', '/api/v1/request-timeline', 'id'),
     ('trace-histograms', '/api/v1/trace-histograms', 'ids'),
     ('trace-server-metrics', '/api/v1/trace-server-metrics', 'id'))
+DATA_HELPERS = (
+    'export-powerx', 'export-agentx', 'investigate-result', 'compare-tco',
+    'compare-releases', 'compare-collectivex')
 
 
 def now():
@@ -96,6 +99,69 @@ def finite(value):
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def structured_errors_required(version):
+    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?', version)
+    require(match is not None, 'Package version must be semantic')
+    return tuple(map(int, match.groups())) >= (0, 10, 0)
+
+
+def check_powerx_schema(document, version):
+    if structured_errors_required(version):
+        require(set(document) == {'schema_version', 'metadata', 'rows'} and
+                type(document['schema_version']) is int and document['schema_version'] == 1,
+                'PowerX JSON schema version differs')
+
+
+def check_structured_error(error, command, version):
+    require(isinstance(error, subprocess.CalledProcessError) and error.returncode == 2,
+            f'{command} invalid argument must exit 2')
+    require(error.output == '', f'{command} invalid argument wrote to stdout')
+    stderr = error.stderr
+    require(type(stderr) is str and stderr.endswith('\n') and stderr.count('\n') == 1,
+            f'{command} stderr must contain exactly one JSON envelope')
+    try:
+        document = json.loads(stderr)
+    except json.JSONDecodeError as caught:
+        raise ValueError(f'{command} stderr is not one JSON envelope') from caught
+    require(type(document) is dict and
+            set(document) == {'schema_version', 'package', 'package_version', 'command', 'error'} and
+            type(document.get('schema_version')) is int and document['schema_version'] == 1 and
+            document['package'] == PACKAGE and document['package_version'] == version and
+            document['command'] == command,
+            f'{command} structured error identity differs')
+    detail = document['error']
+    require(type(detail) is dict and set(detail) == {'code', 'message'} and
+            detail['code'] == 'INVALID_ARGUMENT' and
+            type(detail['message']) is str and bool(detail['message'].strip()),
+            f'{command} structured error detail differs')
+    return document
+
+
+def check_structured_errors(node, npm, installed, project, environment, archive, version, public,
+                            deadline=None):
+    if not structured_errors_required(version):
+        return []
+    commands = [(name, [node, installed / f'scripts/{name}.mjs']) for name in DATA_HELPERS]
+    spec = f'{PACKAGE}@{version}' if public else str(archive)
+    commands.append(('inferencex-skills', [npm, 'exec', '--yes', '--offline', '--package', spec,
+                                           '--', 'inferencex-skills']))
+    evidence = []
+    for command_name, prefix in commands:
+        command = [*prefix, '--error-format', 'json', '--invalid-argument']
+        label = f'structured-error-{command_name}'
+        try:
+            run(command, project, environment, label, deadline)
+        except subprocess.CalledProcessError as error:
+            envelope = check_structured_error(error, command_name, version)
+        else:
+            raise ValueError(f'{command_name} invalid argument unexpectedly succeeded')
+        evidence.append({'command': [str(part) for part in command], 'exit_code': 2,
+                         'stdout_file': str(project / f'{label}.stdout.log'),
+                         'stderr_file': str(project / f'{label}.stderr.log'),
+                         'envelope': envelope})
+    return evidence
 
 
 def same_url(actual, expected):
@@ -291,6 +357,7 @@ def check_metadata(metadata, source, args, version, isl=None, osl=None):
 
 def check_exports(project, json_source, csv_source, args, version):
     document = json.loads((project / 'powerx.json').read_text())
+    check_powerx_schema(document, version)
     expected = check_metadata(document['metadata'], json_source, args, version)
     require(expected, 'Positive example has no validated observations; choose another documented workload')
     require(document['rows'] == expected, 'JSON observations differ from complete public response')
@@ -1478,6 +1545,9 @@ def main():
                                           args.mode == 'public', report, deadline)
             installed = project / ('.agents' if target == 'codex' else '.claude') / 'skills/inferencex-api'
             check_installed(installed, skill_files, record['version'])
+            structured_errors = check_structured_errors(
+                node, npm, installed, project, env, archive, record['version'],
+                args.mode == 'public', deadline)
             for output_format in ['json', 'csv']:
                 flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl), '--format', output_format,
                          '--output', f'powerx.{output_format}', '--evidence-dir', f'powerx-{output_format}-evidence']
@@ -1512,7 +1582,7 @@ def main():
             result['additional_workflows'] = run_additional_workflows(
                 node, installed, project, env, record['version'], deadline)
             check_installed(installed, skill_files, record['version'])
-            result.update(agentx=agentx, agentx_points=points)
+            result.update(agentx=agentx, agentx_points=points, structured_errors=structured_errors)
             result.update(target=target, project=str(project))
             report['targets'].append(result)
         remaining_seconds(deadline, PUBLIC_DEADLINE_SECONDS)
