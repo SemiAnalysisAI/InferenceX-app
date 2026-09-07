@@ -148,6 +148,12 @@ These case counters combine EP and KV; `kv_requested_cases` and
 EP-only. A listed subset of SKUs or reasons is not the total. If the returned
 arrays and counters do not reconcile, report that inconsistency.
 
+For EP point accounting, count `coverage[].points[]` by `terminal_status` with
+code and reconcile the result with the point counters. Compute pending points as
+`requested_points - terminal_points` and terminal-but-unmeasured points as
+`terminal_points - measured_points`. Carry those computed values and labels into
+the report; pending and terminal-but-unmeasured are separate populations.
+
 Matching is deliberately conservative: a changed case ID remains unmatched even
 if visible labels look alike. `comparison_scope.basis=exact_public_identity`
 describes the fields exposed by this API, not proof of a controlled experiment.
