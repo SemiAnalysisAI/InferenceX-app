@@ -1466,6 +1466,13 @@ globalThis.fetch = async (input) => {{
             with self.subTest(required=required):
                 self.assertIn(required, prompt_text)
 
+    def test_contract_one_prompt_pins_maintained_collectivex_positive_pair(self):
+        self.args.contract_one = True
+        prompt_text = check.prompt(self.args, 'codex', self.root / 'candidate.tgz')
+        left, right = check.COLLECTIVEX_POSITIVE_RUN_IDS
+        self.assertIn(f'CollectiveX runs {left} (left) and {right} (right)', prompt_text)
+        self.assertNotIn('the newest two measured CollectiveX runs', prompt_text)
+
     def test_agents_rejects_archive_filename_collision_before_creating_projects(self):
         record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'prompt.txt',
                   'sha256': '0' * 64, 'integrity': 'sha512-invalid'}
@@ -1658,6 +1665,24 @@ class ContractOneBundleOracleTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.serial = 0
+
+    @staticmethod
+    def save_current_collectivex_list(project):
+        body = json.dumps({
+            'version': 1,
+            'discovery_complete': True,
+            'runs': [
+                {'run_id': run_id, 'measured_cases': 14}
+                for run_id in check.COLLECTIVEX_POSITIVE_RUN_IDS
+            ],
+        }, separators=(',', ':'))
+        check.save(project / 'collectivex.json', {'responses': [{
+            'query_url': check.COLLECTIVEX_RUN_LIST_URL,
+            'retrieved_at': '2026-09-07T00:00:00Z',
+            'http_status': 200,
+            'decoded_body_sha256': hashlib.sha256(body.encode()).hexdigest(),
+            'body_text': body,
+        }]})
 
     def bundle(self, kind, responses, build_result, coverage=None, requirements=None,
                result_format='json', normalized_arguments=None):
@@ -2270,6 +2295,7 @@ class ContractOneBundleOracleTests(unittest.TestCase):
         (installed / 'scripts/inferencex.mjs').write_text('// fixture')
         project = self.root / 'project'
         project.mkdir()
+        self.save_current_collectivex_list(project)
         args = SimpleNamespace(model='GLM-5', date='2026-09-07', isl=8192, osl=1024,
                                raw_model='glm5', agentx_model='DeepSeek-V4-Pro',
                                empty_isl=7, empty_osl=13)
@@ -2315,6 +2341,14 @@ class ContractOneBundleOracleTests(unittest.TestCase):
         self.assertEqual(sum('--output-dir' in command for command in commands), 7)
         self.assertEqual(sum('verify' in command for command in commands), 8)
         self.assertTrue(all('--import' in command for command in commands if 'verify' in command))
+        collective_command = next(command for command, label in calls
+                                  if label == 'contract-one-collectivex')
+        self.assertEqual(
+            collective_command[collective_command.index('--left') + 1],
+            check.COLLECTIVEX_POSITIVE_RUN_IDS[0])
+        self.assertEqual(
+            collective_command[collective_command.index('--right') + 1],
+            check.COLLECTIVEX_POSITIVE_RUN_IDS[1])
         pinned = json.loads((project / 'contract-one-scope.json').read_text())
         self.assertEqual(pinned['raw_model'], 'glm5')
         empty_command = next(command for command, label in calls
@@ -2323,6 +2357,42 @@ class ContractOneBundleOracleTests(unittest.TestCase):
         self.assertEqual(empty_command[empty_command.index('--date') + 1], '2026-09-07')
         self.assertIn('--raw-model', empty_command)
         self.assertEqual(empty_command[empty_command.index('--raw-model') + 1], 'glm5')
+
+    def test_contract_one_collectivex_positive_gate_rejects_zero_comparable_pairs(self):
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        self.save_current_collectivex_list(project)
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'},
+                    'coverage': {'available_items': 1},
+                    'items': [{'result_id': '41', 'raw_model': 'glm5',
+                               'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}],
+                })
+            return '{}\n'
+
+        def audit(directory, _version):
+            kind = Path(directory).name
+            return {'eligible_records': 1,
+                    'comparable_pairs': 0 if kind == 'collectivex' else 1}
+
+        with patch.object(check, 'run', side_effect=execute), \
+                patch.object(check, 'check_bundle', side_effect=audit), \
+                self.assertRaisesRegex(ValueError, 'collectivex positive bundle'):
+            check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
 
 
 if __name__ == '__main__':

@@ -31,6 +31,8 @@ API = 'https://inferencex.semianalysis.com/api/v1/benchmarks'
 AGENTX_ORIGIN = 'https://inferencex.semianalysis.com'
 OPENAPI = f'{AGENTX_ORIGIN}/api/openapi.json'
 AGENTX_EXCLUDED_RAW_MODEL = '__inferencex_release_verification_no_match__'
+COLLECTIVEX_POSITIVE_RUN_IDS = ('33378604574', '33412478973')
+COLLECTIVEX_RUN_LIST_URL = f'{AGENTX_ORIGIN}/api/v1/collectivex/runs?version=1'
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 # Only the exact-version npm ETARGET propagation symptom is retryable. No HTTP,
 # publication, data-validation, or candidate-install retries.
@@ -1296,7 +1298,7 @@ Each lookup, CSV export, JSON export, empty export, and diagnostic must be trace
     if getattr(args, 'contract_one', False):
         base += f'''
 
-After completing the compatibility workflow, exercise the installed 1.0 `inferencex` entry. First run `discover configs --model {args.model}` and preserve its JSON. Select an actually observed strict-v2 single-turn config with exactly {args.isl} input and {args.osl} output tokens; do not invent a result ID, model key, hardware, date, topology, or image. Create exactly these six new bundle directories under `bundles`: `powerx`, `agentx`, `result`, `tco`, `releases`, and `collectivex`. Use the matching formal command for each family and `--output-dir`; use the discovered result ID for `result inspect`, the explicit PowerX scope above, the AgentX display model above, the documented TCO prices b200=3.6 and mi355x=1.8, the existing GLM-5 dated release comparison, and the newest two measured CollectiveX runs. Run `inferencex verify` once against each completed directory without network access. Keep every bundle's original `manifest.json`, `result.json` or CSV, and `responses/*.body` files unchanged. Add the exact six bundle summaries and policy outcomes to result.md.
+After completing the compatibility workflow, exercise the installed 1.0 `inferencex` entry. First run `discover configs --model {args.model}` and preserve its JSON. Select an actually observed strict-v2 single-turn config with exactly {args.isl} input and {args.osl} output tokens; do not invent a result ID, model key, hardware, date, topology, or image. Create exactly these six new bundle directories under `bundles`: `powerx`, `agentx`, `result`, `tco`, `releases`, and `collectivex`. Use the matching formal command for each family and `--output-dir`; use the discovered result ID for `result inspect`, the explicit PowerX scope above, the AgentX display model above, the documented TCO prices b200=3.6 and mi355x=1.8, the existing GLM-5 dated release comparison, and CollectiveX runs {COLLECTIVEX_POSITIVE_RUN_IDS[0]} (left) and {COLLECTIVEX_POSITIVE_RUN_IDS[1]} (right) after confirming both remain measured in the compatibility workflow's saved current run list. Run `inferencex verify` once against each completed directory without network access. Keep every bundle's original `manifest.json`, `result.json` or CSV, and `responses/*.body` files unchanged. Add the exact six bundle summaries and policy outcomes to result.md.
 '''
     return base
 
@@ -1889,6 +1891,25 @@ def workflow_source(source, expected_url, body_key='body_utf8', hash_key='decode
     return json.loads(source[body_key].removeprefix('\ufeff'))
 
 
+def maintained_collectivex_positive_pair(project):
+    document = json.loads((project / 'collectivex.json').read_text())
+    require(type(document) is dict and type(document.get('responses')) is list,
+            'CollectiveX compatibility evidence differs')
+    sources = [source for source in document['responses']
+               if type(source) is dict and source.get('query_url') == COLLECTIVEX_RUN_LIST_URL]
+    require(len(sources) == 1, 'CollectiveX compatibility run list differs')
+    listed = workflow_source(sources[0], COLLECTIVEX_RUN_LIST_URL, 'body_text',
+                             url_key='query_url')
+    require(type(listed) is dict and listed.get('version') == 1 and
+            listed.get('discovery_complete') is True and type(listed.get('runs')) is list,
+            'CollectiveX compatibility run list is incomplete')
+    runs = {run.get('run_id'): run for run in listed['runs'] if type(run) is dict}
+    require(all(run_id in runs and type(runs[run_id].get('measured_cases')) is int and
+                runs[run_id]['measured_cases'] > 0 for run_id in COLLECTIVEX_POSITIVE_RUN_IDS),
+            'Maintained CollectiveX positive runs are unavailable in the current list')
+    return COLLECTIVEX_POSITIVE_RUN_IDS
+
+
 def check_additional_workflows(project, version):
     """Live smoke invariants; fixture suites cover the full domain contracts separately."""
     documents = {name: json.loads((project / f'{name}.json').read_text())
@@ -2011,9 +2032,9 @@ def run_additional_workflows(node, installed, project, env, version, deadline):
 
 
 def run_contract_one_workflows(node, installed, project, env, args, version, deadline):
-    """Exercise the installed 1.0 entry while Python independently audits its saved inputs."""
     if not contract_one_required(version):
         return None
+    collective_left, collective_right = maintained_collectivex_positive_pair(project)
     cli = installed / 'scripts/inferencex.mjs'
     require(cli.is_file() and not cli.is_symlink(), 'The installed inferencex entry is missing')
     discovery_flags = ['discover', 'configs', '--model', args.model, '--limit', '1000',
@@ -2064,7 +2085,8 @@ def run_contract_one_workflows(node, installed, project, env, args, version, dea
                      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
                      '--after-run-url',
                      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'],
-        'collectivex': ['collectivex', 'compare'],
+        'collectivex': ['collectivex', 'compare', '--left', collective_left,
+                        '--right', collective_right],
     }
     reports = {}
     denial = project / 'contract-one-deny-network.mjs'
