@@ -237,9 +237,6 @@ function validateReportPath(reportArgument, evidence, physicalExport) {
   } catch (error) {
     throw argumentError(`--report parent must be an existing directory: ${error.message}`, error);
   }
-  if (physicalParent !== resolve(dirname(report))) {
-    throw argumentError('--report must not resolve through a symbolic-link directory');
-  }
   const physicalReport = join(physicalParent, basename(report));
   const foldedReport = physicalReport.toLowerCase();
   const foldedEvidence = evidence.toLowerCase();

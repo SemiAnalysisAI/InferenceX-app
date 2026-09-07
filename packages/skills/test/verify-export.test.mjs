@@ -4,7 +4,9 @@ import { createHash } from 'node:crypto';
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   rmSync,
   symlinkSync,
@@ -403,6 +405,8 @@ before(() => {
         closeSync: fs.closeSync,
         linkSync: fs.linkSync,
         openSync: fs.openSync,
+        symlinkSync: fs.symlinkSync,
+        unlinkSync: fs.unlinkSync,
         writeFileSync: fs.writeFileSync,
         writeSync: fs.writeSync,
       };
@@ -415,12 +419,23 @@ before(() => {
           (dirname(resolved) === dirname(report) && basename(resolved).startsWith(temporaryPrefix));
       };
       fs.openSync = function(path, ...rest) {
+        if (process.env.INFERENCEX_REPORT_MODE === 'retarget' &&
+            process.env.INFERENCEX_RETARGET_ALIAS &&
+            basename(String(path)).startsWith(temporaryPrefix)) {
+          original.unlinkSync(process.env.INFERENCEX_RETARGET_ALIAS);
+          original.symlinkSync(
+            process.env.INFERENCEX_RETARGET_TARGET,
+            process.env.INFERENCEX_RETARGET_ALIAS,
+            'dir',
+          );
+          delete process.env.INFERENCEX_RETARGET_ALIAS;
+        }
         const descriptor = original.openSync.call(this, path, ...rest);
         if (reportPath(path)) tracked.add(descriptor);
         return descriptor;
       };
       fs.writeFileSync = function(path, data, options) {
-        if (process.env.INFERENCEX_REPORT_MODE === 'race' ||
+        if (['race', 'retarget'].includes(process.env.INFERENCEX_REPORT_MODE) ||
             !(typeof path === 'number' ? tracked.has(path) : reportPath(path))) {
           return original.writeFileSync.call(this, path, data, options);
         }
@@ -563,6 +578,133 @@ test('a named report is create-new and preserves an existing report and all inpu
   assert.equal(readFileSync(report, 'utf8'), 'keep prior report');
   assert.deepEqual(readFileSync(join(bundle.evidence, 'manifest.json')), beforeManifest);
   assert.deepEqual(readFileSync(bundle.output), beforeExport);
+});
+
+test('a named report accepts a differently-cased spelling of its existing parent', (context) => {
+  const bundle = powerxBundle();
+  const physicalParent = join(bundle.cwd, 'Case-Sensitive Reports');
+  const alternateParent = join(bundle.cwd, 'case-sensitive reports');
+  mkdirSync(physicalParent);
+  if (!existsSync(alternateParent)) {
+    context.skip('requires a case-insensitive filesystem');
+    return;
+  }
+
+  const report = join(alternateParent, 'verified.md');
+  const result = runVerifier([
+    '--evidence-dir',
+    bundle.evidence,
+    '--export',
+    bundle.output,
+    '--report',
+    report,
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.match(readFileSync(join(physicalParent, 'verified.md'), 'utf8'), /^# Verified PowerX/u);
+});
+
+test('a named report resolves a safe symlinked parent to its canonical directory', () => {
+  const bundle = powerxBundle();
+  const physicalParent = join(bundle.cwd, 'physical reports');
+  const linkedParent = join(bundle.cwd, 'linked reports');
+  mkdirSync(physicalParent);
+  symlinkSync(physicalParent, linkedParent, 'dir');
+
+  const result = runVerifier([
+    '--evidence-dir',
+    bundle.evidence,
+    '--export',
+    bundle.output,
+    '--report',
+    join(linkedParent, 'verified.md'),
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.match(readFileSync(join(physicalParent, 'verified.md'), 'utf8'), /^# Verified PowerX/u);
+});
+
+test('a report keeps its canonical parent if the supplied symlink is retargeted', () => {
+  const bundle = powerxBundle();
+  const physicalParent = join(bundle.cwd, 'physical reports');
+  const redirectedParent = join(bundle.cwd, 'redirected reports');
+  const linkedParent = join(bundle.cwd, 'linked reports');
+  mkdirSync(physicalParent);
+  mkdirSync(redirectedParent);
+  symlinkSync(physicalParent, linkedParent, 'dir');
+  const physicalReport = join(physicalParent, 'verified.md');
+
+  const result = suite.node(
+    [
+      '--import',
+      pathToFileURL(reportWritePreload).href,
+      verifier,
+      '--evidence-dir',
+      bundle.evidence,
+      '--export',
+      bundle.output,
+      '--report',
+      join(linkedParent, 'verified.md'),
+    ],
+    {
+      cwd: bundle.cwd,
+      env: {
+        ...environment,
+        INFERENCEX_REPORT_PATH: physicalReport,
+        INFERENCEX_REPORT_MODE: 'retarget',
+        INFERENCEX_RETARGET_ALIAS: linkedParent,
+        INFERENCEX_RETARGET_TARGET: redirectedParent,
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(physicalReport, 'utf8'), /^# Verified PowerX/u);
+  assert.equal(existsSync(join(redirectedParent, 'verified.md')), false);
+  assert.equal(readlinkSync(linkedParent), redirectedParent);
+});
+
+test('a report symlink alias into evidence is rejected after canonical resolution', () => {
+  const bundle = powerxBundle();
+  const linkedParent = join(bundle.cwd, 'evidence alias');
+  symlinkSync(bundle.evidence, linkedParent, 'dir');
+
+  const result = runVerifier([
+    '--evidence-dir',
+    bundle.evidence,
+    '--export',
+    bundle.output,
+    '--report',
+    join(linkedParent, 'report.md'),
+  ]);
+
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /collides|aliases/i);
+  assert.equal(existsSync(join(bundle.evidence, 'report.md')), false);
+});
+
+test('a dangling symlink report leaf is still an existing report', () => {
+  const bundle = powerxBundle();
+  const report = join(bundle.cwd, 'dangling report.md');
+  const missingTarget = join(bundle.cwd, 'missing report target.md');
+  symlinkSync(missingTarget, report);
+
+  const result = runVerifier([
+    '--evidence-dir',
+    bundle.evidence,
+    '--export',
+    bundle.output,
+    '--report',
+    report,
+  ]);
+
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /already exists/i);
+  assert.equal(readlinkSync(report), missingTarget);
 });
 
 test('failed staged writes leave no partial named report and preserve every input', () => {
