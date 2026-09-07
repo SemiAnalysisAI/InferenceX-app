@@ -88,16 +88,34 @@ before(() => {
     `
 import { writeFileSync } from 'node:fs';
 const mode = process.env.INFERENCEX_CLI_CONTRACT_MODE;
-if (mode === 'body-timeout') {
+let parseTimeoutController;
+if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'parse-timeout') {
   const timeout = AbortSignal.timeout;
   AbortSignal.timeout = milliseconds => {
-    if (milliseconds !== 30_000) return timeout(milliseconds);
+    const controlled =
+      (mode === 'parse-timeout' && milliseconds === 120_000) ||
+      (mode !== 'parse-timeout' && milliseconds === 30_000);
+    if (!controlled) return timeout(milliseconds);
     const controller = new AbortController();
-    setTimeout(
-      () => controller.abort(new DOMException('controlled body timeout', 'TimeoutError')),
-      40,
-    );
+    if (mode === 'parse-timeout') parseTimeoutController = controller;
+    else {
+      setTimeout(
+        () => controller.abort(new DOMException('controlled body timeout', 'TimeoutError')),
+        40,
+      );
+    }
     return controller.signal;
+  };
+}
+if (mode === 'parse-cancel' || mode === 'parse-timeout') {
+  const decode = TextDecoder.prototype.decode;
+  TextDecoder.prototype.decode = function (...args) {
+    const body = decode.apply(this, args);
+    if (body === '[]') {
+      if (mode === 'parse-cancel') process.emit('SIGTERM');
+      else parseTimeoutController.abort(new DOMException('controlled parse timeout', 'TimeoutError'));
+    }
+    return body;
   };
 }
 if (mode === 'stdout-error') {
@@ -122,19 +140,30 @@ globalThis.fetch = async (_input, options) => {
       if (options.signal.aborted) reject(options.signal.reason);
     });
   }
-  if (mode === 'body-timeout') {
+  if (mode === 'body-timeout' || mode === 'http-body-timeout' || mode === 'http-body-pending') {
     return new Response(new ReadableStream({
       start(controller) {
+        if (mode === 'http-body-pending') {
+          const keepAlive = setInterval(() => {}, 1_000);
+          writeFileSync(process.env.INFERENCEX_TEST_READY, 'ready');
+          options.signal.addEventListener('abort', () => clearInterval(keepAlive), { once: true });
+        }
         options.signal.addEventListener('abort', () => controller.error(options.signal.reason), {
           once: true,
         });
       },
-    }), { headers: { 'Content-Type': 'application/json' } });
+    }), {
+      status: mode === 'body-timeout' ? 200 : 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
   if (mode === 'http') return new Response('{"error":"unavailable"}', {
     status: 503, headers: { 'Content-Type': 'application/json' },
   });
   if (mode === 'empty') return new Response('[]', {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (mode === 'parse-cancel' || mode === 'parse-timeout') return new Response('[]', {
     headers: { 'Content-Type': 'application/json' },
   });
   return new Response('{not json', { headers: { 'Content-Type': 'application/json' } });
@@ -220,6 +249,18 @@ test('a timeout while reading a response body remains TIMEOUT', () => {
   );
 });
 
+test('a non-2xx stalled response body preserves TIMEOUT in each affected reader', () => {
+  for (const [name, args] of cases.slice(0, 3)) {
+    diagnostic(run(name, args, 'http-body-timeout'), 'TIMEOUT');
+  }
+});
+
+test('AgentX preserves cancellation and timeout between body read and JSON parsing', () => {
+  const args = ['--model', 'x'];
+  diagnostic(run('export-agentx', args, 'parse-cancel'), 'CANCELLED', 130);
+  diagnostic(run('export-agentx', args, 'parse-timeout'), 'TIMEOUT');
+});
+
 test('stdout writes fail within a bounded interval when the consumer never drains', () => {
   const started = Date.now();
   const result = run('compare-tco', ['--help'], 'stdout-stall');
@@ -288,4 +329,42 @@ test('SIGTERM aborts an active request, preserves output, and leaves failed evid
   assert.equal(manifest.status, 'failed');
   assert.match(manifest.error, /SIGTERM/u);
   assert.equal(manifest.export.sha256, null);
+});
+
+test('SIGTERM after non-2xx headers remains CANCELLED in each affected reader', async () => {
+  for (const [name, args] of cases.slice(0, 3)) {
+    const cwd = suite.project();
+    const ready = join(cwd, `${name}-ready`);
+    const child = spawn(
+      process.execPath,
+      ['--import', pathToFileURL(preload).href, scripts[name], ...args, '--error-format', 'json'],
+      {
+        cwd,
+        env: {
+          ...suite.environment,
+          INFERENCEX_CLI_CONTRACT_MODE: 'http-body-pending',
+          INFERENCEX_TEST_READY: ready,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk) => (stdout += chunk));
+    child.stderr.setEncoding('utf8').on('data', (chunk) => (stderr += chunk));
+    const deadline = Date.now() + 2_000;
+    while (!existsSync(ready) && Date.now() < deadline) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+    assert.ok(existsSync(ready), `${name} response headers did not arrive`);
+    const closed = new Promise((resolve) => {
+      child.once('close', (code, closedBy) => resolve([code, closedBy]));
+    });
+    child.kill('SIGTERM');
+    const [status, signal] = await closed;
+    assert.equal(signal, null, stderr);
+    diagnostic({ status, stdout, stderr }, 'CANCELLED', 130);
+  }
 });

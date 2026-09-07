@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   argumentError,
+  CliError,
   httpError,
   outputBoundary,
   requestBoundary,
@@ -195,6 +196,7 @@ async function fetchJson(path, query, operation, evidence, budget, signal, allow
       return Buffer.concat(chunks);
     }, requestSignal);
   } catch (error) {
+    if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
     if (!response.ok && !(allowNotFound && response.status === 404)) {
       throw httpError(response.status, `${operation}: HTTP ${response.status} (${url.href})`);
     }

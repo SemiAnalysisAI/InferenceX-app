@@ -403,6 +403,7 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
   try {
     bytes = await responseBoundary(() => budget.read(response), requestSignal);
   } catch (error) {
+    if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
     if (!response.ok) throw httpError(response.status, `HTTP ${response.status} (${url.href})`);
     if (error?.code) {
       throw new CliError(
@@ -443,11 +444,13 @@ async function fetchJson(url, operation, requestUrls, evidence, budget, requeste
     }
     throw httpError(response.status, `HTTP ${response.status}${detail} (${url.href})`);
   }
-  try {
-    return await responseBoundary(() => JSON.parse(body), budget.signal);
-  } catch (error) {
-    throw responseError(`Could not read ${operation} JSON: ${error.message}`, error);
-  }
+  return responseBoundary(() => {
+    try {
+      return JSON.parse(body);
+    } catch (error) {
+      throw responseError(`Could not read ${operation} JSON: ${error.message}`, error);
+    }
+  }, budget.signal);
 }
 
 async function fetchChunks(operation, ids, limit, validate, requestUrls, evidence, budget) {

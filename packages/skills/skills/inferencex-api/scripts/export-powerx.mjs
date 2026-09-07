@@ -7,6 +7,7 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 import {
   argumentError,
+  CliError,
   httpError,
   outputBoundary,
   requestBoundary,
@@ -340,6 +341,7 @@ async function exportPowerx(values, isl, osl, url, evidence, signal) {
   try {
     bytes = await responseBoundary(() => budget.read(response), signal);
   } catch (error) {
+    if (error instanceof CliError && ['CANCELLED', 'TIMEOUT'].includes(error.code)) throw error;
     if (!response.ok) throw httpError(response.status, `HTTP ${response.status} (${url.href})`);
     throw error;
   }
