@@ -74,9 +74,10 @@ code before parsing output and retain failed attempts separately from complete e
    its own file; retain failed captures and count every actual HTTP request,
    including discovery and retries. Decode HTTP compression before parsing JSON
    (`fetch` does this; use `curl --compressed` with curl).
-   Read the current OpenAPI operation before constructing a request. Use its exact
-   parameter names, model enum, response shape, and authentication requirements.
-   Reuse the fetched schema during the task.
+   Before the first live data request, read the current OpenAPI operation, including
+   when using a bundled helper. Use its exact parameter names, model enum, response
+   shape, and authentication requirements. Reuse the fetched schema during the task;
+   offline commands do not require a schema request.
 2. Choose the operation and scope that answer the user's request. Its documented
    parameters and response schema determine how to select and interpret the data;
    different operations can have different date semantics and response shapes.

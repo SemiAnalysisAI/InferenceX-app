@@ -313,6 +313,10 @@ Preserve zero as a number and missing data as blank CSV cells or JSON null/absen
 The exporter replaces non-finite numeric values with null, leaves their CSV cells
 blank, and discloses their count. Strict eligibility does not guarantee every
 metric or optional audit field is populated, or prove a representative energy win.
+Scope claims about missing, null or zero measurements to the named metric fields
+and selected rows you checked. Request metadata, topology and coverage counts are
+separate: a zero count is not a measured zero, and unavailable metric keys do not
+imply that the rest of the JSON contains no null values.
 
 ## Export and provenance
 
