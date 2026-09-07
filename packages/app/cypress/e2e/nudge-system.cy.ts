@@ -10,6 +10,11 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Mirrors `TPU_NEWSLETTER_URL` in `src/lib/nudges/registry.tsx`; the unit test
+// there pins the registry side, this spec pins the rendered banner.
+const TPU_NEWSLETTER_ORIGIN = 'https://newsletter.semianalysis.com';
+const TPU_NEWSLETTER_PATH = '/p/tpu-inferencex-full-steam';
+
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
@@ -95,17 +100,14 @@ describe('Landing nudges — modals', () => {
       });
   });
 
-  it('localizes the Rubin comparison banner title in Chinese', () => {
+  it('localizes the TPUv7 banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'OpenAI 最新自研芯片对比 Rubin NVL72')
-      .and(
-        'contain.text',
-        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
-      )
+      .and('contain.text', 'TPUv7 推理性能')
+      .and('contain.text', '对比 TPUv7 与 Blackwell 及 Blackwell Ultra 的推理性能')
       .and('contain.text', '查看结果');
   });
 
@@ -167,25 +169,34 @@ describe('Landing nudges — banner', () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
+    // The TPUv7 banner points off-site at the newsletter write-up. Stub the
+    // destination so the spec never depends on Substack being reachable, then
+    // follow the navigation through `cy.origin` to assert where we landed.
+    cy.intercept('GET', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`, {
+      statusCode: 200,
+      headers: { 'content-type': 'text/html' },
+      body: '<!doctype html><html><body><h1>newsletter stub</h1></body></html>',
+    }).as('newsletter');
+
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('have.attr', 'href', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`);
     cy.get('[data-testid="launch-banner"]').click();
-    cy.location('pathname', { timeout: 10000 }).should('eq', '/inference');
-    cy.location('search')
-      .should('include', 'g_model=DeepSeek-R1-0528')
-      .and('include', 'i_seq=8k%2F1k')
-      .and('include', 'i_prec=fp4')
-      .and('include', 'i_metric=y_outputTputPerMw');
+
+    cy.wait('@newsletter', { timeout: 10000 });
+    cy.origin(TPU_NEWSLETTER_ORIGIN, { args: { path: TPU_NEWSLETTER_PATH } }, ({ path }) => {
+      cy.location('pathname', { timeout: 10000 }).should('eq', path);
+    });
 
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
+    cy.visit('/');
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
-
-    cy.visit('/');
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
 });
