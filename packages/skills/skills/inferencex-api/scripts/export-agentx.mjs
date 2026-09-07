@@ -922,6 +922,7 @@ async function run(args, signal) {
         await saveManifest(evidence);
       }
       if (outputTransaction) {
+        signal.throwIfAborted();
         await outputTransaction.finish();
         outputTransaction = null;
       }
