@@ -153,7 +153,10 @@ function run(left = dataset(ids[0]), right = dataset(ids[1], 10), options = {}) 
     [
       '--import',
       pathToFileURL(preload).href,
-      join(installed.get(options.target ?? 'codex'), 'scripts/compare-collectivex.mjs'),
+      join(
+        installed.get(options.target ?? 'codex'),
+        options.entry ?? 'scripts/compare-collectivex.mjs',
+      ),
       ...(options.args ?? ['--left', ids[0], '--right', ids[1]]),
     ],
     {
@@ -689,21 +692,43 @@ test('both packed cookbooks execute their installed discovery commands and retai
     const root = installed.get(target);
     const cookbook = readFileSync(join(root, 'references/collectivex.md'), 'utf8');
     const prefix = target === 'codex' ? '.agents' : '.claude';
-    const commands = [...cookbook.matchAll(/```bash\n(?<command>node [^\n]+)\n```/gu)].map(
+    const commands = [...cookbook.matchAll(/```bash\n(?<command>[\s\S]*?)\n```/gu)].map(
       (match) => match.groups.command,
     );
     const command = commands.find((line) => line.includes(prefix) && !line.includes('--left'));
     assert.ok(command);
-    const [, script, ...args] = command.split(' ');
-    assert.equal(resolve(root, '../../../', script), join(root, 'scripts/compare-collectivex.mjs'));
-    const result = run(undefined, undefined, { target, cwd: resolve(root, '../../..'), args });
+    const [parent, invocation] = command.replaceAll('\\\n', '').split('\n');
+    assert.equal(parent, 'mkdir -p evidence');
+    const [executable, script, ...args] = invocation.trim().split(/\s+/gu);
+    assert.equal(executable, 'node');
+    assert.equal(resolve(root, '../../../', script), join(root, 'scripts/inferencex.mjs'));
+    assert.deepEqual(args, ['collectivex', 'compare', '--output-dir', 'evidence/collectivex']);
+    const cwd = resolve(root, '../../..');
+    mkdirSync(join(cwd, 'evidence'));
+    const result = run(undefined, undefined, {
+      target,
+      cwd,
+      args,
+      entry: 'scripts/inferencex.mjs',
+    });
     succeeded(result);
-    const output = JSON.parse(
-      readFileSync(join(result.cwd, 'collectivex-comparison.json'), 'utf8'),
-    );
+    const bundle = join(cwd, 'evidence/collectivex');
+    const output = JSON.parse(readFileSync(join(bundle, 'result.json'), 'utf8'));
+    const manifest = JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8'));
+    assert.equal(manifest.contract_version, 1);
     assert.equal(output.discovery.discovery_complete, false);
     assert.equal(output.summary.matched, 1);
-    assert.equal(output.responses.length, 4);
+    assert.equal(output.sources.length, 4);
+    assert.equal(manifest.requests.length, 4);
+    assert.equal(result.requests.length, 4);
+    const verified = run(undefined, undefined, {
+      target,
+      cwd,
+      entry: 'scripts/inferencex.mjs',
+      args: ['verify', bundle],
+    });
+    assert.equal(success(verified).validity, 'valid');
+    assert.equal(verified.requests.length, 4, 'offline verification must add no HTTP requests');
     const guidance = cookbook.replaceAll(/\s+/gu, ' ');
     for (const required of [
       'Cases with **no measured rows** have no comparison group.',
