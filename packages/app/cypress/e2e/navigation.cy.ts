@@ -106,7 +106,7 @@ describe('First-load navigation', () => {
         // on first load, and its corner card would sit over the footer links
         // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-openai-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-tpuv7-banner-dismissed');
       },
     });
 
