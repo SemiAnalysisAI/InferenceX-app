@@ -325,15 +325,15 @@ describe('getValueLabel', () => {
 describe('getCostProviderLabel', () => {
   it('returns natural Chinese ownership labels', () => {
     expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · 超大规模云大批量');
-    expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年期');
+    expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年承诺');
   });
 
   it('returns "Owning at Large Hyperscaler Volume" for costh', () => {
     expect(getCostProviderLabel('costh')).toBe('Owning at Large Hyperscaler Volume');
   });
 
-  it('returns "Renting - 3yr Rental" for costr', () => {
-    expect(getCostProviderLabel('costr')).toBe('Renting - 3yr Rental');
+  it('returns "Rent - 3 Year Commit" for costr', () => {
+    expect(getCostProviderLabel('costr')).toBe('Rent - 3 Year Commit');
   });
 });
 
@@ -405,7 +405,7 @@ describe('getChartTitle', () => {
   it('returns cost title with output cost type and rental provider', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
-      'Cost per Million Output Tokens (Renting - 3yr Rental) at 30 tok/s/user Interactivity',
+      'Cost per Million Output Tokens (Rent - 3 Year Commit) at 30 tok/s/user Interactivity',
     );
   });
 

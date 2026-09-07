@@ -265,7 +265,10 @@ describe('Inference ChartControls cost metrics', () => {
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Total Tokens per $1 TCO (3 Year Rental)').click();
+    cy.contains(
+      '[data-slot="select-item"]',
+      'Total Tokens per $1 TCO (Rent - 3 Year Commit)',
+    ).click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarR');
   });
 });
@@ -449,7 +452,7 @@ describe('Axis option help', () => {
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('3 Year Rental');
+    cy.get('input[aria-label="Search options"]').type('Rent - 3 Year Commit');
     cy.clock();
     cy.get('[data-testid="option-help-y_tokensPerDollarR"]').trigger('pointerover', {
       pointerType: 'mouse',
@@ -472,7 +475,7 @@ describe('Axis option help', () => {
     cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').should('not.exist');
     cy.get('input[aria-label="Search options"]')
       .should('have.focus')
-      .and('have.value', '3 Year Rental');
+      .and('have.value', 'Rent - 3 Year Commit');
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
   });
@@ -539,7 +542,7 @@ describe('Axis option help', () => {
 
   it('opens descriptions and formulas without selecting an option or losing the search', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('3 Year Rental');
+    cy.get('input[aria-label="Search options"]').type('Rent - 3 Year Commit');
     cy.get('[data-testid="option-help-y_tokensPerDollarR"]').click();
     cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]')
       .should('be.visible')
@@ -550,7 +553,7 @@ describe('Axis option help', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').type('{esc}');
     cy.get('[data-testid="option-help-y_tokensPerDollarR"]').should('have.focus');
-    cy.get('input[aria-label="Search options"]').should('have.value', '3 Year Rental');
+    cy.get('input[aria-label="Search options"]').should('have.value', 'Rent - 3 Year Commit');
     cy.get('[data-select-option][data-value="y_tokensPerDollarR"]').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarR');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'false');

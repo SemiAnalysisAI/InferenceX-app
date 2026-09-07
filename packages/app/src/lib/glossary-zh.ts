@@ -751,11 +751,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '每美元总 token 数用每芯片小时产出的总 token 数除以建模得出的每芯片小时全包基础设施成本。',
     explanation:
-      '超大规模云大批量自有硬件和 3 年期租赁两个版本分别采用对应的 TCO 每小时成本。Historical Trends 会插值对应的总吞吐量、输入吞吐量或输出吞吐量，再应用每小时成本系数。',
+      '超大规模云大批量自有硬件和 3 年承诺租赁两个版本分别采用对应的 TCO 每小时成本。Historical Trends 会插值对应的总吞吐量、输入吞吐量或输出吞吐量，再应用每小时成本系数。',
     significance:
       '该指标衡量硬件和软件的成本效率，因此比较时必须采用相同的模型、工作负载、交互性目标、token 类型和基础设施成本口径。',
     benchmarkContext:
-      'InferenceX 分别提供按超大规模云大批量自有硬件和 3 年期租赁成本计算的每美元总 token 数轴，其中超大规模云大批量自有硬件轴是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
+      'InferenceX 分别提供按超大规模云大批量自有硬件和 3 年承诺租赁成本计算的每美元总 token 数轴，其中超大规模云大批量自有硬件轴是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
     measurement: { label: '常用单位', value: '每 1 美元 TCO 对应的 token 数（tok/$）' },
   },
   'energy-per-token': {

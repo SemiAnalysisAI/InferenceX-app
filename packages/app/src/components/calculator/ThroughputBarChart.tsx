@@ -208,7 +208,7 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
         return '自有设备 · 超大规模云大批量';
       }
       case 'costr': {
-        return '租赁设备 · 3 年期';
+        return '租赁设备 · 3 年承诺';
       }
     }
   }
@@ -217,7 +217,7 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
       return 'Owning at Large Hyperscaler Volume';
     }
     case 'costr': {
-      return 'Renting - 3yr Rental';
+      return 'Rent - 3 Year Commit';
     }
   }
 }

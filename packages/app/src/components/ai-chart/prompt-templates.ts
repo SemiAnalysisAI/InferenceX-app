@@ -62,7 +62,7 @@ Open-source ML inference benchmark dashboard. Automated CI runs test real servin
 **Benchmark y-axis metrics**: ${Y_METRIC_LIST}
   Throughput: y_tpPerGpu (total tok/s/gpu, DEFAULT), y_outputTputPerGpu, y_inputTputPerGpu
   Efficiency: y_tpPerMw (tok/s/MW)
-  Cost: y_costh (owning at large hyperscaler volume $/Mtok), y_costr (3yr rental)
+  Cost: y_costh (owning at large hyperscaler volume $/Mtok), y_costr (rent, 3-year commit)
   Energy: y_jTotal (J/tok), y_jOutput, y_jInput
 **Eval metric**: eval_score
 **Reliability metric**: reliability_rate

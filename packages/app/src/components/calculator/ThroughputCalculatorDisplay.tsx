@@ -103,7 +103,7 @@ const COST_PROVIDER_OPTIONS: {
     label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 - 超大规模云大批量',
   },
-  { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
+  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
@@ -191,7 +191,7 @@ const STRINGS = {
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or 3-year rental.',
+      'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -252,7 +252,7 @@ const STRINGS = {
       '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
     costProviderLabel: '计价方式',
     costProviderTooltip:
-      '用于计算每百万 token 成本的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年租赁。',
+      '用于计算每百万 token 成本的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。',
     costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'token 类型',
     tokenTypeTooltip: '选择显示总 token、仅输入 token 还是仅输出 token 的成本。',
