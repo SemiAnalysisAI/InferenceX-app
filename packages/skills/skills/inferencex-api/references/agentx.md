@@ -23,6 +23,10 @@ When counting distinct images or recipe fingerprints, count known values separat
 from rows whose field is missing or null. Report the missing-row count alongside
 the known distinct count; null is not another image or fingerprint.
 
+Keep each aggregate group's `n` with that group. Equal numbers of non-null benchmark
+rows do not imply equal sample counts or sample-size ranges; compute and label
+those statistics separately for each group.
+
 For a replayable contract 1 summary bundle:
 
 ```bash

@@ -28,8 +28,9 @@ requested hardware or pair count and its actual value. Keep `coverage.reasons`
 separate: partial coverage alone does not determine whether a predicate passes.
 
 For every stated count or range, use a verified summary value or compute and print
-the scalar from the exact selected rows. Copy that value into the explanation;
-do not visually count object keys or table rows.
+the scalar from the exact selected rows. Copy its value, field name, and population
+into the explanation. Do not visually count object keys or table rows, or apply
+one field's computed range to another field.
 Keep status claims within the rows actually checked. Selection or exclusion alone
 does not establish availability; a selected-row summary cannot describe other rows.
 

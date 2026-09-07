@@ -2,8 +2,8 @@
   "schema_version": 1,
   "package_version": "1.0.0",
   "files": {
-    "SKILL.md": "3c4e48b716c13741c13f0c332ee1f12d2f907dddc5740e4bea2f679e440f344c",
-    "references/agentx.md": "84e9346167ab8a25d23708ab504152bd23ea5b5d6dd44f4c368d33e874cf5f93",
+    "SKILL.md": "6cd924feb1d69f3408b08e15f2f64aa5415cd4994448b44ae7832cd05c4783ff",
+    "references/agentx.md": "3236b25cd140a54ac33f9ef094451db929770da82fc9058034d84e1a74816826",
     "references/cli-contract.md": "9234b1c9b683cc8f35131ac2d2a52c0ceec6cec8309ecea1316e5a28141803e7",
     "references/cli.md": "921b1d677595459462aa2a4fb7d91184bf906c3b03a97e9f78807876910e6271",
     "references/collectivex.md": "533b20df571430e978f79d8a1c493bc95c276feeaccc46783259e88ee6ef126a",
