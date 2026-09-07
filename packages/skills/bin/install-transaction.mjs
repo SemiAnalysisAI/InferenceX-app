@@ -252,12 +252,17 @@ function moveToRecovery(destination, paths, record) {
   return pathsFor(destination, target, paths.markerName);
 }
 
-function cleanupOwnedTransaction(paths) {
+function removeOwnedContents(paths) {
   rmSync(paths.stage, { recursive: true, force: true });
   rmSync(paths.previous, { recursive: true, force: true });
   rmSync(paths.nextMarker, { force: true });
-  rmSync(paths.marker);
-  rmdirSync(paths.transaction);
+}
+
+function finishCleanup(destination, paths, record) {
+  removeOwnedContents(paths);
+  const recoveryPaths = moveToRecovery(destination, paths, record);
+  rmSync(recoveryPaths.marker);
+  rmdirSync(recoveryPaths.transaction);
 }
 
 function cleanupCommittedTransaction(destination, paths, record) {
@@ -267,7 +272,7 @@ function cleanupCommittedTransaction(destination, paths, record) {
   if (!destinationEntry || stageEntry || (!record.had_destination && previousEntry)) {
     failRecovery('activated transaction paths do not match the owned marker');
   }
-  cleanupOwnedTransaction(paths);
+  finishCleanup(destination, paths, record);
 }
 
 function recoverOwnedTransaction(destination, paths, record) {
@@ -296,7 +301,7 @@ function recoverOwnedTransaction(destination, paths, record) {
     }
     if (destinationExists) rmSync(destination, { recursive: true });
   }
-  cleanupOwnedTransaction(paths);
+  finishCleanup(destination, paths, record);
 }
 
 function claimRecovery(destination, packageName, skillName, state) {
@@ -332,8 +337,7 @@ function claimRecovery(destination, packageName, skillName, state) {
   }
   const record = { ...inspected.record, owner_pid: process.pid };
   updateMarker(inspected.paths, record);
-  const paths = moveToRecovery(destination, inspected.paths, record);
-  return { cleanupOnly: false, paths, record };
+  return { cleanupOnly: false, paths: inspected.paths, record };
 }
 
 function acquireTransaction(destination, packageName, skillName, waitMilliseconds) {
@@ -419,15 +423,16 @@ export function runInstallTransaction({
     const initialPlan = prepare();
     if (initialPlan.outcome === 'skipped') return initialPlan;
   }
-  let { paths, record } = acquireTransaction(destination, packageName, skillName, waitMilliseconds);
+  const acquired = acquireTransaction(destination, packageName, skillName, waitMilliseconds);
+  const { paths } = acquired;
+  let { record } = acquired;
   let destinationMoved = false;
   let stageMoved = false;
   let committed = false;
   try {
     const plan = prepare();
     if (plan.outcome === 'skipped') {
-      paths = moveToRecovery(destination, paths, record);
-      cleanupOwnedTransaction(paths);
+      finishCleanup(destination, paths, record);
       return plan;
     }
 
@@ -465,7 +470,6 @@ export function runInstallTransaction({
     record = { ...record, phase: 'activated' };
     updateMarker(paths, record);
     committed = true;
-    paths = moveToRecovery(destination, paths, record);
     cleanupCommittedTransaction(destination, paths, record);
     return plan;
   } catch (error) {
@@ -473,8 +477,7 @@ export function runInstallTransaction({
     try {
       if (stageMoved) rmSync(destination, { recursive: true });
       if (destinationMoved) renameSync(paths.previous, destination);
-      paths = moveToRecovery(destination, paths, record);
-      cleanupOwnedTransaction(paths);
+      finishCleanup(destination, paths, record);
     } catch (rollbackError) {
       throw new Error(`${error.message}; rollback failed: ${rollbackError.message}`, {
         cause: rollbackError,

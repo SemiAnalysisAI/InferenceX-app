@@ -446,7 +446,8 @@ test('a process killed after committed backup cleanup leaves its owner marker re
         if (
           !paused &&
           path.endsWith('/previous') &&
-          path.includes('.inferencex-skills-transaction.recovering-') &&
+          (path === ${JSON.stringify(join(transaction, 'previous'))} ||
+            path.includes('.inferencex-skills-transaction.recovering-')) &&
           options?.recursive
         ) {
           paused = true;
@@ -816,6 +817,111 @@ test('a stale recovery contender cannot claim a newer transaction at the reused 
   assert.equal(JSON.parse(stale.output.stdout).outcome, 'skipped');
   assert.deepEqual(snapshot(destination), before);
   assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
+});
+
+test('a stale none contender can overlap only cleanup after recovery settles the destination', async () => {
+  const cwd = project('stale none recovery 中文 path-');
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  const before = snapshot(destination);
+
+  const contenderReady = join(cwd, 'contender-before-mkdir');
+  const releaseContender = join(cwd, 'release-contender');
+  const contenderPreload = join(project('stale none contender preload-'), 'preload.mjs');
+  writeFileSync(
+    contenderPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.mkdirSync;
+      let paused = false;
+      fs.mkdirSync = (path, options) => {
+        if (!paused && path === ${JSON.stringify(transaction)}) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(contenderReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseContender)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const contender = spawnPackedInstaller(
+    ['install', '--force', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(contenderPreload).href)}`,
+  );
+  await waitForFile(contenderReady, contender.child);
+
+  mkdirSync(transaction);
+  renameSync(destination, join(transaction, 'previous'));
+  cpSync(join(transaction, 'previous'), destination, { recursive: true });
+  writeFileSync(join(destination, 'SKILL.md'), 'interrupted candidate bytes\n');
+  const { record: deadRecord } = writeTransactionMarker(transaction, destination, {
+    phase: 'previous_moved',
+  });
+  const recovery = `${transaction}.recovering-${deadRecord.transaction_id}`;
+  const recoveryReady = join(cwd, 'recovery-entered-cleanup');
+  const releaseRecovery = join(cwd, 'release-recovery-cleanup');
+  const recoveryPreload = join(project('recovery cleanup boundary preload-'), 'preload.mjs');
+  writeFileSync(
+    recoveryPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.renameSync;
+      let paused = false;
+      fs.renameSync = (source, target) => {
+        const result = original(source, target);
+        if (
+          !paused &&
+          source === ${JSON.stringify(transaction)} &&
+          target === ${JSON.stringify(recovery)}
+        ) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(recoveryReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseRecovery)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const recoveryOwner = spawnPackedInstaller(
+    ['install', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(recoveryPreload).href)}`,
+  );
+  await waitForFile(recoveryReady, recoveryOwner.child);
+
+  const destinationAtCleanupBoundary = snapshot(destination);
+  const backupAtCleanupBoundary = lstatSync(join(recovery, 'previous'), {
+    throwIfNoEntry: false,
+  });
+  writeFileSync(releaseContender, 'continue');
+  await new Promise((resolve) => {
+    setTimeout(resolve, 100);
+  });
+  writeFileSync(releaseRecovery, 'continue');
+  const [[contenderCode], [recoveryCode]] = await Promise.all([
+    contender.closed,
+    recoveryOwner.closed,
+  ]);
+
+  assert.deepEqual(destinationAtCleanupBoundary, before);
+  assert.equal(backupAtCleanupBoundary, undefined);
+  assert.equal(contenderCode, 0, `${contender.output.stdout}\n${contender.output.stderr}`);
+  assert.equal(JSON.parse(contender.output.stdout).outcome, 'overwritten');
+  assert.equal(recoveryCode, 0, `${recoveryOwner.output.stdout}\n${recoveryOwner.output.stderr}`);
+  assert.equal(JSON.parse(recoveryOwner.output.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(destination), before);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
 });
 
 test('malformed, foreign, and symlink transaction markers fail closed without deletion', () => {
