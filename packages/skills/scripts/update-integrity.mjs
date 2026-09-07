@@ -37,7 +37,11 @@ async function generatedIntegrity(root = packageRoot) {
     {
       schema_version: 1,
       package_version: metadata.version,
-      files,
+      files: Object.fromEntries(
+        Object.keys(files)
+          .toSorted()
+          .map((path) => [path, files[path]]),
+      ),
     },
     null,
     2,

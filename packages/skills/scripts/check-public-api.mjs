@@ -198,12 +198,12 @@ export async function checkPublicApi({
   if (!Array.isArray(datasets) || datasets.length === 0 || !datasets.every(datasetRow)) {
     throw new Error('Datasets response shape is empty or invalid');
   }
-  const selector = selectors[0];
+  const selector = selectors.toSorted()[0];
   const benchmarkUrl = new URL('/api/v1/benchmarks', ORIGIN);
   benchmarkUrl.searchParams.set('model', selector);
   const benchmarks = await readJson(benchmarkUrl.href, state, request);
-  if (!Array.isArray(benchmarks) || benchmarks.length === 0 || !benchmarks.every(benchmarkRow)) {
-    throw new Error('Scoped benchmarks response shape is empty or invalid');
+  if (!Array.isArray(benchmarks) || !benchmarks.every(benchmarkRow)) {
+    throw new Error('Scoped benchmarks response shape is invalid');
   }
   return {
     schema_version: 1,

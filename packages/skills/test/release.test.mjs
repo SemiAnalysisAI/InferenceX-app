@@ -176,6 +176,26 @@ test('release manifest provenance is clean, canonical and timezone-qualified', (
   }
 });
 
+test('generated integrity remains usable when files sort between directories and their children', (context) => {
+  const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-integrity-order-'));
+  context.after(() => rmSync(temporary, { recursive: true, force: true, maxRetries: 3 }));
+  const source = resolve(import.meta.dirname, '..');
+  cpSync(join(source, 'skills'), join(temporary, 'skills'), { recursive: true });
+  cpSync(join(source, 'package.json'), join(temporary, 'package.json'));
+  mkdirSync(join(temporary, 'scripts'));
+  const updater = join(temporary, 'scripts/update-integrity.mjs');
+  cpSync(join(source, 'scripts/update-integrity.mjs'), updater);
+  const skill = join(temporary, 'skills/inferencex-api');
+  writeFileSync(join(skill, 'scripts.md'), 'Script reference\n');
+  writeFileSync(join(skill, 'references.md'), 'Reference index\n');
+  execFileSync(process.execPath, [updater]);
+  const result = spawnSync(process.execPath, [join(skill, 'scripts/inferencex.mjs'), 'doctor'], {
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).healthy, true);
+});
+
 test('integrity check is read-only and prepare rejects a clean stale manifest before network or output', (context) => {
   const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'inferencex-integrity-test-'));
   context.after(() => rmSync(temporary, { recursive: true, force: true, maxRetries: 3 }));

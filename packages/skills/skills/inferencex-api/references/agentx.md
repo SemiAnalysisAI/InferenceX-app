@@ -19,6 +19,12 @@ Do not infer values that the response omits. Closed-loop systems can progress
 through different requests during the same run window, so workload mix can drift,
 especially at low concurrency. If identity cannot be confirmed, describe the
 comparison as incomplete.
+In configuration tables, report `disagg`, `num_prefill_gpu`, and `num_decode_gpu`
+as separate source fields. With `disagg: false`, the roles can share the same GPU
+pool: prefill 8 and decode 8 do not establish a 16-GPU deployment. A deployment
+total requires verified allocation semantics; do not unconditionally sum the role
+counts. See the [topology guidance](powerx.md#export-and-provenance) when a
+user requests a derived total.
 When counting distinct images or recipe fingerprints, count known values separately
 from rows whose field is missing or null. Report the missing-row count alongside
 the known distinct count; null is not another image or fingerprint.

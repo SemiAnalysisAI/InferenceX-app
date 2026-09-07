@@ -170,6 +170,21 @@ test('monitor consumes exactly four shapes once under fixed ceilings', async () 
   assert.match(calls.at(-1).url, /benchmarks\?model=DeepSeek-V4-Pro$/u);
 });
 
+test('monitor accepts an empty scoped benchmark response with reordered model enums', async () => {
+  const reordered = structuredClone(openapi);
+  reordered.paths['/api/v1/benchmarks'].get.parameters[0].schema.enum = [
+    'Zeta-Model',
+    'DeepSeek-V4-Pro',
+  ];
+
+  const { result, calls } = await run({ openapi: reordered, benchmarks: [] });
+
+  assert.equal(result.consumed.benchmark_model_parameter.selector, 'DeepSeek-V4-Pro');
+  assert.equal(result.consumed.benchmark_rows, 0);
+  assert.equal(result.totals.api_gets, 4);
+  assert.match(calls.at(-1).url, /benchmarks\?model=DeepSeek-V4-Pro$/u);
+});
+
 test('consumed OpenAPI changes fail while unrelated descriptions do not', async () => {
   const changed = structuredClone(openapi);
   changed.paths['/api/v1/benchmarks'].get.parameters[0].required = false;
@@ -179,16 +194,15 @@ test('consumed OpenAPI changes fail while unrelated descriptions do not', async 
   await run({ openapi: prose });
 });
 
-test('availability, datasets and scoped benchmarks reject malformed or empty data', async () => {
+test('availability and datasets reject empties; all rows reject malformed shapes', async () => {
   for (const [key, malformed] of [
     ['availability', []],
     ['availability', [{ ...availability[0], disagg: 'false' }]],
     ['datasets', []],
     ['datasets', [{ ...datasets[0], conversation_count: -1 }]],
-    ['benchmarks', []],
     ['benchmarks', [{ ...benchmarks[0], metrics: null }]],
   ])
-    await assert.rejects(run({ [key]: malformed }), /empty or invalid/u);
+    await assert.rejects(run({ [key]: malformed }), /response shape is (?:empty or )?invalid/u);
 });
 
 test('exact package identity, total bytes and deadline signals fail closed', async () => {
