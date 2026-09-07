@@ -10,6 +10,7 @@ coverage or supply missing observations.
 For a replayable contract 1 bundle, prefer the versioned entry:
 
 ```bash
+mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --format csv \
   --output-dir evidence/powerx --require-hardware b200

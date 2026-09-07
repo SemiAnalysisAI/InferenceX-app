@@ -10,6 +10,7 @@ For a replayable contract 1 comparison, use the versioned entry and require at
 least one eligible pair when CI needs positive coverage:
 
 ```bash
+mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs releases compare \
   --model GLM-5 --hardware h200_sxm --framework vllm --isl 8192 --osl 1024 \
   --metric median_ttft --before-date 2026-09-01 --after-date 2026-09-02 \

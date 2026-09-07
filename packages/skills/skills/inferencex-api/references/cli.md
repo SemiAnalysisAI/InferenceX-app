@@ -9,6 +9,7 @@ retained pass for all four jobs. Windows is not yet qualified.
 
 ```bash
 inferencex discover models
+mkdir -p evidence
 inferencex powerx export --model GLM-5 --isl 8192 --osl 1024 \
   --output-dir evidence/powerx --require-hardware h200_sxm
 inferencex verify evidence/powerx --require-hardware h200_sxm
@@ -26,6 +27,8 @@ All examples use a new directory. Omit a CI predicate to accept a valid empty or
 partial result at exit 0; add the shown predicate when that coverage is required.
 
 ```bash
+mkdir -p evidence
+
 # PowerX: per-GPU W and explicitly scoped accelerator J units; dates are observations.
 inferencex powerx export --model GLM-5 --isl 8192 --osl 1024 \
   --output-dir evidence/powerx --require-hardware h200_sxm
@@ -61,6 +64,11 @@ identity, and interpretation. A successful empty result is scoped evidence, not
 proof that no benchmark ran. Missing values stay null or absent; never fill them
 with zero.
 
+`--require-hardware <key>` checks `coverage.hardware[].valid_records`, not whether a
+selected row merely has that hardware label. It passes only when the requested
+hardware has `valid_records > 0`. A retained PowerX row without a usable measured
+value or AgentX row without a usable aggregate therefore cannot satisfy this policy.
+
 ## Exit and output handling
 
 Branch on the exit code before parsing stdout:
@@ -80,10 +88,17 @@ directory before consuming it. A pre-commit cancellation leaves an incomplete
 directory without a manifest. Complete response bodies and failed attempt ledger
 entries already written there are retained for diagnosis.
 
-Formal commands require `--output-dir <new-directory>`. They never reuse, merge, or
-overwrite a directory. `verify --report` likewise creates a new report outside the
-bundle. The manifest is written last and records normalized arguments, every request
-attempt, response hashes, the result hash, coverage, policy, and relative paths.
+Formal commands require `--output-dir <new-directory>`. Its parent must already
+exist; the examples create `evidence` first, and the CLI creates the new leaf. They
+never reuse, merge, or overwrite a directory. The manifest is written last and
+records normalized arguments, every request attempt, response hashes, the result
+hash, coverage, policy, and relative paths.
+
+Once completed, the entire bundle tree is immutable: never add, edit, or delete a
+file or directory inside it. Put a README, explanation, or verification report in a
+sibling path outside the bundle. Finish those surrounding writes first, then run
+`inferencex verify` as the final step. `verify --report` also requires a new path
+outside the bundle.
 
 ## Compatibility
 

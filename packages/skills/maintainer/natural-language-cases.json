@@ -37,7 +37,7 @@
     {
       "id": "offline-six-family",
       "family": "offline",
-      "prompt": "This project contains intact, partial, and tampered evidence directories for PowerX, AgentX, result provenance, TCO, release comparison, and CollectiveX. Verify every directory without network access. Require b200 where the result identifies hardware and at least one comparable pair for comparison families. Preserve every input, save any optional reports outside the evidence directories, and separate valid partial evidence, policy failures, and invalid tampering."
+      "prompt": "This project contains intact, partial, and tampered evidence directories for PowerX, AgentX, result provenance, TCO, release comparison, and CollectiveX. Verify every directory without network access. For PowerX, AgentX, result provenance, and TCO, require at least one usable b200 observation. For release comparison and CollectiveX, require at least one comparable pair. Preserve every input, save any optional reports outside the evidence directories, and separate valid partial evidence, policy failures, and invalid tampering."
     }
   ],
   "execution": {

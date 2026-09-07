@@ -5,26 +5,35 @@ description: Query InferenceX benchmarks, PowerX measured energy, AgentX traces,
 
 # InferenceX API
 
-For a replayable CLI task, use these three actions and read the
+For a replayable CLI task, use this workflow and read the
 [CLI contract](references/cli.md):
 
 ```bash
 inferencex discover models
+mkdir -p evidence
 inferencex powerx export --model GLM-5 --isl 8192 --osl 1024 \
   --output-dir evidence/powerx --require-hardware h200_sxm
 inferencex verify evidence/powerx --require-hardware h200_sxm
 ```
 
-Formal commands require a new `--output-dir`. Exit 0 means the bundle completed;
-exit 3 means it completed but an explicit coverage predicate failed. Branch on the
-exit code before parsing stdout. Preserve empty results and missing values as scoped
-evidence. Use the six domain cookbooks below for units, dates, source identity, and
-interpretation.
+Create the parent directory first; the formal command creates the new `--output-dir`.
+Exit 0 means the bundle completed; exit 3 means it completed but an explicit
+coverage predicate failed. Branch on the exit code before parsing stdout. Preserve
+empty results and missing values as scoped evidence. Use the six domain cookbooks
+below for units, dates, source identity, and interpretation.
+`--require-hardware` needs a usable record for that hardware; a matching label with
+a missing usable PowerX measurement or AgentX aggregate does not satisfy it.
 
-For **saved PowerX or AgentX exports, offline verification, or evidence reports**,
-read [the offline cookbook](references/offline-exports.md) and use the installed
-[verifier](scripts/verify-export.mjs). It checks an intact export plus its saved
-evidence and writes deterministic Markdown without HTTP requests or OpenAPI discovery.
+A completed bundle is immutable. Leave every entry under it unchanged: never add,
+edit, or delete files there. Write explanations and reports to sibling paths outside
+the bundle, finish all task writes, and then run `inferencex verify` as the final step.
+
+Formal contract 1 bundles use `inferencex verify <directory>` above. For **legacy
+PowerX or AgentX exports saved separately from their evidence, or reports for those
+exports**, read [the offline cookbook](references/offline-exports.md) and use the
+installed [verifier](scripts/verify-export.mjs). It checks an intact export plus its
+saved evidence and writes deterministic Markdown without HTTP requests or OpenAPI
+discovery.
 Treat a failed verification as a failure; preserve the original files and diagnostic.
 Matching saved evidence establishes consistency, not publisher authenticity.
 

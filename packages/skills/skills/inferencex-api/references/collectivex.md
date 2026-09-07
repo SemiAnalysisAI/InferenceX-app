@@ -9,6 +9,7 @@ needed.
 For a replayable contract 1 comparison:
 
 ```bash
+mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
   --left 90071992547409930001 --right 90071992547409930002 \
   --output-dir evidence/collectivex --min-comparable-pairs 1

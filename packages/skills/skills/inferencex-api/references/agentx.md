@@ -26,6 +26,7 @@ the known distinct count; null is not another image or fingerprint.
 For a replayable contract 1 summary bundle:
 
 ```bash
+mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
   --model DeepSeek-V4-Pro --hardware b300 --output-dir evidence/agentx \
   --require-hardware b300

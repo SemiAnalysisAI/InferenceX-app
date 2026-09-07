@@ -37,6 +37,8 @@
     "offline-six-family": [
       "no network access",
       "all six families attempted",
+      "usable b200 required for PowerX, AgentX, result provenance, and TCO only",
+      "one comparable pair required for release comparison and CollectiveX only",
       "validity separated from coverage and policy",
       "tampered inputs rejected",
       "inputs unchanged"

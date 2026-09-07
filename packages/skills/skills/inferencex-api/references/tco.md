@@ -8,6 +8,7 @@ million output tokens. A full ownership TCO needs additional cost assumptions.
 For a replayable contract 1 comparison:
 
 ```bash
+mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs tco compare \
   --model dsv4 --workloads 1024x1024 --target 50 \
   --gpu-hourly-prices b200=3.6,mi355x=1.8 --output-dir evidence/tco \

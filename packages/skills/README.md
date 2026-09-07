@@ -25,6 +25,7 @@ or `.claude` for Claude Code:
 ```bash
 inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
 node "$inferencex_cli" discover models
+mkdir -p evidence
 node "$inferencex_cli" powerx export --model GLM-5 --isl 8192 --osl 1024 \
   --output-dir evidence/powerx --require-hardware h200_sxm
 node "$inferencex_cli" verify evidence/powerx --require-hardware h200_sxm
@@ -36,6 +37,9 @@ access. Exit 0 means the bundle completed and any explicit policy passed. Exit 3
 means the bundle completed but an explicit policy failed. Branch on the exit code
 before parsing stdout. See the [CLI contract](skills/inferencex-api/references/cli.md)
 for all six command families, schemas, limits, and compatibility rules.
+Create the parent directory first and let the CLI create the new bundle directory.
+After completion, leave the bundle tree unchanged, write explanations and reports
+to sibling paths, and make offline verification the final step.
 
 | Legacy command                                     | Versioned command                                     | Main migration                                                               |
 | -------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
