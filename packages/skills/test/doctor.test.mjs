@@ -12,6 +12,7 @@ import {
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
 
 import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
@@ -126,40 +127,47 @@ test('doctor validates a selected installation version independently of the exec
   assert.equal(readFileSync(join(skill, 'local-user-file.txt'), 'utf8'), 'ignored\n');
 });
 
-test('pending installer recovery is reported without changing the transaction or installation', () => {
-  const { cwd, skill, skillsRoot } = installed();
-  const transaction = `${skill}.inferencex-skills-transaction`;
-  mkdirSync(transaction);
-  const transactionId = randomUUID();
-  const ownerPid = 2_147_483_647;
-  const marker = join(transaction, `owner-${transactionId}-${ownerPid}-${randomUUID()}.json`);
-  writeFileSync(
-    marker,
-    `${JSON.stringify(
-      {
-        schema_version: 1,
-        transaction_id: transactionId,
-        package: packageInfo.name,
-        skill: 'inferencex-api',
-        destination: skill,
-        owner_pid: ownerPid,
-        phase: 'staged',
-        had_destination: true,
-      },
-      null,
-      2,
-    )}\n`,
-  );
-  const before = readFileSync(marker);
+for (const ownerPid of [2_147_483_647, process.pid])
+  test(`installer owner ${ownerPid === process.pid ? 'alive' : 'exited'} is reported without changing the transaction`, () => {
+    const { cwd, skill, skillsRoot } = installed();
+    const transaction = `${skill}.inferencex-skills-transaction`;
+    mkdirSync(transaction);
+    const transactionId = randomUUID();
+    const marker = join(transaction, `owner-${transactionId}-${ownerPid}-${randomUUID()}.json`);
+    writeFileSync(
+      marker,
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          transaction_id: transactionId,
+          package: packageInfo.name,
+          skill: 'inferencex-api',
+          destination: skill,
+          owner_pid: ownerPid,
+          phase: 'staged',
+          had_destination: true,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const before = readFileSync(marker);
 
-  const report = failure(doctor(['--dir', skillsRoot], cwd));
-  assert.equal(report.selected_installation.state, 'recovery_needed');
-  assert.equal(report.selected_installation.transaction.state, 'recovery_needed');
-  assert.ok(report.failures.some(({ check }) => check === 'installer_transaction'));
-  assert.deepEqual(readFileSync(marker), before);
-  assert.ok(lstatSync(transaction).isDirectory());
-  assert.ok(lstatSync(skill).isDirectory());
-});
+    const report = failure(doctor(['--dir', skillsRoot], cwd));
+    assert.equal(
+      report.selected_installation.transaction.state,
+      ownerPid === process.pid ? 'active' : 'recovery_needed',
+    );
+    const schemas = JSON.parse(
+      readFileSync(join(packageRoot, 'skills/inferencex-api/schemas.json')),
+    );
+    const validate = new Ajv2020({ strict: true, validateFormats: false }).compile(schemas.doctor);
+    assert.equal(validate(report), true, JSON.stringify(validate.errors));
+    assert.ok(report.failures.some(({ check }) => check === 'installer_transaction'));
+    assert.deepEqual(readFileSync(marker), before);
+    assert.ok(lstatSync(transaction).isDirectory());
+    assert.ok(lstatSync(skill).isDirectory());
+  });
 
 test('managed symlinks and files over the local byte ceiling fail closed', () => {
   for (const mode of ['symlink', 'oversize']) {

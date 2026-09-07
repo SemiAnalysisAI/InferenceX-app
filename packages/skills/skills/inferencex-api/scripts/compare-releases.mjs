@@ -372,8 +372,8 @@ function buildReleaseComparison({ scope, rows, source, packageVersion }) {
     }
     unique[side] = [...new Map(selected.map((row) => [String(row.id), row])).values()];
     selection[side] = {
-      rows: selected,
-      excluded,
+      rows: selected.map(stringIdentities),
+      excluded: excluded.map(({ row, reasons }) => ({ row: stringIdentities(row), reasons })),
       unique_observations: unique[side].length,
       snapshot_reuses: selected.length - unique[side].length,
     };
@@ -528,6 +528,17 @@ function buildReleaseComparison({ scope, rows, source, packageVersion }) {
       ],
     },
   };
+}
+
+function stringIdentities(row) {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      key,
+      ['id', 'workflow_run_id', 'curve_workflow_run_id'].includes(key) && value !== null
+        ? String(value)
+        : value,
+    ]),
+  );
 }
 
 export async function collect(options, context) {

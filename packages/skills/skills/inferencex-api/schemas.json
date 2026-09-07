@@ -1408,7 +1408,6 @@
             "conc",
             "offload_mode",
             "image",
-            "recipe_fingerprint",
             "metrics",
             "date",
             "run_url"
@@ -1563,7 +1562,7 @@
               "type": ["string", "null"]
             },
             "run_url": {
-              "type": "string",
+              "type": ["string", "null"],
               "pattern": "^https?://"
             },
             "curve_date": {
@@ -1956,8 +1955,7 @@
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "uniqueItems": true
+            }
           }
         },
         "additionalProperties": true
@@ -2102,7 +2100,7 @@
                   "type": ["string", "null"]
                 },
                 "run_url": {
-                  "type": "string",
+                  "type": ["string", "null"],
                   "pattern": "^https?://"
                 },
                 "curve_date": {
@@ -2423,7 +2421,7 @@
                 "type": ["string", "null"]
               },
               "selection": {
-                "enum": ["latest_snapshot", "as_of_snapshot", "github_run"]
+                "enum": ["latest_snapshot", "as_of_snapshot", "logical_run_snapshot"]
               }
             },
             "additionalProperties": true
@@ -2486,7 +2484,6 @@
           "conc",
           "offload_mode",
           "image",
-          "recipe_fingerprint",
           "metrics",
           "date",
           "run_url"
@@ -2593,7 +2590,7 @@
             "type": ["string", "null"]
           },
           "run_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "pattern": "^https?://"
           },
           "curve_date": {
@@ -3544,7 +3541,6 @@
                 "conc",
                 "offload_mode",
                 "image",
-                "recipe_fingerprint",
                 "metrics",
                 "date",
                 "run_url"
@@ -3651,7 +3647,7 @@
                   "type": ["string", "null"]
                 },
                 "run_url": {
-                  "type": "string",
+                  "type": ["string", "null"],
                   "pattern": "^https?://"
                 },
                 "curve_date": {

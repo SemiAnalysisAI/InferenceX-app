@@ -27,7 +27,6 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 PACKAGE = '@semianalysisai/inferencex-skills'
 REGISTRY = 'https://registry.npmjs.org'
-AGENTX_ORIGIN = 'https://inferencex.semianalysis.com'
 COLLECTIVEX_POSITIVE_RUN_IDS = ('33378604574', '33412478973')
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 # Only the exact-version npm ETARGET propagation symptom is retryable. No HTTP,
@@ -318,17 +317,17 @@ def strict_json(body):
     return json.loads(body.decode('utf-8-sig'), parse_constant=reject)
 
 
-def same_json(actual, expected, *, javascript_numbers=False):
+def same_json(actual, expected):
     if finite(actual) and finite(expected):
-        return float(actual) == float(expected) if javascript_numbers else actual == expected
+        return actual == expected
     if type(actual) is not type(expected):
         return False
     if type(actual) is dict:
         return actual.keys() == expected.keys() and all(
-            same_json(actual[key], expected[key], javascript_numbers=javascript_numbers) for key in actual)
+            same_json(actual[key], expected[key]) for key in actual)
     if type(actual) is list:
         return len(actual) == len(expected) and all(
-            same_json(a, b, javascript_numbers=javascript_numbers) for a, b in zip(actual, expected))
+            same_json(a, b) for a, b in zip(actual, expected))
     return actual == expected
 
 
@@ -489,8 +488,33 @@ def _normalized_id_object(value):
     if not isinstance(value, dict):
         return value
     identity_keys = {'id', 'workflow_run_id', 'curve_workflow_run_id', 'github_run_id', 'run_attempt'}
-    return {key: str(item) if key in identity_keys and item is not None else
-            _normalized_id_object(item) for key, item in value.items()}
+    return {key: str(item) if key in identity_keys and item is not None else item
+            for key, item in value.items()}
+
+
+def _json_identity(value):
+    if type(value) is dict:
+        return (dict, tuple((key, _json_identity(item)) for key, item in sorted(value.items())))
+    if type(value) is list:
+        return (list, tuple(map(_json_identity, value)))
+    return (float if finite(value) else type(value), value)
+
+
+def _collective_topology_issues(topology):
+    if type(topology) is not dict:
+        return ['missing_topology']
+    issues = [f'missing_or_invalid_{key}' for key in
+              ('ep_size', 'nodes', 'gpus_per_node', 'scale_up_domain')
+              if not integer(topology.get(key)) or not 0 < topology[key] <= MAX_SAFE_INTEGER]
+    for key in ('scale_up_transport', 'topology_class', 'scale_out_transport'):
+        if key == 'scale_out_transport' and key in topology and topology[key] is None:
+            continue
+        if type(topology.get(key)) is not str or not topology[key].strip():
+            issues.append(f'missing_or_invalid_{key}')
+    return issues
+
+
+MISSING = object()
 
 
 def _collective_source(bodies, requests, references, run_id):
@@ -510,19 +534,42 @@ def _collective_source(bodies, requests, references, run_id):
             'CollectiveX source pointer differs')
     for raw_key in pointer.split('/')[1:]:
         key = raw_key.replace('~1', '/').replace('~0', '~')
-        value = value[int(key)] if isinstance(value, list) else value[key]
+        value = value[int(key)] if isinstance(value, list) else value.get(key, MISSING)
     ep = re.fullmatch(r'/series/(\d+)/points/(\d+)/components/(dispatch|stage|combine|roundtrip)', pointer)
     kv = re.fullmatch(r'/kv/(\d+)/rows/(\d+)', pointer)
     require(ep is not None or kv is not None, 'CollectiveX source identity pointer differs')
     if ep:
         series = bodies[index]['series'][int(ep[1])]
         point = series['points'][int(ep[2])]
+        component = value if type(value) is dict else {}
         identity = {'suite': 'ep',
                     'configuration': {key: item for key, item in series.items() if key != 'points'},
                     'operation': ep[3],
                     **{key: item for key, item in point.items() if key not in {
                         'components', 'roundtrip_token_rate_at_latency_percentile'}},
-                    'payload_bytes': value['payload_bytes']}
+                    **({'payload_bytes': component['payload_bytes']} if 'payload_bytes' in component else {})}
+        issues = _collective_topology_issues(series.get('system'))
+        for key in ('series_id', 'phase', 'mode', 'precision', 'backend'):
+            if type(series.get(key)) is not str or not series[key].strip():
+                issues.append(f'missing_or_invalid_{key}')
+        hardware = series.get('system') or {}
+        if type(hardware.get('sku')) is not str or not hardware['sku'].strip() or \
+                hardware.get('vendor') not in ('nvidia', 'amd'):
+            issues.append('missing_hardware_identity')
+        if any(not integer(point.get(key)) or not 0 < point[key] <= MAX_SAFE_INTEGER
+               for key in ('tokens_per_rank', 'global_tokens')):
+            issues.append('missing_or_invalid_token_counts')
+        if value is MISSING or value is None:
+            issues.append('unavailable_component')
+        if not integer(component.get('payload_bytes')) or not 0 <= component['payload_bytes'] <= MAX_SAFE_INTEGER:
+            issues.append('missing_or_invalid_payload_bytes')
+        metric_groups = [(component, 'latency_us', 'us'),
+                         (component, 'activation_data_rate_gbps_at_latency_percentile', 'GB/s aggregate activation'),
+                         (component, 'payload_data_rate_gbps_at_latency_percentile', 'GB/s per GPU payload')]
+        if ep[3] == 'roundtrip':
+            metric_groups.append((point, 'roundtrip_token_rate_at_latency_percentile', 'tokens/s aggregate'))
+        metric_sources = [(source, f'{name}.{key}', unit) for source, name, unit in metric_groups
+                          for key in ('p50', 'p90', 'p95', 'p99')]
     else:
         case = bodies[index]['kv'][int(kv[1])]
         identity = {'suite': 'kv',
@@ -531,15 +578,132 @@ def _collective_source(bodies, requests, references, run_id):
                     'row': {key: item for key, item in value.items() if key not in {
                         'prep_ms', 'latency_ms', 'request_ms', 'gbps_p50',
                         'gbps_p50_incl_prep', 'verify_passed'}}}
-    return value, identity
+        issues = _collective_topology_issues(case.get('topology'))
+        for key in ('case_id', 'sku', 'backend', 'fabric', 'workload', 'precision'):
+            if type(case.get(key)) is not str or not case[key].strip():
+                issues.append(f'missing_or_invalid_{key}')
+        if case.get('vendor') not in ('nvidia', 'amd'):
+            issues.append('missing_hardware_identity')
+        if case.get('outcome') != 'success' or case.get('disposition') != 'runnable':
+            issues.append('kv_case_not_successful')
+        if value.get('kind') not in ('paged', 'bulk') or value.get('op') not in ('push', 'pull'):
+            issues.append('missing_or_invalid_kv_operation')
+        for key in ('isl', 'batch', 'descs', 'req_bytes'):
+            if not integer(value.get(key)) or not (0 if key == 'req_bytes' else 1) <= value[key] <= MAX_SAFE_INTEGER:
+                issues.append(f'missing_or_invalid_{key}')
+        page_tokens = value.get('page_tokens', MISSING)
+        if not (page_tokens is None and value.get('kind') == 'bulk') and \
+                not (integer(page_tokens) and 0 < page_tokens <= MAX_SAFE_INTEGER):
+            issues.append('missing_or_invalid_page_tokens')
+        if value.get('verify_passed') is not True:
+            issues.append('kv_verification_not_passed')
+        metric_sources = [(value, f'{name}.{key}', 'samples' if key == 'n' else unit)
+                          for name, unit in (('latency_ms', 'ms per burst'), ('request_ms', 'ms per request'))
+                          for key in ('p50', 'p95', 'min', 'max', 'n')]
+        metric_sources += [(value, key, unit) for key, unit in
+                           (('prep_ms', 'ms per burst'), ('gbps_p50', 'GB/s'),
+                            ('gbps_p50_incl_prep', 'GB/s including prep'))]
+    metrics = []
+    for source, name, unit in metric_sources:
+        metric_value = _nested_metric(source, name)
+        require(metric_value is MISSING or metric_value is None or
+                finite(metric_value) and metric_value >= 0, 'CollectiveX metric source is invalid')
+        state = {'status': 'missing'} if metric_value is MISSING else {
+            'status': 'null' if metric_value is None else 'value', 'value': metric_value}
+        metrics.append({'name': name, 'unit': unit, **state})
+    return identity, issues, metrics
 
 
 def _nested_metric(value, name):
     for key in name.split('.'):
-        if value is None:
-            return None
-        value = value.get(key)
+        if value is None or value is MISSING:
+            return value
+        value = value.get(key, MISSING)
     return value
+
+
+def _collective_expected(manifest, requests, bodies, result):
+    options = manifest.get('normalized_arguments', {})
+    require(set(options) == {'left', 'right'}, 'CollectiveX saved scope differs')
+    explicit = options['left'] is not None or options['right'] is not None
+    expected_requests = [('openapi', '/api/openapi.json', {})]
+    if explicit:
+        run_ids = [options['left'], options['right']]
+        require(all(type(value) is str and re.fullmatch(r'[1-9]\d*', value) for value in run_ids) and
+                run_ids[0] != run_ids[1], 'CollectiveX selected run scope differs')
+    else:
+        require(len(bodies) >= 2 and type(bodies[1].get('runs')) is list,
+                'CollectiveX discovery scope differs')
+        run_ids = sorted([run['run_id'] for run in bodies[1]['runs'] if run['measured_cases'] > 0],
+                         key=int)[-2:]
+        expected_requests.append(('collectivex-runs', '/api/v1/collectivex/runs', {'version': ['1']}))
+    dataset_start = len(expected_requests)
+    if len(run_ids) == 2:
+        expected_requests.extend(('collectivex-run', f'/api/v1/collectivex/runs/{run_id}', {'version': ['1']})
+                                 for run_id in run_ids)
+    require([(request['operation'], urlsplit(request['url']).path,
+              parse_qs(urlsplit(request['url']).query, keep_blank_values=True))
+             for request in requests] == expected_requests, 'CollectiveX request scope differs')
+    require(result.get('selection') == {
+        'mode': 'explicit_run_ids' if explicit else 'newest_two_measured_from_one_list',
+        'run_ids': run_ids}, 'CollectiveX selected run scope differs')
+    groups = {}
+    for side, dataset_index in enumerate(range(dataset_start, len(bodies))):
+        dataset = bodies[dataset_index]
+        pointers = [f'/series/{series_index}/points/{point_index}/components/{operation}'
+                    for series_index, series in enumerate(dataset['series'])
+                    for point_index in range(len(series['points']))
+                    for operation in ('dispatch', 'stage', 'combine', 'roundtrip')]
+        pointers += [f'/kv/{case_index}/rows/{row_index}'
+                     for case_index, case in enumerate(dataset.get('kv', []))
+                     for row_index in range(len(case['rows']))]
+        for pointer in pointers:
+            reference = {'response_index': dataset_index, 'json_pointer': pointer}
+            identity, issues, metrics = _collective_source(bodies, requests, [reference], run_ids[side])
+            group = groups.setdefault(_json_identity(identity), [[], []])
+            group[side].append((reference, issues, metrics))
+    comparisons = result['comparisons']
+    keys = [_json_identity(row['identity']) for row in comparisons]
+    require(len(keys) == len(set(keys)) and set(keys) == set(groups),
+            'CollectiveX comparison identity set differs from raw source')
+    counts = dict.fromkeys(('matched', 'only_left', 'only_right', 'ambiguous', 'incomparable'), 0)
+    comparable = 0
+    for comparison, key in zip(comparisons, keys):
+        left, right = groups[key]
+        issues = list(dict.fromkeys(issue for _, problems, _ in left + right for issue in problems))
+        status = ('ambiguous' if len(left) > 1 or len(right) > 1 else 'incomparable' if issues else
+                  'only_right' if not left else 'only_left' if not right else 'matched')
+        require(comparison['left'] == [entry[0] for entry in left] and
+                comparison['right'] == [entry[0] for entry in right],
+                'CollectiveX source references differ from selected run identities')
+        require(comparison['status'] == status and comparison.get('issues') == issues,
+                'CollectiveX comparison status differs from raw source')
+        metrics = []
+        usable = False
+        if status == 'matched':
+            for a, b in zip(left[0][2], right[0][2]):
+                numeric = a['status'] == b['status'] == 'value'
+                usable |= numeric
+                difference = b['value'] - a['value'] if numeric else None
+                ratio = b['value'] / a['value'] if numeric and a['value'] != 0 else None
+                metrics.append({'name': a['name'], 'unit': a['unit'],
+                                'left': {k: v for k, v in a.items() if k not in ('name', 'unit')},
+                                'right': {k: v for k, v in b.items() if k not in ('name', 'unit')},
+                                'difference_right_minus_left': difference if finite(difference) else None,
+                                'ratio_right_over_left': ratio if finite(ratio) else None})
+        require(same_json(comparison['metrics'], metrics), 'CollectiveX metric source or arithmetic differs')
+        comparable += usable
+        counts[status] += 1
+    require(result['summary'] == counts, 'CollectiveX summary differs from raw source')
+    reasons = [{'code': status, 'count': counts[status]} for status in
+               ('only_left', 'only_right', 'ambiguous', 'incomparable') if counts[status]]
+    if counts['matched'] > comparable:
+        reasons.append({'code': 'matched_without_usable_metric', 'count': counts['matched'] - comparable})
+    require(manifest['coverage'] == {
+        'status': 'empty' if not comparisons else 'complete' if comparable == len(comparisons) else 'partial',
+        'selected_records': len(comparisons), 'comparable_pairs': comparable, 'hardware': [],
+        'reasons': reasons}, 'CollectiveX bundle coverage differs from raw source')
+    return len(comparisons), comparable, {}, comparable
 
 
 def _sanitized_export_identity(row):
@@ -737,6 +901,16 @@ def _agentx_expected(manifest, requests, bodies, response_ids, rows, document=No
     selected = [row for row in agentx_rows if all(
         options[name] is None or row[field] == options[name]
         for name, field in AGENTX_FILTERS)]
+    selected_ids = list(dict.fromkeys(result_id for row in selected
+                                     if (result_id := safe_result_id(row['id'])) is not None))
+    expected_requests = [(operation, {'ids': [','.join(map(str, selected_ids[start:start + size]))]})
+                         for operation, size in (('agentic-aggregates', 200),
+                                                 ('derived-agentic-metrics', 200),
+                                                 ('trace-availability', 500))
+                         for start in range(0, len(selected_ids), size)]
+    require([(request['operation'], parse_qs(urlsplit(request['url']).query, keep_blank_values=True))
+             for request in requests[1:]] == expected_requests,
+            'AgentX enrichment request scope differs from selected ID chunks')
     joined = {name: {} for name in
               ('agentic-aggregates', 'derived-agentic-metrics', 'trace-availability')}
     for request, body in zip(requests[1:], bodies[1:]):
@@ -853,7 +1027,9 @@ def _agentx_expected(manifest, requests, bodies, response_ids, rows, document=No
             for column in CONTRACT_AGENTX_CSV_COLUMNS:
                 value = context.get(column, benchmark.get(column))
                 if column == 'metrics_json':
-                    value = json.dumps(benchmark['metrics'], separators=(',', ':'))
+                    require(same_json(strict_json(record[column].encode()), benchmark['metrics']),
+                            f'Bundle CSV value differs: agentx row {index} metrics_json')
+                    continue
                 elif column in enrichment:
                     value = enrichment[column]
                 _csv_cell_matches(record[column], value, f'agentx row {index} {column}')
@@ -1016,14 +1192,62 @@ def check_bundle(directory, version):
 
     if kind == 'result':
         selected = result['selected_result']
+        options = manifest.get('normalized_arguments', {})
+        require(set(options) == {'id', 'model', 'date', 'run_id', 'log_file', 'log_offset', 'log_limit'} and
+                type(options['id']) is str and safe_result_id(options['id']) is not None and
+                type(options['model']) is str and options['model'].strip() and
+                not (options['date'] is not None and options['run_id'] is not None) and
+                (options['run_id'] is None or type(options['run_id']) is str and
+                 safe_result_id(options['run_id']) is not None) and
+                type(options['log_offset']) is int and 0 <= options['log_offset'] <= 2_000_000_000 and
+                type(options['log_limit']) is int and 1 <= options['log_limit'] <= 262_144 and
+                (options['log_file'] is None or type(options['log_file']) is str and
+                 0 < len(options['log_file']) <= 1024 and '\0' not in options['log_file']),
+                'Provenance saved arguments differ')
+        require(selected['id'] == options['id'], 'Provenance selected ID differs from requested scope')
+        benchmark_query = {'model': [options['model']]}
+        if options['date'] is not None:
+            requested_date = options['date']
+            require(type(requested_date) is str and
+                    re.fullmatch(r'\d{4}-\d{2}-\d{2}', requested_date) is not None and
+                    datetime.fromisoformat(requested_date).date().isoformat() == requested_date and
+                    selected['date'] <= requested_date and
+                    selected.get('curve_date', selected['date']) <= requested_date,
+                    'Provenance date scope differs')
+            benchmark_query['date'] = [requested_date]
+        if options['run_id'] is not None:
+            benchmark_query.update(runId=[options['run_id']], exactRun=['true'])
+        expected_requests = [('benchmarks', benchmark_query)]
+        if selected.get('run_url') is not None:
+            workflow_query = {'date': [selected['date']]}
+            if selected['benchmark_type'] == 'agentic_traces':
+                workflow_query['benchmarkType'] = ['agentic_traces']
+            expected_requests.append(('workflow-info', workflow_query))
+        log_query = {'id': [options['id']], 'offset': [str(options['log_offset'])],
+                     'limit': [str(options['log_limit'])]}
+        if options['log_file'] is not None:
+            log_query['file'] = [options['log_file']]
+        expected_requests.append(('server-log', log_query))
+        require([(request['operation'], parse_qs(urlsplit(request['url']).query, keep_blank_values=True))
+                 for request in requests] == expected_requests, 'Provenance request scope differs')
         matches = [_string_export_identities(row) for row in bodies[0]
                    if str(row.get('id')) == str(selected.get('id'))]
         require(len(matches) == 1 and selected == matches[0], 'Provenance selection differs')
         metadata = result.get('metadata', {})
+        expected_scope = {
+            'display_model': options['model'], 'date': options['date'],
+            'github_run_id': options['run_id'],
+            'selection': 'logical_run_snapshot' if options['run_id'] is not None else
+                         'as_of_snapshot' if options['date'] is not None else 'latest_snapshot',
+        }
+        require(metadata.get('scope') == expected_scope and metadata.get('log_window') == {
+            'file': options['log_file'], 'offset': options['log_offset'], 'limit': options['log_limit'],
+            'offset_unit': 'Unicode characters'}, 'Provenance metadata scope differs')
         require(metadata.get('selected_result_id') == selected['id'] and
                 metadata.get('ran_new_benchmark') is False,
                 'Provenance metadata differs')
         producer = result.get('producer', {})
+        expected_run, expected_configs = None, []
         run_url = selected.get('run_url')
         if run_url is None:
             require(producer.get('status') == 'unresolved' and
@@ -1040,9 +1264,22 @@ def check_bundle(directory, version):
             workflow_runs = bodies[1].get('runs', []) if type(bodies[1]) is dict else []
             matching_runs = [item for item in workflow_runs
                              if str(item.get('github_run_id')) == match.group(1)]
+            require(len(matching_runs) <= 1 and all(
+                item.get('date') == selected['date'] and
+                (match.group(2) is None or str(item.get('run_attempt')) == match.group(2))
+                for item in matching_runs), 'Provenance producer attempt differs')
+            if match.group(2) is not None and matching_runs:
+                expected_run = matching_runs[0]
+                expected_configs = [config for config in bodies[1].get('runConfigs', [])
+                                    if str(config.get('github_run_id')) == match.group(1) and
+                                    all(config.get(key) == selected[key] for key in
+                                        ('model', 'hardware', 'framework', 'precision', 'spec_method', 'disagg'))]
             expected_status = 'confirmed' if match.group(2) is not None and matching_runs else 'row_only'
             require(producer.get('status') == expected_status,
                     'Provenance producer confirmation differs')
+        require(same_json(producer.get('workflow_run'), _normalized_id_object(expected_run)) and
+                same_json(producer.get('run_configs'), _normalized_id_object(expected_configs)),
+                'Provenance producer configuration differs from source')
         evidence = result.get('evidence', [])
         require([entry.get('response_id') for entry in evidence] == response_ids and
                 result.get('log', {}).get('source_response_id') == response_ids[-1],
@@ -1057,6 +1294,19 @@ def check_bundle(directory, version):
                     str(saved_log.get('id')) == selected['id'] and
                     log.get('text') == saved_log.get('serverLog'),
                     'Provenance log differs from source')
+        reasons = []
+        for condition, code in (
+            (expected_run is None, 'producer_unconfirmed'),
+            (not expected_configs, 'producer_config_unconfirmed'),
+            (selected['image'] is None, 'image_unavailable'),
+            (requests[-1]['response']['status'] == 404, 'log_unavailable'),
+        ):
+            if condition:
+                reasons.append({'code': code, 'count': 1})
+        require(coverage == {'status': 'partial' if reasons else 'complete',
+                             'selected_records': 1, 'comparable_pairs': None,
+                             'hardware': [{'hardware': selected['hardware'], 'valid_records': 1}],
+                             'reasons': reasons}, 'Provenance bundle coverage differs from source')
         derived = (1, None, {selected['hardware']: 1}, 1)
     elif kind == 'tco':
         feed = bodies[0]
@@ -1143,6 +1393,9 @@ def check_bundle(directory, version):
                                 for item in feed['rows']),
                         'TCO missing point differs from consumed feed')
             else:
+                require((point.get('hardware'), point.get('workload'), point.get('tier')) ==
+                        (row['hardware'], row['workload'], target),
+                        'TCO point scope differs from its hardware, workload or tier')
                 require(point in feed['rows'], 'TCO point differs from consumed feed')
                 expected_status = ('zero_throughput' if point.get('boundary') == 'interpolated' and
                                    point.get('output_tput_per_gpu') == 0 else
@@ -1206,7 +1459,7 @@ def check_bundle(directory, version):
         for side in ('before', 'after'):
             detail = selection.get(side, {})
             selected_rows = detail.get('rows')
-            expected_rows = [row for row in source if
+            expected_rows = [_string_export_identities(row) for row in source if
                              row['benchmark_type'] == 'single_turn' and
                              all(row[key] == options[key] for key in ('hardware', 'framework', 'isl', 'osl')) and
                              (options['raw_model'] is None or row['model'] == options['raw_model']) and
@@ -1267,41 +1520,7 @@ def check_bundle(directory, version):
         derived = (selected_records, comparable,
                    {} if hardware_name is None else {hardware_name: comparable}, comparable)
     elif kind == 'collectivex':
-        comparisons = result['comparisons']
-        run_ids = result.get('selection', {}).get('run_ids', [])
-        if any(comparison['status'] == 'matched' for comparison in comparisons):
-            require(type(run_ids) is list and len(run_ids) == 2 and len(set(run_ids)) == 2,
-                    'CollectiveX matched comparison needs two selected runs')
-            options = manifest.get('normalized_arguments', {})
-            if options.get('left') is not None:
-                require(run_ids == [options['left'], options['right']],
-                        'CollectiveX selected run IDs differ from requested scope')
-        for status, count_value in result['summary'].items():
-            require(count_value == sum(row['status'] == status for row in comparisons),
-                    'CollectiveX summary differs')
-        for comparison in comparisons:
-            if comparison['status'] != 'matched':
-                continue
-            left, left_identity = _collective_source(bodies, requests, comparison['left'], run_ids[0])
-            right, right_identity = _collective_source(bodies, requests, comparison['right'], run_ids[1])
-            require(left_identity == right_identity == comparison.get('identity'),
-                    'CollectiveX matched source identity differs')
-            for metric in comparison['metrics']:
-                left_value = _nested_metric(left, metric['name'])
-                right_value = _nested_metric(right, metric['name'])
-                require(metric['left']['value'] == left_value and
-                        metric['right']['value'] == right_value,
-                        'CollectiveX metric source differs')
-                difference = None if left_value is None or right_value is None else right_value - left_value
-                ratio = None if left_value in (None, 0) or right_value is None else right_value / left_value
-                require(metric['difference_right_minus_left'] == difference and
-                        metric['ratio_right_over_left'] == ratio,
-                        'CollectiveX metric arithmetic differs')
-        comparable = sum(comparison['status'] == 'matched' and any(
-            metric.get('left', {}).get('status') == 'value' and
-            metric.get('right', {}).get('status') == 'value'
-            for metric in comparison.get('metrics', [])) for comparison in comparisons)
-        derived = (len(comparisons), comparable, {}, comparable)
+        derived = _collective_expected(manifest, requests, bodies, result)
 
     selected_records, comparable, derived_hardware, eligible_records = derived
     require(coverage['selected_records'] == selected_records,

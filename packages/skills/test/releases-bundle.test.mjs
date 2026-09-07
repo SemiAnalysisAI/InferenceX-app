@@ -285,7 +285,8 @@ test('exact release run URLs distinguish attempts from misleading workflow IDs',
   const output = JSON.parse(collected.bytes);
   assert.equal(requests, 1);
   assert.equal(output.comparisons.length, 1);
-  assert.deepEqual(output.selection.before.rows, [before]);
+  assert.deepEqual(output.selection.before.rows, [{ ...before, workflow_run_id: '222' }]);
+  assert.deepEqual(output.selection.after.rows, [{ ...after, workflow_run_id: '111' }]);
   assert.deepEqual(output.selection.before.excluded, [
     { row: decoy, reasons: ['run_url_mismatch'] },
   ]);

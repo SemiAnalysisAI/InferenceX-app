@@ -12,7 +12,8 @@ contract 1 evidence directory and `inferencex verify` replays it offline.
 - PowerX and AgentX CSV headers and order are fixed. IDs are strings; observation
   dates and UTC evidence timestamps are separate fields.
 - `inferencex describe` publishes command metadata and `inferencex schema` publishes
-  the contract schemas.
+  the contract schemas. Their metadata uses `output_schema: null`: neither utility
+  emits a bundle summary or claims a domain-result schema.
 - Exit 0 means a completed bundle whose requested policy passed or was absent; exit
   3 means valid evidence with an unmet policy. Exit 2 is invalid input, exit 1 is an
   operational or verification failure, and exit 130 is pre-commit cancellation.

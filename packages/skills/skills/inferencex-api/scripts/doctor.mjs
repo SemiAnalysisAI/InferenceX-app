@@ -92,8 +92,8 @@ function transactionReport(transaction) {
     state:
       transaction.state === 'recoverable'
         ? 'recovery_needed'
-        : transaction.state === 'none'
-          ? 'none'
+        : transaction.state === 'busy'
+          ? 'active'
           : transaction.state,
     phase: transaction.phase,
     had_destination: transaction.had_destination,

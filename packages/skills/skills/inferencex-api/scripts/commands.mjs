@@ -318,7 +318,7 @@ const UTILITY_OPERATIONS = Object.freeze([
     description: 'Print fixed command metadata offline.',
     formats: ['json'],
     policies: [],
-    outputSchema: 'summary',
+    outputSchema: null,
     formal: false,
     contractVersion: 1,
     options: Object.freeze([
@@ -334,7 +334,7 @@ const UTILITY_OPERATIONS = Object.freeze([
     description: 'Print one public JSON Schema offline.',
     formats: ['json'],
     policies: [],
-    outputSchema: 'summary',
+    outputSchema: null,
     formal: false,
     contractVersion: 1,
     options: Object.freeze([

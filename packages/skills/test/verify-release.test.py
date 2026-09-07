@@ -290,6 +290,67 @@ class UnifiedAcceptanceSurfaceTests(unittest.TestCase):
 class ContractOneBundleOracleTests(unittest.TestCase):
     VERSION = '1.0.0'
 
+    @classmethod
+    def setUpClass(cls):
+        cls.package_root = Path(__file__).resolve().parents[1]
+        script = """
+import { provenanceBundleFixtures } from './test/provenance-bundle-fixtures.mjs';
+import { COLLECTIVEX_BUNDLE_VARIANTS } from './test/collectivex-bundle-fixtures.mjs';
+import { AGENTX_BUNDLE_VARIANTS } from './test/agentx-bundle-fixtures.mjs';
+import { TCO_BUNDLE_VARIANTS } from './test/tco-bundle-fixtures.mjs';
+console.log(JSON.stringify({ ...provenanceBundleFixtures(),
+  collectivex: COLLECTIVEX_BUNDLE_VARIANTS, agentx: AGENTX_BUNDLE_VARIANTS,
+  tco: TCO_BUNDLE_VARIANTS }));
+"""
+        cls.collector_fixtures = json.loads(subprocess.check_output(
+            ['node', '--input-type=module', '-e', script], cwd=cls.package_root))
+        cls.collector_outputs = {}
+
+    def collected(self, kind, variant, mutate=None):
+        fixture = json.loads(json.dumps(self.collector_fixtures[kind][variant]))
+        if mutate:
+            mutate(fixture)
+        fixture['raw'] = [json.dumps(item['body'], separators=(',', ':'))
+                          for item in fixture['responses']]
+        script = """
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+const fixture = JSON.parse(readFileSync(0, 'utf8'));
+const modules = { result: 'investigate-result', collectivex: 'compare-collectivex',
+  agentx: 'export-agentx', tco: 'compare-tco' };
+const mod = await import(`./skills/inferencex-api/scripts/${modules[fixture.kind]}.mjs`);
+const options = mod.normalizeArgs(fixture.args.slice(2));
+let cursor = 0;
+const built = await mod.collect(options, {
+  producerVersion: '1.0.0', generatedAt: '2026-09-07T00:00:00.000Z',
+  async get(spec) {
+    const response = fixture.responses[cursor];
+    assert.equal(spec.url, response.url);
+    response.operation = spec.operation;
+    const bytes = Buffer.from(fixture.raw[cursor++]);
+    return { id: createHash('sha256').update(bytes).digest('hex'), bytes,
+      body: response.body, status: response.status ?? 200,
+      retrievedAt: '2026-09-07T00:00:01.000Z' };
+  },
+});
+assert.equal(cursor, fixture.responses.length);
+console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
+  coverage: built.coverage, responses: fixture.responses }));
+"""
+        cache_key = (kind, variant) if mutate is None else None
+        built = self.collector_outputs.get(cache_key)
+        if built is None:
+            built = json.loads(subprocess.check_output(
+                ['node', '--input-type=module', '-e', script], cwd=self.package_root,
+                input=json.dumps({**fixture, 'kind': kind}).encode()))
+            if cache_key is not None:
+                self.collector_outputs[cache_key] = built
+        return self.bundle(kind, [(item['operation'], item['url'], item['body'], item['status'])
+                                 for item in built['responses']],
+                           lambda _: built['result'], built['coverage'],
+                           normalized_arguments=built['options'])
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -511,26 +572,7 @@ class ContractOneBundleOracleTests(unittest.TestCase):
             {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
              'hardware': [{'hardware': 'b300', 'valid_records': 1}], 'reasons': []})
 
-        provenance_responses = [
-            ('benchmarks', origin + '/api/v1/benchmarks?model=GLM-5',
-            [{**base, 'id': 3, 'metrics': {}}], 200),
-            ('workflow-info', origin + '/api/v1/workflow-info?date=2026-09-07', {'runs': []}, 200),
-            ('server-log', origin + '/api/v1/server-log?id=3', {'id': 3, 'serverLog': 'ready'}, 200),
-        ]
-        provenance = self.bundle(
-            'result', provenance_responses,
-            lambda ids: {'schema_version': 1, 'kind': 'result',
-                         'metadata': {'package_version': self.VERSION,
-                                      'selected_result_id': '3', 'ran_new_benchmark': False},
-                         'selected_result': {**base, 'id': '3', 'metrics': {}},
-                         'producer': {'status': 'unresolved', 'github_run_id': None,
-                                      'run_attempt': None, 'workflow_run': None,
-                                      'run_configs': []},
-                         'evidence': [{'response_id': item} for item in ids],
-                         'log': {'status': 'available', 'text': 'ready',
-                                 'source_response_id': ids[-1]}},
-            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
-             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
+        provenance = self.collected('result', 'producer-differs-from-curve')
 
         point = {'hardware': 'b200', 'workload': '1024x1024', 'tier': 50,
                  'output_tput_per_gpu': 1000, 'boundary': 'interpolated',
@@ -614,9 +656,9 @@ class ContractOneBundleOracleTests(unittest.TestCase):
                                       'statistical_verdict': 'not_established'},
                          'sources': [{'response_id': ids[0]}],
                          'selection': {
-                             'before': {'rows': [history[0]], 'excluded': [],
+                             'before': {'rows': [{**history[0], 'id': '4'}], 'excluded': [],
                                         'unique_observations': 1, 'snapshot_reuses': 0},
-                             'after': {'rows': [history[1]], 'excluded': [],
+                             'after': {'rows': [{**history[1], 'id': '5'}], 'excluded': [],
                                        'unique_observations': 1, 'snapshot_reuses': 0}},
                          'comparisons': [{'before_id': '4', 'after_id': '5',
                                           'configuration': configuration,
@@ -626,46 +668,7 @@ class ContractOneBundleOracleTests(unittest.TestCase):
             {'status': 'complete', 'selected_records': 2, 'comparable_pairs': 1,
              'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
 
-        system = {'sku': 'h200_sxm', 'vendor': 'nvidia', 'ep_size': 8, 'nodes': 1,
-                  'gpus_per_node': 8, 'scale_up_domain': 8, 'scale_up_transport': 'NVLink',
-                  'scale_out_transport': None, 'topology_class': 'scale-up'}
-        ep_config = {'series_id': 'case-a', 'phase': 'decode', 'mode': 'normal',
-                     'precision': 'bf16', 'backend': 'deepep', 'system': system}
-        left = {'run': {'run_id': '90071992547409930001'},
-                'series': [{**ep_config, 'points': [{
-            'tokens_per_rank': 32, 'global_tokens': 256,
-            'components': {'dispatch': {'payload_bytes': 8192,
-                                        'latency_us': {'p50': 20}}}}]}]}
-        right = json.loads(json.dumps(left))
-        right['run']['run_id'] = '90071992547409930002'
-        right['series'][0]['points'][0]['components']['dispatch']['latency_us']['p50'] = 10
-        collective_responses = [
-            ('openapi', origin + '/api/openapi.json', {}, 200),
-            ('collectivex-run', origin + '/api/v1/collectivex/runs/90071992547409930001', left, 200),
-            ('collectivex-run', origin + '/api/v1/collectivex/runs/90071992547409930002', right, 200),
-        ]
-        collective = self.bundle(
-            'collectivex', collective_responses,
-            lambda ids: {'schema_version': 1, 'kind': 'collectivex',
-                         'selection': {'run_ids': ['90071992547409930001', '90071992547409930002']},
-                         'sources': [{'response_id': item} for item in ids],
-                         'summary': {'matched': 1, 'only_left': 0, 'only_right': 0,
-                                     'ambiguous': 0, 'incomparable': 0},
-                         'comparisons': [{'status': 'matched',
-                                         'identity': {'suite': 'ep', 'configuration': ep_config,
-                                                      'operation': 'dispatch', 'tokens_per_rank': 32,
-                                                      'global_tokens': 256, 'payload_bytes': 8192},
-                                         'left': [{'response_index': 1,
-                                                   'json_pointer': '/series/0/points/0/components/dispatch'}],
-                                         'right': [{'response_index': 2,
-                                                    'json_pointer': '/series/0/points/0/components/dispatch'}],
-                                         'metrics': [{'name': 'latency_us.p50', 'unit': 'us',
-                                                      'left': {'status': 'value', 'value': 20},
-                                                      'right': {'status': 'value', 'value': 10},
-                                                      'difference_right_minus_left': -10,
-                                                      'ratio_right_over_left': 0.5}]}]},
-            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': 1,
-             'hardware': [], 'reasons': []})
+        collective = self.collected('collectivex', 'positive')
         return {name: value for name, value in (
             ('powerx', power), ('agentx', agent), ('result', provenance), ('tco', tco),
             ('releases', releases), ('collectivex', collective))}
@@ -869,6 +872,132 @@ class ContractOneBundleOracleTests(unittest.TestCase):
         self.assertTrue(all(report['status'] == 'passed' for report in reports.values()))
         self.assertEqual(reports['collectivex']['comparable_pairs'], 1)
 
+    def test_provenance_arguments_must_match_the_selected_result_and_requests(self):
+        for change in ({'id': '999'}, {'model': 'GLM-5'}, {'run_id': '999', 'date': None},
+                       {'log_limit': 1}, {'log_file': 'other.log'}):
+            with self.subTest(change=change):
+                directory = self.collected('result', 'producer-differs-from-curve')
+                path = directory / 'manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['normalized_arguments'].update(change)
+                check.save(path, manifest)
+                with self.assertRaisesRegex(ValueError, 'Provenance.*scope|Provenance.*arguments'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_provenance_partial_coverage_cannot_be_promoted_to_complete(self):
+        directory = self.collected('result', 'missing-log')
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.forge_coverage(directory, status='complete', reasons=[])
+        with self.assertRaisesRegex(ValueError, 'Provenance.*coverage'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_provenance_accepts_agentic_logical_run_and_missing_optional_paths(self):
+        def agentic(fixture):
+            fixture['responses'][0]['body'][0]['benchmark_type'] = 'agentic_traces'
+            fixture['responses'][1]['url'] += '&benchmarkType=agentic_traces'
+        def logical_run(fixture):
+            fixture['args'][-2:] = ['--run-id', '123456789']
+            fixture['responses'][0]['url'] = (
+                'https://inferencex.semianalysis.com/api/v1/benchmarks?'
+                'model=DeepSeek-R1-0528&runId=123456789&exactRun=true')
+        def nested_metadata(fixture):
+            fixture['responses'][1]['body']['runs'][0]['metadata'] = {'id': 7}
+            fixture['responses'][1]['body']['runConfigs'][0]['metadata'] = {'run_attempt': 3}
+        for mutate in (agentic, logical_run, nested_metadata):
+            directory = self.collected('result', 'producer-differs-from-curve', mutate)
+            self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.assertEqual(check.check_bundle(self.collected(
+            'result', 'missing-optional-provenance'), self.VERSION)['status'], 'passed')
+
+    def test_agentx_enrichment_scope_is_derived_from_selected_ids(self):
+        directory = self.fixtures()['agentx']
+        path = directory / 'manifest.json'
+        manifest = json.loads(path.read_text())
+        for request in manifest['requests'][1:]:
+            request['url'] += '%2C999'
+            request['attempts'][-1]['url'] = request['url']
+        check.save(path, manifest)
+        def extend(result):
+            for entry in result['metadata']['request_urls'][1:]:
+                entry['url'] += '%2C999'
+                entry['requested_ids'].append('999')
+        self.rehash_result(directory, extend)
+        with self.assertRaisesRegex(ValueError, 'AgentX.*request.*scope'):
+            check.check_bundle(directory, self.VERSION)
+        self.assertEqual(check.check_bundle(
+            self.collected('agentx', 'multi-chunk'), self.VERSION)['selected_records'], 401)
+
+    def test_tco_point_cannot_be_borrowed_from_another_hardware_row(self):
+        directory = self.collected('tco', 'positive')
+        def swap(result):
+            source, target = result['rows']
+            target['point'] = source['point']
+            target['usd_per_million_output_tokens'] = target['usd_per_gpu_hour'] * 1e6 / (
+                target['point']['output_tput_per_gpu'] * 3600)
+        self.rehash_result(directory, swap)
+        with self.assertRaisesRegex(ValueError, 'TCO point.*scope'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_agentx_csv_metrics_compare_json_values_instead_of_spelling(self):
+        directory = self.fixtures()['agentx']
+        metrics = {'median_ttft': 1e-7, 'note': '中文', 'flag': True}
+        self.rehash_response(directory, 0, lambda rows: rows[0].update(metrics=metrics))
+        self.rehash_result(directory, lambda result: result['rows'][0]['benchmark'].update(metrics=metrics))
+        self.convert_to_csv(directory, 'agentx')
+        self.mutate_csv(directory, lambda rows: rows[0].update(
+            metrics_json='{"flag":true,"note":"中文","median_ttft":1e-7}'))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.mutate_csv(directory, lambda rows: rows[0].update(
+            metrics_json='{"flag":1,"note":"中文","median_ttft":1e-7}'))
+        with self.assertRaisesRegex(ValueError, 'CSV.*metrics_json'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_optional_percentiles_and_parent_roundtrip_metrics(self):
+        def missing(fixture):
+            del fixture['responses'][1]['body']['series'][0]['points'][0][
+                'components']['dispatch']['latency_us']['p99']
+        def roundtrip(fixture):
+            for response in fixture['responses'][1:]:
+                point = response['body']['series'][0]['points'][0]
+                point['components']['roundtrip'] = point['components']['dispatch']
+                point['roundtrip_token_rate_at_latency_percentile']['p50'] = 700
+        for name, mutate in [('missing', missing), ('roundtrip', roundtrip)]:
+            with self.subTest(name=name):
+                directory = self.collected('collectivex', 'positive', mutate)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.assertEqual(check.check_bundle(
+            self.collected('collectivex', 'kv-positive'), self.VERSION)['status'], 'passed')
+
+    def test_collectivex_cannot_drop_incomparable_groups_and_claim_complete(self):
+        directory = self.collected('collectivex', 'positive')
+        def omit(result):
+            result['comparisons'] = [row for row in result['comparisons'] if row['status'] == 'matched']
+            result['summary']['incomparable'] = 0
+        self.rehash_result(directory, omit)
+        self.forge_coverage(directory, status='complete', selected=1, reasons=[])
+        with self.assertRaisesRegex(ValueError, 'CollectiveX.*(set|coverage)'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_ambiguous_and_unverified_groups_are_not_matches(self):
+        def duplicate(fixture):
+            series = fixture['responses'][1]['body']['series'][0]
+            series['points'].append(json.loads(json.dumps(series['points'][0])))
+        def unverified(fixture):
+            fixture['responses'][1]['body']['kv'][0]['rows'][0]['verify_passed'] = False
+        for variant, mutate in [('positive', duplicate), ('kv-positive', unverified)]:
+            with self.subTest(variant=variant):
+                directory = self.collected('collectivex', variant, mutate)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 0)
+                self.forge_coverage(directory, status='complete', reasons=[])
+                with self.assertRaisesRegex(ValueError, 'CollectiveX.*coverage'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_discovery_and_empty_selections_use_saved_run_list(self):
+        for variant in ('one-list', 'empty', 'topology-mismatch'):
+            with self.subTest(variant=variant):
+                directory = self.collected('collectivex', variant)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+
     def test_rehashed_contract_metadata_units_coverage_and_sources_are_rejected(self):
         mutations = [
             ('powerx', lambda result: result['metadata'].update(requested_date='2026-09-01'),
@@ -992,36 +1121,9 @@ class ContractOneBundleOracleTests(unittest.TestCase):
             check.check_bundle(directory, self.VERSION)
 
     def test_collectivex_kv_pairs_require_exact_source_workload(self):
-        config = {'case_id': 'kv-a', 'sku': 'h200_sxm', 'vendor': 'nvidia', 'backend': 'nixl',
-                  'fabric': 'rdma', 'workload': 'dsv4', 'precision': 'bf16',
-                  'topology': {'ep_size': 2, 'nodes': 2, 'gpus_per_node': 1,
-                               'scale_up_domain': 1, 'scale_up_transport': 'NVLink',
-                               'scale_out_transport': 'InfiniBand', 'topology_class': 'scale-out'}}
-        identity = {'kind': 'paged', 'op': 'pull', 'isl': 1024, 'page_tokens': 16,
-                    'batch': 4, 'descs': 64, 'req_bytes': 1024}
-        body = {'kv': [{**config, 'disposition': 'runnable', 'outcome': 'success',
-                        'rows': [{**identity, 'verify_passed': True, 'gbps_p50': 2}]}]}
-        directory = self.bundle(
-            'collectivex', [('collectivex-run',
-                            f'https://inferencex.semianalysis.com/api/v1/collectivex/runs/{run_id}',
-                            {**body, 'run': {'run_id': run_id}}, 200) for run_id in ('1', '2')],
-            lambda ids: {'schema_version': 1, 'kind': 'collectivex',
-                         'selection': {'run_ids': ['1', '2']},
-                         'sources': [{'response_id': item} for item in ids],
-                         'summary': {'matched': 1}, 'comparisons': [{
-                             'identity': {'suite': 'kv', 'configuration': config, 'row': identity},
-                             'status': 'matched',
-                             'left': [{'response_index': 0, 'json_pointer': '/kv/0/rows/0'}],
-                             'right': [{'response_index': 1, 'json_pointer': '/kv/0/rows/0'}],
-                             'metrics': [{'name': 'gbps_p50', 'unit': 'GB/s',
-                                          'left': {'status': 'value', 'value': 2},
-                                          'right': {'status': 'value', 'value': 2},
-                                          'difference_right_minus_left': 0,
-                                          'ratio_right_over_left': 1}]}]},
-            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': 1,
-             'hardware': [], 'reasons': []})
+        directory = self.collected('collectivex', 'kv-positive')
         self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
-        self.rehash_response(directory, 1, lambda value: value['kv'][0]['rows'][0].update(isl=2048))
+        self.rehash_response(directory, 2, lambda value: value['kv'][0]['rows'][0].update(isl=2048))
         with self.assertRaisesRegex(ValueError, 'CollectiveX.*identity'):
             check.check_bundle(directory, self.VERSION)
 
@@ -1188,7 +1290,7 @@ class ContractOneBundleOracleTests(unittest.TestCase):
             requirements={'require_hardware': [], 'min_comparable_pairs': 1})
         for kind in ['powerx', 'agentx', 'tco', 'releases', 'collectivex']:
             with self.subTest(kind=kind), self.assertRaisesRegex(
-                    ValueError, 'coverage|validity|comparable|point|policy|matching'):
+                    ValueError, 'coverage|validity|comparable|point|policy|matching|metric'):
                 check.check_bundle(fixtures[kind], self.VERSION)
 
     def test_result_source_fields_and_release_claims_cannot_be_rehashed(self):
@@ -1237,46 +1339,14 @@ class ContractOneBundleOracleTests(unittest.TestCase):
                 result['selection']['after']['rows'][0]['metrics'].update(median_ttft=None)))
         self.forge_coverage(fixtures['releases'], pairs=0,
                             hardware=[{'hardware': 'h200_sxm', 'valid_records': 0}])
-        self.rehash_result(
-            fixtures['collectivex'],
-            lambda result: result['comparisons'][0].update(
-                status='incomparable', issues=['topology_mismatch'], metrics=[]))
-        self.rehash_result(
-            fixtures['collectivex'],
-            lambda result: result.update(summary={
-                'matched': 0, 'only_left': 0, 'only_right': 0,
-                'ambiguous': 0, 'incomparable': 1}))
-        self.forge_coverage(fixtures['collectivex'], pairs=0)
+        fixtures['collectivex'] = self.collected('collectivex', 'kv-positive', lambda fixture:
+            fixture['responses'][1]['body']['kv'][0]['rows'][0].update(verify_passed=False))
         for kind in ['tco', 'releases', 'collectivex']:
             report = check.check_bundle(fixtures[kind], self.VERSION)
             self.assertEqual(report['eligible_records'], 0)
 
     def test_result_missing_log_is_valid_partial_evidence(self):
-        seed = self.fixtures()['result']
-        seed_manifest = json.loads((seed / 'manifest.json').read_text())
-        benchmark_body = json.loads(
-            (seed / seed_manifest['requests'][0]['response']['path']).read_text())
-        origin = 'https://inferencex.semianalysis.com'
-        directory = self.bundle(
-            'result', [
-                ('benchmarks', origin + '/api/v1/benchmarks?model=GLM-5', benchmark_body, 200),
-                ('workflow-info', origin + '/api/v1/workflow-info?date=2026-09-07',
-                 {'runs': [], 'changelogs': [], 'configs': [], 'runConfigs': []}, 200),
-                ('server-log', origin + '/api/v1/server-log?id=3', {'error': 'not found'}, 404),
-            ],
-            lambda ids: {
-                'schema_version': 1, 'kind': 'result',
-                'metadata': {'package_version': self.VERSION, 'selected_result_id': '3',
-                             'ran_new_benchmark': False},
-                'selected_result': {**benchmark_body[0], 'id': '3'},
-                'producer': {'status': 'unresolved', 'github_run_id': None, 'run_attempt': None,
-                             'workflow_run': None, 'run_configs': []},
-                'evidence': [{'response_id': item} for item in ids],
-                'log': {'status': 'not_found', 'text': None, 'source_response_id': ids[-1]},
-            },
-            {'status': 'partial', 'selected_records': 1, 'comparable_pairs': None,
-             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}],
-             'reasons': [{'code': 'log_unavailable', 'count': 1}]})
+        directory = self.collected('result', 'missing-log')
         report = check.check_bundle(directory, self.VERSION)
         self.assertEqual(report['eligible_records'], 1)
 
