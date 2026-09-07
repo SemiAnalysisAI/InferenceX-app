@@ -924,6 +924,151 @@ test('a stale none contender can overlap only cleanup after recovery settles the
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
 });
 
+test('terminal first-install cleanup cannot delete a newer completed installation', async () => {
+  const cwd = project('terminal cleanup generation 中文 path-');
+  const skillsRoot = join(cwd, '.agents/skills');
+  const destination = join(skillsRoot, 'inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+
+  const contenderReady = join(cwd, 'stale-none-before-mkdir');
+  const releaseContender = join(cwd, 'release-stale-none');
+  const newerReady = join(cwd, 'newer-canonical-ready');
+  const releaseNewer = join(cwd, 'release-newer-canonical');
+  const contenderPreload = join(project('terminal stale-none preload-'), 'preload.mjs');
+  writeFileSync(
+    contenderPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const originalMkdir = fs.mkdirSync;
+      const originalCopy = fs.cpSync;
+      let paused = false;
+      fs.mkdirSync = (path, options) => {
+        if (!paused && path === ${JSON.stringify(transaction)}) {
+          paused = true;
+          fs.writeFileSync(${JSON.stringify(contenderReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseContender)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return originalMkdir(path, options);
+      };
+      fs.cpSync = (source, target, options) => {
+        const result = originalCopy(source, target, options);
+        if (target === ${JSON.stringify(join(transaction, 'stage'))}) {
+          fs.writeFileSync(
+            ${JSON.stringify(join(transaction, 'stage/local-notes.txt'))},
+            'keep newer installation',
+          );
+          fs.writeFileSync(${JSON.stringify(newerReady)}, 'ready');
+          while (!fs.existsSync(${JSON.stringify(releaseNewer)})) {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+          }
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const contender = spawnPackedInstaller(
+    ['install', '--target', 'codex', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(contenderPreload).href)}`,
+  );
+  await waitForFile(contenderReady, contender.child);
+
+  const stageReady = join(cwd, 'first-install-stage-ready');
+  const stagePreload = join(project('first install crash preload-'), 'preload.mjs');
+  writeFileSync(
+    stagePreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.cpSync;
+      fs.cpSync = (source, target, options) => {
+        const result = original(source, target, options);
+        if (target === ${JSON.stringify(join(transaction, 'stage'))}) {
+          fs.writeFileSync(${JSON.stringify(stageReady)}, 'ready');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const crashedInstaller = spawnPackedInstaller(
+    ['install', '--target', 'codex', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(stagePreload).href)}`,
+  );
+  await waitForFile(stageReady, crashedInstaller.child);
+  process.kill(-crashedInstaller.child.pid, 'SIGKILL');
+  await crashedInstaller.closed;
+
+  const ownerMarker = readdirSync(transaction).find((name) => name.startsWith('owner-'));
+  assert.ok(ownerMarker);
+  const interrupted = JSON.parse(readFileSync(join(transaction, ownerMarker), 'utf8'));
+  const recovery = `${transaction}.recovering-${interrupted.transaction_id}`;
+  const cleanupReady = join(cwd, 'terminal-cleanup-moved');
+  const cleanupPreload = join(project('terminal cleanup crash preload-'), 'preload.mjs');
+  writeFileSync(
+    cleanupPreload,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.renameSync;
+      fs.renameSync = (source, target) => {
+        const result = original(source, target);
+        if (source === ${JSON.stringify(transaction)} && target === ${JSON.stringify(recovery)}) {
+          fs.writeFileSync(${JSON.stringify(cleanupReady)}, 'ready');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  const cleanupOwner = spawnPackedInstaller(
+    ['install', '--target', 'codex', '--json'],
+    cwd,
+    `--import=${JSON.stringify(pathToFileURL(cleanupPreload).href)}`,
+  );
+  await waitForFile(cleanupReady, cleanupOwner.child);
+  const terminalMarker = readdirSync(recovery).find((name) => name.startsWith('owner-'));
+  assert.ok(terminalMarker);
+  const terminalPhase = JSON.parse(readFileSync(join(recovery, terminalMarker), 'utf8')).phase;
+
+  writeFileSync(releaseContender, 'continue');
+  await waitForFile(newerReady, contender.child);
+  const coexistence = JSON.parse(run(['status', '--target', 'codex', '--json'], cwd).stdout);
+  assert.equal(coexistence.transaction_state, 'busy');
+  process.kill(-cleanupOwner.child.pid, 'SIGKILL');
+  await cleanupOwner.closed;
+
+  const follower = spawnPackedInstaller(['install', '--target', 'codex', '--json'], cwd);
+  for (let attempt = 0; attempt < 250 && existsSync(recovery); attempt++) {
+    if (follower.child.exitCode !== null) break;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
+  assert.equal(lstatSync(recovery, { throwIfNoEntry: false }), undefined, follower.output.stderr);
+  assert.equal(follower.child.exitCode, null, follower.output.stderr);
+  writeFileSync(releaseNewer, 'continue');
+  const [[contenderCode], [followerCode]] = await Promise.all([contender.closed, follower.closed]);
+
+  assert.equal(contenderCode, 0, `${contender.output.stdout}\n${contender.output.stderr}`);
+  assert.equal(JSON.parse(contender.output.stdout).outcome, 'installed');
+  assert.equal(followerCode, 0, `${follower.output.stdout}\n${follower.output.stderr}`);
+  assert.equal(JSON.parse(follower.output.stdout).outcome, 'skipped');
+  assert.equal(terminalPhase, 'cleanup');
+  assert.equal(
+    readFileSync(join(destination, 'local-notes.txt'), 'utf8'),
+    'keep newer installation',
+  );
+  assert.deepEqual(readdirSync(skillsRoot), ['inferencex-api']);
+});
+
 test('malformed, foreign, and symlink transaction markers fail closed without deletion', () => {
   for (const kind of ['malformed', 'foreign', 'symlink']) {
     const cwd = project(`${kind} transaction-`);

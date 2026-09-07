@@ -18,7 +18,7 @@ const RECOVERY_SUFFIX = '.recovering-';
 const NEXT_MARKER = 'transaction.next.json';
 const STAGE = 'stage';
 const PREVIOUS = 'previous';
-const PHASES = new Set(['staging', 'staged', 'previous_moved', 'activated']);
+const PHASES = new Set(['staging', 'staged', 'previous_moved', 'activated', 'cleanup']);
 const UUID_PATTERN = '[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}';
 const OWNER_PATTERN = new RegExp(
   `^owner-(?<transactionId>${UUID_PATTERN})-(?<pid>[1-9]\\d*)-(?<claimId>${UUID_PATTERN})\\.json$`,
@@ -170,21 +170,58 @@ function readTransaction(destination, transaction, recoveryTransactionId = null)
   ) {
     return blocked('installer transaction marker is foreign or malformed');
   }
+  if (record.phase === 'cleanup' && names.length !== 1) {
+    return blocked('terminal installer cleanup contains unexpected data');
+  }
   return { state: 'valid', identity, paths, record };
 }
 
 export function inspectInstallTransaction(destination, packageName, skillName) {
   const locations = transactionLocations(destination);
   const canonicalEntry = lstatSync(locations.canonical, { throwIfNoEntry: false });
-  if ((canonicalEntry && locations.recoveries.length > 0) || locations.recoveries.length > 1) {
+  const recoveries = [];
+  for (const recovery of locations.recoveries) {
+    if (recovery.transactionId === null) {
+      return blocked('installer recovery path is foreign or malformed');
+    }
+    const inspected = readTransaction(destination, recovery.path, recovery.transactionId);
+    if (inspected.state === 'missing') continue;
+    if (inspected.state === 'blocked') return inspected;
+    if (
+      inspected.state === 'valid' &&
+      (inspected.record.package !== packageName || inspected.record.skill !== skillName)
+    ) {
+      return blocked('installer transaction marker is foreign or malformed');
+    }
+    recoveries.push({ location: recovery, inspected });
+  }
+  let canonical;
+  if (canonicalEntry) {
+    canonical = readTransaction(destination, locations.canonical);
+    if (canonical.state === 'blocked') return canonical;
+    if (
+      canonical.state === 'valid' &&
+      (canonical.record.package !== packageName || canonical.record.skill !== skillName)
+    ) {
+      return blocked('installer transaction marker is foreign or malformed');
+    }
+  }
+  if (
+    ((canonical && recoveries.length > 0) || recoveries.length > 1) &&
+    recoveries.some(
+      ({ inspected }) => inspected.state !== 'cleanup' && inspected.record.phase !== 'cleanup',
+    )
+  ) {
     return blocked('multiple installer transaction paths require manual inspection');
   }
-  const recovery = locations.recoveries[0];
-  if (recovery && recovery.transactionId === null) {
-    return blocked('installer recovery path is foreign or malformed');
+  const selected =
+    recoveries[0] ??
+    (canonical ? { location: { path: locations.canonical }, inspected: canonical } : null);
+  if (!selected) {
+    return { state: 'none', phase: null, had_destination: null, reason: null };
   }
-  const transaction = recovery?.path ?? locations.canonical;
-  const inspected = readTransaction(destination, transaction, recovery?.transactionId);
+  const { inspected } = selected;
+  const transaction = selected.location.path;
   if (inspected.state === 'missing') {
     return { state: 'none', phase: null, had_destination: null, reason: null };
   }
@@ -196,21 +233,22 @@ export function inspectInstallTransaction(destination, packageName, skillName) {
       had_destination: null,
       transaction,
       cleanup_only: true,
+      marker_name: null,
       projected_destination_exists: inspected.projectedDestinationExists,
       reason: 'interrupted installer transaction cleanup needs recovery',
     };
   }
-  if (inspected.record.package !== packageName || inspected.record.skill !== skillName) {
-    return blocked('installer transaction marker is foreign or malformed');
-  }
   const live = processIsLive(inspected.identity.ownerPid);
+  const cleanupOnly = inspected.record.phase === 'cleanup';
   return {
     state: live ? 'busy' : 'recoverable',
     phase: inspected.record.phase,
     had_destination: inspected.record.had_destination,
-    projected_destination_exists:
-      inspected.record.phase === 'activated' || inspected.record.had_destination,
+    projected_destination_exists: cleanupOnly
+      ? Boolean(lstatSync(destination, { throwIfNoEntry: false }))
+      : inspected.record.phase === 'activated' || inspected.record.had_destination,
     transaction,
+    cleanup_only: cleanupOnly,
     marker_name: inspected.paths.markerName,
     transaction_id: inspected.identity.transactionId,
     reason: live
@@ -260,7 +298,9 @@ function removeOwnedContents(paths) {
 
 function finishCleanup(destination, paths, record) {
   removeOwnedContents(paths);
-  const recoveryPaths = moveToRecovery(destination, paths, record);
+  const terminalRecord = { ...record, phase: 'cleanup' };
+  updateMarker(paths, terminalRecord);
+  const recoveryPaths = moveToRecovery(destination, paths, terminalRecord);
   rmSync(recoveryPaths.marker);
   rmdirSync(recoveryPaths.transaction);
 }
@@ -280,6 +320,10 @@ function recoverOwnedTransaction(destination, paths, record) {
   const stageExists = Boolean(lstatSync(paths.stage, { throwIfNoEntry: false }));
   const previousExists = Boolean(lstatSync(paths.previous, { throwIfNoEntry: false }));
 
+  if (record.phase === 'cleanup') {
+    finishCleanup(destination, paths, record);
+    return;
+  }
   if (record.phase === 'activated') {
     cleanupCommittedTransaction(destination, paths, record);
     return;
@@ -305,7 +349,7 @@ function recoverOwnedTransaction(destination, paths, record) {
 }
 
 function claimRecovery(destination, packageName, skillName, state) {
-  if (state.cleanup_only) {
+  if (state.cleanup_only && state.marker_name === null) {
     try {
       rmdirSync(state.transaction);
     } catch (error) {
@@ -337,6 +381,10 @@ function claimRecovery(destination, packageName, skillName, state) {
   }
   const record = { ...inspected.record, owner_pid: process.pid };
   updateMarker(inspected.paths, record);
+  if (record.phase === 'cleanup') {
+    finishCleanup(destination, inspected.paths, record);
+    return { cleanupOnly: true };
+  }
   return { cleanupOnly: false, paths: inspected.paths, record };
 }
 
