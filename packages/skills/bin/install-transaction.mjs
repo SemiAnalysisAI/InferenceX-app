@@ -296,13 +296,17 @@ function removeOwnedContents(paths) {
   rmSync(paths.nextMarker, { force: true });
 }
 
+function finishTerminalCleanup(destination, paths, record) {
+  const recoveryPaths = moveToRecovery(destination, paths, record);
+  rmSync(recoveryPaths.marker);
+  rmdirSync(recoveryPaths.transaction);
+}
+
 function finishCleanup(destination, paths, record) {
   removeOwnedContents(paths);
   const terminalRecord = { ...record, phase: 'cleanup' };
   updateMarker(paths, terminalRecord);
-  const recoveryPaths = moveToRecovery(destination, paths, terminalRecord);
-  rmSync(recoveryPaths.marker);
-  rmdirSync(recoveryPaths.transaction);
+  finishTerminalCleanup(destination, paths, terminalRecord);
 }
 
 function cleanupCommittedTransaction(destination, paths, record) {
@@ -321,7 +325,7 @@ function recoverOwnedTransaction(destination, paths, record) {
   const previousExists = Boolean(lstatSync(paths.previous, { throwIfNoEntry: false }));
 
   if (record.phase === 'cleanup') {
-    finishCleanup(destination, paths, record);
+    finishTerminalCleanup(destination, paths, record);
     return;
   }
   if (record.phase === 'activated') {
@@ -379,12 +383,12 @@ function claimRecovery(destination, packageName, skillName, state) {
   ) {
     failRecovery('claimed installer transaction identity does not match the observed owner token');
   }
-  const record = { ...inspected.record, owner_pid: process.pid };
-  updateMarker(inspected.paths, record);
-  if (record.phase === 'cleanup') {
-    finishCleanup(destination, inspected.paths, record);
+  if (inspected.record.phase === 'cleanup') {
+    finishTerminalCleanup(destination, inspected.paths, inspected.record);
     return { cleanupOnly: true };
   }
+  const record = { ...inspected.record, owner_pid: process.pid };
+  updateMarker(inspected.paths, record);
   return { cleanupOnly: false, paths: inspected.paths, record };
 }
 
