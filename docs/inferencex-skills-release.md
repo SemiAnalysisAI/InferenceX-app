@@ -1,10 +1,10 @@
 # Releasing the InferenceX API skill
 
 The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
-`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, `0.8.0`, and `0.9.0` are immutable
-public releases. The website advertises the verified `0.8.0` release. For later
-releases, keep website commands pinned until publication and public verification
-succeed. The
+`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, `0.8.0`, `0.9.0`, `0.10.0`, and
+`0.11.0` are immutable public releases. The website advertises the verified
+`0.11.0` release. For later releases, keep website commands pinned until publication
+and public verification succeed. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
 Adding this workflow does not configure npm access or prove a successful OIDC release.
@@ -100,6 +100,17 @@ row count. Use `--date YYYY-MM-DD` for a reproducible cutoff and `--raw-model KE
 when intentionally selecting a particular returned model. A positive example that
 no longer returns validated observations fails visibly; review the API and choose
 an available workload instead of silently passing an empty export.
+
+From 0.11.0, candidate and public verification also replay five saved captures per
+target with the installed offline verifier: PowerX JSON/CSV, AgentX summary JSON/CSV,
+and the excluded AgentX JSON selection. The independent Python oracle still checks
+their source data and exports first. Each capture is replayed twice
+for each target, totaling 20 runs across Codex and Claude Code per verification.
+The replay subprocesses reject `fetch` calls and must exit successfully. Each
+Markdown report pair must be nonempty and byte-identical; export/evidence file
+lists, modes, sizes and SHA-256 fingerprints must remain unchanged. These automatic
+checks supplement the live checks and native discovery acceptance; they do not
+replace either.
 
 ## Independent native-agent acceptance
 
