@@ -20,7 +20,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costr: 0.7 })),
   };
 });
 
@@ -39,10 +39,8 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   };
@@ -138,7 +136,7 @@ describe('updateRepoUrl', () => {
 
 // ===========================================================================
 // calculateCostsForGpus (produces both cost-per-million and tokens-per-dollar)
-// costh=2.8, costn=1.4, costr=0.7 (from mock, but this fn uses userCosts arg)
+// costh=2.8, costr=0.7 (from mock, but this fn uses userCosts arg)
 // ===========================================================================
 describe('calculateCostsForGpus', () => {
   it('computes purchasing power: tpPerGpu=1000, userCost=$5/hr → 720,000 tok/$', () => {
@@ -230,19 +228,17 @@ describe('calculatePowerForGpus', () => {
 
 // ===========================================================================
 // computeOutputCostFields
-// mock: getHardwareConfig → { costh: 2.8, costn: 1.4, costr: 0.7 }
+// mock: getHardwareConfig → { costh: 2.8, costr: 0.7 }
 // ===========================================================================
 describe('computeOutputCostFields', () => {
   it('skips computation when all output cost fields already exist', () => {
     const existing = {
       costhOutput: { y: 99, roof: false },
-      costnOutput: { y: 99, roof: false },
       costrOutput: { y: 99, roof: false },
     };
     const item = pt(existing);
     const result = computeOutputCostFields([item]);
     expect(result[0].costhOutput?.y).toBe(99);
-    expect(result[0].costnOutput?.y).toBe(99);
     expect(result[0].costrOutput?.y).toBe(99);
   });
 
@@ -252,7 +248,6 @@ describe('computeOutputCostFields', () => {
     });
     const result = computeOutputCostFields([item]);
     expect(result[0].costhOutput?.y).toBe(0.778);
-    expect(result[0].costnOutput?.y).toBe(0.389);
     expect(result[0].costrOutput?.y).toBe(0.194);
     expect(result[0].outputTokensPerDollarH?.y).toBeCloseTo(1_285_714.286, 3);
     expect(result[0].costhOutput?.roof).toBe(false);
@@ -263,7 +258,6 @@ describe('computeOutputCostFields', () => {
     const item = pt({ tpPerGpu: { y: 1000, roof: false } });
     const result = computeOutputCostFields([item]);
     expect(result[0].costhOutput?.y).toBe(0.889);
-    expect(result[0].costnOutput?.y).toBe(0.444);
     expect(result[0].costrOutput?.y).toBe(0.222);
     expect(result[0].outputTokensPerDollarH?.y).toBeCloseTo(1_125_000, 3);
   });
@@ -271,13 +265,13 @@ describe('computeOutputCostFields', () => {
   it('does not overwrite an existing costhOutput field (partial override)', () => {
     const item = pt({
       costhOutput: { y: 42, roof: false },
-      // costnOutput and costrOutput are absent — early return won't fire
+      // costrOutput is absent — early return won't fire
     });
     const result = computeOutputCostFields([item]);
     // costhOutput already existed → kept as 42
     expect(result[0].costhOutput?.y).toBe(42);
-    // costnOutput was absent → computed
-    expect(result[0].costnOutput?.y).toBe(0.444);
+    // costrOutput was absent → computed
+    expect(result[0].costrOutput?.y).toBe(0.222);
   });
 
   it('returns an empty array for empty input', () => {
@@ -287,33 +281,29 @@ describe('computeOutputCostFields', () => {
 
 // ===========================================================================
 // computeInputCostFields
-// mock: getHardwareConfig → { costh: 2.8, costn: 1.4, costr: 0.7 }
-// costhi/costni/costri are REQUIRED in InferenceData, so a valid fixture
+// mock: getHardwareConfig → { costh: 2.8, costr: 0.7 }
+// costhi/costri are REQUIRED in InferenceData, so a valid fixture
 // always triggers the early-return. use `undefined as any` to reach compute path.
 // ===========================================================================
 describe('computeInputCostFields', () => {
   it('skips computation when all input cost fields already exist', () => {
     const item = pt({
       costhi: { y: 99, roof: false },
-      costni: { y: 99, roof: false },
       costri: { y: 99, roof: false },
     });
     const result = computeInputCostFields([item]);
     expect(result[0].costhi?.y).toBe(99);
-    expect(result[0].costni?.y).toBe(99);
     expect(result[0].costri?.y).toBe(99);
   });
 
   it('computes both input cost and input tokens per dollar', () => {
     const item = pt({
       costhi: undefined as any,
-      costni: undefined as any,
       costri: undefined as any,
       inputTputPerGpu: { y: 200, roof: false },
     });
     const result = computeInputCostFields([item]);
     expect(result[0].costhi?.y).toBe(3.889);
-    expect(result[0].costni?.y).toBe(1.944);
     expect(result[0].costri?.y).toBe(0.972);
     expect(result[0].inputTokensPerDollarH?.y).toBeCloseTo(257_142.857, 3);
     expect(result[0].costhi?.roof).toBe(false);
@@ -323,13 +313,11 @@ describe('computeInputCostFields', () => {
     // fallback tput = 1000 * 0.125 = 125
     const item = pt({
       costhi: undefined as any,
-      costni: undefined as any,
       costri: undefined as any,
       tpPerGpu: { y: 1000, roof: false },
     });
     const result = computeInputCostFields([item]);
     expect(result[0].costhi?.y).toBe(6.222);
-    expect(result[0].costni?.y).toBe(3.111);
     expect(result[0].costri?.y).toBe(1.556);
     expect(result[0].inputTokensPerDollarH?.y).toBeCloseTo(160_714.286, 3);
   });
@@ -337,14 +325,13 @@ describe('computeInputCostFields', () => {
   it('does not overwrite an existing costhi field (partial override)', () => {
     const item = pt({
       costhi: { y: 77, roof: false },
-      costni: undefined as any,
       costri: undefined as any,
     });
     const result = computeInputCostFields([item]);
     // costhi already existed → kept as 77
     expect(result[0].costhi?.y).toBe(77);
-    // costni was absent → computed (fallback: tpPerGpu=1000)
-    expect(result[0].costni?.y).toBe(3.111);
+    // costri was absent → computed (fallback: tpPerGpu=1000)
+    expect(result[0].costri?.y).toBe(1.556);
   });
 
   it('returns an empty array for empty input', () => {

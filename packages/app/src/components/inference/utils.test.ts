@@ -40,10 +40,8 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 2, roof: false },
-    costn: { y: 1.5, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 5, roof: false },
-    costni: { y: 3, roof: false },
     costri: { y: 1.5, roof: false },
     ...overrides,
   };
@@ -87,13 +85,6 @@ describe('filterDataByCostLimit', () => {
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costh');
     expect(result).toHaveLength(2);
     expect(result.every((p) => p.costh.y <= 2)).toBe(true);
-  });
-
-  it('filters by costn.y <= y_cost_limit', () => {
-    const data = [pt({ costn: { y: 1, roof: false } }), pt({ costn: { y: 3, roof: false } })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.5 }), 'y_costn');
-    expect(result).toHaveLength(1);
-    expect(result[0].costn.y).toBe(1);
   });
 
   it('filters by costr.y <= y_cost_limit', () => {
@@ -381,10 +372,10 @@ describe('processOverlayChartData', () => {
 
   it('keeps all unofficial-run tokens-per-dollar points without the former cost clamp', () => {
     const data = [
-      pt({ tokensPerDollarN: { y: 500_000, roof: false }, median_intvty: 10 } as any),
-      pt({ tokensPerDollarN: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
+      pt({ tokensPerDollarH: { y: 500_000, roof: false }, median_intvty: 10 } as any),
+      pt({ tokensPerDollarH: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarN', null);
+    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarH', null);
     expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
@@ -399,12 +390,12 @@ describe('processOverlayChartData', () => {
 
   it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
-      tokensPerDollarN: { y: 500_000, roof: false },
+      tokensPerDollarH: { y: 500_000, roof: false },
       median_intvty: 10,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
     const highValue = pt({
-      tokensPerDollarN: { y: 2_000_000, roof: false },
+      tokensPerDollarH: { y: 2_000_000, roof: false },
       median_intvty: 20,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
@@ -412,7 +403,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartDataWithClipping(
       [visible, highValue],
       'interactivity',
-      'y_tokensPerDollarN',
+      'y_tokensPerDollarH',
       null,
     );
 

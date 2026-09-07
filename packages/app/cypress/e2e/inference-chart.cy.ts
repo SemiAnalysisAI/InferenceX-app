@@ -83,7 +83,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('contain.text', 'Cost Tier: Owning Hyperscaler')
+      .should('contain.text', 'Cost Tier: Owning at Large Hyperscaler Volume')
       .and('contain.text', 'Updated:')
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
@@ -191,7 +191,7 @@ describe('Inference Chart', () => {
   it('plots infrastructure total tokens per dollar for official and unofficial runs', () => {
     interceptOverlayRun();
     cy.visit(
-      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarN`,
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarH`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -203,7 +203,7 @@ describe('Inference Chart', () => {
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
@@ -214,7 +214,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('have.text', 'Owning Neocloud Giant');
+      .should('have.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
       'have.length.greaterThan',
       0,
@@ -223,10 +223,10 @@ describe('Inference Chart', () => {
       'have.length.greaterThan',
       0,
     );
-    openYAxisHelp('y_tokensPerDollarN');
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+    openYAxisHelp('y_tokensPerDollarH');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]')
       .should('contain.text', 'infrastructure spend')
-      .and('contain.text', 'Neocloud Giant')
+      .and('contain.text', 'large hyperscaler purchasing volume')
       .and('contain.text', 'all-in cost per chip-hour');
   });
 
@@ -296,14 +296,14 @@ describe('Inference Chart', () => {
     cy.viewport(390, 844);
     interceptOverlayRun();
     cy.visit(
-      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarN`,
+      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarH`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@unofficialRun');
 
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
+      '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模云大批量）',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
@@ -314,15 +314,15 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('have.text', '自有（Neocloud Giant）');
+      .should('have.text', '自有（超大规模云大批量）');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,
     );
-    openYAxisHelp('y_tokensPerDollarN');
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarN"]')
+    openYAxisHelp('y_tokensPerDollarH');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]')
       .should('contain.text', '基础设施开支')
-      .and('contain.text', 'Neocloud Giant')
+      .and('contain.text', '超大规模云厂商大批量采购价')
       .and('contain.text', '每芯片小时全包成本');
   });
 

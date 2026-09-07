@@ -98,8 +98,11 @@ const COST_PROVIDER_OPTIONS: {
   label: string;
   labelZh: string;
 }[] = [
-  { value: 'costh', label: 'Hyperscaler', labelZh: '超大规模云服务商' },
-  { value: 'costn', label: 'Neocloud', labelZh: 'Neocloud' },
+  {
+    value: 'costh',
+    label: 'Owning at Large Hyperscaler Volume',
+    labelZh: '自有 - 超大规模云大批量',
+  },
   { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
 ];
 
@@ -188,7 +191,7 @@ const STRINGS = {
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental.',
+      'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or 3-year rental.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -249,7 +252,7 @@ const STRINGS = {
       '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
     costProviderLabel: '计价方式',
     costProviderTooltip:
-      '用于计算每百万 token 成本的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
+      '用于计算每百万 token 成本的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年租赁。',
     costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'token 类型',
     tokenTypeTooltip: '选择显示总 token、仅输入 token 还是仅输出 token 的成本。',
@@ -1281,12 +1284,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
                                   {specs.badgeLabel ?? base.toUpperCase()}: $
-                                  {(costProvider === 'costh'
-                                    ? specs.costh
-                                    : costProvider === 'costn'
-                                      ? specs.costn
-                                      : specs.costr
-                                  ).toFixed(2)}
+                                  {(costProvider === 'costh' ? specs.costh : specs.costr).toFixed(
+                                    2,
+                                  )}
                                   /hr
                                 </Badge>
                               ))}

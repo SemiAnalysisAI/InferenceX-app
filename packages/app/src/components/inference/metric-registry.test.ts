@@ -17,6 +17,7 @@ import {
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
 } from './metric-registry';
+import type { YAxisMetricKey } from './types';
 
 describe('metric registry', () => {
   it('derives chart-specific roofline corners from one polarity owner', () => {
@@ -27,8 +28,8 @@ describe('metric registry', () => {
     expect(e2e.y_tpPerGpu_roofline).toBe('upper_right');
     expect(interactivity.y_tokenRevenuePerGpuHour_roofline).toBe('upper_left');
     expect(e2e.y_tokenRevenuePerGpuHour_roofline).toBe('upper_right');
-    expect(interactivity.y_tokensPerDollarN_roofline).toBe('upper_left');
-    expect(e2e.y_tokensPerDollarN_roofline).toBe('upper_right');
+    expect(interactivity.y_tokensPerDollarH_roofline).toBe('upper_left');
+    expect(e2e.y_tokensPerDollarH_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
@@ -78,13 +79,10 @@ describe('metric registry', () => {
   it('labels every infrastructure purchasing-power metric as TCO', () => {
     const metricKeys = [
       'tokensPerDollarH',
-      'tokensPerDollarN',
       'tokensPerDollarR',
       'outputTokensPerDollarH',
-      'outputTokensPerDollarN',
       'outputTokensPerDollarR',
       'inputTokensPerDollarH',
-      'inputTokensPerDollarN',
       'inputTokensPerDollarR',
       'tokensPerDollarUser',
     ] as const;
@@ -127,7 +125,6 @@ describe('metric registry', () => {
 
   it('keeps the cost tier out of the chart title and appends it to the option label', () => {
     expect(metricCostTier('tokensPerDollarH')).toBe('hyperscaler');
-    expect(metricCostTier('costn')).toBe('neocloud');
     expect(metricCostTier('inputTokensPerDollarR')).toBe('rental');
     expect(metricCostTier('costUser')).toBe('custom');
     expect(metricCostTier('tpPerGpu')).toBeUndefined();
@@ -136,25 +133,21 @@ describe('metric registry', () => {
     expect(metricChartTitle('tokensPerDollarH', 'en')).toBe('Total Tokens per $1 TCO');
     expect(metricChartTitle('tokensPerDollarH', 'zh')).toBe('每 1 美元 TCO 对应的总 token 数');
     expect(metricOptionTitle('tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
-    );
-    expect(metricOptionTitle('tokensPerDollarN', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     expect(metricOptionTitle('costr', 'en')).toBe('Cost per Million Total Tokens (3 Year Rental)');
-    expect(metricOptionTitle('costh', 'zh')).toBe('每百万总 token 成本（自有 - 超大规模）');
+    expect(metricOptionTitle('costh', 'zh')).toBe('每百万总 token 成本（自有 - 超大规模云大批量）');
     expect(metricOptionTitle('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
 
-    expect(costTierLabel('hyperscaler', 'en')).toBe('Owning Hyperscaler');
-    expect(costTierLabel('neocloud', 'en')).toBe('Owning Neocloud Giant');
+    expect(costTierLabel('hyperscaler', 'en')).toBe('Owning at Large Hyperscaler Volume');
     expect(costTierLabel('rental', 'en')).toBe('3 Year Rental');
-    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模）');
+    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模云大批量）');
 
     // Chart definitions carry both spellings so the selector and the heading
     // read from the same registry entry.
     const [interactivity] = chartDefinitions;
     expect(interactivity.y_tokensPerDollarH_title).toBe(
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     expect(interactivity.y_tokensPerDollarH_chartTitle).toBe('Total Tokens per $1 TCO');
     expect(interactivity.y_tokensPerDollarH_costTier).toBe('hyperscaler');
@@ -200,19 +193,39 @@ describe('metric compatibility', () => {
     expect(isBenchmarkMetricKey('removedMetric')).toBe(false);
   });
 
-  it('maps links for the removed API-price metric to Neocloud infrastructure cost', () => {
-    expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarN');
+  it('maps links for the removed API-price metric to hyperscaler-volume infrastructure cost', () => {
+    expect(resolveMetricConfigKey('y_tokensPerDollar')).toBe('y_tokensPerDollarH');
+  });
+
+  it.each([
+    ['y_tokensPerDollarN', 'y_tokensPerDollarH'],
+    ['y_outputTokensPerDollarN', 'y_outputTokensPerDollarH'],
+    ['y_inputTokensPerDollarN', 'y_inputTokensPerDollarH'],
+    ['y_costn', 'y_costh'],
+    ['y_costnOutput', 'y_costhOutput'],
+    ['y_costni', 'y_costhi'],
+  ])('maps removed Neocloud axis %s to the hyperscaler-volume metric %s', (legacy, expected) => {
+    expect(resolveMetricConfigKey(legacy)).toBe(expected);
+  });
+
+  it('does not offer any Neocloud-tier axis', () => {
+    for (const key of Object.keys(METRIC_REGISTRY) as YAxisMetricKey[]) {
+      expect(key).not.toMatch(
+        /^(?:costn|tokensPerDollarN|outputTokensPerDollarN|inputTokensPerDollarN)/u,
+      );
+      expect(metricCostTier(key)).not.toBe('neocloud');
+    }
   });
 
   it.each([
     ['y_tokensPerRmbH', 'y_tokensPerDollarH'],
-    ['y_tokensPerRmbN', 'y_tokensPerDollarN'],
+    ['y_tokensPerRmbN', 'y_tokensPerDollarH'],
     ['y_tokensPerRmbR', 'y_tokensPerDollarR'],
     ['y_outputTokensPerRmbH', 'y_outputTokensPerDollarH'],
-    ['y_outputTokensPerRmbN', 'y_outputTokensPerDollarN'],
+    ['y_outputTokensPerRmbN', 'y_outputTokensPerDollarH'],
     ['y_outputTokensPerRmbR', 'y_outputTokensPerDollarR'],
     ['y_inputTokensPerRmbH', 'y_inputTokensPerDollarH'],
-    ['y_inputTokensPerRmbN', 'y_inputTokensPerDollarN'],
+    ['y_inputTokensPerRmbN', 'y_inputTokensPerDollarH'],
     ['y_inputTokensPerRmbR', 'y_inputTokensPerDollarR'],
   ])('maps removed RMB axis %s to its USD equivalent %s', (legacy, expected) => {
     expect(resolveMetricConfigKey(legacy)).toBe(expected);
@@ -232,7 +245,7 @@ describe('metric compatibility', () => {
     expect(resolveMetricConfigKey('y_costUser')).toBe('y_costUser');
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('tokenRevenuePerGpuHour')).toBe(true);
-    expect(isBenchmarkMetricKey('tokensPerDollarN')).toBe(true);
+    expect(isBenchmarkMetricKey('tokensPerDollarR')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
   });
@@ -243,7 +256,7 @@ describe('metric compatibility', () => {
     expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_tokenRevenuePerGpuHour')).toBe('total');
-    expect(tokenMetricTypeForConfigKey('y_tokensPerDollarN')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_tokensPerDollarR')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
     expect(tokenMetricTypeForConfigKey('y_measuredPrefillJPerInputToken')).toBe('input');
     expect(tokenMetricTypeForConfigKey('y_measuredDecodeJPerOutputToken')).toBe('output');

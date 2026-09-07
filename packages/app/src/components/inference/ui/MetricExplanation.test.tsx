@@ -39,9 +39,9 @@ afterEach(() => {
 
 describe('MetricExplanation', () => {
   it('preserves the full cost-basis explanation and formula in selector help', () => {
-    act(() => root.render(<MetricExplanation metricKey="tokensPerDollarN" />));
+    act(() => root.render(<MetricExplanation metricKey="tokensPerDollarH" />));
     expect(container.textContent).toContain('infrastructure spend');
-    expect(container.textContent).toContain('Neocloud Giant');
+    expect(container.textContent).toContain('large hyperscaler purchasing volume');
     expect(container.querySelector('code')!.textContent).toBe(
       'tok/$ = (total tok/s/chip × 3,600) ÷ all-in cost per chip-hour ($)',
     );

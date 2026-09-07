@@ -7,25 +7,19 @@ export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'l
  * Pricing basis behind a cost or purchasing-power metric. The chart heading
  * shows only the metric (`title`); the tier is spelled out separately in the
  * caption's "Cost Tier" line and appended to the y-axis option label so the
- * three variants stay distinguishable in the selector.
+ * two variants stay distinguishable in the selector.
  */
-export type CostTier = 'hyperscaler' | 'neocloud' | 'rental' | 'custom';
+export type CostTier = 'hyperscaler' | 'rental' | 'custom';
 
 export const COST_TIER_LABELS: Record<
   CostTier,
   { option: string; optionZh: string; label: string; labelZh: string }
 > = {
   hyperscaler: {
-    option: 'Owning - Hyperscaler',
-    optionZh: '自有 - 超大规模',
-    label: 'Owning Hyperscaler',
-    labelZh: '自有（超大规模）',
-  },
-  neocloud: {
-    option: 'Owning - Neocloud Giant',
-    optionZh: '自有 - Neocloud Giant',
-    label: 'Owning Neocloud Giant',
-    labelZh: '自有（Neocloud Giant）',
+    option: 'Owning at Large Hyperscaler Volume',
+    optionZh: '自有 - 超大规模云大批量',
+    label: 'Owning at Large Hyperscaler Volume',
+    labelZh: '自有（超大规模云大批量）',
   },
   rental: {
     option: '3 Year Rental',
@@ -103,15 +97,6 @@ export const METRIC_REGISTRY = {
     costTier: 'hyperscaler',
     polarity: 'higher',
   },
-  tokensPerDollarN: {
-    field: 'tokensPerDollarN.y',
-    label: 'Total Tokens per $1 TCO (tok/$)',
-    labelZh: '每 1 美元 TCO 对应的总 token 数（tok/$）',
-    title: 'Total Tokens per $1 TCO',
-    titleZh: '每 1 美元 TCO 对应的总 token 数',
-    costTier: 'neocloud',
-    polarity: 'higher',
-  },
   tokensPerDollarR: {
     field: 'tokensPerDollarR.y',
     label: 'Total Tokens per $1 TCO (tok/$)',
@@ -154,15 +139,6 @@ export const METRIC_REGISTRY = {
     costTier: 'hyperscaler',
     polarity: 'lower',
   },
-  costn: {
-    field: 'costn.y',
-    label: 'Cost per Million Total Tokens ($)',
-    labelZh: '每百万总 token 成本（$）',
-    title: 'Cost per Million Total Tokens',
-    titleZh: '每百万总 token 成本',
-    costTier: 'neocloud',
-    polarity: 'lower',
-  },
   costr: {
     field: 'costr.y',
     label: 'Cost per Million Total Tokens ($)',
@@ -179,15 +155,6 @@ export const METRIC_REGISTRY = {
     title: 'Cost per Million Output Tokens',
     titleZh: '每百万输出 token 成本',
     costTier: 'hyperscaler',
-    polarity: 'lower',
-  },
-  costnOutput: {
-    field: 'costnOutput.y',
-    label: 'Cost per Million Output Tokens ($)',
-    labelZh: '每百万输出 token 成本（$）',
-    title: 'Cost per Million Output Tokens',
-    titleZh: '每百万输出 token 成本',
-    costTier: 'neocloud',
     polarity: 'lower',
   },
   costrOutput: {
@@ -208,15 +175,6 @@ export const METRIC_REGISTRY = {
     costTier: 'hyperscaler',
     polarity: 'lower',
   },
-  costni: {
-    field: 'costni.y',
-    label: 'Cost per Million Input Tokens ($)',
-    labelZh: '每百万输入 token 成本（$）',
-    title: 'Cost per Million Input Tokens',
-    titleZh: '每百万输入 token 成本',
-    costTier: 'neocloud',
-    polarity: 'lower',
-  },
   costri: {
     field: 'costri.y',
     label: 'Cost per Million Input Tokens ($)',
@@ -235,15 +193,6 @@ export const METRIC_REGISTRY = {
     costTier: 'hyperscaler',
     polarity: 'higher',
   },
-  outputTokensPerDollarN: {
-    field: 'outputTokensPerDollarN.y',
-    label: 'Output Tokens per $1 TCO (tok/$)',
-    labelZh: '每 1 美元 TCO 对应的输出 token 数（tok/$）',
-    title: 'Output Tokens per $1 TCO',
-    titleZh: '每 1 美元 TCO 对应的输出 token 数',
-    costTier: 'neocloud',
-    polarity: 'higher',
-  },
   outputTokensPerDollarR: {
     field: 'outputTokensPerDollarR.y',
     label: 'Output Tokens per $1 TCO (tok/$)',
@@ -260,15 +209,6 @@ export const METRIC_REGISTRY = {
     title: 'Input Tokens per $1 TCO',
     titleZh: '每 1 美元 TCO 对应的输入 token 数',
     costTier: 'hyperscaler',
-    polarity: 'higher',
-  },
-  inputTokensPerDollarN: {
-    field: 'inputTokensPerDollarN.y',
-    label: 'Input Tokens per $1 TCO (tok/$)',
-    labelZh: '每 1 美元 TCO 对应的输入 token 数（tok/$）',
-    title: 'Input Tokens per $1 TCO',
-    titleZh: '每 1 美元 TCO 对应的输入 token 数',
-    costTier: 'neocloud',
     polarity: 'higher',
   },
   inputTokensPerDollarR: {
@@ -433,16 +373,24 @@ export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarH' satisfies MetricConfigKey;
 
 const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
-  y_tokensPerDollar: 'y_tokensPerDollarN',
+  y_tokensPerDollar: 'y_tokensPerDollarH',
+  // The Neocloud ownership tier was removed; shared links land on the
+  // hyperscaler-volume ownership variant of the same metric.
+  y_tokensPerDollarN: 'y_tokensPerDollarH',
+  y_outputTokensPerDollarN: 'y_outputTokensPerDollarH',
+  y_inputTokensPerDollarN: 'y_inputTokensPerDollarH',
+  y_costn: 'y_costh',
+  y_costnOutput: 'y_costhOutput',
+  y_costni: 'y_costhi',
   // The ¥-priced axes were removed; shared links land on the same tokens in $.
   y_tokensPerRmbH: 'y_tokensPerDollarH',
-  y_tokensPerRmbN: 'y_tokensPerDollarN',
+  y_tokensPerRmbN: 'y_tokensPerDollarH',
   y_tokensPerRmbR: 'y_tokensPerDollarR',
   y_outputTokensPerRmbH: 'y_outputTokensPerDollarH',
-  y_outputTokensPerRmbN: 'y_outputTokensPerDollarN',
+  y_outputTokensPerRmbN: 'y_outputTokensPerDollarH',
   y_outputTokensPerRmbR: 'y_outputTokensPerDollarR',
   y_inputTokensPerRmbH: 'y_inputTokensPerDollarH',
-  y_inputTokensPerRmbN: 'y_inputTokensPerDollarN',
+  y_inputTokensPerRmbN: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbR: 'y_inputTokensPerDollarR',
 };
 
@@ -465,7 +413,7 @@ export function metricChartTitle(metricKey: MetricKey, locale: 'en' | 'zh'): str
 
 /**
  * Y-axis option label: the chart title plus its cost tier in parentheses, so
- * the Hyperscaler / Neocloud / Rental variants read apart in the selector.
+ * the Hyperscaler / Rental variants read apart in the selector.
  */
 export function metricOptionTitle(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   const title = metricChartTitle(metricKey, locale);
@@ -595,32 +543,32 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Total Tokens per $1 TCO',
     labelZh: '每 1 美元 TCO 对应的总 token 数',
-    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
+    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarR'],
   },
   {
     label: 'Output Tokens per $1 TCO',
     labelZh: '每 1 美元 TCO 对应的输出 token 数',
-    metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarN', 'y_outputTokensPerDollarR'],
+    metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarR'],
   },
   {
     label: 'Input Tokens per $1 TCO',
     labelZh: '每 1 美元 TCO 对应的输入 token 数',
-    metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarN', 'y_inputTokensPerDollarR'],
+    metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarR'],
   },
   {
     label: 'Cost per Million Total Tokens',
     labelZh: '每百万总 token 成本',
-    metrics: ['y_costh', 'y_costn', 'y_costr'],
+    metrics: ['y_costh', 'y_costr'],
   },
   {
     label: 'Cost per Million Output Tokens',
     labelZh: '每百万输出 token 成本',
-    metrics: ['y_costhOutput', 'y_costnOutput', 'y_costrOutput'],
+    metrics: ['y_costhOutput', 'y_costrOutput'],
   },
   {
     label: 'Cost per Million Input Tokens',
     labelZh: '每百万输入 token 成本',
-    metrics: ['y_costhi', 'y_costni', 'y_costri'],
+    metrics: ['y_costhi', 'y_costri'],
   },
   {
     label: 'All-in Provisioned Energy per Token',

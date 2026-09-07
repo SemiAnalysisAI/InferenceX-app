@@ -26,26 +26,20 @@ const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_output
 const PER_TOKEN_TYPE_POWER_METRICS = new Set(['y_inputTputPerMw', 'y_outputTputPerMw']);
 const TOTAL_COST_METRICS = new Set([
   'y_costh',
-  'y_costn',
   'y_costr',
   'y_tokensPerDollarH',
-  'y_tokensPerDollarN',
   'y_tokensPerDollarR',
 ]);
 const OUTPUT_COST_METRICS = new Set([
   'y_costhOutput',
-  'y_costnOutput',
   'y_costrOutput',
   'y_outputTokensPerDollarH',
-  'y_outputTokensPerDollarN',
   'y_outputTokensPerDollarR',
 ]);
 const INPUT_COST_METRICS = new Set([
   'y_costhi',
-  'y_costni',
   'y_costri',
   'y_inputTokensPerDollarH',
-  'y_inputTokensPerDollarN',
   'y_inputTokensPerDollarR',
 ]);
 const POWER_VALUES = Object.fromEntries(
@@ -160,14 +154,7 @@ function getCostValues(selectedYAxisMetric: string) {
       selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
       selectedYAxisMetric === 'y_inputTokensPerDollarH'
         ? specs.costh
-        : selectedYAxisMetric === 'y_costn' ||
-            selectedYAxisMetric === 'y_costnOutput' ||
-            selectedYAxisMetric === 'y_costni' ||
-            selectedYAxisMetric === 'y_tokensPerDollarN' ||
-            selectedYAxisMetric === 'y_outputTokensPerDollarN' ||
-            selectedYAxisMetric === 'y_inputTokensPerDollarN'
-          ? specs.costn
-          : specs.costr,
+        : specs.costr,
     ]),
   );
 }

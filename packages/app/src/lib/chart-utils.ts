@@ -349,20 +349,12 @@ export function buildDerivedChartFields(
   if (wants('costh')) {
     fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
-  if (wants('costn')) {
-    fields.costn = chartMetric(millionTokensPerHour ? specs.costn / millionTokensPerHour : 0);
-  }
   if (wants('costr')) {
     fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
   if (wants('costhOutput')) {
     fields.costhOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
-    );
-  }
-  if (wants('costnOutput')) {
-    fields.costnOutput = chartMetric(
-      millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costrOutput')) {
@@ -375,11 +367,6 @@ export function buildDerivedChartFields(
       millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
-  if (wants('costni')) {
-    fields.costni = chartMetric(
-      millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
-    );
-  }
   if (wants('costri')) {
     fields.costri = chartMetric(
       millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
@@ -387,9 +374,6 @@ export function buildDerivedChartFields(
   }
   if (wants('tokensPerDollarH')) {
     fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
-  }
-  if (wants('tokensPerDollarN')) {
-    fields.tokensPerDollarN = chartMetric(specs.costn ? tokensPerHour / specs.costn : 0);
   }
   if (wants('tokensPerDollarR')) {
     fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
@@ -399,11 +383,6 @@ export function buildDerivedChartFields(
       specs.costh ? outputTokensPerHour / specs.costh : 0,
     );
   }
-  if (wants('outputTokensPerDollarN')) {
-    fields.outputTokensPerDollarN = chartMetric(
-      specs.costn ? outputTokensPerHour / specs.costn : 0,
-    );
-  }
   if (wants('outputTokensPerDollarR')) {
     fields.outputTokensPerDollarR = chartMetric(
       specs.costr ? outputTokensPerHour / specs.costr : 0,
@@ -411,9 +390,6 @@ export function buildDerivedChartFields(
   }
   if (wants('inputTokensPerDollarH')) {
     fields.inputTokensPerDollarH = chartMetric(specs.costh ? inputTokensPerHour / specs.costh : 0);
-  }
-  if (wants('inputTokensPerDollarN')) {
-    fields.inputTokensPerDollarN = chartMetric(specs.costn ? inputTokensPerHour / specs.costn : 0);
   }
   if (wants('inputTokensPerDollarR')) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);

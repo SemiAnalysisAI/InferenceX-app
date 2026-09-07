@@ -59,13 +59,10 @@ export const filterDataByCostLimit = (
   // Map of metric keys to their corresponding data point fields
   const costFieldMap: Record<string, (point: InferenceData) => number | undefined> = {
     costh: (point) => point.costh?.y,
-    costn: (point) => point.costn?.y,
     costr: (point) => point.costr?.y,
     costhOutput: (point) => point.costhOutput?.y,
-    costnOutput: (point) => point.costnOutput?.y,
     costrOutput: (point) => point.costrOutput?.y,
     costhi: (point) => point.costhi?.y,
-    costni: (point) => point.costni?.y,
     costri: (point) => point.costri?.y,
     costUser: (point) => point.costUser?.y,
   };

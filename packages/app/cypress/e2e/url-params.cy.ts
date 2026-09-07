@@ -116,7 +116,7 @@ describe('URL Parameter Persistence', () => {
           cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
           cy.contains(
             '[data-select-option]',
-            'Cost per Million Total Tokens (Owning - Hyperscaler)',
+            'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
           ).click({ force: true });
 
           cy.get('[data-testid="scatter-quick-filters"]').click();
@@ -175,7 +175,7 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+        'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
       );
 
       cy.get('[data-testid="scatter-graph"]')
@@ -197,7 +197,7 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.contains(
         '[data-select-option]',
-        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+        'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
       ).click({
         force: true,
       });
@@ -208,12 +208,12 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('maps the removed API-pricing URL to Neocloud TCO', () => {
+    it('maps the removed API-pricing URL to hyperscaler-volume TCO', () => {
       visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+        'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()

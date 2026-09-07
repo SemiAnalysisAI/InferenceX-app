@@ -148,14 +148,12 @@ describe('getHardwareConfig', () => {
       tdp: 700,
       power: 1.125,
       costh: 1.47,
-      costn: 1.56,
       costr: 1.79,
     });
     expect(getGpuSpecs('vr200_coreweave-vera-rubin')).toEqual({
       tdp: 1800,
       power: 3.3,
       costh: 3.61,
-      costn: 3.61,
       costr: 3.61,
     });
   });
@@ -216,14 +214,13 @@ describe('getHardwareConfig', () => {
   it('HW_REGISTRY has non-negative cost rates for all entries', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
       expect(entry.costh).toBeGreaterThanOrEqual(0);
-      expect(entry.costn).toBeGreaterThanOrEqual(0);
       expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
 
   it('states every cost tier to at most two decimal places', () => {
     for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
-      for (const tier of ['costh', 'costn', 'costr'] as const) {
+      for (const tier of ['costh', 'costr'] as const) {
         const value = entry[tier];
         // A published rate, never a raw TCO-model output with 16 digits.
         expect(`${gpu}.${tier}=${value}`).toBe(`${gpu}.${tier}=${Math.round(value * 100) / 100}`);
@@ -233,19 +230,19 @@ describe('getHardwareConfig', () => {
 
   it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
     const expectedRates = {
-      h100: [1.17, 1.55, 1.78],
-      h200: [1.22, 1.59, 2.05],
-      b200: [1.73, 2.07, 2.6],
-      b300: [2.26, 2.52, 3],
-      gb200: [1.86, 2.26, 2.6],
-      gb300: [2.31, 2.79, 3.3],
-      mi300x: [0.95, 1.16, 1.3],
-      mi325x: [1.1, 1.32, 1.6],
-      mi355x: [1.5, 2.09, 2.1],
+      h100: [1.17, 1.78],
+      h200: [1.22, 2.05],
+      b200: [1.73, 2.6],
+      b300: [2.26, 3],
+      gb200: [1.86, 2.6],
+      gb300: [2.31, 3.3],
+      mi300x: [0.95, 1.3],
+      mi325x: [1.1, 1.6],
+      mi355x: [1.5, 2.1],
     } as const;
 
-    for (const [gpu, [costh, costn, costr]] of Object.entries(expectedRates)) {
-      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costn, costr });
+    for (const [gpu, [costh, costr]] of Object.entries(expectedRates)) {
+      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costr });
     }
   });
 });
@@ -259,7 +256,6 @@ describe('getGpuSpecs', () => {
     expect(specs.tdp).toBe(700);
     expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.17);
-    expect(specs.costn).toBe(1.55);
     expect(specs.costr).toBe(1.78);
   });
 
@@ -279,7 +275,6 @@ describe('getGpuSpecs', () => {
     expect(specs.power).toBe(0);
     expect(specs.tdp).toBe(0);
     expect(specs.costh).toBe(0);
-    expect(specs.costn).toBe(0);
     expect(specs.costr).toBe(0);
   });
 

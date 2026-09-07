@@ -186,7 +186,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 2. What **vendor** and **architecture codename**? (e.g. NVIDIA Blackwell, AMD CDNA 4)
 3. What is the **display label**? (e.g. `H200`, `GB200 NVL72`)
 4. What is the **all-in power per GPU** in kW?
-5. What are the **cost rates** in $/GPU/hr? (hyperscaler, neocloud, retail)
+5. What are the **cost rates** in $/GPU/hr? (owning at large hyperscaler volume, 3-year rental)
 6. What is the **TDP** in watts?
 7. Where should it **sort** relative to existing GPUs in legends? (lower = first)
 8. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?
@@ -196,7 +196,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 **`packages/constants/src/gpu-keys.ts`** (single source of truth):
 
-- Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costn`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
+- Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
 - If this is a **new vendor** (not NVIDIA or AMD), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type in `src/lib/dynamic-colors.ts`.
 
 **`packages/db/src/etl/normalizers.ts`**:

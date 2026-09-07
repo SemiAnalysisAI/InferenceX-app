@@ -154,10 +154,8 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
     inputTputPerGpu: { y: 40, roof: false },
     tpPerMw: { y: 185, roof: false },
     costh: { y: 0.52, roof: false },
-    costn: { y: 0.68, roof: false },
     costr: { y: 0.45, roof: false },
     costhi: { y: 0.4, roof: false },
-    costni: { y: 0.55, roof: false },
     costri: { y: 0.35, roof: false },
     ...overrides,
   };

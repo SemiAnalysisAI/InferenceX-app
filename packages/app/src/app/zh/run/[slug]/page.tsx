@@ -95,7 +95,7 @@ function buildFaqZh(
 
   const costAnswer =
     typeof read?.costPerMtok === 'number'
-      ? `按超大规模云 $/GPU/小时 价格、每用户每秒 ${data.primaryTier} token 档位计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。新兴云与零售租用价格见上方表格；更慢的交互档位成本更低。`
+      ? `按超大规模云大批量自有 $/GPU/小时 价格、每用户每秒 ${data.primaryTier} token 档位计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。零售租用价格见上方表格；更慢的交互档位成本更低。`
       : `每百万 token 成本由实测吞吐和 SemiAnalysis AI Cloud TCO 模型的 $/GPU/小时 价格换算得出，待该组合达到主交互档位后即会显示。`;
 
   const servingAnswer = `本页数据来自 ${data.frameworks.join('、')}，精度覆盖 ${data.precisions.map((p) => p.toUpperCase()).join('、')}${data.hasDisagg ? '，包含 prefill 分离部署' : ''}${data.hasMultinode ? '，并包含多节点部署' : ''}。推理引擎持续重新构建并重跑基准，最优配置可能随时变化。`;
@@ -195,8 +195,7 @@ export default async function ZhRunPage({ params }: Props) {
     colGpuHour: '$/GPU/小时',
     colCostPerMtok: '每百万 token 成本',
     priceTierLabels: {
-      hyperscaler: '超大规模云',
-      neocloud: '新兴云',
+      hyperscaler: '自有 - 超大规模云大批量',
       retail: '零售租用',
     },
     emptyState: `InferenceX 集群尚未发布 ${model} 在 ${chipLabel} 上的基准测试结果。基准测试持续运行，新结果落地后本页会自动填充。`,

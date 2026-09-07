@@ -54,8 +54,11 @@ const COST_PROVIDER_OPTIONS: {
   label: string;
   labelZh: string;
 }[] = [
-  { value: 'costh', label: 'Hyperscaler', labelZh: '超大规模云服务商' },
-  { value: 'costn', label: 'Neocloud', labelZh: 'Neocloud' },
+  {
+    value: 'costh',
+    label: 'Owning at Large Hyperscaler Volume',
+    labelZh: '自有 - 超大规模云大批量',
+  },
   { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
 ];
 
@@ -72,7 +75,7 @@ const STRINGS = {
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used for the fleet cost line. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental.',
+      'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or 3-year rental.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -94,7 +97,7 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '集群成本线采用的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
+      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年租赁。',
     costProviderPlaceholder: '成本供应商',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:

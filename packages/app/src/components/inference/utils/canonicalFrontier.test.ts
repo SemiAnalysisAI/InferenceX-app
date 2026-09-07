@@ -16,7 +16,6 @@ const point = (id: number, y: number, over: Partial<InferenceData> = {}): Infere
     tpPerGpu: { y, roof: false },
     tpPerMw: { y, roof: false },
     costh: { y, roof: false },
-    costn: { y, roof: false },
     costr: { y, roof: false },
     ...over,
   }) as InferenceData;

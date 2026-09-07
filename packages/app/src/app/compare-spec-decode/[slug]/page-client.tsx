@@ -53,7 +53,7 @@ const STRINGS = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). */
+/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). */
 const DEFAULT_Y_AXIS = 'y_costh';
 
 interface CompareSpecDecodePageClientProps {

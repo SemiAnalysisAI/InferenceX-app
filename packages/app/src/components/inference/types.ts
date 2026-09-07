@@ -289,28 +289,22 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   /** Total tokens produced per dollar of modeled infrastructure spend. */
   tokensPerDollarH?: { y: number; roof: boolean };
-  tokensPerDollarN?: { y: number; roof: boolean };
   tokensPerDollarR?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
   // Cost per million tokens.
   costh: { y: number; roof: boolean };
-  costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
   costhOutput?: { y: number; roof: boolean };
-  costnOutput?: { y: number; roof: boolean };
   costrOutput?: { y: number; roof: boolean };
   costhi: { y: number; roof: boolean };
-  costni: { y: number; roof: boolean };
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
   // Tokens purchasable per $1.
   outputTokensPerDollarH?: { y: number; roof: boolean };
-  outputTokensPerDollarN?: { y: number; roof: boolean };
   outputTokensPerDollarR?: { y: number; roof: boolean };
   inputTokensPerDollarH?: { y: number; roof: boolean };
-  inputTokensPerDollarN?: { y: number; roof: boolean };
   inputTokensPerDollarR?: { y: number; roof: boolean };
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };

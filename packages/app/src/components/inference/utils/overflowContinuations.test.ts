@@ -15,10 +15,8 @@ const point = (x: number, y: number): InferenceData =>
     tpPerGpu: { y, roof: false },
     tpPerMw: { y, roof: false },
     costh: { y, roof: false },
-    costn: { y, roof: false },
     costr: { y, roof: false },
     costhi: { y, roof: false },
-    costni: { y, roof: false },
     costri: { y, roof: false },
   }) as InferenceData;
 

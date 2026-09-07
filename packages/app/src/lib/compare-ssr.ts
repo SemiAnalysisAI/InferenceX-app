@@ -174,13 +174,10 @@ export function buildGpuDataPoints(
       dp_attention: row.decode_dp_attention,
       disagg: row.disagg,
       costh: computeGpuCost(specs.costh, tput),
-      costn: computeGpuCost(specs.costn, tput),
       costr: computeGpuCost(specs.costr, tput),
       costhi: computeGpuCost(specs.costh, inputTput),
-      costni: computeGpuCost(specs.costn, inputTput),
       costri: computeGpuCost(specs.costr, inputTput),
       costhOutput: computeGpuCost(specs.costh, outputTput),
-      costnOutput: computeGpuCost(specs.costn, outputTput),
       costrOutput: computeGpuCost(specs.costr, outputTput),
       tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
       inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
@@ -229,13 +226,10 @@ function buildAgenticGpuDataPoints(
       dp_attention: row.decode_dp_attention,
       disagg: row.disagg,
       costh: computeGpuCost(specs.costh, tput),
-      costn: computeGpuCost(specs.costn, tput),
       costr: computeGpuCost(specs.costr, tput),
       costhi: computeGpuCost(specs.costh, inputTput),
-      costni: computeGpuCost(specs.costn, inputTput),
       costri: computeGpuCost(specs.costr, inputTput),
       costhOutput: computeGpuCost(specs.costh, outputTput),
-      costnOutput: computeGpuCost(specs.costn, outputTput),
       costrOutput: computeGpuCost(specs.costr, outputTput),
       tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
       inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
@@ -1070,7 +1064,7 @@ export function buildJsonLd(
       : `${aLabel} vs ${bLabel} (${model.label}) Interpolated Benchmark Comparison`;
   const datasetDescription =
     variant === 'per-dollar'
-      ? `Owning-hyperscaler cost per million tokens for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels — dollar-normalized inference benchmark.`
+      ? `Owning-at-large-hyperscaler-volume cost per million tokens for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels — dollar-normalized inference benchmark.`
       : `Interpolated throughput, cost, power efficiency, and concurrency for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels.`;
 
   const comparisonRows = ssrRows

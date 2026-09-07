@@ -91,8 +91,7 @@ const STRINGS = {
       nic: 'NIC',
       tdp: 'TDP per chip',
       allInPower: 'All-in power per chip',
-      costHyperscaler: 'Hyperscaler $/chip/hr',
-      costNeocloud: 'Neocloud $/chip/hr',
+      costHyperscaler: 'Owning at Large Hyperscaler Volume $/chip/hr',
       costRetail: 'Retail $/chip/hr',
     },
     notSupported: 'Not supported',
@@ -153,8 +152,7 @@ const STRINGS = {
       nic: '网卡',
       tdp: '单芯片 TDP',
       allInPower: '单芯片综合功耗',
-      costHyperscaler: '超大规模云 $/芯片/小时',
-      costNeocloud: 'Neocloud $/芯片/小时',
+      costHyperscaler: '自有 - 超大规模云大批量 $/芯片/小时',
       costRetail: '零售档 $/芯片/小时',
     },
     notSupported: '不支持',
@@ -324,7 +322,6 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
     [t.specLabels.tdp, `${hw.tdp.toLocaleString('en-US')} W`],
     [t.specLabels.allInPower, `${hw.power} kW`],
     [t.specLabels.costHyperscaler, `$${hw.costh.toFixed(2)}`],
-    [t.specLabels.costNeocloud, `$${hw.costn.toFixed(2)}`],
     [t.specLabels.costRetail, `$${hw.costr.toFixed(2)}`],
   ];
   return (

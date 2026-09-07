@@ -146,14 +146,10 @@ export function getCostField(
   costType: 'total' | 'input' | 'output',
 ): number {
   if (costType === 'input') {
-    return costProvider === 'costh' ? p.costhi : costProvider === 'costn' ? p.costni : p.costri;
+    return costProvider === 'costh' ? p.costhi : p.costri;
   }
   if (costType === 'output') {
-    return costProvider === 'costh'
-      ? p.costhOutput
-      : costProvider === 'costn'
-        ? p.costnOutput
-        : p.costrOutput;
+    return costProvider === 'costh' ? p.costhOutput : p.costrOutput;
   }
   return p[costProvider];
 }

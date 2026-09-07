@@ -40,7 +40,7 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
+/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). Defined in
  *  packages/app/src/components/inference/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
@@ -99,7 +99,7 @@ interface ComparePerDollarPageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
-  /** Owning-hyperscaler $/GPU/hr for each GPU — sourced from HW_REGISTRY.costh
+  /** Large-hyperscaler-volume ownership $/GPU/hr for each GPU — sourced from HW_REGISTRY.costh
    *  (the same input the per-dollar cost-per-token math uses). Rendered in the
    *  header so readers can audit the pricing assumptions. */
   aCostPerGpuHr: number;
@@ -193,10 +193,10 @@ export default function ComparePerDollarPageClient({
                 <p className="mt-2 text-sm text-muted-foreground">
                   Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                   <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
-                  Owning-hyperscaler TCO normalized by total tokens — performance per dollar across
-                  LLM workloads. Pick the more cost-efficient SKU at every target interactivity
-                  level. Use the chart controls below to switch sequences, precisions, and metrics —
-                  same interactions as{' '}
+                  Large-hyperscaler-volume ownership TCO normalized by total tokens — performance
+                  per dollar across LLM workloads. Pick the more cost-efficient SKU at every target
+                  interactivity level. Use the chart controls below to switch sequences, precisions,
+                  and metrics — same interactions as{' '}
                   <Link href="/" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>

@@ -135,7 +135,7 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
-// Option labels carry the cost tier ("… (Owning - Hyperscaler)") so the three
+// Option labels carry the cost tier ("… (Owning at Large Hyperscaler Volume)") so the
 // pricing variants read apart in the selector; the chart heading drops it.
 const METRIC_TITLE_MAP = new Map(
   (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [

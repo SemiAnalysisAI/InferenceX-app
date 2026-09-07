@@ -53,13 +53,10 @@ function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
     tp: 8,
     precision: 'fp8',
     costh: 1.5,
-    costn: 2,
     costr: 1.2,
     costhi: 0.8,
-    costni: 1.1,
     costri: 0.6,
     costhOutput: 2.2,
-    costnOutput: 2.8,
     costrOutput: 1.8,
     tpPerMw: 1200,
     inputTpPerMw: 300,
@@ -117,31 +114,25 @@ describe('snapshot token-metric capabilities', () => {
 describe('getCostField', () => {
   const p = makePoint({
     costh: 1.5,
-    costn: 2,
     costr: 1.2,
     costhi: 0.8,
-    costni: 1.1,
     costri: 0.6,
     costhOutput: 2.2,
-    costnOutput: 2.8,
     costrOutput: 1.8,
   });
 
   it('returns total cost for each provider', () => {
     expect(getCostField(p, 'costh', 'total')).toBe(1.5);
-    expect(getCostField(p, 'costn', 'total')).toBe(2);
     expect(getCostField(p, 'costr', 'total')).toBe(1.2);
   });
 
   it('returns input cost for each provider', () => {
     expect(getCostField(p, 'costh', 'input')).toBe(0.8);
-    expect(getCostField(p, 'costn', 'input')).toBe(1.1);
     expect(getCostField(p, 'costr', 'input')).toBe(0.6);
   });
 
   it('returns output cost for each provider', () => {
     expect(getCostField(p, 'costh', 'output')).toBe(2.2);
-    expect(getCostField(p, 'costn', 'output')).toBe(2.8);
     expect(getCostField(p, 'costr', 'output')).toBe(1.8);
   });
 });
@@ -529,20 +520,17 @@ describe('interpolateForGPU', () => {
 
   it('uses the specified cost provider', () => {
     const points = [
-      makePoint({ interactivity: 10, throughput: 800, costh: 1, costn: 2, costr: 3 }),
-      makePoint({ interactivity: 30, throughput: 400, costh: 1.5, costn: 2.5, costr: 3.5 }),
+      makePoint({ interactivity: 10, throughput: 800, costh: 1, costr: 3 }),
+      makePoint({ interactivity: 30, throughput: 400, costh: 1.5, costr: 3.5 }),
     ];
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh');
-    const resultN = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costn');
     const resultR = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costr');
 
     expect(resultH).not.toBeNull();
-    expect(resultN).not.toBeNull();
     expect(resultR).not.toBeNull();
 
-    // Neocloud cost should be higher than hyperscaler, rental highest
-    expect(resultN!.cost).toBeGreaterThan(resultH!.cost);
-    expect(resultR!.cost).toBeGreaterThan(resultN!.cost);
+    // Rental cost should be higher than hyperscaler-volume ownership
+    expect(resultR!.cost).toBeGreaterThan(resultH!.cost);
   });
 
   it('clamps interpolated values to non-negative', () => {
@@ -610,46 +598,37 @@ describe('getCostField — exhaustive provider × token type matrix', () => {
   it('returns all 9 correct fields for distinct cost values', () => {
     const p = makePoint({
       costh: 1.1,
-      costn: 2.2,
       costr: 3.3,
       costhi: 4.4,
-      costni: 5.5,
       costri: 6.6,
       costhOutput: 7.7,
-      costnOutput: 8.8,
       costrOutput: 9.9,
     });
 
     // Total
     expect(getCostField(p, 'costh', 'total')).toBeCloseTo(1.1);
-    expect(getCostField(p, 'costn', 'total')).toBeCloseTo(2.2);
     expect(getCostField(p, 'costr', 'total')).toBeCloseTo(3.3);
 
     // Input
     expect(getCostField(p, 'costh', 'input')).toBeCloseTo(4.4);
-    expect(getCostField(p, 'costn', 'input')).toBeCloseTo(5.5);
     expect(getCostField(p, 'costr', 'input')).toBeCloseTo(6.6);
 
     // Output
     expect(getCostField(p, 'costh', 'output')).toBeCloseTo(7.7);
-    expect(getCostField(p, 'costn', 'output')).toBeCloseTo(8.8);
     expect(getCostField(p, 'costr', 'output')).toBeCloseTo(9.9);
   });
 
   it('returns 0 when all cost fields are zero', () => {
     const p = makePoint({
       costh: 0,
-      costn: 0,
       costr: 0,
       costhi: 0,
-      costni: 0,
       costri: 0,
       costhOutput: 0,
-      costnOutput: 0,
       costrOutput: 0,
     });
     expect(getCostField(p, 'costh', 'total')).toBe(0);
-    expect(getCostField(p, 'costn', 'input')).toBe(0);
+    expect(getCostField(p, 'costh', 'input')).toBe(0);
     expect(getCostField(p, 'costr', 'output')).toBe(0);
   });
 
@@ -868,47 +847,39 @@ describe('interpolateForGPU — cost provider consistency', () => {
         interactivity: 10,
         throughput: 800,
         costh: 0.5,
-        costn: 1,
         costr: 0.3,
         costhi: 0.25,
-        costni: 0.5,
         costri: 0.15,
         costhOutput: 0.75,
-        costnOutput: 1.5,
         costrOutput: 0.45,
       }),
       makePoint({
         interactivity: 30,
         throughput: 400,
         costh: 0.8,
-        costn: 1.6,
         costr: 0.48,
         costhi: 0.4,
-        costni: 0.8,
         costri: 0.24,
         costhOutput: 1.2,
-        costnOutput: 2.4,
         costrOutput: 0.72,
       }),
     ];
 
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh')!;
-    const resultN = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costn')!;
     const resultR = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costr')!;
 
     // Same throughput value regardless of cost provider (cost doesn't affect throughput)
-    expect(resultH.value).toBeCloseTo(resultN.value, 5);
     expect(resultH.value).toBeCloseTo(resultR.value, 5);
 
     // But costs should differ across providers
-    expect(resultH.cost).not.toBeCloseTo(resultN.cost, 1);
-    expect(resultH.costInput).not.toBeCloseTo(resultN.costInput, 1);
-    expect(resultH.costOutput).not.toBeCloseTo(resultN.costOutput, 1);
+    expect(resultH.cost).not.toBeCloseTo(resultR.cost, 1);
+    expect(resultH.costInput).not.toBeCloseTo(resultR.costInput, 1);
+    expect(resultH.costOutput).not.toBeCloseTo(resultR.costOutput, 1);
 
-    // Neocloud costs are ~2x hyperscaler in this test data
-    expect(resultN.cost).toBeGreaterThan(resultH.cost);
-    expect(resultN.costInput).toBeGreaterThan(resultH.costInput);
-    expect(resultN.costOutput).toBeGreaterThan(resultH.costOutput);
+    // Rental costs are lower than hyperscaler-volume ownership in this test data
+    expect(resultR.cost).toBeLessThan(resultH.cost);
+    expect(resultR.costInput).toBeLessThan(resultH.costInput);
+    expect(resultR.costOutput).toBeLessThan(resultH.costOutput);
   });
 
   it('interpolated tpPerMw values are independent of cost provider', () => {
@@ -930,12 +901,12 @@ describe('interpolateForGPU — cost provider consistency', () => {
     ];
 
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh')!;
-    const resultN = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costn')!;
+    const resultR = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costr')!;
 
     // tpPerMw should be identical regardless of cost provider
-    expect(resultH.tpPerMw).toBeCloseTo(resultN.tpPerMw, 5);
-    expect(resultH.inputTpPerMw).toBeCloseTo(resultN.inputTpPerMw, 5);
-    expect(resultH.outputTpPerMw).toBeCloseTo(resultN.outputTpPerMw, 5);
+    expect(resultH.tpPerMw).toBeCloseTo(resultR.tpPerMw, 5);
+    expect(resultH.inputTpPerMw).toBeCloseTo(resultR.inputTpPerMw, 5);
+    expect(resultH.outputTpPerMw).toBeCloseTo(resultR.outputTpPerMw, 5);
   });
 });
 
@@ -1007,10 +978,10 @@ describe('maxInteractivityAtCost', () => {
   // Strictly decreasing throughput as interactivity rises — every point is on
   // the frontier — with total-token hyperscaler cost rising alongside.
   const monotonePoints = [
-    makePoint({ interactivity: 10, throughput: 1000, costh: 0.2, costn: 0.3, costhi: 1 }),
-    makePoint({ interactivity: 20, throughput: 800, costh: 0.4, costn: 0.6, costhi: 0.5 }),
-    makePoint({ interactivity: 30, throughput: 500, costh: 0.8, costn: 1.2, costhi: 1.5 }),
-    makePoint({ interactivity: 40, throughput: 200, costh: 2, costn: 3, costhi: 0.9 }),
+    makePoint({ interactivity: 10, throughput: 1000, costh: 0.2, costr: 0.4, costhi: 1 }),
+    makePoint({ interactivity: 20, throughput: 800, costh: 0.4, costr: 0.8, costhi: 0.5 }),
+    makePoint({ interactivity: 30, throughput: 500, costh: 0.8, costr: 1.6, costhi: 1.5 }),
+    makePoint({ interactivity: 40, throughput: 200, costh: 2, costr: 4, costhi: 0.9 }),
   ];
 
   it('returns null for empty input', () => {
@@ -1069,12 +1040,12 @@ describe('maxInteractivityAtCost', () => {
   });
 
   it('respects the cost provider', () => {
-    // Neocloud is pricier across the board, so the affordable iv is lower.
+    // Rental is pricier across the board in this fixture, so the affordable iv is lower.
     const ivH = maxInteractivityAtCost(monotonePoints, 0.8, 'costh', 'total');
-    const ivN = maxInteractivityAtCost(monotonePoints, 0.8, 'costn', 'total');
+    const ivR = maxInteractivityAtCost(monotonePoints, 0.8, 'costr', 'total');
     expect(ivH).not.toBeNull();
-    expect(ivN).not.toBeNull();
-    expect(ivN!).toBeLessThan(ivH!);
+    expect(ivR).not.toBeNull();
+    expect(ivR!).toBeLessThan(ivH!);
   });
 
   it('handles non-monotone cost curves (input-token cost) by returning the highest affordable iv', () => {

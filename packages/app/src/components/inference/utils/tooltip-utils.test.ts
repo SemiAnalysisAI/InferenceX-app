@@ -25,10 +25,8 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   } as InferenceData;
@@ -43,7 +41,6 @@ const mockHardwareConfig: HardwareConfig = {
     color: 'red',
     power: 700,
     costh: 2.8,
-    costn: 1.4,
     costr: 0.7,
   },
   b200: {
@@ -54,7 +51,6 @@ const mockHardwareConfig: HardwareConfig = {
     color: 'blue',
     power: 1000,
     costh: 5,
-    costn: 2.5,
     costr: 1.25,
   },
 } as unknown as HardwareConfig;

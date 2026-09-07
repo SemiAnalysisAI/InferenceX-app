@@ -624,7 +624,7 @@ function missingReasonForPlatform(
  *   $ / 1M total tokens = HW_REGISTRY.costh × 1,000,000
  *                       ÷ (total tok/s per deployed GPU × 3,600)
  *
- * `costh` is the HYPERSCALER $/GPU/hr tier (not neocloud `costn` or retail
+ * `costh` is the owning-at-large-hyperscaler-volume $/GPU/hr tier (not retail
  * `costr`), and the denominator counts TOTAL (input + output) tokens over
  * every deployed GPU — prefill + decode for disaggregated serving.
  */

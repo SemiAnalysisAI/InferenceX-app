@@ -1094,9 +1094,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
 
   it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
     for (const [option, label] of [
-      ['Neocloud', '自有设备 · Neocloud'],
       ['3 年租赁', '租赁设备 · 3 年期'],
-      ['超大规模云服务商', '自有设备 · Hyperscaler'],
+      ['自有 - 超大规模云大批量', '自有设备 · 超大规模云大批量'],
     ]) {
       cy.get('[data-testid="fleet-cost-selector"]').click();
       cy.contains('[role="option"]', option).click();

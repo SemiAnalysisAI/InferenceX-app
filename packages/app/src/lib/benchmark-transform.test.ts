@@ -1376,8 +1376,8 @@ describe('transformBenchmarkRows — data point values', () => {
     // Cost fields should be computed
     expect(point.costh).toBeDefined();
     expect(point.costh.y).toBeGreaterThan(0);
-    expect(point.costn).toBeDefined();
-    expect(point.costn.y).toBeGreaterThan(0);
+    expect(point.costr).toBeDefined();
+    expect(point.costr.y).toBeGreaterThan(0);
   });
 
   it('sets outputTputPerGpu and inputTputPerGpu when values are non-zero', () => {

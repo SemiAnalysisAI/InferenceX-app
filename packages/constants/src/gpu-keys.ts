@@ -14,10 +14,8 @@ export interface HwEntry {
   /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
    * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
   power: number;
-  /** $/GPU/hr — hyperscaler tier */
+  /** $/GPU/hr — owning at large hyperscaler volume */
   costh: number;
-  /** $/GPU/hr — neocloud tier */
-  costn: number;
   /** $/GPU/hr — retail tier */
   costr: number;
 }
@@ -32,7 +30,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1800,
     power: 3.3,
     costh: 3.61,
-    costn: 3.61,
     costr: 3.61,
   },
   h100: {
@@ -43,7 +40,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.17,
-    costn: 1.55,
     costr: 1.78,
   },
   h200: {
@@ -54,7 +50,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.22,
-    costn: 1.59,
     costr: 2.05,
   },
   b200: {
@@ -65,7 +60,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.71,
     costh: 1.73,
-    costn: 2.07,
     costr: 2.6,
   },
   b300: {
@@ -76,7 +70,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.9,
     costh: 2.26,
-    costn: 2.52,
     costr: 3,
   },
   gb200: {
@@ -87,7 +80,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.87,
     costh: 1.86,
-    costn: 2.26,
     costr: 2.6,
   },
   gb300: {
@@ -98,7 +90,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.12,
     costh: 2.31,
-    costn: 2.79,
     costr: 3.3,
   },
   mi300x: {
@@ -109,7 +100,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 750,
     power: 1.39,
     costh: 0.95,
-    costn: 1.16,
     costr: 1.3,
   },
   mi325x: {
@@ -120,7 +110,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.69,
     costh: 1.1,
-    costn: 1.32,
     costr: 1.6,
   },
   mi355x: {
@@ -131,7 +120,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.09,
     costh: 1.5,
-    costn: 2.09,
     costr: 2.1,
   },
   // NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, PCIe Gen5, 96 GB GDDR7).
@@ -146,7 +134,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 600,
     power: 0.975,
     costh: 0.68,
-    costn: 0.75,
     costr: 0.52,
   },
   jalapeno: {
@@ -158,7 +145,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.125,
     costh: 1.47,
-    costn: 1.56,
     costr: 1.79,
   },
 };

@@ -46,10 +46,8 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
   tpPerGpu: { y: 1200, roof: false },
   tpPerMw: { y: 694, roof: false },
   costh: { y: 0.5, roof: false },
-  costn: { y: 0.4, roof: false },
   costr: { y: 0.3, roof: false },
   costhi: { y: 0.6, roof: false },
-  costni: { y: 0.5, roof: false },
   costri: { y: 0.4, roof: false },
   ...overrides,
 });
@@ -292,10 +290,8 @@ describe('inferenceChartToCsv', () => {
         tpPerGpu: { y: 0, roof: false },
         tpPerMw: { y: 0, roof: false },
         costh: { y: 0, roof: false },
-        costn: { y: 0, roof: false },
         costr: { y: 0, roof: false },
         costhi: { y: 0, roof: false },
-        costni: { y: 0, roof: false },
         costri: { y: 0, roof: false },
       } as InferenceData,
     ];
