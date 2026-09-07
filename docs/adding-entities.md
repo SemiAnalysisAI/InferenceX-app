@@ -186,7 +186,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 2. What **vendor** and **architecture codename**? (e.g. NVIDIA Blackwell, AMD CDNA 4)
 3. What is the **display label**? (e.g. `H200`, `GB200 NVL72`)
 4. What is the **all-in power per GPU** in kW?
-5. What are the **cost rates** in $/GPU/hr? (owning at large hyperscaler volume, 3-year rental)
+5. What are the **cost rates** in $/GPU/hr? (owning at large hyperscaler volume, rent on a 3-year commit)
 6. What is the **TDP** in watts?
 7. Where should it **sort** relative to existing GPUs in legends? (lower = first)
 8. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?

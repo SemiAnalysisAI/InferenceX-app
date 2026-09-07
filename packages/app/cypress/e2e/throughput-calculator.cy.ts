@@ -379,7 +379,7 @@ describe('TCO Calculator', () => {
       });
       cy.get('[role="option"]').should('have.length', 2);
       cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at Large Hyperscaler Volume');
-      cy.get('[role="option"]').eq(1).should('contain.text', '3yr Rental');
+      cy.get('[role="option"]').eq(1).should('contain.text', 'Rent - 3 Year Commit');
       cy.get('body').type('{esc}');
     });
 
@@ -441,10 +441,10 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').contains('3yr Rental').click();
+      cy.get('[role="option"]').contains('Rent - 3 Year Commit').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Renting - 3yr Rental');
+        .should('contain.text', 'Rent - 3 Year Commit');
     });
 
     // -------------------------------------------------------------------------

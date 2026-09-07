@@ -22,10 +22,10 @@ export const COST_TIER_LABELS: Record<
     labelZh: '自有（超大规模云大批量）',
   },
   rental: {
-    option: '3 Year Rental',
-    optionZh: '3 年租赁',
-    label: '3 Year Rental',
-    labelZh: '3 年租赁',
+    option: 'Rent - 3 Year Commit',
+    optionZh: '租赁 - 3 年承诺',
+    label: 'Rent - 3 Year Commit',
+    labelZh: '租赁 - 3 年承诺',
   },
   custom: {
     option: 'Custom User Values',
@@ -413,7 +413,7 @@ export function metricChartTitle(metricKey: MetricKey, locale: 'en' | 'zh'): str
 
 /**
  * Y-axis option label: the chart title plus its cost tier in parentheses, so
- * the Hyperscaler / Rental variants read apart in the selector.
+ * the Hyperscaler / Rent variants read apart in the selector.
  */
 export function metricOptionTitle(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   const title = metricChartTitle(metricKey, locale);

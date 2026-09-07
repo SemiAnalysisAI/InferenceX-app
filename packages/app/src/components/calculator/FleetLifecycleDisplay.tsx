@@ -59,7 +59,7 @@ const COST_PROVIDER_OPTIONS: {
     label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 - 超大规模云大批量',
   },
-  { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
+  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
@@ -75,7 +75,7 @@ const STRINGS = {
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or 3-year rental.',
+      'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -97,7 +97,7 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年租赁。',
+      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。',
     costProviderPlaceholder: '成本供应商',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
