@@ -5,12 +5,15 @@ interactivity target. It applies explicit user-supplied USD/GPU-hour rates to th
 public feed's output throughput. The result is a GPU rental/rate cost estimate per
 million output tokens. A full ownership TCO needs additional cost assumptions.
 
-For a replayable contract 1 comparison:
+When the user supplies the model, workload, target, and exact hardware keys with
+prices, run the comparison directly. `--model` accepts a DB model key or display name;
+model discovery, an OpenAPI download, and a preliminary feed download are not
+prerequisites for this formal command.
 
 ```bash
 mkdir -p evidence
 node .agents/skills/inferencex-api/scripts/inferencex.mjs tco compare \
-  --model dsv4 --workloads 1024x1024 --target 50 \
+  --model DeepSeek-V4-Pro --workloads 1024x1024 --target 50 \
   --gpu-hourly-prices b200=3.6,mi355x=1.8 --output-dir evidence/tco \
   --require-hardware b200 --require-hardware mi355x
 ```
@@ -20,18 +23,22 @@ throughput rows keep null modeled costs. Without a predicate they are valid scop
 output; a required hardware miss commits the bundle and exits 3. See the
 [CLI contract](cli.md).
 
-Keep every downloaded response and temporary parsing file inside the current
-project unless the user chooses another destination. Use a separate file for each
-HTTP attempt and retain failed captures. Count actual requests, including discovery
-and retries, in the report; do not count only the final successful exports.
+For evidence provenance, report the bundle's `manifest.json`, request URLs,
+recorded attempts, and retained response paths/hashes. Derive a bundle attempt
+count from `requests[].attempts`; it describes that bundle, not every request in
+the agent session. Supplemental discovery reads are outside this manifest. Keep
+their captures separately in the project, and identify any missing capture if
+the report relies on it. A successful bundle verification does not verify those
+supplemental reads.
 
 ## Establish the comparison
 
-1. Read the current [`/api/v1/tco-feed` OpenAPI operation](https://inferencex.semianalysis.com/api/openapi.json)
-   for supported model keys/display names. Obtain the user's model, input/output
-   token lengths, target, and positive per-GPU hourly prices. Keep the supplied rate's source
-   and billing scope in the accompanying explanation. Ask for missing prices;
-   never substitute website defaults or guessed market prices.
+1. Obtain the user's model, input/output token lengths, target, and positive
+   per-GPU hourly prices. Keep the supplied rate's source and billing scope in the
+   accompanying explanation. Ask for missing prices; never substitute website
+   defaults or guessed market prices. If the model is unresolved, consult the
+   current [`/api/v1/tco-feed` OpenAPI operation](https://inferencex.semianalysis.com/api/openapi.json)
+   using the bounded raw-API capture recipe before making a raw data request.
 2. Express the target in **median output tok/s/user**. The feed prefers stored
    `median_intvty`, using `1 / median_itl` only when that field is unavailable.
    It does not guarantee the two stored statistics are reciprocal. For an
@@ -114,26 +121,30 @@ The feed pools frameworks, precisions, speculative methods, and deployment
 configurations into a hardware frontier. It exposes no observation IDs or complete
 configuration identity, and returns throughput rounded to three decimal places.
 Describe a comparison as **frontier estimates under the stated GPU rates**.
+A surprising hardware ranking alone cannot identify why the frontiers differ.
 If the user requires matched configuration, topology, precision, run provenance,
 or quality, stop this comparison and gather the necessary benchmark evidence.
 
 ## Deliver or stop
 
-The JSON contains assumptions, selected rows, coverage, and `source`: the exact
-query URL, retrieval timestamp, HTTP status, complete UTF-8 response body, byte
-count, and SHA-256. The hash covers the bytes after Fetch decodes HTTP compression;
-encoding the retained `source.body` as UTF-8 reproduces them. Save the whole export.
-A URL or as-of date alone does not freeze live data.
+`result.json` contains assumptions, selected rows, coverage, and a source reference.
+`manifest.json` records the exact query URL, retrieval timestamp, HTTP status,
+attempt ledger, decoded response path, byte count, and SHA-256. The complete body
+is retained under `responses/`; its hash covers bytes after Fetch decodes HTTP
+compression. Save the whole bundle. A URL or as-of date alone does not freeze data.
 
-The request has a 30-second deadline and 4 MiB response limit. Redirects, HTTP
+The command defaults to a 30-second deadline and 4 MiB response limit. Redirects, HTTP
 errors, invalid JSON/UTF-8, mismatched scope, inconsistent evidence, numeric
 overflow, and output errors fail with a nonzero exit. A partial-coverage response
-is a successful export with explicit null costs. It needs no automatic retry.
+commits a valid bundle with explicit null costs and is not retried; an unmet
+requested coverage policy exits 3. Transient request failures use the bounded
+retry policy in the [CLI contract](cli.md).
 
-Use `--output` for a file: validation completes before an atomic replacement,
-and failed reads/writes preserve the existing file. Without it, JSON goes to
-stdout and errors to stderr. Shell redirection can truncate a file before the
-helper starts; a closed stdout pipe fails and any partial stream is unusable.
+`--output-dir` creates a new evidence directory and refuses an existing one.
+The final manifest commits the bundle; stdout contains a command summary, not
+the result body. Write reports at sibling paths and finish with `inferencex verify`
+on the bundle. See the [CLI contract](cli.md) for incomplete writes and failures
+after commit.
 
 Deliver the artifact with the model keys, workload/target, user rates, per-row
 evidence dates, coverage, and configuration limits. State that no new benchmarks

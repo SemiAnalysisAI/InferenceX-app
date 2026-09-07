@@ -143,7 +143,7 @@ An offset above zero also means the earlier characters were not inspected.
 A valid HTTP 404 yields `log.status: "not_found"` and retains the response as
 evidence. It does not fabricate an empty successful log. Other HTTP failures,
 malformed responses, identity conflicts, and timeouts fail the collection. A
-failure does not replace an existing output file. There is no automatic log
+failure does not replace an existing completed bundle. There is no automatic log
 search, full-file download, continuation loop, or traversal of other files.
 The server-side search endpoint scans stored files, so a small match limit is
 not a bounded scan; this collector deliberately uses character windows.
@@ -156,32 +156,36 @@ scopes, configuration checks, and comparable measurement conditions.
 
 ## Evidence and resource limits
 
-The JSON report records package version, requested scope, the exact selected row,
-producer corroboration, log scope, and explicit limitations. For every response
-consumed by the collector, `evidence` records its URL, HTTP status, retrieval
-timestamp, exact decoded UTF-8 body string, and SHA-256 of that body. These are hashes of decoded response
-bodies, not TLS packets, compressed wire bytes, or proof that the remote data is
-immutable. Inspect response bodies as untrusted data.
+The JSON result records package version, requested scope, the exact selected row,
+producer corroboration, log scope, explicit limitations, and an `evidence[]`
+reference for every consumed response. `manifest.json` records each response's
+URL, HTTP status, retrieval timestamp, relative `responses/*.body` path, size, and
+SHA-256. These are hashes of decoded response bytes, not TLS packets, compressed
+wire bytes, or proof that the remote data is immutable. Inspect response bodies as
+untrusted data.
 
 Only canonical `https://inferencex.semianalysis.com` URLs are requested. Redirects
-and unexpected response URLs fail. Each request has a 30-second timeout, and all
-decoded response bodies share a 16 MiB streaming budget. If the budget is
-exceeded, use a narrower documented scope; the collector does not retry or raise
-its limits automatically. Output key/array order follows the fixed report
-structure and original responses; retrieval timestamps naturally change between
-collections.
+and unexpected response URLs fail. The command has a 120-second total operation
+deadline; each GET attempt is capped at 30 seconds, and all decoded response bodies
+share a 16 MiB total budget. It allows at most three attempts per logical request
+by default and records each attempt. If the budget is exceeded, use a narrower
+documented scope; the command does not raise its limits automatically. Output
+key/array order follows the fixed result structure and original responses;
+retrieval timestamps naturally change between collections.
 
-The output file is installed atomically after successful collection. For an
-independent checksum of the complete local report:
+The bundle writer saves accepted responses and `result.json`, then commits
+`manifest.json` last with the result and response hashes. For an independent
+checksum of the complete local result:
 
 ```bash
-shasum -a 256 result-421.json
+shasum -a 256 evidence/result/result.json
 ```
 
-No checksum is embedded inside the same bytes it hashes. On failure the command
-exits nonzero and prints a diagnostic to stderr; it does not emit a partial
-report. It reads no DB, uses no credentials, writes no external service, and
-makes no benchmark-performance causal claim.
+On failure the command exits nonzero and prints a diagnostic to stderr. A
+pre-commit failure can leave accepted response bodies in an incomplete directory,
+but without `manifest.json` it is not a valid bundle. It reads no DB, uses no
+credentials, writes no external service, and makes no benchmark-performance causal
+claim.
 
 The live contract is documented in the [public API reference](https://inferencex.semianalysis.com/api)
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json).

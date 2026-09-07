@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -82,21 +83,50 @@ function run(
   rows = [],
   {
     metadata = strictMetadata(),
-    report = `${JSON.stringify({ metadata })}\nNo strictV2 rows matched the requested scope.\n`,
+    resultText = `${JSON.stringify({ schema_version: 1, kind: 'powerx', metadata, rows: [] })}\n`,
+    manifestOverrides = {},
     body = JSON.stringify(rows),
     status = 200,
     networkError = false,
   } = {},
 ) {
   const cwd = project();
-  const reportPath = join(cwd, 'powerx-report.log');
+  const bundlePath = join(cwd, 'powerx');
+  const resultPath = join(bundlePath, 'result.json');
+  const manifestPath = join(bundlePath, 'manifest.json');
   const responseRoot = project('response-');
   const responsePath = join(responseRoot, 'response.json');
   const requestPath = join(responseRoot, 'requests.jsonl');
-  writeFileSync(reportPath, report);
+  mkdirSync(bundlePath);
+  writeFileSync(resultPath, resultText);
+  const resultBytes = readFileSync(resultPath);
+  const manifest = {
+    schema_version: 1,
+    kind: 'powerx',
+    contract_version: 1,
+    normalized_arguments: {
+      model: metadata.requested_model,
+      date: metadata.requested_date,
+      isl: metadata.isl,
+      osl: metadata.osl,
+      raw_model: metadata.raw_model,
+      format: 'json',
+    },
+    coverage: { status: 'empty', selected_records: 0 },
+    result: {
+      format: 'json',
+      path: 'result.json',
+      sha256: createHash('sha256').update(resultBytes).digest('hex'),
+      size: resultBytes.length,
+    },
+    ...manifestOverrides,
+  };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+  const resultBefore = readFileSync(resultPath);
+  const manifestBefore = readFileSync(manifestPath);
   writeFileSync(responsePath, JSON.stringify({ body, status, networkError }));
   const result = suite.node(
-    ['--import', pathToFileURL(preload).href, '--input-type=module', '-', reportPath],
+    ['--import', pathToFileURL(preload).href, '--input-type=module', '-', bundlePath],
     {
       cwd,
       env: {
@@ -111,12 +141,10 @@ function run(
     ? readFileSync(requestPath, 'utf8').trimEnd().split('\n').map(JSON.parse)
     : [];
   assert.ok(requests.length <= 1, 'the recipe makes at most one diagnostic request');
-  assert.equal(readFileSync(reportPath, 'utf8'), report, 'the strict export report is unchanged');
-  assert.deepEqual(
-    readdirSync(cwd),
-    ['powerx-report.log'],
-    'diagnosis creates no export or other file',
-  );
+  assert.deepEqual(readFileSync(resultPath), resultBefore, 'the strict result is unchanged');
+  assert.deepEqual(readFileSync(manifestPath), manifestBefore, 'the strict manifest is unchanged');
+  assert.deepEqual(readdirSync(cwd), ['powerx'], 'diagnosis creates no export or other file');
+  assert.deepEqual(readdirSync(bundlePath).toSorted(), ['manifest.json', 'result.json']);
   return { ...result, requests };
 }
 
@@ -139,7 +167,7 @@ globalThis.fetch = async (input, options) => {
   const section = cookbook.split('## Diagnose an empty strict selection\n')[1]?.split('\n## ')[0];
   assert.ok(section, 'the installed cookbook contains the empty-selection recipe');
   const snippet = section.match(
-    /```bash\nnode --input-type=module - powerx-report\.log <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/,
+    /```bash\nnode --input-type=module - evidence\/powerx <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/,
   );
   assert.ok(snippet, 'execute the shipped recipe, not a test-only diagnostic implementation');
   diagnosticCode = snippet.groups.code;
@@ -424,10 +452,21 @@ test('HTTP, network, malformed JSON and response-shape failures do not claim dat
   }
 });
 
-test('nonempty and malformed strict reports are rejected before any request', () => {
+test('nonempty and malformed strict bundle results are rejected before any request', () => {
   const cases = [
-    { report: 'not JSON\n' },
-    { report: '{}\n' },
+    { resultText: 'not JSON\n' },
+    { resultText: '{}\n' },
+    { manifestOverrides: { coverage: { status: 'complete', selected_records: 0 } } },
+    {
+      manifestOverrides: {
+        result: {
+          format: 'json',
+          path: 'result.json',
+          sha256: '0'.repeat(64),
+          size: 1,
+        },
+      },
+    },
     { metadata: strictMetadata({ selected_rows: 1, selected_models: ['glm5.1'] }) },
     { metadata: strictMetadata({ selected_rows: '0' }) },
     { metadata: strictMetadata({ selected_models: ['glm5.1'] }) },
@@ -447,7 +486,7 @@ test('nonempty and malformed strict reports are rejected before any request', ()
   }
 });
 
-test('report URLs cannot change the host, endpoint, query or recorded export scope', () => {
+test('result URLs cannot change the host, endpoint, query or recorded export scope', () => {
   const base = 'https://inferencex.semianalysis.com/api/v1/benchmarks';
   const query = '?model=GLM-5&date=2026-09-04&powerValid=strictV2';
   const urls = [

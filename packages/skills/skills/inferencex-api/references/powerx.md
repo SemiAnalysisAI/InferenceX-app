@@ -1,7 +1,7 @@
 # PowerX measured-data export
 
-Use the bundled Node 24 exporter for measured GPU power and energy in an exact
-single-turn workload. Consult the current
+Use the bundled exporter through the versioned CLI on Node 24 or 26 for measured
+GPU power and energy in an exact single-turn workload. Consult the current
 [OpenAPI benchmark operation](https://inferencex.semianalysis.com/api/openapi.json)
 for supported display models and metric descriptions. The exporter consumes the
 complete public JSON response; an extracted web-page summary cannot establish
@@ -31,13 +31,16 @@ from current responses.
 The required `--output-dir` is a new evidence bundle. The exporter saves each
 complete decoded response before filtering. `manifest.json` links it to the result:
 
-- `schema_version: 1`, `package_version`, and `status` (`pending`, `complete`, `failed`).
-- `request`: URL, GET method and all requested API/local filters.
-- `response`: HTTP status, retrieval time, body filename, SHA-256 and checksum meaning;
-  `null` means no HTTP response was received. A received but unreadable body is distinct.
-- `export`: format, absolute destination or `stdout`, output SHA-256 and the existing
-  extraction metadata. An empty successful selection still has context and evidence.
-- `error`: failure explanation when present.
+- Top-level `schema_version`, `kind`, `contract_version`, `created_at`, and
+  `producer.package_version` identify the bundle contract and producer.
+- `normalized_arguments` records the display model, workload, date, raw-model filter,
+  and result format.
+- Each `requests[]` entry records the operation, exact URL, allowed statuses, every
+  attempt, and the accepted response's status, retrieval time, relative body path,
+  SHA-256, size, and decoded encoding.
+- `result` records the relative `result.json` or `result.csv` path, format, SHA-256,
+  and size. `coverage` and `summary` retain selection and policy outcomes, including
+  a valid empty selection.
 
 Only a manifest committed last means the bundle completed. HTTP, JSON, shape, or
 write errors exit unsuccessfully; retain the incomplete directory for diagnosis.
@@ -63,8 +66,8 @@ projection cannot be combined with `powerValid`. The first exporter covers
 single-turn snapshots. For other public reads, return to the general skill;
 history has no `powerValid` parameter.
 
-The summary reports rows returned by the strict API request, rows selected by the
-local scope, and both sets of raw model keys. A requested display bucket can cover
+The result metadata reports rows returned by the strict API request, rows selected
+by the local scope, and both sets of raw model keys. A requested display bucket can cover
 multiple releases. Report the returned keys alongside the requested display name;
 the latter does not establish an exact release for every row.
 
@@ -86,9 +89,10 @@ subset of the selected rows.
 Before making any all, none, or single-value claim about a categorical field such
 as `disagg`, check every selected row; never infer the claim from a sample or subset.
 
-An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
-**No strictV2 rows matched the requested scope.** This establishes no eligible
-observations for that selection, not an absence of all underlying benchmarks.
+An empty selection succeeds with a header-only CSV or JSON `rows: []`.
+`manifest.json` records `coverage.status: "empty"`; JSON result metadata records
+`selected_rows: 0`. This establishes no eligible observations for that selection,
+not an absence of all underlying benchmarks.
 Non-success HTTP responses, malformed JSON, or unexpected response shapes fail
 with a nonzero status and no successful export. If the complete response cannot
 be obtained, report the access failure rather than reconstructing rows from a
@@ -96,13 +100,13 @@ summary or relaxing strict validity.
 
 ## Diagnose an empty strict selection
 
-Start from the successful export's `powerx-report.log`, whose first line records
-the strict request metadata. Use this recipe only when `selected_rows` is zero
-and the user needs an explanation. It makes **one** unfiltered benchmark request
-by removing only `powerValid`, then reapplies the exact local workload/raw-model
-scope. Keep the original export unchanged and save diagnostic output separately.
-Do not rerun this recipe automatically, broaden the date/model, or merge its rows
-into the validated export.
+Start from a successfully verified JSON bundle, whose `result.json` metadata
+records the strict request and whose `rows` array is empty. Use this recipe only
+when `selected_rows` is zero and the user needs an explanation. It makes **one**
+unfiltered benchmark request by removing only `powerValid`, then reapplies the
+exact local workload/raw-model scope. Keep the original export unchanged and save
+diagnostic output separately. Do not rerun this recipe automatically, broaden the
+date/model, or merge its rows into the validated export.
 
 Validation and measurement availability are independent. Apply these rules in
 order, using the original numeric fields without coercion:
@@ -124,15 +128,32 @@ Missing audit data does not establish invalidity; quote reported reason codes
 only as supplied and leave an unreported cause unknown.
 
 ```bash
-node --input-type=module - powerx-report.log <<'JS'
+node --input-type=module - evidence/powerx <<'JS'
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import process from 'node:process';
 
 let strictEmptyConfirmed = false;
 async function diagnose() {
-  if (process.argv.length !== 3) throw new Error('Provide the saved exporter report path');
-  const firstLine = (await readFile(process.argv[2], 'utf8')).split(/\r?\n/u, 1)[0];
-  const { metadata: strict } = JSON.parse(firstLine);
+  if (process.argv.length !== 3) throw new Error('Provide the saved PowerX bundle directory');
+  const manifest = JSON.parse(await readFile(join(process.argv[2], 'manifest.json'), 'utf8'));
+  if (
+    manifest?.schema_version !== 1 || manifest.kind !== 'powerx' ||
+    manifest.contract_version !== 1 || manifest.result?.format !== 'json' ||
+    manifest.result?.path !== 'result.json' ||
+    !/^[a-f0-9]{64}$/u.test(manifest.result?.sha256 ?? '') ||
+    !Number.isSafeInteger(manifest.result?.size) || manifest.result.size < 0 ||
+    manifest.coverage?.status !== 'empty' || manifest.coverage?.selected_records !== 0
+  ) throw new Error('Expected a completed empty PowerX JSON bundle');
+  const resultBytes = await readFile(join(process.argv[2], manifest.result.path));
+  if (
+    resultBytes.length !== manifest.result.size ||
+    createHash('sha256').update(resultBytes).digest('hex') !== manifest.result.sha256
+  ) throw new Error('PowerX result size or hash differs from manifest.json');
+  const document = JSON.parse(resultBytes.toString('utf8'));
+  const strict = document?.metadata;
+  const args = manifest.normalized_arguments;
   const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   const positiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
   const date = strict?.requested_date;
@@ -142,6 +163,11 @@ async function diagnose() {
     new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
   );
   if (
+    !object(args) || args.format !== 'json' || args.model !== strict?.requested_model ||
+    args.date !== strict?.requested_date || args.isl !== strict?.isl || args.osl !== strict?.osl ||
+    args.raw_model !== strict?.raw_model ||
+    !object(document) || document.schema_version !== 1 || document.kind !== 'powerx' ||
+    !Array.isArray(document.rows) || document.rows.length !== 0 ||
     !object(strict) || strict.selected_rows !== 0 ||
     !Array.isArray(strict.selected_models) || strict.selected_models.length !== 0 ||
     !Number.isSafeInteger(strict.returned_rows) || strict.returned_rows < 0 ||
@@ -154,7 +180,7 @@ async function diagnose() {
     !positiveInteger(strict.isl) || !positiveInteger(strict.osl) || !validDate ||
     strict.date_selection !== (date === null ? 'latest' : 'as-of') ||
     !(strict.raw_model === null || typeof strict.raw_model === 'string' && strict.raw_model.trim())
-  ) throw new Error('Expected a successful empty strict export report with valid scope metadata');
+  ) throw new Error('Expected a successful empty strict PowerX JSON result with valid scope metadata');
   const url = new URL(strict.query_url);
   if (
     url.origin !== 'https://inferencex.semianalysis.com' ||
@@ -239,7 +265,7 @@ async function diagnose() {
 diagnose().catch((error) => {
   const status = strictEmptyConfirmed
     ? 'The earlier strict selection remains empty; underlying availability is unknown.'
-    : 'No diagnostic request was made; inspect the report.';
+    : 'No diagnostic request was made; inspect the saved result.';
   console.error(`Diagnostic failed: ${error.message}. ${status}`);
   process.exitCode = 1;
 });

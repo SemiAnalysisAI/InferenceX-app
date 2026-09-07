@@ -10,9 +10,13 @@ the skill does not add a binary to `PATH`; resolve this `SKILL.md` and run
 `node <skill>/scripts/inferencex.mjs`. Domain modules under `scripts/` are internal
 code, not command-line interfaces.
 
+Choose the workflow from the user's task first. With complete selectors, start its
+formal command directly; it captures the data it needs. Use `inferencex discover`
+only to resolve missing selectors, and `describe` or `schema` for offline command
+metadata.
+
 ```bash
 inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
-node "$inferencex_cli" discover models
 mkdir -p evidence
 node "$inferencex_cli" powerx export --model GLM-5 --isl 8192 --osl 1024 \
   --output-dir evidence/powerx --require-hardware h200_sxm

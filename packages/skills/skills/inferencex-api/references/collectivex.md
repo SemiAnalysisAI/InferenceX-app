@@ -41,7 +41,7 @@ node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
   --output-dir evidence/collectivex
 ```
 
-Requires Node 24+. The command checks the current OpenAPI operations, reads the run
+Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
 bounded example selection, not a representative sample. A cancelled or failed
@@ -77,7 +77,7 @@ All paths above are under `/api/v1`. Consult the [public API reference](https://
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
 current contract. A missing/unsupported version is HTTP 400. HTTP 404, an upstream
 502/503, malformed data, a redirect, or an interrupted response is a failed read,
-not an empty comparison. The helper exits nonzero and publishes no export on
+not an empty comparison. The command exits nonzero without a completed manifest on
 those failures; it never substitutes a different run.
 
 `discovery_complete=false` means further bounded discovery passes may reveal more
@@ -188,14 +188,15 @@ returned fields without inventing defaults. The server's shared reader has its
 own compatibility fallbacks, so returned defaults are not independently verified
 artifact provenance.
 
-Save the JSON beside the answer. `responses[]` contains each exact request URL,
-HTTP status, retrieval timestamp, SHA-256 of the decoded response bytes, and
-complete `body_text`, including the OpenAPI response. Parse `body_text` to inspect
-the original dataset; comparison source pointers identify a response index and
-JSON Pointer within that parsed body. Run IDs remain exact strings, and
-`runs[].run` retains the returned attempt, `generated_at`, conclusion, and source
-SHA. Retrieval time and generated time describe different events. Cite URLs and
-timestamps from **this export**, never from another selection or an older example.
+Keep the bundle with the answer. `manifest.json` records each exact request URL,
+HTTP status, retrieval timestamp, response size, SHA-256, and relative
+`responses/*.body` path, including for OpenAPI. Parse those complete decoded body
+files to inspect the original datasets; the result's `sources[]` entries and
+comparison source pointers identify the corresponding response index and JSON
+Pointer. Run IDs remain exact strings, and `runs[].run` retains the returned
+attempt, `generated_at`, conclusion, and source SHA. Retrieval time and generated
+time describe different events. Cite URLs and timestamps from **this bundle**,
+never from another selection or an older example.
 
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and

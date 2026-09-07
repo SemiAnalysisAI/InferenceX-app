@@ -125,20 +125,22 @@ in the returned AgentX rows so an empty exact selection can be diagnosed without
 making claims about jobs or artifacts outside that response.
 
 The new `--output-dir` is the evidence bundle. It contains every decoded response,
-the result, and a manifest linking their hashes.
+the result, and a manifest linking their hashes and request attempts.
 
 JSON retains every selected benchmark object separately from its `agentx`
 enrichment. CSV repeats package, request, and filter context on every row. Its
 `metrics.*` columns are the sorted union of scalar metric keys in the selected
 rows; arrays and objects are not embedded in cells. Missing and null cells stay
-blank, while real zero and `false` values remain explicit. Both formats record
-request URLs, retrieval context, row counts, missing enrichment entries, nullable
-groups, and trace availability. The first stderr line is machine-readable metadata,
-including for a header-only CSV. `no_agentx_rows` means the complete benchmark
-response contained no AgentX observations; `no_matching_rows` means exact local
-filters excluded the returned AgentX observations. Neither outcome says whether
-other benchmark jobs, failed runs, source artifacts, or data outside that response
-exist.
+blank, while real zero and `false` values remain explicit. JSON metadata and each
+populated CSV row record request, filter, and retrieval context; `manifest.json`
+always records normalized arguments, the request ledger, result hash, coverage,
+and policy, including for a header-only CSV. In JSON, `no_agentx_rows` means the
+complete benchmark response contained no AgentX observations;
+`no_matching_rows` means exact local filters excluded the returned AgentX
+observations. A header-only CSV does not encode that distinction in a data row;
+validate the bundle with `inferencex verify`, then inspect the saved benchmark
+response. Neither outcome says whether other benchmark jobs, failed runs, source
+artifacts, or data outside that response exist.
 
 An unsupported raw ID remains in the export but is not sent to numeric enrichment
 endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
