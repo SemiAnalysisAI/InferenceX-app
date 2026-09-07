@@ -5,12 +5,13 @@ import {
   cpSync,
   existsSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   truncateSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import process from 'node:process';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -22,6 +23,8 @@ const { environment, project, temporaryRoot } = suite;
 const responsePreload = join(temporaryRoot, 'offline-verifier-responses.mjs');
 const denyPreload = join(temporaryRoot, 'offline-verifier-deny-io.mjs');
 const pauseReadPreload = join(temporaryRoot, 'offline-verifier-pause-read.mjs');
+const growReadPreload = join(temporaryRoot, 'offline-verifier-grow-read.mjs');
+const reportWritePreload = join(temporaryRoot, 'offline-verifier-report-write.mjs');
 let verifier;
 let powerxExporter;
 let agentxExporter;
@@ -311,11 +314,20 @@ before(() => {
     pauseReadPreload,
     `
       import fs from 'node:fs';
+      import { resolve } from 'node:path';
       import { syncBuiltinESMExports } from 'node:module';
-      const original = fs.readFileSync;
+      const original = { openSync: fs.openSync, readSync: fs.readSync };
+      const tracked = new Set();
       let paused = false;
-      fs.readFileSync = function(path, ...rest) {
-        if (!paused && typeof path === 'number') {
+      fs.openSync = function(path, ...rest) {
+        const descriptor = original.openSync.call(this, path, ...rest);
+        if (resolve(String(path)) === resolve(process.env.INFERENCEX_PAUSE_TARGET)) {
+          tracked.add(descriptor);
+        }
+        return descriptor;
+      };
+      fs.readSync = function(descriptor, ...rest) {
+        if (!paused && tracked.has(descriptor)) {
           paused = true;
           fs.writeFileSync(process.env.INFERENCEX_OFFLINE_READY, 'ready');
           const view = new Int32Array(new SharedArrayBuffer(4));
@@ -323,7 +335,126 @@ before(() => {
             Atomics.wait(view, 0, 0, 10);
           }
         }
-        return original.call(this, path, ...rest);
+        return original.readSync.call(this, descriptor, ...rest);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  writeFileSync(
+    growReadPreload,
+    `
+      import fs from 'node:fs';
+      import { resolve } from 'node:path';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = {
+        appendFileSync: fs.appendFileSync,
+        fstatSync: fs.fstatSync,
+        openSync: fs.openSync,
+        readFileSync: fs.readFileSync,
+        readSync: fs.readSync,
+        writeFileSync: fs.writeFileSync,
+      };
+      const tracked = new Set();
+      let grew = false;
+      let readBytes = 0;
+      let largestRequest = 0;
+      fs.openSync = function(path, ...rest) {
+        const descriptor = original.openSync.call(this, path, ...rest);
+        if (resolve(String(path)) === resolve(process.env.INFERENCEX_GROW_TARGET)) {
+          tracked.add(descriptor);
+        }
+        return descriptor;
+      };
+      fs.fstatSync = function(descriptor, ...rest) {
+        const result = original.fstatSync.call(this, descriptor, ...rest);
+        if (tracked.has(descriptor) && !grew) {
+          grew = true;
+          original.appendFileSync(process.env.INFERENCEX_GROW_TARGET, Buffer.alloc(10 * 1024 * 1024));
+        }
+        return result;
+      };
+      fs.readFileSync = function(path, ...rest) {
+        const result = original.readFileSync.call(this, path, ...rest);
+        if (tracked.has(path)) readBytes += Buffer.byteLength(result);
+        return result;
+      };
+      fs.readSync = function(descriptor, buffer, offset, length, ...rest) {
+        if (tracked.has(descriptor)) largestRequest = Math.max(largestRequest, length);
+        const count = original.readSync.call(this, descriptor, buffer, offset, length, ...rest);
+        if (tracked.has(descriptor)) readBytes += count;
+        return count;
+      };
+      process.on('exit', () => {
+        original.writeFileSync(
+          process.env.INFERENCEX_GROW_METRICS,
+          JSON.stringify({ grew, read_bytes: readBytes, largest_request: largestRequest }),
+        );
+      });
+      syncBuiltinESMExports();
+    `,
+  );
+  writeFileSync(
+    reportWritePreload,
+    `
+      import fs from 'node:fs';
+      import { basename, dirname, resolve } from 'node:path';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = {
+        closeSync: fs.closeSync,
+        linkSync: fs.linkSync,
+        openSync: fs.openSync,
+        writeFileSync: fs.writeFileSync,
+        writeSync: fs.writeSync,
+      };
+      const report = resolve(process.env.INFERENCEX_REPORT_PATH);
+      const temporaryPrefix = '.' + basename(report) + '.';
+      const tracked = new Set();
+      const reportPath = (path) => {
+        const resolved = resolve(String(path));
+        return resolved === report ||
+          (dirname(resolved) === dirname(report) && basename(resolved).startsWith(temporaryPrefix));
+      };
+      fs.openSync = function(path, ...rest) {
+        const descriptor = original.openSync.call(this, path, ...rest);
+        if (reportPath(path)) tracked.add(descriptor);
+        return descriptor;
+      };
+      fs.writeFileSync = function(path, data, options) {
+        if (process.env.INFERENCEX_REPORT_MODE === 'race' ||
+            !(typeof path === 'number' ? tracked.has(path) : reportPath(path))) {
+          return original.writeFileSync.call(this, path, data, options);
+        }
+        const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data, options?.encoding);
+        const descriptor = typeof path === 'number'
+          ? path
+          : original.openSync(path, options?.flag ?? 'w', options?.mode);
+        const close = typeof path !== 'number';
+        const prefix = Math.min(120, bytes.length);
+        try {
+          original.writeSync(descriptor, bytes, 0, prefix);
+          if (process.env.INFERENCEX_REPORT_MODE === 'pause') {
+            original.writeFileSync(process.env.INFERENCEX_OFFLINE_READY, 'ready');
+            const view = new Int32Array(new SharedArrayBuffer(4));
+            while (!fs.existsSync(process.env.INFERENCEX_OFFLINE_RELEASE)) {
+              Atomics.wait(view, 0, 0, 10);
+            }
+            if (prefix < bytes.length) {
+              original.writeSync(descriptor, bytes, prefix, bytes.length - prefix);
+            }
+            return;
+          }
+          const error = new Error(process.env.INFERENCEX_REPORT_MODE);
+          error.code = process.env.INFERENCEX_REPORT_MODE;
+          throw error;
+        } finally {
+          if (close) original.closeSync(descriptor);
+        }
+      };
+      fs.linkSync = function(source, destination) {
+        if (process.env.INFERENCEX_REPORT_MODE === 'race' && resolve(destination) === report) {
+          original.writeFileSync(report, 'racing existing report', { flag: 'wx' });
+        }
+        return original.linkSync.call(this, source, destination);
       };
       syncBuiltinESMExports();
     `,
@@ -432,6 +563,81 @@ test('a named report is create-new and preserves an existing report and all inpu
   assert.equal(readFileSync(report, 'utf8'), 'keep prior report');
   assert.deepEqual(readFileSync(join(bundle.evidence, 'manifest.json')), beforeManifest);
   assert.deepEqual(readFileSync(bundle.output), beforeExport);
+});
+
+test('failed staged writes leave no partial named report and preserve every input', () => {
+  for (const code of ['ENOSPC', 'EIO']) {
+    const bundle = powerxBundle();
+    const report = join(bundle.cwd, `failed-${code}.md`);
+    const manifestBytes = readFileSync(join(bundle.evidence, 'manifest.json'));
+    const exportBytes = readFileSync(bundle.output);
+    const result = suite.node(
+      [
+        '--import',
+        pathToFileURL(reportWritePreload).href,
+        verifier,
+        '--evidence-dir',
+        bundle.evidence,
+        '--export',
+        bundle.output,
+        '--report',
+        report,
+        '--error-format',
+        'json',
+      ],
+      {
+        cwd: bundle.cwd,
+        env: {
+          ...environment,
+          INFERENCEX_REPORT_PATH: report,
+          INFERENCEX_REPORT_MODE: code,
+        },
+      },
+    );
+    assert.equal(result.status, 1, code);
+    assert.equal(result.stdout, '');
+    assert.equal(JSON.parse(result.stderr).error.code, 'OUTPUT_ERROR');
+    assert.equal(existsSync(report), false);
+    assert.equal(
+      readdirSync(bundle.cwd).some((name) => name.startsWith(`.${basename(report)}.`)),
+      false,
+    );
+    assert.deepEqual(readFileSync(join(bundle.evidence, 'manifest.json')), manifestBytes);
+    assert.deepEqual(readFileSync(bundle.output), exportBytes);
+  }
+});
+
+test('atomic create-new publication preserves a report created by a racing writer', () => {
+  const bundle = powerxBundle();
+  const report = join(bundle.cwd, 'racing report.md');
+  const result = suite.node(
+    [
+      '--import',
+      pathToFileURL(reportWritePreload).href,
+      verifier,
+      '--evidence-dir',
+      bundle.evidence,
+      '--export',
+      bundle.output,
+      '--report',
+      report,
+    ],
+    {
+      cwd: bundle.cwd,
+      env: {
+        ...environment,
+        INFERENCEX_REPORT_PATH: report,
+        INFERENCEX_REPORT_MODE: 'race',
+      },
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.equal(readFileSync(report, 'utf8'), 'racing existing report');
+  assert.equal(
+    readdirSync(bundle.cwd).some((name) => name.startsWith(`.${basename(report)}.`)),
+    false,
+  );
 });
 
 test('changed export and response bytes fail before any report is emitted', () => {
@@ -643,6 +849,33 @@ test('path aliases and prior reports are rejected without overwriting any input'
 });
 
 test('manifest, response, and export byte budgets fail without partial reports', () => {
+  const exactBundle = powerxBundle();
+  const exactManifest = join(exactBundle.evidence, 'manifest.json');
+  const exactBytes = readFileSync(exactManifest);
+  writeFileSync(
+    exactManifest,
+    Buffer.concat([exactBytes, Buffer.alloc(1024 * 1024 - exactBytes.length, 32)]),
+  );
+  const exactResult = runVerifier([
+    '--evidence-dir',
+    exactBundle.evidence,
+    '--export',
+    exactBundle.output,
+  ]);
+  assert.equal(exactResult.status, 0, exactResult.stderr);
+
+  const zeroBundle = powerxBundle();
+  writeFileSync(join(zeroBundle.evidence, 'manifest.json'), Buffer.alloc(0));
+  const zeroResult = runVerifier([
+    '--evidence-dir',
+    zeroBundle.evidence,
+    '--export',
+    zeroBundle.output,
+  ]);
+  assert.equal(zeroResult.status, 1);
+  assert.equal(zeroResult.stdout, '');
+  assert.match(zeroResult.stderr, /manifest.*JSON/iu);
+
   const manifestBundle = powerxBundle();
   writeFileSync(join(manifestBundle.evidence, 'manifest.json'), Buffer.alloc(1024 * 1024 + 1, 32));
   const manifestResult = runVerifier([
@@ -678,6 +911,41 @@ test('manifest, response, and export byte budgets fail without partial reports',
   ]);
   assert.equal(exportResult.status, 1);
   assert.match(exportResult.stderr, /export.*256 MiB/i);
+});
+
+test('a file that grows after fstat is rejected without reading beyond its accepted size', () => {
+  const bundle = powerxBundle();
+  const manifestPath = join(bundle.evidence, 'manifest.json');
+  const acceptedSize = readFileSync(manifestPath).length;
+  const metricsPath = join(bundle.cwd, 'read-metrics.json');
+  const result = suite.node(
+    [
+      '--import',
+      pathToFileURL(growReadPreload).href,
+      '--import',
+      pathToFileURL(denyPreload).href,
+      verifier,
+      '--evidence-dir',
+      bundle.evidence,
+      '--export',
+      bundle.output,
+    ],
+    {
+      cwd: bundle.cwd,
+      env: {
+        ...environment,
+        INFERENCEX_GROW_TARGET: manifestPath,
+        INFERENCEX_GROW_METRICS: metricsPath,
+        INFERENCEX_OFFLINE_VIOLATIONS: join(bundle.cwd, 'offline-violations'),
+      },
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /manifest.*changed|manifest.*limit/iu);
+  const metrics = JSON.parse(readFileSync(metricsPath, 'utf8'));
+  assert.equal(metrics.grew, true);
+  assert.ok(metrics.read_bytes <= acceptedSize + 1, JSON.stringify(metrics));
 });
 
 test('the aggregate response and rendered-report byte budgets fail explicitly', () => {
@@ -745,7 +1013,67 @@ test('leading and repeated backticks cannot escape the report code span or exhau
   assert.doesNotMatch(repeatedResult.stderr, /INTERNAL_ERROR|call stack/iu);
 });
 
-test('SIGTERM queued during a synchronous input read cancels before report publication', async () => {
+test('SIGTERM during a staged report write cancels before atomic publication', async (context) => {
+  const bundle = powerxBundle();
+  const report = join(bundle.cwd, 'cancelled staged report.md');
+  const ready = join(bundle.cwd, 'write-ready');
+  const release = join(bundle.cwd, 'write-release');
+  const child = spawn(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(reportWritePreload).href,
+      verifier,
+      '--evidence-dir',
+      bundle.evidence,
+      '--export',
+      bundle.output,
+      '--report',
+      report,
+    ],
+    {
+      cwd: bundle.cwd,
+      env: {
+        ...environment,
+        INFERENCEX_REPORT_PATH: report,
+        INFERENCEX_REPORT_MODE: 'pause',
+        INFERENCEX_OFFLINE_READY: ready,
+        INFERENCEX_OFFLINE_RELEASE: release,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  context.after(() => {
+    writeFileSync(release, 'release');
+    child.kill('SIGKILL');
+  });
+  const stdout = [];
+  const stderr = [];
+  child.stdout.on('data', (chunk) => stdout.push(chunk));
+  child.stderr.on('data', (chunk) => stderr.push(chunk));
+  const exitPromise = new Promise((resolve) => {
+    child.once('exit', (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
+  await waitForFile(ready);
+  assert.equal(child.kill('SIGTERM'), true);
+  await new Promise((resolve) => {
+    setTimeout(resolve, 50);
+  });
+  writeFileSync(release, 'release');
+  const exit = await exitPromise;
+  assert.deepEqual(exit, { code: 130, signal: null });
+  assert.equal(Buffer.concat(stdout).toString(), '');
+  assert.match(Buffer.concat(stderr).toString(), /Cancelled by SIGTERM/);
+  assert.equal(existsSync(report), false);
+  assert.equal(
+    readdirSync(bundle.cwd).some((name) => name.startsWith(`.${basename(report)}.`)),
+    false,
+  );
+});
+
+test('SIGTERM queued during a synchronous input read cancels before report publication', async (context) => {
   const bundle = powerxBundle();
   const report = join(bundle.cwd, 'must not be published.md');
   const ready = join(bundle.cwd, 'read-ready');
@@ -770,6 +1098,7 @@ test('SIGTERM queued during a synchronous input read cancels before report publi
       cwd: bundle.cwd,
       env: {
         ...environment,
+        INFERENCEX_PAUSE_TARGET: join(bundle.evidence, 'manifest.json'),
         INFERENCEX_OFFLINE_READY: ready,
         INFERENCEX_OFFLINE_RELEASE: release,
         INFERENCEX_OFFLINE_VIOLATIONS: violations,
@@ -777,21 +1106,26 @@ test('SIGTERM queued during a synchronous input read cancels before report publi
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
+  context.after(() => {
+    writeFileSync(release, 'release');
+    child.kill('SIGKILL');
+  });
   const stdout = [];
   const stderr = [];
   child.stdout.on('data', (chunk) => stdout.push(chunk));
   child.stderr.on('data', (chunk) => stderr.push(chunk));
+  const exitPromise = new Promise((resolve) => {
+    child.once('exit', (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
   await waitForFile(ready);
   assert.equal(child.kill('SIGTERM'), true);
   await new Promise((resolve) => {
     setTimeout(resolve, 50);
   });
   writeFileSync(release, 'release');
-  const exit = await new Promise((resolve) => {
-    child.once('exit', (code, signal) => {
-      resolve({ code, signal });
-    });
-  });
+  const exit = await exitPromise;
   assert.deepEqual(exit, { code: 130, signal: null });
   assert.equal(Buffer.concat(stdout).toString(), '');
   assert.match(Buffer.concat(stderr).toString(), /Cancelled by SIGTERM/);

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
   constants,
   fstatSync,
+  linkSync,
   lstatSync,
   openSync,
-  readFileSync,
+  readSync,
   readdirSync,
   realpathSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -139,8 +141,27 @@ function readRegular(path, limit, label) {
       opened.isFile() && opened.size <= limit,
       `${label} exceeds the ${formatLimit(limit)} byte limit`,
     );
-    const bytes = readFileSync(descriptor);
-    verify(bytes.length <= limit, `${label} exceeds the ${formatLimit(limit)} byte limit`);
+    const bytes = Buffer.allocUnsafe(opened.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(descriptor, bytes, offset, Math.min(64 * 1024, bytes.length - offset));
+      if (count === 0) break;
+      offset += count;
+    }
+    const extra = Buffer.allocUnsafe(1);
+    const extraBytes = readSync(descriptor, extra, 0, 1);
+    const after = fstatSync(descriptor);
+    verify(
+      offset === opened.size &&
+        extraBytes === 0 &&
+        after.dev === opened.dev &&
+        after.ino === opened.ino &&
+        after.mode === opened.mode &&
+        after.size === opened.size &&
+        after.mtimeMs === opened.mtimeMs &&
+        after.ctimeMs === opened.ctimeMs,
+      `${label} changed while it was being read`,
+    );
     return bytes;
   } catch (error) {
     if (error instanceof CliError) throw error;
@@ -914,6 +935,40 @@ function renderReport(verification) {
   return bytes;
 }
 
+async function publishReport(path, bytes, signal) {
+  const temporary = join(dirname(path), `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
+  let descriptor;
+  let identity;
+  try {
+    descriptor = openSync(
+      temporary,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o600,
+    );
+    identity = fstatSync(descriptor);
+    writeFileSync(descriptor, bytes);
+    closeSync(descriptor);
+    descriptor = undefined;
+    await new Promise((done) => {
+      setImmediate(done);
+    });
+    signal.throwIfAborted();
+    linkSync(temporary, path);
+  } finally {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {}
+    }
+    if (identity !== undefined) {
+      try {
+        const current = lstatSync(temporary);
+        if (current.dev === identity.dev && current.ino === identity.ino) unlinkSync(temporary);
+      } catch {}
+    }
+  }
+}
+
 async function main(args, signal) {
   const { values } = parseArgs({
     args,
@@ -952,7 +1007,7 @@ async function main(args, signal) {
   signal.throwIfAborted();
   await (reportPath === null
     ? writeStdout(report, { signal })
-    : outputBoundary(() => writeFileSync(reportPath, report, { flag: 'wx', mode: 0o600 }), signal));
+    : outputBoundary(() => publishReport(reportPath, report, signal), signal));
   process.stderr.write(`Verified ${verification.kind} export against saved evidence.\n`);
 }
 
