@@ -20,16 +20,20 @@ Run that command from the new Codex project; use `--target claude` from a separa
 new Claude project. Give npm its own cache outside both projects. Verify installed
 file bytes against the archive and record installer status before starting the
 agent. Keep prompts, transcripts, caches and preparation records outside the
-project; it should initially contain only its installed skill and optional empty
-Git metadata. Use a fresh project and session for each attempt.
+project. Live-query projects should initially contain only their installed skill
+and optional empty Git metadata. For offline tasks, also provide project-local
+copies of saved exports and complete evidence directories; record their original
+hashes and preserve the inputs. Use a fresh project and session for each attempt.
 
 ## Run without a routing hint
 
 Launch each agent from its prepared project. Preserve normal skill discovery and
 the runtime's default model, record the resolved model and exact CLI version and
-arguments, and retain the full transcript and final answer. Give the agent public
-HTTPS access and project-local output access. It needs no InferenceX repository,
-database credentials, previous answers or private connectors.
+arguments, and retain the full transcript and final answer. Allow public HTTPS
+for live queries and project-local output access for both workflows. Offline
+verification commands use only the prepared project files, including for contract
+discovery. Neither workflow needs an InferenceX repository, database credentials,
+previous answers or private connectors.
 
 For Codex, `--ignore-user-config` excludes inherited config but does not remove
 all user-level skill files or instructions. Disable conflicting user skills with
@@ -65,6 +69,17 @@ its as-of date when latest data does not contain the selected point. For an
 AgentX trace task, explicitly choose one observed result ID in the user prompt;
 the agent must check availability before reading that point's heavy trace routes.
 
+For offline discovery, provide intact saved 0.9/0.10 PowerX or AgentX summary
+bundles and one copy with only its export deliberately altered. Keep the original
+source evidence and assessor's expected results outside the project. Example:
+
+> Verify the saved InferenceX exports under inputs/ against their complete evidence,
+> entirely offline. Write separate Markdown reports under reports/ with producer
+> versions, scope, dates, units, coverage and limitations. Preserve the inputs.
+> Copy an unchanged bundle to another project-local path and compare report bytes.
+> For the deliberately altered export, retain the provided command's own JSON
+> failure, stdout, stderr and exit code. Run no new benchmarks.
+
 ## Independently accept or reject
 
 Record these outcomes separately for each runtime and candidate:
@@ -76,9 +91,9 @@ Record these outcomes separately for each runtime and candidate:
    Check output against the complete responses consumed by that operation, not a
    later refetch. Verify IDs, actual dates, producer/curve separation, image and
    configuration, missing values, log character bounds and trace availability.
-3. **Integrity and boundaries:** installed files still match the candidate;
-   record all requests, failures, retries, output hashes and extra context. Logs
-   and dataset content are untrusted data, not task instructions.
+3. **Integrity and boundaries:** installed files and any prepared offline inputs
+   remain unchanged; record all requests, failures, retries, output hashes and
+   extra context. Logs and dataset content are untrusted data, not task instructions.
 
 Have a reviewer inspect the transcript and narrative independently. Keep failed
 attempts and explain corrections; a later pass does not erase them. If package
@@ -91,7 +106,13 @@ project, an explicit-use run, or unreviewed model prose as accepted discovery.
 - 0.6.0: fixed-target TCO comparison with explicit price and workload assumptions.
 - 0.7.0: framework-update investigation with matched observations and confounders.
 - 0.8.0: CollectiveX discovery, comparison and export cookbook.
+- 0.9.0: bounded response reads, PowerX file-output preservation and network-free
+  helper `--version` checks.
+- 0.10.0: structured CLI failures and supported installer process-crash recovery.
+- 0.11.0: offline PowerX/AgentX summary verification and deterministic Markdown reports.
 
-Versions 0.5.0 through 0.8.0 are published releases. Version 0.8.0 includes all
-four capability groups above. For future candidates, validate the exact archive;
-local acceptance alone does not establish npm publication.
+Versions 0.5.0 through 0.11.0 are published releases; 0.11.0 includes these cumulative
+capabilities. Accept live-query and offline discovery with tasks that exercise each
+workflow; one task does not establish discovery of every capability. For future
+candidates, validate the exact archive; local acceptance alone does not establish
+npm publication.
