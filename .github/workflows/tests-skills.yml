@@ -124,7 +124,7 @@ jobs:
         run: |
           destination="$RUNNER_TEMP/inferencex-skills-platform-acceptance"
           mkdir -p "$destination"
-          node -e "const fs=require('node:fs'); const record={os:process.env.ACCEPTANCE_OS,node:process.env.ACCEPTANCE_NODE,arch:process.arch,status:'passed',archive_sha256:process.env.ARCHIVE_SHA256,run_id:process.env.GITHUB_RUN_ID,run_attempt:process.env.GITHUB_RUN_ATTEMPT,head_sha:process.env.GITHUB_SHA,job_name:process.env.ACCEPTANCE_JOB,evidence_url:'https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/'+process.env.GITHUB_RUN_ID}; fs.writeFileSync(process.argv[1], JSON.stringify(record,null,2)+'\n',{flag:'wx'})" "$destination/${{ matrix.os.id }}-node-${{ matrix.node-version }}.json"
+          node -e "const fs=require('node:fs'); const record={os:process.env.ACCEPTANCE_OS,node:process.env.ACCEPTANCE_NODE,arch:process.arch,status:'passed',archive_sha256:process.env.ARCHIVE_SHA256,run_id:process.env.GITHUB_RUN_ID,run_attempt:process.env.GITHUB_RUN_ATTEMPT,head_sha:process.env.GITHUB_SHA,job_name:process.env.ACCEPTANCE_JOB,evidence_url:'https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/'+process.env.GITHUB_RUN_ID}; fs.writeFileSync(process.argv[1], JSON.stringify(record,null,2)+'\n',{flag:'wx'})" "$destination/${ACCEPTANCE_OS}-node-${ACCEPTANCE_NODE}.json"
           cp "$RUNNER_TEMP/inferencex-skills-archive/archive.sha256" "$destination/archive.sha256"
       - name: Upload platform acceptance record
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

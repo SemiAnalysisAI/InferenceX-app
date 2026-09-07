@@ -93,7 +93,7 @@ jobs:
             "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" \
             "$RUNNER_TEMP/skills-release/release.json" \
             "$RUNNER_TEMP/skills-release/release-summary.json" \
-            --target "${{ github.sha }}" \
+            --target "$GITHUB_SHA" \
             --title "InferenceX skills ${RELEASE_VERSION}" \
             --notes "Accepted public package archive, release identity, and sanitized qualification summary."
       - name: Preserve release and verification evidence

@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   check:
+    name: Check published skills API contract
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
