@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { GOOGLE_YELLOW, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -35,6 +35,7 @@ const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
   teacup: (hue) => hue < 170 || hue > 300, // keep the blue/cyan zone
+  google: (hue) => hue < 55 || hue > 100, // keep gold separate from red, green, and blue
   unknown: null,
 };
 
@@ -49,6 +50,7 @@ const PREFERRED_ZONE: Record<
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
   teacup: { hmin: 190, hmax: 280 }, // cyans/blues
+  google: { hmin: 70, hmax: 95 }, // golds
   unknown: null,
 };
 
@@ -118,6 +120,10 @@ export const generateHighContrastColors = (
 
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
+    if (vendor === 'google' && count === 1) {
+      colors[vendorKeys[0]] = GOOGLE_YELLOW;
+      continue;
+    }
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
     const preferred = PREFERRED_ZONE[vendor] ?? null;
 

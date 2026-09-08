@@ -7,14 +7,18 @@
  * → more perceptual distance between colors → easier to distinguish.
  */
 
-import { GPU_VENDORS, VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
+import {
+  GOOGLE_YELLOW,
+  GPU_VENDORS,
+  VENDOR_OKLCH_ZONES,
+} from '@semianalysisai/inferencex-constants';
 import { getModelSortIndex } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
 // Vendor detection
 // ---------------------------------------------------------------------------
 
-export type Vendor = 'nvidia' | 'amd' | 'teacup' | 'unknown';
+export type Vendor = 'nvidia' | 'amd' | 'teacup' | 'google' | 'unknown';
 
 /** Determine vendor from a hardware key by looking up GPU_VENDORS. */
 export function getVendor(hwKey: string): Vendor {
@@ -22,11 +26,12 @@ export function getVendor(hwKey: string): Vendor {
   const base = hwKey.split('_')[0];
   // Keys whose dataset carries an explicit vendor (e.g. CollectiveX series) lead
   // with the vendor name itself rather than a registered GPU key.
-  if (base === 'nvidia' || base === 'amd' || base === 'teacup') return base;
+  if (base === 'nvidia' || base === 'amd' || base === 'teacup' || base === 'google') return base;
   const vendor = GPU_VENDORS[base];
   if (vendor === 'NVIDIA') return 'nvidia';
   if (vendor === 'AMD') return 'amd';
   if (vendor === 'Teacup') return 'teacup';
+  if (vendor === 'Google') return 'google';
   return 'unknown';
 }
 
@@ -65,7 +70,7 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
  *
  * @param activeKeys - The hardware keys that are currently checked / visible.
  * @param theme      - 'light' or 'dark'.
- * @returns Map of hwKey → `oklch(L C H)` string.
+ * @returns Map of hwKey → CSS color; a single Google series uses its exact brand hex.
  */
 export function generateVendorColors(
   activeKeys: string[],
@@ -93,6 +98,10 @@ export function generateVendorColors(
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const count = keys.length;
+    if (vendor === 'google' && count === 1) {
+      result[keys[0]] = GOOGLE_YELLOW;
+      continue;
+    }
 
     for (let i = 0; i < count; i++) {
       // Evenly space hues, with padding at the edges so the first and last
@@ -148,19 +157,24 @@ export function generateGpuDateColors(
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const gpuCount = keys.length;
+    const googleBase = vendor === 'google' && gpuCount === 1 ? hexToOklch(GOOGLE_YELLOW) : null;
 
     for (let gi = 0; gi < gpuCount; gi++) {
       const hue =
-        gpuCount <= 1
+        googleBase?.[2] ??
+        (gpuCount <= 1
           ? (zone.start + zone.end) / 2
-          : zone.start + ((gi + 0.5) / gpuCount) * (zone.end - zone.start);
+          : zone.start + ((gi + 0.5) / gpuCount) * (zone.end - zone.start));
 
       for (let di = 0; di < dateCount; di++) {
         // Oldest date = lightest, newest = darkest
         const lightness =
           dateCount <= 1 ? (lMin + lMax) / 2 : lMax - (di / (dateCount - 1)) * (lMax - lMin);
         const compositeKey = `${di}_${keys[gi]}`;
-        result[compositeKey] = `oklch(${lightness.toFixed(3)} ${chroma} ${hue.toFixed(1)})`;
+        result[compositeKey] =
+          googleBase && dateCount === 1
+            ? GOOGLE_YELLOW
+            : `oklch(${lightness.toFixed(3)} ${googleBase?.[1] ?? chroma} ${hue.toFixed(1)})`;
       }
     }
   }

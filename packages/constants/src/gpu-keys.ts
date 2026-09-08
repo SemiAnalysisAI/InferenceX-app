@@ -174,6 +174,9 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 // zones to both maps below (OKLch for normal mode, HSL for high-contrast).
 // ---------------------------------------------------------------------------
 
+/** Google yellow, used unchanged for a single Google hardware series. */
+export const GOOGLE_YELLOW = '#F4B400';
+
 /**
  * OKLch hue zones for normal-mode vendor-aware colors.
  * Narrow, precise bands for assigning brand-matching color shades.
@@ -181,9 +184,13 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
  * Layout (approximate):
  *   0-12    (gap)
  *   12-42   AMD reds/oranges
- *   42-120  (gap)
+ *   42-80   (gap)
+ *   80-105  Google golds
+ *   105-120 (gap)
  *   120-170 NVIDIA greens
- *   170-275 (gap)
+ *   170-235 (gap)
+ *   235-270 Teacup blues
+ *   270-275 (gap)
  *   275-330 unknown / fallback (purples)
  *   330-360 (gap)
  */
@@ -194,6 +201,7 @@ export const VENDOR_OKLCH_ZONES: Record<
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
   teacup: { start: 235, end: 270, chroma: { light: 0.14, dark: 0.16 } },
+  google: { start: 80, end: 105, chroma: { light: 0.14, dark: 0.16 } },
   unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
 };
 
@@ -206,8 +214,9 @@ export const VENDOR_OKLCH_ZONES: Record<
  * expands symmetrically — these are preferred zones, not hard constraints.
  *
  * Layout (360° wheel):
+ *   Google:  40–60 (20°) — golds
  *   NVIDIA:  60–195  (135°) — greens through cyans
- *   AMD:     300–360 + 0–60  (120°, wraps) — magentas through oranges
+ *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
  *   Teacup:  195–240 (45°) — cyan/blues
  *   unknown: 240–300 (60°) — blues/purples
  *
@@ -219,7 +228,8 @@ export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]>
   teacup: [{ start: 195, span: 45 }],
   amd: [
     { start: 300, span: 60 },
-    { start: 0, span: 60 },
+    { start: 0, span: 40 },
   ],
+  google: [{ start: 40, span: 20 }],
   unknown: [{ start: 240, span: 60 }],
 };

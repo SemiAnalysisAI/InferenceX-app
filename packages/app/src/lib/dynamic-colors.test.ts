@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { hsl } from 'd3';
 
-import { VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
+import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
   generateHighContrastGpuDateColors,
+  generateGpuDateColors,
   generateVendorColors,
   getVendor,
 } from './dynamic-colors';
@@ -19,6 +21,8 @@ describe('getVendor', () => {
     expect(getVendor('h100_vllm')).toBe('nvidia');
     expect(getVendor('mi300x_sglang')).toBe('amd');
     expect(getVendor('jalapeno_teacup')).toBe('teacup');
+    expect(getVendor('tpuv7')).toBe('google');
+    expect(getVendor('tpuv7_vllm')).toBe('google');
   });
 
   it('classifies keys that lead with a literal vendor token', () => {
@@ -26,6 +30,7 @@ describe('getVendor', () => {
     // registered GPU key (their SKUs, e.g. "h200-dgxc", are not registry keys).
     expect(getVendor('nvidia_h200-dgxc_normal_ep8')).toBe('nvidia');
     expect(getVendor('amd_mi355x-oam_normal_ep8')).toBe('amd');
+    expect(getVendor('google_ironwood_normal_tp8')).toBe('google');
   });
 
   it('falls back to unknown for unclassifiable keys', () => {
@@ -112,5 +117,37 @@ describe('generateHighContrastGpuDateColors', () => {
     const colors = generateHighContrastGpuDateColors({ gpu: 'var(--foreground)' }, 2, 'light');
     expect(colors['0_gpu']).toBe('var(--foreground)');
     expect(colors['1_gpu']).toBe('var(--foreground)');
+  });
+});
+
+describe('TPUv7 vendor colors', () => {
+  it.each(['light', 'dark'] as const)(
+    'keeps Google distinct across normal and historical charts (%s)',
+    (theme) => {
+      const keys = ['tpuv7_vllm', 'b200_vllm', 'b300_vllm', 'mystery_series'];
+      const colors = generateVendorColors(keys, theme);
+      expect(colors.tpuv7_vllm).toBe('#F4B400');
+      expect(colors.tpuv7_vllm).not.toBe(colors.mystery_series);
+      const historical = generateGpuDateColors(keys, 2, theme);
+      const hue = hueOf(historical['0_tpuv7_vllm']);
+      expect(hue).toBeGreaterThan(80);
+      expect(hue).toBeLessThan(90);
+      expect(generateGpuDateColors(keys, 1, theme)['0_tpuv7_vllm']).toBe('#F4B400');
+      expect(hueOf(historical['1_tpuv7_vllm'])).toBe(hue);
+      expect(historical['0_tpuv7_vllm']).not.toBe(historical['1_tpuv7_vllm']);
+    },
+  );
+
+  it('reserves a separate Google HSL band', () => {
+    const hue = hsl('#F4B400').h;
+    expect(
+      VENDOR_HSL_ZONES.google.some(({ start, span }) => hue >= start && hue < start + span),
+    ).toBe(true);
+    for (const [vendor, segments] of Object.entries(VENDOR_HSL_ZONES)) {
+      if (vendor === 'google') continue;
+      for (const segment of segments) {
+        expect(segment.start >= 60 || segment.start + segment.span <= 40).toBe(true);
+      }
+    }
   });
 });
