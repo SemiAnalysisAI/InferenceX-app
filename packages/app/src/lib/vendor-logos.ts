@@ -15,7 +15,7 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 export const HW_VENDOR_LOGOS: Record<string, string> = {
   NVIDIA: 'nvidia-color.svg',
   AMD: 'amd.svg',
-  Google: 'google-color.svg',
+  Google: 'google.svg',
 };
 
 /** Logo filename under `/logos/` for a hardware vendor, if one exists. */
@@ -72,9 +72,9 @@ const OPENAI_LOGO_SVG =
  * Vendor display name → mark. Vendors without a known mark are absent;
  * labels for those series render exactly as before, with no icon.
  */
-/** Four-color Google G, matching the existing comparison hero mark. */
+/** Monochrome Google G, black on colored chart pills like the AMD and NVIDIA marks. */
 const GOOGLE_LOGO_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" fill="#EA4335"/><path d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" fill="#4285F4"/><path d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" fill="#FBBC05"/><path d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" fill="#34A853"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" fill="#000000"/><path d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" fill="#000000"/><path d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" fill="#000000"/><path d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" fill="#000000"/></svg>';
 
 export const VENDOR_LOGO_ICONS: Record<string, VendorLogoIcon> = {
   Google: { href: svgDataUri(GOOGLE_LOGO_SVG), width: 10, height: 10 },
@@ -105,7 +105,7 @@ const NVIDIA_COLOR_LOGO_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 4.063 24 14.01" fill="#76B900"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg>';
 
 export const AXIS_VENDOR_LOGO_ICONS: Record<string, AxisVendorLogoIcon> = {
-  Google: { href: svgDataUri(GOOGLE_LOGO_SVG), width: 10, height: 10, monochrome: false },
+  Google: { href: svgDataUri(GOOGLE_LOGO_SVG), width: 10, height: 10, monochrome: true },
   NVIDIA: { href: svgDataUri(NVIDIA_COLOR_LOGO_SVG), width: 24, height: 14, monochrome: false },
   AMD: { href: svgDataUri(AMD_LOGO_SVG), width: 10, height: 10, monochrome: true },
 };

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 
+import { isMonochromeLogo } from './model-logos';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -34,11 +35,15 @@ describe('vendor logo icons', () => {
   it('uses the same export-safe Google mark for TPU labels and hardware badges', () => {
     for (const key of ['tpuv7', 'tpuv7_vllm', 'tpuv7_vllm_fp8']) {
       expect(getLineLabelVendorIcon(key)).toBe(VENDOR_LOGO_ICONS.Google);
-      expect(getAxisVendorIcon(key)?.monochrome).toBe(false);
+      expect(getAxisVendorIcon(key)?.monochrome).toBe(true);
       expect(getAxisVendorIcon(key)?.href).toBe(VENDOR_LOGO_ICONS.Google.href);
     }
-    expect(getHwVendorLogo('Google')).toBe('google-color.svg');
-    const svg = readFileSync('public/logos/google-color.svg', 'utf8').trim();
+    expect(getHwVendorLogo('Google')).toBe('google.svg');
+    expect(isMonochromeLogo('google.svg')).toBe(true);
+    const svg = readFileSync('public/logos/google.svg', 'utf8').trim();
+    expect([...svg.matchAll(/fill="(?<fill>[^"]+)"/gu)].map((match) => match.groups?.fill)).toEqual(
+      ['#000000', '#000000', '#000000', '#000000'],
+    );
     expect(VENDOR_LOGO_ICONS.Google.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
   });
 
