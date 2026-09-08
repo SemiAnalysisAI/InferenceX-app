@@ -143,7 +143,30 @@ function run(
   assert.ok(requests.length <= 1, 'the recipe makes at most one diagnostic request');
   assert.deepEqual(readFileSync(resultPath), resultBefore, 'the strict result is unchanged');
   assert.deepEqual(readFileSync(manifestPath), manifestBefore, 'the strict manifest is unchanged');
-  assert.deepEqual(readdirSync(cwd), ['powerx'], 'diagnosis creates no export or other file');
+  const captures = readdirSync(cwd).filter((name) => name.startsWith('api-evidence-'));
+  assert.equal(captures.length, requests.length, 'each diagnostic attempt gets a separate capture');
+  if (requests.length > 0) {
+    const record = JSON.parse(readFileSync(join(cwd, captures[0], 'response.json'), 'utf8'));
+    assert.equal(record.query_url, requests[0].url);
+    if (networkError) {
+      assert.match(record.error, /network failure/u);
+      assert.equal(record.status, null);
+      assert.ok(Number.isFinite(Date.parse(record.failed_at)));
+      assert.equal(record.retrieved_at, undefined);
+      assert.equal(record.body_path, undefined, 'a failed transfer has no complete body');
+    } else {
+      const saved = readFileSync(join(cwd, record.body_path));
+      assert.deepEqual(saved, Buffer.from(body));
+      assert.equal(record.status, status);
+      assert.ok(Number.isFinite(Date.parse(record.retrieved_at)));
+      assert.equal(record.decoded_bytes, saved.byteLength);
+      assert.equal(record.sha256, createHash('sha256').update(saved).digest('hex'));
+    }
+  }
+  assert.deepEqual(
+    readdirSync(cwd).filter((name) => !captures.includes(name)),
+    ['powerx'],
+  );
   assert.deepEqual(readdirSync(bundlePath).toSorted(), ['manifest.json', 'result.json']);
   return { ...result, requests };
 }
@@ -174,7 +197,10 @@ globalThis.fetch = async (input, options) => {
 });
 
 test('installed recipe makes one same-scope GET and preserves the earlier strict result', () => {
-  const selected = observation({ power_valid: 0, avg_power_w: 0 });
+  const selected = observation(
+    { power_valid: 0, avg_power_w: 0 },
+    { power_invalid_reasons: ['设备计数不一致'] },
+  );
   const rows = [
     selected,
     observation({}, { id: 'other-release', model: 'glm5' }),

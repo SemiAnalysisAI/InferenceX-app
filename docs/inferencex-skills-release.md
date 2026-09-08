@@ -97,9 +97,11 @@ identical bytes must not rewrite which source was actually tested.
 Each platform entry also records the Actions run and attempt as numeric strings,
 the tested 40-hex commit SHA, the exact matrix job name, and the matching
 `SemiAnalysisAI/InferenceX-app` Actions evidence URL. Each native entry retains its
-aggregate hashes and seven maintained case records; every case records its case ID,
+aggregate hashes and every maintained case record (13 per runtime); every case records its case ID,
 runtime and assessor pass statuses, and prompt/answer transcript hashes. Known
 limitations use the maintained stable codes with descriptions.
+
+The maintained cases include discovery, topology interpretation, a selected trace, result-ID-only provenance, missing prices, and a P99 ITL requirement. Assess final prose and supplemental derived files against the captured responses as well as verifying formal bundles. Preserve failures and grade any retry separately.
 
 The qualification JSON is a reviewed evidence declaration. Its validation checks
 the declared archive, matrix, scopes, identities, and hashes before npm mutation;
@@ -239,7 +241,7 @@ gh workflow run publish-skills.yml --ref master --json < publish-inputs.json
 Inspect and retain `publish-inputs.json` before dispatch. A different branch is
 refused. CI runs packed-interface tests, prepares the source archive, and requires
 byte-for-byte identity with the reviewed SHA-256. Before npm mutation, it validates
-the record's exact archive, four platform jobs, two native runtimes, seven assessed
+the record's exact archive, four platform jobs, two native runtimes, all maintained assessed
 cases per runtime, hashes, and known limitations.
 It performs a clean candidate install/export, checks the digest again,
 and publishes that same tarball using OIDC. It then verifies public metadata and

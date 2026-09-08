@@ -2,9 +2,12 @@
 
 These Node 24 recipes use public HTTPS and the current OpenAPI document. Run them
 from your project; no repository checkout, database credentials, or extra packages
-are needed. Each prints JSON only after successful reads and records each request
-URL and retrieval time. Save the output with the answer. HTTP errors, malformed
-JSON, and unexpected response shapes are failures, not empty results.
+are needed. Each creates a fresh `api-evidence-*` directory and saves complete
+decoded response bodies before parsing or filtering. Adjacent JSON records retain
+the request URL, retrieval time, status, byte count and SHA-256; HTTP and malformed
+JSON bodies remain available on failure. Save this directory and the printed JSON
+with the answer. Repeating a recipe creates a new directory and preserves earlier
+attempts. A hash identifies saved bytes, not remote authenticity.
 
 The versioned CLI can list supported capabilities and public model scopes with
 `inferencex discover capabilities` and `inferencex discover models`. See the
@@ -20,11 +23,31 @@ observation's actual date and provenance.
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
-async function read(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
-  return response.json();
+const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
+async function read(path) {
+  const query_url = new URL(path, base).href;
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read(`${base}/api/openapi.json`);
 const operation = schema.paths['/api/v1/benchmarks']?.get;
@@ -38,8 +61,9 @@ if (!Array.isArray(rows)) throw new Error('Expected a benchmark row array');
 const selected = rows.filter((row) =>
   row.benchmark_type === 'single_turn' && row.isl === 8192 && row.osl === 1024);
 console.log(JSON.stringify({
+  requests,
   query_url: url.href,
-  retrieved_at: new Date().toISOString(),
+  retrieved_at: requests.at(-1).retrieved_at,
   requested_model: model,
   scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
   returned_models: [...new Set(selected.map((row) => row.model))],
@@ -66,17 +90,33 @@ lists available values so an empty match does not require guessing another alias
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'dsv4', task: 'gsm8k', sample_limit: 5 };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/evaluations']?.get;
@@ -134,18 +174,34 @@ example choice, not a representative sample.
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const requestedSlug = null;
 const scope = { requested_slug: requestedSlug, limit: 3, offset: 0, sort: 'id' };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const paths = ['/api/v1/datasets', '/api/v1/datasets/{slug}/conversations',
@@ -230,10 +286,13 @@ Edit `scope` to match the user's request; discover raw hardware keys from the AP
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'DeepSeek-V4-Pro', hardware: 'b200', benchmark_type: 'single_turn',
   isl: 8192, osl: 1024, date_from: '2026-08-01', date_to: '2026-09-04', date_field: 'date' };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
@@ -243,11 +302,24 @@ if (!validDate(scope.date_from) || !validDate(scope.date_to) || scope.date_from 
 }
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/benchmarks/history']?.get;

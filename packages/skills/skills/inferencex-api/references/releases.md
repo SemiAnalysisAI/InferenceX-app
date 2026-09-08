@@ -132,6 +132,10 @@ or malformed known topology fails validation. Unknown unrelated metadata is
 preserved; this fixed comparison contract cannot certify future unreviewed
 configuration dimensions as matched.
 
+Describe prefill/decode fields as role counts (for example, `4/4; disagg=false`),
+using the [shared GPU topology rule](../SKILL.md#evidence-and-interpretation).
+Matching configuration fields alone does not establish a physical GPU total.
+
 Each complete key must have exactly one before and one after observation.
 Multiple candidates yield `ambiguous_configuration`; a missing opposite key
 yields `no_matching_configuration`. The helper never chooses the best point,

@@ -105,7 +105,10 @@ records the strict request and whose `rows` array is empty. Use this recipe only
 when `selected_rows` is zero and the user needs an explanation. It makes **one**
 unfiltered benchmark request by removing only `powerValid`, then reapplies the
 exact local workload/raw-model scope. Keep the original export unchanged and save
-diagnostic output separately. Do not rerun this recipe automatically, broaden the
+diagnostic output separately. Each attempt saves its complete decoded response and
+URL/time/status/byte-count/SHA-256 record in a new `api-evidence-*` directory before
+parsing or filtering, including HTTP and JSON failures. Keep this directory with
+the diagnostic output. Do not rerun this recipe automatically, broaden the
 date/model, or merge its rows into the validated export.
 
 Validation and measurement availability are independent. Apply these rules in
@@ -116,7 +119,7 @@ order, using the original numeric fields without coercion:
 | Numeric `power_valid === 0`                                                                              | `invalid`; any remaining measurements are unreliable.     |
 | A present verdict other than numeric `0` or `1`, or a present schema that is not a positive safe integer | `unknown`.                                                |
 | Numeric schema `>= 3`                                                                                    | `unsupported_schema`; future semantics are not schema v2. |
-| Absent verdict, absent schema, or schema `1`                                                             | `legacy_unverified` for strictV2.                         |
+| Absent verdict, absent schema, or schema `1`                                                             | `legacy_unverified` for strictV2; cause and age unknown.  |
 | Numeric verdict `1` and schema `2`                                                                       | `strictV2_eligible`.                                      |
 
 Check the nine named watts/joules fields separately. `some_recorded` means at
@@ -125,12 +128,13 @@ least one is a finite number, including zero; `missing` means none is. The
 malformed values. Optional role-specific fields can legitimately be absent.
 Temperature/utilization alone does not establish recorded power or energy.
 Missing audit data does not establish invalidity; quote reported reason codes
-only as supplied and leave an unreported cause unknown.
+only as supplied and leave an unreported cause unknown. `legacy_unverified` is
+this recipe's eligibility label, not evidence that a row predates validation.
 
 ```bash
 node --input-type=module - evidence/powerx <<'JS'
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 
@@ -192,10 +196,24 @@ async function diagnose() {
   ) throw new Error('Recorded URL does not match the strict benchmark scope');
   strictEmptyConfirmed = true;
   url.searchParams.delete('powerValid');
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+  const captureDir = await mkdtemp('api-evidence-');
+  let response, bytes;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    await writeFile(join(captureDir, 'response.json'), JSON.stringify({ query_url: url.href,
+      failed_at: new Date().toISOString(), status: response?.status ?? null, error: error.message }),
+      { flag: 'wx' });
+    throw error;
+  }
+  const capture = { query_url: url.href, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: join(captureDir, 'response.body'), decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  await writeFile(capture.body_path, bytes, { flag: 'wx' });
+  await writeFile(join(captureDir, 'response.json'), JSON.stringify(capture), { flag: 'wx' });
   if (!response.ok) throw new Error(`Diagnostic request returned HTTP ${response.status}`);
-  const rows = await response.json();
-  const retrievedAt = new Date().toISOString();
+  const rows = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   function benchmarkRow(row) {
     if (!object(row) || !object(row.metrics)) return false;
     const date = new Date(`${row.date}T00:00:00Z`);
@@ -254,7 +272,7 @@ async function diagnose() {
   console.log(JSON.stringify({
     strict,
     diagnostic: {
-      query_url: url.href, retrieved_at: retrievedAt, returned_rows: rows.length, scoped_rows: scoped.length,
+      ...capture, returned_rows: rows.length, scoped_rows: scoped.length,
       scope: { requested_model: strict.requested_model, requested_date: date, raw_model: strict.raw_model,
         benchmark_type: 'single_turn', isl: strict.isl, osl: strict.osl },
       outcome: validationCounts.strictV2_eligible ? 'response_discrepancy' : scoped.length ? 'classified' : 'no_observations',
@@ -348,14 +366,11 @@ Single-turn rows commonly omit producer workflow IDs/start times, while snapshot
 fields remain present. Keep those producer fields absent; a snapshot ID does not
 identify the producer of every observation. Preserve source timestamps as supplied.
 
-Preserve raw topology alongside `disagg`. On non-disaggregated rows, prefill and
-decode roles can share the same GPUs: `num_prefill_gpu=8` and `num_decode_gpu=8`
-are not evidence of a 16-GPU deployment. Do not sum those role fields or invent a
-deployment-total column or range. Report the original configuration fields; if a
-user requests a derived total, first verify the allocation semantics for that
-configuration. A disaggregated configuration can have distinct role pools, but
-that rule cannot be applied to aggregated rows. This follows the distinction in
-the [existing data-transform documentation](https://github.com/SemiAnalysisAI/InferenceX-app/blob/cc5d87cd37a3a502ce63b58c8985fa034fa07965/docs/data-transforms.md).
+Apply the [shared GPU topology rule](../SKILL.md#evidence-and-interpretation) to
+CSV additions and prose. For example, raw role counts `64/64`, `disagg=false` and
+TP8/EP8 establish neither 64 nor 8 physical GPUs. Keep those configuration values
+and an unknown physical total until producer allocation evidence resolves it.
+Equal roles can overlap; verified disaggregated pools can be distinct.
 
 Optional `workers`, `power_audit`, and `power_invalid_reasons` are top-level row
 fields, separate from `metrics`. JSON retains them when present, including null

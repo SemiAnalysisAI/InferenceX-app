@@ -28,15 +28,9 @@ const scope = {
   empty_osl: 13,
   agentx_model: 'DeepSeek-V4-Pro',
 };
-const caseIds = [
-  'powerx-live',
-  'agentx-live',
-  'result-live',
-  'tco-live',
-  'releases-live',
-  'collectivex-live',
-  'offline-six-family',
-];
+const caseIds = JSON.parse(
+  readFileSync(new URL('../maintainer/natural-language-cases.json', import.meta.url), 'utf8'),
+).cases.map((entry) => entry.id);
 const matrix = ['linux', 'macos'].flatMap((os) =>
   ['24', '26'].map((node) => ({
     os,
@@ -58,13 +52,13 @@ const native = ['codex', 'claude'].map((runtime) => ({
   case_set_sha256: 'c'.repeat(64),
   prompt_transcript_sha256: 'd'.repeat(64),
   answer_transcript_sha256: 'e'.repeat(64),
-  scope: ['powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex', 'offline'],
+  scope: ['powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex', 'offline', 'discovery'],
   cases: caseIds.map((caseId, index) => ({
     case_id: caseId,
     status: 'passed',
     assessor_status: 'passed',
-    prompt_transcript_sha256: (index + 1).toString(16).repeat(64),
-    answer_transcript_sha256: (index + 8).toString(16).repeat(64),
+    prompt_transcript_sha256: (index + 1).toString(16).padStart(64, '0'),
+    answer_transcript_sha256: (index + 101).toString(16).padStart(64, '0'),
   })),
 }));
 const candidate = {
@@ -232,6 +226,11 @@ test('qualification is validated before publication and supplied independently o
     },
     (value) => {
       value.native_acceptance[0].cases[0].case_id = 'made-up-case';
+    },
+    (value) => {
+      value.native_acceptance[0].cases = value.native_acceptance[0].cases.filter(
+        (entry) => entry.case_id !== 'tco-tail-latency',
+      );
     },
     (value) => {
       value.native_acceptance[0].cases[0].status = 'failed';

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -28,6 +29,9 @@ const schema = {
     },
   },
   paths: {
+    '/api/v1/benchmarks': {
+      get: { parameters: [{ name: 'model', schema: { enum: ['DeepSeek-V4-Pro'] } }] },
+    },
     '/api/v1/benchmarks/history': {
       get: {
         parameters: [
@@ -59,6 +63,7 @@ before(() => {
       'Evaluation lookup',
       'Dataset discovery and conversation inspection',
       'Benchmark history for a GPU and workload',
+      'Basic benchmark lookup',
     ].map((heading) => {
       const section = cookbook.split(`## ${heading}\n`)[1]?.split('\n## ')[0];
       const snippet = section?.match(
@@ -79,14 +84,18 @@ globalThis.fetch = async (input) => {
   appendFileSync(process.env.INFERENCEX_EXAMPLE_REQUESTS, JSON.stringify(url) + '\\n');
   const response = fixtures[url];
   if (!response) throw new Error('Unexpected request: ' + url);
+  if (response.networkError) throw new TypeError('fixture network failure');
   return new Response(response.body, { status: response.status ?? 200 });
 };
 `,
   );
 });
 
-function run(index, responses, { target = 'codex', replacement, openapi = schema } = {}) {
-  const project = suite.project('request-');
+function run(
+  index,
+  responses,
+  { target = 'codex', replacement, openapi = schema, project = suite.project('request-') } = {},
+) {
   const fixtures = { [`${base}/api/openapi.json`]: { body: JSON.stringify(openapi) } };
   for (const [path, value] of Object.entries(responses)) {
     fixtures[`${base}${path}`] = value;
@@ -94,6 +103,7 @@ function run(index, responses, { target = 'codex', replacement, openapi = schema
   const fixturesPath = join(project, 'responses.json');
   const requestsPath = join(project, 'requests.jsonl');
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
+  writeFileSync(requestsPath, '');
   let code = installed.get(target)[index];
   if (replacement) code = code.replace(...replacement);
   const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
@@ -107,6 +117,8 @@ function run(index, responses, { target = 'codex', replacement, openapi = schema
   });
   return {
     ...result,
+    project,
+    fixtures,
     requests: readFileSync(requestsPath, 'utf8').trimEnd().split('\n').map(JSON.parse),
   };
 }
@@ -158,8 +170,76 @@ function succeeded(result) {
     result.requests,
   );
   assert.ok(output.requests.every((request) => Number.isFinite(Date.parse(request.retrieved_at))));
+  assertCaptures(result);
   return output;
 }
+
+function assertCaptures(result) {
+  const directories = readdirSync(result.project).filter((name) =>
+    name.startsWith('api-evidence-'),
+  );
+  assert.ok(directories.length > 0, 'preserve complete responses in a unique attempt directory');
+  const records = directories.flatMap((directory) =>
+    readdirSync(join(result.project, directory))
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => JSON.parse(readFileSync(join(result.project, directory, name), 'utf8'))),
+  );
+  for (const record of records) {
+    if (result.fixtures[record.query_url].networkError) {
+      assert.match(record.error, /network failure/u);
+      assert.equal(record.status, null);
+      assert.ok(Number.isFinite(Date.parse(record.failed_at)));
+      assert.equal(record.retrieved_at, undefined);
+      assert.equal(record.body_path, undefined, 'a failed transfer has no complete body');
+      continue;
+    }
+    const body = readFileSync(join(result.project, record.body_path));
+    assert.deepEqual(body, Buffer.from(result.fixtures[record.query_url].body));
+    assert.equal(record.decoded_bytes, body.byteLength);
+    assert.equal(record.sha256, createHash('sha256').update(body).digest('hex'));
+    assert.equal(record.status, result.fixtures[record.query_url].status ?? 200);
+    assert.ok(Number.isFinite(Date.parse(record.retrieved_at)));
+  }
+  return { directories, records };
+}
+
+test('raw recipes retain complete UTF-8 and failure bodies before parsing, and repeated attempts never overwrite', () => {
+  const rows = Array.from({ length: 7 }, (_, index) =>
+    evaluation(`row-${index}`, '2026-09-01', { note: `测量 ${index}` }),
+  );
+  const first = run(0, { '/api/v1/evaluations': response(rows) });
+  const output = succeeded(first);
+  assert.equal(output.sample_rows.length, 5);
+  const { records } = assertCaptures(first);
+  const full = records.find((record) => record.query_url.endsWith('/evaluations'));
+  assert.ok(full.decoded_bytes > JSON.stringify(rows).length, 'count UTF-8 bytes, not characters');
+  const original = readFileSync(join(first.project, full.body_path));
+  succeeded(run(0, { '/api/v1/evaluations': response(rows) }, { project: first.project }));
+  assert.equal(assertCaptures(first).directories.length, 2);
+  assert.deepEqual(readFileSync(join(first.project, full.body_path)), original);
+
+  for (const failure of [
+    { status: 503, body: '{"error":"暂不可用"}' },
+    { body: '{malformed JSON' },
+    { networkError: true },
+  ]) {
+    const result = run(0, { '/api/v1/evaluations': failure });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+    assert.equal(assertCaptures(result).records.length, 2);
+  }
+});
+
+test('basic benchmark recipe captures the complete response while returning only its latest sample', () => {
+  const rows = Array.from({ length: 7 }, (_, index) =>
+    historyRow(`row-${index}`, `2026-09-0${index + 1}`),
+  );
+  const result = run(3, { '/api/v1/benchmarks?model=DeepSeek-V4-Pro': response(rows) });
+  const output = succeeded(result);
+  assert.equal(output.matching_rows, 7);
+  assert.deepEqual(output.sample_rows, rows.toReversed().slice(0, 5));
+  assert.equal(output.retrieved_at, output.requests.at(-1).retrieved_at);
+});
 
 test('installed evaluation recipe counts the full scope and preserves raw metrics, IDs, nulls and provenance', () => {
   const newest = Array.from({ length: 5 }, (_, i) =>

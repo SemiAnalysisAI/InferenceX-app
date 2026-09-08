@@ -11,15 +11,11 @@ const COMMIT = /^(?:[a-f\d]{40}|[a-f\d]{64})$/u;
 const POSITIVE_INTEGER = /^[1-9]\d*$/u;
 const VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 const ARCHITECTURES = new Set(['arm64', 'x64']);
-const CASE_IDS = [
-  'powerx-live',
-  'agentx-live',
-  'result-live',
-  'tco-live',
-  'releases-live',
-  'collectivex-live',
-  'offline-six-family',
-];
+const CASES = JSON.parse(
+  readFileSync(new URL('../maintainer/natural-language-cases.json', import.meta.url), 'utf8'),
+).cases;
+const CASE_IDS = CASES.map((entry) => entry.id);
+const SCOPE_IDS = [...new Set(CASES.map((entry) => entry.family))].toSorted();
 const LIMITATIONS = Object.freeze({
   NO_NEW_BENCHMARKS: 'Release qualification did not launch new benchmark runs.',
   WINDOWS_UNQUALIFIED: 'Windows is outside the qualified platform matrix.',
@@ -153,12 +149,12 @@ export function validateQualification(release, qualification) {
       assert.match(entry[key], HASH, `Native acceptance ${key} is invalid`);
     }
     assert.ok(
-      Array.isArray(entry.scope) && entry.scope.length === 7,
+      Array.isArray(entry.scope) && entry.scope.length === SCOPE_IDS.length,
       'Native acceptance scope is incomplete',
     );
     assert.deepEqual(
       [...entry.scope].sort(),
-      ['agentx', 'collectivex', 'offline', 'powerx', 'releases', 'result', 'tco'],
+      SCOPE_IDS,
       'Native acceptance scope is incomplete or duplicated',
     );
     assert.ok(

@@ -38,6 +38,36 @@
       "id": "offline-six-family",
       "family": "offline",
       "prompt": "This project contains intact, partial, and tampered evidence directories for PowerX, AgentX, result provenance, TCO, release comparison, and CollectiveX. Verify every directory without network access. For PowerX, AgentX, result provenance, and TCO, require at least one usable b200 observation. For release comparison and CollectiveX, require at least one comparable pair. Preserve every input, save any optional reports outside the evidence directories, and separate valid partial evidence, policy failures, and invalid tampering."
+    },
+    {
+      "id": "discovery-evidence",
+      "family": "discovery",
+      "prompt": "I’m preparing an infrastructure review using InferenceX. What existing GLM-5 benchmark data is available for 8192 input tokens and 1024 output tokens?\n\nIdentify the available hardware, frameworks and observation dates. Show five representative recent results with their configurations and sources, and explain how you selected them. Save the underlying responses and a short report in this project."
+    },
+    {
+      "id": "powerx-topology",
+      "family": "powerx",
+      "prompt": "Prepare a spreadsheet-ready CSV of existing InferenceX PowerX results for DeepSeek-V4-Pro at 8192 input tokens and 1024 output tokens.\n\nInclude the available topology, power and energy information. Explain per-GPU versus deployment-level quantities and how many GPUs each configuration actually establishes. Report missing measurements and verify the saved export before handing it over."
+    },
+    {
+      "id": "agentx-selected-trace",
+      "family": "agentx",
+      "prompt": "Inspect this InferenceX AgentX result: 441083, for DeepSeek-V4-Pro, observed in logical run 33814452339.\n\nCheck whether a stored trace is available. If it is, inspect this point’s request timeline and server metrics, summarize the slow phases, queue behavior and cancellations, and preserve the original responses. Keep the investigation limited to this selected result."
+    },
+    {
+      "id": "result-id-discovery",
+      "family": "result",
+      "prompt": "Where did InferenceX result 416696 come from?\n\nI only have this ID. Find its model and available source context, then explain the actual measurement date, producing run, configuration and image. Save your evidence and distinguish confirmed information from anything you could not recover."
+    },
+    {
+      "id": "tco-missing-prices",
+      "family": "tco",
+      "prompt": "Which is cheaper for serving DeepSeek-V4-Pro at 8192 input tokens, 1024 output tokens and 50 output tokens per second per user: B200 or MI355X?\n\nUse existing InferenceX data. I have not supplied rental prices yet. Work out what can already be established and ask me for any remaining inputs needed for a defensible cost comparison."
+    },
+    {
+      "id": "tco-tail-latency",
+      "family": "tco",
+      "prompt": "Our production requirement is P99 inter-token latency below 20 ms. We can rent B200 at $3.60 per GPU-hour or MI355X at $1.80 per GPU-hour.\n\nUsing existing InferenceX DeepSeek-V4-Pro data for an 8192-input, 1024-output workload, determine whether either option meets that requirement and compare costs where the evidence supports it. Explain any missing evidence."
     }
   ],
   "execution": {

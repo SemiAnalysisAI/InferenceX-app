@@ -63,8 +63,18 @@ so reserialized parsed values cannot establish their exact original digits.
 
 Inspect each server-metric series' returned fields before calculating statistics.
 For example, `queueDepth` carries `running`, `waiting`, and `total`, while scalar
-series can use `value`. Summarize the actual fields and their missing values;
-absence of `value` alone does not mean a queue-depth sample is missing.
+series use `value`. Report each series' own sample, finite, nonzero, and missing
+counts; their array lengths can differ. A nonzero fraction uses that field's
+finite count as its denominator, with missing samples reported separately.
+An empty series has no samples; zero-valued samples remain recorded observations.
+
+For timeline accounting, `sum(end - start)` is cumulative request latency and can
+exceed elapsed time when requests overlap. The union of `[start, end]` intervals
+is time with at least one request in flight. Neither measures GPU utilization or
+server busy time. Keep every phase and cancelled request in the default summary;
+label any narrower selection explicitly. A sampled KV-cache maximum or a slow
+first request describes that observation; it cannot establish that cache capacity
+was never limiting or that a cold cache caused the latency.
 
 This workflow reads existing observations and runs no new benchmark. AgentX does
 not evaluate model answer quality. If AgentX rows contain power fields, interpret
@@ -262,7 +272,9 @@ if (!traceAvailable) {
           !object(request) || typeof request.cid !== 'string' || !integer(request.ti) ||
           typeof request.wid !== 'string' || !integer(request.ad) ||
           typeof request.phase !== 'string' || !integer(request.credit) ||
-          !integer(request.start) || !finiteOrNull(request.ack) || !integer(request.end) ||
+          !Number.isSafeInteger(request.start) || request.start < 0 ||
+          !finiteOrNull(request.ack) || !Number.isSafeInteger(request.end) ||
+          request.end < request.start ||
           !finiteOrNull(request.ttftMs) || !finiteOrNull(request.tpotMs) ||
           !finiteOrNull(request.isl) || !finiteOrNull(request.osl) ||
           typeof request.cancelled !== 'boolean' ||
@@ -302,12 +314,50 @@ if (!traceAvailable) {
       throw new Error('Unexpected aggregate server metrics response');
     }
 
+    // Summarize returned samples separately; series are not aligned by array index.
+    const sampleCounts = (points, fields = ['value']) => ({
+      sample_count: points.length,
+      fields: Object.fromEntries(fields.map((field) => {
+        const values = points.map((point) => point[field]).filter(finite);
+        return [field, {
+          finite_count: values.length,
+          nonzero_count: values.filter((value) => value !== 0).length,
+          missing_or_nonfinite_count: points.length - values.length,
+        }];
+      })),
+    });
+    const scalarSeries = series.filter((key) => key !== 'queueDepth' && key !== 'kvCacheUsageByEngine');
+    const serverMetricSamples = {
+      ...Object.fromEntries(scalarSeries.map((key) => [key, sampleCounts(serverMetrics[key])])),
+      queueDepth: sampleCounts(serverMetrics.queueDepth, ['running', 'waiting', 'total']),
+      promptTokensBySource: Object.fromEntries(Object.entries(serverMetrics.promptTokensBySource)
+        .map(([source, points]) => [source, sampleCounts(points)])),
+      kvCacheUsageByEngine: serverMetrics.kvCacheUsageByEngine.map(({ engineLabel, points }) => ({
+        engineLabel, ...sampleCounts(points),
+      })),
+    };
+    let cumulativeRequestLatencyS = 0;
+    let requestInflightUnionS = 0;
+    let coveredEnd = 0;
+    for (const { start, end } of [...timeline.requests].sort((a, b) => a.start - b.start)) {
+      cumulativeRequestLatencyS += (end - start) / 1e9;
+      requestInflightUnionS += Math.max(0, end - Math.max(start, coveredEnd)) / 1e9;
+      coveredEnd = Math.max(coveredEnd, end);
+    }
+
     console.log(JSON.stringify({
       ...common(),
       outcome: 'trace_diagnostics',
       timeline,
       histograms,
       server_metrics: serverMetrics,
+      trace_summary: {
+        request_count: timeline.requests.length,
+        cancelled_request_count: timeline.requests.filter((request) => request.cancelled).length,
+        cumulative_request_latency_s: cumulativeRequestLatencyS,
+        request_inflight_union_s: requestInflightUnionS,
+        server_metric_samples: serverMetricSamples,
+      },
     }, null, 2));
   } catch (error) {
     throw new Error(

@@ -42,8 +42,41 @@
       "validity separated from coverage and policy",
       "tampered inputs rejected",
       "inputs unchanged"
+    ],
+    "discovery-evidence": [
+      "summaries and date spans computed from the selected records",
+      "physical GPU totals require allocation evidence",
+      "missing power validation verdict does not establish measurement age or invalidity"
+    ],
+    "powerx-topology": [
+      "raw topology role fields preserved",
+      "physical GPU count remains unknown without allocation evidence",
+      "supplementary CSV and report obey the same unit and topology rules as the formal bundle"
+    ],
+    "agentx-selected-trace": [
+      "only the selected point inspected",
+      "each metric series has its own sample and nonzero denominators",
+      "cumulative request latency distinguished from request-inflight interval union",
+      "request timing and sampled server metrics do not establish GPU busy time or causality"
+    ],
+    "result-id-discovery": [
+      "model and source context discovered from result ID only",
+      "is_current identifies the requested result rather than recency or validity",
+      "siblings with different workloads not described as replacements"
+    ],
+    "tco-missing-prices": [
+      "no invented rental rates or likely cost winner",
+      "available throughput and symbolic break-even distinguished from priced comparison",
+      "missing rates requested from user"
+    ],
+    "tco-tail-latency": [
+      "P99 ITL evaluated using finite raw p99_itl in seconds",
+      "20 ms requirement uses strict less than 0.020 seconds",
+      "median interactivity and reciprocal p99_intvty never substitute for p99_itl",
+      "costs scoped to the observed configurations that satisfy the requirement",
+      "missing or invalid tail evidence remains unresolved"
     ]
   },
   "verdicts": ["passed", "failed", "needs-review"],
-  "rule": "Assess the original transcript and answer. Never edit either artifact to manufacture a passing result."
+  "rule": "Assess the original transcript, final answer, and every supplemental report or derived data file against captured responses, not only the formal bundle. Check numerical summaries, units, sample denominators, scope, and unsupported conclusions. Never edit an artifact or replace a failed attempt to manufacture a passing result."
 }

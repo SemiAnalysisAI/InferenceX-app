@@ -28,7 +28,14 @@ archive, run from the target project:
 INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.12.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
   inferencex-skills install --target codex
+npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
+  inferencex-skills status --target codex --json
+npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
+  inferencex-skills install --target codex --force --dry-run --json
 ```
+
+Use that same candidate archive for every installer operation before publication.
+An unpublished version returning `ETARGET` does not justify substituting `latest`.
 
 | Target              | Installed skill                  |
 | ------------------- | -------------------------------- |
@@ -137,7 +144,8 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
 ```
 
 发布前审阅本地 `.tgz` 时，将 `--package` 的值换成产物绝对路径，并加上
-`--offline`。Codex 安装到 `.agents/skills/inferencex-api/`，Claude Code
+`--offline`。安装、`status`、`--dry-run` 和重新安装均须使用同一份候选产物。
+未发布版本返回 `ETARGET` 时，不能改用 `latest` 代替。Codex 安装到 `.agents/skills/inferencex-api/`，Claude Code
 安装到 `.claude/skills/inferencex-api/`。`--dir` 可指定自定义 skills 根目录。
 
 ### 统一命令

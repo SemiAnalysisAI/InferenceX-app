@@ -167,7 +167,7 @@ export const FORMAL_OPERATIONS = Object.freeze([
         option('--workloads', 'ISLxOSL,...', 'Comma-separated workload shapes.', {
           required: true,
         }),
-        option('--target', 'number', 'Target output tokens per second per user.', {
+        option('--target', 'number', 'Target median output tokens per second per user.', {
           required: true,
         }),
         option(

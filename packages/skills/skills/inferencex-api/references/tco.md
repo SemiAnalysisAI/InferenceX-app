@@ -35,17 +35,16 @@ supplemental reads.
 
 1. Obtain the user's model, input/output token lengths, target, and positive
    per-GPU hourly prices. Keep the supplied rate's source and billing scope in the
-   accompanying explanation. Ask for missing prices; never substitute website
-   defaults or guessed market prices. If the model is unresolved, consult the
+   accompanying explanation. For missing prices, use the branch below. If the
+   model is unresolved, consult the
    current [`/api/v1/tco-feed` OpenAPI operation](https://inferencex.semianalysis.com/api/openapi.json)
    using the bounded raw-API capture recipe before making a raw data request.
 2. Express the target in **median output tok/s/user**. The feed prefers stored
    `median_intvty`, using `1 / median_itl` only when that field is unavailable.
    It does not guarantee the two stored statistics are reciprocal. For an
-   inter-token latency constraint, first obtain an explicit interactivity target
-   or verify the underlying statistic; `1000 / milliseconds` alone does not prove
-   the feed meets that latency requirement. TTFT, total request latency, and
-   P90/P99 latency also require different evidence. Agentic Traces require a
+   inter-token latency constraint, obtain the actual latency metric: use the P99
+   recipe below for a P99 ITL requirement. TTFT, total request latency, and other
+   percentiles require their own metrics. Agentic Traces require a
    different read; this feed covers fixed single-turn workloads.
 3. Read the complete JSON `view=points&format=json` response at that model,
    workload list, target (`tiers`), and optional date. The bundled helper performs
@@ -57,6 +56,64 @@ supplemental reads.
 4. Use one scope for every GPU. `--date` is an inclusive as-of cutoff; source
    evidence may be older. Omission selects latest available data. Keep workloads
    separate: this helper produces no workload blend, weighted score, or ranking.
+
+## When hourly prices are missing
+
+Keep the missing rates symbolic. Use the [bounded raw-API capture recipe](public-api-examples.md)
+to retain the complete `tco-feed?view=points&format=json` response for the requested
+model, workloads, median target (`tiers`), and optional date. Report positive,
+in-range throughput and evidence dates separately for each hardware/workload.
+For two such points with throughputs `t_A` and `t_B`, equal modeled cost occurs at
+`price_A / price_B = t_A / t_B`; A is cheaper only if the user's rate ratio is below
+that boundary. Missing, clamped, and unreachable points have no cost boundary.
+
+Finish with the symbolic boundary and ask for the missing USD/GPU-hour rates and
+billing scope. The cheaper hardware remains unresolved. Website defaults, typical
+market spreads, and invented `$1` rates are not user-supplied prices; pass
+`--gpu-hourly-prices` to the formal comparison once those inputs are supplied.
+
+## Check a P99 ITL constraint
+
+Use the raw benchmark observation's `metrics.p99_itl`, measured in **seconds**.
+Convert it to milliseconds with `p99_itl * 1000`. `p99_tpot` measures a different
+statistic (per-request time per output token). The reciprocal `1000 / p99_intvty`
+is not P99 ITL. A median frontier target cannot certify a tail SLA.
+
+Capture the complete benchmark/history response using the bounded raw-API recipe,
+then set the workload scope to the user's request. Obtain `scope.model` from
+`inferencex discover models` or the captured rows' actual `model` value; `dsv4`
+below is an example raw key, not a display-name conversion rule. This offline
+example keeps every selected observation and checks **strictly below 20 ms**
+(`p99_itl < 0.020` seconds). Missing, nonnumeric, nonfinite, and negative values
+remain `unknown`; preserve the source capture alongside this derived report.
+
+```bash
+node --input-type=module - evidence/benchmark-history.body <<'JS'
+import { readFileSync } from 'node:fs';
+const scope = { model: 'dsv4', benchmark_type: 'single_turn', isl: 8192, osl: 1024 };
+const source_path = process.argv[2];
+const rows = JSON.parse(readFileSync(source_path, 'utf8'));
+if (!Array.isArray(rows)) throw new Error('Expected a captured benchmark row array');
+const selected = rows.filter((row) =>
+  Object.entries(scope).every(([key, value]) => row[key] === value));
+const checked = selected.map((row) => {
+  const seconds = row.metrics?.p99_itl;
+  const known = Number.isFinite(seconds) && seconds >= 0;
+  return {
+    ...row,
+    p99_itl_ms: known ? seconds * 1000 : null,
+    p99_itl_under_20ms: known ? (seconds < 0.020 ? 'pass' : 'fail') : 'unknown',
+  };
+});
+console.log(JSON.stringify({ source_path, scope, matching_rows: checked.length, rows: checked }, null, 2));
+JS
+```
+
+Report passing, failing, and unknown **result IDs** with their configuration,
+measurement date, and source. A sampled row's failure says nothing about unexamined
+configurations; a recorded pass is scoped to that observation, not a production SLA.
+For a cost comparison under this constraint, first establish eligible observations
+and comparable throughput scope; the median-only TCO feed does not do that filtering.
 
 ## Run the comparison
 

@@ -31,11 +31,11 @@ defines exit codes, fixed CSV columns, JSON evolution, and the move from 0.11 an
       Discover a live scope and verify six formal result families against the saved
       response bytes, including valid empty evidence and an explicit policy failure.
 - [ ] Run each maintained natural-language case in a fresh Codex and Claude
-      project: six live cases and the offline six-family matrix. Retain the original
+      project: twelve live cases and the offline six-family matrix. Retain the original
       prompts, transcripts, answers, failures, and independent assessor outcomes.
       An exit code alone does not establish implicit discovery or correct prose.
 - [ ] Assemble the reviewed qualification JSON from the four actual Actions job
-      records and fourteen assessed native cases. All entries must refer to the
+      records and twenty-six assessed native cases. All entries must refer to the
       accepted archive; validate it with `release-summary.mjs check-qualification`.
 
 Keep detailed captures outside the npm package. A failed attempt remains evidence;

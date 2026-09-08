@@ -64,6 +64,14 @@ return the complete original benchmark row, image, or producing attempt. Keep
 that distinction in the answer even when it identifies an otherwise unavailable
 historical result.
 
+`is_current` marks the requested result ID: it is true exactly when the sibling's
+`id` equals the request's `id`. A false value means a different result was returned;
+it says nothing about that result's age, validity, or whether it was superseded.
+Siblings can share a producing run while differing in workload or concurrency.
+Confirm each full row's `isl` and `osl` before comparing: a 1024×1024 sibling of
+an 8192×1024 selected point is a different workload, not its replacement. The
+selected point's `sku` does not supply missing per-sibling workload fields.
+
 The IDs and dates here are illustrative. Substitute the selected row's actual
 values and original query scope. `--date` is an **as-of cutoff**, not a claim that
 every returned point was produced on that date. Omit it for the latest available
