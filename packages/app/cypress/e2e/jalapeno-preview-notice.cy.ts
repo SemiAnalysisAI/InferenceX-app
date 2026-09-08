@@ -141,11 +141,8 @@ describe('official preview notices', () => {
       .and('contain.text', 'Results may change as validation and publication continue.')
       .and('not.contain.text', '\u2014');
     cy.get(JALAPENO_NOTICE).should('not.exist');
-
-    cy.get('[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="TPU7x"]')
-      .first()
-      .click({ force: true });
-    cy.get(TPUV7_NOTICE).should('not.exist');
+    // With the API mocked empty, TPU7x is the only series here, so the legend
+    // offers no "Hide" toggle; the Jalapeño case above covers toggle tracking.
 
     cy.visit(`/inference?${JALAPENO_QUERY}`);
     cy.get(JALAPENO_NOTICE, { timeout: 20000 }).should('be.visible');
