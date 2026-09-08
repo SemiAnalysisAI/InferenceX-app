@@ -10,8 +10,8 @@ import {
 } from './supplemental-benchmarks';
 
 describe('supplemental benchmark snapshots', () => {
-  it('ships every supplied Jalapeño and July VR200 point', () => {
-    expect(SUPPLEMENTAL_BENCHMARK_ROWS).toHaveLength(50);
+  it('ships every supplied Jalapeño, July VR200, and TPUv7 point', () => {
+    expect(SUPPLEMENTAL_BENCHMARK_ROWS).toHaveLength(57);
     expect(SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'jalapeno')).toHaveLength(
       36,
     );
@@ -27,6 +27,40 @@ describe('supplemental benchmark snapshots', () => {
         'https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell',
       ]),
     );
+  });
+
+  it('keeps TPUv7 FP8 rows and availability separate from legacy FP4 snapshots', () => {
+    const rows = withSupplementalBenchmarks([], { model: 'Qwen-3.5-397B-A17B' }).filter(
+      (row) => row.hardware === 'tpuv7',
+    );
+    expect(rows.map((row) => row.conc)).toEqual([4, 8, 16, 32, 64, 128, 256]);
+    for (const row of rows) {
+      expect(row).toMatchObject({
+        precision: 'fp8',
+        isl: 8192,
+        osl: 1024,
+        date: '2026-08-26',
+        framework: 'vllm',
+      });
+    }
+    expect(rows[0].metrics.output_tput_per_gpu).toBeCloseTo(123.001518);
+    expect(withSupplementalAvailability([]).find((row) => row.hardware === 'tpuv7')).toMatchObject({
+      model: 'qwen3.5',
+      precision: 'fp8',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(
+      SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware !== 'tpuv7').every(
+        (row) => row.precision === 'fp4',
+      ),
+    ).toBe(true);
+    const history = withSupplementalBenchmarkHistory([], {
+      model: 'qwen3.5',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(history.filter((row) => row.hardware === 'tpuv7')).toHaveLength(7);
   });
 
   it('resolves the newest snapshot independently per hardware curve', () => {
@@ -54,8 +88,8 @@ describe('supplemental benchmark snapshots', () => {
     );
 
     const availability = withSupplementalAvailability([]);
-    expect(availability).toHaveLength(5);
-    expect(withSupplementalAvailability(availability)).toHaveLength(5);
+    expect(availability).toHaveLength(6);
+    expect(withSupplementalAvailability(availability)).toHaveLength(6);
   });
 
   it('limits only the July VR200 snapshot to output-token metrics', () => {

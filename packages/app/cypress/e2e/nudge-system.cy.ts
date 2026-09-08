@@ -10,11 +10,6 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Mirrors `TPU_NEWSLETTER_URL` in `src/lib/nudges/registry.tsx`; the unit test
-// there pins the registry side, this spec pins the rendered banner.
-const TPU_NEWSLETTER_ORIGIN = 'https://newsletter.semianalysis.com';
-const TPU_NEWSLETTER_PATH = '/p/tpu-inferencex-full-steam';
-
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
@@ -46,7 +41,7 @@ beforeEach(() => {
 // Landing — modal priority & dismissal
 // ---------------------------------------------------------------------------
 
-describe('Landing nudges — modals', () => {
+describe('Landing nudges — modals', { testIsolation: true }, () => {
   it('shows the launch banner on fresh first load', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
@@ -128,7 +123,7 @@ describe('Landing nudges — modals', () => {
 // Landing — banner
 // ---------------------------------------------------------------------------
 
-describe('Landing nudges — banner', () => {
+describe('Landing nudges — banner', { testIsolation: true }, () => {
   it('shows launch banner on landing page', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
@@ -169,31 +164,22 @@ describe('Landing nudges — banner', () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
-    // The TPUv7 banner points off-site at the newsletter write-up. Stub the
-    // destination so the spec never depends on Substack being reachable, then
-    // follow the navigation through `cy.origin` to assert where we landed.
-    cy.intercept('GET', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`, {
-      statusCode: 200,
-      headers: { 'content-type': 'text/html' },
-      body: '<!doctype html><html><body><h1>newsletter stub</h1></body></html>',
-    }).as('newsletter');
-
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`);
+      .and('have.attr', 'href', '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8');
     cy.get('[data-testid="launch-banner"]').click();
 
-    cy.wait('@newsletter', { timeout: 10000 });
-    cy.origin(TPU_NEWSLETTER_ORIGIN, { args: { path: TPU_NEWSLETTER_PATH } }, ({ path }) => {
-      cy.location('pathname', { timeout: 10000 }).should('eq', path);
-    });
+    cy.location('pathname').should('eq', '/inference');
+    cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
 
     // Body click must not write the dismissal key — the banner should still
-    // render on a fresh visit to landing.
-    cy.visit('/');
+    // render after returning home and reloading the landing page.
+    cy.get('[data-testid="nav-link-home"]').click();
+    cy.location('pathname').should('eq', '/');
+    cy.reload();
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });

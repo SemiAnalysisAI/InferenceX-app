@@ -184,3 +184,26 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/submissions');
   });
 });
+
+describe('TPUv7 launch banner', { testIsolation: true }, () => {
+  for (const locale of ['', '/zh']) {
+    it(`opens the TPUv7 FP8 results from ${locale || '/'} landing page`, () => {
+      cy.visit(locale || '/', {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-tpuv7-banner-dismissed');
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="launch-banner"]')
+        .should(
+          'have.attr',
+          'href',
+          `${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`,
+        )
+        .click();
+      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+      cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
+    });
+  }
+});

@@ -108,7 +108,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     // see this one; cypress specs seed/clear this key and must stay in sync.
     expect(banner.storageKey).toBe('inferencex-tpuv7-banner-dismissed');
     expect(banner.content.href).toBe(
-      'https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam',
+      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8',
     );
     expect(banner.analytics).toEqual({
       shown: 'inference_tpuv7_banner_shown',
@@ -116,12 +116,12 @@ describe('NUDGE_REGISTRY integrity', () => {
       action: 'inference_tpuv7_banner_clicked',
       properties: {
         banner_id: 'tpuv7-inference',
-        destination: 'newsletter',
+        destination: 'inference',
       },
     });
-    // External destination: no locale prefix even from the Chinese tree.
+    // Clicks preserve the Chinese locale as well as the TPU workload filters.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam');
+    expect(location.href).toBe('/zh/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8');
   });
 
   it('gives every coach mark an anchor to point at', () => {
