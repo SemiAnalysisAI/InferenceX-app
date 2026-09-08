@@ -28,6 +28,8 @@ interface SupplementalDataset {
   points: readonly PointTuple[];
   /** Omitted means the snapshot is valid for every token metric. */
   supportedTokenMetrics?: readonly TokenMetricType[];
+  /** Defaults to 'fp4' when omitted, matching every pre-existing snapshot. */
+  precision?: string;
 }
 
 const dsr1August17: readonly PointTuple[] = [
@@ -203,6 +205,41 @@ const vrJuly: readonly PointTuple[] = [
   [72, 1, 72, 400, 115.5, 183.535, 0, 400, 0, 0],
 ];
 
+// Single 8-chip TPU v7 (Ironwood) node, Qwen3.5-397B-A17B-FP8 on vLLM.
+// Lower concurrencies (4-64) ran TP8/DP1; the top two (128, 256) ran TP1/DP8
+// internally — this tuple format only tracks a single "tp" slot, so all rows
+// report tp=8 to reflect the constant 8-chip node footprint used throughout.
+const tpuv7Qwen35August26: readonly PointTuple[] = [
+  [
+    8, 1, 8, 4, 1106.0144106246432, 123.00151802118774, 983.0128926034555, 131.64888705609664,
+    0.26892674050759524, 7.2218290029559284,
+  ],
+  [
+    8, 1, 8, 8, 1760.9681874834419, 197.90875854244936, 1563.0594289409926, 103.64793571613815,
+    0.268642965471372, 9.27846261439845,
+  ],
+  [
+    8, 1, 8, 16, 2456.9772869226604, 272.17218266716407, 2184.805104255496, 71.32828540050576,
+    0.26853204250801355, 13.109142028028145,
+  ],
+  [
+    8, 1, 8, 32, 3350.562835186429, 374.5752548238647, 2975.987580362564, 48.44853301283267,
+    0.28178216295782477, 19.436007942887954,
+  ],
+  [
+    8, 1, 8, 64, 4334.590748533495, 480.7467788137091, 3853.8439697197855, 30.776144689201782,
+    0.45816936204209924, 30.521604063455015,
+  ],
+  [
+    8, 1, 8, 128, 6469.928720561886, 716.3928663552701, 5753.535854206615, 24.48557067862354,
+    2.732123397407122, 39.73736083658878,
+  ],
+  [
+    8, 1, 8, 256, 9363.824997632008, 1040.5862153469675, 8323.23878228504, 17.90952197535618,
+    3.6078880773857236, 54.9554339585593,
+  ],
+];
+
 const DATASETS: readonly SupplementalDataset[] = [
   {
     id: 'jalapeno-dsr1-2026-08-17',
@@ -241,6 +278,16 @@ const DATASETS: readonly SupplementalDataset[] = [
     points: kimiAugust22,
   },
   {
+    id: 'tpuv7-qwen3.5-2026-08-26',
+    model: 'qwen3.5',
+    modelAliases: ['qwen3.5', 'Qwen-3.5-397B-A17B'],
+    date: '2026-08-26',
+    hardware: 'tpuv7',
+    framework: 'vllm',
+    precision: 'fp8',
+    points: tpuv7Qwen35August26,
+  },
+  {
     id: 'vr200-dsr1-2026-07-01',
     model: 'dsr1',
     modelAliases: ['dsr1', 'DeepSeek-R1-0528'],
@@ -268,7 +315,7 @@ function toBenchmarkRow(dataset: SupplementalDataset, point: PointTuple): Benchm
     hardware: dataset.hardware,
     framework: dataset.framework,
     model: dataset.model,
-    precision: 'fp4',
+    precision: dataset.precision ?? 'fp4',
     spec_method: 'none',
     disagg: false,
     is_multinode: chips > 8,
@@ -409,7 +456,7 @@ export function withSupplementalAvailability(rows: AvailabilityRow[]): Availabil
     model: dataset.model,
     isl: 8192,
     osl: 1024,
-    precision: 'fp4',
+    precision: dataset.precision ?? 'fp4',
     hardware: dataset.hardware,
     framework: dataset.framework,
     spec_method: 'none',

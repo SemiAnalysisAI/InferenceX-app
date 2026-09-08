@@ -147,6 +147,16 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costh: 1.47,
     costr: 1.79,
   },
+  tpuv7: {
+    vendor: 'Google',
+    arch: 'Ironwood',
+    label: 'TPU7x',
+    sort: 11,
+    tdp: 980,
+    power: 1.207,
+    costh: 1.21,
+    costr: 1.21,
+  },
 };
 
 /** Canonical set of GPU key strings used across all packages. */
