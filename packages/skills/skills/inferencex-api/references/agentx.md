@@ -25,9 +25,10 @@ pool: prefill 8 and decode 8 do not establish a 16-GPU deployment. A deployment
 total requires verified allocation semantics; do not unconditionally sum the role
 counts. See the [topology guidance](powerx.md#export-and-provenance) when a
 user requests a derived total.
-When counting distinct images or recipe fingerprints, count known values separately
-from rows whose field is missing or null. Report the missing-row count alongside
-the known distinct count; null is not another image or fingerprint.
+For any optional field, including images, recipe fingerprints and replay-lane
+`srcInner`, count distinct known values separately from missing or null rows.
+Report both populations: `new Set(rows.map(row => row.field)).size` incorrectly
+counts `undefined` as another value. Keep a returned zero as a known value.
 
 Keep each aggregate group's `n` with that group. Equal numbers of non-null benchmark
 rows do not imply equal sample counts or sample-size ranges; compute and label

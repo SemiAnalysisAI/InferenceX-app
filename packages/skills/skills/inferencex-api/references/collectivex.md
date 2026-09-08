@@ -92,7 +92,8 @@ discovery has a bounded upstream window, artifacts expire, and retained runs can
 outlive their artifacts. The export therefore always sets `history_complete=false`.
 Stored fallback data can also be served when upstream refresh fails. Compare each
 detail's returned `run_attempt` with its discovery summary; a later attempt is a
-different snapshot, even under the same run ID.
+different snapshot, even under the same run ID. Equal attempt numbers do not prove
+identical snapshots; data can refresh within an attempt.
 
 ## 2. Check comparability before interpreting differences
 
@@ -136,6 +137,8 @@ disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
 coverage; absence of the optional `kv` field does not imply a failed KV suite.
+Pending data and a cancelled run do not establish whether a case started or why
+measurements are missing. Keep those returned states separate from explanations.
 
 For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
 by outcome. Reconcile their combined totals with the run's `requested_cases`,

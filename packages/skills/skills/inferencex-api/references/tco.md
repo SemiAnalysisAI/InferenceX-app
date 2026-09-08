@@ -71,6 +71,9 @@ For two such points with throughputs `t_A` and `t_B`, equal modeled cost occurs 
 estimate is lower only if the user's rate ratio is below that boundary. A
 whole-deployment comparison additionally needs the denominator evidence below.
 Missing, clamped, and unreachable points have no cost boundary.
+If reporting sensitivity with supplied prices, equality at the boundary means a
+tie; crossing it changes the cheaper estimate. Keep that distinction when rounding
+the saved boundary for prose.
 
 Finish with the symbolic boundary and ask for the missing USD/GPU-hour rates and
 billing scope. The cheaper hardware remains unresolved. Website defaults, typical

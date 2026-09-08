@@ -64,6 +64,13 @@ return the complete original benchmark row, image, or producing attempt. Keep
 that distinction in the answer even when it identifies an otherwise unavailable
 historical result.
 
+For an ID-only investigation, use siblings to resolve the selected point's scope
+and retain their raw response; do not add classifications of the other IDs. If the
+user asks to compare siblings, join each ID to its own captured full row and check
+`model`, `benchmark_type`, `isl`, `osl` and applicable dataset/config identity.
+Matching concurrency or TP cannot establish a shared workload. Missing full rows
+mean unknown workload, including in supplemental JSON lists and field names.
+
 `is_current` marks the requested result ID: it is true exactly when the sibling's
 `id` equals the request's `id`. A false value means a different result was returned;
 it says nothing about that result's age, validity, or whether it was superseded.
