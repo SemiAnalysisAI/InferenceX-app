@@ -61,6 +61,7 @@ const AGENTX_QWEN_B300 = 'qwen3-5-397b-agentx-b300-fp4-vs-h100';
 const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
+const TPU_INFERENCEX = 'tpu-inferencex-full-steam';
 
 const entries = [
   {
@@ -440,7 +441,14 @@ const entries = [
       'iso-interactivity',
       'performance-per-dollar',
     ],
-    articleSlugs: [INFERENCEX_V2, B200_KIMI, B200_GLM5, GB300_DSV4, AGENTX_GLM_SGLANG],
+    articleSlugs: [
+      INFERENCEX_V2,
+      B200_KIMI,
+      B200_GLM5,
+      GB300_DSV4,
+      AGENTX_GLM_SGLANG,
+      TPU_INFERENCEX,
+    ],
   },
   {
     slug: 'performance-per-dollar',
@@ -464,7 +472,14 @@ const entries = [
       'iso-interactivity',
       'throughput',
     ],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, MI355X_GLM5, AGENTX_DSV4_MI355X_B200],
+    articleSlugs: [
+      B200_GLM5,
+      B200_MINIMAX,
+      B200_KIMI,
+      MI355X_GLM5,
+      AGENTX_DSV4_MI355X_B200,
+      TPU_INFERENCEX,
+    ],
   },
   {
     slug: 'total-cost-of-ownership',
@@ -487,7 +502,7 @@ const entries = [
       'tokens-per-megawatt',
       'throughput',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO, TPU_INFERENCEX],
   },
   {
     slug: 'tokens-per-megawatt',
@@ -604,7 +619,14 @@ const entries = [
       'time-to-first-token',
       'nvidia-dynamo',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3, AGENTX_V3],
+    articleSlugs: [
+      AGENTIC_WORKLOADS,
+      INFERENCEX_V2,
+      GB200_KIMI,
+      KIMI_K3,
+      AGENTX_V3,
+      TPU_INFERENCEX,
+    ],
   },
   {
     slug: 'disaggregated-inference',
@@ -650,7 +672,7 @@ const entries = [
     benchmarkContext:
       'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
     relatedTerms: ['multi-token-prediction', 'acceptance-length', 'decode', 'batching', 'agentx'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
+    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3, TPU_INFERENCEX],
   },
   {
     slug: 'multi-token-prediction',
@@ -728,7 +750,7 @@ const entries = [
       'all-to-all',
       'tensor-parallelism',
     ],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, KIMI_K3],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, KIMI_K3, TPU_INFERENCEX],
   },
   {
     slug: 'data-parallelism',
@@ -826,7 +848,7 @@ const entries = [
     benchmarkContext:
       'System topology determines the communication domain. A B200 in an eight-chip node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
     relatedTerms: ['nvlink', 'wide-expert-parallelism', 'all-to-all', 'tensor-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, JALAPENO],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, JALAPENO, TPU_INFERENCEX],
   },
   {
     slug: 'high-bandwidth-memory',
@@ -916,7 +938,7 @@ const entries = [
     benchmarkContext:
       'An InferenceX FP8 label covers the complete recipe. The checkpoint filename, engine, attention backend, KV-cache format, chip generation, and MTP setting can all change the curve.',
     relatedTerms: ['quantization', 'fp4', 'high-bandwidth-memory', 'rocm', 'cuda'],
-    articleSlugs: [INFERENCEX_V2, MI355X_GLM5, B200_MINIMAX],
+    articleSlugs: [INFERENCEX_V2, MI355X_GLM5, B200_MINIMAX, TPU_INFERENCEX],
   },
   {
     slug: 'fp4',
@@ -1192,7 +1214,7 @@ const entries = [
       'total-cost-of-ownership',
       'throughput',
     ],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, B200_GLM5, AGENTX_QWEN_B300],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, B200_GLM5, AGENTX_QWEN_B300, TPU_INFERENCEX],
   },
   {
     slug: 'energy-per-token',
@@ -1256,7 +1278,7 @@ const entries = [
       'kv-cache-manager',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300, TPU_INFERENCEX],
   },
   {
     slug: 'cpu-offloading',
@@ -1637,7 +1659,7 @@ const entries = [
       'mixture-of-experts',
       'prefix-caching',
     ],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, GB200_KIMI, AGENTX_M3_TRT],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, GB200_KIMI, AGENTX_M3_TRT, TPU_INFERENCEX],
   },
   {
     slug: 'int4',
@@ -1734,7 +1756,7 @@ const entries = [
       'sparse-attention',
       'prefix-caching',
     ],
-    articleSlugs: [AGENTX_V3, KIMI_K3, DEEPSEEK_V4],
+    articleSlugs: [AGENTX_V3, KIMI_K3, DEEPSEEK_V4, TPU_INFERENCEX],
   },
   {
     slug: 'linear-attention',
@@ -1752,7 +1774,7 @@ const entries = [
     benchmarkContext:
       'InferenceX serves models using these layers, and engine support for checkpointing and transferring recurrent state is part of the recipe. A model can be day-zero servable and still lack reuse of that state, which shows up as unexpectedly high prefill cost on repeated turns.',
     relatedTerms: ['hybrid-attention', 'kv-cache', 'sparse-attention', 'prefill'],
-    articleSlugs: [AGENTX_V3, MI355X_QWEN, KIMI_K3, AGENTX_QWEN_SGLANG],
+    articleSlugs: [AGENTX_V3, MI355X_QWEN, KIMI_K3, AGENTX_QWEN_SGLANG, TPU_INFERENCEX],
   },
   {
     slug: 'nvl72',
@@ -1975,7 +1997,7 @@ const entries = [
     benchmarkContext:
       'All engines in InferenceX recipes manage KV memory in paged or block based form. High concurrency points on long context scenarios such as AgentX are only reachable because paging keeps cache waste small as hundreds of sessions grow and shrink.',
     relatedTerms: ['kv-cache', 'kv-cache-manager', 'continuous-batching', 'prefix-caching', 'vllm'],
-    articleSlugs: [AGENT_BENCHMARK, INFERENCEMAX],
+    articleSlugs: [AGENT_BENCHMARK, INFERENCEMAX, TPU_INFERENCEX],
   },
   {
     slug: 'radix-attention',
@@ -2222,7 +2244,7 @@ const entries = [
       'nvlink',
       'scale-up-vs-scale-out',
     ],
-    articleSlugs: [VR_RUBIN, INFERENCEX_V2],
+    articleSlugs: [VR_RUBIN, INFERENCEX_V2, TPU_INFERENCEX],
   },
   {
     slug: 'reduce-scatter',
@@ -2240,7 +2262,7 @@ const entries = [
     benchmarkContext:
       'InferenceX recipes with tensor parallel sharding trigger reduction collectives in every transformer layer, and CollectiveX exists precisely to publish cross vendor measurements of these primitives at the message sizes inference actually uses.',
     relatedTerms: ['all-reduce', 'all-gather', 'tensor-parallelism', 'nvlink'],
-    articleSlugs: [VR_RUBIN, GB200_KIMI],
+    articleSlugs: [VR_RUBIN, GB200_KIMI, TPU_INFERENCEX],
   },
   {
     slug: 'infiniband',
