@@ -10,7 +10,10 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TPU_NEWSLETTER_URL = 'https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam';
+// Mirrors `TPU_NEWSLETTER_URL` in `src/lib/nudges/registry.tsx`; the unit test
+// there pins the registry side, this spec pins the rendered banner.
+const TPU_NEWSLETTER_ORIGIN = 'https://newsletter.semianalysis.com';
+const TPU_NEWSLETTER_PATH = '/p/tpu-inferencex-full-steam';
 
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
@@ -97,7 +100,7 @@ describe('Landing nudges — modals', () => {
       });
   });
 
-  it('localizes the TPUv7 inference banner in Chinese', () => {
+  it('localizes the TPUv7 banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
@@ -166,23 +169,31 @@ describe('Landing nudges — banner', () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
-    cy.intercept('GET', TPU_NEWSLETTER_URL, (request) => {
-      request.redirect(`${Cypress.config('baseUrl')}/`);
-    }).as('tpuNewsletter');
+    // The TPUv7 banner points off-site at the newsletter write-up. Stub the
+    // destination so the spec never depends on Substack being reachable, then
+    // follow the navigation through `cy.origin` to assert where we landed.
+    cy.intercept('GET', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`, {
+      statusCode: 200,
+      headers: { 'content-type': 'text/html' },
+      body: '<!doctype html><html><body><h1>newsletter stub</h1></body></html>',
+    }).as('newsletter');
 
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', TPU_NEWSLETTER_URL)
-      .click();
+      .and('have.attr', 'href', `${TPU_NEWSLETTER_ORIGIN}${TPU_NEWSLETTER_PATH}`);
+    cy.get('[data-testid="launch-banner"]').click();
 
-    cy.wait('@tpuNewsletter').its('request.url').should('eq', TPU_NEWSLETTER_URL);
-    cy.location('pathname').should('eq', '/');
+    cy.wait('@newsletter', { timeout: 10000 });
+    cy.origin(TPU_NEWSLETTER_ORIGIN, { args: { path: TPU_NEWSLETTER_PATH } }, ({ path }) => {
+      cy.location('pathname', { timeout: 10000 }).should('eq', path);
+    });
 
-    // The intercepted redirect produces a fresh landing-page document. The
-    // banner remaining visible proves that the body click did not dismiss it.
+    // Body click must not write the dismissal key — the banner should still
+    // render on a fresh visit to landing.
+    cy.visit('/');
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
