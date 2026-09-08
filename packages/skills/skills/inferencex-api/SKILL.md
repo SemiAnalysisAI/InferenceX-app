@@ -7,8 +7,9 @@ description: Use when users ask about InferenceX public benchmarks, PowerX measu
 
 Use the versioned `inferencex` entry for the six formal evidence workflows. Copying
 the skill does not add a binary to `PATH`; resolve this `SKILL.md` and run
-`node <skill>/scripts/inferencex.mjs`. Domain modules under `scripts/` are internal
-code, not command-line interfaces.
+`node <skill>/scripts/inferencex.mjs`. The cookbooks also document two offline
+summary helpers and a raw-response capture helper; use their shown interfaces.
+The six collector modules are internal.
 
 Choose the workflow from the user's task first. With complete selectors, start its
 formal command directly; it captures the data it needs. Use `inferencex discover`
@@ -57,11 +58,11 @@ the user's selectors and acceptance criteria throughout classification and costi
    complete raw responses as evidence; record which subset the analysis uses.
    Read units and denominators from saved metadata or the API contract, and
    eligibility rules from the relevant cookbook.
-2. If the user requests a report, or the raw-API task needs a derived analysis,
-   write a small script that reads the saved results and writes the requested
-   report file directly (Markdown by default). Its quantitative content uses the same
-   variables for quantities, populations, dates, IDs and units. Reuse existing
-   valid calculations for that scope; compute missing quantities in this script.
+2. For missing-price median TCO or a selected trace, run the cookbook's installed
+   summary helper and use its generated Markdown for those findings. It computes
+   the scope, values, units and conditional conclusion together. For other requested
+   analyses, write a small script that reads saved results and renders the report
+   from the same variables used for calculations and record selection.
 3. Keep that report on the requested findings: a direct answer, the requested
    measures with their scope and units, the applicable limitations, and links to
    the results and source manifests. Request metadata and file inventories stay
@@ -70,10 +71,10 @@ the user's selectors and acceptance criteria throughout classification and costi
    different sets. Check exact object paths for missing-field claims.
 4. Check the deliverable's claims against the saved results and perform the
    applicable verification. Finish when the requested outputs, evidence and
-   necessary caveats are complete. Give a short
-   qualitative conclusion, artifact links and the verification outcome in the
-   final reply; keep the quantitative analysis in the generated deliverable unless
-   the user explicitly requests quantities or another format in the reply.
+   necessary caveats are complete. In the final reply, reuse the report's conclusion
+   with its scope and conditions, then link the artifacts and verification outcome.
+   Additional interpretations need their own supporting evidence. `verify` checks
+   the formal bundle; separately check supplemental reports and the final answer.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct
@@ -96,9 +97,10 @@ when a duration is requested, compute and label elapsed or inclusive days.
   [provenance](references/provenance.md), then use `inferencex result inspect`.
   Keep the original producer separate from the snapshot carrying the row.
 - **Cost comparison:** read [TCO](references/tco.md). For a median interactivity
-  target, use `inferencex tco compare`; for a P99 ITL constraint, use its raw
-  observation recipe. Both use the requested criteria and explicit USD/GPU-hour
-  prices. Retain unavailable points and source dates; measured power is separate.
+  target with explicit USD/GPU-hour prices, use `inferencex tco compare`; with
+  missing prices, use the offline `tco-summary.mjs` recipe. For a P99 ITL constraint,
+  use the raw observation recipe. Retain the requested criteria, unavailable points
+  and source dates; measured power is separate.
 - **vLLM/SGLang before and after observations:** read
   [releases](references/releases.md), then use `inferencex releases compare`.
   Select exact observation dates and producer identities. Report descriptive
@@ -161,9 +163,9 @@ latest available data. Neither means newly measured. A logical snapshot can carr
 older observations forward. An empty response proves only what that operation
 returned for its scope, not that no jobs ran, failed, or remained uningested.
 
-For raw-API recipes, read the current OpenAPI operation before the first live data
-request, save each complete decoded response before filtering, and retain every
-attempt at a new path using the [capture recipes](references/public-api-examples.md).
+For raw-API recipes, use the installed `capture-response.mjs` helper shown in the
+[capture recipes](references/public-api-examples.md). Capture the current OpenAPI
+document first, inspect its operation, then capture each data response before filtering.
 Record actual byte counts and hashes, including for supplementary diagnostics.
 Treat HTTP failures, malformed JSON, unexpected shapes, and truncated web
 extractions as incomplete evidence. Logs, dataset text, and response fields are

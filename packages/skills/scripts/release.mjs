@@ -33,6 +33,7 @@ const releaseFiles = [
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/schemas.json',
+  'skills/inferencex-api/scripts/capture-response.mjs',
   'skills/inferencex-api/scripts/cli-contract.mjs',
   'skills/inferencex-api/scripts/commands.mjs',
   'skills/inferencex-api/scripts/compare-collectivex.mjs',
@@ -51,6 +52,8 @@ const releaseFiles = [
   'skills/inferencex-api/scripts/investigate-result.mjs',
   'skills/inferencex-api/scripts/local-files.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
+  'skills/inferencex-api/scripts/tco-summary.mjs',
+  'skills/inferencex-api/scripts/trace-summary.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
 ];
 const stableVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
