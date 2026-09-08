@@ -188,7 +188,10 @@ was never limiting or that a cold cache caused the latency.
 
 ```bash
 node --input-type=module <<'JS'
-const base = 'https://inferencex.semianalysis.com';
+import { summarizeTrace, renderTraceSummary, validateTimeline } from './.agents/skills/inferencex-api/scripts/trace-summary.mjs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+import { readFileSync } from 'node:fs';
+
 const selectedResultId = '421';
 const diagnosticId = /^(?:[1-9]\d*)$/u.test(selectedResultId) ? Number(selectedResultId) : null;
 if (!Number.isSafeInteger(diagnosticId) || diagnosticId <= 0 || String(diagnosticId) !== selectedResultId) {
@@ -197,20 +200,12 @@ if (!Number.isSafeInteger(diagnosticId) || diagnosticId <= 0 || String(diagnosti
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
-const integer = (value) => finite(value) && Number.isInteger(value);
-const finiteOrNull = (value) => value === null || finite(value);
-const requests = [];
+const { read: capture, requests } = createResponseCapture();
 
 async function read(path) {
-  const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, {
-    redirect: 'error',
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const body_utf8 = await response.text();
-  const data = JSON.parse(body_utf8);
-  requests.push({ query_url, retrieved_at: new Date().toISOString(), body_utf8 });
+  const data = await capture(path);
+  const record = requests.at(-1);
+  record.body_utf8 = readFileSync(record.body_path, 'utf8');
   return data;
 }
 
@@ -264,36 +259,27 @@ const common = () => ({
   },
 });
 
-if (!traceAvailable) {
+function writeDiagnostics(diagnostics) {
+  const trace_summary = summarizeTrace(diagnostics);
   console.log(JSON.stringify({
+    ...diagnostics,
+    trace_summary,
+    trace_report_markdown: renderTraceSummary(trace_summary),
+  }, null, 2));
+}
+
+if (!traceAvailable) {
+  writeDiagnostics({
     ...common(),
     outcome: 'trace_unavailable',
     timeline: null,
     histograms: null,
     server_metrics: null,
-  }, null, 2));
+  });
 } else {
   try {
     const timeline = await read(`/api/v1/request-timeline?id=${id}`);
-    if (!object(timeline) || !integer(timeline.version) || !integer(timeline.startNs) ||
-        !integer(timeline.endNs) || !finite(timeline.durationS) ||
-        !Array.isArray(timeline.requests) || timeline.requests.some((request) =>
-          !object(request) || typeof request.cid !== 'string' || !integer(request.ti) ||
-          typeof request.wid !== 'string' || !integer(request.ad) ||
-          typeof request.phase !== 'string' || !integer(request.credit) ||
-          !Number.isSafeInteger(request.start) || request.start < 0 ||
-          !finiteOrNull(request.ack) || !Number.isSafeInteger(request.end) ||
-          request.end < request.start ||
-          !finiteOrNull(request.ttftMs) || !finiteOrNull(request.tpotMs) ||
-          !finiteOrNull(request.isl) || !finiteOrNull(request.osl) ||
-          typeof request.cancelled !== 'boolean' ||
-          Object.hasOwn(request, 'ri') && !integer(request.ri) ||
-          Object.hasOwn(request, 'srcTrace') && typeof request.srcTrace !== 'string' ||
-          Object.hasOwn(request, 'srcOuter') && !integer(request.srcOuter) ||
-          Object.hasOwn(request, 'srcInner') && !integer(request.srcInner) ||
-          Object.hasOwn(request, 'srcKind') && typeof request.srcKind !== 'string')) {
-      throw new Error('Unexpected request timeline response');
-    }
+    validateTimeline(timeline);
 
     const histograms = await read(`/api/v1/trace-histograms?ids=${id}`);
     const histogram = object(histograms) ? histograms[id] : null;
@@ -305,69 +291,14 @@ if (!traceAvailable) {
     }
 
     const serverMetrics = await read(`/api/v1/trace-server-metrics?id=${id}`);
-    const series = ['kvCacheUsage', 'prefixCacheHitRate', 'queueDepth', 'prefillTps',
-      'decodeTps', 'prefixCacheHitsTps', 'hostKvCacheUsage', 'kvCacheUsageByEngine'];
-    if (!object(serverMetrics) || !object(serverMetrics.meta) ||
-        !integer(serverMetrics.startNs) || !integer(serverMetrics.endNs) ||
-        !finite(serverMetrics.durationS) || !integer(serverMetrics.timeslicesCount) ||
-        serverMetrics.timeslicesCount < 0 ||
-        series.some((key) => !Array.isArray(serverMetrics[key]) ||
-          serverMetrics[key].some((entry) => !object(entry))) ||
-        !object(serverMetrics.promptTokensBySource) ||
-        Object.values(serverMetrics.promptTokensBySource).some((entries) =>
-          !Array.isArray(entries) || entries.some((entry) => !object(entry))) ||
-        !finiteOrNull(serverMetrics.kvCachePoolTokens) ||
-        !Array.isArray(serverMetrics.metricSources) ||
-        serverMetrics.metricSources.some((entry) => !object(entry)) ||
-        Object.hasOwn(serverMetrics.meta, 'id') && serverMetrics.meta.id !== diagnosticId) {
-      throw new Error('Unexpected aggregate server metrics response');
-    }
 
-    // Summarize returned samples separately; series are not aligned by array index.
-    const sampleCounts = (points, fields = ['value']) => ({
-      sample_count: points.length,
-      fields: Object.fromEntries(fields.map((field) => {
-        const values = points.map((point) => point[field]).filter(finite);
-        return [field, {
-          finite_count: values.length,
-          nonzero_count: values.filter((value) => value !== 0).length,
-          missing_or_nonfinite_count: points.length - values.length,
-        }];
-      })),
-    });
-    const scalarSeries = series.filter((key) => key !== 'queueDepth' && key !== 'kvCacheUsageByEngine');
-    const serverMetricSamples = {
-      ...Object.fromEntries(scalarSeries.map((key) => [key, sampleCounts(serverMetrics[key])])),
-      queueDepth: sampleCounts(serverMetrics.queueDepth, ['running', 'waiting', 'total']),
-      promptTokensBySource: Object.fromEntries(Object.entries(serverMetrics.promptTokensBySource)
-        .map(([source, points]) => [source, sampleCounts(points)])),
-      kvCacheUsageByEngine: serverMetrics.kvCacheUsageByEngine.map(({ engineLabel, points }) => ({
-        engineLabel, ...sampleCounts(points),
-      })),
-    };
-    let cumulativeRequestLatencyS = 0;
-    let requestInflightUnionS = 0;
-    let coveredEnd = 0;
-    for (const { start, end } of [...timeline.requests].sort((a, b) => a.start - b.start)) {
-      cumulativeRequestLatencyS += (end - start) / 1e9;
-      requestInflightUnionS += Math.max(0, end - Math.max(start, coveredEnd)) / 1e9;
-      coveredEnd = Math.max(coveredEnd, end);
-    }
-
-    console.log(JSON.stringify({
+    writeDiagnostics({
       ...common(),
       outcome: 'trace_diagnostics',
       timeline,
       histograms,
       server_metrics: serverMetrics,
-      trace_summary: {
-        request_count: timeline.requests.length,
-        cancelled_request_count: timeline.requests.filter((request) => request.cancelled).length,
-        cumulative_request_latency_s: cumulativeRequestLatencyS,
-        request_inflight_union_s: requestInflightUnionS,
-        server_metric_samples: serverMetricSamples,
-      },
-    }, null, 2));
+    });
   } catch (error) {
     throw new Error(
       `Trace availability inconsistency for result ${id}: ${error.message}`,
@@ -378,7 +309,28 @@ if (!traceAvailable) {
 JS
 ```
 
-Save the JSON output with the analysis. `benchmark_siblings.sku` and
+The recipe calls the installed offline helper and emits `trace_summary` plus
+`trace_report_markdown`. Save the JSON output with the analysis. Reuse the generated
+Markdown conclusion in the final answer, including its exact global/per-phase scope,
+request identity, phase, units, and value; do not relabel a phase maximum as the
+longest request in the entire trace. The summary includes cancelled requests and
+uses the first request in original timeline order to break equal-duration ties.
+For Claude Code, replace `.agents/skills` with `.claude/skills` in the import.
+
+To recompute the same report offline from saved recipe output:
+
+```bash
+node .agents/skills/inferencex-api/scripts/trace-summary.mjs evidence/selected-point.json > evidence/selected-point-summary.json
+```
+
+This helper reads only the supplied regular file (up to 64 MiB) and ignores any
+previously saved summary. It uses the package's JSON error diagnostics on stderr.
+It preserves unavailable traces separately from valid empty timelines; malformed
+scope, timeline events, or required server-metric structures fail instead of
+producing a no-trace result. It uses safe relative request offsets for duration
+calculations and does not subtract the rounded JavaScript wall-clock anchors.
+
+`benchmark_siblings.sku` and
 `selected_point` retain every identity field the API supplied; absence remains
 absence. `metadata.requests[].body_utf8` retains response text before numeric
 parsing; use it when exact large-integer values matter. Preserve the distinction
