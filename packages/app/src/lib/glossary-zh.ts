@@ -2015,6 +2015,299 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       value: '每芯片小时 1.03 美元（SemiAnalysis TCO 模型）',
     },
   },
+  tensorcore: {
+    term: 'TensorCore（TPU）',
+    aliases: ['TensorCore', 'TPU TensorCore', 'TC'],
+    plainEnglish:
+      'TensorCore 是 TPU 芯片里的主计算模块，包含矩阵单元、向量单元和片上存储，负责模型的稠密计算。',
+    definition:
+      'TPU TensorCore 是 TPU die 上的稠密计算模块，把一个或多个 MXU systolic 阵列、一个向量处理单元（VPU），以及它们读写的 VMEM 暂存区组合在一起。',
+    explanation:
+      'Ironwood 每颗芯片有 2 个 TensorCore，每个计算 die 一个，另外还有 4 个第三代 SparseCore。TensorCore 内部的 MXU 负责矩阵乘法，VPU 负责逐元素和归约运算，VMEM 把操作数放在两者旁边。Google 的 TPU 文档用 TensorCore 指这一模块，它与 NVIDIA GPU 流式多处理器里的 Tensor Core 无关。当集合通信或 gather 在 TensorCore 上运行时，占用的是 MXU 和 VPU 本可以用于模型计算的周期。',
+    significance:
+      'Ironwood 的多项优化都在把不规则工作从 TensorCore 挪到 SparseCore 上，让稠密单元持续运转。把 ReduceScatter 移到 SparseCore 释放了 TensorCore 的执行时间；把 ragged gather-reduce 路径中的 top-k 权重 gather 移过去之后，DeepSeek-V3 微基准中的 TensorCore 开销从 29 微秒降到 14 微秒。',
+    benchmarkContext:
+      'TPU InferenceX 预览把 Qwen3.5 397B 在 8k1k 上的部分收益归因于让 TensorCore 保持空闲：SparseCore 上的专家输入重排把服务吞吐量比原始 kernel 提高了 12%，而一个基于 VMEM 容量推导的阈值会在 SparseCore 卸载反而更慢时，把小集合通信留在 TensorCore 上。',
+  },
+  vpu: {
+    term: 'VPU（向量处理单元）',
+    aliases: ['VPU', 'Vector Processing Unit', 'TPU 向量单元', '向量单元'],
+    plainEnglish:
+      'VPU 是 TPU 中负责逐元素计算的部件，处理激活函数、softmax 和状态更新等，与矩阵单元协同工作。',
+    definition:
+      'VPU（Vector Processing Unit）是 TPU TensorCore 内的 SIMD 引擎，在末维为 128 lane 的 tile 上执行逐元素、归约和数据重排操作。',
+    explanation:
+      'MXU 负责矩阵乘法，VPU 负责矩阵乘法周围的一切：激活函数、归一化、softmax、rank-one 状态更新，以及把 kernel 各阶段拼接起来的缩放向量加法。VPU 处理的 tile 末维是 128 lane、8 sublane，末维更小的数组会被补齐。MXU 和 VPU 的工作相互重叠时 kernel 更快，一方等待另一方时更慢；同时存活的值太多时还会导致向量寄存器溢出到 VMEM。',
+    significance:
+      'Gated DeltaNet 输出投影的改写完全是为了让两个单元重叠。原先 VPU 先执行 rank-one 更新，MXU 再把更新后的状态乘以 query，MXU 只能等待。重排代数式后，MXU 可以直接用衰减后的状态计算 Sq，VPU 同时构建下一个 token 的状态，本次更新对输出的贡献则用每个 head 一个标量乘向量的方式单独加上。',
+    benchmarkContext:
+      '这一重叠让 Qwen3.5 397B 在 8k1k 上的吞吐量在并发 64 下提高 2.79%，在并发 512 下提高 4.48%。后续改动在 decode 循环内对 Q 和 K 切片以减少向量寄存器溢出，decode-64 kernel 快了约 20%，端到端收益在并发 512 下为 8k1k 0.8%、1k8k 3.8%。',
+  },
+  'systolic-array': {
+    term: 'Systolic 阵列',
+    aliases: ['systolic array', 'systolic 阵列', '脉动阵列', 'weight-stationary 阵列'],
+    plainEnglish:
+      'Systolic 阵列是由大量乘加单元组成的网格，数据像脉搏一样在单元之间逐格传递，矩阵乘法中途不需要访问内存。',
+    definition:
+      'Systolic 阵列是一个二维乘加单元网格，其中一个操作数固定驻留，另一个操作数流过网格，部分和在每个时钟周期传递给相邻单元。',
+    explanation:
+      '在 TPU 的 MXU 中，权重加载进阵列后保持不动。激活值从一条边进入，每个单元把输入乘以自己存储的权重，再加上邻居传来的部分和，最终结果从另一边流出，中间值从不写入内存。阵列边长固定：TPU v5 及之前是 128，v6e 起是 256，小于边长的矩阵维度都会被补齐。GPU 的 tensor core 则从寄存器读取小 tile，因此对不规则形状更宽容。',
+    significance:
+      'Systolic 设计在单位硅面积和功耗下提供极高的每周期 MAC 数，这是 Google 能把 Ironwood 的每 token 价格压到 Blackwell 以下的部分原因。代价是刚性：Ironwood 的 256x256 阵列只有在两个矩阵维度都是 256 的倍数时才能交付 65,536 MAC/周期，head 维度为 128 时注意力矩阵乘法的利用率上限只有 50%。',
+    benchmarkContext:
+      'TPU InferenceX 预览和 OpenAI Jalapeno 分析都把 systolic 阵列几何视为模型 bring-up 成本差异的主要原因。形状能填满阵列的模型只需要数周调优，与阵列冲突的模型则需要先写新的 Pallas kernel 才能追平。',
+  },
+  megacore: {
+    term: 'MegaCore',
+    aliases: ['MegaCore', 'Megacore 模式', '融合 TPU 核心'],
+    plainEnglish:
+      'MegaCore 是 TPU v4 和 v5p 的设计，把两个物理核心融合成一个共享同一内存空间的逻辑加速器。',
+    definition:
+      'MegaCore 是 TPU v4 和 v5p 的约定：一颗芯片上的两个物理 TensorCore 以单个逻辑设备的形式呈现给软件，共用一个统一的 HBM 地址空间。',
+    explanation:
+      '在 MegaCore 下，编译器和框架看到的是每颗芯片一个大设备，两个核心在幕后分摊工作。Ironwood 放弃了这一设计：两个计算 die 各自作为独立逻辑设备运行，拥有各自的内存，通过高带宽 die-to-die 链路相连而不是统一内存结构，因此 JAX 和 TorchTPU 看到的是每颗芯片两个设备。Ironwood 上的 TP8 配置因此跨越 4 颗芯片上的 8 个逻辑设备。',
+    significance:
+      '这一变化把协调工作从硬件移到了软件。集合通信现在分成经 die-to-die 链路的片内阶段和经 ICI 的片间阶段，kernel 可以让两者重叠。这也意味着基准测试中的每芯片数字聚合了两个设备，在与单 die GPU 比较每芯片每秒 token 数时需要注意。',
+    benchmarkContext:
+      'Ironwood 在 SparseCore 上实现的 ReduceScatter 先通过 die-to-die 链路合并芯片内的贡献，再在芯片之间交换部分和，这只有在两个 die 是独立设备时才可行。InferenceX 按每芯片报告 Ironwood 吞吐量，因此在每用户 20 tok/s 下的 9,364 tok/s/chip 覆盖了两个 die。',
+  },
+  'die-to-die-link': {
+    term: 'Die-to-die 链路',
+    aliases: ['die-to-die link', 'D2D 链路', '片内链路', 'inter-die link'],
+    plainEnglish:
+      'Die-to-die 链路连接同一封装内的两个计算 die，速度快于芯片之间的网络，但两个 die 不共享内存空间。',
+    definition:
+      'Die-to-die 链路是 Ironwood 封装内连接两个计算 die 的高带宽互连，让每个 die 作为独立逻辑设备运行，同时以快于芯片间 ICI 网络的速度交换数据。',
+    explanation:
+      'Ironwood 每个封装内有两个 die，各自带有 TensorCore、HBM 和 SparseCore。Die-to-die 链路在两者之间传输数据，不经过 ICI。因为这条链路比 ICI 快，集合通信被组织成层次结构：先在芯片内归约，再在芯片之间交换部分和。GPU 上也有类似思路，Blackwell 用 NV-HBI 连接两个 die，但 Blackwell 对外呈现为一个设备，Ironwood 呈现为两个。',
+    significance:
+      '两级集合通信让 kernel 可以把一个 microbatch 的快速片内阶段与另一个 microbatch 的慢速片间阶段重叠。在 Ironwood 的 ReduceScatter kernel 中，microbatch 1 的片内 DMA ScatterReduce 与 microbatch 0 沿 ICI 维度的 ScatterReduce 并发执行，缩短了集合通信的端到端时间。',
+    benchmarkContext:
+      '使用 die-to-die 链路的 SparseCore ReduceScatter 是 DP attention 加 EP8 服务配置的一部分，该配置产出了 InferenceX Official Preview 中的 Qwen3.5 397B 结果。Google 把每芯片双设备布局作为相对 MegaCore 的设计变化来报告，而不是单独的基准测试项。',
+  },
+  'twisted-torus': {
+    term: 'Twisted torus（扭转环面）',
+    aliases: ['twisted torus', '扭转 torus', 'twisted 3D torus', 'Mobius torus'],
+    plainEnglish:
+      'Twisted torus 是把 wraparound 链路错位连接的 torus 网络，像莫比乌斯带一样，进一步减少芯片之间的平均跳数。',
+    definition:
+      'Twisted torus 是一种 torus 拓扑，其一个或多个维度上的 wraparound 连接不是把一行直接接回自身，而是错位接到相邻行，从而在同等规模下比普通 torus 拥有更低的平均跳数和最坏跳数。',
+    explanation:
+      '普通 torus 把每一行的两端连接起来，把直线变成环，最坏距离从 N 减半到 N/2。Twisted torus 把 wraparound 错开，让一行连到另一侧的相邻行，流量分散到更多路径，平均距离再次下降。Google 在 TPU pod 中使用这一变体：pod 由 4x4x4 共 64 颗芯片的立方体组成，再通过光电路交换机拼接，并在整个 pod 范围内保留 wraparound 特性。',
+    significance:
+      '跳数决定小集合通信消息的延迟，扭转在不增加硬件的情况下换来几个百分点的延迟收益。TPU 8i 的 Boardfly 拓扑走得更远，直接放弃 torus，改用高基数层次化网络，把 1,024 到 1,152 颗芯片规模下的网络直径从约 16 跳降到约 7 跳。',
+    benchmarkContext:
+      'TPU InferenceX 预览指出，对小尺寸专家并行消息，TPU torus 在很多情况下延迟低于单跳 NVSwitch，详细结果留给 CollectiveX 和 NetworkingX 测试线。',
+  },
+  superpod: {
+    term: 'TPU superpod',
+    aliases: ['superpod', 'TPU pod', 'Ironwood superpod', '完整 pod'],
+    plainEnglish:
+      'Superpod 是接入同一个 ICI 网络的最大 TPU 单元，Ironwood 最多 9,216 颗芯片，可以当作一台机器使用。',
+    definition:
+      'TPU superpod 是一代 TPU 中通过 ICI 互连的最大域，由 64 芯片立方体经光电路交换机拼接而成；Ironwood 的 superpod 达到 9,216 颗芯片，约 42.5 FP8 exaflops。',
+    explanation:
+      '每个 4x4x4 共 64 颗芯片的立方体占满一个机柜。光电路交换机在保留 torus wraparound 的前提下连接各立方体，整个 pod 表现为一个大型 twisted torus。由于 ICI 绕过主机 CPU，并在整个 pod 范围内提供 NVLink 级别的带宽，模型可以用张量并行、专家并行和数据并行切分到数千颗芯片上，不需要流水线阶段。客户租用的是 pod 的切片而不是整个 pod，OCS 层还能让 Google 在几秒内绕开故障芯片。',
+    significance:
+      'Pod 是 TPU 服务策略不同于 GPU 的根本原因。NVL72 域把 scale-up 组限制在 72 颗 GPU，而 Ironwood pod 能把超过 1,000 颗芯片放进一个低延迟域，从而支持机柜级 NVIDIA 系统无法复制的超宽专家并行和大模型分离式服务。',
+    benchmarkContext:
+      'InferenceX Official Preview 在小切片上运行聚合服务，但文章认为 pod 才是让 TPUv7 分离式服务能与 GB200 和 GB300 NVL72 竞争的关键，相关结果将在后续文章发布。',
+  },
+  stablehlo: {
+    term: 'StableHLO',
+    aliases: ['StableHLO', 'HLO', 'MHLO'],
+    plainEnglish:
+      'StableHLO 是一种标准化的中间表示，PyTorch、JAX 等框架把程序输出成这种格式，再由 XLA 编译器转成 TPU 机器码。',
+    definition:
+      'StableHLO 是基于 MLIR 的可移植、带版本的算子集，在高层张量运算的层面描述机器学习程序，作为框架与 XLA 编译器之间的交接格式。',
+    explanation:
+      '在 TorchTPU 的编译路径中，TorchDynamo 和 AOTAutograd 捕获 FX 图，TorchTPU 把它降级为 StableHLO，XLA 再把它编译成 TPU 可执行文件。在 JAX 路径中，jax.jit 把程序追踪为同一种表示。由于 StableHLO 跨版本稳定，序列化后的程序可以稍后编译，或由不同版本的框架编译。它位于硬件之上、框架之下，因此不包含 MXU tile 尺寸的信息，padding 和布局决策由 XLA 之后再加。',
+    significance:
+      '共享的 IR 让 vLLM 和 SGLang 无论模型来自 PyTorch 还是 JAX，都能复用同一套编译器栈。这也意味着绕过 StableHLO 做手工调优的 Pallas kernel 必须以 custom call 的形式显式调用，编译器不会自动发现它们。',
+    benchmarkContext:
+      'TPU InferenceX 预览中所有 Qwen3.5 397B 结果都经过 StableHLO 到 XLA 的路径。文章把它与 GPU PyTorch 路径对比，后者的 torch.compile 降级到 Inductor 和 Triton。',
+  },
+  'privateuse1-backend': {
+    term: 'PrivateUse1 后端',
+    aliases: ['PrivateUse1', 'PyTorch out-of-tree 后端', '自定义设备后端'],
+    plainEnglish:
+      'PrivateUse1 是 PyTorch 允许厂商接入新设备类型的钩子，让张量可以像放在 CUDA 上一样放在 device="tpu" 上。',
+    definition:
+      'PrivateUse1 是 PyTorch 中预留的 dispatch key 和设备类型，允许 out-of-tree 后端注册自己的张量、内存分配器和算子实现，使框架把新加速器当作一等设备处理。',
+    explanation:
+      'TorchTPU 用 PrivateUse1 暴露一个位于 device="tpu" 上的普通 torch.Tensor，而不是由 JAX 数组支撑的包装对象。PyTorch dispatcher 把 ATen 操作路由到 TPU 后端，后端既可以在 bring-up 和调试时 eager 执行，也可以通过 torch.compile 捕获图。DDP、FSDP2 和 DTensor 等分布式 API 通过同一机制工作。此前的 TorchAX 方案则通过 __torch_dispatch__ 拦截每个操作并翻译成 JAX 调用。',
+    significance:
+      '这个后端钩子让"原生"一词有了具体含义。服务引擎可以复用上游的模型代码、调度器、continuous batching 和功能逻辑，不需要 PyTorch 到 JAX 的翻译层，从而降低每个新模型和引擎功能登陆 TPU 的成本。',
+    benchmarkContext:
+      'TPU InferenceX 预览的结果来自基于该后端构建的 TorchTPU vLLM 栈。Google 预计在 10 月中旬的 PyTorch Conference 前后结束私测并开源，之后 SemiAnalysis 会把 TPU 基准测试从自己的 fork 迁移到公开的 InferenceX 仓库。',
+  },
+  'torch-compile': {
+    term: 'torch.compile',
+    aliases: ['torch.compile', 'TorchDynamo', 'AOTAutograd', 'Inductor'],
+    plainEnglish:
+      'torch.compile 是 PyTorch 的编译入口，把模型捕获成图交给编译器后端，而不是逐个执行每个操作。',
+    definition:
+      'torch.compile 是 PyTorch 的 API，用 TorchDynamo 把 Python 层的模型代码捕获为 FX 图，用 AOTAutograd 追踪前向和反向，再由 Inductor 或 XLA 等可插拔后端生成设备代码。',
+    explanation:
+      '在 NVIDIA GPU 上，vLLM 使用 torch.compile 配合 Inductor，输出 Triton kernel。在 TPU 上，TorchTPU 保留同一入口但更换后端：FX 图被降级为 StableHLO，由 XLA 编译。Google 明确了这一编译器选择，用 XLA 而不是 Inductor 和 Triton。此前的 TorchAX 路径完全绕过 torch.compile，因为 jax.jit 已经负责图捕获和编译。编译后的图按张量形状特化，因此服务引擎需要对请求形状分桶以限制重编译。',
+    significance:
+      '保留 torch.compile 作为入口，意味着 TPU 专用的编译藏在 vLLM 和 SGLang 已经在调用的 API 后面。针对 PyTorch 编译路径编写的引擎功能可以直接沿用，而 XLA 的形状敏感性意味着分桶和 padding 仍然需要针对 TPU 调优。',
+    benchmarkContext:
+      'TPU InferenceX 预览中的 Qwen3.5 397B 数据都经过 torch.compile 进入 XLA。低并发调优把请求元数据按活跃请求数而非配置上限分桶，让 GDN 调度开销从 283 微秒降到 97 微秒，8k1k 吞吐量在并发 64 下从每芯片每秒 2,328 token 提高到 2,516。',
+  },
+  functionalization: {
+    term: '函数化（functionalization）',
+    aliases: ['functionalization', '函数化', '显式状态传递', 'explicit state'],
+    plainEnglish:
+      '函数化把原地修改对象的代码改写成以状态为输入、返回新状态的代码，这样编译器才能追踪它。',
+    definition:
+      '函数化是一种程序变换，把对 Python 对象的原地修改（例如写入 KV cache）转换为纯函数的显式输入和输出，使 jax.jit 这类追踪式编译器能把程序捕获为计算图。',
+    explanation:
+      'vLLM 管理着每一步都在变化的状态，最重要的是 KV cache。在 TorchAX 路径中，模型包装器把权重和 KV cache 作为显式状态交给 JAX：每个推理步骤接收旧 cache，返回更新后的 cache。jax.jit 因此可以只捕获一次，然后反复执行编译好的图。PyTorch 在 AOTAutograd 内部也有自己的函数化 pass，为 torch.compile 提供同样的作用，这是 TorchTPU 路径能复用编译管线的原因之一。',
+    significance:
+      '这一变换在正常工作时不可见，出问题时却很棘手。服务引擎在编写时假定 Python 对象可变，它们与函数式编译器之间的不匹配是翻译层问题之一，正是这类问题推动 Google 从 TorchAX 转向原生 TorchTPU 后端。',
+    benchmarkContext:
+      'TPU InferenceX 预览把函数化描述为此前 tpu-inference 后端把 vLLM 搬到 JAX 上的手段之一。TorchTPU 路径用 PyTorch dispatch 取代了这种手写的状态传递，因此 Qwen3.5 397B 的结果依赖编译器在内部处理它。',
+  },
+  'sglang-jax': {
+    term: 'SGLang-JAX',
+    aliases: ['SGLang-JAX', 'sgl-jax', 'SGL-torchtpu'],
+    plainEnglish:
+      'SGLang-JAX 是 SGLang 服务引擎面向 TPU 的 JAX 原生版本，独立于基于 PyTorch 的 SGLang 运行时。',
+    definition:
+      'SGLang-JAX 是一个 JAX 原生的服务引擎，把 SGLang 风格的调度和 prefix caching 与 JAX 模型实现及 TPU 专用 kernel 结合，而不是把 PyTorch 版 SGLang 运行时翻译到 TPU 上。',
+    explanation:
+      'vLLM 通过 TorchAX 翻译登陆 TPU，SGLang 则选择了另一条路，用 JAX 重新实现了引擎。这样可以直接使用成熟的 TPU 原语，代价是维护一套与上游 SGLang 分叉的第二代码库。Google 和 RadixArk 已宣布基于 TorchTPU 的 PyTorch 原生替代方案 SGL-torchtpu，它能让 TPU 上的 SGLang 重新共享上游代码路径。',
+    significance:
+      '两个引擎采用两种不同的 TPU 策略，说明生态尚未定型。TorchTPU 的目标是让两者收敛：vLLM 和 SGLang 都获得原生 PyTorch 设备，Pallas kernel 工作可以共享，模型的 day-0 支持也能与 NVIDIA、AMD 同步登陆 TPU。',
+    benchmarkContext:
+      'TPU InferenceX 预览的结果使用 TorchTPU vLLM。TorchTPU SGLang 开源后会补上 TPU 上的 SGLang 结果，届时 SemiAnalysis 会把 TPU 基准测试迁入公开的 InferenceX 仓库。',
+  },
+  pjrt: {
+    term: 'PJRT',
+    aliases: ['PJRT', 'PJRT buffer', 'PJRT 插件'],
+    plainEnglish:
+      'PJRT 是位于 JAX、TorchTPU 等框架与 TPU 硬件之间的运行时接口，负责管理设备内存缓冲区和执行。',
+    definition:
+      'PJRT 是基于 XLA 的框架用来分配设备缓冲区、启动编译后可执行文件和传输数据的插件式运行时 API，PJRTBuffer 对象封装了张量在设备上的原始硬件内存描述符。',
+    explanation:
+      'TPU 上的 JAX 数组和 TorchTPU 张量都由 PJRT 缓冲区支撑。能够提取原生 PJRTBuffer 硬件描述符的库可以在设备之间直接搬运数据，不经过框架中转，TPU-Sync 正是这样为分离式服务实现零拷贝 KV cache 传输的。由于 JAX 和 TorchTPU 都使用 PJRT，一个传输库可以同时服务两套栈。',
+    significance:
+      '运行时层是分离式服务和 offload 管道所在的位置。零拷贝传输省去了每个 KV block 一次额外的 HBM 往返，当 prefill 池以高请求速率向 decode 池发送大量 cache 时尤为重要。同样的描述符很可能也是 TPU 上 Mooncake Store 支持的底层基础。',
+    benchmarkContext:
+      'TPU InferenceX 预览描述 TPU-Sync（原名 TPU-raiden）通过提取原生 PJRTBuffer 描述符实现零拷贝传输，并支持 DRAM offload。基于它的 TPUv7 分离式服务结果将在后续文章发布。',
+  },
+  'triple-buffering': {
+    term: '三缓冲（triple buffering）',
+    aliases: ['triple buffering', '三缓冲', '三级预取', '更深的流水线'],
+    plainEnglish:
+      '三缓冲同时让三个数据块在途，一个在计算、两个在读取，让计算单元几乎不用等待内存。',
+    definition:
+      '三缓冲是一种 kernel 流水线技术，分配三个片上缓冲区，在处理当前块的同时从 HBM 预取接下来的两个块，比双缓冲多一级。',
+    explanation:
+      '双缓冲通过在计算第 N 块时读取第 N+1 块来隐藏 HBM 延迟。三缓冲再加上第 N+2 块，在传输时间波动、或某一块的读取比另一块的计算更长时更有帮助。代价是 VMEM：三个缓冲区必须与 kernel 其他存活数据一起放得下。在 Ironwood 上，grouped matmul 第二版对专家权重做三缓冲，让下一组专家的权重在计算当前组时已经在途；批量 ragged paged attention 也对 page 数据做三缓冲，以减少 padding 并改善流水线。',
+    significance:
+      '更深的流水线用稀缺的 VMEM 换 MXU 利用率。取舍取决于块大小，这正是 RPA v3 修复把 KV 读取块与 KV 计算块分开的原因：把计算块缩到 4k token、读取块保持 16k，为预取缓冲腾出了空间。',
+    benchmarkContext:
+      '带三缓冲专家权重的 grouped matmul v2 属于 MoE kernel 工作的一部分，这些工作支撑了 TPU InferenceX 预览中的 Qwen3.5 397B 结果。批量 RPA 的改动在 Qwen3-32B 上测量，其数字与 397B 的对比分开呈现。',
+  },
+  'sequence-on-lane-layout': {
+    term: 'Sequence-on-lane 布局',
+    aliases: ['sequence-on-lane', 'lane 优先 KV 布局', 'token-on-lane 布局'],
+    plainEnglish:
+      'Sequence-on-lane 是一种 KV cache 布局，把一页 token 放在 128 宽的向量 lane 轴上而不是 head 维度上，减少浪费在 padding 上的内存。',
+    definition:
+      'Sequence-on-lane 布局是一种 TPU KV cache 排布方式，把一个 page 的 token 映射到 128 lane 的末维、把 head 维度映射到 sublane 轴，避免小 head 维度放在 lane 轴上时产生的 padding。',
+    explanation:
+      'TPU 向量单元处理的 tile 末维是 128 lane，末维更小的数组都会被补齐。批量 attention kernel 原先沿 head 维度打包 key 和 value，FP8 下打包因子为 4。每个设备只有一个 KV head 的模型只有两样东西可打包，因此每个 tile 有一半是 padding。把 token 放到 lane 轴上后，无论 head 数量多少 tile 都能填满，head 维度也只需是 32 的倍数而不是 128，head 维度为 64 的模型也能使用该 kernel。',
+    significance:
+      '在高并发下，KV 容量就是 decode 吞吐量。这种布局在低并发下每 token 延迟约增加 3%，但在大 batch 时避免了请求排队等待 KV 空间。它还扩大了无需定制工作就能运行在共享 attention kernel 上的模型范围。',
+    benchmarkContext:
+      '在报告的 Ironwood 配置中，可用 KV page 从 5,141 翻倍到 10,283。在并发 128 的 8k1k 上，额外容量把吞吐量提高 16.5%，中位 TTFT 降低 95%，因为请求不再等待 KV 空间。',
+    measurement: {
+      label: 'FP8、每设备单 KV head 下的可用 KV page',
+      value: '5,141 到 10,283 页；并发 128 的 8k1k 上吞吐量 +16.5%，中位 TTFT -95%',
+    },
+  },
+  'collective-offload': {
+    term: 'SparseCore 集合通信卸载',
+    aliases: ['collective offload', '集合通信卸载', 'SparseCore 卸载阈值', 'SC collective'],
+    plainEnglish:
+      '集合通信卸载把 all-reduce 等通信操作放到 TPU 的 SparseCore 上运行而不是 TensorCore，但只在消息足够大、值得这么做时才卸载。',
+    definition:
+      'SparseCore 集合通信卸载是 Ironwood 的一种技术，在 SparseCore 上执行 all-reduce、all-gather 和 reduce-scatter，让 TensorCore 专注矩阵计算，并用一个尺寸阈值把小于阈值的集合通信留在 TensorCore 上。',
+    explanation:
+      'SparseCore 为不规则数据搬运而设计，天然适合承载集合通信。Google 在 SparseCore 上实现了 ReduceScatter，采用两级方案：先通过 die-to-die 链路在芯片内归约，再经 ICI 在芯片间交换，并用双缓冲让各阶段重叠。卸载并非免费：在 SparseCore 上启动有开销，对于能放进 VMEM 的小消息，TensorCore 完成得更快。对 Qwen3.5，一个由 VMEM 容量推导的阈值逐个集合通信地决定由哪个单元执行。',
+    significance:
+      '这个阈值提醒我们，把工作从关键单元上挪走也可能适得其反。某些情况下把集合通信卸载到 SparseCore 会让性能变差，收益来自按消息大小逐个选择，而不是把卸载当成一刀切的策略。它也说明 TPU 服务优化会触及 GPU 栈交给 NCCL 处理的调度决策。',
+    benchmarkContext:
+      '基于阈值的卸载让 Qwen3.5 397B 在 8k1k 上的吞吐量在并发 64 下提高 2.7%，在并发 128 下提高 5.7%。把专家 ID 和路由权重的两个独立 all-gather 合并为一个，每层节省约 80 微秒，按 DeepSeek-V3 的 58 层计算，每次前向传播约节省 4.64 毫秒。',
+  },
+  'kv-head-replication': {
+    term: 'KV head 复制',
+    aliases: ['KV head replication', 'KV head 复制', '复制 KV head', 'KV head 冗余'],
+    plainEnglish:
+      'KV head 复制在模型的 KV head 数量少于所切分的设备数量时，把相同的 key-value head 复制到多个张量并行 rank 上。',
+    definition:
+      'KV head 复制是一种张量并行策略：当张量并行度超过 grouped-query attention 层的 KV head 数量时，把 key 和 value head 复制到各个 rank 上，让每个 rank 无需通信就能拿到本地 query head 所需的 KV 数据。',
+    explanation:
+      'Qwen3.5 有 32 个 query head 和 2 个共享 KV head。TP8 下每个设备分到 4 个 query head，但 2 个 KV head 无法均分到 8 个设备：每个 KV head 被 16 个 query head 共享，因此有 4 个设备需要同一份 KV 数据。在每个 rank 上复制两个 KV head 可以避免对 KV 张量做 all-to-all 交换，代价是每个 rank 都重复保存 KV cache。vLLM 早已支持这一行为，TPU 后端需要一个兼容性修复来启用它。',
+    significance:
+      '高并发下的替代方案是 DP attention：每个设备处理不同的请求子集，并为这些请求保存两个 KV head，这样 KV 内存不会在 rank 之间重复，而体积更大的专家权重仍通过专家并行切分。Ironwood 服务在低并发下使用 TP8 attention，在高并发下使用 DP8 加 EP8。',
+    benchmarkContext:
+      '启用复制消除了 Qwen3.5 397B TorchTPU bring-up 中不必要的 All-to-All 通信。切换到 TP8 attention 加专家并行的低并发调优让 1k1k 在并发 4 下提高 22.9%，在并发 8 下提高 18.1%。',
+  },
+  'recurrent-state': {
+    term: '循环状态（recurrent state）',
+    aliases: ['recurrent state', '循环状态', 'GDN 状态', '线性注意力状态', 'SSM 状态'],
+    plainEnglish:
+      '循环状态是线性注意力或 SSM 层为每个请求保存的固定大小内存，不像 KV cache 那样随每个 token 增长。',
+    definition:
+      '循环状态是 Gated DeltaNet 等线性注意力层在每一步更新的、每个请求固定大小的张量，取代了 softmax 注意力层按 token 存储且不断增长的 key-value 历史。',
+    explanation:
+      '在 Qwen3.5 这样的混合模型中，GQA 层累积随上下文增长的 KV 历史，GDN 层则为每个请求保存一个固定大小的状态，每个 token 都对它衰减、施加 rank-one 更新并读出。服务引擎必须为这个状态分配 slot、决定其存储精度，并为 prefix caching 处理 checkpoint，因为请求一旦继续，实时状态就会被覆盖。在 Ironwood 上，状态最初按每个层组 num_blocks 个 slot 分配，浪费了 HBM，后来压缩为大约每个活跃请求一个 slot。',
+    significance:
+      '循环状态改变了内存预算：它不随上下文增长，这正是混合架构的意义所在，但它必须存放在某处，并且每一步都要在 VMEM 和 HBM 之间搬运。以 BF16 存储、以 FP32 计算可以把它的占用减半。混合模型的 prefix caching 需要分开的读写 slot，缓存的 checkpoint 才能保留下来。',
+    benchmarkContext:
+      '紧凑分配回收了约 76 GiB HBM，把 attention block 池扩大了 71%，让 Qwen3.5 397B 在 1k8k 上的吞吐量在并发 64 下提高 18%。BF16 状态存储在并发 512 的 1k8k 上再带来 15% 的收益。',
+    measurement: {
+      label: 'Qwen3.5 397B 的紧凑循环状态分配',
+      value: '回收约 76 GiB HBM，attention block 池 +71%，并发 64 的 1k8k 吞吐量 +18%',
+    },
+  },
+  'hybrid-prefix-caching': {
+    term: '混合模型 prefix caching',
+    aliases: [
+      'hybrid prefix caching',
+      '混合 prefix caching',
+      'GDN checkpoint 缓存',
+      '对齐 checkpoint 模式',
+    ],
+    plainEnglish:
+      '混合模型 prefix caching 让同时包含注意力层和线性注意力层的模型能复用缓存的 prompt，方法是把循环状态与 KV block 一起保存。',
+    definition:
+      '混合模型 prefix caching 是一种服务技术，为共享的 prompt 前缀同时保存注意力层的 KV block 和线性注意力层循环状态的 checkpoint，使新请求可以从该前缀继续而无需重新计算。',
+    explanation:
+      '对纯注意力模型，缓存前缀就是保留它的 KV block。对混合模型，前缀末尾的 GDN 循环状态也必须保留，但实时状态通常会随着请求继续而被覆盖。Ironwood 的实现给 GDN 分开的 slot 用于读取 checkpoint 和写入实时状态，状态地址从已经用于定位 KV block 的 block table 推导，checkpoint 按对齐的缓存粒度保存，使保存的状态总是落在 KV block 边界上。这种模式需要完整的 checkpoint 池而不是紧凑的按请求分配，用 HBM 换取跨请求复用。',
+    significance:
+      '智能体和多轮负载会复用很长的系统提示词和对话历史，混合模型只有在循环状态也被缓存时才能受益。取舍很明确：混合模型的 prefix caching 会消耗紧凑分配省下的 HBM，因此只有在前缀确实被共享时才划算。',
+    benchmarkContext:
+      'TPU InferenceX 预览中的 Qwen3.5 397B 数字来自随机输入的 8k1k 运行，请求之间没有任何共享，因此没有经过这条路径。带 DP 支持的混合模型 prefix caching 是 Google 客户所要求的 AgentX TPU 结果的基础工作。',
+  },
+  'kv-cache-p2p-pooling': {
+    term: 'KV cache DRAM P2P 池化',
+    aliases: ['P2P pooling', 'P2P 池化', 'DRAM 池化', '共享 KV 池'],
+    plainEnglish:
+      'P2P 池化把多台服务器的主机内存合并成一个逻辑 KV cache 存储，任何服务器上的加速器都能从其他服务器拉取缓存的上下文。',
+    definition:
+      'KV cache DRAM P2P 池化是一种 offload 架构，把集群中每个节点贡献的主机 DRAM 聚合为单个逻辑内存池，让任意加速器通过网络读取其他节点写入的 KV cache。',
+    explanation:
+      '单节点 offload 在 HBM 满时把 KV block 从 HBM 移到本地主机 DRAM。池化更进一步：Mooncake Store 把每台 TPU 主机上的 DRAM 统一为一个共享池，还能把多台服务器的 NVMe 池化，或者接入 WEKA、VAST 这类分布式文件系统后端。被路由到与计算前缀的服务器不同的机器上的请求仍然可以命中缓存。Google 正通过 TPU-Sync 对外开放其原生 TPU offload 栈，并支持 Mooncake Store，后者很可能基于 TPU-Sync 的原语实现。',
+    significance:
+      '池化提高了智能体负载可达到的 prefix cache 命中率，这类负载的会话会运行数百轮，子智能体还会带着全新上下文突发出现。没有池化，命中率就受限于单节点能容纳多少内容，以及路由器能否把会话固定在一台机器上。',
+    benchmarkContext:
+      'TPU-Sync DRAM offload 和 Mooncake Store 池化被列为 TPU InferenceX 预览的后续步骤，排在 AgentX TPU 结果之前。NVIDIA 和 AMD 的 AgentX 文章已经表明，KV 工作集大小和 offload 容量决定智能体负载的每 token 成本。',
+  },
 };
 
 const entries = getAllGlossaryEntries().map((entry) => {
