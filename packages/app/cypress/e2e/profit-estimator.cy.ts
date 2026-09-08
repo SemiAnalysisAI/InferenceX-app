@@ -838,6 +838,8 @@ describe('Profit Estimator per GW — Chinese mirror', () => {
     cy.get('label[for="profit-lab-cut"]').should('contain.text', '模型许可费');
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
     chart().should('contain.text', '模型许可费').and('contain.text', '利润');
+    cy.get('[data-testid="profit-benchmark-panel"] legend').should('have.text', '基准测试配置');
+    cy.get('[data-testid="profit-pricing-panel"] legend').should('have.text', '定价配置');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦每年收入与利润估算');
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
@@ -914,4 +916,65 @@ describe('Profit Estimator (per chip-hour)', () => {
       .should('have.attr', 'href', '/zh/calculator')
       .and('contain.text', 'TCO 计算器');
   });
+});
+
+describe('Profit Estimator — responsive control panels', () => {
+  beforeEach(stubOpenRouter);
+
+  for (const route of ['/profit-estimator', '/profit-estimator-per-gigawatt']) {
+    for (const width of [375, 1440]) {
+      it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
+        cy.viewport(width, 1000);
+        cy.visit(route, { onBeforeLoad: suppressNudges });
+        chart().should('exist');
+        cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
+          cy.get('legend').should('have.text', 'Benchmark Config');
+          cy.get('#profit-model').should('contain.text', 'Kimi K3');
+          cy.get('#profit-target').should('have.value', '45');
+        });
+        cy.get('[data-testid="profit-pricing-panel"]').within(() => {
+          cy.get('legend').should('have.text', 'Pricing Config');
+          cy.get('#profit-utilization').should('have.value', '60');
+          cy.get('#profit-lab-cut').should('have.value', '30');
+          cy.get('#profit-price-source').click();
+        });
+        cy.contains('[role="option"]', 'Custom $/M tok').click();
+        cy.get('#profit-cost').click();
+        cy.contains('[role="option"]', 'Custom $/GPU/hr').click();
+        cy.get('[data-testid="profit-pricing-panel"] [data-testid="profit-custom-prices"]')
+          .find('input')
+          .should('have.length', 3);
+        cy.get(
+          '[data-testid="profit-pricing-panel"] [data-testid="profit-custom-costs"] input',
+        ).should('have.length.greaterThan', 0);
+        cy.get('[data-testid="profit-controls"]').should(($controls) => {
+          const benchmark = $controls
+            .find('[data-testid="profit-benchmark-panel"]')[0]!
+            .getBoundingClientRect();
+          const pricing = $controls
+            .find('[data-testid="profit-pricing-panel"]')[0]!
+            .getBoundingClientRect();
+          if (width >= 1280) {
+            expect(Math.abs(benchmark.top - pricing.top), 'aligned panel tops').to.be.lessThan(2);
+            expect(pricing.left - benchmark.right, 'space between panels').to.be.at.least(15);
+          } else {
+            expect(pricing.top - benchmark.bottom, 'stacked panels').to.be.at.least(15);
+          }
+          for (const panel of $controls.find('fieldset')) {
+            const bounds = panel.getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(0);
+            expect(bounds.right).to.be.at.most(width);
+            for (const control of panel.querySelectorAll('input, button[role="combobox"]')) {
+              const rect = control.getBoundingClientRect();
+              expect(rect.left, `${control.id} left`).to.be.at.least(bounds.left);
+              expect(rect.right, `${control.id} right`).to.be.at.most(bounds.right);
+              expect(rect.height, `${control.id} height`).to.be.at.least(width < 768 ? 44 : 36);
+            }
+          }
+        });
+        cy.get('#profit-utilization').clear().type('50').blur();
+        cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+      });
+    }
+  }
 });

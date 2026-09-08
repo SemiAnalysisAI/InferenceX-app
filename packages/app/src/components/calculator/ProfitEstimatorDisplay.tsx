@@ -197,6 +197,8 @@ const STRINGS = {
       'gw-year': 'Revenue & Profit Estimator per GigaWatt',
       'chip-hour': 'Revenue & Profit Estimator',
     },
+    benchmarkGroup: 'Benchmark Config',
+    pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
@@ -297,6 +299,8 @@ const STRINGS = {
       'gw-year': '每吉瓦收入与利润估算器',
       'chip-hour': '收入与利润估算器',
     },
+    benchmarkGroup: '基准测试配置',
+    pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '算力支出分段采用的 TCO 层级：按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。带锁的租赁期限（按需至 2 年承诺）收录于 TCO 模型。',
@@ -1300,296 +1304,305 @@ function ProfitEstimatorInner({
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                  featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
-                }`}
-              >
-                <div className="md:col-span-2">
-                  <ModelSelector
-                    id="profit-model"
-                    data-testid="profit-model-selector"
-                    value={selectedModel}
-                    onChange={handleModelChange}
-                    open={openDropdown === 'model'}
-                    onOpenChange={handleDropdownOpenChange('model')}
-                    availableModels={agenticModels}
-                  />
-                </div>
-                {featureGateUnlocked && (
-                  <PercentileSelector
-                    id="profit-percentile"
-                    data-testid="profit-percentile-selector"
-                    value={selectedPercentile}
-                    onChange={handlePercentileChange}
-                  />
-                )}
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="profit-cost"
-                    label={t.costProviderLabel}
-                    tooltip={t.costProviderTooltip}
-                  />
-                  <div data-testid="profit-cost-selector">
-                    <MultiSelect
-                      triggerId="profit-cost"
-                      options={[
-                        ...COST_PROVIDER_OPTIONS.filter((p) => p.value !== 'custom').map(
-                          (provider) => ({
-                            value: provider.value,
-                            label: locale === 'zh' ? provider.labelZh : provider.label,
-                          }),
-                        ),
-                        ...lockedCostProviderOptions(locale),
-                        ...COST_PROVIDER_OPTIONS.filter((p) => p.value === 'custom').map(
-                          (provider) => ({
-                            value: provider.value,
-                            label: locale === 'zh' ? provider.labelZh : provider.label,
-                          }),
-                        ),
-                      ]}
-                      value={[costProvider]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        if (interceptLockedTier(next)) return;
-                        setCostProvider(next as ProfitCostProvider);
-                        track('profit_cost_provider_changed', { provider: next });
-                      }}
-                      open={openDropdown === 'costProvider'}
-                      onOpenChange={handleDropdownOpenChange('costProvider')}
-                      placeholder={t.costProviderPlaceholder}
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:grid-cols-4">
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="profit-target"
-                    label={t.targetAgenticLabel(percentileLabel)}
-                    tooltip={t.targetAgenticTooltip(percentileLabel)}
-                  />
-                  <Input
-                    id="profit-target"
-                    data-testid="profit-target-input"
-                    type="number"
-                    onWheel={blurOnWheel}
-                    inputMode="decimal"
-                    min={1}
-                    step={1}
-                    value={targetRaw}
-                    onChange={handleTargetChange}
-                    onBlur={handleTargetBlur}
-                  />
-                </div>
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="profit-price-source"
-                    label={t.priceSourceLabel}
-                    tooltip={t.priceSourceTooltip}
-                  />
-                  <div data-testid="profit-price-source-selector">
-                    <MultiSelect
-                      triggerId="profit-price-source"
-                      options={priceSourceOptions(listPricing?.vendor ?? null).map((option) => ({
-                        value: option.value,
-                        label: locale === 'zh' ? option.labelZh : option.label,
-                      }))}
-                      value={[effectivePriceSource]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        // Seed the custom fields from the price in force (list or
-                        // live catalog) so switching over starts from a real price
-                        // instead of $1/M.
-                        if (next === 'custom' && pricing) {
-                          setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
-                          setCustomCachedPrice(
-                            formatTokenPrice(cachedInputPricePerMillion(pricing)),
-                          );
-                          setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
-                        }
-                        setPriceSource(next as PriceSource);
-                        track('profit_price_source_changed', { source: next });
-                      }}
-                      open={openDropdown === 'priceSource'}
-                      onOpenChange={handleDropdownOpenChange('priceSource')}
-                      placeholder={t.priceSourcePlaceholder}
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="profit-utilization"
-                    label={t.utilizationLabel}
-                    tooltip={t.utilizationTooltip}
-                  />
-                  <Input
-                    id="profit-utilization"
-                    data-testid="profit-utilization-input"
-                    type="number"
-                    onWheel={blurOnWheel}
-                    inputMode="decimal"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={utilization.raw}
-                    onChange={(e) => utilization.onChange(e.target.value)}
-                    onBlur={utilization.onBlur}
-                  />
-                </div>
-                <div className="flex flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="profit-lab-cut"
-                    label={t.labCutLabel}
-                    tooltip={t.labCutTooltip}
-                  />
-                  <Input
-                    id="profit-lab-cut"
-                    data-testid="profit-lab-cut-input"
-                    type="number"
-                    onWheel={blurOnWheel}
-                    inputMode="decimal"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={labCut.raw}
-                    onChange={(e) => labCut.onChange(e.target.value)}
-                    onBlur={labCut.onBlur}
-                  />
-                </div>
-              </div>
-
-              {/* Custom token prices get their own row so the main controls keep their width. */}
-              {effectivePriceSource === 'custom' && (
-                <div
-                  data-testid="profit-custom-prices"
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-5">
+                <ControlPanel
+                  legend={t.benchmarkGroup}
+                  data-testid="profit-benchmark-panel"
+                  className="grid-cols-1 md:grid-cols-2 xl:col-span-2"
                 >
-                  <div className="flex flex-col space-y-1.5">
-                    <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
+                  <div className="min-w-0 md:col-span-2">
+                    <ModelSelector
+                      id="profit-model"
+                      data-testid="profit-model-selector"
+                      value={selectedModel}
+                      onChange={handleModelChange}
+                      open={openDropdown === 'model'}
+                      onOpenChange={handleDropdownOpenChange('model')}
+                      availableModels={agenticModels}
+                    />
+                  </div>
+                  {featureGateUnlocked && (
+                    <div className="min-w-0 md:col-span-2">
+                      <PercentileSelector
+                        id="profit-percentile"
+                        data-testid="profit-percentile-selector"
+                        value={selectedPercentile}
+                        onChange={handlePercentileChange}
+                      />
+                    </div>
+                  )}
+                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <LabelWithTooltip
+                      htmlFor="profit-target"
+                      label={t.targetAgenticLabel(percentileLabel)}
+                      tooltip={t.targetAgenticTooltip(percentileLabel)}
+                    />
                     <Input
-                      id="profit-input-price"
-                      data-testid="profit-input-price"
+                      id="profit-target"
+                      data-testid="profit-target-input"
                       type="number"
                       onWheel={blurOnWheel}
                       inputMode="decimal"
-                      min={0}
-                      step={0.01}
-                      value={customInputPrice}
-                      onChange={(e) => setCustomInputPrice(e.target.value)}
-                      onBlur={() =>
-                        track('profit_custom_price_set', {
-                          stream: 'input',
-                          value: customInputPrice,
-                        })
-                      }
+                      min={1}
+                      step={1}
+                      value={targetRaw}
+                      onChange={handleTargetChange}
+                      onBlur={handleTargetBlur}
                     />
                   </div>
-                  <div className="flex flex-col space-y-1.5">
-                    <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
-                    <Input
-                      id="profit-cached-price"
-                      data-testid="profit-cached-price"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={0}
-                      step={0.001}
-                      value={customCachedPrice}
-                      onChange={(e) => setCustomCachedPrice(e.target.value)}
-                      onBlur={() =>
-                        track('profit_custom_price_set', {
-                          stream: 'cached',
-                          value: customCachedPrice,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex flex-col space-y-1.5">
-                    <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
-                    <Input
-                      id="profit-output-price"
-                      data-testid="profit-output-price"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={0}
-                      step={0.01}
-                      value={customOutputPrice}
-                      onChange={(e) => setCustomOutputPrice(e.target.value)}
-                      onBlur={() =>
-                        track('profit_custom_price_set', {
-                          stream: 'output',
-                          value: customOutputPrice,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              {showsTcoBasis && (
-                <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
-                    tooltip={
-                      locale === 'zh'
-                        ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                        : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                    }
-                  />
-                  <TcoBasisToggle source="profit" className="h-9" />
-                </div>
-              )}
-
-              {costProvider === 'custom' && customCostBases.length > 0 && (
-                <div
-                  data-testid="profit-custom-costs"
-                  className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6"
+                </ControlPanel>
+                <ControlPanel
+                  legend={t.pricingGroup}
+                  data-testid="profit-pricing-panel"
+                  className="grid-cols-1 md:grid-cols-2 xl:col-span-3"
                 >
-                  {customCostBases.map((base) => {
-                    const label = HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase();
-                    return (
-                      <div key={base} className="flex flex-col space-y-1.5">
-                        <Label htmlFor={`profit-custom-cost-${base}`}>
-                          {t.customCostLabel(label)}
-                        </Label>
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-cost"
+                      label={t.costProviderLabel}
+                      tooltip={t.costProviderTooltip}
+                    />
+                    <div data-testid="profit-cost-selector">
+                      <MultiSelect
+                        triggerId="profit-cost"
+                        options={[
+                          ...COST_PROVIDER_OPTIONS.filter((p) => p.value !== 'custom').map(
+                            (provider) => ({
+                              value: provider.value,
+                              label: locale === 'zh' ? provider.labelZh : provider.label,
+                            }),
+                          ),
+                          ...lockedCostProviderOptions(locale),
+                          ...COST_PROVIDER_OPTIONS.filter((p) => p.value === 'custom').map(
+                            (provider) => ({
+                              value: provider.value,
+                              label: locale === 'zh' ? provider.labelZh : provider.label,
+                            }),
+                          ),
+                        ]}
+                        value={[costProvider]}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (!next) return;
+                          if (interceptLockedTier(next)) return;
+                          setCostProvider(next as ProfitCostProvider);
+                          track('profit_cost_provider_changed', { provider: next });
+                        }}
+                        open={openDropdown === 'costProvider'}
+                        onOpenChange={handleDropdownOpenChange('costProvider')}
+                        placeholder={t.costProviderPlaceholder}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        searchable={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-price-source"
+                      label={t.priceSourceLabel}
+                      tooltip={t.priceSourceTooltip}
+                    />
+                    <div data-testid="profit-price-source-selector">
+                      <MultiSelect
+                        triggerId="profit-price-source"
+                        options={priceSourceOptions(listPricing?.vendor ?? null).map((option) => ({
+                          value: option.value,
+                          label: locale === 'zh' ? option.labelZh : option.label,
+                        }))}
+                        value={[effectivePriceSource]}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (!next) return;
+                          // Seed the custom fields from the price in force (list or
+                          // live catalog) so switching over starts from a real price
+                          // instead of $1/M.
+                          if (next === 'custom' && pricing) {
+                            setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
+                            setCustomCachedPrice(
+                              formatTokenPrice(cachedInputPricePerMillion(pricing)),
+                            );
+                            setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
+                          }
+                          setPriceSource(next as PriceSource);
+                          track('profit_price_source_changed', { source: next });
+                        }}
+                        open={openDropdown === 'priceSource'}
+                        onOpenChange={handleDropdownOpenChange('priceSource')}
+                        placeholder={t.priceSourcePlaceholder}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        searchable={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-utilization"
+                      label={t.utilizationLabel}
+                      tooltip={t.utilizationTooltip}
+                    />
+                    <Input
+                      id="profit-utilization"
+                      data-testid="profit-utilization-input"
+                      type="number"
+                      onWheel={blurOnWheel}
+                      inputMode="decimal"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={utilization.raw}
+                      onChange={(e) => utilization.onChange(e.target.value)}
+                      onBlur={utilization.onBlur}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-lab-cut"
+                      label={t.labCutLabel}
+                      tooltip={t.labCutTooltip}
+                    />
+                    <Input
+                      id="profit-lab-cut"
+                      data-testid="profit-lab-cut-input"
+                      type="number"
+                      onWheel={blurOnWheel}
+                      inputMode="decimal"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={labCut.raw}
+                      onChange={(e) => labCut.onChange(e.target.value)}
+                      onBlur={labCut.onBlur}
+                    />
+                  </div>
+                  {/* Custom token prices get their own row so the main controls keep their width. */}
+                  {effectivePriceSource === 'custom' && (
+                    <div
+                      data-testid="profit-custom-prices"
+                      className="grid min-w-0 gap-4 md:col-span-2 md:grid-cols-3"
+                    >
+                      <div className="flex min-w-0 flex-col space-y-1.5">
+                        <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
                         <Input
-                          id={`profit-custom-cost-${base}`}
-                          data-testid={`profit-custom-cost-${base}`}
+                          id="profit-input-price"
+                          data-testid="profit-input-price"
                           type="number"
                           onWheel={blurOnWheel}
                           inputMode="decimal"
                           min={0}
                           step={0.01}
-                          value={customCosts[base] ?? ''}
-                          onChange={(e) =>
-                            setCustomCosts((prev) => ({ ...prev, [base]: e.target.value }))
-                          }
+                          value={customInputPrice}
+                          onChange={(e) => setCustomInputPrice(e.target.value)}
                           onBlur={() =>
-                            track('profit_custom_cost_set', { gpu: base, value: customCosts[base] })
+                            track('profit_custom_price_set', {
+                              stream: 'input',
+                              value: customInputPrice,
+                            })
                           }
                         />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="flex min-w-0 flex-col space-y-1.5">
+                        <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
+                        <Input
+                          id="profit-cached-price"
+                          data-testid="profit-cached-price"
+                          type="number"
+                          onWheel={blurOnWheel}
+                          inputMode="decimal"
+                          min={0}
+                          step={0.001}
+                          value={customCachedPrice}
+                          onChange={(e) => setCustomCachedPrice(e.target.value)}
+                          onBlur={() =>
+                            track('profit_custom_price_set', {
+                              stream: 'cached',
+                              value: customCachedPrice,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col space-y-1.5">
+                        <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
+                        <Input
+                          id="profit-output-price"
+                          data-testid="profit-output-price"
+                          type="number"
+                          onWheel={blurOnWheel}
+                          inputMode="decimal"
+                          min={0}
+                          step={0.01}
+                          value={customOutputPrice}
+                          onChange={(e) => setCustomOutputPrice(e.target.value)}
+                          onBlur={() =>
+                            track('profit_custom_price_set', {
+                              stream: 'output',
+                              value: customOutputPrice,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {showsTcoBasis && (
+                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5 md:col-span-2">
+                      <LabelWithTooltip
+                        label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                        tooltip={
+                          locale === 'zh'
+                            ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                            : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                        }
+                      />
+                      <TcoBasisToggle source="profit" className="md:h-9" />
+                    </div>
+                  )}
+
+                  {costProvider === 'custom' && customCostBases.length > 0 && (
+                    <div
+                      data-testid="profit-custom-costs"
+                      className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2 xl:grid-cols-3"
+                    >
+                      {customCostBases.map((base) => {
+                        const label = HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase();
+                        return (
+                          <div key={base} className="flex min-w-0 flex-col space-y-1.5">
+                            <Label htmlFor={`profit-custom-cost-${base}`}>
+                              {t.customCostLabel(label)}
+                            </Label>
+                            <Input
+                              id={`profit-custom-cost-${base}`}
+                              data-testid={`profit-custom-cost-${base}`}
+                              type="number"
+                              onWheel={blurOnWheel}
+                              inputMode="decimal"
+                              min={0}
+                              step={0.01}
+                              value={customCosts[base] ?? ''}
+                              onChange={(e) =>
+                                setCustomCosts((prev) => ({ ...prev, [base]: e.target.value }))
+                              }
+                              onBlur={() =>
+                                track('profit_custom_cost_set', {
+                                  gpu: base,
+                                  value: customCosts[base],
+                                })
+                              }
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ControlPanel>
+              </div>
 
               <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
                 <div className="grid min-w-0 gap-3 md:grid-cols-2">
