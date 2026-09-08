@@ -143,14 +143,14 @@ export function createMdxComponents(
       const darkSrc = props.srcDark ?? props.src;
       const hasThemedVariants = Boolean(props.srcLight || props.srcDark) && lightSrc !== darkSrc;
       return (
-        <figure className="my-6 flex flex-col items-center">
+        <figure className="my-8 flex flex-col items-start gap-3">
           {hasThemedVariants ? (
             <ThemedFigureImage
               srcLight={lightSrc}
               srcDark={darkSrc}
               alt={props.alt ?? ''}
               loading={loading}
-              className="rounded-lg w-full md:w-3/4"
+              className="w-full rounded-xl"
             />
           ) : (
             (lightSrc || darkSrc) && (
@@ -159,12 +159,12 @@ export function createMdxComponents(
                 alt={props.alt ?? ''}
                 loading={loading}
                 decoding="async"
-                className="rounded-lg w-full md:w-3/4"
+                className="w-full rounded-xl"
               />
             )
           )}
           {props.caption && (
-            <figcaption className="text-center text-sm text-muted-foreground mt-2">
+            <figcaption className="text-sm text-muted-foreground">
               {renderCaption(props.caption)}
             </figcaption>
           )}
@@ -186,12 +186,12 @@ export function createMdxComponents(
         locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX Dashboard';
       const href = props.href ?? defaultHref;
       return (
-        <div className="my-6 flex justify-center">
+        <div className="not-prose my-8 flex justify-center">
           <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-0 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-brand/90 [&_p]:m-0"
           >
             {props.children ?? defaultLabel}
           </a>

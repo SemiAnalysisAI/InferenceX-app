@@ -1,21 +1,15 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import 'katex/dist/katex.min.css';
 
-import { BlogBackLink } from '@/components/blog/blog-back-link';
-import { BlogPostNav } from '@/components/blog/blog-post-nav';
-import { BlogToc } from '@/components/blog/blog-toc';
-import { HashScroll } from '@/components/blog/hash-scroll';
-import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { Card } from '@/components/ui/card';
+import { BlogPostContent } from '@/components/blog/blog-post-content';
 import { JsonLd } from '@/components/json-ld';
 import {
   blogDescription,
   getAllPosts,
   getAdjacentPosts,
+  getRelatedPosts,
   buildBlogBreadcrumbJsonLdZh,
   buildBlogPostingJsonLd,
   extractHeadings,
@@ -81,6 +75,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
 
   const { meta, raw } = result;
   const adjacent = getAdjacentPosts(slug, 'zh');
+  const related = getRelatedPosts(slug, getAllPosts('zh'));
   const headings = extractHeadings(raw);
   const { content } = await compileBlogMdx(raw, 'zh');
 
@@ -88,77 +83,17 @@ export default async function ZhBlogPostPage({ params }: Props) {
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);
 
   return (
-    <main className="relative">
-      <HashScroll />
-      <ReadingProgressBar slug={slug} />
+    <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-        <section data-blog-section="true" className="flex flex-col gap-4">
-          <Card>
-            <BlogBackLink href="/zh/blog" label="返回文章列表" />
-            <header>
-              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
-              <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
-                <span>{AUTHOR_NAME}</span>
-                <span>&middot;</span>
-                <time dateTime={meta.date}>
-                  {new Date(`${meta.date}T00:00:00Z`).toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    timeZone: 'UTC',
-                  })}
-                </time>
-                <span>&middot;</span>
-                <span>预计阅读 {meta.readingTime} 分钟</span>
-                <span>&middot;</span>
-                <Link href={`/blog/${slug}`} hrefLang="en" className="hover:underline text-brand">
-                  阅读英文原文
-                </Link>
-                {meta.tags && meta.tags.length > 0 && (
-                  <>
-                    <span>&middot;</span>
-                    {meta.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-muted px-3 py-0.5 text-xs">
-                        {tag}
-                      </span>
-                    ))}
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-4">
-                <ShareTwitterButton text={meta.title} />
-                <ShareLinkedInButton />
-              </div>
-            </header>
-            {headings.length > 0 && (
-              <div className="mt-4">
-                <BlogToc headings={headings} locale="zh" />
-              </div>
-            )}
-            <div className="mt-6 pt-6 border-t border-border/40">
-              <article
-                data-blog-article
-                className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
-              >
-                {content}
-                <p className="text-xs text-muted-foreground">
-                  本文由英文原文翻译而来，如有歧义以英文版为准。所有文章版权归 &copy; SemiAnalysis
-                  所有，保留所有权利。覆盖应用源代码的 AGPL-3.0 许可证不适用于文章内容。
-                </p>
-              </article>
-            </div>
-          </Card>
-          <BlogPostNav
-            prev={adjacent.prev ? { slug: adjacent.prev.slug, title: adjacent.prev.title } : null}
-            next={adjacent.next ? { slug: adjacent.next.slug, title: adjacent.next.title } : null}
-            basePath="/zh/blog"
-            labels={{ prev: '上一篇', next: '下一篇' }}
-          />
-        </section>
-      </div>
-    </main>
+      <BlogPostContent
+        locale="zh"
+        meta={meta}
+        headings={headings}
+        content={content}
+        adjacent={adjacent}
+        related={related}
+      />
+    </>
   );
 }

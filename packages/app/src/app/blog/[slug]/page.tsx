@@ -3,18 +3,13 @@ import { notFound } from 'next/navigation';
 
 import 'katex/dist/katex.min.css';
 
-import { BlogBackLink } from '@/components/blog/blog-back-link';
-import { BlogPostNav } from '@/components/blog/blog-post-nav';
-import { BlogToc } from '@/components/blog/blog-toc';
-import { HashScroll } from '@/components/blog/hash-scroll';
-import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { Card } from '@/components/ui/card';
+import { BlogPostContent } from '@/components/blog/blog-post-content';
 import { JsonLd } from '@/components/json-ld';
 import {
   blogDescription,
   getAllPosts,
   getAdjacentPosts,
+  getRelatedPosts,
   buildBlogBreadcrumbJsonLd,
   buildBlogPostingJsonLd,
   extractHeadings,
@@ -85,6 +80,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   const { meta, raw } = result;
   const adjacent = getAdjacentPosts(slug);
+  const related = getRelatedPosts(slug, getAllPosts());
   const headings = extractHeadings(raw);
   const { content } = await compileBlogMdx(raw);
 
@@ -92,71 +88,17 @@ export default async function BlogPostPage({ params }: Props) {
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd(slug, meta.title);
 
   return (
-    <main className="relative">
-      <HashScroll />
-      <ReadingProgressBar slug={slug} />
+    <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-        <section data-blog-section="true" className="flex flex-col gap-4">
-          <Card>
-            <BlogBackLink />
-            <header>
-              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
-              <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
-                <span>{AUTHOR_NAME}</span>
-                <span>&middot;</span>
-                <time dateTime={meta.date}>
-                  {new Date(`${meta.date}T00:00:00Z`).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    timeZone: 'UTC',
-                  })}
-                </time>
-                <span>&middot;</span>
-                <span>{meta.readingTime} min read</span>
-                {meta.tags && meta.tags.length > 0 && (
-                  <>
-                    <span>&middot;</span>
-                    {meta.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-muted px-3 py-0.5 text-xs">
-                        {tag}
-                      </span>
-                    ))}
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-4">
-                <ShareTwitterButton text={meta.title} />
-                <ShareLinkedInButton />
-              </div>
-            </header>
-            {headings.length > 0 && (
-              <div className="mt-4">
-                <BlogToc headings={headings} />
-              </div>
-            )}
-            <div className="mt-6 pt-6 border-t border-border/40">
-              <article
-                data-blog-article
-                className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
-              >
-                {content}
-                <p className="text-xs text-muted-foreground">
-                  All articles and posts are &copy; SemiAnalysis. All rights reserved. The AGPL-3.0
-                  license covering the application source code does not apply to article content.
-                </p>
-              </article>
-            </div>
-          </Card>
-          <BlogPostNav
-            prev={adjacent.prev ? { slug: adjacent.prev.slug, title: adjacent.prev.title } : null}
-            next={adjacent.next ? { slug: adjacent.next.slug, title: adjacent.next.title } : null}
-          />
-        </section>
-      </div>
-    </main>
+      <BlogPostContent
+        locale="en"
+        meta={meta}
+        headings={headings}
+        content={content}
+        adjacent={adjacent}
+        related={related}
+      />
+    </>
   );
 }
