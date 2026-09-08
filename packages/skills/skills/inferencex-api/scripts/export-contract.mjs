@@ -219,30 +219,9 @@ function powerxBenchmarkRow(row) {
   if (!object(row) || !object(row.metrics)) return false;
   return (
     (Number.isSafeInteger(row.id) || (typeof row.id === 'string' && row.id.trim().length > 0)) &&
-    [
-      'hardware',
-      'framework',
-      'model',
-      'precision',
-      'spec_method',
-      'benchmark_type',
-      'offload_mode',
-      'date',
-    ].every((key) => typeof row[key] === 'string') &&
-    ['disagg', 'is_multinode', 'prefill_dp_attention', 'decode_dp_attention'].every(
-      (key) => typeof row[key] === 'boolean',
-    ) &&
-    [
-      'prefill_tp',
-      'prefill_ep',
-      'prefill_num_workers',
-      'decode_tp',
-      'decode_ep',
-      'decode_num_workers',
-      'num_prefill_gpu',
-      'num_decode_gpu',
-      'conc',
-    ].every((key) => Number.isInteger(row[key])) &&
+    REQUIRED_STRING_FIELDS.every((key) => typeof row[key] === 'string') &&
+    REQUIRED_BOOLEAN_FIELDS.every((key) => typeof row[key] === 'boolean') &&
+    REQUIRED_INTEGER_FIELDS.every((key) => Number.isInteger(row[key])) &&
     ['isl', 'osl'].every((key) => row[key] === null || Number.isFinite(row[key])) &&
     ['image', 'run_url'].every((key) => row[key] === null || typeof row[key] === 'string') &&
     validDate(row.date) &&
