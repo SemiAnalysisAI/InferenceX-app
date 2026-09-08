@@ -231,7 +231,6 @@ export function buildGpuGroups<M extends GroupMeta>(
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,
-      physicalChips: entry.physicalChips,
       dp: entry.dp,
       precision: row.precision,
       ep: row.decode_ep,

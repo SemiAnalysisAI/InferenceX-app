@@ -1,75 +1,55 @@
 'use client';
 
+import { useMemo } from 'react';
+
 import { useGlobalFilterSelection, useGlobalFilterActions } from '@/components/GlobalFilterContext';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
+import type { TcoBasis } from '@/lib/constants';
 import { showsTcoBasisSelector } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/utils';
 
-const STRINGS = {
-  en: {
-    label: 'TCO Basis',
-    external: 'External',
-    internal: 'Internal',
-    note: 'USD per physical chip/hour. External customer pricing or internal owner cost.',
-  },
-  zh: {
-    label: 'TCO 口径',
-    external: '外部',
-    internal: '内部',
-    note: '单位：美元/物理芯片/小时。可选择外部客户价格或内部自有成本。',
-  },
+const LABELS = {
+  en: { external: 'External', internal: 'Internal', aria: 'TCO basis' },
+  zh: { external: '外部', internal: '内部', aria: 'TCO 口径' },
 } as const;
 
+/**
+ * Whether the current model/scenario exposes the TCO Basis selector. The basis
+ * state itself is global; only the control is scoped to scenarios that
+ * benchmark hardware with a distinct internal owner cost.
+ */
 export function useShowsTcoBasisSelector(): boolean {
   const { selectedModel, effectiveSequence } = useGlobalFilterSelection();
   return showsTcoBasisSelector(selectedModel, effectiveSequence);
 }
 
-/** Show only for TPU hardware that survives the current filters, including overlays. */
-export function TcoBasisToggle({
-  visible = true,
-  source,
-  className,
-}: {
-  visible?: boolean;
-  source: string;
-  className?: string;
-}) {
+/** Global external customer pricing versus internal owner cost selection. */
+export function TcoBasisToggle({ source, className }: { source: string; className?: string }) {
   const { tcoBasis } = useGlobalFilterSelection();
   const { setTcoBasis } = useGlobalFilterActions();
-  const t = STRINGS[useLocale()];
-  const showsTcoBasis = useShowsTcoBasisSelector();
-  if (!visible || !showsTcoBasis) return null;
+  const labels = LABELS[useLocale()];
+  const options = useMemo<SegmentedToggleOption<TcoBasis>[]>(
+    () => [
+      { value: 'external', label: labels.external, testId: 'tco-basis-external' },
+      { value: 'internal', label: labels.internal, testId: 'tco-basis-internal' },
+    ],
+    [labels],
+  );
+
   return (
-    <div className="flex min-w-0 flex-col gap-1.5" data-testid="tpu-tco-assumptions">
-      <LabelWithTooltip label={t.label} tooltip={t.note} />
-      <SegmentedToggle
-        className={className}
-        size="default"
-        buttonClassName="flex-1 justify-center"
-        role="group"
-        value={tcoBasis}
-        options={[
-          {
-            value: 'external' as const,
-            label: t.external,
-            testId: 'tco-basis-external',
-          },
-          {
-            value: 'internal' as const,
-            label: t.internal,
-            testId: 'tco-basis-internal',
-          },
-        ]}
-        onValueChange={(basis) => {
-          setTcoBasis(basis);
-          track('tco_basis_changed', { basis, source });
-        }}
-        ariaLabel={t.label}
-        testId="tco-basis-toggle"
-      />
-    </div>
+    <SegmentedToggle
+      role="group"
+      value={tcoBasis}
+      options={options}
+      onValueChange={(basis) => {
+        setTcoBasis(basis);
+        track('tco_basis_changed', { basis, source });
+      }}
+      ariaLabel={labels.aria}
+      testId="tco-basis-toggle"
+      className={cn('w-fit self-start', className)}
+    />
   );
 }

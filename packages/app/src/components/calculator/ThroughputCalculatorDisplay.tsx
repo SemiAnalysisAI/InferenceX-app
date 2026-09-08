@@ -1077,8 +1077,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   </div>
                 </div>
                 {showsTcoBasis && (
-                  <div className="min-w-0 w-full max-w-48 lg:col-span-2">
-                    <TcoBasisToggle source="calculator" className="h-9" />
+                  <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 lg:col-span-2">
+                    <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
+                    <TcoBasisToggle source="calculator" className="md:h-9" />
                   </div>
                 )}
               </ControlPanel>

@@ -1720,7 +1720,7 @@ describe('ChartDisplay engine comparison guard', () => {
       );
     }
 
-    mountWithProviders(<OfficialRowsScopeHarness />, { globalFilters: {}, unofficial: {} });
+    mountWithProviders(<OfficialRowsScopeHarness />, { unofficial: {} });
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
 
@@ -2124,7 +2124,7 @@ describe('ChartDisplay engine comparison guard', () => {
       );
     }
 
-    mountWithProviders(<OverlayScopeHarness />, { globalFilters: {} });
+    mountWithProviders(<OverlayScopeHarness />);
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 

@@ -56,6 +56,14 @@ describe('TPU publication preview', () => {
       expect(dp8.decode_tp).to.equal(1);
       expect(dp8.y).to.be.closeTo((3674.8418266267754 * 3600) / 1.03, 0.001);
     });
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('[data-slot="select-item"][data-value="y_tpPerGpu"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'data-value', 'y_tpPerGpu');
+    cy.get(overlayPoints).should('have.length', 6);
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('[data-slot="select-item"][data-value="y_tokensPerDollarH"]').click();
+    cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('#scatter-hide-non-optimal').click();
     cy.contains('TP1/DP8').should('exist');
     cy.get('[aria-label="Dismiss tpuv7_updates"]').click();
@@ -103,6 +111,8 @@ describe('TPU publication preview', () => {
             expect(bounds.right).to.be.at.most(width);
             for (const button of $toggle[0].querySelectorAll('button')) {
               expect(button.scrollWidth).to.be.at.most(button.clientWidth);
+              expect(button.getBoundingClientRect().top).to.be.at.least(bounds.top);
+              expect(button.getBoundingClientRect().bottom).to.be.at.most(bounds.bottom);
             }
           });
       });

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -388,7 +389,11 @@ export default function ChartControls({
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
-  const tcoVisible = showTcoBasis && showsTcoBasisSelector(selectedModel, selectedSequence);
+  const tcoVisible =
+    mounted &&
+    showTcoBasis &&
+    isCostMetric(selectedYAxisMetric) &&
+    showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
@@ -486,8 +491,9 @@ export default function ChartControls({
               </div>
 
               {tcoVisible && (
-                <div className="min-w-0 w-full max-w-48 sm:col-span-2 xl:col-span-1">
-                  <TcoBasisToggle source={tcoSource} />
+                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
+                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
                 </div>
               )}
 

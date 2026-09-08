@@ -34,8 +34,6 @@ interface ChartButtonsProps {
    * They wrap with the actions and inherit this wrapper's no-export behavior.
    */
   leadingControls?: ReactNode;
-  /** Settings aligned to the left of the view/export actions, outside the exported caption. */
-  settingsControls?: ReactNode;
   /** Optional container class override for positioning/layout variants. */
   className?: string;
   /**
@@ -65,7 +63,6 @@ export function ChartButtons({
   onExportMp4,
   exportFileName,
   leadingControls,
-  settingsControls,
   className,
   mobileVisible = true,
 }: ChartButtonsProps) {
@@ -120,103 +117,100 @@ export function ChartButtons({
     <div
       data-slot="chart-actions"
       className={cn(
-        'no-export export-buttons mb-3 min-w-0 flex-wrap items-end justify-end gap-3',
+        'no-export export-buttons mb-3 min-w-0 flex-wrap items-center justify-end gap-2',
         mobileVisible ? 'flex' : 'hidden md:flex',
         className,
       )}
     >
-      {settingsControls && <div className="mr-auto min-w-0 empty:hidden">{settingsControls}</div>}
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-        {leadingControls && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">{leadingControls}</div>
-        )}
-        {onExportCsv || onExportMp4 ? (
-          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                data-testid="export-button"
-                variant="outline"
-                size={isExporting ? 'default' : 'icon'}
-                className={`h-11 shrink-0 md:h-8 ${isExporting ? '' : 'w-11 md:w-8'}`}
-                disabled={isExporting}
-                aria-label={t.exportMenu}
-              >
-                <Download className={isExporting ? 'mr-2' : ''} size={16} />
-                {isExporting && t.exporting}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-44 p-1">
+      {leadingControls && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{leadingControls}</div>
+      )}
+      {onExportCsv || onExportMp4 ? (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              data-testid="export-button"
+              variant="outline"
+              size={isExporting ? 'default' : 'icon'}
+              className={`h-11 shrink-0 md:h-8 ${isExporting ? '' : 'w-11 md:w-8'}`}
+              disabled={isExporting}
+              aria-label={t.exportMenu}
+            >
+              <Download className={isExporting ? 'mr-2' : ''} size={16} />
+              {isExporting && t.exporting}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-44 p-1">
+            <button
+              type="button"
+              data-testid="export-png-button"
+              data-ph-capture-attribute-export-type="png"
+              data-ph-capture-attribute-chart={chartId}
+              className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8 ${hideImageExport ? 'opacity-40 pointer-events-none' : ''}`}
+              onClick={handleExportPng}
+              aria-disabled={hideImageExport}
+            >
+              <Image size={14} />
+              {t.png}
+            </button>
+            {onExportCsv && (
               <button
                 type="button"
-                data-testid="export-png-button"
-                data-ph-capture-attribute-export-type="png"
+                data-testid="export-csv-button"
+                data-ph-capture-attribute-export-type="csv"
                 data-ph-capture-attribute-chart={chartId}
-                className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8 ${hideImageExport ? 'opacity-40 pointer-events-none' : ''}`}
-                onClick={handleExportPng}
-                aria-disabled={hideImageExport}
+                className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8"
+                onClick={handleExportCsv}
               >
-                <Image size={14} />
-                {t.png}
+                <FileSpreadsheet size={14} />
+                {t.csv}
               </button>
-              {onExportCsv && (
-                <button
-                  type="button"
-                  data-testid="export-csv-button"
-                  data-ph-capture-attribute-export-type="csv"
-                  data-ph-capture-attribute-chart={chartId}
-                  className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8"
-                  onClick={handleExportCsv}
-                >
-                  <FileSpreadsheet size={14} />
-                  {t.csv}
-                </button>
-              )}
-              {onExportMp4 && (
-                <button
-                  type="button"
-                  data-testid="export-mp4-button"
-                  data-ph-capture-attribute-export-type="mp4"
-                  data-ph-capture-attribute-chart={chartId}
-                  className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8"
-                  onClick={handleExportMp4}
-                >
-                  <Video size={14} />
-                  {t.mp4}
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <Button
-            data-testid="export-button"
-            variant="outline"
-            size={isExporting ? 'default' : 'icon'}
-            className={`h-11 shrink-0 md:h-8 ${isExporting ? '' : 'w-11 md:w-8'}`}
-            onClick={handleExportPng}
-            disabled={isExporting}
-            aria-label={t.exportMenu}
-          >
-            <Download className={isExporting ? 'mr-2' : ''} size={16} />
-            {isExporting && t.exporting}
-          </Button>
-        )}
-        {!hideZoomReset && (
-          <Button
-            data-testid="zoom-reset-button"
-            variant="outline"
-            size="icon"
-            className="size-11 md:size-8"
-            disabled={hideImageExport}
-            aria-label={t.reset}
-            onClick={() => {
-              track(`${analyticsPrefix}_zoom_reset_button`);
-              window.dispatchEvent(new CustomEvent(resetEventName));
-            }}
-          >
-            <RotateCcw size={16} />
-          </Button>
-        )}
-      </div>
+            )}
+            {onExportMp4 && (
+              <button
+                type="button"
+                data-testid="export-mp4-button"
+                data-ph-capture-attribute-export-type="mp4"
+                data-ph-capture-attribute-chart={chartId}
+                className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8"
+                onClick={handleExportMp4}
+              >
+                <Video size={14} />
+                {t.mp4}
+              </button>
+            )}
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <Button
+          data-testid="export-button"
+          variant="outline"
+          size={isExporting ? 'default' : 'icon'}
+          className={`h-11 shrink-0 md:h-8 ${isExporting ? '' : 'w-11 md:w-8'}`}
+          onClick={handleExportPng}
+          disabled={isExporting}
+          aria-label={t.exportMenu}
+        >
+          <Download className={isExporting ? 'mr-2' : ''} size={16} />
+          {isExporting && t.exporting}
+        </Button>
+      )}
+      {!hideZoomReset && (
+        <Button
+          data-testid="zoom-reset-button"
+          variant="outline"
+          size="icon"
+          className="size-11 md:size-8"
+          disabled={hideImageExport}
+          aria-label={t.reset}
+          onClick={() => {
+            track(`${analyticsPrefix}_zoom_reset_button`);
+            window.dispatchEvent(new CustomEvent(resetEventName));
+          }}
+        >
+          <RotateCcw size={16} />
+        </Button>
+      )}
     </div>
   );
 }
