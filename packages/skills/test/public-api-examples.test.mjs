@@ -19,6 +19,8 @@ const schema = {
         items: {
           properties: {
             metrics: {
+              description:
+                'Time metrics are seconds; throughput is tokens/s/GPU unless named otherwise.',
               properties: {
                 avg_power_w: { description: 'Mean measured watts per GPU.' },
               },
@@ -515,7 +517,7 @@ test('installed history recipe keeps all scoped observations, dates, raw configu
   const first = historyRow('9007199254740993123', '2026-08-01');
   const last = historyRow('last', '2026-09-04', {
     framework: 'sglang',
-    metrics: { output_tput_per_gpu: 0 },
+    metrics: { output_tput_per_gpu: 0, median_ttft: 0.25 },
   });
   const rows = [
     last,
@@ -536,8 +538,13 @@ test('installed history recipe keeps all scoped observations, dates, raw configu
     assert.deepEqual(output.rows, [first, last]);
     assert.deepEqual(output.observed_dates, ['2026-08-01', '2026-09-04']);
     assert.deepEqual(output.available_hardware, ['b200', 'h200']);
+    assert.equal(
+      output.metrics_description,
+      schema.components.schemas.BenchmarkRows.items.properties.metrics.description,
+    );
     assert.deepEqual(output.metric_descriptions, {
       avg_power_w: 'Mean measured watts per GPU.',
+      median_ttft: null,
       output_tput_per_gpu: null,
     });
     assert.deepEqual(output.scope, {

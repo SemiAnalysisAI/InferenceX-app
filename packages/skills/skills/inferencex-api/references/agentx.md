@@ -68,6 +68,10 @@ series use `value`. Report each series' own sample, finite, nonzero, and missing
 counts; their array lengths can differ. A nonzero fraction uses that field's
 finite count as its denominator, with missing samples reported separately.
 An empty series has no samples; zero-valued samples remain recorded observations.
+When relating a request group to metric windows, align timestamp origins, state
+the inclusion rule, and report inside/outside counts for that exact group. Retain
+exceptions; overlapping overall ranges do not establish that every member falls
+inside the same windows.
 
 For timeline accounting, `sum(end - start)` is cumulative request latency and can
 exceed elapsed time when requests overlap. The union of `[start, end]` intervals

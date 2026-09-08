@@ -210,5 +210,8 @@ never from another selection or an older example.
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and
 relevant unmeasured coverage. Summarize numerical differences only from the
-complete requested set of `matched` groups. Keep the result scoped to the two
+complete requested set of `matched` groups. With no matches, explain the actual
+identity differences and unavailable fields. Do not invent relaxed counterpart
+counts or performance pairs unless the user requests that separate analysis.
+Keep the result scoped to the two
 returned snapshots and state that no new benchmarks were run.

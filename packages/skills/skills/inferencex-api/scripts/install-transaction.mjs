@@ -103,7 +103,12 @@ function processIsLive(pid) {
   }
 }
 
-async function readTransaction(destination, transaction, recoveryTransactionId = null) {
+async function readTransaction(
+  destination,
+  transaction,
+  recoveryTransactionId = null,
+  remainingRescans = 2,
+) {
   const directory = lstatSync(transaction, { throwIfNoEntry: false });
   if (!directory) return { state: 'missing' };
   if (!directory.isDirectory() || directory.isSymbolicLink()) {
@@ -148,9 +153,10 @@ async function readTransaction(destination, transaction, recoveryTransactionId =
     return blocked('installer transaction update is not a regular file');
   }
 
+  let marker;
   let record;
   try {
-    const marker = lstatSync(paths.marker, { throwIfNoEntry: false });
+    marker = lstatSync(paths.marker, { throwIfNoEntry: false });
     if (!marker?.isFile() || marker.isSymbolicLink()) {
       return blocked('installer transaction marker is missing or not a regular file');
     }
@@ -159,6 +165,19 @@ async function readTransaction(destination, transaction, recoveryTransactionId =
     );
   } catch (error) {
     if (error.cause?.code === 'ENOENT') return { state: 'missing' };
+    const current = lstatSync(paths.marker, { throwIfNoEntry: false });
+    if (!current) return { state: 'missing' };
+    if (
+      remainingRescans > 0 &&
+      marker &&
+      current.isFile() &&
+      !current.isSymbolicLink() &&
+      (current.dev !== marker.dev || current.ino !== marker.ino)
+    ) {
+      // Atomic owner updates can unlink the open inode and change its ctime.
+      // Discard that read; a bounded full rescan must validate the new owner and paths.
+      return readTransaction(destination, transaction, recoveryTransactionId, remainingRescans - 1);
+    }
     return blocked(
       error instanceof SyntaxError
         ? 'installer transaction marker is malformed'

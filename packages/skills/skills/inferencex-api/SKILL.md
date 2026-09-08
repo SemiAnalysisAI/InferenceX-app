@@ -99,15 +99,21 @@ counts exclude absent and null fields; real zero and false remain values. Before
 claiming a configuration flag is uniform, tally true, false and missing across the
 complete selection. Copy saved scalars with their population labels into every
 report. Observation pairs differ from metric comparisons and individual rows.
-Calculate intervals from explicit date endpoints. Cite the request URL, retrieval time, scope, source identities,
+For evidence, link the manifest and capture sidecars. If reporting a request or
+capture count, derive it from those records, never from the number of workflow steps.
+Report date endpoints directly. Add a duration only when requested, compute it
+from those endpoints, and distinguish elapsed days from inclusive calendar dates.
+Cite the request URL, retrieval time, scope, source identities,
 and observation dates. Scope conclusions to the records checked; a recorded zero
 is a source value, not proof of physical absence or a causal explanation.
 High latency or concurrency alone cannot identify queueing, saturation, or another
 bottleneck. Report observed values and unresolved causes.
 
-Match comparisons on workload and configuration. Keep per-GPU watts, deployment
-GPU joules, token units, and TCO assumptions distinct. Preserve numeric-looking IDs
-as strings. The benchmark API array is not chronological; sort by each row's
+Match comparisons on workload and configuration. Claims of "same configuration"
+or "only X differs" require comparing all recorded configuration fields; retain
+additional differences and unknowns instead of matching just a display label.
+Keep per-GPU watts, deployment GPU joules, token units, and TCO assumptions distinct.
+Preserve numeric-looking IDs as strings. The benchmark API array is not chronological; sort by each row's
 `date` before taking a latest-observation sample.
 
 **GPU topology:** report `num_prefill_gpu` and `num_decode_gpu` as raw role counts,

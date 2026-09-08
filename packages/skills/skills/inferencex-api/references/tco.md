@@ -95,6 +95,12 @@ Use the raw benchmark observation's `metrics.p99_itl`, measured in **seconds**.
 Convert it to milliseconds with `p99_itl * 1000`. `p99_tpot` measures a different
 statistic (per-request time per output token). The reciprocal `1000 / p99_intvty`
 is not P99 ITL. A median frontier target cannot certify a tail SLA.
+Use only the user's requested predicate for classification and costing. An unusual
+`p99.9_itl`, TPOT/ITL ratio, framework, or concurrency can warrant a separate
+diagnostic caveat, but does not turn a finite `p99_itl < 0.020` into a failure.
+Retain the passing row and its cost on the API-reported basis. Label optional
+screens separately without replacing the requested comparison, and avoid
+inferring burst delivery from aggregate percentiles alone.
 
 Capture the complete benchmark/history response using the bounded raw-API recipe,
 then set the workload scope to the user's request. Obtain `scope.model` from
@@ -132,12 +138,6 @@ JS
 Report passing, failing, and unknown **result IDs** with their configuration,
 measurement date, and source. A sampled row's failure says nothing about unexamined
 configurations; a recorded pass is scoped to that observation, not a production SLA.
-Use only the user's requested predicate for that classification. An unusual
-`p99.9_itl`, TPOT/ITL ratio, framework, or concurrency can warrant a separate
-diagnostic caveat, but does not turn a finite `p99_itl < 0.020` into a failure.
-Retain the passing row and its cost on the API-reported basis. Label any optional
-screen separately, obtain the user's constraint before applying it, and avoid
-inferring burst delivery from aggregate percentiles alone.
 For a cost comparison under this constraint, first establish eligible observations
 and comparable throughput scope; the median-only TCO feed does not do that filtering.
 

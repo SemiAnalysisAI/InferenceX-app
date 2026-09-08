@@ -24,6 +24,13 @@ Branch on the exit code before parsing output:
   unsupported contract.
 - `2`: the command arguments are invalid.
 
+For multiple bundles, save one report row per directory with its exit code,
+validity, coverage status and policy status copied from that verification. Keep
+these dimensions separate: a partial bundle can pass policy. Derive any grouped
+counts from this saved table using an explicit filter, and reuse those scalars
+instead of recounting them in prose. Explain reasons within the bundle's actual
+family and subsystem scope.
+
 Verification performs no HTTP request and runs no benchmark. Run it on a copy when
 testing deliberate tampering, because completed bundles must remain unchanged.
 Matching hashes and reconstructed output establish internal consistency, not
