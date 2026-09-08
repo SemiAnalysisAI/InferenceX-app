@@ -168,6 +168,30 @@ interface ChartControlsProps {
   showXAxisMode?: boolean;
 }
 
+/**
+ * TCO basis control for cost metrics. Reads the global model/scenario
+ * selection only when rendered, so ChartControls itself does not need a
+ * GlobalFilterProvider unless a cost metric is active.
+ */
+function TcoBasisField({
+  source,
+  label,
+  tooltip,
+}: {
+  source: 'inference' | 'historical';
+  label: string;
+  tooltip: string;
+}) {
+  const showsTcoBasis = useShowsTcoBasisSelector();
+  if (!showsTcoBasis) return null;
+  return (
+    <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
+      <LabelWithTooltip label={label} tooltip={tooltip} />
+      <TcoBasisToggle source={source} className="h-9" />
+    </div>
+  );
+}
+
 export default function ChartControls({
   hideGpuComparison = false,
   tcoSource = 'inference',
@@ -183,8 +207,6 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const showsTcoBasis = useShowsTcoBasisSelector();
-
   const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
     useInferenceFilters();
   const {
@@ -449,11 +471,8 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && showsTcoBasis && isCostMetric(selectedYAxisMetric) && (
-                <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
-                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source={tcoSource} className="h-9" />
-                </div>
+              {mounted && isCostMetric(selectedYAxisMetric) && (
+                <TcoBasisField source={tcoSource} label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
               )}
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
