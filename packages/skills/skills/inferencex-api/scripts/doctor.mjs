@@ -172,7 +172,7 @@ export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = 
   let transaction = { state: 'none', phase: null, had_destination: null, reason: null };
   if (options.external) {
     try {
-      transaction = inspectInstallTransaction(options.root, PACKAGE_NAME, SKILL_NAME);
+      transaction = await inspectInstallTransaction(options.root, PACKAGE_NAME, SKILL_NAME);
     } catch (error) {
       transaction = {
         state: 'blocked',

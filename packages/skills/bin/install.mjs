@@ -16,6 +16,7 @@ import {
   runInstallTransaction,
 } from '../skills/inferencex-api/scripts/install-transaction.mjs';
 import { diagnose } from '../skills/inferencex-api/scripts/doctor.mjs';
+import { readBoundedRegular } from '../skills/inferencex-api/scripts/local-files.mjs';
 
 const SKILL_NAME = 'inferencex-api';
 const INSTALL_METADATA = '.inferencex-skills.json';
@@ -75,7 +76,9 @@ async function installedState(destination, packageName, signal) {
     const file = lstatSync(metadataPath, { throwIfNoEntry: false });
     if (!file) return unknownState('no installation metadata; legacy or manually copied skill');
     if (!file.isFile()) return unknownState('installation metadata is not a regular file');
-    metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    metadata = JSON.parse(
+      await readBoundedRegular(metadataPath, 64 * 1024, 'installer receipt', { signal }),
+    );
     versionMatch =
       typeof metadata?.version === 'string'
         ? /^(?<major>\d+)\.(?<minor>\d+)\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?$/.exec(
@@ -86,9 +89,10 @@ async function installedState(destination, packageName, signal) {
       return unknownState('invalid installation metadata');
     }
   } catch (error) {
+    signal?.throwIfAborted();
     return error instanceof SyntaxError
       ? unknownState('invalid installation metadata')
-      : unknownState(`could not read installation metadata: ${error.code ?? 'read error'}`);
+      : unknownState(`could not read installation metadata: ${error.cause?.code ?? error.message}`);
   }
 
   if (BigInt(versionMatch.groups.major) >= 1n || BigInt(versionMatch.groups.minor) >= 12n) {
@@ -104,7 +108,7 @@ async function installedState(destination, packageName, signal) {
 }
 
 async function statusRecord(destination, packageInfo, signal) {
-  const transaction = inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
+  const transaction = await inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
   const installation =
     transaction.state === 'none'
       ? await installedState(destination, packageInfo.name, signal)
@@ -121,20 +125,15 @@ async function statusRecord(destination, packageInfo, signal) {
             : {}),
         };
   return {
-    schema_version: 1,
-    package: packageInfo.name,
-    installer_version: packageInfo.version,
-    skill_path: destination,
-    ...installation,
+    record: {
+      schema_version: 1,
+      package: packageInfo.name,
+      installer_version: packageInfo.version,
+      skill_path: destination,
+      ...installation,
+    },
+    transaction,
   };
-}
-
-function recoveryLeavesDestination(record) {
-  return (
-    record.transaction_phase === 'activated' ||
-    record.transaction_had_destination === true ||
-    record.transaction_projected_destination_exists === true
-  );
 }
 
 function showStatus(record) {
@@ -147,8 +146,9 @@ function showStatus(record) {
   console.log(`Skill path: ${record.skill_path}`);
 }
 
-function installationPlan(source, destination, force) {
-  const existing = lstatSync(destination, { throwIfNoEntry: false });
+function installationPlan(source, destination, force, existingRoot = destination) {
+  const existing =
+    existingRoot === null ? undefined : lstatSync(existingRoot, { throwIfNoEntry: false });
   if (existing && !force) return { outcome: 'skipped', write_paths: [] };
   if (existing && !existing.isDirectory()) {
     throw new Error(`Cannot overwrite ${destination}: the existing skill is not a directory.`);
@@ -167,7 +167,10 @@ function installationPlan(source, destination, force) {
   for (const path of [...paths, INSTALL_METADATA]) {
     const target = join(destination, path);
     const directory = path !== INSTALL_METADATA && lstatSync(join(source, path)).isDirectory();
-    const entry = lstatSync(target, { throwIfNoEntry: false });
+    const entry =
+      existingRoot === null
+        ? undefined
+        : lstatSync(join(existingRoot, path), { throwIfNoEntry: false });
     if (entry?.isSymbolicLink()) {
       throw new Error(`Cannot overwrite symbolic link at ${target}.`);
     }
@@ -273,20 +276,22 @@ async function main(args, signal) {
 
   const root = resolve(values.dir ?? TARGET_DIRS[values.target ?? 'claude']);
   const destination = join(root, SKILL_NAME);
-  let record = await statusRecord(destination, packageInfo, signal);
+  const initialStatus = await statusRecord(destination, packageInfo, signal);
+  const { transaction } = initialStatus;
+  let { record } = initialStatus;
   if (command === 'status') {
     if (values.json) await writeStdout(`${JSON.stringify(record)}\n`, { signal });
     else showStatus(record);
     return;
   }
   const dryRun = values['dry-run'] ?? false;
-  const recoveredDestinationExists = recoveryLeavesDestination(record);
+  const recoveredDestinationExists = typeof transaction.recovery_source === 'string';
   const plan = dryRun
     ? record.transaction_state === undefined
       ? installationPlan(source, destination, values.force)
       : record.transaction_state === 'recovery_needed' &&
           (values.force || !recoveredDestinationExists)
-        ? installationPlan(source, destination, true)
+        ? installationPlan(source, destination, true, transaction.recovery_source)
         : { outcome: 'skipped', write_paths: [] }
     : await installTransaction({
         source,
@@ -298,7 +303,10 @@ async function main(args, signal) {
         signal,
         prepare: () => installationPlan(source, destination, values.force),
       });
-  if (!dryRun) record = await statusRecord(destination, packageInfo);
+  if (!dryRun) {
+    const installedStatus = await statusRecord(destination, packageInfo);
+    record = installedStatus.record;
+  }
   const result = {
     ...record,
     dry_run: dryRun,

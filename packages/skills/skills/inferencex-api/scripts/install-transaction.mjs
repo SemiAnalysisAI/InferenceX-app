@@ -3,7 +3,6 @@ import {
   cpSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   renameSync,
   rmdirSync,
@@ -13,6 +12,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import process from 'node:process';
 import { setImmediate, setTimeout } from 'node:timers/promises';
+import { readBoundedRegular } from './local-files.mjs';
 
 const TRANSACTION_SUFFIX = '.inferencex-skills-transaction';
 const RECOVERY_SUFFIX = '.recovering-';
@@ -103,7 +103,7 @@ function processIsLive(pid) {
   }
 }
 
-function readTransaction(destination, transaction, recoveryTransactionId = null) {
+async function readTransaction(destination, transaction, recoveryTransactionId = null) {
   const directory = lstatSync(transaction, { throwIfNoEntry: false });
   if (!directory) return { state: 'missing' };
   if (!directory.isDirectory() || directory.isSymbolicLink()) {
@@ -154,12 +154,14 @@ function readTransaction(destination, transaction, recoveryTransactionId = null)
     if (!marker?.isFile() || marker.isSymbolicLink()) {
       return blocked('installer transaction marker is missing or not a regular file');
     }
-    record = JSON.parse(readFileSync(paths.marker, 'utf8'));
+    record = JSON.parse(
+      await readBoundedRegular(paths.marker, 64 * 1024, 'installer transaction marker'),
+    );
   } catch (error) {
     return blocked(
       error instanceof SyntaxError
         ? 'installer transaction marker is malformed'
-        : `could not read installer transaction marker: ${error.code ?? 'read error'}`,
+        : `could not read installer transaction marker: ${error.cause?.code ?? error.message}`,
     );
   }
   if (
@@ -181,7 +183,7 @@ function readTransaction(destination, transaction, recoveryTransactionId = null)
   return { state: 'valid', identity, paths, record };
 }
 
-export function inspectInstallTransaction(
+export async function inspectInstallTransaction(
   destination,
   packageName,
   skillName,
@@ -194,7 +196,7 @@ export function inspectInstallTransaction(
     if (recovery.transactionId === null) {
       return blocked('installer recovery path is foreign or malformed');
     }
-    const inspected = readTransaction(destination, recovery.path, recovery.transactionId);
+    const inspected = await readTransaction(destination, recovery.path, recovery.transactionId);
     if (inspected.state === 'missing') continue;
     if (inspected.state === 'blocked') return inspected;
     if (
@@ -207,7 +209,7 @@ export function inspectInstallTransaction(
   }
   let canonical;
   if (canonicalEntry) {
-    canonical = readTransaction(destination, locations.canonical);
+    canonical = await readTransaction(destination, locations.canonical);
     if (canonical.state === 'blocked') return canonical;
     if (
       canonical.state === 'valid' &&
@@ -251,18 +253,30 @@ export function inspectInstallTransaction(
       cleanup_only: true,
       marker_name: null,
       projected_destination_exists: inspected.projectedDestinationExists,
+      recovery_source: inspected.projectedDestinationExists ? destination : null,
       reason: 'interrupted installer transaction cleanup needs recovery',
     };
   }
   const live = processIsLive(inspected.identity.ownerPid);
   const cleanupOnly = inspected.record.phase === 'cleanup';
+  let recoverySource;
+  if (!live) {
+    try {
+      recoverySource = recoverySourcePath(destination, inspected.paths, inspected.record);
+    } catch (error) {
+      return blocked(error.message);
+    }
+  }
   return {
     state: live ? 'busy' : 'recoverable',
     phase: inspected.record.phase,
     had_destination: inspected.record.had_destination,
-    projected_destination_exists: cleanupOnly
-      ? Boolean(lstatSync(destination, { throwIfNoEntry: false }))
-      : inspected.record.phase === 'activated' || inspected.record.had_destination,
+    projected_destination_exists: live
+      ? cleanupOnly
+        ? Boolean(lstatSync(destination, { throwIfNoEntry: false }))
+        : inspected.record.phase === 'activated' || inspected.record.had_destination
+      : recoverySource !== null,
+    recovery_source: recoverySource,
     transaction,
     cleanup_only: cleanupOnly,
     marker_name: inspected.paths.markerName,
@@ -325,21 +339,41 @@ function finishCleanup(destination, paths, record) {
   finishTerminalCleanup(destination, paths, terminalRecord);
 }
 
-function cleanupCommittedTransaction(destination, paths, record) {
-  const destinationEntry = lstatSync(destination, { throwIfNoEntry: false });
-  const stageEntry = lstatSync(paths.stage, { throwIfNoEntry: false });
-  const previousEntry = lstatSync(paths.previous, { throwIfNoEntry: false });
-  if (!destinationEntry || stageEntry || (!record.had_destination && previousEntry)) {
-    failRecovery('activated transaction paths do not match the owned marker');
+function recoverySourcePath(destination, paths, record) {
+  const destinationExists = Boolean(lstatSync(destination, { throwIfNoEntry: false }));
+  if (record.phase === 'cleanup') return destinationExists ? destination : null;
+  const stageExists = Boolean(lstatSync(paths.stage, { throwIfNoEntry: false }));
+  const previousExists = Boolean(lstatSync(paths.previous, { throwIfNoEntry: false }));
+
+  if (record.phase === 'activated') {
+    if (!destinationExists || stageExists || (!record.had_destination && previousExists)) {
+      failRecovery('activated transaction paths do not match the owned marker');
+    }
+    return destination;
   }
+  if (record.had_destination) {
+    if (previousExists) {
+      if (destinationExists && stageExists) {
+        failRecovery('both the destination and staged installation are present with a backup');
+      }
+      return paths.previous;
+    }
+    if (!destinationExists) failRecovery('the previous installation is missing');
+    return destination;
+  }
+  if (previousExists) failRecovery('an unexpected previous installation is present');
+  if (destinationExists && stageExists) {
+    failRecovery('both a destination and staged new installation are present');
+  }
+  return null;
+}
+
+function cleanupCommittedTransaction(destination, paths, record) {
+  recoverySourcePath(destination, paths, record);
   finishCleanup(destination, paths, record);
 }
 
 function recoverOwnedTransaction(destination, paths, record) {
-  const destinationExists = Boolean(lstatSync(destination, { throwIfNoEntry: false }));
-  const stageExists = Boolean(lstatSync(paths.stage, { throwIfNoEntry: false }));
-  const previousExists = Boolean(lstatSync(paths.previous, { throwIfNoEntry: false }));
-
   if (record.phase === 'cleanup') {
     finishTerminalCleanup(destination, paths, record);
     return;
@@ -348,27 +382,15 @@ function recoverOwnedTransaction(destination, paths, record) {
     cleanupCommittedTransaction(destination, paths, record);
     return;
   }
-  if (record.had_destination) {
-    if (previousExists) {
-      if (destinationExists && stageExists) {
-        failRecovery('both the destination and staged installation are present with a backup');
-      }
-      if (destinationExists) rmSync(destination, { recursive: true });
-      renameSync(paths.previous, destination);
-    } else if (!destinationExists) {
-      failRecovery('the previous installation is missing');
-    }
-  } else {
-    if (previousExists) failRecovery('an unexpected previous installation is present');
-    if (destinationExists && stageExists) {
-      failRecovery('both a destination and staged new installation are present');
-    }
-    if (destinationExists) rmSync(destination, { recursive: true });
+  const source = recoverySourcePath(destination, paths, record);
+  if (source !== destination) {
+    if (lstatSync(destination, { throwIfNoEntry: false })) rmSync(destination, { recursive: true });
+    if (source !== null) renameSync(source, destination);
   }
   finishCleanup(destination, paths, record);
 }
 
-function claimRecovery(destination, packageName, skillName, state) {
+async function claimRecovery(destination, packageName, skillName, state) {
   if (state.cleanup_only && state.marker_name === null) {
     try {
       rmdirSync(state.transaction);
@@ -386,7 +408,7 @@ function claimRecovery(destination, packageName, skillName, state) {
     if (error.code === 'ENOENT') return null;
     throw error;
   }
-  const inspected = readTransaction(destination, state.transaction);
+  const inspected = await readTransaction(destination, state.transaction);
   if (inspected.state !== 'valid' || inspected.paths.markerName !== claimedName) {
     failRecovery(
       inspected.reason ?? 'claimed installer transaction changed before it could be validated',
@@ -414,7 +436,7 @@ async function acquireTransaction(destination, packageName, skillName, waitMilli
   mkdirSync(dirname(destination), { recursive: true });
   for (;;) {
     await cancellationCheckpoint(signal);
-    const state = inspectInstallTransaction(destination, packageName, skillName, {
+    const state = await inspectInstallTransaction(destination, packageName, skillName, {
       recoveriesFirst: true,
     });
     if (state.state === 'blocked') {
@@ -434,7 +456,7 @@ async function acquireTransaction(destination, packageName, skillName, waitMilli
     }
     unmarkedDeadline = undefined;
     if (state.state === 'recoverable') {
-      const claimed = claimRecovery(destination, packageName, skillName, state);
+      const claimed = await claimRecovery(destination, packageName, skillName, state);
       if (!claimed) continue;
       if (!claimed.cleanupOnly) {
         recoverOwnedTransaction(destination, claimed.paths, claimed.record);
@@ -491,7 +513,7 @@ export async function runInstallTransaction({
   waitMilliseconds = 30_000,
 }) {
   await cancellationCheckpoint(signal);
-  const pending = inspectInstallTransaction(destination, packageName, skillName);
+  const pending = await inspectInstallTransaction(destination, packageName, skillName);
   if (pending.state === 'none') {
     const initialPlan = prepare();
     if (initialPlan.outcome === 'skipped') return initialPlan;

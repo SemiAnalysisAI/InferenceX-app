@@ -352,6 +352,142 @@ test('dry-run predicts a skip after recovering an activated first install', () =
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex-api']);
 });
 
+test('recovery dry-run preflights the tree that recovery retains', () => {
+  for (const scenario of [
+    {
+      name: 'backup rename before marker update',
+      phase: 'staged',
+      trees: ['previous', 'stage'],
+      conflict: 'previous',
+      retained: 'previous',
+    },
+    {
+      name: 'activation rename before marker update',
+      phase: 'previous_moved',
+      trees: ['previous', 'destination'],
+      conflict: 'previous',
+      retained: 'previous',
+    },
+    {
+      name: 'activated destination wins over backup',
+      phase: 'activated',
+      trees: ['previous', 'destination'],
+      conflict: 'previous',
+      retained: 'destination',
+    },
+    {
+      name: 'uncommitted destination is discarded',
+      phase: 'previous_moved',
+      trees: ['previous', 'destination'],
+      conflict: 'destination',
+      retained: 'previous',
+    },
+    {
+      name: 'uncommitted first install is discarded',
+      phase: 'staged',
+      trees: ['destination'],
+      conflict: 'destination',
+      retained: null,
+      hadDestination: false,
+    },
+    {
+      name: 'terminal cleanup leaves no destination',
+      phase: 'cleanup',
+      trees: [],
+      retained: null,
+    },
+  ]) {
+    const cwd = project(`${scenario.name}-`);
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const transaction = `${destination}.inferencex-skills-transaction`;
+    const trees = {
+      destination,
+      previous: join(transaction, 'previous'),
+      stage: join(transaction, 'stage'),
+    };
+    mkdirSync(transaction);
+    for (const tree of scenario.trees.filter((name) => name !== 'destination')) {
+      cpSync(destination, trees[tree], { recursive: true });
+    }
+    if (!scenario.trees.includes('destination')) rmSync(destination, { recursive: true });
+    for (const tree of scenario.trees) writeFileSync(join(trees[tree], 'local-notes.txt'), tree);
+    if (scenario.conflict) {
+      const conflict = join(trees[scenario.conflict], 'scripts/doctor.mjs');
+      rmSync(conflict);
+      mkdirSync(conflict);
+      writeFileSync(join(conflict, 'user-file.txt'), 'preserve this directory');
+    }
+    writeTransactionMarker(transaction, destination, {
+      phase: scenario.phase,
+      had_destination: scenario.hadDestination ?? true,
+    });
+    const before = snapshot(cwd);
+    const retainedBefore = scenario.retained ? snapshot(trees[scenario.retained]) : null;
+    const conflicts = scenario.conflict === scenario.retained;
+
+    const preview = run(['install', '--force', '--dry-run', '--json'], cwd);
+    assert.equal(preview.status, conflicts ? 1 : 0, `${preview.stdout}\n${preview.stderr}`);
+    const planned = JSON.parse(preview.stdout);
+    if (conflicts) {
+      assert.equal(planned.outcome, 'failed');
+      assert.match(planned.reason, /doctor\.mjs: expected a regular file/u);
+    } else {
+      assert.equal(
+        planned.outcome,
+        scenario.retained ? 'would_recover_then_overwrite' : 'would_recover_then_install',
+      );
+      assert.ok(planned.write_paths.includes(join('scripts', 'doctor.mjs')));
+    }
+    assert.deepEqual(snapshot(cwd), before, scenario.name);
+
+    const installed = run(['install', '--force', '--json'], cwd);
+    assert.equal(installed.status, conflicts ? 1 : 0, `${installed.stdout}\n${installed.stderr}`);
+    const actual = JSON.parse(installed.stdout);
+    if (conflicts) {
+      assert.equal(actual.outcome, 'failed');
+      assert.match(actual.reason, /doctor\.mjs: expected a regular file/u);
+      assert.deepEqual(snapshot(destination), retainedBefore);
+    } else {
+      assert.equal(actual.outcome, scenario.retained ? 'overwritten' : 'installed');
+      const notes = join(destination, 'local-notes.txt');
+      if (scenario.retained) assert.equal(readFileSync(notes, 'utf8'), scenario.retained);
+      else assert.equal(lstatSync(notes, { throwIfNoEntry: false }), undefined);
+    }
+  }
+});
+
+test('recovery dry-run blocks layouts that recovery cannot explain without changing files', () => {
+  for (const scenario of [
+    { phase: 'previous_moved', trees: ['destination', 'previous', 'stage'], hadDestination: true },
+    { phase: 'activated', trees: ['previous'], hadDestination: true },
+    { phase: 'staged', trees: ['destination', 'stage'], hadDestination: false },
+  ]) {
+    const cwd = project('invalid recovery preview-');
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const transaction = `${destination}.inferencex-skills-transaction`;
+    mkdirSync(transaction);
+    for (const tree of scenario.trees.filter((name) => name !== 'destination')) {
+      cpSync(destination, join(transaction, tree), { recursive: true });
+    }
+    if (!scenario.trees.includes('destination')) rmSync(destination, { recursive: true });
+    writeTransactionMarker(transaction, destination, {
+      phase: scenario.phase,
+      had_destination: scenario.hadDestination,
+    });
+    const before = snapshot(cwd);
+
+    const result = run(['install', '--force', '--dry-run', '--json'], cwd);
+    succeeded(result);
+    const preview = JSON.parse(result.stdout);
+    assert.equal(preview.outcome, 'blocked_by_transaction');
+    assert.equal(preview.transaction_state, 'blocked');
+    assert.deepEqual(preview.write_paths, []);
+    assert.deepEqual(snapshot(cwd), before);
+  }
+});
+
 test('a process killed between activation renames is recovered by the next install', async () => {
   const cwd = project('killed activation 中文 path-');
   succeeded(run(['install'], cwd));
@@ -1273,6 +1409,33 @@ test('malformed, foreign, and symlink transaction markers fail closed without de
     assert.deepEqual(snapshot(cwd), beforeProject);
     assert.deepEqual(snapshot(outside), beforeOutside);
     assert.equal(readFileSync(join(outside, 'sentinel.txt'), 'utf8'), 'never delete me');
+  }
+});
+
+test('transaction marker reads are bounded and oversized markers remain untouched', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  mkdirSync(transaction);
+  const { path, record } = writeTransactionMarker(transaction, destination);
+  for (const size of [64 * 1024, 64 * 1024 + 1]) {
+    writeFileSync(path, JSON.stringify(record).padEnd(size));
+    const before = snapshot(cwd);
+    const status = run(['status', '--json'], cwd);
+    succeeded(status);
+    const report = JSON.parse(status.stdout);
+    assert.equal(report.transaction_state, size === 64 * 1024 ? 'recovery_needed' : 'blocked');
+    if (size > 64 * 1024) {
+      assert.match(report.reason, /byte limit/u);
+      const preview = run(['install', '--force', '--dry-run', '--json'], cwd);
+      succeeded(preview);
+      assert.equal(JSON.parse(preview.stdout).outcome, 'blocked_by_transaction');
+      const install = run(['install', '--force', '--json'], cwd);
+      assert.equal(install.status, 1, `${install.stdout}\n${install.stderr}`);
+      assert.match(JSON.parse(install.stdout).reason, /byte limit/u);
+    }
+    assert.deepEqual(snapshot(cwd), before);
   }
 });
 

@@ -464,6 +464,22 @@ test('JSON status preserves missing or invalid receipts and manifest mismatches 
   }
 });
 
+test('status bounds legacy installation receipts without changing them', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const receipt = join(cwd, '.claude/skills/inferencex-api', metadataName);
+  const contents = JSON.stringify({ package: packageInfo.name, version: '0.11.0' });
+  for (const size of [64 * 1024, 64 * 1024 + 1]) {
+    writeFileSync(receipt, contents.padEnd(size));
+    const before = snapshot(cwd);
+    const record = jsonResult(run(['status', '--json'], cwd));
+    assert.equal(record.installation_state, size === 64 * 1024 ? 'installed' : 'unknown');
+    assert.equal(record.installed_version, size === 64 * 1024 ? '0.11.0' : null);
+    if (size > 64 * 1024) assert.match(record.reason, /byte limit/u);
+    assert.deepEqual(snapshot(cwd), before);
+  }
+});
+
 test('JSON install distinguishes installed, skipped, and overwritten with the actual installed state', () => {
   const cwd = project();
   const installed = jsonResult(run(['install', '--json'], cwd));
