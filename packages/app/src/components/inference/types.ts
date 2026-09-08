@@ -55,6 +55,8 @@ export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
 export interface AggDataEntry {
+  /** Numeric data-parallel replica count, distinct from DP Attention. */
+  dp?: number;
   /** Metric keys present in the source row before missing values are normalized to zero. */
   rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */

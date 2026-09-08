@@ -21,21 +21,24 @@ export interface GpuSpecs {
   costr: number;
 }
 
+export type TcoBasis = 'external' | 'internal';
+
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
  * Splits on '_' or '-' to get the base (e.g. "h100_vllm" -> "h100").
  */
-export function getGpuSpecs(hwKey: string): GpuSpecs {
+export function getGpuSpecs(hwKey: string, basis: TcoBasis = 'external'): GpuSpecs {
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
+  const internalCost = base === 'tpuv7' ? 1.03 : undefined;
   return {
     tdp: entry.tdp,
     power: entry.power,
-    costh: entry.costh,
-    costr: entry.costr,
+    costh: basis === 'internal' ? (internalCost ?? entry.costh) : entry.costh,
+    costr: basis === 'internal' ? (internalCost ?? entry.costr) : entry.costr,
   };
 }
 

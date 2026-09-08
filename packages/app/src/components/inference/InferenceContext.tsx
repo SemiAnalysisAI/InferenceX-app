@@ -269,7 +269,7 @@ export function InferenceProvider({
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
-  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions } =
+  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions, tcoBasis } =
     useGlobalFilterSelection();
   const {
     setSelectedModel,
@@ -738,6 +738,7 @@ export function InferenceProvider({
     overviewHistoryPair,
     benchmarkQueryScope,
     selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
+    tcoBasis,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters

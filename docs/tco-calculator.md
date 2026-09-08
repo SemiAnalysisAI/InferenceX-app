@@ -1,5 +1,18 @@
 # TCO Calculator — Design Rationale
 
+## TCO basis
+
+The global **TCO Basis** control switches between external customer pricing (the default)
+and internal owner cost. TPUv7 uses **$1.21/chip/hour external** and **$1.03/chip/hour internal**;
+other hardware retains its existing rates. The selection is shared across inference, historical
+trends, the TCO calculator, fleet lifecycle, and the profit estimator, and is encoded as
+`g_tco=internal` in share links. Explicit custom hourly costs remain user-controlled.
+
+The basis changes cost per token and tokens per dollar, including unofficial overlays, without
+changing measured throughput or energy assumptions. TPUv7's Qwen3.5 snapshot uses four physical
+chips: TP8/DP1 at concurrency 4–64 and TP1/DP8 at concurrency 128–256. Logical parallelism does
+not multiply the physical chip count; reported throughput is already normalized per chip.
+
 ## Why Interpolation Instead of Raw Data
 
 Users want to compare GPUs at a specific interactivity target (e.g., "which GPU is cheapest at 200 tok/s/user?"). Raw benchmark data has discrete concurrency points, so GPU A might have data at 180 and 220 tok/s but not exactly 200. Interpolation fills the gaps using the same Pareto front + monotone spline used for roofline curves.

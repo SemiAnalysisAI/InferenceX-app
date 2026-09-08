@@ -31,6 +31,7 @@ import {
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
+  type TcoBasis,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import {
@@ -265,6 +266,7 @@ export function useChartData(
   },
   benchmarkQueryScope?: string,
   initialBenchmarkRows?: BenchmarkRow[],
+  tcoBasis: TcoBasis = 'external',
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -419,8 +421,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile);
-  }, [rows, selectedPercentile]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
+  }, [rows, selectedPercentile, tcoBasis]);
 
   // Sort hardware config — stabilize reference when keys haven't changed.
   // Different sequences for the same model often have the same GPU configs,

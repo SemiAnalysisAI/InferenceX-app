@@ -70,7 +70,7 @@ const asBool = (v: boolean | string | undefined): boolean | undefined =>
 export const getPointLabel = (d: InferenceData): string => {
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
-  return parallelismLabel({
+  const label = parallelismLabel({
     // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
     // into it for aggregated rows) — the label wants the actual TP width, so
     // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
@@ -97,6 +97,7 @@ export const getPointLabel = (d: InferenceData): string => {
     decodeDpAttention: asBool(d.decode_dp_attention),
     decodeNumWorkers: d.decode_num_workers,
   });
+  return d.dp && d.dp > 1 ? `${label}DP${d.dp}` : label;
 };
 
 const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
@@ -425,6 +426,7 @@ const PARALLELISM_STRINGS = {
     decode: 'Decode',
     gpusUnit: 'Chips',
     tensorParallelism: 'Tensor Parallelism',
+    dataParallelism: 'Data Parallelism',
     expertParallelism: 'Expert Parallelism',
     pipelineParallelism: 'Pipeline Parallelism',
     decodeContextParallelism: 'Decode Context Parallelism (DCP)',
@@ -445,6 +447,7 @@ const PARALLELISM_STRINGS = {
     decode: '解码',
     gpusUnit: '个芯片',
     tensorParallelism: '张量并行 (TP)',
+    dataParallelism: '数据并行 (DP)',
     expertParallelism: '专家并行 (EP)',
     pipelineParallelism: '流水线并行 (PP)',
     decodeContextParallelism: '解码上下文并行 (DCP)',
@@ -512,6 +515,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   return `
     ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
+    ${d.dp === undefined ? '' : tooltipLine(t.dataParallelism, d.dp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
     ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}
     ${aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : ''}

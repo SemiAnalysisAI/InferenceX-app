@@ -9,7 +9,11 @@
  * black logo or the reversed-out white logo — no color variant exists, so the
  * dark-mode invert reproduces the official reversed treatment.
  */
-export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['amd.svg', 'openai.svg']);
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set([
+  'amd.svg',
+  'openai.svg',
+  'google.svg',
+]);
 
 /** Whether a logo file needs a dark-mode invert to stay visible. */
 export function isMonochromeLogo(file: string): boolean {

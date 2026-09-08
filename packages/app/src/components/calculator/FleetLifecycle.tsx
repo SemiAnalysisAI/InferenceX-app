@@ -1,5 +1,7 @@
 'use client';
 
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+
 import { BarChart3, Table2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,7 +34,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { exportToCsv } from '@/lib/csv-export';
 import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
-import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import {
   getModelLabel,
   getSequenceLabel,
@@ -95,6 +97,7 @@ interface FleetLifecycleProps {
 type LifecycleView = 'chart' | 'table';
 
 interface CsvAssumptions {
+  tcoBasis: TcoBasis;
   priceInput: string;
   outputPriceInput: string;
   rampInput: string;
@@ -186,8 +189,9 @@ const STRINGS = {
       recoveryInput,
       horizonInput,
       mw,
+      tcoBasis,
     }: CsvAssumptions) =>
-      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
+      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW, TCO basis ${tcoBasis}`,
     colRevenue: 'Revenue $/day',
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
@@ -312,8 +316,9 @@ const STRINGS = {
       recoveryInput,
       horizonInput,
       mw,
+      tcoBasis,
     }: CsvAssumptions) =>
-      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW`,
+      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW，TCO 口径：${tcoBasis === 'internal' ? '内部' : '外部'}`,
     colRevenue: '收入 $/天',
     colCost: '成本 $/天',
     colMargin: '利润 $/天',
@@ -544,6 +549,7 @@ export default function FleetLifecycle({
   onMwInputChange,
   colorResolver,
 }: FleetLifecycleProps) {
+  const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
   /** A zero or blank budget sizes no fleet, so it is treated as unset. */
@@ -553,6 +559,7 @@ export default function FleetLifecycle({
   }, [mwInput]);
 
   const historical = useHistoricalBest({
+    tcoBasis,
     model: selectedModel,
     sequence: selectedSequence,
     precisions: selectedPrecisions,
@@ -710,7 +717,7 @@ export default function FleetLifecycle({
       // Power and $/chip/hr come from the base GPU, so they are identical across
       // the hwKeys pooled into this line — which is what keeps cost flat even
       // though the winning config changes.
-      const specs = getGpuSpecs(progression.baseGpu);
+      const specs = getGpuSpecs(progression.baseGpu, tcoBasis);
       const steps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
       // Chip count is mw / all-in power, so it is the same at every rung. Users
@@ -771,7 +778,16 @@ export default function FleetLifecycle({
       return [{ progression, steps, costPerHour, provisionedMw, gpus, concurrentUsersNow }];
     });
     return { fleets: sized, unplottable: absent };
-  }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue, cacheReadRatio]);
+  }, [
+    mw,
+    anchorMs,
+    visibleProgressions,
+    costProvider,
+    costType,
+    targetValue,
+    cacheReadRatio,
+    tcoBasis,
+  ]);
 
   // Interrupts sell fewer tokens off the same racks, so they raise break-even.
   // The seeded price has to carry the same haircut the plotted margin does, or
@@ -1043,6 +1059,7 @@ export default function FleetLifecycle({
         recoveryInput,
         horizonInput,
         mw,
+        tcoBasis,
       }),
     ]);
   }, [
@@ -1057,6 +1074,7 @@ export default function FleetLifecycle({
     recoveryInput,
     horizonInput,
     mw,
+    tcoBasis,
   ]);
 
   /**

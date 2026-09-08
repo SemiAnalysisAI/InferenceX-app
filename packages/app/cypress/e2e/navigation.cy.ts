@@ -1,3 +1,8 @@
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
+import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
+
+const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
+
 // Merged from tabs.cy.ts and first-load-navigation.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
@@ -204,6 +209,103 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
       cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
+      // Verify the rendered values, then reload the share URL in each locale.
+      cy.location('href').then((href) => {
+        const url = new URL(href);
+        url.searchParams.set('g_model', 'Qwen-3.5-397B-A17B');
+        url.searchParams.set('i_seq', '8k/1k');
+        url.searchParams.set('i_prec', 'fp8');
+        url.searchParams.set('i_metric', 'y_costh');
+        cy.visit(url.toString());
+      });
+      const dots = '.dot-group[data-hw-key^="tpuv7"]';
+
+      cy.get(dots)
+        .first()
+        .then(($point) => {
+          const external = { ...datum($point[0]) };
+          cy.get('[data-testid="tco-basis-internal"]').click();
+          cy.get(dots)
+            .first()
+            .should(($internal) => {
+              expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
+              expect(datum($internal[0]).x).to.equal(external.x);
+            });
+          cy.get('[data-testid="share-button"]').first().click();
+          cy.get('[data-testid="share-url-input"]')
+            .invoke('val')
+            .should('include', 'g_tco=internal')
+            .then((url) => cy.visit(String(url)));
+          cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+          cy.get(dots)
+            .first()
+            .should(($internal) => {
+              expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
+            });
+          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
+          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
+          cy.viewport(390, 844);
+          cy.get('[data-testid="inference-secondary-controls"] > button').click();
+          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
+          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
+          cy.get('[data-testid="tco-basis-external"]').click();
+          cy.get(dots)
+            .first()
+            .should(($restored) => {
+              expect(datum($restored[0]).y).to.be.closeTo(external.y, 1e-8);
+            });
+        });
     });
   }
+  it('reprices a TPU unofficial overlay without changing throughput', () => {
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            name: 'TPU test',
+            branch: 'tpu-test',
+            sha: 'abc000',
+            createdAt: '2026-08-26T00:00:00Z',
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'tpuv7').map(
+          (row) => ({ ...row, run_url: OVERLAY_RUN_URL }),
+        ),
+        evaluations: [],
+      },
+    }).as('tpuOverlay');
+    cy.visit(
+      `/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8&i_metric=y_costh&unofficialrun=${OVERLAY_RUN_ID}`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      },
+    );
+    cy.wait('@tpuOverlay');
+    const points = '.unofficial-overlay-pt';
+    cy.get(points)
+      .first()
+      .then(($point) => {
+        const external = { ...datum($point[0]) };
+        cy.get('[data-testid="tco-basis-internal"]').click();
+        cy.get(points)
+          .first()
+          .should(($internal) => {
+            expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
+            expect(datum($internal[0]).x).to.equal(external.x);
+          });
+        cy.get('[data-testid="tco-basis-external"]').click();
+        cy.get(points)
+          .first()
+          .should(($restored) => {
+            expect(datum($restored[0]).y).to.be.closeTo(external.y, 1e-8);
+          });
+      });
+  });
 });

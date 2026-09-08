@@ -10,7 +10,7 @@ import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
-import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
+import { getModelSortIndex, getHardwareConfig, getGpuSpecs, type TcoBasis } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
@@ -157,6 +157,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile?: Percentile;
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
+    tcoBasis?: TcoBasis;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -170,6 +171,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
+    tcoBasis = 'external',
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -198,7 +200,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     const inputTput = m.input_tput_per_gpu ?? 0;
     const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
     const tokenShare = inputTokenShare(row, inputTput, outputTput);
-    const specs = getGpuSpecs(hwKey);
+    const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
 
     if (!grouped[groupKey]) grouped[groupKey] = [];
@@ -264,6 +266,7 @@ export function useThroughputData(
   initialRows?: BenchmarkRow[],
   enabled = true,
   selectedTokenType: CostType = 'total',
+  tcoBasis: TcoBasis = 'external',
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -325,6 +328,7 @@ export function useThroughputData(
       precisions: selectedPrecisions,
       percentile: selectedPercentile,
       tokenType: selectedTokenType,
+      tcoBasis,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -379,6 +383,7 @@ export function useThroughputData(
     selectedPrecisions,
     selectedPercentile,
     selectedTokenType,
+    tcoBasis,
     overlayRows,
     runIndexByUrl,
   ]);

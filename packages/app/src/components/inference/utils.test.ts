@@ -590,3 +590,36 @@ describe('processOverlayChartData', () => {
     expect(result[0].x).toBe(0.4);
   });
 });
+
+describe('TPUv7 overlay TCO basis', () => {
+  it('reprices costs and purchasing power without mutating the source or other hardware', () => {
+    const tpu = pt({
+      hwKey: 'tpuv7_vllm',
+      costh: { y: 1.21, roof: false },
+      costhi: { y: 2.42, roof: false },
+      costhOutput: { y: 3.63, roof: false },
+      tokensPerDollarH: { y: 100, roof: false },
+      outputTokensPerDollarH: { y: 40, roof: false },
+    });
+    const nvidia = pt({ ...tpu, hwKey: 'h200_vllm' });
+    const points = processOverlayChartData(
+      [tpu, nvidia],
+      'interactivity',
+      'y_tokensPerDollarH',
+      null,
+      { tcoBasis: 'internal' },
+    );
+    const repriced = points.find((p) => p.hwKey === 'tpuv7_vllm')!;
+    expect(repriced.costh!.y).toBeCloseTo(1.03);
+    expect(repriced.costhi!.y).toBeCloseTo(2.06);
+    expect(repriced.costhOutput!.y).toBeCloseTo(3.09);
+    expect(repriced.y).toBeCloseTo((100 * 1.21) / 1.03);
+    expect(repriced.outputTokensPerDollarH!.y).toBeCloseTo((40 * 1.21) / 1.03);
+    expect(points.find((p) => p.hwKey === 'h200_vllm')!.costh).toEqual(nvidia.costh);
+    expect(tpu.costh!.y).toBe(1.21);
+    expect(
+      processOverlayChartData([tpu], 'interactivity', 'y_costh', null, { tcoBasis: 'external' })[0]
+        .y,
+    ).toBe(1.21);
+  });
+});

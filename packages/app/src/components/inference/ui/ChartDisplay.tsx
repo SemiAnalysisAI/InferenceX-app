@@ -24,6 +24,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -373,6 +374,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
+  const { tcoBasis } = useGlobalFilterSelection();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
@@ -423,6 +425,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          tcoBasis,
           selectedXAxisMode,
         },
       );
@@ -475,6 +478,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedPercentile,
     selectedXAxisMode,
     tokenRevenuePricing,
+    tcoBasis,
     compareGpuPair,
   ]);
 
@@ -1073,6 +1077,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           />
                           {!minimalChrome && (
                             <MetricAssumptionNotes
+                              tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
                             />

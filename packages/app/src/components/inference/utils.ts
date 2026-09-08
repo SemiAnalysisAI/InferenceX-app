@@ -1,3 +1,4 @@
+import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
 /**
  * @file utils.ts
  * @description Inference-specific utility functions for filtering chart data.
@@ -143,6 +144,7 @@ export function processOverlayChartData(
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
+    tcoBasis?: TcoBasis;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -168,6 +170,7 @@ export function processOverlayChartDataWithClipping(
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
+    tcoBasis?: TcoBasis;
   },
 ): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
@@ -176,6 +179,36 @@ export function processOverlayChartDataWithClipping(
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
   const selectedPercentile = options?.selectedPercentile ?? 'median';
+  const sourceData =
+    options?.tcoBasis === 'internal'
+      ? data.map((point) => {
+          const external = getGpuSpecs(point.hwKey, 'external');
+          const internal = getGpuSpecs(point.hwKey, 'internal');
+          const repriced = { ...point };
+          for (const [provider, suffix] of [
+            ['costh', 'H'],
+            ['costr', 'R'],
+          ] as const) {
+            if (external[provider] <= 0 || internal[provider] <= 0) continue;
+            const ratio = internal[provider] / external[provider];
+            const costs = [provider, `${provider}i`, `${provider}Output`] as const;
+            const purchasingPower = [
+              `tokensPerDollar${suffix}`,
+              `inputTokensPerDollar${suffix}`,
+              `outputTokensPerDollar${suffix}`,
+            ] as const;
+            for (const key of [...costs, ...purchasingPower]) {
+              const value = point[key];
+              if (value)
+                repriced[key] = {
+                  ...value,
+                  y: value.y * (key.startsWith('cost') ? ratio : 1 / ratio),
+                };
+            }
+          }
+          return repriced;
+        })
+      : data;
 
   // selectedXAxisMetric is already the effective metric for this chart type
   // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
@@ -189,7 +222,7 @@ export function processOverlayChartDataWithClipping(
   // for the natural axis and for agentic (long TTFTs are normal there).
   const isTtftX = xAxisField.endsWith('_ttft');
 
-  const processedData = data
+  const processedData = sourceData
     .filter((d) => metricKey in d)
     .map((d) => remapInferencePoint(d, metricKey, xAxisField));
 

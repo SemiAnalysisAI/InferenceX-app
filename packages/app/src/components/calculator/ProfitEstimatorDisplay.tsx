@@ -1,5 +1,7 @@
 'use client';
 
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -508,6 +510,7 @@ function ProfitEstimatorInner({
   // which resolves to the densest measured precision per model, so the bars
   // always reflect the best-covered run set.
   const {
+    tcoBasis,
     selectedModel,
     effectiveSequence,
     sequenceResolved,
@@ -603,6 +606,7 @@ function ProfitEstimatorInner({
     undefined,
     true,
     'total',
+    tcoBasis,
   );
 
   // ── Compare history ───────────────────────────────────────────────────────
@@ -822,20 +826,20 @@ function ProfitEstimatorInner({
       const next = { ...prev };
       for (const base of customCostBases) {
         if (next[base] === undefined) {
-          next[base] = String(getGpuSpecs(base)[CUSTOM_COST_SEED]);
+          next[base] = String(getGpuSpecs(base, tcoBasis)[CUSTOM_COST_SEED]);
           changed = true;
         }
       }
       return changed ? next : prev;
     });
-  }, [customCostBases]);
+  }, [customCostBases, tcoBasis]);
   const costPerGpuHourFor = useCallback(
     (hwKey: string): number => {
       const base = baseGpuOf(hwKey);
       if (costProvider === 'custom') return parseCustomCostInput(customCosts[base]) ?? 0;
-      return getGpuSpecs(base)[costProvider];
+      return getGpuSpecs(base, tcoBasis)[costProvider];
     },
-    [costProvider, customCosts],
+    [costProvider, customCosts, tcoBasis],
   );
   const interpolationCostProvider: CostProvider =
     costProvider === 'custom' ? CUSTOM_COST_SEED : costProvider;
@@ -1520,6 +1524,18 @@ function ProfitEstimatorInner({
                   </div>
                 </div>
               )}
+
+              <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
+                <LabelWithTooltip
+                  label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                  tooltip={
+                    locale === 'zh'
+                      ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                      : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                  }
+                />
+                <TcoBasisToggle source="profit" className="h-9" />
+              </div>
 
               {costProvider === 'custom' && customCostBases.length > 0 && (
                 <div

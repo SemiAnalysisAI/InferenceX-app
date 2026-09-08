@@ -17,7 +17,7 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import { getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -302,20 +302,24 @@ const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: fal
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
+  requestedMetrics?: undefined,
+  tcoBasis?: TcoBasis,
 ): DerivedChartFields;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics: readonly DerivedMetricKey[],
+  tcoBasis?: TcoBasis,
 ): Partial<DerivedChartFields>;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
+  tcoBasis: TcoBasis = 'external',
 ): Partial<DerivedChartFields> {
   const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
   const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);
-  const specs = getGpuSpecs(currentHwKey);
+  const specs = getGpuSpecs(currentHwKey, tcoBasis);
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -455,7 +459,12 @@ export function createChartDataPoint(
             : entry.num_prefill_gpu > 0
               ? entry.num_prefill_gpu
               : 0,
-          entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+          // TPU tensor widths count logical cores, not physical chips. Explicit
+          // counts are authoritative for these rows (including unofficial runs).
+          currentHwKey.split('_')[0] === 'tpuv7' &&
+            (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
+            ? 0
+            : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
         ),
     image: entry.image ?? undefined,
     dp_attention:
