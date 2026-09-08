@@ -45,6 +45,7 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/schemas.json',
+  'skills/inferencex-api/scripts/capture-response.mjs',
   'skills/inferencex-api/scripts/chart-layout.mjs',
   'skills/inferencex-api/scripts/charts.mjs',
   'skills/inferencex-api/scripts/cli-contract.mjs',
@@ -66,6 +67,8 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/scripts/local-files.mjs',
   'skills/inferencex-api/scripts/request-headers.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
+  'skills/inferencex-api/scripts/tco-summary.mjs',
+  'skills/inferencex-api/scripts/trace-summary.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
 ];
 

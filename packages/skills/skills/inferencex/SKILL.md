@@ -13,7 +13,10 @@ Read [the shared workflow guide](../inferencex-api/SKILL.md), then only the
 cookbook relevant to the task. It covers every existing CLI workflow and utility,
 as well as dashboard views and chart/table templates. Resolve its relative paths from `../inferencex-api/`;
 the executable is `../inferencex-api/scripts/inferencex.mjs` relative to this
-skill directory. Run it with Node.js 24 or later. No global binary or API key is
+skill directory. Offline summary helpers (`tco-summary.mjs`, `trace-summary.mjs`)
+and the raw-response capture helper (`capture-response.mjs`) also live under
+`../inferencex-api/scripts/`; use their cookbook interfaces rather than inventing
+parallel analysis. Run it with Node.js 24 or later. No global binary or API key is
 required.
 
 For direct AgentX presentation requests, [inferencex-to-chart](../inferencex-to-chart/SKILL.md)
