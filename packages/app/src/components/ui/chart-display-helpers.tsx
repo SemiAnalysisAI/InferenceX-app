@@ -14,7 +14,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
-import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from '@/lib/constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -182,7 +182,7 @@ export function MetricAssumptionNotes({
   activeHwKeys,
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
-  tcoBasis = 'external',
+  tcoBasis = DEFAULT_TCO_BASIS,
 }: {
   selectedYAxisMetric: string;
   /**

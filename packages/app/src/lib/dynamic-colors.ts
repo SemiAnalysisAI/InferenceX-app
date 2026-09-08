@@ -7,11 +7,7 @@
  * → more perceptual distance between colors → easier to distinguish.
  */
 
-import {
-  GOOGLE_YELLOW,
-  GPU_VENDORS,
-  VENDOR_OKLCH_ZONES,
-} from '@semianalysisai/inferencex-constants';
+import { GOOGLE_BLUE, GPU_VENDORS, VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
 import { getModelSortIndex } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
@@ -99,7 +95,7 @@ export function generateVendorColors(
     const chroma = zone.chroma[theme];
     const count = keys.length;
     if (vendor === 'google' && count === 1) {
-      result[keys[0]] = GOOGLE_YELLOW;
+      result[keys[0]] = GOOGLE_BLUE;
       continue;
     }
 
@@ -157,7 +153,7 @@ export function generateGpuDateColors(
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const gpuCount = keys.length;
-    const googleBase = vendor === 'google' && gpuCount === 1 ? hexToOklch(GOOGLE_YELLOW) : null;
+    const googleBase = vendor === 'google' && gpuCount === 1 ? hexToOklch(GOOGLE_BLUE) : null;
 
     for (let gi = 0; gi < gpuCount; gi++) {
       const hue =
@@ -173,7 +169,7 @@ export function generateGpuDateColors(
         const compositeKey = `${di}_${keys[gi]}`;
         result[compositeKey] =
           googleBase && dateCount === 1
-            ? GOOGLE_YELLOW
+            ? GOOGLE_BLUE
             : `oklch(${lightness.toFixed(3)} ${googleBase?.[1] ?? chroma} ${hue.toFixed(1)})`;
       }
     }

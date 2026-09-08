@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   includesJalapenoResult,
+  includesTpuv7Result,
   includesVeraRubinResult,
   JalapenoOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 
@@ -45,6 +47,21 @@ describe('official preview notices', () => {
     expect(includesVeraRubinResult(['h100_vllm', 'vr200_rubin-july'])).toBe(true);
     expect(includesVeraRubinResult(['vr200_coreweave-vera-rubin'])).toBe(true);
     expect(includesVeraRubinResult(['h100_vllm', 'jalapeno_teacup'])).toBe(false);
+
+    expect(includesTpuv7Result(['b200_vllm', 'tpuv7_vllm'])).toBe(true);
+    expect(includesTpuv7Result(['tpuv7_fp8'])).toBe(true);
+    expect(includesTpuv7Result(['h100_vllm', 'jalapeno_teacup'])).toBe(false);
+  });
+
+  it('identifies TPU7x data as an official preview in both locales', () => {
+    const notice = renderNotice(<Tpuv7OfficialPreviewNotice />, 'tpuv7-official-preview-notice');
+    expect(notice?.getAttribute('role')).toBe('note');
+    expect(notice?.getAttribute('aria-label')).toBe('InferenceX Official Preview');
+    expect(notice?.textContent).toContain('TPU7x results are an official preview');
+
+    localeState.pathname = '/zh/inference';
+    const zhNotice = renderNotice(<Tpuv7OfficialPreviewNotice />, 'tpuv7-official-preview-notice');
+    expect(zhNotice?.textContent).toContain('TPU7x 结果为官方预览');
   });
 
   it('identifies Jalapeño and Vera Rubin data as official previews in English', () => {

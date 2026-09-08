@@ -1,5 +1,7 @@
 'use client';
 
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -37,9 +39,17 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  metricChartTitle,
+  metricCostTier,
   metricOptionTitle,
   type MetricKey,
 } from '@/components/inference/metric-registry';
+import { lockedTierLabel, lockedTierValue } from '@/components/ui/locked-rent-tiers';
+import {
+  LOCKED_RENT_TIERS,
+  LockedTierBadge,
+  useLockedTierDialog,
+} from '@/components/ui/tco-model-dialog';
 import {
   cachedInputPricePerMillion,
   formatTokenPrice,
@@ -49,7 +59,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
@@ -58,8 +68,8 @@ const STRINGS = {
     tcoBasis: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
-    benchmarkControls: 'Configuration',
-    chartControls: 'Chart',
+    benchmarkControls: 'Benchmark Config',
+    chartControls: 'Chart Config',
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
@@ -100,8 +110,8 @@ const STRINGS = {
     tcoBasis: 'TCO 口径',
     tcoBasisTooltip:
       '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
-    benchmarkControls: '配置',
-    chartControls: '图表',
+    benchmarkControls: '基准测试配置',
+    chartControls: '图表配置',
     compareHistory: '对比历史趋势',
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
@@ -161,12 +171,15 @@ interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
+  showTcoBasis?: boolean;
   /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
 }
 
 export default function ChartControls({
   hideGpuComparison = false,
+  tcoSource = 'inference',
+  showTcoBasis = false,
   showXAxisMode = false,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -179,7 +192,6 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-
   const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
     useInferenceFilters();
   const {
@@ -230,12 +242,14 @@ export default function ChartControls({
       ),
     [visibleGroups],
   );
+  // Locked rental tiers open the TCO model dialog instead of changing the axis.
+  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
+    useLockedTierDialog('yaxis_metric');
   const groupedYAxisOptions = useMemo(
     () =>
       visibleGroups
-        .map((group) => ({
-          groupLabel: locale === 'zh' ? group.labelZh : group.label,
-          options: group.metrics
+        .map((group) => {
+          const options = group.metrics
             .filter((m) => METRIC_TITLE_MAP.has(m))
             .map((m) => ({
               value: m,
@@ -243,8 +257,30 @@ export default function ChartControls({
               label:
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,
-            })),
-        }))
+            }));
+          // Groups that publish a Rent - 3 Year Commit axis also list the
+          // shorter-commit rental tiers, locked, so readers can see which
+          // pricing bases exist and where they are published.
+          const rentalMetric = group.metrics
+            .map((m) => m.replace(/^y_/u, '') as MetricKey)
+            .find((key) => METRIC_TITLE_MAP.has(`y_${key}`) && metricCostTier(key) === 'rental');
+          const lockedOptions = rentalMetric
+            ? LOCKED_RENT_TIERS.map((tier) => {
+                const title = metricChartTitle(rentalMetric, locale);
+                const tierLabel = lockedTierLabel(tier, locale);
+                return {
+                  value: lockedTierValue(tier.id, rentalMetric),
+                  label: locale === 'zh' ? `${title}（${tierLabel}）` : `${title} (${tierLabel})`,
+                  badge: <LockedTierBadge className="mt-0.5" />,
+                  testId: `yaxis-locked-${tier.id}-${rentalMetric}`,
+                };
+              })
+            : [];
+          return {
+            groupLabel: locale === 'zh' ? group.labelZh : group.label,
+            options: [...options, ...lockedOptions],
+          };
+        })
         .filter((g) => g.options.length > 0),
     [visibleGroups, locale],
   );
@@ -297,6 +333,7 @@ export default function ChartControls({
   };
 
   const handleYAxisMetricChange = (value: string) => {
+    if (interceptLockedTier(value)) return;
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
       metric: value,
@@ -351,6 +388,7 @@ export default function ChartControls({
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tcoVisible = showTcoBasis && showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
@@ -414,9 +452,12 @@ export default function ChartControls({
         >
           <ControlPanel
             legend={t.chartControls}
+            data-testid="inference-chart-configuration"
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            <div
+              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+            >
               {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
@@ -443,6 +484,12 @@ export default function ChartControls({
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
               </div>
+
+              {tcoVisible && (
+                <div className="min-w-0 w-full max-w-48 sm:col-span-2 xl:col-span-1">
+                  <TcoBasisToggle source={tcoSource} />
+                </div>
+              )}
 
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
@@ -610,6 +657,7 @@ export default function ChartControls({
           )}
         </MobileControlSection>
       </div>
+      {tcoModelDialog}
     </TooltipProvider>
   );
 }

@@ -10,7 +10,13 @@ import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
-import { getModelSortIndex, getHardwareConfig, getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import {
+  DEFAULT_TCO_BASIS,
+  getModelSortIndex,
+  getHardwareConfig,
+  getGpuSpecs,
+  type TcoBasis,
+} from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
@@ -171,7 +177,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
-    tcoBasis = 'external',
+    tcoBasis = DEFAULT_TCO_BASIS,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -268,7 +274,7 @@ export function useThroughputData(
   initialRows?: BenchmarkRow[],
   enabled = true,
   selectedTokenType: CostType = 'total',
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ) {
   const initialCacheScope = useMemo(
     () =>

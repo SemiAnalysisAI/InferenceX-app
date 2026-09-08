@@ -50,7 +50,6 @@ import { ShareButton } from '@/components/ui/share-button';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
@@ -886,12 +885,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   {!minimalChrome && (
                     <ChartButtons
                       chartId={`chart-${graphIndex}`}
-                      settingsControls={
-                        <TcoBasisToggle
-                          visible={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
-                          source="inference"
-                        />
-                      }
                       mobileVisible
                       analyticsPrefix={
                         isTimelineMode
@@ -1203,7 +1196,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     description={t.inferencePerformanceDesc}
                     actions={<ShareButton />}
                   />
-                  <ChartControls showXAxisMode />
+                  <ChartControls
+                    showXAxisMode
+                    showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
+                  />
                 </>
               )}
               {embedded && (

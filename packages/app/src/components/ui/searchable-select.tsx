@@ -39,6 +39,8 @@ export interface SearchableSelectOption {
   label: string;
   help?: React.ReactNode;
   testId?: string;
+  /** Optional trailing visual (e.g. a lock glyph) rendered after the label. */
+  badge?: React.ReactNode;
 }
 
 export interface SearchableSelectGroup {
@@ -439,6 +441,7 @@ export function SearchableSelect({
                             )}
                           >
                             <span className="min-w-0 flex-1">{option.label}</span>
+                            {option.badge}
                             {isSelected && (
                               <CheckIcon
                                 aria-hidden="true"
@@ -493,6 +496,7 @@ export function SearchableSelect({
                         {isSelected && <CheckIcon className="size-4 text-primary" />}
                       </span>
                       <span>{option.label}</span>
+                      {option.badge}
                     </div>
                   );
                 })}

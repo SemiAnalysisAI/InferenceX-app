@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { GOOGLE_YELLOW, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -17,7 +17,7 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -34,8 +34,8 @@ import type { Locale } from '@/lib/i18n';
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
-  openai: (hue) => hue < 285 || hue > 340, // keep the purple zone
-  google: (hue) => hue < 55 || hue > 100, // keep gold separate from red, green, and blue
+  openai: (hue) => hue < 290 || hue > 350, // keep the purple/violet zone
+  google: (hue) => hue < 255 || hue > 300, // keep blue separate from teal and purple
   unknown: null,
 };
 
@@ -49,8 +49,8 @@ const PREFERRED_ZONE: Record<
 > = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
-  openai: { hmin: 295, hmax: 330 }, // purples
-  google: { hmin: 70, hmax: 95 }, // golds
+  openai: { hmin: 300, hmax: 340 }, // purples/violets
+  google: { hmin: 265, hmax: 295 }, // blues (brand hue ~284)
   unknown: null,
 };
 
@@ -121,7 +121,7 @@ export const generateHighContrastColors = (
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
     if (vendor === 'google' && count === 1) {
-      colors[vendorKeys[0]] = GOOGLE_YELLOW;
+      colors[vendorKeys[0]] = GOOGLE_BLUE;
       continue;
     }
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
@@ -315,7 +315,7 @@ export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): Partial<DerivedChartFields> {
   const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
   const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);

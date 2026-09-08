@@ -373,14 +373,41 @@ describe('TCO Calculator', () => {
       cy.get('#calc-sequence').should('be.focused');
     });
 
-    it('cost provider selector appears and has both options', () => {
+    it('cost provider selector lists both published tiers and five locked rental tiers', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').should('have.length', 2);
+      cy.get('[role="option"]').should('have.length', 7);
       cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at Large Hyperscaler Volume');
       cy.get('[role="option"]').eq(1).should('contain.text', 'Rent - 3 Year Commit');
+      cy.get('[role="option"]').eq(2).should('contain.text', 'Rent - On Demand');
+      cy.get('[role="option"]').eq(3).should('contain.text', 'Rent - 1 Month Commit');
+      cy.get('[role="option"]').eq(4).should('contain.text', 'Rent - 6 Month Commit');
+      cy.get('[role="option"]').eq(5).should('contain.text', 'Rent - 1 Year Commit');
+      cy.get('[role="option"]').eq(6).should('contain.text', 'Rent - 2 Year Commit');
+      cy.get('[role="option"] [data-testid="locked-tier-badge"]').should('have.length', 5);
       cy.get('body').type('{esc}');
+    });
+
+    it('picking a locked rental tier opens the TCO model dialog without changing the provider', () => {
+      cy.get('#calc-cost').invoke('text').as('providerBefore');
+      cy.get('[data-testid="calculator-controls"]').within(() => {
+        cy.get('#calc-cost').click();
+      });
+      cy.get('[data-testid="cost-provider-locked-rent_1_year"]').click();
+      cy.get('[data-testid="tco-model-dialog"]')
+        .should('be.visible')
+        .and('contain.text', 'Rent - 1 Year Commit');
+      cy.get('[data-testid="tco-model-dialog-link"]').should(
+        'have.attr',
+        'href',
+        'https://semianalysis.com/ai-cloud-tco-model/',
+      );
+      cy.contains('button', 'Not now').click();
+      cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
+      cy.get<string>('@providerBefore').then((before) => {
+        cy.get('#calc-cost').should('have.text', before);
+      });
     });
 
     it('token type selector has Total, Input, and Output options', () => {

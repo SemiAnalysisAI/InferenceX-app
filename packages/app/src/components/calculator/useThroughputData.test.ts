@@ -1363,7 +1363,9 @@ describe('buildGpuGroups', () => {
       precisions: ['fp8'],
       classify: singlePrecisionClassify,
     };
-    const external = Object.values(buildGpuGroups([row], options).grouped)[0][0];
+    const external = Object.values(
+      buildGpuGroups([row], { ...options, tcoBasis: 'external' }).grouped,
+    )[0][0];
     const internal = Object.values(
       buildGpuGroups([row], { ...options, tcoBasis: 'internal' }).grouped,
     )[0][0];

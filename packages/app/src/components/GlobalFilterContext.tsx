@@ -44,7 +44,7 @@ import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
-import type { TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -319,7 +319,7 @@ export function GlobalFilterProvider({
   );
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
-  const [tcoBasis, setTcoBasis] = useState<TcoBasis>('external');
+  const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
 
   // Apply URL param overrides synchronously after the first commit. Runs only
   // on the client (useEffect on server is a no-op). Updates state before paint
@@ -418,7 +418,7 @@ export function GlobalFilterProvider({
     // cannot fight a user changing filters in place. A param-only navigation
     // within /inference is therefore not picked up — no in-app link does that
     // today, and covering it would mean the Suspense bailout above.
-    setTcoBasis(getUrlParam('g_tco') === 'internal' ? 'internal' : 'external');
+    setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 

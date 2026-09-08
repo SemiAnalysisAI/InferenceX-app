@@ -135,7 +135,11 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
 
   const result: UnofficialChartData = {};
   for (const [key, rows] of groups) {
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    // Overlay points are always priced on the external basis here;
+    // `processOverlayChartDataWithClipping` reprices them to the selected
+    // basis at render time, so seeding them with the app default would
+    // double-apply the internal/external ratio.
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
       (d) => d.chartType === 'interactivity',

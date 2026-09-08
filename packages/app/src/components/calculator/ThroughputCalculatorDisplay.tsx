@@ -47,8 +47,10 @@ import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
@@ -57,8 +59,9 @@ import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -192,7 +195,7 @@ const STRINGS = {
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit.',
+      'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -256,7 +259,7 @@ const STRINGS = {
       '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
     costProviderLabel: '计价方式',
     costProviderTooltip:
-      '用于计算每百万 token 成本的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。',
+      '用于计算每百万 token 成本的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
     costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'token 类型',
     tokenTypeTooltip: '选择显示总 token、仅输入 token 还是仅输出 token 的成本。',
@@ -362,6 +365,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
+  // Shorter-commit rental tiers are listed but locked; picking one opens the
+  // TCO model dialog instead of changing the cost provider.
+  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } = useLockedTierDialog(
+    'calculator_cost_provider',
+  );
 
   const {
     selectedModel,
@@ -369,6 +377,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
   } = useGlobalFilterSelection();
+  const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -569,6 +578,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
   const showsVeraRubinPreview = useMemo(
     () => includesVeraRubinResult(results.map((result) => result.hwKey)),
+    [results],
+  );
+  const showsTpuv7Preview = useMemo(
+    () => includesTpuv7Result(results.map((result) => result.hwKey)),
     [results],
   );
   const barResultsKey = useMemo(
@@ -931,6 +944,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     );
   }
 
+  const showsTcoBasis =
+    scenarioShowsTcoBasis && barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7');
+
   return (
     <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
@@ -947,7 +963,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               <ControlPanel
                 legend={t.benchmarkGroup}
                 className={`md:grid-cols-2 ${
-                  isAgenticSequence ? 'lg:grid-cols-8' : 'lg:grid-cols-7'
+                  showsTcoBasis
+                    ? isAgenticSequence
+                      ? 'lg:grid-cols-10'
+                      : 'lg:grid-cols-9'
+                    : isAgenticSequence
+                      ? 'lg:grid-cols-8'
+                      : 'lg:grid-cols-7'
                 }`}
               >
                 <ModelSelector
@@ -996,14 +1018,18 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   <div data-testid="calc-cost-selector">
                     <MultiSelect
                       triggerId="calc-cost"
-                      options={COST_PROVIDER_OPTIONS.map((provider) => ({
-                        value: provider.value,
-                        label: locale === 'zh' ? provider.labelZh : provider.label,
-                      }))}
+                      options={[
+                        ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                          value: provider.value,
+                          label: locale === 'zh' ? provider.labelZh : provider.label,
+                        })),
+                        ...lockedCostProviderOptions(locale),
+                      ]}
                       value={[costProvider]}
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
+                        if (interceptLockedTier(next)) return;
                         handleCostProviderChange(next);
                       }}
                       open={openDropdown === 'costProvider'}
@@ -1050,6 +1076,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     />
                   </div>
                 </div>
+                {showsTcoBasis && (
+                  <div className="min-w-0 w-full max-w-48 lg:col-span-2">
+                    <TcoBasisToggle source="calculator" className="h-9" />
+                  </div>
+                )}
               </ControlPanel>
 
               <MobileControlSection
@@ -1215,12 +1246,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           <figure data-testid="calculator-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="calculator-chart"
-              settingsControls={
-                <TcoBasisToggle
-                  visible={barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7')}
-                  source="calculator"
-                />
-              }
               analyticsPrefix="calculator"
               zoomResetEvent="d3chart_zoom_reset_calculator-chart"
               onExportCsv={handleExportCsv}
@@ -1264,6 +1289,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         </p>
                         {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                         {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                        {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
                         {barMetric === 'power' && barResults.length > 0 && (
                           <>
                             <p
@@ -1495,6 +1521,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           </Card>
         </section>
       )}
+      {tcoModelDialog}
     </div>
   );
 }

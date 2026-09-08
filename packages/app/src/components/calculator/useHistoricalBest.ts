@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import type { TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 import { useStableValue } from '@/hooks/useStableValue';
 import { Percentile, type Model, type Sequence } from '@/lib/data-mappings';
 
@@ -62,7 +62,7 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     costProvider,
     costType,
     percentile = Percentile.P90,
-    tcoBasis = 'external',
+    tcoBasis = DEFAULT_TCO_BASIS,
     enabled,
   } = options;
 

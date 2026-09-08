@@ -126,28 +126,39 @@ describe('TPUv7 vendor colors', () => {
     (theme) => {
       const keys = ['tpuv7_vllm', 'b200_vllm', 'b300_vllm', 'mystery_series'];
       const colors = generateVendorColors(keys, theme);
-      expect(colors.tpuv7_vllm).toBe('#F4B400');
+      expect(colors.tpuv7_vllm).toBe('#4285F4');
       expect(colors.tpuv7_vllm).not.toBe(colors.mystery_series);
       const historical = generateGpuDateColors(keys, 2, theme);
       const hue = hueOf(historical['0_tpuv7_vllm']);
-      expect(hue).toBeGreaterThan(80);
-      expect(hue).toBeLessThan(90);
-      expect(generateGpuDateColors(keys, 1, theme)['0_tpuv7_vllm']).toBe('#F4B400');
+      expect(hue).toBeGreaterThan(255);
+      expect(hue).toBeLessThan(265);
+      expect(generateGpuDateColors(keys, 1, theme)['0_tpuv7_vllm']).toBe('#4285F4');
       expect(hueOf(historical['1_tpuv7_vllm'])).toBe(hue);
       expect(historical['0_tpuv7_vllm']).not.toBe(historical['1_tpuv7_vllm']);
     },
   );
 
   it('reserves a separate Google HSL band', () => {
-    const hue = hsl('#F4B400').h;
-    expect(
-      VENDOR_HSL_ZONES.google.some(({ start, span }) => hue >= start && hue < start + span),
-    ).toBe(true);
+    const hue = hsl('#4285F4').h;
+    const [google] = VENDOR_HSL_ZONES.google;
+    expect(hue >= google.start && hue < google.start + google.span).toBe(true);
     for (const [vendor, segments] of Object.entries(VENDOR_HSL_ZONES)) {
       if (vendor === 'google') continue;
       for (const segment of segments) {
-        expect(segment.start >= 60 || segment.start + segment.span <= 40).toBe(true);
+        expect(
+          segment.start >= google.start + google.span ||
+            segment.start + segment.span <= google.start,
+        ).toBe(true);
       }
     }
+  });
+
+  it('keeps Jalapeño purple and apart from Google blue', () => {
+    const colors = generateVendorColors(['jalapeno_teacup', 'tpuv7_vllm'], 'light');
+    const jalapenoHue = hueOf(colors.jalapeno_teacup);
+    expect(jalapenoHue).toBeGreaterThanOrEqual(290);
+    expect(jalapenoHue).toBeLessThanOrEqual(330);
+    expect(colors.tpuv7_vllm).toBe('#4285F4');
+    expect(VENDOR_OKLCH_ZONES.openai.start).toBeGreaterThan(VENDOR_OKLCH_ZONES.google.end);
   });
 });

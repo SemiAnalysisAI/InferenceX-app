@@ -28,6 +28,7 @@ import {
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import {
+  DEFAULT_TCO_BASIS,
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
@@ -266,7 +267,7 @@ export function useChartData(
   },
   benchmarkQueryScope?: string,
   initialBenchmarkRows?: BenchmarkRow[],
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the

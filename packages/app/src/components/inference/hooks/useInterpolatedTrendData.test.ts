@@ -74,7 +74,7 @@ describe('rowToLightweightPoint', () => {
   it('uses the selected TPU cost basis for historical cost and tokens per dollar', () => {
     const row = makeBenchmarkRow({ hardware: 'tpuv7', framework: 'vllm' });
     const metrics = ['costhOutput', 'outputTokensPerDollarH', 'tpPerMw'] as const;
-    const external = rowToLightweightPoint(row, metrics)!;
+    const external = rowToLightweightPoint(row, metrics, undefined, 'external')!;
     const internal = rowToLightweightPoint(row, metrics, undefined, 'internal')!;
     expect(internal.costhOutput!.y).toBeCloseTo((external.costhOutput!.y * 1.03) / 1.21);
     expect(internal.outputTokensPerDollarH!.y).toBeCloseTo(

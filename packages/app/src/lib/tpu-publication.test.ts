@@ -55,7 +55,7 @@ describe('TPU publication paths', () => {
   it('applies the selected assumption identically to full charts, trends and calculator overlays', () => {
     const row = rows.find((r) => r.decode_tp === 1)!;
     const entry = rowToAggDataEntry(row);
-    const external = buildDerivedChartFields(entry, 'tpuv7_vllm');
+    const external = buildDerivedChartFields(entry, 'tpuv7_vllm', undefined, 'external');
     const internal = buildDerivedChartFields(entry, 'tpuv7_vllm', undefined, 'internal');
     expect(internal.costh.y / external.costh.y).toBeCloseTo(1.03 / 1.21);
     expect(internal.tokensPerDollarH!.y / external.tokensPerDollarH!.y).toBeCloseTo(1.21 / 1.03);

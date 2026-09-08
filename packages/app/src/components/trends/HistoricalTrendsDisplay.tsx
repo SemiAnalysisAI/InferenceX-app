@@ -17,7 +17,6 @@ import ChartControls from '@/components/inference/ui/ChartControls';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
@@ -44,8 +43,10 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
 import {
@@ -235,6 +236,7 @@ export default function HistoricalTrendsDisplay() {
   );
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
+  const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
 
   // Check `error` before the loading skeleton: a failed benchmark query never
   // produces rows, so `loading` (which includes "no rows yet") would otherwise
@@ -271,7 +273,11 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls tcoSource="historical" hideGpuComparison />
+            <ChartControls
+              tcoSource="historical"
+              hideGpuComparison
+              showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+            />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -323,7 +329,11 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls tcoSource="historical" hideGpuComparison />
+          <ChartControls
+            tcoSource="historical"
+            hideGpuComparison
+            showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+          />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
@@ -398,12 +408,6 @@ export default function HistoricalTrendsDisplay() {
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
-              settingsControls={
-                <TcoBasisToggle
-                  visible={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
-                  source="gpu_timeseries"
-                />
-              }
               analyticsPrefix="historical"
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
@@ -448,6 +452,7 @@ export default function HistoricalTrendsDisplay() {
                     />
                     {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                     {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
                       activeHwKeys={activeHwTypes}

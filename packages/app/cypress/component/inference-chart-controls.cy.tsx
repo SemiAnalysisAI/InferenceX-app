@@ -1,6 +1,6 @@
 import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
@@ -75,6 +75,28 @@ describe('Inference ChartControls', () => {
         });
       cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', option.key);
     }
+  });
+
+  it('lists locked rental tiers under each cost group and opens the TCO model dialog', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('Cost per Million Total Tokens')
+      .closest('[role="rowgroup"]')
+      .within(() => {
+        cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
+        cy.get('[data-testid="yaxis-locked-rent_1_year-costr"]')
+          .should('contain.text', 'Cost per Million Total Tokens (Rent - 1 Year Commit)')
+          .scrollIntoView()
+          .click();
+      });
+    cy.get('[data-testid="tco-model-dialog"]')
+      .should('be.visible')
+      .and('contain.text', 'Rent - 1 Year Commit');
+    cy.get('[data-testid="tco-model-dialog-link"]')
+      .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
+      .and('have.attr', 'target', '_blank');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.contains('button', 'Not now').click();
+    cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
   });
 
   it('hides the GPU comparison section when no GPUs are selected', () => {
@@ -237,14 +259,56 @@ describe('Inference ChartControls', () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
-      inference: { selectedYAxisMetric: 'y_costh' },
-      globalFilters: {},
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.EightK_OneK,
+      },
+      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
 
-  it('leaves the TCO basis toggle in the chart toolbar without duplicating it in filters', () => {
+  it('hides the TCO basis toggle for other models and scenarios', () => {
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.EightK_OneK,
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        effectiveSequence: Sequence.EightK_OneK,
+      },
+    });
+    cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.EightK_OneK,
+      },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
+    });
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+  });
+
+  it('sizes the TCO basis toggle to its buttons on desktop and mobile', () => {
+    for (const width of [1280, 390]) {
+      cy.viewport(width, 844);
+      if (width === 390) cy.get('[data-testid="inference-secondary-controls"] > button').click();
+      cy.get('[data-testid="tco-basis-toggle"]').should(($toggle) => {
+        const toggle = $toggle[0];
+        const buttons = [...toggle.querySelectorAll('button')];
+        const buttonWidth = buttons.reduce(
+          (sum, button) => sum + button.getBoundingClientRect().width,
+          0,
+        );
+        expect(toggle.getBoundingClientRect().width).to.be.lessThan(buttonWidth + 20);
+      });
+    }
   });
 
   it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
