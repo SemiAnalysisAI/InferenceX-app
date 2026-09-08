@@ -7,6 +7,7 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { track } from '@/lib/analytics';
 import type { TcoBasis } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/utils';
 
 const LABELS = {
   en: { external: 'External', internal: 'Internal', aria: 'TCO basis' },
@@ -37,7 +38,7 @@ export function TcoBasisToggle({ source, className }: { source: string; classNam
       }}
       ariaLabel={labels.aria}
       testId="tco-basis-toggle"
-      className={className}
+      className={cn('w-fit self-start', className)}
     />
   );
 }

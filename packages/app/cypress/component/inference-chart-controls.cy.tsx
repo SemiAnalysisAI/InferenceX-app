@@ -243,6 +243,22 @@ describe('Inference ChartControls cost metrics', () => {
     });
   });
 
+  it('sizes the TCO basis toggle to its buttons on desktop and mobile', () => {
+    for (const width of [1280, 390]) {
+      cy.viewport(width, 844);
+      if (width === 390) cy.get('[data-testid="inference-secondary-controls"] > button').click();
+      cy.get('[data-testid="tco-basis-toggle"]').should(($toggle) => {
+        const toggle = $toggle[0];
+        const buttons = [...toggle.querySelectorAll('button')];
+        const buttonWidth = buttons.reduce(
+          (sum, button) => sum + button.getBoundingClientRect().width,
+          0,
+        );
+        expect(toggle.getBoundingClientRect().width).to.be.lessThan(buttonWidth + 20);
+      });
+    }
+  });
+
   it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains(
