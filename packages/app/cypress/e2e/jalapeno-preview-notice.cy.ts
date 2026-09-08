@@ -2,6 +2,9 @@ const JALAPENO_QUERY =
   'g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu';
 const JALAPENO_NOTICE = '[data-testid="jalapeno-official-preview-notice"]';
 const VERA_RUBIN_NOTICE = '[data-testid="vera-rubin-official-preview-notice"]';
+const TPUV7_QUERY =
+  'g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_outputTputPerGpu';
+const TPUV7_NOTICE = '[data-testid="tpuv7-official-preview-notice"]';
 
 describe('official preview notices', () => {
   beforeEach(() => {
@@ -127,5 +130,22 @@ describe('official preview notices', () => {
     );
     cy.get(JALAPENO_NOTICE).should('not.exist');
     cy.get(VERA_RUBIN_NOTICE).should('not.exist');
+  });
+
+  it('renders the TPU7x graph notice on the Qwen3.5 8k/1k curve and nowhere else', () => {
+    cy.visit(`/inference?${TPUV7_QUERY}`);
+
+    cy.get(TPUV7_NOTICE, { timeout: 20000 })
+      .should('be.visible')
+      .and('contain.text', 'InferenceX Official Preview')
+      .and('contain.text', 'Results may change as validation and publication continue.')
+      .and('not.contain.text', '\u2014');
+    cy.get(JALAPENO_NOTICE).should('not.exist');
+    // With the API mocked empty, TPU7x is the only series here, so the legend
+    // offers no "Hide" toggle; the Jalapeño case above covers toggle tracking.
+
+    cy.visit(`/inference?${JALAPENO_QUERY}`);
+    cy.get(JALAPENO_NOTICE, { timeout: 20000 }).should('be.visible');
+    cy.get(TPUV7_NOTICE).should('not.exist');
   });
 });

@@ -47,8 +47,10 @@ import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
@@ -573,6 +575,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
   const showsVeraRubinPreview = useMemo(
     () => includesVeraRubinResult(results.map((result) => result.hwKey)),
+    [results],
+  );
+  const showsTpuv7Preview = useMemo(
+    () => includesTpuv7Result(results.map((result) => result.hwKey)),
     [results],
   );
   const barResultsKey = useMemo(
@@ -1272,6 +1278,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         </p>
                         {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                         {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                        {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
                         {barMetric === 'power' && barResults.length > 0 && (
                           <>
                             <p

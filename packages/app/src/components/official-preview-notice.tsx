@@ -33,6 +33,22 @@ export const VERA_RUBIN_PREVIEW_STRINGS = {
   },
 } as const;
 
+export const TPUV7_PREVIEW_STRINGS = {
+  en: {
+    title: 'InferenceX Official Preview',
+    description:
+      'TPU7x results are an official preview and may change as validation and publication continue.',
+    chartDetail: 'Results may change as validation and publication continue.',
+  },
+  zh: {
+    title: 'InferenceX 官方预览',
+    description: 'TPU7x 结果为官方预览；随着验证和发布工作的推进，数据可能会调整。',
+    chartDetail: '随着验证和发布工作的推进，结果可能会调整。',
+  },
+} as const;
+
+// TPUv7 data is currently the supplemental Qwen3.5 8k/1k snapshot only, so a
+// hardware-scoped match covers exactly that curve, mirroring Jalapeño.
 export const OFFICIAL_PREVIEW_SERIES = [
   {
     id: 'jalapeno-official-preview',
@@ -43,6 +59,11 @@ export const OFFICIAL_PREVIEW_SERIES = [
     id: 'vera-rubin-official-preview',
     baseGpuKeys: ['vr200'],
     strings: VERA_RUBIN_PREVIEW_STRINGS,
+  },
+  {
+    id: 'tpuv7-official-preview',
+    baseGpuKeys: ['tpuv7'],
+    strings: TPUV7_PREVIEW_STRINGS,
   },
 ] as const;
 
@@ -64,8 +85,15 @@ export function includesVeraRubinResult(hardwareKeys: Iterable<string>): boolean
   return includesHardwareResult(hardwareKeys, OFFICIAL_PREVIEW_SERIES[1].baseGpuKeys);
 }
 
+export function includesTpuv7Result(hardwareKeys: Iterable<string>): boolean {
+  return includesHardwareResult(hardwareKeys, OFFICIAL_PREVIEW_SERIES[2].baseGpuKeys);
+}
+
 interface OfficialPreviewNoticeProps {
-  strings: typeof JALAPENO_PREVIEW_STRINGS | typeof VERA_RUBIN_PREVIEW_STRINGS;
+  strings:
+    | typeof JALAPENO_PREVIEW_STRINGS
+    | typeof VERA_RUBIN_PREVIEW_STRINGS
+    | typeof TPUV7_PREVIEW_STRINGS;
   testId: string;
 }
 
@@ -103,5 +131,11 @@ export function VeraRubinOfficialPreviewNotice() {
       strings={VERA_RUBIN_PREVIEW_STRINGS}
       testId="vera-rubin-official-preview-notice"
     />
+  );
+}
+
+export function Tpuv7OfficialPreviewNotice() {
+  return (
+    <OfficialPreviewNotice strings={TPUV7_PREVIEW_STRINGS} testId="tpuv7-official-preview-notice" />
   );
 }
