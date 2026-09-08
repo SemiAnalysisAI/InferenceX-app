@@ -148,11 +148,14 @@ reporting them. An EP case is terminal only when all its points have a non-pendi
 `failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
 These case counters combine EP and KV; `kv_requested_cases` and
 `kv_measured_cases` identify the KV subset, while the run's point counters are
-EP-only. A listed subset of SKUs or reasons is not the total. If the returned
+EP-only. Run-list summaries expose this subset at `kv_cases.requested` and
+`kv_cases.measured`; the flat names above belong to run details. Inspect the
+returned object at the appropriate path when reporting availability.
+A listed subset of SKUs or reasons is not the total. If the returned
 arrays and counters do not reconcile, report that inconsistency.
 
-For EP point accounting, count `coverage[].points[]` by `terminal_status` with
-code and reconcile the result with the point counters. Compute pending points as
+For EP point accounting, compute a histogram of `coverage[].points[].terminal_status`
+and reconcile it with the point counters. Compute pending points as
 `requested_points - terminal_points` and terminal-but-unmeasured points as
 `terminal_points - measured_points`. Carry those computed values and labels into
 the report; pending and terminal-but-unmeasured are separate populations.

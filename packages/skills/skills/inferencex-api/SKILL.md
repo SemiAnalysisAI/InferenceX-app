@@ -47,6 +47,34 @@ Keep `coverage.reasons` separate from `policy.reasons`. A valid empty or partial
 bundle is scoped evidence. A required hardware key passes only with a usable record;
 a matching label is insufficient. Missing values remain missing, never zero.
 
+## Produce the answer
+
+Use one report, generated from the saved evidence:
+
+1. Select only the fields and populations needed to answer the user's request. Read their
+   units and eligibility rules in the relevant cookbook. Keep the complete raw
+   responses; the report covers the requested question and its coverage limits.
+2. Compute the requested statistics in a script. Save the field path, filter,
+   known and missing populations with each calculation. Render numerical table
+   cells and sentences directly from those variables in the same script. This
+   includes counts expressed as words and rounding; a second handwritten copy can
+   drift from a correct calculation. Use the manifest and capture sidecars as
+   links for hashes, request metadata and byte counts.
+3. Write one compact report outside the bundle: the direct answer, generated
+   tables for requested quantities, evidence links, and applicable limits. Keep
+   additional raw and computed data in JSON or CSV. For a missing-field claim,
+   record the exact object path and distinguish absent, null, zero and false.
+4. Read the generated report and verify the bundle. The final reply gives the
+   conclusion, report and evidence links, verification outcome, and any missing
+   input. Reuse the report's wording for quantities needed in that reply.
+
+For benchmark lookup and history, start from the saved `selection_summary` and
+`sample_summary`; regenerate the sample summary when its rows change. Distinct
+counts use known values, with missing values reported separately. A flag's
+population includes true, false and missing. Observation pairs, metric
+comparisons and individual rows are separate populations. Report date endpoints;
+when a duration is requested, compute and label elapsed or inclusive days.
+
 ## Choose the workflow
 
 - **PowerX measured power or energy:** read
@@ -86,23 +114,6 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json). Public
 reads use HTTPS without credentials.
 
-For benchmark lookup and history, use the recipe's saved `selection_summary` for
-the selected population and `sample_summary` for every sample described. Regenerate
-`sample_summary` whenever its rows change.
-Keep reports focused on the requested task and required coverage. Omit unrequested
-derived summaries and classifications. Supplemental JSON, CSV and Markdown must
-meet the same evidence standard as the final answer.
-Before reporting any count, range or mean, save its field, exact filter, known and
-missing populations, and computed value. Claims such as "all", "only" and "other"
-need that exact population: after excluding a row, recompute the count. Distinct
-counts exclude absent and null fields; real zero and false remain values. Before
-claiming a configuration flag is uniform, tally true, false and missing across the
-complete selection. Copy saved scalars with their population labels into every
-report. Observation pairs differ from metric comparisons and individual rows.
-For evidence, link the manifest and capture sidecars. If reporting a request or
-capture count, derive it from those records, never from the number of workflow steps.
-Report date endpoints directly. Add a duration only when requested, compute it
-from those endpoints, and distinguish elapsed days from inclusive calendar dates.
 Cite the request URL, retrieval time, scope, source identities,
 and observation dates. Scope conclusions to the records checked; a recorded zero
 is a source value, not proof of physical absence or a causal explanation.

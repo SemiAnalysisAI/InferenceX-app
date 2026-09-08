@@ -59,8 +59,10 @@ cancellation state returned by the API; do not reduce the timeline to successful
 main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosecond
 anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
 `timeline.startNs`. Keep those two timestamp roles separate. Retain the original
-response text before parsing: JavaScript `Number` can round large integer anchors,
-so reserialized parsed values cannot establish their exact original digits.
+response text before parsing: JavaScript `Number` can round large integer anchors.
+For anchor differences, parse the original JSON with Python's integer-preserving
+`json.load`, subtract the integer anchors, then convert the difference to seconds.
+Reserialized JavaScript numbers cannot recover the original digits.
 
 Inspect each server-metric series' returned fields before calculating statistics.
 For example, `queueDepth` carries `running`, `waiting`, and `total`, while scalar
