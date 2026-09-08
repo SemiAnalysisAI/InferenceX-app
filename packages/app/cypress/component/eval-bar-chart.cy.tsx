@@ -1,4 +1,5 @@
 import EvalBarChartD3 from '@/components/evaluation/ui/BarChartD3';
+import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { mountWithProviders } from '../support/test-utils';
 import { createMockEvaluationChartData } from '../support/mock-data';
 import { Model, Precision } from '@/lib/data-mappings';
@@ -6,6 +7,56 @@ import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 
 describe('EvalBarChartD3', () => {
+  it('omits default DP in table cells while preserving DP8 and physical chip counts', () => {
+    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/30864013158';
+    const tpu = {
+      hwKey: 'tpuv7_vllm',
+      hardware: 'tpuv7',
+      framework: 'vllm',
+      model: Model.Qwen3_5,
+      precision: Precision.FP8,
+      physicalChips: 4,
+      numPrefillGpu: 4,
+      numDecodeGpu: 4,
+    };
+    const data = [
+      createMockEvaluationChartData({
+        ...tpu,
+        configLabel: 'TPU7x tensor parallel',
+        tp: 8,
+        dp: 1,
+        score: 0.9,
+      }),
+      createMockEvaluationChartData({
+        ...tpu,
+        evalResultId: -1,
+        configId: 2,
+        configLabel: 'TPU7x data parallel',
+        tp: 1,
+        dp: 8,
+        score: 0.8,
+        runUrl,
+      }),
+    ];
+    mountWithProviders(<EvaluationTable data={data} />, {
+      unofficial: { runIndexByUrl: { [runUrl]: 0 } },
+    });
+    cy.get('[data-testid="data-table-preset-all"]').click();
+    cy.contains('thead th', /^TP$/)
+      .invoke('index')
+      .then((index) => {
+        cy.get('tbody tr').eq(0).find('td').eq(index).should('have.text', '8');
+        cy.get('tbody tr').eq(1).find('td').eq(index).should('have.text', '1 / DP8');
+      });
+    cy.contains('thead th', 'Physical Chips')
+      .invoke('index')
+      .then((index) => {
+        cy.get('tbody tr').each(($row) => {
+          cy.wrap($row).find('td').eq(index).should('have.text', '4');
+        });
+      });
+  });
+
   it('shows skeleton during loading with no data', () => {
     mountWithProviders(<EvalBarChartD3 />, {
       evaluation: {

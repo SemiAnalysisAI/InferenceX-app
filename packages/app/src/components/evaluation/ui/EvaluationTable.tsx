@@ -215,7 +215,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       {
         header: 'TP',
         align: 'right',
-        cell: (row) => (row.dp ? `${row.tp} / DP${row.dp}` : row.tp),
+        cell: (row) => (row.dp && row.dp > 1 ? `${row.tp} / DP${row.dp}` : row.tp),
         sortValue: (row) => row.tp,
         className: 'tabular-nums',
         importance: 'key',
