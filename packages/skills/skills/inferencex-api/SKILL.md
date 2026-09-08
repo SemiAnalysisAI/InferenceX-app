@@ -107,7 +107,11 @@ total unknown** and keep the raw values; do not add a derived total column or ra
 
 **Missing power verdict:** absent `power_valid` means no verdict is available in
 that response. Absence alone establishes neither the cause, measurement age, nor
-invalidity. Apply the [PowerX eligibility rules](references/powerx.md#selection-and-coverage)
+invalidity. Older deployed OpenAPI descriptions call this a "legacy row predating
+validation"; that explanation is too strong. Ingest omits the verdict whenever
+the producer supplies none, without an age check. Use the row's date for its age
+and apply this distinction in supplemental reports as well as the final answer.
+Apply the [PowerX eligibility rules](references/powerx.md#selection-and-coverage)
 before measured-power comparisons.
 
 A benchmark `date` query is an as-of cutoff unless `exact=true`; omission means

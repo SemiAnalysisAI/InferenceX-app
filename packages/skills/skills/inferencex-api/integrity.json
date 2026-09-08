@@ -2,7 +2,7 @@
   "schema_version": 1,
   "package_version": "0.12.0",
   "files": {
-    "SKILL.md": "09134729b82fdbf053bc989e17dc7853d00970e7589ade6767c7fe1810060778",
+    "SKILL.md": "ef3b816ee8bb65356c64767cdce33894d89a9277590fc57465c6de1fec14b325",
     "references/agentx.md": "402458b895dcbc4c8f19b5ed67131ababe7432fe4f2435cf4d91ea11a362fb9a",
     "references/cli-contract.md": "2e45686428c04a3abef56ff872310a3638c9ecfcd38fd027f897853d5f93253f",
     "references/cli.md": "61643e5a4d145fe491b445d7919ed92df4e95d9aa6baaf42910179c9557462f7",
@@ -12,7 +12,7 @@
     "references/provenance.md": "9a33a9391f5caee7260f6df3999538f860b7d2d343955c6e019487a5c8c44b1e",
     "references/public-api-examples.md": "6f16a06e5939e666b60b86a0ed7d3858bd810ff243d636f00f4616614c4e5ff8",
     "references/releases.md": "a4b39fb2608c9000604c042a023f72215fc82af5f6676be2a88f0d0f3834f8da",
-    "references/tco.md": "4b572f695ef228dd89533ce85619cb472d99fed3e595646e212152c31b344a5d",
+    "references/tco.md": "f39b9651f11331ff1728f9cc449cc77833116cbcd5f038c6fe445f5e0521fb1c",
     "schemas.json": "eba70dfb190e6d94d0b0352db0f8b49631cb1fb9a6e026c97b8316b91839105c",
     "scripts/cli-contract.mjs": "9fe93c512ea1524d81e98445dc4aba50e93d610f12e51e68d50e736aa321533a",
     "scripts/commands.mjs": "317b14f8f1d0b1dae62a7181410b5edaf2abb28220ccffd47891a1a7fd719e36",

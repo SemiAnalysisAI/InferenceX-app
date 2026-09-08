@@ -71,6 +71,11 @@ Finish with the symbolic boundary and ask for the missing USD/GPU-hour rates and
 billing scope. The cheaper hardware remains unresolved. Website defaults, typical
 market spreads, and invented `$1` rates are not user-supplied prices; pass
 `--gpu-hourly-prices` to the formal comparison once those inputs are supplied.
+Keep that unresolved conclusion throughout the final answer and saved report.
+Saying "at current market spreads it is not close" or naming a likely winner
+still assumes prices, even when followed by a request for the user's rates.
+Give only conditional comparisons, such as "A is cheaper if its rate ratio is
+below this boundary"; the feed supplies throughput, not rental-price evidence.
 
 ## Check a P99 ITL constraint
 
