@@ -54,16 +54,12 @@ node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
   --left <left-run-id> --right <right-run-id> --output-dir evidence/collectivex-pair
 ```
 
-The versioned command saves a formal bundle with a 120-second total deadline and
-a shared 32 MiB response budget. The explicit pair uses three logical reads;
-discovery uses at most four. Retry attempts follow the [CLI contract](cli.md). Finish any
-report in a sibling path, then run `inferencex verify` on that output directory.
-
 ### Request boundary
 
-The explicit pair makes three logical reads; discovery makes at most four. The CLI
-applies its shared deadline, decoded-byte budget, retry ledger, and create-new bundle
-rules. It never substitutes a different run after a failed read.
+The command has a 120-second total deadline and a shared 32 MiB response budget.
+An explicit pair uses three logical reads; discovery uses at most four. Retry
+attempts and output handling follow the [CLI contract](cli.md). A failed read
+never substitutes a different run.
 
 The public operations require `version=1`:
 
@@ -200,14 +196,13 @@ returned fields without inventing defaults. The server's shared reader has its
 own compatibility fallbacks, so returned defaults are not independently verified
 artifact provenance.
 
-Keep the bundle with the answer. `manifest.json` records each exact request URL,
-HTTP status, retrieval timestamp, response size, SHA-256, and relative
-`responses/*.body` path, including for OpenAPI. Parse those complete decoded body
-files to inspect the original datasets; the result's `sources[]` entries and
-comparison source pointers identify the corresponding response index and JSON
-Pointer. Run IDs remain exact strings, and `runs[].run` retains the returned
+Follow the shared [delivery rules](../SKILL.md#deliver-the-requested-result) for
+bundle metadata, retention, and verification. The manifest includes the OpenAPI
+capture. Inspect original datasets in the decoded `responses/*.body` files; the
+result's `sources[]` entries and comparison pointers identify their response
+indices and JSON Pointers. Run IDs remain exact strings, and `runs[].run` retains the returned
 attempt, `generated_at`, conclusion, and source SHA. Retrieval time and generated
-time describe different events. Cite URLs and timestamps from **this bundle**,
+time describe different events. Use URLs and timestamps from **this bundle**,
 never from another selection or an older example.
 
 Report the selected runs and attempts, discovery coverage, matched/unmatched/

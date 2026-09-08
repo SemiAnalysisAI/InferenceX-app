@@ -25,10 +25,9 @@ pool: prefill 8 and decode 8 do not establish a 16-GPU deployment. A deployment
 total requires verified allocation semantics; do not unconditionally sum the role
 counts. See the [topology guidance](powerx.md#export-and-provenance) when a
 user requests a derived total.
-For any optional field, including images, recipe fingerprints and replay-lane
-`srcInner`, count distinct known values separately from missing or null rows.
-Report both populations: `new Set(rows.map(row => row.field)).size` incorrectly
-counts `undefined` as another value. Keep a returned zero as a known value.
+For optional-field statistics needed by the requested analysis, count distinct
+known values separately from missing or null rows. Report both populations and
+keep a returned zero as a known value.
 
 Keep each aggregate group's `n` with that group. Equal numbers of non-null benchmark
 rows do not imply equal sample counts or sample-size ranges; compute and label
@@ -52,36 +51,6 @@ node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
 A valid empty selection exits 0; the explicit hardware predicate commits that
 bundle and exits 3 when no usable b300 summary exists. See the
 [CLI contract](cli.md) for exit and verification handling.
-
-Public timelines contain sanitized replay structure. They do not expose original
-prompts, code, or tool payloads. Preserve every phase, replay-lane field, and
-cancellation state returned by the API; do not reduce the timeline to successful
-main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosecond
-anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
-`timeline.startNs`. Keep those two timestamp roles separate. Retain the original
-response text before parsing: JavaScript `Number` can round large integer anchors.
-For anchor differences, parse the original JSON with Python's integer-preserving
-`json.load`, subtract the integer anchors, then convert the difference to seconds.
-Reserialized JavaScript numbers cannot recover the original digits.
-
-Inspect each server-metric series' returned fields before calculating statistics.
-For example, `queueDepth` carries `running`, `waiting`, and `total`, while scalar
-series use `value`. Report each series' own sample, finite, nonzero, and missing
-counts; their array lengths can differ. A nonzero fraction uses that field's
-finite count as its denominator, with missing samples reported separately.
-An empty series has no samples; zero-valued samples remain recorded observations.
-When relating a request group to metric windows, align timestamp origins, state
-the inclusion rule, and report inside/outside counts for that exact group. Retain
-exceptions; overlapping overall ranges do not establish that every member falls
-inside the same windows.
-
-For timeline accounting, `sum(end - start)` is cumulative request latency and can
-exceed elapsed time when requests overlap. The union of `[start, end]` intervals
-is time with at least one request in flight. Neither measures GPU utilization or
-server busy time. Keep every phase and cancelled request in the default summary;
-label any narrower selection explicitly. A sampled KV-cache maximum or a slow
-first request describes that observation; it cannot establish that cache capacity
-was never limiting or that a cold cache caused the latency.
 
 This workflow reads existing observations and runs no new benchmark. AgentX does
 not evaluate model answer quality. If AgentX rows contain power fields, interpret
@@ -186,6 +155,36 @@ stops before all heavy trace operations. If availability advertises a trace, it
 reads exactly one timeline, one-ID histogram data, and aggregate server metrics.
 An HTTP error, malformed JSON, or invalid required response after that advertisement
 is a trace inconsistency and fails the recipe.
+
+Public timelines contain sanitized replay structure. They do not expose original
+prompts, code, or tool payloads. Preserve every phase, replay-lane field, and
+cancellation state returned by the API; do not reduce the timeline to successful
+main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosecond
+anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
+`timeline.startNs`. Keep those two timestamp roles separate. Retain the original
+response text before parsing: JavaScript `Number` can round large integer anchors.
+For anchor differences, parse the original JSON with Python's integer-preserving
+`json.load`, subtract the integer anchors, then convert the difference to seconds.
+Reserialized JavaScript numbers cannot recover the original digits.
+
+For each server-metric series used in the requested analysis, inspect its returned
+fields before calculating statistics. `queueDepth` carries `running`, `waiting`,
+and `total`, while scalar series use `value`. Report that series' own sample,
+finite, nonzero, and missing counts; array lengths can differ. A nonzero fraction
+uses that field's finite count as its denominator, with missing samples reported
+separately. An empty series has no samples; zero-valued samples remain recorded
+observations. When relating a request group to metric windows, align timestamp
+origins, state the inclusion rule, and report inside/outside counts for that exact
+group. Retain exceptions; overlapping overall ranges do not establish that every
+member falls inside the same windows.
+
+For timeline accounting, `sum(end - start)` is cumulative request latency and can
+exceed elapsed time when requests overlap. The union of `[start, end]` intervals
+is time with at least one request in flight. Neither measures GPU utilization or
+server busy time. Keep every phase and cancelled request in the default summary;
+label any narrower selection explicitly. A sampled KV-cache maximum or a slow
+first request describes that observation; it cannot establish that cache capacity
+was never limiting or that a cold cache caused the latency.
 
 ```bash
 node --input-type=module <<'JS'

@@ -47,26 +47,33 @@ Keep `coverage.reasons` separate from `policy.reasons`. A valid empty or partial
 bundle is scoped evidence. A required hardware key passes only with a usable record;
 a matching label is insufficient. Missing values remain missing, never zero.
 
-## Produce the answer
+## Deliver the requested result
 
-Use one report, generated from the saved evidence:
+Use the formal result and its metadata for values already computed by the CLI.
+Calculate only the additional quantities needed for the user's question. Preserve
+the user's selectors and acceptance criteria throughout classification and costing.
 
-1. Select only the fields and populations needed to answer the user's request. Read their
-   units and eligibility rules in the relevant cookbook. Keep the complete raw
-   responses; the report covers the requested question and its coverage limits.
-2. Compute the requested statistics in a script. Save the field path, filter,
-   known and missing populations with each calculation. Render numerical table
-   cells and sentences directly from those variables in the same script. This
-   includes counts expressed as words and rounding; a second handwritten copy can
-   drift from a correct calculation. Use the manifest and capture sidecars as
-   links for hashes, request metadata and byte counts.
-3. Write one compact report outside the bundle: the direct answer, generated
-   tables for requested quantities, evidence links, and applicable limits. Keep
-   additional raw and computed data in JSON or CSV. For a missing-field claim,
-   record the exact object path and distinguish absent, null, zero and false.
-4. Read the generated report and verify the bundle. The final reply gives the
-   conclusion, report and evidence links, verification outcome, and any missing
-   input. Reuse the report's wording for quantities needed in that reply.
+1. Select the exact records and fields needed for the requested output. Keep the
+   complete raw responses as evidence; record which subset the analysis uses.
+   Read units and denominators from saved metadata or the API contract, and
+   eligibility rules from the relevant cookbook.
+2. If the user requests a report, or the raw-API task needs a derived analysis,
+   write a small script that reads the saved results and writes the requested
+   report file directly (Markdown by default). Its quantitative content uses the same
+   variables for quantities, populations, dates, IDs and units. Reuse existing
+   valid calculations for that scope; compute missing quantities in this script.
+3. Keep that report on the requested findings: a direct answer, the requested
+   measures with their scope and units, the applicable limitations, and links to
+   the results and source manifests. Request metadata and file inventories stay
+   in the linked evidence. State the selected analysis scope positively;
+   downloaded records, selected rows and individually investigated points are
+   different sets. Check exact object paths for missing-field claims.
+4. Check the deliverable's claims against the saved results and perform the
+   applicable verification. Finish when the requested outputs, evidence and
+   necessary caveats are complete. Give a short
+   qualitative conclusion, artifact links and the verification outcome in the
+   final reply; keep the quantitative analysis in the generated deliverable unless
+   the user explicitly requests quantities or another format in the reply.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct
@@ -88,10 +95,10 @@ when a duration is requested, compute and label elapsed or inclusive days.
 - **A result's producer, configuration, image, or bounded log:** read
   [provenance](references/provenance.md), then use `inferencex result inspect`.
   Keep the original producer separate from the snapshot carrying the row.
-- **Cost at a fixed interactivity target:** read [TCO](references/tco.md), then use
-  `inferencex tco compare`. Compute rental-rate estimates from reported output
-  throughput and explicit USD/GPU-hour prices; measured power is a separate workflow. Retain
-  unavailable points and source dates.
+- **Cost comparison:** read [TCO](references/tco.md). For a median interactivity
+  target, use `inferencex tco compare`; for a P99 ITL constraint, use its raw
+  observation recipe. Both use the requested criteria and explicit USD/GPU-hour
+  prices. Retain unavailable points and source dates; measured power is separate.
 - **vLLM/SGLang before and after observations:** read
   [releases](references/releases.md), then use `inferencex releases compare`.
   Select exact observation dates and producer identities. Report descriptive
@@ -114,8 +121,13 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json). Public
 reads use HTTPS without credentials.
 
-Cite the request URL, retrieval time, scope, source identities,
-and observation dates. Scope conclusions to the records checked; a recorded zero
+Bundle manifests and raw-capture sidecars retain request URLs, retrieval times,
+HTTP statuses, response paths, decoded byte counts and SHA-256 hashes. Those hashes
+identify the retained decoded bytes; they do not authenticate the remote source,
+record compressed wire bytes or prove remote immutability. Link this evidence
+using the delivery rules above.
+
+Scope conclusions to the records checked; a recorded zero
 is a source value, not proof of physical absence or a causal explanation.
 High latency or concurrency alone cannot identify queueing, saturation, or another
 bottleneck. Report observed values and unresolved causes.

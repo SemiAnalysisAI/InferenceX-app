@@ -56,7 +56,7 @@ find it manually:
 4. Compare the full row's ID, raw model, config identity, date, and parsed producer
    GitHub run ID with the discovery response. Stop on disagreement. Preserve
    the OpenAPI, sibling, and mapping responses with URLs, retrieval times, and
-   body checksums alongside the collector report so the entire discovery is
+   body checksums alongside the collector bundle so the entire discovery is
    reviewable.
 
 The sibling response supplies partial identity and source scope. It does not
@@ -100,7 +100,7 @@ preserved but are never converted into diagnostic request IDs.
 
 ## Read producer identity separately from the curve snapshot
 
-The report preserves the complete selected API row in `selected_result`, including
+`result.json` preserves the complete selected API row in `selected_result`, including
 unknown fields. Missing optional fields remain absent, and nulls, zeroes, and
 false values retain their meaning. In particular:
 
@@ -149,7 +149,7 @@ node .agents/skills/inferencex-api/scripts/inferencex.mjs result inspect \
 ```
 
 Offsets count Unicode characters, not bytes or lines. Limits are 1–262,144
-characters; offsets are 0–2,000,000,000. The report validates the returned result
+characters; offsets are 0–2,000,000,000. The collector validates the returned result
 ID, filename, offset, and continuation before attaching the log. It preserves the
 original chunk, inspected character count, `partial`, and `more_available`.
 `nextOffset` is a possible next window, not permission to read the entire file.

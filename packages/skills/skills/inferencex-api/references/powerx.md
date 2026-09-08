@@ -377,8 +377,8 @@ fields, separate from `metrics`. JSON retains them when present, including null
 workers. Their absence does not prevent export or justify inventing audit evidence.
 
 Deliver the export with the selected workload/model keys, measurement dates,
-request URL, retrieval time, package version, and coverage summary. State that this
-is extraction of existing observations and that no new benchmark runs occurred.
+coverage summary, and a link to its manifest. State that this extracts existing
+observations and that no new benchmark runs occurred.
 Use the recorded request and local filters to repeat the procedure; live data can
 change, so a saved URL alone does not freeze an immutable result.
 
