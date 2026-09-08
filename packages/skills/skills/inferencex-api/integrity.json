@@ -2,7 +2,7 @@
   "schema_version": 1,
   "package_version": "0.12.0",
   "files": {
-    "SKILL.md": "dc3dad16898a87d6255d3219d23939a668b95c28e7e659c268b344670fd659f2",
+    "SKILL.md": "90b20c02ed5f8a0a4804bff691fc62250a8e056b0f83cdda9eb016c313b5b4e9",
     "references/agentx.md": "402458b895dcbc4c8f19b5ed67131ababe7432fe4f2435cf4d91ea11a362fb9a",
     "references/cli-contract.md": "2e45686428c04a3abef56ff872310a3638c9ecfcd38fd027f897853d5f93253f",
     "references/cli.md": "61643e5a4d145fe491b445d7919ed92df4e95d9aa6baaf42910179c9557462f7",
