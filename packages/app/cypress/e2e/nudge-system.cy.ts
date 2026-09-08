@@ -176,10 +176,10 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
 
     // Body click must not write the dismissal key — the banner should still
-    // render on a fresh visit to landing. Reset the document first so dev
-    // server hot reloads cannot restore the outgoing chart route.
-    cy.visit('about:blank');
-    cy.visit('/');
+    // render after returning home and reloading the landing page.
+    cy.get('[data-testid="nav-link-home"]').click();
+    cy.location('pathname').should('eq', '/');
+    cy.reload();
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
     });
