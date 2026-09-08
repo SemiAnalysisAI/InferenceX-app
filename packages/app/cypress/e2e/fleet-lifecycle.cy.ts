@@ -214,6 +214,37 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
   });
 
+  it('keeps benchmark and chart controls inside their panels on phones and desktops', () => {
+    for (const width of [375, 1440]) {
+      cy.viewport(width, 900);
+      cy.get('[data-testid="fleet-benchmark-panel"]').within(() => {
+        cy.get('legend').should('have.text', 'Benchmark Config');
+        cy.get('#fleet-model').should('exist');
+        cy.get('#fleet-sequence').should('exist');
+        cy.get('#fleet-precision').should('exist');
+      });
+      cy.get('[data-testid="fleet-chart-panel"]').within(() => {
+        cy.get('legend').should('have.text', 'Chart Config');
+        cy.get('#fleet-cost').should('exist');
+        cy.get('#fleet-cost-type').should('exist');
+        cy.get('#fleet-target').should('exist');
+      });
+      cy.get('[data-testid="fleet-controls"] fieldset').should(($panels) => {
+        for (const panel of $panels) {
+          const bounds = panel.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(width);
+          for (const control of panel.querySelectorAll('input, button[role="combobox"]')) {
+            const rect = control.getBoundingClientRect();
+            expect(rect.left, `${control.id} left`).to.be.at.least(bounds.left);
+            expect(rect.right, `${control.id} right`).to.be.at.most(bounds.right);
+          }
+        }
+      });
+      assertFleetControlLabels();
+    }
+  });
+
   it('keeps fleet economics inputs together in the assumptions group', () => {
     cy.viewport(1280, 900);
     cy.get('[data-testid="calculator-lifecycle-section"] fieldset').should('have.length', 2);
@@ -1043,6 +1074,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
 
   it('translates the section, including the table headers and notes', () => {
     assertFleetControlLabels('zh');
+    cy.get('[data-testid="fleet-benchmark-panel"] legend').should('have.text', '基准测试配置');
+    cy.get('[data-testid="fleet-chart-panel"] legend').should('have.text', '图表配置');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', '集群生命周期')
       .and('contain.text', '设施功率 (MW)');

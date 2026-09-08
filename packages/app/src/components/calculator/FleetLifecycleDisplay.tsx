@@ -21,6 +21,7 @@ import {
 } from '@/components/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
@@ -76,6 +77,8 @@ const STRINGS = {
     title: 'Fleet Lifecycle',
     description:
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
+    benchmarkGroup: 'Benchmark Config',
+    chartGroup: 'Chart Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
@@ -98,6 +101,8 @@ const STRINGS = {
     title: '集群生命周期',
     description:
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
+    benchmarkGroup: '基准测试配置',
+    chartGroup: '图表配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
@@ -375,20 +380,24 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
             />
 
             <TooltipProvider delayDuration={0}>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                  isAgenticSequence ? 'lg:grid-cols-6' : 'lg:grid-cols-5'
+              <ControlPanel
+                legend={t.benchmarkGroup}
+                data-testid="fleet-benchmark-panel"
+                className={`grid-cols-1 md:grid-cols-2 ${
+                  isAgenticSequence && featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
                 }`}
               >
-                <ModelSelector
-                  id="fleet-model"
-                  data-testid="fleet-model-selector"
-                  value={selectedModel}
-                  onChange={handleModelChange}
-                  open={openDropdown === 'model'}
-                  onOpenChange={handleDropdownOpenChange('model')}
-                  availableModels={availableModels}
-                />
+                <div className="min-w-0 md:col-span-2">
+                  <ModelSelector
+                    id="fleet-model"
+                    data-testid="fleet-model-selector"
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    open={openDropdown === 'model'}
+                    onOpenChange={handleDropdownOpenChange('model')}
+                    availableModels={availableModels}
+                  />
+                </div>
                 <ScenarioSelector
                   id="fleet-sequence"
                   data-testid="fleet-sequence-selector"
@@ -416,8 +425,13 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   onOpenChange={handleDropdownOpenChange('precision')}
                   availablePrecisions={availablePrecisions}
                 />
-
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
+              </ControlPanel>
+              <ControlPanel
+                legend={t.chartGroup}
+                data-testid="fleet-chart-panel"
+                className="grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+              >
+                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
                   <LabelWithTooltip
                     htmlFor="fleet-cost"
                     label={t.costProviderLabel}
@@ -454,7 +468,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 </div>
 
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
                   <LabelWithTooltip
                     htmlFor="fleet-cost-type"
                     label={t.tokenTypeLabel}
@@ -486,91 +500,92 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     />
                   </div>
                 </div>
-              </div>
+                {showsTcoBasis && (
+                  <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                      tooltip={
+                        locale === 'zh'
+                          ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                          : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                      }
+                    />
+                    <TcoBasisToggle source="fleet" className="md:h-9" />
+                  </div>
+                )}
 
-              {showsTcoBasis && (
-                <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
-                    tooltip={
-                      locale === 'zh'
-                        ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                        : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                    }
-                  />
-                  <TcoBasisToggle source="fleet" className="h-9" />
-                </div>
-              )}
-
-              {/* Target value slider + input */}
-              {!loading && hasData && (
-                <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="fleet-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <input
-                        id="fleet-target"
-                        type="range"
-                        min={currentRange.min}
-                        max={currentRange.max}
-                        step={1}
-                        value={targetValue}
-                        onChange={handleSliderChange}
-                        onPointerUp={() =>
-                          track('fleet_target_slider_set', { mode, value: targetValue })
-                        }
-                        className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
+                {/* Target value slider + input */}
+                {!loading && hasData && (
+                  <div className="space-y-2 md:col-span-2 xl:col-span-3">
+                    <LabelWithTooltip
+                      htmlFor="fleet-target"
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      tooltip={
+                        isAgenticSequence
+                          ? t.targetAgenticTooltip(percentileLabel)
+                          : t.targetTooltip
+                      }
+                    />
+                    <div className="flex items-center gap-4">
+                      <div className="min-w-0 flex-1">
+                        <input
+                          id="fleet-target"
+                          type="range"
+                          min={currentRange.min}
+                          max={currentRange.max}
+                          step={1}
+                          value={targetValue}
+                          onChange={handleSliderChange}
+                          onPointerUp={() =>
+                            track('fleet_target_slider_set', { mode, value: targetValue })
+                          }
+                          className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
                         [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
                         [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
                         [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
                         [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                      />
-                      <div
-                        className="relative h-4 text-xs text-muted-foreground"
-                        style={{ marginLeft: 8, marginRight: 8 }}
-                      >
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span
-                            key={i}
-                            className="absolute -translate-x-1/2"
-                            style={{ left: `${(i / 5) * 100}%` }}
-                          >
-                            {Math.round(
-                              currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                            )}
-                          </span>
-                        ))}
+                        />
+                        <div
+                          className="relative h-4 text-xs text-muted-foreground"
+                          style={{ marginLeft: 8, marginRight: 8 }}
+                        >
+                          {Array.from({ length: 6 }, (_, i) => (
+                            <span
+                              key={i}
+                              className="absolute -translate-x-1/2"
+                              style={{ left: `${(i / 5) * 100}%` }}
+                            >
+                              {Math.round(
+                                currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
+                              )}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                      <Input
+                        type="number"
+                        aria-label={
+                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                        }
+                        value={resolveCalculatorTargetInputValue(
+                          inputValue,
+                          targetValue,
+                          isTargetInputFocused,
+                        )}
+                        onFocus={handleInputFocus}
+                        onChange={handleInputChange}
+                        onBlur={handleInputBlur}
+                        className="w-24 shrink-0"
+                        min={0}
+                      />
                     </div>
-                    <Input
-                      type="number"
-                      aria-label={
-                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                      }
-                      value={resolveCalculatorTargetInputValue(
-                        inputValue,
-                        targetValue,
-                        isTargetInputFocused,
-                      )}
-                      onFocus={handleInputFocus}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      className="w-24"
-                      min={0}
-                    />
                   </div>
-                </div>
-              )}
+                )}
+              </ControlPanel>
             </TooltipProvider>
 
             {!loading && legendItems.length > 0 && (
