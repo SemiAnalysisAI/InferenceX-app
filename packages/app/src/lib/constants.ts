@@ -36,12 +36,15 @@ export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS):
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
+  // The TCO basis only reprices the owning tier: Google's internal owner cost vs
+  // what an external buyer pays. The rental tier is a customer renting from GCP
+  // at the 3-year commit rate, which does not change with the basis.
   const internalCost = base === 'tpuv7' ? 1.03 : undefined;
   return {
     tdp: entry.tdp,
     power: entry.power,
     costh: basis === 'internal' ? (internalCost ?? entry.costh) : entry.costh,
-    costr: basis === 'internal' ? (internalCost ?? entry.costr) : entry.costr,
+    costr: entry.costr,
   };
 }
 
