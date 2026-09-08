@@ -17,6 +17,22 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
+const schemas = JSON.parse(readFileSync(join(packageRoot, 'skills/inferencex-api/schemas.json')));
+const validateDoctor = new Ajv2020({ strict: true, validateFormats: false }).compile(
+  schemas.doctor,
+);
+const apiPaths = [
+  '/api/v1/benchmarks',
+  '/api/v1/benchmarks/history',
+  '/api/v1/workflow-info',
+  '/api/v1/server-log',
+  '/api/v1/tco-feed',
+  '/api/v1/agentic-aggregates',
+  '/api/v1/derived-agentic-metrics',
+  '/api/v1/trace-availability',
+  '/api/v1/collectivex/runs',
+  '/api/v1/collectivex/runs/{runId}',
+];
 
 function doctor(args, cwd) {
   return suite.query(['doctor', ...args], cwd);
@@ -33,6 +49,11 @@ function failure(result) {
   const diagnostic = JSON.parse(result.stderr);
   assert.equal(diagnostic.error.code, 'INSTALLATION_UNHEALTHY');
   assert.ok(diagnostic.error.details.failures.length > 0);
+  assert.equal(
+    validateDoctor(diagnostic.error.details),
+    true,
+    JSON.stringify(validateDoctor.errors),
+  );
   return diagnostic.error.details;
 }
 
@@ -127,6 +148,33 @@ test('doctor validates a selected installation version independently of the exec
   assert.equal(readFileSync(join(skill, 'local-user-file.txt'), 'utf8'), 'ignored\n');
 });
 
+for (const [name, contents, invalidManifest] of [
+  ['bad JSON', '{', false],
+  ['bad fields', JSON.stringify({ package: 'wrong-package', version: 123 }), false],
+  ['version mismatch', JSON.stringify({ package: packageInfo.name, version: '0.10.7' }), false],
+  ['no valid version', JSON.stringify({ package: packageInfo.name, version: [] }), true],
+]) {
+  test(`doctor keeps invalid receipts out of its report: ${name}`, () => {
+    const { cwd, skill, skillsRoot } = installed();
+    const receiptPath = join(skill, '.inferencex-skills.json');
+    writeFileSync(receiptPath, contents);
+    if (invalidManifest) writeFileSync(join(skill, 'integrity.json'), '{');
+    const report = failure(doctor(['--dir', skillsRoot], cwd));
+    assert.ok(report.failures.some(({ check }) => check === 'installer_receipt'));
+    assert.equal(report.selected_installation.state, 'unknown');
+    assert.equal(
+      report.selected_installation.version,
+      invalidManifest ? null : packageInfo.version,
+    );
+    assert.deepEqual(report.selected_installation.receipt, {
+      status: 'invalid_or_missing',
+      package: null,
+      version: null,
+    });
+    assert.equal(readFileSync(receiptPath, 'utf8'), contents);
+  });
+}
+
 for (const ownerPid of [2_147_483_647, process.pid])
   test(`installer owner ${ownerPid === process.pid ? 'alive' : 'exited'} is reported without changing the transaction`, () => {
     const { cwd, skill, skillsRoot } = installed();
@@ -158,11 +206,6 @@ for (const ownerPid of [2_147_483_647, process.pid])
       report.selected_installation.transaction.state,
       ownerPid === process.pid ? 'active' : 'recovery_needed',
     );
-    const schemas = JSON.parse(
-      readFileSync(join(packageRoot, 'skills/inferencex-api/schemas.json')),
-    );
-    const validate = new Ajv2020({ strict: true, validateFormats: false }).compile(schemas.doctor);
-    assert.equal(validate(report), true, JSON.stringify(validate.errors));
     assert.ok(report.failures.some(({ check }) => check === 'installer_transaction'));
     assert.deepEqual(readFileSync(marker), before);
     assert.ok(lstatSync(transaction).isDirectory());
@@ -216,18 +259,6 @@ syncBuiltinESMExports();
 test('--check-api performs one bounded OpenAPI GET with an explicit scope', () => {
   const cwd = suite.project('doctor api-');
   const events = join(cwd, 'events.jsonl');
-  const paths = [
-    '/api/v1/benchmarks',
-    '/api/v1/benchmarks/history',
-    '/api/v1/workflow-info',
-    '/api/v1/server-log',
-    '/api/v1/tco-feed',
-    '/api/v1/agentic-aggregates',
-    '/api/v1/derived-agentic-metrics',
-    '/api/v1/trace-availability',
-    '/api/v1/collectivex/runs',
-    '/api/v1/collectivex/runs/{runId}',
-  ];
   const result = withNodeOptions(
     `
 import { appendFileSync } from 'node:fs';
@@ -242,7 +273,7 @@ globalThis.fetch = async (url, options) => {
   return new Response(${JSON.stringify(
     JSON.stringify({
       openapi: '3.1.0',
-      paths: Object.fromEntries(paths.map((path) => [path, { get: {} }])),
+      paths: Object.fromEntries(apiPaths.map((path) => [path, { get: {} }])),
     }),
   )}, { headers: { 'content-type': 'application/json' } });
 };
@@ -263,6 +294,29 @@ globalThis.fetch = async (url, options) => {
       .filter(({ type }) => type === 'timeout')
       .every(({ milliseconds }) => milliseconds <= 10_000),
   );
+});
+
+test('--check-api rejects missing and malformed GET declarations', () => {
+  const cwd = suite.project('doctor invalid api-');
+  for (const get of [undefined, null, [], false, 0, 'GET']) {
+    const document = {
+      openapi: '3.1.0',
+      paths: Object.fromEntries(apiPaths.map((path) => [path, { get: {} }])),
+    };
+    document.paths['/api/v1/benchmarks'] = { get };
+    const report = withNodeOptions(
+      `globalThis.fetch = async () => new Response(${JSON.stringify(JSON.stringify(document))});`,
+      () => failure(doctor(['--check-api'], cwd)),
+    );
+    assert.equal(report.api_check.status, 'failed');
+    assert.equal(report.api_check.request_count, 1);
+    assert.ok(
+      report.failures.some(
+        ({ check, reason }) =>
+          check === 'api_contract' && reason.includes('GET /api/v1/benchmarks'),
+      ),
+    );
+  }
 });
 
 test('--check-api does not retry a retryable HTTP failure', () => {

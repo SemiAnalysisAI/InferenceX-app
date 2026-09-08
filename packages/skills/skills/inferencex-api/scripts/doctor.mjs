@@ -242,18 +242,19 @@ export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = 
   let receipt = null;
   if (options.external && physicalRoot !== undefined) {
     try {
-      receipt = parseJson(
+      const candidate = parseJson(
         await readBoundedRegular(join(physicalRoot, RECEIPT), RECEIPT_LIMIT, 'installer receipt', {
           signal,
         }),
         'Installer receipt',
       );
-      if (!object(receipt) || receipt.package !== PACKAGE_NAME || !semver(receipt.version)) {
+      if (!object(candidate) || candidate.package !== PACKAGE_NAME || !semver(candidate.version)) {
         throw new Error('Installer receipt has an invalid package or version');
       }
-      if (manifest !== undefined && receipt.version !== manifest.package_version) {
+      if (manifest !== undefined && candidate.version !== manifest.package_version) {
         throw new Error('Installer receipt version disagrees with the selected integrity manifest');
       }
+      receipt = candidate;
     } catch (error) {
       rethrowCancellation(error);
       addFailure(
@@ -338,8 +339,8 @@ export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = 
         throw new Error('OpenAPI response does not declare OpenAPI 3');
       }
       for (const path of OPERATIONS) {
-        if (response.body.paths?.[path]?.get === undefined) {
-          throw new Error(`OpenAPI operation is missing: GET ${path}`);
+        if (!object(response.body.paths?.[path]?.get)) {
+          throw new Error(`OpenAPI operation is missing or invalid: GET ${path}`);
         }
       }
       apiCheck = {
