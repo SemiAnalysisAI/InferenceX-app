@@ -158,6 +158,7 @@ async function readTransaction(destination, transaction, recoveryTransactionId =
       await readBoundedRegular(paths.marker, 64 * 1024, 'installer transaction marker'),
     );
   } catch (error) {
+    if (error.cause?.code === 'ENOENT') return { state: 'missing' };
     return blocked(
       error instanceof SyntaxError
         ? 'installer transaction marker is malformed'

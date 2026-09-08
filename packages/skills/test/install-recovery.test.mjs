@@ -690,6 +690,37 @@ test('simultaneous installs serialize and the second observes the first result',
   assert.equal(lstatSync(transaction, { throwIfNoEntry: false }), undefined);
 });
 
+test('status rechecks installation when cleanup removes a marker before open', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  const { path } = writeTransactionMarker(transaction, destination, { phase: 'cleanup' });
+
+  const result = runWithPreload(
+    ['status', '--json'],
+    cwd,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.promises.open;
+      fs.promises.open = async (path, ...args) => {
+        if (path === ${JSON.stringify(path)}) {
+          fs.rmSync(${JSON.stringify(transaction)}, { recursive: true });
+        }
+        return original(path, ...args);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+
+  assert.equal(JSON.parse(succeeded(result).stdout).installation_state, 'installed');
+  assert.deepEqual(snapshot(destination), before);
+  assert.equal(existsSync(transaction), false);
+});
+
 test('a contender waits while the transaction owner writes its initial marker', async () => {
   const cwd = project();
   const destination = join(cwd, '.claude/skills/inferencex-api');

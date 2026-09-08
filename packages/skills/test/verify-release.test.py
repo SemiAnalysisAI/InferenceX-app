@@ -1297,6 +1297,23 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
                 with self.assertRaisesRegex(ValueError, 'Release (selection|matching)'):
                     check.check_bundle(directory, self.VERSION)
 
+    def test_release_zero_baseline_requires_null_percent_change(self):
+        directory = self.fixtures()['releases']
+        self.rehash_response(directory, 0, lambda rows:
+                             rows[0]['metrics'].update(median_ttft=0))
+        self.rehash_result(directory, lambda result: (
+            result['selection']['before']['rows'][0]['metrics'].update(median_ttft=0),
+            result['comparisons'][0]['metric'].update(
+                before=0, delta=15, percent_change=None, status='zero_baseline')))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        for percent, status in ((999, 'zero_baseline'), (None, 'observed_change')):
+            with self.subTest(percent=percent, status=status):
+                self.rehash_result(directory, lambda result:
+                                   result['comparisons'][0]['metric'].update(
+                                       percent_change=percent, status=status))
+                with self.assertRaisesRegex(ValueError, 'Release zero baseline'):
+                    check.check_bundle(directory, self.VERSION)
+
     def test_release_snapshot_reuse_requires_one_consistent_producer_observation(self):
         directory = self.fixtures()['releases']
         def carried(row):

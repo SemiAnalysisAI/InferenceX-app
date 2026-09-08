@@ -304,8 +304,10 @@ test('--check-api rejects missing and malformed GET declarations', () => {
       paths: Object.fromEntries(apiPaths.map((path) => [path, { get: {} }])),
     };
     document.paths['/api/v1/benchmarks'] = { get };
+    writeFileSync(join(cwd, 'openapi.json'), JSON.stringify(document));
     const report = withNodeOptions(
-      `globalThis.fetch = async () => new Response(${JSON.stringify(JSON.stringify(document))});`,
+      `import { readFileSync } from 'node:fs';
+       globalThis.fetch = async () => new Response(readFileSync('openapi.json'));`,
       () => failure(doctor(['--check-api'], cwd)),
     );
     assert.equal(report.api_check.status, 'failed');

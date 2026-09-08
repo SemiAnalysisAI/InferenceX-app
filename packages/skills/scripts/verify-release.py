@@ -1543,6 +1543,10 @@ def check_bundle(directory, version, expected_kind=None):
             if finite(before) and finite(after) and before != 0:
                 require(math.isclose(metric['percent_change'], (after - before) / before * 100,
                                      rel_tol=1e-12), 'Release percent change differs')
+            elif finite(before) and finite(after):
+                require(metric.get('percent_change') is None and
+                        metric.get('status') == 'zero_baseline',
+                        'Release zero baseline requires a null percent change and zero_baseline status')
         require(result['metadata']['causal_attribution'] == 'not_established',
                 'Release result overclaims causality')
         require(result['metadata'].get('statistical_verdict') == 'not_established',
