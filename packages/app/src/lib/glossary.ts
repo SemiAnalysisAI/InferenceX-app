@@ -61,6 +61,7 @@ const AGENTX_QWEN_B300 = 'qwen3-5-397b-agentx-b300-fp4-vs-h100';
 const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
+const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
 
 const entries = [
   {
@@ -2523,6 +2524,571 @@ const entries = [
       'inference-engine',
     ],
     articleSlugs: [MI355X_KIMI, SGLANG_056],
+  },
+  {
+    slug: 'tpu',
+    term: 'Tensor Processing Unit',
+    abbreviation: 'TPU',
+    aliases: ['TPU', 'Google TPU', 'Cloud TPU'],
+    category: 'Hardware',
+    plainEnglish:
+      'A TPU is the accelerator Google designs for its own AI workloads and now sells or rents to other companies for inference.',
+    definition:
+      'A Tensor Processing Unit is a Google-designed accelerator built around large systolic matrix units, an on-chip vector memory, SparseCores for irregular work, and a chip-to-chip fabric called ICI.',
+    explanation:
+      'TPUs run Search, Ads, YouTube, and every Gemini generation inside Google. Each chip pairs TensorCores, whose MXU systolic arrays do the matrix multiplies, with SparseCores that handle embedding lookups and data movement. The XLA compiler schedules work across those units, and Pallas kernels cover operations the compiler does not tile well. Chips connect through ICI into pods of thousands of devices without passing through a host CPU. Ironwood (TPUv7) is the first generation Google offers for outside inference customers, and the TPUv8 lineup splits into 8t for training and 8i for inference.',
+    significance:
+      'The design trades single-chip peak for system-level cost. Wide matrix units, a low-latency torus, and compiler-driven scheduling give Google a lower cost per token than a spec sheet would predict, but tile geometry punishes model shapes that do not fill the array. External adoption depends on the PyTorch-native TorchTPU stack reaching parity with the CUDA ecosystem in vLLM and SGLang.',
+    benchmarkContext:
+      'The InferenceX Official Preview publishes the first third-party TPUv7 results, comparing FP8 aggregated serving against B200 and B300. Ironwood reaches up to 50% better performance per dollar in that comparison, and AgentX and disaggregated TPU results follow once the TorchTPU stack is open sourced.',
+    relatedTerms: ['tpuv7-ironwood', 'mxu', 'sparsecore', 'ici', 'torchtpu', 'xla'],
+    articleSlugs: [TPU_IRONWOOD, VR_RUBIN],
+  },
+  {
+    slug: 'tpuv7-ironwood',
+    term: 'TPUv7 Ironwood',
+    aliases: ['Ironwood', 'TPU v7', 'TPUv7', 'v7x'],
+    category: 'Hardware',
+    plainEnglish:
+      'Ironwood is the seventh-generation TPU and the first one Google sells for other companies to run their own inference on.',
+    definition:
+      'TPUv7 Ironwood is the Google accelerator with two independent compute dies per chip, native FP8 hardware, a 256x256 MXU, roughly six times the HBM of Trillium, and a 3D torus ICI fabric.',
+    explanation:
+      'Ironwood drops the MegaCore convention of TPU v4 and v5p, where two cores shared one memory space. Its two dies run as separate logical devices joined by a die-to-die link, so frameworks see two devices per chip. Each chip carries two TensorCores and four third-generation SparseCores. The base pod unit is a 4x4x4 cube of 64 chips, and optical circuit switches stitch cubes into a 9,216-chip superpod. Ironwood has no native FP4, so the current comparison against NVIDIA uses FP8 on both sides.',
+    significance:
+      'This is the first generation where Google competes for outside inference workloads with chips that can be bought outright or rented. Anthropic alone committed to more than one million TPUs. The FP8-only compute path caps the comparison against Blackwell until TPUv8i adds native FP4.',
+    benchmarkContext:
+      'In the InferenceX Official Preview, Ironwood serving Qwen3.5 397B in FP8 costs about $0.181 per million tokens at 100 tokens per second per user, against $0.222 for B200 and $0.276 for B300. At 20 tokens per second per user it delivers 50.4% more tokens per dollar than B200 and 96.0% more than B300 using external TCO.',
+    measurement: {
+      label: 'Cost at 100 tok/s/user, FP8 8k1k',
+      value: '$0.181 per million tokens vs $0.222 (B200) and $0.276 (B300)',
+    },
+    relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'mxu',
+    term: 'Matrix Multiply Unit',
+    abbreviation: 'MXU',
+    aliases: ['MXU', 'systolic array', 'TPU matrix unit'],
+    category: 'Hardware',
+    plainEnglish:
+      'The MXU is the grid of multiply-accumulate cells inside a TPU that does the matrix math, and it only runs at full speed when every cell has real work.',
+    definition:
+      'The Matrix Multiply Unit is the systolic array at the center of a TPU TensorCore, a two-dimensional grid of multiply-accumulate cells that holds weights stationary while activations stream through.',
+    explanation:
+      'Weights load into the array and stay put. Activations enter from one edge, partial sums ripple across the grid cell by cell, and the finished result streams out the far side without touching memory mid-computation. TPU generations through v5 used a 128x128 array, or 16,384 MACs per cycle. From v6e onward, including Ironwood, the array is 256x256, or 65,536 MACs per cycle. The XLA compiler pads any matrix dimension smaller than the array side up to fill the tile, and every padded cell still consumes a MAC that cycle.',
+    significance:
+      'A wider array is only free when it stays full. A head dimension of 128 on a 256-wide MXU caps the attention matmuls at 50% utilization, and a head dimension of 64 caps them at 25% before any kernel code is written. GPU matrix cores consume small tiles, so the same shapes cost almost nothing on an H100 or B200. Model hyperparameters that were arbitrary on GPUs become a direct throughput tax on TPUs.',
+    benchmarkContext:
+      'Bring-up cost on TPU correlates with how well a model fits the MXU rather than with how popular the model is. Qwen3.5 was chosen as the first TorchTPU bring-up model partly because its shapes fall out cleanly, and the Pallas kernel work described in the InferenceX Official Preview centers on keeping the array fed.',
+    relatedTerms: ['tpu', 'tile-padding', 'gemm', 'vmem', 'pallas', 'arithmetic-intensity'],
+    articleSlugs: [TPU_IRONWOOD, JALAPENO],
+  },
+  {
+    slug: 'sparsecore',
+    term: 'SparseCore',
+    aliases: ['SparseCores', 'TPU SparseCore', 'SC'],
+    category: 'Hardware',
+    plainEnglish:
+      'SparseCores are small helper cores on a TPU chip that handle irregular jobs such as gathers and data movement so the matrix units can keep multiplying.',
+    definition:
+      'A SparseCore is a specialized TPU core for sparse and irregular operations such as embedding lookups, gathers, permutations, and data movement, running alongside the dense TensorCores on the same chip.',
+    explanation:
+      'Ironwood has four third-generation SparseCores per chip next to two TensorCores. Dense matrix engines choke on ragged access patterns, so the TPU team moves that work to SparseCores. In the external serving stack, the MoE token permutation that gathers each expert’s tokens into contiguous groups, the top-k weight gather in the ragged gather-reduce path, and the ReduceScatter collective all run on SparseCore. The TensorCore keeps executing expert matmuls while the SparseCore rearranges data and moves partial sums, and double buffering overlaps the two.',
+    significance:
+      'Offload is not free. A collective that fits in VMEM can be slower on SparseCore than on the TensorCore because of launch overhead, so Qwen3.5 uses a VMEM-derived threshold to decide which all-reduce and all-gather operations move. Getting the split right is a recurring source of per-layer latency wins.',
+    benchmarkContext:
+      'The SparseCore MoE permutation rewrite reported 12% higher 8k1k serving throughput on Ironwood along with lower TTFT and TPOT. Moving the top-k weight gather cut TensorCore overhead from 29 to 14 microseconds in a DeepSeek-V3 microbenchmark, and the collective threshold gained 2.7% at concurrency 64 and 5.7% at concurrency 128.',
+    relatedTerms: ['tpu', 'mxu', 'vmem', 'mixture-of-experts', 'reduce-scatter', 'grouped-gemm'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'vmem',
+    term: 'Vector memory',
+    abbreviation: 'VMEM',
+    aliases: ['VMEM', 'TPU on-chip memory', 'vector memory'],
+    category: 'Hardware',
+    plainEnglish:
+      'VMEM is the fast on-chip scratch memory a TPU kernel works from, and how much of it a kernel uses decides how far ahead it can prefetch.',
+    definition:
+      'VMEM is the software-managed on-chip vector memory of a TPU TensorCore, the staging area that Pallas kernels fill from HBM and compute against, analogous to shared memory on a GPU.',
+    explanation:
+      'A Pallas kernel hides HBM latency by double buffering: it fetches the next block into VMEM while computing on the current one, so both blocks must fit at once. The size of the compute block therefore determines how deep the prefetch can be. The vector unit reads VMEM in tiles whose last dimension is 128 lanes wide, so arrays with a smaller trailing dimension are padded up. Recurrent state for Gated DeltaNet layers stays in FP32 inside VMEM even when it is stored in BF16 in HBM, which halves the HBM footprint without changing the arithmetic.',
+    significance:
+      'VMEM pressure shows up as regressions in unexpected places. Adding a second buffer set for asynchronous GDN state transfers initially broke data-parallel attention until scratch buffers were reused. Collective offload to SparseCore is gated on whether the message fits in VMEM. Kernel authors on TPU budget VMEM the way GPU kernel authors budget shared memory and registers.',
+    benchmarkContext:
+      'The ragged paged attention v3 fix split the KV compute block from the fetch block, keeping the fetch at 16k tokens while reducing compute to 4k, which freed VMEM for the prefetch buffer and lifted decode throughput from 64.9k to 96.3k tokens per second on Qwen3-0.6B. The asynchronous GDN state transfer gained 11.3% at concurrency 512 once VMEM capacity was recovered.',
+    relatedTerms: ['mxu', 'pallas', 'double-buffering', 'high-bandwidth-memory', 'sparsecore'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'ici',
+    term: 'Inter-Chip Interconnect',
+    abbreviation: 'ICI',
+    aliases: ['ICI', 'TPU interconnect', 'ICI fabric'],
+    category: 'Hardware',
+    plainEnglish:
+      'ICI is the custom network that lets TPU chips exchange data directly with each other across a whole pod without going through the host CPU.',
+    definition:
+      'ICI is Google’s chip-to-chip interconnect for TPUs, a point-to-point fabric that carries activations, gradients, and KV-cache traffic between chips without routing through PCIe or a general-purpose NIC.',
+    explanation:
+      'Each TPU has ICI links to its torus neighbors: four on the 2D torus of v2 and v3, six on the 3D torus from v4 onward. Optical circuit switches join 64-chip cubes into pods of thousands of chips while preserving the wraparound links. The result is NVLink-class bandwidth across an entire pod rather than across eight or 72 devices. TPU 8i doubles ICI bandwidth to 19.2 Tb/s per chip and moves from the torus to the Boardfly topology.',
+    significance:
+      'Pod-wide bandwidth changes what parallelism is practical. A DeepSeek-V3-scale model can be sharded across a pod with tensor, expert, and data parallelism without pipeline stages, and Ironwood pods scaling past 1,000 chips can run disaggregated serving and ultra-wide expert parallelism that an NVL72 domain cannot. A torus has more hops than a single-hop NVSwitch, so latency depends on message size and topology.',
+    benchmarkContext:
+      'The InferenceX Official Preview notes that upcoming CollectiveX and NetworkingX results show the TPU torus often has lower latency than a single-hop NVSwitch for the small expert-parallel messages MoE decode produces. The ICI fabric is also where the SparseCore ReduceScatter overlaps die-to-die and chip-to-chip transfers.',
+    relatedTerms: [
+      'torus-topology',
+      'optical-circuit-switch',
+      'boardfly',
+      'nvlink',
+      'scale-up-vs-scale-out',
+      'tpu',
+    ],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'torus-topology',
+    term: 'Torus topology',
+    aliases: ['3D torus', 'twisted torus', 'torus network'],
+    category: 'Hardware',
+    plainEnglish:
+      'A torus is a grid network whose edges wrap around and connect to each other, so the farthest chip is never more than half the grid away.',
+    definition:
+      'A torus topology connects each chip to its nearest neighbors along every axis and adds wraparound links between the ends of each row, forming rings that halve the worst-case hop distance of a plain mesh.',
+    explanation:
+      'TPU v2 and v3 used a 2D torus with four neighbors per chip. From v4 onward Google uses a 3D torus with six neighbors along the plus and minus X, Y, and Z axes, and Ironwood keeps that layout. The building block is a 4x4x4 cube of 64 chips sized to one rack. A twisted torus offsets the wraparound to shave the average hop count further. Optical circuit switches connect cubes while preserving the wraparound property, which lets Google rewire around a failed chip or link in seconds. Traffic that crosses many hops pays latency at each one, so collectives are scheduled to stay local where possible.',
+    significance:
+      'Before NVL72 racks, any model that did not fit in an eight-GPU node needed pipeline parallelism because inter-node InfiniBand was slow. The TPU torus gave NVLink-class bandwidth across an entire pod years earlier. The tradeoff is hop count: a 1,024-chip torus has a diameter around 16 hops, which is why TPU 8i moves to the flatter Boardfly network for inference.',
+    benchmarkContext:
+      'CollectiveX and NetworkingX measure collective latency directly. The InferenceX Official Preview reports that the TPU torus often beats a single-hop NVSwitch on latency for the small expert-parallel messages that dominate MoE decode, even though it has more hops.',
+    relatedTerms: ['ici', 'optical-circuit-switch', 'boardfly', 'all-to-all', 'expert-parallelism'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'optical-circuit-switch',
+    term: 'Optical circuit switch',
+    abbreviation: 'OCS',
+    aliases: ['OCS', 'optical switching', 'MEMS optical switch'],
+    category: 'Hardware',
+    plainEnglish:
+      'An optical circuit switch uses tiny mirrors to redirect light between fibers, letting Google rewire a TPU pod without touching a cable.',
+    definition:
+      'An optical circuit switch is a device that steers optical signals between fiber ports with movable mirrors, creating reconfigurable point-to-point links without converting the signal to electrical form or inspecting packets.',
+    explanation:
+      'Google uses OCS to stitch 4x4x4 TPU cubes into larger pods while preserving the torus wraparound links across the whole topology. Because the switch redirects light rather than routing packets, it adds negligible latency and no per-packet processing, and it can be reconfigured in software. Ironwood pods scale this way to a 9,216-chip superpod with 42.5 FP8 exaflops of aggregate compute. The same mechanism lets an operator carve a pod into smaller slices of arbitrary shape for different jobs.',
+    significance:
+      'The operational payoff is fault tolerance. A dead chip or failed link is bypassed in seconds by moving mirrors instead of sending a technician to re-splice copper in a live datacenter. Reconfigurability also means the physical pod does not dictate the logical topology, so a job can request the torus dimensions it wants.',
+    benchmarkContext:
+      'OCS is why TPU results in InferenceX are reported per chip within a pod rather than per fixed rack unit. The Official Preview compares aggregated TPUv7 serving against B200 and B300 nodes, with disaggregated pod-scale comparisons against NVL72 reserved for a follow-up.',
+    relatedTerms: ['torus-topology', 'ici', 'tpu', 'scale-up-vs-scale-out', 'infiniband'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'boardfly',
+    term: 'Boardfly',
+    aliases: ['Boardfly topology', 'TPU 8i network', 'TPUv8i Boardfly'],
+    category: 'Hardware',
+    plainEnglish:
+      'Boardfly is the new flatter network in Google’s inference-only TPU 8i that cuts the number of hops between chips roughly in half compared with a torus.',
+    definition:
+      'Boardfly is the high-radix, hierarchical interconnect topology of TPU 8i that replaces the nearest-neighbor 3D torus, named after the dragonfly family of supercomputer networks.',
+    explanation:
+      'TPU 8t, the training chip, keeps the 3D torus. TPU 8i, the inference chip, switches to Boardfly, a fabric of high-radix switches rather than a mesh of direct neighbor links. At comparable scale in the 1,024 to 1,152 chip range, network diameter falls from roughly 16 hops to about 7. TPU 8i pairs this with 19.2 Tb/s of ICI bandwidth, double the prior generation, and 384 MB of on-chip SRAM, three times the prior generation, sized to hold the KV cache of reasoning and agentic models on chip. It also brings native FP4 compute, which Ironwood lacks.',
+    significance:
+      'Fewer hops mean lower tail latency on collectives, which matters when tokens route across MoE layers or when a multi-turn agent session compounds every extra hop into user-visible latency. Boardfly also changes networking attachment capex per chip. This is the first time Google has split training and inference into separate architectures.',
+    benchmarkContext:
+      'SemiAnalysis expects TPUv8i Boardfly to be competitive with Rubin NVL72. When TPUv8i lands on InferenceX and AgentX, the comparison against NVIDIA moves from FP8 versus FP8 to FP4 versus FP4, removing the quality asymmetry in the current Ironwood results.',
+    relatedTerms: ['ici', 'torus-topology', 'tpu', 'tail-latency', 'fp4', 'all-to-all'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'tile-padding',
+    term: 'Tile padding',
+    aliases: ['shape padding', 'MXU padding', 'lane padding'],
+    category: 'Hardware',
+    plainEnglish:
+      'Tile padding is the wasted work a chip does when a matrix dimension is smaller than its hardware tile and gets filled with zeros to fit.',
+    definition:
+      'Tile padding is the rounding up of a tensor dimension to the native tile size of a compute or vector unit, with the padded cells occupying hardware cycles while contributing nothing to the result.',
+    explanation:
+      'On TPU the MXU side length is 128 on older generations and 256 on v6e and v7, and the vector unit works on tiles whose trailing dimension is 128 lanes. XLA pads any smaller axis to fill the tile. Llama 3 8B has a head dimension of 128, exactly half of a 256-wide MXU, which caps its two attention matmuls at 50% utilization. gpt-oss ships head dimension 64 and caps at 25%. DeepSeek MLA splits its query-key dimension into 128 plus 64 for 192, awkward against any power-of-two array. In the batched attention kernel, a single FP8 KV head per device left half of every tile as padding until a sequence-on-lane layout put tokens on the 128-lane axis instead.',
+    significance:
+      'GPU matrix cores consume small tiles, so head dimensions of 64 or 128 and odd post-sharding KV head counts land near peak on H100 or B200. On TPU the same choices are a direct throughput tax before any kernel is written. Bring-up cost therefore tracks how well a model fits the tile geometry rather than how popular it is.',
+    benchmarkContext:
+      'The sequence-on-lane KV layout doubled usable KV pages from 5,141 to 10,283 in the reported Ironwood configuration and lifted 8k1k throughput 16.5% at concurrency 128 while cutting median TTFT by 95%. Explicit packing dimensions in ragged paged attention exist to work around XLA default tiling.',
+    relatedTerms: [
+      'mxu',
+      'ragged-paged-attention',
+      'grouped-query-attention',
+      'gpu-utilization',
+      'xla',
+    ],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'torchtpu',
+    term: 'TorchTPU',
+    aliases: ['TorchTPU backend', 'native PyTorch TPU', 'torch device tpu'],
+    category: 'Software',
+    plainEnglish:
+      'TorchTPU makes a TPU look like an ordinary PyTorch device, so vLLM and SGLang can run their existing PyTorch code on Google chips.',
+    definition:
+      'TorchTPU is Google’s PyTorch-native TPU backend, built on the PrivateUse1 extension point, that exposes a real torch.Tensor on device tpu and lowers compiled graphs through StableHLO and XLA.',
+    explanation:
+      'The PyTorch dispatcher routes ATen operations to the TPU backend directly instead of translating them into JAX. Developers can run eagerly for bring-up and debugging, or call torch.compile, where TorchDynamo and AOTAutograd produce an FX graph, TorchTPU lowers it to StableHLO, and XLA emits the TPU executable. Inductor and Triton are not used. Native scope covers tensors, dispatch, eager execution, compile entrypoints, and distributed APIs including DDP, FSDP2, DTensor, and both SPMD and MPMD. The kernel layer stays TPU-specific: TorchTPU can call Pallas and JAX-backed custom kernels, so kernels written for the TorchAX stack migrate rather than restart.',
+    significance:
+      'vLLM and SGLang can reuse upstream model code, schedulers, continuous batching, and feature logic instead of rebuilding them across a PyTorch-to-JAX boundary. That lowers the cost of bringing up new models and moves TPU toward day-zero support alongside NVIDIA. TorchTPU replaces TorchAX, which will be deprecated.',
+    benchmarkContext:
+      'The TPUv7 results in the InferenceX Official Preview come from the native TorchTPU vLLM stack serving Qwen3.5 397B in FP8. TorchTPU is in private beta as of early September 2026 and is expected to be open sourced around mid-October at the PyTorch Conference, at which point SemiAnalysis moves TPU benchmarking from its fork to the public InferenceX repo.',
+    relatedTerms: ['torchax', 'xla', 'pallas', 'vllm', 'sglang', 'tpu'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'torchax',
+    term: 'TorchAX',
+    aliases: ['torchax', 'tpu-inference backend', 'PyTorch to JAX translation'],
+    category: 'Software',
+    plainEnglish:
+      'TorchAX let PyTorch model code run on TPUs by secretly translating each operation into JAX, an approach TorchTPU is now replacing.',
+    definition:
+      'TorchAX is a translation layer that intercepts PyTorch ATen operations through the __torch_dispatch__ hook and executes them as JAX operations, backing each torchax.tensor.Tensor with a jax.Array.',
+    explanation:
+      'vLLM TPU support went through three stages. The first prototype used PyTorch/XLA lazy execution to collect operations into graphs for XLA. The current public tpu-inference backend uses a TPU-optimized JAX model when one exists and otherwise runs the PyTorch model through TorchAX. State such as weights and the KV cache is exposed to JAX explicitly through functionalization so jax.jit can capture each step, and vLLM bypasses its usual torch.compile path because the JAX pipeline already handles graph capture. SGLang-JAX is a separate JAX-native engine that made a similar trade. Google chose JAX because it had more mature TPU primitives and parallelism support at the time.',
+    significance:
+      'Translating across two frameworks caused recurring issues with low-level optimization, paged attention, and fitting vLLM’s worker model to TPU execution, and it forced engine features to be reimplemented on the JAX side. Those costs prompted Google, PyTorch, vLLM, and SGLang to build TorchTPU instead.',
+    benchmarkContext:
+      'The Pallas kernels developed under TorchAX, including the MoE, GDN, and paged attention work described in the InferenceX Official Preview, carry over to TorchTPU because both stacks can invoke Pallas and JAX kernels. TorchAX itself is scheduled for deprecation once TorchTPU ships.',
+    relatedTerms: ['torchtpu', 'jax', 'xla', 'pallas', 'vllm'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'pallas',
+    term: 'Pallas',
+    aliases: ['Pallas kernels', 'JAX Pallas', 'TPU custom kernels'],
+    category: 'Software',
+    plainEnglish:
+      'Pallas is the way engineers write hand-tuned kernels for TPUs when the compiler alone does not schedule an operation well enough.',
+    definition:
+      'Pallas is the JAX extension for writing custom TPU and GPU kernels that control tiling, memory movement between HBM and VMEM, and the scheduling of MXU and vector unit work explicitly.',
+    explanation:
+      'XLA handles most of a model, but performance-critical operations such as ragged paged attention, grouped MoE matmuls, and Gated DeltaNet recurrences need explicit control over block sizes, double buffering, and lane layout. Pallas provides that control in Python. The TPU inference optimizations in the Official Preview are mostly Pallas kernels: GDN v3 fuses Conv1D and GDN into one kernel, the grouped matmul triple-buffers expert weights, and the attention kernel adopts a sequence-on-lane layout. Helion’s TPU backend also emits Pallas. TorchTPU can call Pallas kernels from native PyTorch, so kernels written for TorchAX transfer with wrapper and layout adjustments.',
+    significance:
+      'Pallas plays the role that CUDA C++, CUTLASS, and Triton play on NVIDIA. Native PyTorch support does not remove the need for it; tensor shapes and layouts still have to be tuned to feed the MXU. How fast the ecosystem writes Pallas kernels for new models sets the pace of TPU externalization.',
+    benchmarkContext:
+      'Reported Pallas kernel wins on Ironwood include GDN v3 speedups of 1.41x decode, 1.60x prefill, and 2.14x mixed batches at the kernel level, an 11.3% throughput gain at concurrency 512 from asynchronous state transfers, and a 49% decode throughput gain from splitting attention fetch and compute block sizes.',
+    relatedTerms: ['xla', 'jax', 'torchtpu', 'vmem', 'kernel-fusion', 'triton'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'xla',
+    term: 'XLA',
+    abbreviation: 'XLA',
+    aliases: ['Accelerated Linear Algebra', 'StableHLO', 'XLA compiler'],
+    category: 'Software',
+    plainEnglish:
+      'XLA is the compiler that turns a model graph into TPU machine code, deciding how to tile, pad, fuse, and schedule every operation.',
+    definition:
+      'XLA is the domain-specific compiler for linear algebra that consumes a StableHLO graph and produces executable code for TPUs and other accelerators, handling fusion, layout, tiling, and scheduling.',
+    explanation:
+      'Every TPU serving path ends in XLA. In the JAX path, jax.jit captures a step and hands it to XLA. In TorchTPU, TorchDynamo and AOTAutograd produce an FX graph that is lowered to StableHLO, the standardized intermediate representation, and XLA compiles it. XLA is the compiler in both cases; Inductor and Triton are not involved. The compiler pads any dimension smaller than the MXU tile, picks default layouts, and fuses elementwise work, which is efficient for regular shapes and costly for shapes that fight the tile geometry. Pallas exists for the cases where XLA’s defaults are not good enough.',
+    significance:
+      'Co-design between the compiler and the hardware is a large part of Google’s cost-per-token advantage: the chip, fabric, and compiler are designed together so computation and communication can be optimized as one system. The same tight coupling means model shapes and compiled shape buckets have outsized performance effects.',
+    benchmarkContext:
+      'Several Official Preview optimizations are about steering XLA rather than replacing it, including packing expert ID and token index into one sort key so XLA performs a simpler sort, which cut sort latency from 106.6 to 21.7 microseconds and enabled an FP8 all-gather.',
+    relatedTerms: ['torchtpu', 'jax', 'pallas', 'tile-padding', 'shape-bucketing', 'cuda-graphs'],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'jax',
+    term: 'JAX',
+    aliases: ['JAX framework', 'jax.jit', 'Google JAX'],
+    category: 'Software',
+    plainEnglish:
+      'JAX is Google’s Python framework for array computing that compiles functions through XLA and has been the native way to program TPUs.',
+    definition:
+      'JAX is a Python library for composable function transformations such as jit, grad, and vmap over NumPy-style arrays, compiled through XLA and used as the primary first-party framework for TPUs.',
+    explanation:
+      'JAX programs are functional: state such as model weights and the KV cache is passed in and out explicitly so jax.jit can trace a step into a graph. That model fits XLA well and made JAX the mature path for TPU primitives and parallelism, which is why the first external vLLM TPU backend translated PyTorch into JAX through TorchAX and why SGLang-JAX exists as a separate JAX-native engine. TorchTPU changes the relationship: PyTorch becomes the user-facing framework, but JAX-backed custom kernels and Pallas remain callable underneath, and TPU-Sync works natively with both JAX and TorchTPU.',
+    significance:
+      'The open-source serving ecosystem is written in PyTorch. Requiring engines to cross a PyTorch-to-JAX boundary slowed feature parity and model bring-up on TPU, so Google is moving the serving stack to PyTorch-native while keeping JAX and Pallas for kernels and for its own internal workloads.',
+    benchmarkContext:
+      'Initial Qwen3.5 TPU support added pure JAX implementations of causal Conv1D and Gated DeltaNet before later Pallas kernels optimized them. The InferenceX Official Preview numbers come from the TorchTPU vLLM stack rather than the JAX-translated tpu-inference backend.',
+    relatedTerms: ['xla', 'torchax', 'torchtpu', 'pallas', 'tpu'],
+    articleSlugs: [TPU_IRONWOOD, INFERENCEX_V2],
+  },
+  {
+    slug: 'tpu-sync',
+    term: 'TPU-Sync',
+    aliases: ['TPU-raiden', 'tpu-sync', 'TPU KV transfer library'],
+    category: 'Software',
+    plainEnglish:
+      'TPU-Sync is Google’s library for moving KV cache between TPUs and out to host memory, the plumbing that disaggregated serving and offloading need.',
+    definition:
+      'TPU-Sync, formerly TPU-raiden, is Google’s open-sourced disaggregated KV-cache transfer library for TPUs that performs zero-copy transfers by extracting native PJRTBuffer hardware descriptors.',
+    explanation:
+      'Prefill-decode disaggregation needs a fast path to move a finished prefill’s KV cache from one pool of chips to another, and KV-cache offloading needs a path from HBM to host DRAM and back. TPU-Sync supplies both. It works natively with JAX and with the TorchTPU stack, and it supports native TPU KV-cache DRAM offloading for large models and medium-to-large batches where HBM cannot hold every user’s cache. Google has run disaggregation internally for Gemini for years; externalizing it began only a couple of months before the Official Preview, alongside TPU support in llm-d.',
+    significance:
+      'Without a transfer library, TPU external serving is limited to aggregated mode, which is where the current results sit and where GB200 and GB300 NVL72 disaggregated serving currently leads on part of the curve. SemiAnalysis expects Mooncake Store support on TPU to be built on TPU-Sync primitives.',
+    benchmarkContext:
+      'The InferenceX Official Preview compares aggregated TPUv7 against aggregated B200 and B300. A TPUv7 disaggregated versus GB200 and GB300 NVL72 disaggregated comparison is planned for a follow-up once TPU-Sync-based disaggregation is optimized in the external stack.',
+    relatedTerms: [
+      'disaggregated-inference',
+      'kv-cache-offload',
+      'cpu-offloading',
+      'mooncake-store',
+      'llm-d',
+      'torchtpu',
+    ],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'mooncake-store',
+    term: 'Mooncake Store',
+    aliases: ['Mooncake', 'Mooncake KV store', 'P2P KV pooling'],
+    category: 'Software',
+    plainEnglish:
+      'Mooncake Store pools the host memory and NVMe drives across many servers into one shared KV-cache store that any accelerator in the cluster can read.',
+    definition:
+      'Mooncake Store is the open-source distributed KV-cache storage layer from the Mooncake project that aggregates DRAM and NVMe across serving nodes into a single logical pool with peer-to-peer access.',
+    explanation:
+      'With P2P pooling, the KV-cache storage on each host is presented as one logical memory pool, so an accelerator on any server can fetch cache written by any other server instead of only its own host. Mooncake Store also pools NVMe across servers and supports distributed filesystem backends such as WEKA and VAST. It is used with vLLM and SGLang on GPUs as the industry-standard offloading store, and Google is adding TPU support along with the DRAM P2P pooling mode, likely implemented on TPU-Sync primitives.',
+    significance:
+      'Agentic and multi-turn workloads reuse long prefixes across many requests and across sub-agent bursts. A cluster-wide pool raises the KV-cache hit rate well beyond what a single host’s DRAM allows, which is what makes high-concurrency agent serving economical once HBM is exhausted.',
+    benchmarkContext:
+      'AgentX results on GPUs already depend on offloading behavior, and the planned AgentX TPU results will exercise Mooncake Store and TPU-Sync on Ironwood. The InferenceX Official Preview lists Mooncake support as one of the next externalization steps after disaggregation.',
+    relatedTerms: [
+      'kv-cache-offload',
+      'nvme-offloading',
+      'cpu-offloading',
+      'tpu-sync',
+      'prefix-cache-hit-rate',
+      'kv-cache-manager',
+    ],
+    articleSlugs: [TPU_IRONWOOD, AGENTX_V3, KIMI_K3],
+  },
+  {
+    slug: 'llm-d',
+    term: 'llm-d',
+    aliases: ['llm-d project', 'Kubernetes LLM serving', 'distributed inference orchestrator'],
+    category: 'Software',
+    plainEnglish:
+      'llm-d is a Kubernetes-native framework that runs vLLM across many nodes with smart routing, prefix-aware scheduling, and disaggregated prefill and decode.',
+    definition:
+      'llm-d is an open-source distributed inference serving framework built on Kubernetes and vLLM that provides KV-aware routing, prefill-decode disaggregation, and multi-node scheduling for large model deployments.',
+    explanation:
+      'A single vLLM instance serves one replica. Production deployments need a layer that routes each request to the replica most likely to hold its prefix in cache, splits prefill and decode across separate pools, and scales those pools independently. llm-d supplies that orchestration, backed by Red Hat, Google, and other contributors. TPU support in llm-d is part of Google’s externalization work for prefill-decode disaggregation, alongside the TPU-Sync transfer library, so external TPU customers can run the same disaggregated topology Google uses internally for Gemini.',
+    significance:
+      'Disaggregation and KV-aware routing are where much of the remaining performance-per-dollar gain sits for TPU, and they only exist above the engine. Shipping TPU support in a widely used orchestrator matters as much as the engine backend for making those features usable outside Google.',
+    benchmarkContext:
+      'InferenceX single-node aggregated results do not exercise llm-d. The planned TPUv7 disaggregated comparison against GB200 and GB300 NVL72 depends on the llm-d and TPU-Sync work landing in the external stack.',
+    relatedTerms: [
+      'disaggregated-inference',
+      'kv-aware-routing',
+      'tpu-sync',
+      'vllm',
+      'nvidia-dynamo',
+    ],
+    articleSlugs: [TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'double-buffering',
+    term: 'Double buffering',
+    aliases: ['triple buffering', 'prefetch pipelining', 'DMA overlap'],
+    category: 'Software',
+    plainEnglish:
+      'Double buffering fetches the next chunk of data while the chip is still computing on the current one, so memory latency is hidden behind useful work.',
+    definition:
+      'Double buffering is a kernel technique that allocates two on-chip buffers so a DMA transfer into one overlaps computation on the other, with triple buffering extending the same idea to a deeper pipeline.',
+    explanation:
+      'On TPU a Pallas kernel hides HBM latency by fetching the next block into VMEM while the MXU works on the current block. Both blocks must fit in VMEM, so compute block size sets how far ahead the prefetch can run. The SparseCore ReduceScatter uses double buffering to transfer one chunk while accumulating another, overlapping local reductions and die-to-die transfers with slower chip-to-chip traffic. The grouped matmul triple-buffers expert weights so the next group’s weights are in flight while the current group computes. Asynchronous GDN state transfers use the same pattern, which initially cost VMEM until scratch buffers were reused.',
+    significance:
+      'Much of the reported TPU kernel gain comes from overlap rather than from faster arithmetic. Getting the buffer budget wrong shows up as either exposed memory latency or VMEM regressions elsewhere in the kernel.',
+    benchmarkContext:
+      'Splitting the ragged paged attention compute block from the fetch block gave the prefetch pipeline room and raised decode throughput 49% on Qwen3-0.6B. Asynchronous GDN state transfers gained 11.3% on 8k1k at concurrency 512 once VMEM was recovered. Batched ragged paged attention triple-buffers to reduce padding and improve pipelining.',
+    relatedTerms: [
+      'vmem',
+      'pallas',
+      'kernel-fusion',
+      'memory-bandwidth',
+      'memory-bound-vs-compute-bound',
+    ],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'shape-bucketing',
+    term: 'Shape bucketing',
+    aliases: ['compiled shape buckets', 'padding buckets', 'token buckets'],
+    category: 'Software',
+    plainEnglish:
+      'Shape bucketing rounds each batch up to one of a few precompiled sizes so the compiler does not have to build a new program for every request count.',
+    definition:
+      'Shape bucketing is the practice of compiling a kernel or graph for a fixed set of tensor shapes and padding each live batch up to the nearest bucket, trading some wasted work for avoiding recompilation.',
+    explanation:
+      'Ahead-of-time compilers such as XLA specialize on static shapes, so a serving engine cannot compile a fresh program for every combination of request count and sequence length. It picks buckets instead. When the buckets are tuned for hundreds of concurrent requests and only four or eight are in flight, metadata is sized for the configured maximum, padding tokens trigger dummy expert work, and scheduling overhead dominates. The TPU stack now buckets request metadata by active request count, adds a dedicated attention bucket for concurrency four, reduces the minimum token bucket, and routes padding tokens to expert zero so they do not load extra expert weights.',
+    significance:
+      'InferenceX operating points sit at exactly these low concurrencies, so bucket tuning directly changes reported curves. The same issue appears on GPUs as CUDA graph capture sizes; the TPU version is stricter because XLA compiles whole graphs per shape.',
+    benchmarkContext:
+      'Bucketing metadata by active requests cut GDN scheduling overhead from 283 to 97 microseconds on 8k1k at concurrency 64 and raised throughput from 2,328 to 2,516 tokens per chip per second. Qwen3.5 InferenceX tuning gained 13.3% on 8k1k and 15.5% on 1k1k at concurrency four, and a further round gained 22.9% on 1k1k at concurrency four.',
+    relatedTerms: ['xla', 'cuda-graphs', 'concurrency', 'tile-padding', 'continuous-batching'],
+    articleSlugs: [TPU_IRONWOOD, AGENTX_V3],
+  },
+  {
+    slug: 'gated-deltanet',
+    term: 'Gated DeltaNet',
+    abbreviation: 'GDN',
+    aliases: ['GDN', 'Gated Delta Net', 'delta rule attention'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Gated DeltaNet is a linear attention layer that keeps a fixed-size running state per request instead of a KV cache that grows with every token.',
+    definition:
+      'Gated DeltaNet is a recurrent linear attention mechanism in which, at each step, the running state is decayed by a gate, updated with a rank-one delta-rule correction, and projected by the query to produce the output.',
+    explanation:
+      'Qwen3.5 interleaves GDN layers with grouped-query attention layers, making it a hybrid model with two kinds of state: GQA layers accumulate a growing KV history while GDN layers hold a fixed-size recurrent state per request. On TPU the recurrence is scheduled across the MXU, VPU, VMEM, and HBM. One optimization rearranges the output projection algebra so the MXU computes the decayed state times the query while the VPU builds the next state, removing the state update from the MXU dependency path; the current token’s contribution is a scalar dot product per head plus a small vector add. Other changes slice Q and K in the decode loop to cut register spills, store state in BF16 in HBM while computing in FP32, and fuse Conv1D with GDN into one kernel.',
+    significance:
+      'Fixed-size state makes long contexts cheap in memory but complicates prefix caching, because the recurrent state at the end of a cached prefix is normally overwritten as the request continues. Hybrid prefix caching gives GDN separate slots for reading a checkpoint and writing live state, aligned to KV block boundaries.',
+    benchmarkContext:
+      'Reported Ironwood gains on Qwen3.5 include 4.48% throughput at concurrency 512 from the algebra rearrangement, 11.3% from asynchronous state transfers, 15% on 1k8k from BF16 state storage, and kernel-level speedups of 1.41x decode, 1.60x prefill, and 2.14x mixed batches from GDN v3.',
+    relatedTerms: [
+      'linear-attention',
+      'hybrid-attention',
+      'prefix-caching',
+      'grouped-query-attention',
+      'kv-cache',
+      'vmem',
+    ],
+    articleSlugs: [TPU_IRONWOOD, AGENTX_V3, KIMI_K3, MI355X_QWEN, AGENTX_QWEN_SGLANG],
+  },
+  {
+    slug: 'aggregated-serving',
+    term: 'Aggregated serving',
+    aliases: ['agg serving', 'colocated prefill and decode', 'non-disaggregated serving'],
+    category: 'Serving',
+    plainEnglish:
+      'Aggregated serving runs prefill and decode on the same set of chips, the default deployment shape before an engine adds prefill-decode disaggregation.',
+    definition:
+      'Aggregated serving is the deployment mode in which each replica handles both the prefill and decode phases of every request on the same accelerators, as opposed to disaggregated serving with separate prefill and decode pools.',
+    explanation:
+      'In aggregated mode a scheduler interleaves prompt processing and token generation on one set of devices, usually with chunked prefill so long prompts do not stall decode. It needs no KV-cache transfer between pools and is simpler to operate, but prefill and decode compete for the same compute and memory bandwidth, and neither phase can be scaled or tuned independently. Disaggregation separates them and typically wins at high concurrency on rack-scale systems, at the cost of a fast transfer path such as NIXL on NVIDIA or TPU-Sync on TPU. The external TPU stack currently serves in aggregated mode only.',
+    significance:
+      'Comparing aggregated against disaggregated is an apples-to-bananas comparison: it mixes a deployment-mode difference into a hardware comparison. InferenceX labels the mode on every curve so readers can separate the two.',
+    benchmarkContext:
+      'The InferenceX Official Preview compares TPUv7 aggregated FP8 serving against B200 and B300 aggregated FP8 serving, where Ironwood reaches up to 50% better performance per dollar. Against GB300 NVL72 disaggregated serving, TPUv7 aggregated is competitive at low and high end-to-end latency but trails by about 30% in the middle of the curve until TPU disaggregation is optimized.',
+    relatedTerms: [
+      'disaggregated-inference',
+      'chunked-prefill',
+      'prefill',
+      'decode',
+      'apples-to-apples-comparison',
+      'tpu-sync',
+    ],
+    articleSlugs: [TPU_IRONWOOD, GB200_R1, GB300_DSV4],
+  },
+  {
+    slug: 'ragged-paged-attention',
+    term: 'Ragged paged attention',
+    abbreviation: 'RPA',
+    aliases: ['RPA', 'RPA v3', 'batched ragged paged attention'],
+    category: 'Serving',
+    plainEnglish:
+      'Ragged paged attention is the TPU attention kernel that handles a batch of requests with different lengths reading from a paged KV cache in one launch.',
+    definition:
+      'Ragged paged attention is the Pallas attention kernel for TPU that processes variable-length sequences from a block-table-addressed KV cache, precomputing page metadata and pipelining page fetches across a batch.',
+    explanation:
+      'A batch of in-flight requests has ragged lengths, and their KV pages are scattered across HBM. The kernel batches sequences together, precomputes page metadata, and triple-buffers page fetches to keep the MXU fed while reducing padding. Layout matters: the original kernel packed keys and values along the head dimension, which wasted half of every 128-lane tile for a single FP8 KV head per device. The sequence-on-lane layout puts tokens on the lane axis and the head dimension on sublanes, doubling usable pages and admitting head dimension 64. A separate fix split the KV compute block from the fetch block so the prefetch pipeline had VMEM to run ahead of the MXU. Removing a hybrid page-size alignment constraint let batched attention use a 256-token page.',
+    significance:
+      'Attention over the paged cache is where TPU tile geometry and VMEM budget collide most directly. Layout and block-size decisions in this one kernel moved usable KV capacity, TTFT, and decode throughput by tens of percent on unchanged hardware.',
+    benchmarkContext:
+      'The sequence-on-lane layout raised usable KV pages from 5,141 to 10,283 and lifted 8k1k throughput 16.5% at concurrency 128 with a 95% cut in median TTFT. The block-size split raised decode throughput from 64.9k to 96.3k tokens per second on Qwen3-0.6B, and the 256-token page gave about 7% on 1k8k at concurrency 512.',
+    relatedTerms: [
+      'paged-attention',
+      'kv-cache',
+      'pallas',
+      'tile-padding',
+      'vmem',
+      'double-buffering',
+    ],
+    articleSlugs: [TPU_IRONWOOD],
+  },
+  {
+    slug: 'grouped-gemm',
+    term: 'Grouped GEMM',
+    aliases: ['grouped matmul', 'GroupedGEMM', 'ragged matmul'],
+    category: 'Software',
+    plainEnglish:
+      'A grouped GEMM runs many small matrix multiplies, one per expert, in a single launch so a mixture-of-experts layer does not pay per-expert overhead.',
+    definition:
+      'A grouped GEMM is a kernel that executes a set of independent matrix multiplications with different row counts in one launch, used in MoE layers where each expert receives a ragged group of routed tokens.',
+    explanation:
+      'A mixture-of-experts layer produces irregular groups of tokens for each expert, and those ragged groups must be reshaped into something the matrix units can consume efficiently. On TPU the second grouped matmul version removes redundant tile computation, sizes transfers to the number of valid rows rather than the padded maximum, triple-buffers expert weights so the next group is in flight while the current one computes, and fuses group metadata generation into the kernel. The irregular token permutation moved to SparseCore. For small batches a dedicated path builds one-hot matrices and uses ordinary matmuls to permute and unpermute tokens because the general ragged path costs more than the work it arranges. With DP attention and expert parallelism, the kernel all-gathers token activations and routing metadata first and reduce-scatters weighted outputs back to each attention rank.',
+    significance:
+      'MoE efficiency on any accelerator reduces to how well the grouped GEMM tolerates ragged group sizes and how much of the routing work can be hidden. On TPU the added constraint is MXU tile geometry, so expert widths and token counts also need to fill 256-wide tiles.',
+    benchmarkContext:
+      'The SparseCore permutation rewrite reported 12% higher 8k1k throughput on Ironwood, the small-batch one-hot path gained 7.3% at concurrency 64 and 5.1% at 128, and merging the routing all-gathers saved roughly 80 microseconds per layer, about 4.64 ms per forward pass across DeepSeek-V3’s 58 layers.',
+    relatedTerms: [
+      'gemm',
+      'mixture-of-experts',
+      'expert-parallelism',
+      'sparsecore',
+      'all-gather',
+      'reduce-scatter',
+    ],
+    articleSlugs: [TPU_IRONWOOD, DEEPSEEK_V4],
+  },
+  {
+    slug: 'apples-to-apples-comparison',
+    term: 'Apples-to-apples comparison',
+    aliases: ['apples to apples', 'apples to bananas', 'like-for-like comparison'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'An apples-to-apples comparison holds precision, serving mode, and workload constant so a difference in results can be attributed to the hardware.',
+    definition:
+      'An apples-to-apples comparison in InferenceX matches numerical precision, aggregated or disaggregated serving mode, speculative decoding settings, and workload shape across systems so that only the hardware and its software stack differ.',
+    explanation:
+      'FP8 on one side and FP4 on the other is not apples to apples, because FP4 carries a quality loss relative to FP8 and reads half the bytes per weight. Aggregated on one side and disaggregated on the other mixes a deployment-mode advantage into the result. Single-token prediction against MTP does the same for speculative decoding. InferenceX calls the mismatched case apples to bananas and still publishes it, labeled, because buyers face those choices, but headline claims come from matched settings. Ironwood has no native FP4, so its fair comparison today is FP8 versus FP8 Blackwell; TPUv8i will be compared FP4 versus FP4.',
+    significance:
+      'A large share of vendor performance claims rest on mismatched settings. Insisting on matched precision and serving mode is what makes a performance-per-dollar ratio a statement about the chip rather than about the recipe chosen for the marketing slide.',
+    benchmarkContext:
+      'The InferenceX Official Preview headline, up to 50% better performance per dollar for TPUv7, is an apples-to-apples FP8 aggregated single-token comparison against B200 and B300. The GB300 NVL72 disaggregated versus TPUv7 aggregated chart is explicitly labeled apples to bananas and shows about a 30% GB300 advantage mid-curve.',
+    relatedTerms: [
+      'performance-per-dollar',
+      'pareto-frontier',
+      'aggregated-serving',
+      'disaggregated-inference',
+      'fp8',
+      'fp4',
+      'recipe',
+    ],
+    articleSlugs: [TPU_IRONWOOD, INFERENCEMAX, VR_RUBIN, JALAPENO],
+  },
+  {
+    slug: 'internal-vs-external-tco',
+    term: 'Internal vs external TCO',
+    aliases: ['internal TCO', 'external TCO', 'hyperscaler TCO'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Internal TCO is what a chip costs its own designer to run; external TCO is what a customer pays to buy or rent it, and the two can differ a lot.',
+    definition:
+      'Internal TCO is the hourly cost of a chip to the company that designs and operates it, while external TCO is the cost to a third party buying or renting the same chip, including the vendor’s margin.',
+    explanation:
+      'Google both runs TPUs for Gemini and sells or rents them to customers such as Anthropic. The SemiAnalysis TCO Model estimates Ironwood internal TCO at about $1.03 per chip-hour and a higher external TCO that reflects what a hyperscaler lab pays to buy TPUs. Which number to use depends on the question: internal TCO describes Google’s own serving economics, external TCO describes whether a customer should choose TPU over B200 or B300. NVIDIA GPUs only have an external TCO from the buyer’s point of view because NVIDIA does not operate them as a service.',
+    significance:
+      'Performance-per-dollar rankings move with the TCO basis. Publishing both numbers separates the hardware’s cost structure from the vendor’s pricing decision, and it shows how much room Google has to cut external pricing if it chooses to.',
+    benchmarkContext:
+      'On external TCO, Ironwood delivers 50.4% more tokens per dollar than B200 and 96.0% more than B300 at concurrency 256 in the InferenceX Official Preview. On internal TCO the same datapoint becomes 76.7% and 130.2%. The article uses external TCO for its headline comparison and internal TCO for the apples-to-bananas chart against GB300 NVL72 disaggregated serving.',
+    measurement: {
+      label: 'Ironwood internal TCO',
+      value: '$1.03 per chip-hour (SemiAnalysis TCO Model)',
+    },
+    relatedTerms: [
+      'total-cost-of-ownership',
+      'performance-per-dollar',
+      'tokens-per-dollar',
+      'cost-per-million-tokens',
+      'tpuv7-ironwood',
+    ],
+    articleSlugs: [TPU_IRONWOOD, VR_RUBIN],
   },
 ] as const satisfies readonly GlossaryEntry[];
 
