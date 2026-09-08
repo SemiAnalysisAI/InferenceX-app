@@ -110,6 +110,9 @@ export function createHttpClient({
       if (deadline - now() <= 0) {
         throw new CliError('TIMEOUT', 'Operation deadline exceeded.');
       }
+      if (budget.consumedBytes >= totalBytes) {
+        throw responseError(`Operation exhausted total ${totalBytes}-byte budget`);
+      }
     } catch (error) {
       throw cancellationError(error, signal, cancellation);
     }
@@ -124,37 +127,32 @@ export function createHttpClient({
     }
   }
 
-  async function handleTransportFailure(
-    failure,
-    { request, ordinal, attemptStartedAt, consumedBefore, status },
-  ) {
+  async function handleTransportFailure(failure, { ordinal, recordAttempt, status }) {
     const cancelled = failure instanceof CliError && failure.code === 'CANCELLED';
+    const hasBudget = budget.consumedBytes < totalBytes;
     const delayMs = Math.round(
       (BACKOFF_MS[ordinal - 1] ?? 0) * (1 + Math.max(0, Math.min(1, random())) * 0.2),
     );
     const canRetry =
-      !cancelled && ordinal < maxAttempts && delayMs > 0 && delayMs < deadline - now();
-    attempts.push({
-      operation: request.operation,
-      url: request.url,
-      ordinal,
-      startedAt: attemptStartedAt,
-      endedAt: isoTime(now),
+      !cancelled && hasBudget && ordinal < maxAttempts && delayMs > 0 && delayMs < deadline - now();
+    recordAttempt({
       ...(status === undefined ? {} : { status }),
       networkCode: transportCode(failure),
-      consumedBytes: budget.consumedBytes - consumedBefore,
       retry: {
         decision: canRetry ? 'retry' : cancelled ? 'not_retryable' : 'stop',
         reason: cancelled
           ? failure.code
           : canRetry
             ? 'transient_network_error'
-            : ordinal === maxAttempts
-              ? 'attempts_exhausted'
-              : 'deadline_exceeded',
+            : hasBudget
+              ? ordinal === maxAttempts
+                ? 'attempts_exhausted'
+                : 'deadline_exceeded'
+              : 'total_budget_exhausted',
         ...(canRetry ? { delayMs } : {}),
       },
     });
+    if (!hasBudget) throwIfStopped();
     if (!canRetry) throw failure;
     await pause(delayMs);
   }
@@ -170,6 +168,17 @@ export function createHttpClient({
       ]);
       const attemptStartedAt = isoTime(now);
       const consumedBefore = budget.consumedBytes;
+      const recordAttempt = (details) => {
+        attempts.push({
+          operation: request.operation,
+          url: request.url,
+          ordinal,
+          startedAt: attemptStartedAt,
+          endedAt: isoTime(now),
+          consumedBytes: budget.consumedBytes - consumedBefore,
+          ...details,
+        });
+      };
       let response;
       let failure;
       try {
@@ -188,23 +197,13 @@ export function createHttpClient({
       }
 
       if (failure) {
-        await handleTransportFailure(failure, {
-          request,
-          ordinal,
-          attemptStartedAt,
-          consumedBefore,
-        });
+        await handleTransportFailure(failure, { ordinal, recordAttempt });
         continue;
       }
 
       if (!(response instanceof Response)) {
         const error = responseError('Fetch returned an invalid response object.');
-        attempts.push({
-          operation: request.operation,
-          url: request.url,
-          ordinal,
-          startedAt: attemptStartedAt,
-          endedAt: isoTime(now),
+        recordAttempt({
           networkCode: 'INVALID_RESPONSE',
           consumedBytes: 0,
           retry: { decision: 'not_retryable', reason: error.code },
@@ -220,16 +219,15 @@ export function createHttpClient({
           (BACKOFF_MS[ordinal - 1] ?? 0) * (1 + Math.max(0, Math.min(1, random())) * 0.2),
         );
         const delayMs = Math.max(backoff, serverDelay ?? 0);
+        const hasBudget = budget.consumedBytes < totalBytes;
         const canRetry =
-          retryable && ordinal < maxAttempts && delayMs > 0 && delayMs < deadline - now();
-        attempts.push({
-          operation: request.operation,
-          url: request.url,
-          ordinal,
-          startedAt: attemptStartedAt,
-          endedAt: isoTime(now),
+          retryable &&
+          hasBudget &&
+          ordinal < maxAttempts &&
+          delayMs > 0 &&
+          delayMs < deadline - now();
+        recordAttempt({
           status: response.status,
-          consumedBytes: budget.consumedBytes - consumedBefore,
           retry: {
             decision: canRetry ? 'retry' : retryable ? 'stop' : 'not_retryable',
             reason: canRetry
@@ -237,13 +235,16 @@ export function createHttpClient({
                 ? 'retry_after'
                 : 'transient_http_status'
               : retryable
-                ? ordinal === maxAttempts
-                  ? 'attempts_exhausted'
-                  : 'deadline_exceeded'
+                ? hasBudget
+                  ? ordinal === maxAttempts
+                    ? 'attempts_exhausted'
+                    : 'deadline_exceeded'
+                  : 'total_budget_exhausted'
                 : 'http_status',
             ...(canRetry ? { delayMs } : {}),
           },
         });
+        if (!hasBudget) throwIfStopped();
         if (!canRetry) throw httpError(response.status);
         await pause(delayMs);
         continue;
@@ -259,23 +260,15 @@ export function createHttpClient({
           await handleTransportFailure(
             new CliError('NETWORK_ERROR', stopped.message, { cause: stopped }),
             {
-              request,
               ordinal,
-              attemptStartedAt,
-              consumedBefore,
+              recordAttempt,
               status: response.status,
             },
           );
           continue;
         }
-        attempts.push({
-          operation: request.operation,
-          url: request.url,
-          ordinal,
-          startedAt: attemptStartedAt,
-          endedAt: isoTime(now),
+        recordAttempt({
           status: response.status,
-          consumedBytes: budget.consumedBytes - consumedBefore,
           retry: { decision: 'not_retryable', reason: stopped.code },
         });
         throw stopped;
@@ -288,27 +281,15 @@ export function createHttpClient({
         body = await responseBoundary(() => JSON.parse(text), requestSignal);
       } catch (error) {
         const normalized = cancellationError(error, requestSignal, cancellation);
-        attempts.push({
-          operation: request.operation,
-          url: request.url,
-          ordinal,
-          startedAt: attemptStartedAt,
-          endedAt: isoTime(now),
+        recordAttempt({
           status: response.status,
-          consumedBytes: budget.consumedBytes - consumedBefore,
           retry: { decision: 'not_retryable', reason: normalized.code ?? 'INVALID_RESPONSE' },
         });
         throw normalized;
       }
 
-      attempts.push({
-        operation: request.operation,
-        url: request.url,
-        ordinal,
-        startedAt: attemptStartedAt,
-        endedAt: isoTime(now),
+      recordAttempt({
         status: response.status,
-        consumedBytes: budget.consumedBytes - consumedBefore,
         retry: { decision: 'accepted', reason: 'allowed_status' },
       });
       return {

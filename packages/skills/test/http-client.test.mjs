@@ -250,47 +250,58 @@ test('strict UTF-8 decoding rejects invalid bytes without retrying', async () =>
   assert.equal(client.attempts[0].consumedBytes, 2);
 });
 
-test('accepted-status transport interruption retries and charges partial bytes', async () => {
-  let calls = 0;
-  const waits = [];
-  const client = createHttpClient({
-    timeoutMs: 2_000,
-    responseBytes: 8,
-    totalBytes: 8,
-    fetchImpl: () => {
-      calls++;
-      if (calls === 1) {
-        return new Response(
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue(Uint8Array.from([1, 2, 3, 4]));
-              setImmediate(() =>
-                controller.error(
-                  Object.assign(new TypeError('socket reset'), { code: 'ECONNRESET' }),
-                ),
-              );
-            },
-          }),
-        );
-      }
-      return new Response('{}');
-    },
-    sleep: (milliseconds) => waits.push(milliseconds),
-    random: () => 0,
+for (const [partialBytes, retry] of [
+  [4, true],
+  [8, false],
+]) {
+  test(`transport interruption ${retry ? 'retries with bytes remaining' : 'stops at the total byte limit'}`, async () => {
+    let calls = 0;
+    const waits = [];
+    const client = createHttpClient({
+      timeoutMs: 2_000,
+      responseBytes: 8,
+      totalBytes: 8,
+      fetchImpl: () => {
+        calls++;
+        if (calls === 1) {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(partialBytes));
+                setImmediate(() =>
+                  controller.error(
+                    Object.assign(new TypeError('socket reset'), { code: 'ECONNRESET' }),
+                  ),
+                );
+              },
+            }),
+          );
+        }
+        return new Response('{}');
+      },
+      sleep: (milliseconds) => waits.push(milliseconds),
+      random: () => 0,
+    });
+    if (retry) {
+      const saved = await client.get(request);
+      assert.deepEqual(saved.body, {});
+      assert.equal(client.attempts[1].consumedBytes, 2);
+    } else {
+      await assert.rejects(client.get(request), { code: 'INVALID_RESPONSE' });
+    }
+    assert.equal(calls, retry ? 2 : 1);
+    assert.deepEqual(waits, retry ? [500] : []);
+    assert.equal(client.attempts.length, calls);
+    assert.equal(client.attempts[0].consumedBytes, partialBytes);
+    assert.equal(client.attempts[0].networkCode, 'ECONNRESET');
+    assert.deepEqual(
+      client.attempts[0].retry,
+      retry
+        ? { decision: 'retry', reason: 'transient_network_error', delayMs: 500 }
+        : { decision: 'stop', reason: 'total_budget_exhausted' },
+    );
   });
-  const saved = await client.get(request);
-  assert.deepEqual(saved.body, {});
-  assert.equal(calls, 2);
-  assert.deepEqual(waits, [500]);
-  assert.equal(client.attempts[0].consumedBytes, 4);
-  assert.equal(client.attempts[1].consumedBytes, 2);
-  assert.equal(client.attempts[0].networkCode, 'ECONNRESET');
-  assert.deepEqual(client.attempts[0].retry, {
-    decision: 'retry',
-    reason: 'transient_network_error',
-    delayMs: 500,
-  });
-});
+}
 
 test('byte-limit failures do not retry', async () => {
   let calls = 0;
@@ -309,6 +320,29 @@ test('byte-limit failures do not retry', async () => {
   assert.deepEqual(client.attempts[0].retry, {
     decision: 'not_retryable',
     reason: 'INVALID_RESPONSE',
+  });
+});
+
+test('an exhausted total byte budget blocks later logical requests without an attempt', async () => {
+  let calls = 0;
+  const client = createHttpClient({
+    timeoutMs: 1_000,
+    responseBytes: 8,
+    totalBytes: 8,
+    fetchImpl: () => {
+      calls++;
+      return new Response('{"ok":1}');
+    },
+  });
+  const saved = await client.get(request);
+  assert.deepEqual(saved.body, { ok: 1 });
+  assert.equal(client.attempts[0].consumedBytes, 8);
+  await assert.rejects(client.get(request), { code: 'INVALID_RESPONSE' });
+  assert.equal(calls, 1);
+  assert.equal(client.attempts.length, 1);
+  assert.deepEqual(client.attempts[0].retry, {
+    decision: 'accepted',
+    reason: 'allowed_status',
   });
 });
 
