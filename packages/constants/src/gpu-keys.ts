@@ -174,8 +174,8 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 // zones to both maps below (OKLch for normal mode, HSL for high-contrast).
 // ---------------------------------------------------------------------------
 
-/** Google yellow, used unchanged for a single Google hardware series. */
-export const GOOGLE_YELLOW = '#F4B400';
+/** Google brand blue, used unchanged for a single Google hardware series. */
+export const GOOGLE_BLUE = '#4285F4';
 
 /**
  * OKLch hue zones for normal-mode vendor-aware colors.
@@ -184,14 +184,14 @@ export const GOOGLE_YELLOW = '#F4B400';
  * Layout (approximate):
  *   0-12    (gap)
  *   12-42   AMD reds/oranges
- *   42-80   (gap)
- *   80-105  Google golds
- *   105-120 (gap)
+ *   42-120  (gap)
  *   120-170 NVIDIA greens
- *   170-235 (gap)
- *   235-270 Teacup blues
- *   270-275 (gap)
- *   275-330 unknown / fallback (purples)
+ *   170-185 (gap)
+ *   185-235 unknown / fallback (cyans/teals)
+ *   235-250 (gap)
+ *   250-275 Google blues (brand hue ~260)
+ *   275-290 (gap)
+ *   290-330 Teacup purples
  *   330-360 (gap)
  */
 export const VENDOR_OKLCH_ZONES: Record<
@@ -200,36 +200,36 @@ export const VENDOR_OKLCH_ZONES: Record<
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
-  teacup: { start: 235, end: 270, chroma: { light: 0.14, dark: 0.16 } },
-  google: { start: 80, end: 105, chroma: { light: 0.14, dark: 0.16 } },
-  unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
+  teacup: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
+  google: { start: 250, end: 275, chroma: { light: 0.16, dark: 0.18 } },
+  unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
 };
 
 /**
  * Preferred HSL hue zones for high-contrast mode.
  * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
  * from different vendors are visually distinct and vendor-appropriate
- * (NVIDIA = greens, AMD = reds/oranges, unknown = blues/purples).
+ * (NVIDIA = greens, AMD = reds/oranges, Google = blues, Teacup = purples).
  * When a vendor has too many items to fit with sufficient spacing, the zone
  * expands symmetrically — these are preferred zones, not hard constraints.
  *
  * Layout (360° wheel):
- *   Google:  40–60 (20°) — golds
- *   NVIDIA:  60–195  (135°) — greens through cyans
+ *   NVIDIA:  40–180  (140°) — yellow-greens through cyans
+ *   unknown: 180–205 (25°) — cyans
+ *   Google:  205–235 (30°) — blues (brand hue ~217)
+ *   Teacup:  255–300 (45°) — purples/violets
  *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
- *   Teacup:  195–240 (45°) — cyan/blues
- *   unknown: 240–300 (60°) — blues/purples
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
-  nvidia: [{ start: 60, span: 135 }],
-  teacup: [{ start: 195, span: 45 }],
+  nvidia: [{ start: 40, span: 140 }],
+  teacup: [{ start: 255, span: 45 }],
   amd: [
     { start: 300, span: 60 },
     { start: 0, span: 40 },
   ],
-  google: [{ start: 40, span: 20 }],
-  unknown: [{ start: 240, span: 60 }],
+  google: [{ start: 205, span: 30 }],
+  unknown: [{ start: 180, span: 25 }],
 };

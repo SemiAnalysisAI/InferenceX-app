@@ -43,8 +43,10 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
 import {
@@ -234,6 +236,7 @@ export default function HistoricalTrendsDisplay() {
   );
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
+  const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
 
   // Check `error` before the loading skeleton: a failed benchmark query never
   // produces rows, so `loading` (which includes "no rows yet") would otherwise
@@ -441,6 +444,7 @@ export default function HistoricalTrendsDisplay() {
                     />
                     {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                     {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
                       activeHwKeys={activeHwTypes}

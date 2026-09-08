@@ -250,10 +250,10 @@ function isNotGreenish(rgb: [number, number, number]): boolean {
 
 describe('generateHighContrastColors', () => {
   it.each(['light', 'dark'])(
-    'gives TPUv7 a gold high-contrast color alongside Blackwell (%s)',
+    'gives TPUv7 the Google blue high-contrast color alongside Blackwell (%s)',
     (theme) => {
       const colors = generateHighContrastColors(['tpuv7_vllm', 'b200_vllm', 'b300_vllm'], theme);
-      expect(colors.tpuv7_vllm).toBe('#F4B400');
+      expect(colors.tpuv7_vllm).toBe('#4285F4');
       expect(new Set(Object.values(colors)).size).toBe(3);
     },
   );

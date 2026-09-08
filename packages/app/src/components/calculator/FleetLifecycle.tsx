@@ -16,8 +16,10 @@ import type { HardwareConfig } from '@/components/inference/types';
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -657,6 +659,9 @@ export default function FleetLifecycle({
     visibleHistoricalProgressions.map((progression) => progression.hwKey),
   );
   const showsVeraRubinPreview = includesVeraRubinResult(
+    visibleHistoricalProgressions.map((progression) => progression.hwKey),
+  );
+  const showsTpuv7Preview = includesTpuv7Result(
     visibleHistoricalProgressions.map((progression) => progression.hwKey),
   );
 
@@ -1432,6 +1437,7 @@ export default function FleetLifecycle({
             />
             {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
             {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {view === 'table' ? (
               <>
                 <figcaption>{caption}</figcaption>
