@@ -181,7 +181,7 @@ function assertCaptures(result) {
   assert.ok(directories.length > 0, 'preserve complete responses in a unique attempt directory');
   const records = directories.flatMap((directory) =>
     readdirSync(join(result.project, directory))
-      .filter((name) => name.endsWith('.json'))
+      .filter((name) => /^\d+\.json$/u.test(name))
       .map((name) => JSON.parse(readFileSync(join(result.project, directory, name), 'utf8'))),
   );
   for (const record of records) {
@@ -440,6 +440,45 @@ const historyRow = (id, date, overrides = {}) => ({
   curve_workflow_run_id: '9007199254740993124',
   workers: [{ device_id: 'GPU-001', sample: null }],
   ...overrides,
+});
+
+test('benchmark recipes save exact selected concurrency counts without samples, duplicates or coercion', () => {
+  const rows = [4, 4, null, undefined, '32', 16].map((conc, index) =>
+    historyRow(`selected-${index}`, index === 5 ? '2026-08-01' : '2026-09-04', { conc }),
+  );
+  rows.push(historyRow('outside-workload', '2026-09-04', { isl: 1024, conc: 1024 }));
+  for (const [index, path] of [
+    [3, '/api/v1/benchmarks?model=DeepSeek-V4-Pro'],
+    [2, '/api/v1/benchmarks/history?model=DeepSeek-V4-Pro&isl=8192&osl=1024'],
+  ]) {
+    for (const [input, expected] of [
+      [
+        rows,
+        {
+          selected_rows: 6,
+          concurrency: { known_rows: 3, unknown_rows: 3, distinct_count: 2, min: 4, max: 16 },
+        },
+      ],
+      [
+        [],
+        {
+          selected_rows: 0,
+          concurrency: { known_rows: 0, unknown_rows: 0, distinct_count: 0, min: null, max: null },
+        },
+      ],
+    ]) {
+      const result = run(index, { [path]: response(input) });
+      const output = succeeded(result);
+      assert.deepEqual(output.selection_summary, expected);
+      const captureDir = assertCaptures(result).directories[0];
+      assert.deepEqual(
+        JSON.parse(
+          readFileSync(join(result.project, captureDir, 'selection-summary.json'), 'utf8'),
+        ),
+        expected,
+      );
+    }
+  }
 });
 
 test('installed history recipe keeps all scoped observations, dates, raw configuration and documented units', () => {

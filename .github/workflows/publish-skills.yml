@@ -81,6 +81,7 @@ jobs:
           "$RUNNER_TEMP/skills-release/qualification.json"
           "$RUNNER_TEMP/skills-release/release-summary.json"
       - name: Publish immutable durable release assets
+        # If npm succeeded and a later step fails, use the artifact recovery in docs/inferencex-skills-release.md.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

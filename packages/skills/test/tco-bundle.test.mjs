@@ -271,6 +271,13 @@ test('finite TCO inputs that overflow or underflow modeled cost fail at numeric 
 
 test('result records API interpolation as saved input rather than replayed methodology', () => {
   const result = bundles.readResult(bundles.create('tco', 'positive').directory);
+  assert.match(result.metadata.cost_scope, /API-reported output throughput/u);
+  assert.match(result.metadata.cost_scope, /GPU divisor may be role-specific or unverified/u);
+  assert.match(result.metadata.cost_scope, /not verified whole-deployment GPU rental cost/u);
   assert.match(result.metadata.frontier_scope, /API frontier/u);
+  assert.match(
+    result.metadata.frontier_scope,
+    /no observation IDs, verified whole-deployment GPU denominator/u,
+  );
   assert.match(result.metadata.offline_verification_scope, /not independently revalidate/u);
 });

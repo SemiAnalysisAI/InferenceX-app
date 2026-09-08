@@ -19,7 +19,12 @@ do not have a formal evidence-bundle command.
 This Node 24 example prints up to five latest available single-turn observations
 with 8192 input and 1024 output tokens, ordered by observation date newest first.
 It reports the full matching count before limiting the sample and retains each
-observation's actual date and provenance.
+observation's actual date and provenance. `selection_summary` is also saved as
+`selection-summary.json` beside the captures. It summarizes all selected rows
+before sampling: concurrency is known only for positive safe integers; missing,
+null or malformed values count as unknown, without coercion. Distinct counts and
+nullable bounds describe known values only. Use these saved scalars in the report
+and final answer. The history recipe below uses the same summary.
 
 ```bash
 node --input-type=module <<'JS'
@@ -60,6 +65,15 @@ const rows = await read(url);
 if (!Array.isArray(rows)) throw new Error('Expected a benchmark row array');
 const selected = rows.filter((row) =>
   row.benchmark_type === 'single_turn' && row.isl === 8192 && row.osl === 1024);
+const knownConcurrency = selected.map((row) => row.conc)
+  .filter((value) => Number.isSafeInteger(value) && value > 0);
+const concurrencyValues = [...new Set(knownConcurrency)].toSorted((a, b) => a - b);
+const selection_summary = {
+  selected_rows: selected.length,
+  concurrency: { known_rows: knownConcurrency.length, unknown_rows: selected.length - knownConcurrency.length,
+    distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
+};
+writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
 console.log(JSON.stringify({
   requests,
   query_url: url.href,
@@ -67,7 +81,7 @@ console.log(JSON.stringify({
   requested_model: model,
   scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
   returned_models: [...new Set(selected.map((row) => row.model))],
-  matching_rows: selected.length,
+  matching_rows: selected.length, selection_summary,
   sample_rows: selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
 }, null, 2));
 JS
@@ -340,10 +354,19 @@ if (!Array.isArray(rows) || rows.some((row) => !object(row) || !object(row.metri
 const selected = rows.filter((row) => row.hardware === scope.hardware &&
   row.benchmark_type === scope.benchmark_type && row.isl === scope.isl && row.osl === scope.osl &&
   row.date >= scope.date_from && row.date <= scope.date_to).toSorted((a, b) => a.date.localeCompare(b.date));
+const knownConcurrency = selected.map((row) => row.conc)
+  .filter((value) => Number.isSafeInteger(value) && value > 0);
+const concurrencyValues = [...new Set(knownConcurrency)].toSorted((a, b) => a - b);
+const selection_summary = {
+  selected_rows: selected.length,
+  concurrency: { known_rows: knownConcurrency.length, unknown_rows: selected.length - knownConcurrency.length,
+    distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
+};
+writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
 const definitions = schema.components?.schemas?.BenchmarkRows?.items?.properties?.metrics?.properties ?? {};
 const metricKeys = [...new Set(selected.flatMap((row) => Object.keys(row.metrics)))].toSorted();
 console.log(JSON.stringify({
-  scope, requests, returned_rows: rows.length, selected_rows: selected.length,
+  scope, requests, returned_rows: rows.length, selected_rows: selected.length, selection_summary,
   available_hardware: [...new Set(rows.map((row) => row.hardware))].toSorted(),
   observed_dates: [...new Set(selected.map((row) => row.date))],
   metric_descriptions: Object.fromEntries(metricKeys.map((key) => [key, definitions[key]?.description ?? null])),

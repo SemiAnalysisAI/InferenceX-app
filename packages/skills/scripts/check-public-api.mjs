@@ -7,6 +7,8 @@ import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 
+import { isMain } from '../skills/inferencex-api/scripts/cli-contract.mjs';
+
 const PACKAGE = '@semianalysisai/inferencex-skills';
 const ORIGIN = 'https://inferencex.semianalysis.com';
 const VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
@@ -265,7 +267,7 @@ async function main(args) {
   }
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

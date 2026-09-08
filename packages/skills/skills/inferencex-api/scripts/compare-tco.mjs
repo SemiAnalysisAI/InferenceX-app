@@ -251,9 +251,10 @@ function comparisonMetadata({ producerVersion, scope, feed, contractVersion }) {
     throughput_unit: TCO_UNITS.gpu_output_throughput,
     formula: 'USD/GPU-hour * 1000000 / (output tokens/second/GPU * 3600)',
     assumed_throughput_fraction: 1,
-    cost_scope: 'Supplied GPU hourly rate only; not total purchase or ownership cost',
+    cost_scope:
+      'Supplied GPU hourly rate applied to API-reported output throughput; GPU divisor may be role-specific or unverified; not verified whole-deployment GPU rental cost or total ownership cost',
     frontier_scope:
-      'API frontier across frameworks, precisions, speculative methods and deployment configurations; no observation IDs or matched-configuration proof',
+      'API frontier across frameworks, precisions, speculative methods and deployment configurations on API-reported throughput bases; no observation IDs, verified whole-deployment GPU denominator or matched-configuration proof',
     offline_verification_scope:
       'Saved API interpolation is an input; offline verification recalculates costs from saved points and does not independently revalidate benchmark frontier interpolation methodology.',
   };

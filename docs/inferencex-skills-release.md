@@ -96,7 +96,13 @@ identical bytes must not rewrite which source was actually tested.
 
 Each platform entry also records the Actions run and attempt as numeric strings,
 the tested 40-hex commit SHA, the exact matrix job name, and the matching
-`SemiAnalysisAI/InferenceX-app` Actions evidence URL. Each native entry retains its
+`SemiAnalysisAI/InferenceX-app` Actions evidence URL. A retried matrix cell may have
+a later attempt than the other cells; all four must still share the run, tested
+commit, and archive SHA-256. Download each selected successful record from
+`inferencex-skills-<linux|macos>-node-<24|26>-attempt-<attempt>`. The pack job retains
+`inferencex-skills-platform-archive-attempt-<attempt>` and passes its exact artifact
+name to the matrix, so retrying a failed cell reuses that successful pack. Full
+reruns save new artifacts without replacing earlier attempts. Each native entry retains its
 aggregate hashes and every maintained case record (13 per runtime); every case records its case ID,
 runtime and assessor pass statuses, and prompt/answer transcript hashes. Known
 limitations use the maintained stable codes with descriptions.
@@ -279,6 +285,81 @@ Do not rerun publication or bump the version just to hide a failed verification.
 Announce availability only after the public verification passes. A prepared
 workflow, saved npm settings, and a successful upload each establish less than a
 successful end-to-end release.
+
+### Recover missing GitHub release assets after npm publication
+
+If npm publication succeeded but a later step failed, do not rerun the publishing
+workflow: its unpublished-version check intentionally rejects that version.
+Recover the original run's `inferencex-skills-release-<run-id>` artifact before its
+30-day expiry. Use a new download directory and the reviewed hash from the original
+dispatch; do not repackage the current checkout or replace that hash with a newly
+calculated value.
+
+```bash
+skills_publish_run_id='<original publish workflow run ID>'
+skills_recovery_dir="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-release-recovery.XXXXXX")"
+gh run download "$skills_publish_run_id" \
+  --repo SemiAnalysisAI/InferenceX-app \
+  --name "inferencex-skills-release-${skills_publish_run_id}" \
+  --dir "$skills_recovery_dir/original"
+skills_release_dir="$skills_recovery_dir/original/skills-release"
+skills_release_commit="$(jq -er .source_commit "$skills_release_dir/release.json")"
+gh run view "$skills_publish_run_id" --repo SemiAnalysisAI/InferenceX-app \
+  --json headSha,workflowName,url
+```
+
+Confirm the manifest's version and hash match the original dispatch and its
+`source_commit` matches that publish run's `headSha`. Before running any maintainer
+script below, use a clean checkout at that commit:
+
+```bash
+test "$(git rev-parse HEAD)" = "$skills_release_commit"
+node packages/skills/scripts/release.mjs check \
+  "$skills_release_dir/release.json" "$SKILLS_REVIEWED_SHA256"
+node packages/skills/scripts/release-summary.mjs check-qualification \
+  "$skills_release_dir/release.json" "$skills_release_dir/qualification.json"
+```
+
+Inspect `original/skills-candidate-verification/verification.json` under the
+recovery directory: it must have `status: "passed"` and `mode: "candidate"`.
+Rerun only public verification as above, using every value in the candidate's
+`scope` (including optional fields and empty-workload values) and a fresh evidence directory.
+Keep any earlier public verification or release summary unchanged. Build a new
+summary from the original candidate and qualification plus the successful public
+attempt:
+
+```bash
+node packages/skills/scripts/release-summary.mjs \
+  "$skills_release_dir/release.json" \
+  "$skills_recovery_dir/original/skills-candidate-verification/verification.json" \
+  "$skills_public_attempt/evidence/verification.json" \
+  "$skills_release_dir/qualification.json" \
+  "$skills_recovery_dir/release-summary.json"
+skills_release_version="$(jq -r .version "$skills_release_dir/release.json")"
+skills_release_tag="inferencex-skills-v${skills_release_version}"
+```
+
+Inspect `gh release view "$skills_release_tag" --repo SemiAnalysisAI/InferenceX-app`
+before any write. Only a confirmed missing release permits creation; authentication
+or network errors do not establish absence. If the tag already exists, verify it
+resolves to `skills_release_commit` first (`--target` does not move an existing tag).
+Create the missing release with the original archive and manifest plus the newly
+verified summary:
+
+```bash
+gh release create "$skills_release_tag" \
+  "$skills_release_dir/semianalysisai-inferencex-skills-${skills_release_version}.tgz" \
+  "$skills_release_dir/release.json" "$skills_recovery_dir/release-summary.json" \
+  --repo SemiAnalysisAI/InferenceX-app --target "$skills_release_commit" \
+  --title "InferenceX skills ${skills_release_version}" \
+  --notes "Accepted public package archive, release identity, and sanitized qualification summary."
+```
+
+If the release already exists, download and verify its assets first. A timeout may
+have occurred after creation succeeded. Do not overwrite existing assets; missing
+or differing assets require maintainer review. If the original candidate or
+qualification evidence cannot be recovered, stop rather than manufacture a passed
+release record. Recovery never invokes `npm publish`.
 
 ## Structured failures and recoverable upgrades
 

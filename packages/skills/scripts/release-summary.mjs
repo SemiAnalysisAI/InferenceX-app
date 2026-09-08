@@ -5,6 +5,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 
+import { isMain } from '../skills/inferencex-api/scripts/cli-contract.mjs';
+
 const PACKAGE = '@semianalysisai/inferencex-skills';
 const HASH = /^[a-f\d]{64}$/u;
 const COMMIT = /^(?:[a-f\d]{40}|[a-f\d]{64})$/u;
@@ -128,7 +130,7 @@ export function validateQualification(release, qualification) {
     };
   });
   assert.equal(required.size, 0, 'Platform matrix is incomplete or duplicated');
-  for (const key of ['run_id', 'run_attempt', 'head_sha', 'evidence_url'])
+  for (const key of ['run_id', 'head_sha', 'evidence_url'])
     assert.equal(
       new Set(platforms.map((entry) => entry[key])).size,
       1,
@@ -293,7 +295,7 @@ function main(args) {
   process.stdout.write(`${JSON.stringify(summary)}\n`);
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (isMain(import.meta.url)) {
   try {
     main(process.argv.slice(2));
   } catch (error) {

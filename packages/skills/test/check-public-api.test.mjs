@@ -1,12 +1,43 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { checkPublicApi, resolvePackage } from '../scripts/check-public-api.mjs';
+
+test('maintainer CLIs execute through relative and symlink paths while imports stay inert', () => {
+  const root = mkdtempSync(join(tmpdir(), 'maintainer-entry-'));
+  try {
+    for (const name of ['check-public-api.mjs', 'release-summary.mjs']) {
+      const script = fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
+      const link = join(root, name);
+      symlinkSync(script, link);
+      for (const [cwd, path] of [
+        [dirname(script), name],
+        [dirname(dirname(script)), `scripts/${name}`],
+        [root, name],
+        [root, link],
+      ]) {
+        const result = spawnSync(process.execPath, [path], { cwd, encoding: 'utf8' });
+        assert.equal(result.status, 1, `${path}: ${result.stderr}`);
+        assert.match(result.stderr, /^Usage:/u);
+      }
+      const imported = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', `await import(${JSON.stringify(script)})`],
+        { encoding: 'utf8' },
+      );
+      assert.equal(imported.status, 0, imported.stderr);
+      assert.equal(imported.stdout, '');
+      assert.equal(imported.stderr, '');
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 const identity = {
   package: '@semianalysisai/inferencex-skills',

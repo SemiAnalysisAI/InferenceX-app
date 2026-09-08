@@ -85,11 +85,12 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json). Public
 reads use HTTPS without credentials.
 
-For every count, range, mean, or elapsed date interval in the final answer and
-supplementary files, compute from the exact selected records or use a verified
-summary. Retain the field, population and denominator: observation pairs differ
-from metric comparisons and individual rows. Calculate intervals from explicit
-date endpoints. Cite the request URL, retrieval time, scope, source identities,
+For benchmark lookup and history, use the recipe's saved `selection_summary`.
+Compute and save any additional count, range, mean, or elapsed date interval from
+the exact selected records before writing reports. Copy the same computed scalars
+into supplementary files and the final answer. Retain the field, population and
+denominator: observation pairs differ from metric comparisons and individual rows.
+Calculate intervals from explicit date endpoints. Cite the request URL, retrieval time, scope, source identities,
 and observation dates. Scope conclusions to the records checked; a recorded zero
 is a source value, not proof of physical absence or a causal explanation.
 

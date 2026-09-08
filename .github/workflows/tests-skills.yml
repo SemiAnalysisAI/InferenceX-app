@@ -27,6 +27,7 @@ jobs:
     outputs:
       filename: ${{ steps.pack.outputs.filename }}
       sha256: ${{ steps.pack.outputs.sha256 }}
+      artifact-name: ${{ steps.pack.outputs.artifact-name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,10 +52,11 @@ jobs:
           rm "$destination/pack.json"
           echo "filename=$filename" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "artifact-name=inferencex-skills-platform-archive-attempt-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: Upload the exact platform-test archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: inferencex-skills-platform-archive
+          name: ${{ steps.pack.outputs.artifact-name }}
           path: |
             ${{ runner.temp }}/inferencex-skills-archive/${{ steps.pack.outputs.filename }}
             ${{ runner.temp }}/inferencex-skills-archive/archive.sha256
@@ -95,7 +97,7 @@ jobs:
       - name: Download the exact Node 24 archive
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: inferencex-skills-platform-archive
+          name: ${{ needs.pack-archive.outputs.artifact-name }}
           path: ${{ runner.temp }}/inferencex-skills-archive
       - name: Record runtime and runner inventory
         shell: bash
@@ -129,7 +131,7 @@ jobs:
       - name: Upload platform acceptance record
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: inferencex-skills-${{ matrix.os.id }}-node-${{ matrix.node-version }}
+          name: inferencex-skills-${{ matrix.os.id }}-node-${{ matrix.node-version }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/inferencex-skills-platform-acceptance/
           if-no-files-found: error
           retention-days: 30

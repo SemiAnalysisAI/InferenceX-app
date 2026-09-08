@@ -181,6 +181,28 @@ test('summary output is create-new and platform jobs test the accepted archive',
   assert.notEqual(rerun.status, 0);
 });
 
+test('qualification preserves retried matrix attempts while requiring one run and archive', () => {
+  const retried = structuredClone(qualification);
+  retried.platform_matrix[0].run_attempt = '2';
+  const accepted = validateQualification(release, retried);
+  assert.deepEqual(
+    accepted.platform_matrix.map((entry) => entry.run_attempt),
+    ['2', '1', '1', '1'],
+  );
+  for (const changes of [
+    {
+      run_id: '987654321',
+      evidence_url: 'https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/987654321',
+    },
+    { archive_sha256: 'f'.repeat(64) },
+    { head_sha: 'f'.repeat(40) },
+  ]) {
+    const invalid = structuredClone(retried);
+    Object.assign(invalid.platform_matrix[0], changes);
+    assert.throws(() => validateQualification(release, invalid));
+  }
+});
+
 test('qualification is validated before publication and supplied independently of live verification', () => {
   assert.equal(validateQualification(release, qualification).platform_matrix.length, 4);
   const summary = createReleaseSummary(release, candidate, publicVerification, qualification);

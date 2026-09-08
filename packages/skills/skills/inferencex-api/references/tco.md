@@ -2,8 +2,9 @@
 
 Use `inferencex tco compare` for a fixed single-turn workload and a common median
 interactivity target. It applies explicit user-supplied USD/GPU-hour rates to the
-public feed's output throughput. The result is a GPU rental/rate cost estimate per
-million output tokens. A full ownership TCO needs additional cost assumptions.
+public feed's output throughput. The result is a rate estimate per million output
+tokens **on the API's reported throughput basis**. Whole-deployment rental cost
+requires verifying which GPUs that throughput divides by; ownership TCO also needs other costs.
 
 When the user supplies the model, workload, target, and exact hardware keys with
 prices, run the comparison directly. `--model` accepts a DB model key or display name;
@@ -28,8 +29,10 @@ recorded attempts, and retained response paths/hashes. Derive a bundle attempt
 count from `requests[].attempts`; it describes that bundle, not every request in
 the agent session. Supplemental discovery reads are outside this manifest. Keep
 their captures separately in the project, and identify any missing capture if
-the report relies on it. A successful bundle verification does not verify those
-supplemental reads.
+the report relies on it. Preserve each raw capture's JSON sidecar. An optional
+combined index must serialize those objects as a JSON array; concatenating JSON
+objects does not produce a valid JSON manifest. A successful bundle verification
+does not verify supplemental reads.
 
 ## Establish the comparison
 
@@ -64,8 +67,10 @@ to retain the complete `tco-feed?view=points&format=json` response for the reque
 model, workloads, median target (`tiers`), and optional date. Report positive,
 in-range throughput and evidence dates separately for each hardware/workload.
 For two such points with throughputs `t_A` and `t_B`, equal modeled cost occurs at
-`price_A / price_B = t_A / t_B`; A is cheaper only if the user's rate ratio is below
-that boundary. Missing, clamped, and unreachable points have no cost boundary.
+`price_A / price_B = t_A / t_B` on the API-reported throughput basis; A's rate
+estimate is lower only if the user's rate ratio is below that boundary. A
+whole-deployment comparison additionally needs the denominator evidence below.
+Missing, clamped, and unreachable points have no cost boundary.
 
 Finish with the symbolic boundary and ask for the missing USD/GPU-hour rates and
 billing scope. The cheaper hardware remains unresolved. Website defaults, typical
@@ -74,8 +79,8 @@ market spreads, and invented `$1` rates are not user-supplied prices; pass
 Keep that unresolved conclusion throughout the final answer and saved report.
 Saying "at current market spreads it is not close" or naming a likely winner
 still assumes prices, even when followed by a request for the user's rates.
-Give only conditional comparisons, such as "A is cheaper if its rate ratio is
-below this boundary"; the feed supplies throughput, not rental-price evidence.
+Give only conditional comparisons on the reported throughput basis; the feed
+supplies throughput, not rental-price evidence.
 Keep `evidence_date` knot dates distinct from `latest_date` for the whole frontier.
 If reporting an elapsed gap, compute `(Date.parse(to) - Date.parse(from)) / 86400000`
 from the stated endpoints and save that scalar before quoting it in prose. Otherwise
@@ -95,6 +100,8 @@ below is an example raw key, not a display-name conversion rule. This offline
 example keeps every selected observation and checks **strictly below 20 ms**
 (`p99_itl < 0.020` seconds). Missing, nonnumeric, nonfinite, and negative values
 remain `unknown`; preserve the source capture alongside this derived report.
+Raw request concurrency is `conc`. The recipe maps it to `concurrency`, retaining
+the raw field and using `null` for missing or invalid values.
 
 ```bash
 node --input-type=module - evidence/benchmark-history.body <<'JS'
@@ -110,6 +117,7 @@ const checked = selected.map((row) => {
   const known = Number.isFinite(seconds) && seconds >= 0;
   return {
     ...row,
+    concurrency: Number.isSafeInteger(row.conc) && row.conc > 0 ? row.conc : null,
     p99_itl_ms: known ? seconds * 1000 : null,
     p99_itl_under_20ms: known ? (seconds < 0.020 ? 'pass' : 'fail') : 'unknown',
   };
@@ -124,7 +132,7 @@ configurations; a recorded pass is scoped to that observation, not a production 
 Use only the user's requested predicate for that classification. An unusual
 `p99.9_itl`, TPOT/ITL ratio, framework, or concurrency can warrant a separate
 diagnostic caveat, but does not turn a finite `p99_itl < 0.020` into a failure.
-Retain the passing row and its cost in the requested comparison. Label any optional
+Retain the passing row and its cost on the API-reported basis. Label any optional
 screen separately, obtain the user's constraint before applying it, and avoid
 inferring burst delivery from aggregate percentiles alone.
 For a cost comparison under this constraint, first establish eligible observations
@@ -154,6 +162,14 @@ interpolation, then computes:
 USD per million output tokens =
   USD/GPU-hour × 1,000,000 / (output tokens/second/GPU × 3,600)
 ```
+
+The feed preserves the producer's output-throughput denominator. Fixed-sequence
+results can divide output throughput by decode GPUs and total throughput by
+prefill plus decode GPUs; AgentX uses a different path. Ratios between fields
+alone establish neither physical GPU membership nor a universal `2×` correction.
+Keep the rate estimate on the reported basis. A whole-deployment conversion or
+fleet winner requires the exact producer semantics, verified pool membership,
+and rates for those pools; otherwise that conclusion remains unresolved.
 
 For example, a supplied rate of `$3.60/GPU-hour` and API throughput of
 `1,000 output tok/s/GPU` give `$1.00/M output tokens`. This assumes the reported
@@ -192,7 +208,7 @@ frontier's observations. Do not turn a one-key response into a matched-release c
 The feed pools frameworks, precisions, speculative methods, and deployment
 configurations into a hardware frontier. It exposes no observation IDs or complete
 configuration identity, and returns throughput rounded to three decimal places.
-Describe a comparison as **frontier estimates under the stated GPU rates**.
+Describe a comparison as **frontier rate estimates on the API-reported throughput basis**.
 A surprising hardware ranking alone cannot identify why the frontiers differ.
 If the user requires matched configuration, topology, precision, run provenance,
 or quality, stop this comparison and gather the necessary benchmark evidence.

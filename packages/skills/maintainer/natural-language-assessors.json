@@ -22,7 +22,9 @@
     "tco-live": [
       "prices treated as user assumptions",
       "target and workload preserved",
-      "null unavailable costs are not zero"
+      "null unavailable costs are not zero",
+      "recompute costs using captured API-reported output throughput; whole-deployment cost requires verified producer denominator, pool membership, and pool rates",
+      "throughput ratios alone do not establish physical GPU counts or a universal 2x conversion"
     ],
     "releases-live": [
       "exact public identity matching",
@@ -67,6 +69,8 @@
     "tco-missing-prices": [
       "no invented rental rates or likely cost winner",
       "available throughput and symbolic break-even distinguished from priced comparison",
+      "recompute symbolic price-ratio boundaries from captured API-reported throughput, without claiming verified whole-deployment costs",
+      "any whole-deployment conversion requires verified producer denominator, pool membership, and pool rates; no universal 2x correction from throughput ratios",
       "missing rates requested from user"
     ],
     "tco-tail-latency": [
@@ -74,6 +78,8 @@
       "20 ms requirement uses strict less than 0.020 seconds",
       "median interactivity and reciprocal p99_intvty never substitute for p99_itl",
       "costs scoped to the observed configurations that satisfy the requirement",
+      "recompute eligible-row costs from supplied rates and captured API-reported output throughput; a fleet-cost claim additionally requires verified producer denominator, pool membership, and pool rates",
+      "throughput ratios alone do not establish physical GPU counts or a universal 2x conversion",
       "missing or invalid tail evidence remains unresolved"
     ]
   },
