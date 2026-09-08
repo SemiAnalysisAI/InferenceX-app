@@ -445,6 +445,7 @@ function validateRequest(request) {
     throw responseError('Malformed request attempt ledger');
   }
   for (const [index, attempt] of request.attempts.entries()) {
+    if (!plainObject(attempt)) throw responseError('Malformed request attempt ledger');
     const final = index === request.attempts.length - 1;
     const hasStatus = Object.hasOwn(attempt, 'status');
     const hasNetworkCode = Object.hasOwn(attempt, 'networkCode');
@@ -454,7 +455,6 @@ function validateRequest(request) {
         ? hasNetworkCode
         : hasStatus && !hasNetworkCode;
     if (
-      !plainObject(attempt) ||
       attempt.operation !== request.operation ||
       attempt.url !== request.url ||
       attempt.ordinal !== index + 1 ||

@@ -218,6 +218,18 @@ test('report output rejects existing files and evidence-directory targets withou
   assert.equal(readFileSync(existing, 'utf8'), 'keep me');
 });
 
+test('null request attempts return INVALID_EVIDENCE', () => {
+  const saved = bundles.create('powerx', 'positive');
+  const path = join(saved.directory, 'manifest.json');
+  const manifest = JSON.parse(readFileSync(path, 'utf8'));
+  manifest.requests[0].attempts[0] = null;
+  writeFileSync(path, `${JSON.stringify(manifest)}\n`);
+  const result = bundles.verify(saved.directory);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_EVIDENCE');
+});
+
 test('offline verification rejects incomplete, malformed, escaping, missing and symlinked files', () => {
   const cases = [
     (directory) => rmSync(join(directory, 'manifest.json')),

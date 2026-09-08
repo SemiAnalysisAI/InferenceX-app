@@ -22,7 +22,7 @@
     "scripts/coverage-policy.mjs": "8f4bcb87b25b7e1c1d6065e3abdd04efe4e744bba35874c055d54df4b7e0337c",
     "scripts/discover.mjs": "95a92e56ad1cd42d26deb4a59bd5b02731ff687461d1023981f76d7d3c5b6308",
     "scripts/doctor.mjs": "a8f3dd55fb774e674cc52a2a035c54d53884a35c32db2bbf9b86f2abc6edb271",
-    "scripts/evidence-bundle.mjs": "09a0b6e3865906f0af51b2bbba3c42c218e5f4c37754946a4887691430cb7f7f",
+    "scripts/evidence-bundle.mjs": "31a820849e02b979a9f0507baad4a123b7c87ee8927af276f20a31102b1fe425",
     "scripts/export-agentx.mjs": "dea1a4ec13b1120b338e40c0c26b024791b10f9bf4562aa762166f4046adb745",
     "scripts/export-contract.mjs": "c03647ac078d10569599acac0cdd98b17d70bbfd2a2c7d5dde3a148547e4287d",
     "scripts/export-powerx.mjs": "58612a94ec5d60329b683eee326c16e19c263f110f13a2dc5c0ba844ff023946",
