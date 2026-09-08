@@ -95,9 +95,11 @@ contract version. Both exit 1.
 The default error format is JSON; `--error-format text` is available for people.
 `--human` changes successful stdout only. If stdout fails after `manifest.json` is
 committed, the error includes `bundle_complete: true` and the directory; verify the
-directory before consuming it. A pre-commit cancellation leaves an incomplete
-directory without a manifest. Complete response bodies and failed attempt ledger
-entries already written there are retained for diagnosis.
+directory before consuming it. Failure or cancellation before commit may leave an
+incomplete directory with response or result files already written. Request/attempt
+records commit with `manifest.json`; an incomplete directory does not guarantee a
+persisted ledger. Retain the directory for diagnosis and capture stdout, stderr,
+and the exit code outside it using the [attempt wrapper](cli-contract.md#handle-one-attempt).
 
 Formal commands require `--output-dir <new-directory>`. Its parent must already
 exist; the examples create `evidence` first, and the CLI creates the new leaf. They

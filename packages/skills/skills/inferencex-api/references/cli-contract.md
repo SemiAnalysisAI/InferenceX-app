@@ -49,9 +49,10 @@ after reviewing the failed predicate in `policy.reasons`. A directory without
 error records `bundle_complete: true`; verify that directory offline.
 
 The CLI bounds decoded response bytes, total bytes, deadlines, and attempts per
-command. It records every retry and complete response. `SIGINT` and `SIGTERM`
-cancel active work; cancellation before commit leaves diagnostic files but no valid
-bundle. A completed bundle is immutable.
+command. A completed bundle records the request attempts and accepted responses.
+`SIGINT` and `SIGTERM` cancel active work. Before commit, retain any files already
+written and the wrapper's stdout, stderr, and exit code; the incomplete directory
+does not guarantee a persisted request ledger. A completed bundle is immutable.
 
 ## Inspect and recover an installation
 
