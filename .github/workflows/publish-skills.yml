@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       qualification_json:
-        description: 'Reviewed evidence declaration: exact archive, Actions job metadata, 7 assessed cases per runtime, allowed limitation codes'
+        description: 'Reviewed evidence declaration: exact archive, Actions job metadata, all maintained cases per runtime, allowed limitation codes'
         required: true
         type: string
 
