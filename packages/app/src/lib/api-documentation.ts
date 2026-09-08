@@ -226,7 +226,7 @@ const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
   additionalProperties: numberSchema,
   description:
-    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
   properties: Object.fromEntries(
     POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
       key,

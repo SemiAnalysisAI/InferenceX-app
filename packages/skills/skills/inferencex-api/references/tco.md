@@ -76,6 +76,10 @@ Saying "at current market spreads it is not close" or naming a likely winner
 still assumes prices, even when followed by a request for the user's rates.
 Give only conditional comparisons, such as "A is cheaper if its rate ratio is
 below this boundary"; the feed supplies throughput, not rental-price evidence.
+Keep `evidence_date` knot dates distinct from `latest_date` for the whole frontier.
+If reporting an elapsed gap, compute `(Date.parse(to) - Date.parse(from)) / 86400000`
+from the stated endpoints and save that scalar before quoting it in prose. Otherwise
+report the date endpoints without inventing a gap.
 
 ## Check a P99 ITL constraint
 
@@ -117,6 +121,12 @@ JS
 Report passing, failing, and unknown **result IDs** with their configuration,
 measurement date, and source. A sampled row's failure says nothing about unexamined
 configurations; a recorded pass is scoped to that observation, not a production SLA.
+Use only the user's requested predicate for that classification. An unusual
+`p99.9_itl`, TPOT/ITL ratio, framework, or concurrency can warrant a separate
+diagnostic caveat, but does not turn a finite `p99_itl < 0.020` into a failure.
+Retain the passing row and its cost in the requested comparison. Label any optional
+screen separately, obtain the user's constraint before applying it, and avoid
+inferring burst delivery from aggregate percentiles alone.
 For a cost comparison under this constraint, first establish eligible observations
 and comparable throughput scope; the median-only TCO feed does not do that filtering.
 
