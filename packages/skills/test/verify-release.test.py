@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -314,7 +315,8 @@ console.log(JSON.stringify({ ...provenanceBundleFixtures(),
         cls.collector_outputs = {}
 
     def collected(self, kind, variant, mutate=None):
-        fixture = json.loads(json.dumps(self.collector_fixtures[kind][variant]))
+        fixture = json.loads(json.dumps(variant if type(variant) is dict else
+                                        self.collector_fixtures[kind][variant]))
         if mutate:
             mutate(fixture)
         fixture['raw'] = [json.dumps(item['body'], separators=(',', ':'))
@@ -325,7 +327,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const fixture = JSON.parse(readFileSync(0, 'utf8'));
 const modules = { result: 'investigate-result', collectivex: 'compare-collectivex',
-  agentx: 'export-agentx', tco: 'compare-tco' };
+  agentx: 'export-agentx', tco: 'compare-tco', releases: 'compare-releases' };
 const mod = await import(`./skills/inferencex-api/scripts/${modules[fixture.kind]}.mjs`);
 const options = mod.normalizeArgs(fixture.args.slice(2));
 let cursor = 0;
@@ -345,7 +347,7 @@ assert.equal(cursor, fixture.responses.length);
 console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
   coverage: built.coverage, responses: fixture.responses }));
 """
-        cache_key = (kind, variant) if mutate is None else None
+        cache_key = (kind, variant) if mutate is None and type(variant) is str else None
         built = self.collector_outputs.get(cache_key)
         if built is None:
             built = json.loads(subprocess.check_output(
@@ -874,6 +876,189 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
         manifest['result']['size'] = len(raw)
         manifest['result']['sha256'] = hashlib.sha256(raw).hexdigest()
         check.save(manifest_path, manifest)
+
+    def check_native_agent(self, fixtures, **scope):
+        attempt = Path(tempfile.mkdtemp(dir=self.root))
+        archive = attempt / 'candidate.tgz'
+        skill_files = {'SKILL.md': b'fixture', 'scripts/inferencex.mjs': b'// fixture'}
+        with tarfile.open(archive, 'w:gz') as packed:
+            for name, body in skill_files.items():
+                member = tarfile.TarInfo('package/skills/inferencex-api/' + name)
+                member.size = len(body)
+                packed.addfile(member, io.BytesIO(body))
+        body = archive.read_bytes()
+        record = {'name': check.PACKAGE, 'version': self.VERSION, 'filename': archive.name,
+                  'sha256': hashlib.sha256(body).hexdigest(),
+                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
+        check.save(attempt / 'release.json', record)
+        args = SimpleNamespace(
+            model='GLM-5', date=None, isl=8192, osl=1024, raw_model=None,
+            agentx_model='DeepSeek-V4-Pro', empty_isl=7, empty_osl=13)
+        vars(args).update(scope)
+        targets = []
+        for target in ('codex', 'claude'):
+            project = attempt / target
+            project.mkdir()
+            local_archive = project / archive.name
+            local_archive.write_bytes(body)
+            prompt = check.prompt(args, target, local_archive).encode()
+            (project / 'prompt.txt').write_bytes(prompt)
+            targets.append({'target': target, 'project': str(project),
+                            'status': 'awaiting-native-agent',
+                            'prompt_sha256': hashlib.sha256(prompt).hexdigest()})
+        check.save(attempt / 'acceptance.json', {
+            'mode': 'agents', 'status': 'prepared', 'candidate': record,
+            'scope': vars(args).copy(), 'targets': targets})
+        project = attempt / 'codex'
+        installed = project / '.agents/skills/inferencex-api'
+        for name, content in skill_files.items():
+            destination = installed / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+        check.save(installed / '.inferencex-skills.json', {
+            'package': check.PACKAGE, 'version': self.VERSION})
+        for kind, directory in fixtures.items():
+            shutil.copytree(directory, project / 'bundles' / kind)
+        (project / 'result.md').write_text('Fixture narrative; independent review still required.\n')
+        vars(args).update(mode='check-agent', manifest=attempt / 'release.json',
+                          evidence=attempt / 'evidence', project=project)
+        with patch.object(check.argparse.ArgumentParser, 'parse_args', return_value=args), \
+                patch('sys.stdout', new=io.StringIO()):
+            check.main()
+        return json.loads((args.evidence / 'verification.json').read_text())
+
+    def test_check_agent_rejects_substituted_bundle_families(self):
+        fixtures = self.fixtures()
+        with self.assertRaisesRegex(ValueError, 'family'):
+            self.check_native_agent({kind: fixtures['powerx'] for kind in fixtures})
+
+    def test_check_agent_rejects_bundles_for_a_different_prepared_scope(self):
+        with self.assertRaisesRegex(ValueError, 'scope'):
+            self.check_native_agent(self.fixtures(), model='DeepSeek-V4-Pro', isl=32, osl=64)
+
+    def test_check_agent_accepts_six_source_derived_bundles_for_the_prepared_tasks(self):
+        fixtures = self.fixtures()
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro')
+        commands = check.contract_one_commands(args, '1')
+        manifest = json.loads((fixtures['powerx'] / 'manifest.json').read_text())
+        power_rows = json.loads((fixtures['powerx'] / manifest['requests'][0]['response']['path']).read_text())
+
+        def link_result(fixture):
+            fixture['args'] = commands['result']
+            fixture['responses'][0].update(body=power_rows,
+                url='https://inferencex.semianalysis.com/api/v1/benchmarks?model=GLM-5')
+            fixture['responses'][1]['url'] = 'https://inferencex.semianalysis.com/api/v1/server-log?id=1&offset=0&limit=16384'
+            fixture['responses'][1]['body']['id'] = 1
+
+        fixtures['result'] = self.collected('result', 'missing-optional-provenance', link_result)
+
+        def tco_scope(fixture):
+            fixture['args'] = commands['tco']
+            response = fixture['responses'][0]
+            response['url'] = 'https://inferencex.semianalysis.com/api/v1/tco-feed?model=DeepSeek-V4-Pro&workloads=8192x1024&tiers=50&view=points&format=json&date=2026-09-06'
+            response['body'].update(model='DeepSeek-V4-Pro', workloads=['8192x1024'])
+            for row in response['body']['rows']:
+                row['workload'] = '8192x1024'
+
+        fixtures['tco'] = self.collected('tco', 'positive', tco_scope)
+        manifest = json.loads((fixtures['releases'] / 'manifest.json').read_text())
+        history = json.loads((fixtures['releases'] / manifest['requests'][0]['response']['path']).read_text())
+        for row, date, run_id in zip(history, ('2026-05-30', '2026-07-02'),
+                                      ('26694739752', '28571158239')):
+            row.update(model='glm5.1', hardware='mi355x', date=date,
+                       run_url=f'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id}/attempts/1')
+        fixtures['releases'] = self.collected('releases', {
+            'args': commands['releases'], 'responses': [{
+                'operation': 'benchmark-history', 'url': manifest['requests'][0]['url'],
+                'body': history, 'status': 200}]})
+
+        def collective_scope(fixture):
+            fixture['args'] = commands['collectivex']
+            for response, run_id in zip(fixture['responses'][1:], ('33378604574', '33412478973')):
+                response['url'] = f'https://inferencex.semianalysis.com/api/v1/collectivex/runs/{run_id}?version=1'
+                response['body']['run']['run_id'] = run_id
+
+        fixtures['collectivex'] = self.collected('collectivex', 'positive', collective_scope)
+        report = self.check_native_agent(fixtures)
+        self.assertEqual(report['status'], 'data-checks-passed')
+        self.assertEqual({kind: audit['kind'] for kind, audit in report['targets'][0]['bundles'].items()},
+                         {kind: kind for kind in fixtures})
+
+    def test_json_derivations_distinguish_boolean_and_numeric_values(self):
+        fixtures = self.fixtures()
+        mutations = [
+            ('powerx', lambda result: result['rows'][0].update(disagg=0)),
+            ('agentx', lambda result: result['rows'][0]['agentx']['trace_availability'].update(value=0)),
+            ('tco', lambda result: result['rows'][0]['point'].update(is_interpolated=1)),
+            ('result', lambda result: result['metadata']['log_window'].update(offset=False)),
+            ('releases', lambda result: result['comparisons'][0]['configuration'].update(disagg=0)),
+            ('collectivex', lambda result: result['comparisons'][0]['left'][0].update(response_index=True)),
+        ]
+        for kind, mutate in mutations:
+            with self.subTest(kind=kind):
+                self.rehash_result(fixtures[kind], mutate)
+                with self.assertRaises(ValueError):
+                    check.check_bundle(fixtures[kind], self.VERSION)
+
+    def test_native_scope_binds_each_task_and_the_selected_powerx_observation(self):
+        fixtures = self.fixtures()
+        bundles = self.root / 'native-scope'
+        for kind, directory in fixtures.items():
+            shutil.copytree(directory, bundles / kind)
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro')
+        # Domain replay is covered above; this fixture isolates the prepared task boundary.
+        scopes = {
+            'result': {'id': '1', 'model': 'GLM-5', 'date': None, 'run_id': None,
+                       'log_file': None, 'log_offset': 0, 'log_limit': 16384},
+            'tco': {'model': 'DeepSeek-V4-Pro', 'date': '2026-09-06',
+                    'workloads': ['8192x1024'],
+                    'target_output_tokens_per_second_per_user': 50.0,
+                    'gpu_hourly_prices_usd': {'mi355x': 1.8, 'b200': 3.6},
+                    'units': check.TCO_UNITS},
+            'releases': {'model': 'GLM-5', 'raw_model': 'glm5.1', 'hardware': 'mi355x',
+                         'framework': 'sglang', 'isl': 8192, 'osl': 1024,
+                         'metric': 'median_ttft', 'before_date': '2026-05-30',
+                         'after_date': '2026-07-02', 'before_image': None, 'after_image': None,
+                         'before_run_url': 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+                         'after_run_url': 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'},
+            'collectivex': {'left': '33378604574', 'right': '33412478973'},
+        }
+        for kind, scope in scopes.items():
+            path = bundles / kind / 'manifest.json'
+            manifest = json.loads(path.read_text())
+            manifest['normalized_arguments'] = scope
+            check.save(path, manifest)
+        power = json.loads((bundles / 'powerx/result.json').read_text())
+        selected = power['rows'][0]
+        result_path = bundles / 'result/result.json'
+        check.save(result_path, {'selected_result': selected})
+        check.check_native_scope(bundles, args)
+        for kind, field, value in (
+            ('powerx', 'model', 'wrong'), ('powerx', 'isl', 32),
+            ('powerx', 'osl', 64), ('powerx', 'date', '2026-08-01'),
+            ('powerx', 'raw_model', 'another-raw-model'), ('agentx', 'model', 'wrong'),
+            ('result', 'model', 'wrong'), ('result', 'date', '2026-08-01'),
+            ('tco', 'date', None), ('tco', 'gpu_hourly_prices_usd', {'b200': 0}),
+            ('releases', 'before_date', '2026-05-31'),
+            ('releases', 'after_run_url', None), ('collectivex', 'right', '33378604574'),
+        ):
+            with self.subTest(kind=kind, field=field):
+                path = bundles / kind / 'manifest.json'
+                original = path.read_text()
+                changed = json.loads(original)
+                changed['normalized_arguments'][field] = value
+                check.save(path, changed)
+                with self.assertRaisesRegex(ValueError, 'scope'):
+                    check.check_native_scope(bundles, args)
+                path.write_text(original)
+        for field, value in (('id', '999'), ('model', 'wrong'), ('hardware', 'wrong'),
+                             ('isl', 32), ('osl', 64)):
+            with self.subTest(selected_field=field):
+                check.save(result_path, {'selected_result': {**selected, field: value}})
+                with self.assertRaisesRegex(ValueError, 'selected PowerX context'):
+                    check.check_native_scope(bundles, args)
 
     def test_six_family_bundles_are_checked_against_consumed_responses(self):
         reports = {kind: check.check_bundle(directory, self.VERSION)
@@ -1428,7 +1613,7 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
                 raise subprocess.CalledProcessError(3, command, output=output, stderr='')
             return '{}\n'
 
-        def audit(directory, version):
+        def audit(directory, version, expected_kind):
             self.assertEqual(version, self.VERSION)
             name = Path(directory).name
             return {'kind': 'powerx' if name == 'powerx-empty' else name,
@@ -1467,6 +1652,35 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
         self.assertIn('--raw-model', empty_command)
         self.assertEqual(empty_command[empty_command.index('--raw-model') + 1], 'glm5')
 
+    def test_contract_one_candidate_rejects_a_wrong_bundle_family(self):
+        power = self.fixtures()['powerx']
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'}, 'coverage': {'available_items': 1},
+                    'items': [{'result_id': '1', 'raw_model': 'glm5', 'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}]})
+            if '--output-dir' in command:
+                shutil.copytree(power, command[command.index('--output-dir') + 1])
+            return '{}\n'
+
+        with patch.object(check, 'run', side_effect=execute), \
+                self.assertRaisesRegex(ValueError, 'family differs from requested task'):
+            check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
+
     def test_contract_one_collectivex_positive_gate_rejects_zero_comparable_pairs(self):
         installed = self.root / 'installed'
         (installed / 'scripts').mkdir(parents=True)
@@ -1491,7 +1705,7 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
                 })
             return '{}\n'
 
-        def audit(directory, _version):
+        def audit(directory, _version, expected_kind):
             kind = Path(directory).name
             return {'eligible_records': 1,
                     'comparable_pairs': 0 if kind == 'collectivex' else 1}

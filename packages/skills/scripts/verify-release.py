@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import signal
 import stat
 import subprocess
@@ -400,6 +401,35 @@ def agentx_map(value, requested_ids, operation):
     return result
 
 
+def contract_one_commands(args, result_id):
+    collective_left, collective_right = COLLECTIVEX_POSITIVE_RUN_IDS
+    power_flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl)]
+    if args.date:
+        power_flags += ['--date', args.date]
+    if args.raw_model:
+        power_flags += ['--raw-model', args.raw_model]
+    result_flags = ['--id', result_id, '--model', args.model]
+    if args.date:
+        result_flags += ['--date', args.date]
+    return {
+        'powerx': ['powerx', 'export', *power_flags],
+        'agentx': ['agentx', 'export', '--model', args.agentx_model],
+        'result': ['result', 'inspect', *result_flags],
+        'tco': ['tco', 'compare', '--model', 'DeepSeek-V4-Pro', '--workloads', '8192x1024',
+                '--target', '50', '--gpu-hourly-prices', 'b200=3.6,mi355x=1.8',
+                '--date', '2026-09-06'],
+        'releases': ['releases', 'compare', '--model', 'GLM-5', '--raw-model', 'glm5.1',
+                     '--hardware', 'mi355x', '--framework', 'sglang', '--isl', '8192',
+                     '--osl', '1024', '--metric', 'median_ttft', '--before-date', '2026-05-30',
+                     '--after-date', '2026-07-02', '--before-run-url',
+                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+                     '--after-run-url',
+                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'],
+        'collectivex': ['collectivex', 'compare', '--left', collective_left,
+                        '--right', collective_right],
+    }
+
+
 def prompt(args, target, archive):
     archive = archive.resolve()
     project = archive.parent
@@ -407,7 +437,9 @@ def prompt(args, target, archive):
     cli = skill_root / 'scripts/inferencex.mjs'
     date = f' --date {args.date}' if args.date else ''
     raw = f' --raw-model {args.raw_model}' if args.raw_model else ''
-    left, right = COLLECTIVEX_POSITIVE_RUN_IDS
+    commands = '\n'.join(
+        f'- `inferencex {shlex.join(flags)} --output-dir bundles/{kind}`'
+        for kind, flags in contract_one_commands(args, 'SELECTED_RESULT_ID').items())
     installer = f'npm exec --yes --offline --package {archive} -- inferencex-skills'
     return f'''Work only in {project}. Use the exact candidate archive {archive}; do not read another
 checkout, use private services, or run benchmarks.
@@ -421,23 +453,18 @@ Install the candidate, inspect status, and preview a forced reinstall in order:
 Preserve stdout, stderr, and exit codes. Read the installed SKILL.md. The installed
 CLI is {cli}. Use only its unified query surface. The six formal routes are:
 
-- `inferencex powerx export`
-- `inferencex agentx export`
-- `inferencex result inspect`
-- `inferencex tco compare`
-- `inferencex releases compare`
-- `inferencex collectivex compare`
+{commands}
 
 Offline replay uses `inferencex verify`.
 
 Create a `bundles` parent and exactly these six children through the formal commands:
 powerx, agentx, result, tco, releases, and collectivex. First run `discover configs
 --model {args.model}{date}` and select an observed strict-v2 single-turn configuration
-with {args.isl} input and {args.osl} output tokens{raw}. Use that exact result ID and
-hardware for PowerX and result provenance. Export AgentX summaries for
-{args.agentx_model}. Use TCO assumptions b200=3.6 and mi355x=1.8 for workload
-8192x1024 at target 50. Use the maintained GLM-5 dated release comparison and
-CollectiveX runs {left} and {right}.
+with {args.isl} input and {args.osl} output tokens{raw}. Export that matching
+PowerX workload scope, then investigate one observation present in the PowerX
+rows, replacing SELECTED_RESULT_ID in the command above. Its result ID, raw model,
+hardware, and workload must match the selected PowerX row. Use the other commands'
+model, dates, workloads, assumptions, and run IDs exactly as given.
 
 After each bundle completes, run `inferencex verify` on it without network access.
 Keep completed bundle bytes unchanged. Write each command, exit code, verification
@@ -644,9 +671,9 @@ def _collective_expected(manifest, requests, bodies, result):
     require([(request['operation'], urlsplit(request['url']).path,
               parse_qs(urlsplit(request['url']).query, keep_blank_values=True))
              for request in requests] == expected_requests, 'CollectiveX request scope differs')
-    require(result.get('selection') == {
+    require(same_json(result.get('selection'), {
         'mode': 'explicit_run_ids' if explicit else 'newest_two_measured_from_one_list',
-        'run_ids': run_ids}, 'CollectiveX selected run scope differs')
+        'run_ids': run_ids}), 'CollectiveX selected run scope differs')
     groups = {}
     for side, dataset_index in enumerate(range(dataset_start, len(bodies))):
         dataset = bodies[dataset_index]
@@ -673,8 +700,8 @@ def _collective_expected(manifest, requests, bodies, result):
         issues = list(dict.fromkeys(issue for _, problems, _ in left + right for issue in problems))
         status = ('ambiguous' if len(left) > 1 or len(right) > 1 else 'incomparable' if issues else
                   'only_right' if not left else 'only_left' if not right else 'matched')
-        require(comparison['left'] == [entry[0] for entry in left] and
-                comparison['right'] == [entry[0] for entry in right],
+        require(same_json(comparison['left'], [entry[0] for entry in left]) and
+                same_json(comparison['right'], [entry[0] for entry in right]),
                 'CollectiveX source references differ from selected run identities')
         require(comparison['status'] == status and comparison.get('issues') == issues,
                 'CollectiveX comparison status differs from raw source')
@@ -694,15 +721,15 @@ def _collective_expected(manifest, requests, bodies, result):
         require(same_json(comparison['metrics'], metrics), 'CollectiveX metric source or arithmetic differs')
         comparable += usable
         counts[status] += 1
-    require(result['summary'] == counts, 'CollectiveX summary differs from raw source')
+    require(same_json(result['summary'], counts), 'CollectiveX summary differs from raw source')
     reasons = [{'code': status, 'count': counts[status]} for status in
                ('only_left', 'only_right', 'ambiguous', 'incomparable') if counts[status]]
     if counts['matched'] > comparable:
         reasons.append({'code': 'matched_without_usable_metric', 'count': counts['matched'] - comparable})
-    require(manifest['coverage'] == {
+    require(same_json(manifest['coverage'], {
         'status': 'empty' if not comparisons else 'complete' if comparable == len(comparisons) else 'partial',
         'selected_records': len(comparisons), 'comparable_pairs': comparable, 'hardware': [],
-        'reasons': reasons}, 'CollectiveX bundle coverage differs from raw source')
+        'reasons': reasons}), 'CollectiveX bundle coverage differs from raw source')
     return len(comparisons), comparable, {}, comparable
 
 
@@ -804,7 +831,7 @@ def _powerx_expected(manifest, requests, bodies, response_ids, rows, document=No
         expected.append(clean)
         non_finite_values += changed
     if manifest['result']['format'] == 'json':
-        require(rows == expected, 'PowerX derivation differs')
+        require(same_json(rows, expected), 'PowerX derivation differs')
         metadata = {
             'package_version': manifest['producer']['package_version'],
             'query_url': requests[0]['url'],
@@ -835,8 +862,8 @@ def _powerx_expected(manifest, requests, bodies, response_ids, rows, document=No
             'contract_version': 1,
             'source_response_id': response_ids[0],
         }
-        require(document.get('metadata') == metadata, 'PowerX metadata differs from saved response')
-        require(document.get('units') == POWERX_UNITS, 'PowerX units differ')
+        require(same_json(document.get('metadata'), metadata), 'PowerX metadata differs from saved response')
+        require(same_json(document.get('units'), POWERX_UNITS), 'PowerX units differ')
     else:
         require(len(rows) == len(expected), 'PowerX CSV row count differs')
         context = {
@@ -876,7 +903,7 @@ def _powerx_expected(manifest, requests, bodies, response_ids, rows, document=No
                    ([{'code': 'measurement_unavailable', 'count': unavailable}]
                     if unavailable else []),
     }
-    require(manifest.get('coverage') == expected_coverage,
+    require(same_json(manifest.get('coverage'), expected_coverage),
             'PowerX bundle coverage differs from saved response')
     return len(expected), None, hardware, eligible
 
@@ -946,7 +973,7 @@ def _agentx_expected(manifest, requests, bodies, response_ids, rows, document=No
             }
         expected.append({'benchmark': benchmark, 'agentx': agentx})
     if manifest['result']['format'] == 'json':
-        require(rows == expected, 'AgentX join differs')
+        require(same_json(rows, expected), 'AgentX join differs')
         request_urls = []
         for request, response_id in zip(requests, response_ids):
             entry = {'operation': request['operation'], 'url': request['url'],
@@ -992,7 +1019,7 @@ def _agentx_expected(manifest, requests, bodies, response_ids, rows, document=No
             'contract_version': 1,
             'source_response_ids': response_ids,
         }
-        require(document.get('metadata') == metadata,
+        require(same_json(document.get('metadata'), metadata),
                 'AgentX metadata differs from saved responses')
     else:
         require(len(rows) == len(expected), 'AgentX CSV row count differs')
@@ -1053,12 +1080,12 @@ def _agentx_expected(manifest, requests, bodies, response_ids, rows, document=No
         'reasons': ([{'code': 'aggregate_unavailable', 'count': unavailable}]
                     if unavailable else []),
     }
-    require(manifest.get('coverage') == expected_coverage,
+    require(same_json(manifest.get('coverage'), expected_coverage),
             'AgentX bundle coverage differs from saved responses')
     return len(expected), None, hardware, eligible
 
 
-def check_bundle(directory, version):
+def check_bundle(directory, version, expected_kind=None):
     """Independent contract-1 bundle audit; never invokes the JavaScript renderer."""
     supplied = Path(directory)
     require(supplied.is_dir() and not supplied.is_symlink(),
@@ -1081,6 +1108,7 @@ def check_bundle(directory, version):
     kind = manifest.get('kind')
     require(kind in {'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'},
             'Bundle family differs')
+    require(expected_kind is None or kind == expected_kind, 'Bundle family differs from requested task')
     result_record = manifest.get('result', {})
     result_bytes = regular(result_record.get('path'), 'Result')
     require(result_record.get('size') == len(result_bytes) and
@@ -1152,7 +1180,7 @@ def check_bundle(directory, version):
     summary = manifest.get('summary', {})
     require(summary.get('schema_version') == 1 and summary.get('kind') == kind and
             summary.get('package_version') == version and summary.get('validity') == 'valid' and
-            summary.get('coverage') == coverage and
+            same_json(summary.get('coverage'), coverage) and
             summary.get('output') == {'result': result_record.get('path'), 'manifest': 'manifest.json'},
             'Bundle summary differs')
     policy = summary.get('policy', {})
@@ -1232,7 +1260,7 @@ def check_bundle(directory, version):
                  for request in requests] == expected_requests, 'Provenance request scope differs')
         matches = [_string_export_identities(row) for row in bodies[0]
                    if str(row.get('id')) == str(selected.get('id'))]
-        require(len(matches) == 1 and selected == matches[0], 'Provenance selection differs')
+        require(len(matches) == 1 and same_json(selected, matches[0]), 'Provenance selection differs')
         metadata = result.get('metadata', {})
         expected_scope = {
             'display_model': options['model'], 'date': options['date'],
@@ -1240,9 +1268,9 @@ def check_bundle(directory, version):
             'selection': 'logical_run_snapshot' if options['run_id'] is not None else
                          'as_of_snapshot' if options['date'] is not None else 'latest_snapshot',
         }
-        require(metadata.get('scope') == expected_scope and metadata.get('log_window') == {
+        require(same_json(metadata.get('scope'), expected_scope) and same_json(metadata.get('log_window'), {
             'file': options['log_file'], 'offset': options['log_offset'], 'limit': options['log_limit'],
-            'offset_unit': 'Unicode characters'}, 'Provenance metadata scope differs')
+            'offset_unit': 'Unicode characters'}), 'Provenance metadata scope differs')
         require(metadata.get('selected_result_id') == selected['id'] and
                 metadata.get('ran_new_benchmark') is False,
                 'Provenance metadata differs')
@@ -1303,10 +1331,10 @@ def check_bundle(directory, version):
         ):
             if condition:
                 reasons.append({'code': code, 'count': 1})
-        require(coverage == {'status': 'partial' if reasons else 'complete',
+        require(same_json(coverage, {'status': 'partial' if reasons else 'complete',
                              'selected_records': 1, 'comparable_pairs': None,
                              'hardware': [{'hardware': selected['hardware'], 'valid_records': 1}],
-                             'reasons': reasons}, 'Provenance bundle coverage differs from source')
+                             'reasons': reasons}), 'Provenance bundle coverage differs from source')
         derived = (1, None, {selected['hardware']: 1}, 1)
     elif kind == 'tco':
         feed = bodies[0]
@@ -1369,9 +1397,9 @@ def check_bundle(directory, version):
                 'verification recalculates costs from saved points and does not independently '
                 'revalidate benchmark frontier interpolation methodology.'),
         }
-        require(result.get('metadata') == expected_metadata,
+        require(same_json(result.get('metadata'), expected_metadata),
                 'TCO metadata differs from saved response and arguments')
-        require(result.get('units') == TCO_UNITS, 'TCO units differ')
+        require(same_json(result.get('units'), TCO_UNITS), 'TCO units differ')
         expected_source = {
             'response_id': response_ids[0],
             'query_url': requests[0]['url'],
@@ -1381,7 +1409,7 @@ def check_bundle(directory, version):
             'body_encoding': 'utf8',
             'body_bytes': requests[0]['response']['size'],
         }
-        require(result.get('source') == expected_source,
+        require(same_json(result.get('source'), expected_source),
                 'TCO source differs from saved response')
         eligible, hardware = 0, {}
         status_counts = {status: 0 for status in TCO_STATUSES}
@@ -1399,7 +1427,7 @@ def check_bundle(directory, version):
                 require((point.get('hardware'), point.get('workload'), point.get('tier')) ==
                         (row['hardware'], row['workload'], target),
                         'TCO point scope differs from its hardware, workload or tier')
-                require(point in feed['rows'], 'TCO point differs from consumed feed')
+                require(any(same_json(point, item) for item in feed['rows']), 'TCO point differs from consumed feed')
                 expected_status = ('zero_throughput' if point.get('boundary') == 'interpolated' and
                                    point.get('output_tput_per_gpu') == 0 else
                                    'available' if point.get('boundary') == 'interpolated' else
@@ -1428,7 +1456,7 @@ def check_bundle(directory, version):
             'status_counts': status_counts,
             'returned_hardware': _sorted_unique(row['hardware'] for row in feed['rows']),
         }
-        require(result.get('coverage') == expected_domain_coverage,
+        require(same_json(result.get('coverage'), expected_domain_coverage),
                 'TCO coverage differs from saved response')
         expected_bundle_coverage = {
             'status': 'empty' if not result['rows'] else
@@ -1440,7 +1468,7 @@ def check_bundle(directory, version):
             'reasons': [{'code': status, 'count': status_counts[status]}
                         for status in TCO_STATUSES[1:] if status_counts[status]],
         }
-        require(manifest.get('coverage') == expected_bundle_coverage,
+        require(same_json(manifest.get('coverage'), expected_bundle_coverage),
                 'TCO bundle coverage differs from saved response')
         derived = (len(result['rows']), None, hardware, eligible)
     elif kind == 'releases':
@@ -1450,7 +1478,7 @@ def check_bundle(directory, version):
             original = {key: value for key, value in row.items() if key not in {
                 'curve_date', 'curve_workflow_run_id', 'curve_run_started_at'}}
             result_id = str(row['id'])
-            require(result_id not in originals or originals[result_id] == original,
+            require(result_id not in originals or same_json(originals[result_id], original),
                     'Release observation identity differs between snapshots')
             originals[result_id] = original
         options = manifest.get('normalized_arguments', {})
@@ -1469,7 +1497,7 @@ def check_bundle(directory, version):
                              row['date'] == options[f'{side}_date'] and
                              all(options[f'{side}_{key}'] is None or row[key] == options[f'{side}_{key}']
                                  for key in ('image', 'run_url'))]
-            require(selected_rows == expected_rows, 'Release selection differs from saved scope')
+            require(same_json(selected_rows, expected_rows), 'Release selection differs from saved scope')
             unique = {str(row['id']): row for row in selected_rows}
             require(detail.get('unique_observations') == len(unique) and
                     detail.get('snapshot_reuses') == len(selected_rows) - len(unique),
@@ -1493,17 +1521,17 @@ def check_bundle(directory, version):
         comparable = 0
         for pair in result['comparisons']:
             before_row, after_row = expected_pairs[(pair['before_id'], pair['after_id'])]
-            require(pair.get('configuration') == {
-                key: before_row[key] for key in RELEASE_CONFIGURATION_FIELDS} and
-                pair.get('configuration_metrics') == {
+            require(same_json(pair.get('configuration'), {
+                key: before_row[key] for key in RELEASE_CONFIGURATION_FIELDS}) and
+                same_json(pair.get('configuration_metrics'), {
                     key: before_row['metrics'][key] for key in RELEASE_CONFIGURATION_METRICS
-                    if key in before_row['metrics']}, 'Release matching configuration differs')
+                    if key in before_row['metrics']}), 'Release matching configuration differs')
             metric = pair['metric']
             metric_name = metric['name']
             before, after = metric['before'], metric['after']
             require(metric_name == options['metric'] and
-                    before_row['metrics'].get(metric_name) == before and
-                    after_row['metrics'].get(metric_name) == after,
+                    same_json(before_row['metrics'].get(metric_name), before) and
+                    same_json(after_row['metrics'].get(metric_name), after),
                     'Release metric source differs')
             if finite(before) and finite(after):
                 comparable += 1
@@ -1528,7 +1556,7 @@ def check_bundle(directory, version):
     selected_records, comparable, derived_hardware, eligible_records = derived
     require(coverage['selected_records'] == selected_records,
             'Bundle selected-record coverage differs from result')
-    require(coverage.get('comparable_pairs') == comparable,
+    require(same_json(coverage.get('comparable_pairs'), comparable),
             'Bundle comparable-pair coverage differs from result')
     hardware_entries = coverage.get('hardware')
     require(type(hardware_entries) is list and
@@ -1556,9 +1584,48 @@ def check_bundle(directory, version):
             'policy_status': expected_policy, 'policy_exit_code': policy_exit_code}
 
 
+def check_native_scope(bundles, args):
+    """Bind independently valid bundles to the prepared six-family task."""
+    manifests = {kind: json.loads((bundles / kind / 'manifest.json').read_text())
+                 for kind in ('powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex')}
+    options = {kind: manifest['normalized_arguments'] for kind, manifest in manifests.items()}
+    require(same_json(options['powerx'], {
+        'model': args.model, 'date': args.date, 'isl': args.isl, 'osl': args.osl,
+        'raw_model': args.raw_model, 'format': 'json'}), 'Native PowerX task scope differs')
+    require(same_json(options['agentx'], {
+        'model': args.agentx_model, 'date': None, 'format': 'json',
+        **{name: None for name, _field in AGENTX_FILTERS}}), 'Native AgentX task scope differs')
+    power = json.loads((bundles / 'powerx' / manifests['powerx']['result']['path']).read_text())
+    result = json.loads((bundles / 'result' / manifests['result']['result']['path']).read_text())
+    selected = result['selected_result']
+    context = ('id', 'model', 'hardware', 'benchmark_type', 'isl', 'osl', 'date')
+    require(any(same_json({key: row.get(key) for key in context},
+                          {key: selected.get(key) for key in context}) for row in power['rows']),
+            'Native result is not linked to the selected PowerX context')
+    require(same_json(options['result'], {
+        'id': selected['id'], 'model': args.model, 'date': args.date, 'run_id': None,
+        'log_file': None, 'log_offset': 0, 'log_limit': 16384}), 'Native result task scope differs')
+    commands = contract_one_commands(args, selected['id'])
+    # These maintained commands contain only paired flags, with no positional values.
+    fixed = {kind: dict(zip(commands[kind][2::2], commands[kind][3::2]))
+             for kind in ('tco', 'releases', 'collectivex')}
+    tco = options['tco']
+    actual_tco = {
+        '--model': tco['model'], '--date': tco['date'],
+        '--workloads': ','.join(tco['workloads']),
+        '--target': js_text(tco['target_output_tokens_per_second_per_user']),
+    }
+    prices = dict(item.split('=') for item in fixed['tco'].pop('--gpu-hourly-prices').split(','))
+    require(actual_tco == fixed['tco'] and same_json(tco['gpu_hourly_prices_usd'],
+            {name: float(price) for name, price in prices.items()}), 'Native TCO task scope differs')
+    for kind in ('releases', 'collectivex'):
+        actual = {f'--{name.replace("_", "-")}': js_text(value)
+                  for name, value in options[kind].items() if value is not None}
+        require(actual == fixed[kind], f'Native {kind} task scope differs')
+
+
 def run_contract_one_workflows(node, installed, project, env, args, version, deadline):
     require(contract_one_required(version), 'Release verifier requires contract 1')
-    collective_left, collective_right = COLLECTIVEX_POSITIVE_RUN_IDS
     cli = installed / 'scripts/inferencex.mjs'
     require(cli.is_file() and not cli.is_symlink(), 'The installed inferencex entry is missing')
     discovery_flags = ['discover', 'configs', '--model', args.model, '--limit', '1000',
@@ -1587,31 +1654,7 @@ def run_contract_one_workflows(node, installed, project, env, args, version, dea
 
     bundle_root = project / 'contract-one-bundles'
     bundle_root.mkdir()
-    power_flags = ['--model', args.model, '--isl', str(args.isl), '--osl', str(args.osl)]
-    if args.date:
-        power_flags += ['--date', args.date]
-    if args.raw_model:
-        power_flags += ['--raw-model', args.raw_model]
-    result_flags = ['--id', selected['result_id'], '--model', args.model]
-    if args.date:
-        result_flags += ['--date', args.date]
-    commands = {
-        'powerx': ['powerx', 'export', *power_flags],
-        'agentx': ['agentx', 'export', '--model', args.agentx_model],
-        'result': ['result', 'inspect', *result_flags],
-        'tco': ['tco', 'compare', '--model', 'DeepSeek-V4-Pro', '--workloads', '8192x1024',
-                '--target', '50', '--gpu-hourly-prices', 'b200=3.6,mi355x=1.8',
-                '--date', '2026-09-06'],
-        'releases': ['releases', 'compare', '--model', 'GLM-5', '--raw-model', 'glm5.1',
-                     '--hardware', 'mi355x', '--framework', 'sglang', '--isl', '8192',
-                     '--osl', '1024', '--metric', 'median_ttft', '--before-date', '2026-05-30',
-                     '--after-date', '2026-07-02', '--before-run-url',
-                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
-                     '--after-run-url',
-                     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'],
-        'collectivex': ['collectivex', 'compare', '--left', collective_left,
-                        '--right', collective_right],
-    }
+    commands = contract_one_commands(args, selected['result_id'])
     reports = {}
     denial = project / 'contract-one-deny-network.mjs'
     denial.write_text("globalThis.fetch = () => { throw new Error('offline verification attempted HTTP'); };\n")
@@ -1619,7 +1662,7 @@ def run_contract_one_workflows(node, installed, project, env, args, version, dea
         directory = bundle_root / kind
         run([node, cli, *flags, '--output-dir', directory, '--max-attempts', '3'],
             project, env, f'contract-one-{kind}', deadline)
-        reports[kind] = check_bundle(directory, version)
+        reports[kind] = check_bundle(directory, version, kind)
         require(reports[kind]['eligible_records'] > 0 and
                 (kind not in {'releases', 'collectivex'} or
                  reports[kind]['comparable_pairs'] > 0),
@@ -1636,7 +1679,7 @@ def run_contract_one_workflows(node, installed, project, env, args, version, dea
     run([node, cli, 'powerx', 'export', *empty_flags,
          '--output-dir', empty, '--max-attempts', '3'],
         project, env, 'contract-one-powerx-empty', deadline)
-    empty_report = check_bundle(empty, version)
+    empty_report = check_bundle(empty, version, 'powerx')
     require(empty_report['selected_records'] == 0, 'PowerX negative scope is no longer empty')
     run([node, '--import', denial, cli, 'verify', empty], project, env,
         'contract-one-verify-powerx-empty', deadline)
@@ -1745,8 +1788,9 @@ def main():
                     {path.name for path in bundles.iterdir()} == expected and
                     all(path.is_dir() and not path.is_symlink() for path in bundles.iterdir()),
                     'Native-agent bundle inventory differs')
-            audits = {kind: check_bundle(bundles / kind, record['version'])
+            audits = {kind: check_bundle(bundles / kind, record['version'], kind)
                       for kind in sorted(expected)}
+            check_native_scope(bundles, args)
             require((args.project / 'result.md').is_file() and
                     (args.project / 'result.md').read_text().strip(),
                     'Native-agent narrative is missing')

@@ -59,8 +59,15 @@ function validateVerdict(record, mode, releaseIdentity) {
   assert.equal(record.new_benchmark_runs, false, `${mode} verification launched a benchmark`);
   assert.ok(record.scope && typeof record.scope === 'object', `${mode} scope is missing`);
   assert.ok(
-    Array.isArray(record.targets) && record.targets.length > 0,
-    `${mode} targets are missing`,
+    Array.isArray(record.targets) &&
+      record.targets.length === 2 &&
+      record.targets.every((entry) => entry?.contract_one?.status === 'passed'),
+    `${mode} requires two completed target workflows`,
+  );
+  assert.deepEqual(
+    record.targets.map((entry) => entry.target).toSorted(),
+    ['claude', 'codex'],
+    `${mode} target identities differ`,
   );
 }
 
@@ -216,7 +223,10 @@ export function validateQualification(release, qualification) {
   const limitations = qualification.known_limitations;
   assert.ok(Array.isArray(limitations), 'Known limitations are invalid');
   const acceptedLimitations = limitations.map((code) => {
-    assert.ok(Object.hasOwn(LIMITATIONS, code), 'Unknown known-limitation code');
+    assert.ok(
+      typeof code === 'string' && Object.hasOwn(LIMITATIONS, code),
+      'Unknown known-limitation code',
+    );
     return { code, description: LIMITATIONS[code] };
   });
   assert.equal(

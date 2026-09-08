@@ -67,7 +67,7 @@ const candidate = {
   candidate: release,
   new_benchmark_runs: false,
   scope,
-  targets: [{ target: 'codex' }, { target: 'claude' }],
+  targets: ['codex', 'claude'].map((target) => ({ target, contract_one: { status: 'passed' } })),
   environment: { SECRET: 'must-not-copy' },
   logs: 'must-not-copy',
 };
@@ -179,6 +179,34 @@ test('summary output is create-new and platform jobs test the accepted archive',
     { encoding: 'utf8' },
   );
   assert.notEqual(rerun.status, 0);
+});
+
+test('summary requires both completed target workflows in each verification record', () => {
+  for (const targets of [
+    [null],
+    candidate.targets.slice(0, 1),
+    [candidate.targets[0], candidate.targets[0]],
+    [candidate.targets[0], { target: 'claude' }],
+    [candidate.targets[0], { target: 'claude', contract_one: { status: 'failed' } }],
+  ]) {
+    assert.throws(() =>
+      createReleaseSummary(release, { ...candidate, targets }, publicVerification, qualification),
+    );
+    const rejected = execute({ ...publicVerification, targets });
+    assert.notEqual(rejected.status, 0);
+    assert.equal(rejected.outputFileExists, false);
+  }
+});
+
+test('qualification rejects coerced known-limitation codes', () => {
+  for (const knownLimitations of [
+    [['WINDOWS_UNQUALIFIED']],
+    [['WINDOWS_UNQUALIFIED'], ['WINDOWS_UNQUALIFIED']],
+  ]) {
+    assert.throws(() =>
+      validateQualification(release, { ...qualification, known_limitations: knownLimitations }),
+    );
+  }
 });
 
 test('qualification preserves retried matrix attempts while requiring one run and archive', () => {

@@ -25,7 +25,8 @@ Settings with these exact values:
 For new configurations created after September 3, 2026, npm permits staged
 publishing by default; direct `npm publish` must be selected explicitly. This
 workflow uses GitHub-hosted runners, Node 24, npm >=11.5.1, and job-scoped
-`contents: read` / `id-token: write`; it needs no npm token secret. npm checks the
+`contents: write` / `id-token: write`; the contents permission creates the GitHub
+release assets after public verification. It needs no npm token secret. npm checks the
 repository and workflow identity during publication, not when settings are saved.
 See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
@@ -201,6 +202,13 @@ used during preparation. The checker independently reconstructs all six bundle
 families from their original response bytes and validates the manifests, hashes,
 scope, coverage, policy, dates, units, and provenance. No later refetch replaces
 the consumed input.
+
+The six directory names must contain their corresponding bundle families and the
+prepared task scopes. The inspected result must appear in the selected PowerX
+observations. A valid bundle for a different task does not satisfy this acceptance
+check. JSON comparisons preserve boolean values separately from numeric zero and
+one. These explicit command instructions do not establish implicit discovery;
+use the separate maintained natural-language cases for that assessment.
 
 The checker reports `data-checks-passed`, leaving narrative review explicit. A
 different reviewer must inspect the transcript and explanation for:
