@@ -446,7 +446,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-muted-foreground">
+        <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-foreground/80">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (

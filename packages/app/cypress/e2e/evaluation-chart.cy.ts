@@ -369,7 +369,8 @@ describe('Evaluation evidence reader', () => {
         },
       }).as('unofficialEvidence');
     });
-    cy.visit(`/evaluation?unofficialrun=${runId}`);
+    // Match the artifact fixture explicitly instead of inheriting changing dashboard defaults.
+    cy.visit(`/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`);
     cy.wait('@unofficialEvidence');
     // The overlay can sort below the first ten official rows once both fetches settle.
     cy.get('[data-testid="evaluation-results-table"] [aria-label="Rows per page"]').click();

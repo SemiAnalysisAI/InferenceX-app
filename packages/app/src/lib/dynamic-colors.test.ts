@@ -20,7 +20,7 @@ describe('getVendor', () => {
   it('classifies registered GPU base keys through GPU_VENDORS', () => {
     expect(getVendor('h100_vllm')).toBe('nvidia');
     expect(getVendor('mi300x_sglang')).toBe('amd');
-    expect(getVendor('jalapeno_teacup')).toBe('teacup');
+    expect(getVendor('jalapeno_teacup')).toBe('openai');
     expect(getVendor('tpuv7')).toBe('google');
     expect(getVendor('tpuv7_vllm')).toBe('google');
   });
@@ -46,13 +46,13 @@ describe('generateVendorColors', () => {
     );
     const nvidia = VENDOR_OKLCH_ZONES.nvidia;
     const amd = VENDOR_OKLCH_ZONES.amd;
-    const teacup = VENDOR_OKLCH_ZONES.teacup;
+    const openai = VENDOR_OKLCH_ZONES.openai;
     expect(hueOf(colors['nvidia_series-a'])).toBeGreaterThanOrEqual(nvidia.start);
     expect(hueOf(colors['nvidia_series-a'])).toBeLessThanOrEqual(nvidia.end);
     expect(hueOf(colors['amd_series-b'])).toBeGreaterThanOrEqual(amd.start);
     expect(hueOf(colors['amd_series-b'])).toBeLessThanOrEqual(amd.end);
-    expect(hueOf(colors.jalapeno_teacup)).toBeGreaterThanOrEqual(teacup.start);
-    expect(hueOf(colors.jalapeno_teacup)).toBeLessThanOrEqual(teacup.end);
+    expect(hueOf(colors.jalapeno_teacup)).toBeGreaterThanOrEqual(openai.start);
+    expect(hueOf(colors.jalapeno_teacup)).toBeLessThanOrEqual(openai.end);
   });
 
   it('keeps unclassifiable keys in the unknown zone', () => {

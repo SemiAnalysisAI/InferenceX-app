@@ -63,7 +63,7 @@ describe('TPU publication preview', () => {
     cy.get('[data-testid="tco-basis-internal"]')
       .first()
       .should('have.attr', 'aria-pressed', 'true');
-    cy.contains('TPU TCO 假设').should('be.visible');
+    cy.contains('TCO 口径').should('be.visible');
     cy.get('[data-testid="tco-basis-external"]').first().click();
     cy.get(overlayPoints).should(($points) => {
       const dp8 = [...$points]

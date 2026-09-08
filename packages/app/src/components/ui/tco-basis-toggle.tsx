@@ -4,18 +4,17 @@ import { useGlobalFilterSelection, useGlobalFilterActions } from '@/components/G
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { InfoHelp } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics';
-import { getGpuSpecs } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
 
 const STRINGS = {
   en: {
-    label: 'TPU TCO assumption',
+    label: 'TCO Basis',
     external: 'External',
     internal: 'Internal',
     note: 'USD per physical chip/hour. External customer pricing or internal owner cost.',
   },
   zh: {
-    label: 'TPU TCO 假设',
+    label: 'TCO 口径',
     external: '外部',
     internal: '内部',
     note: '单位：美元/物理芯片/小时。可选择外部客户价格或内部自有成本。',
@@ -56,12 +55,12 @@ export function TcoBasisToggle({
         options={[
           {
             value: 'external' as const,
-            label: `${t.external} · $${getGpuSpecs('tpuv7', 'external').costh.toFixed(2)}`,
+            label: t.external,
             testId: 'tco-basis-external',
           },
           {
             value: 'internal' as const,
-            label: `${t.internal} · $${getGpuSpecs('tpuv7', 'internal').costh.toFixed(2)}`,
+            label: t.internal,
             testId: 'tco-basis-internal',
           },
         ]}

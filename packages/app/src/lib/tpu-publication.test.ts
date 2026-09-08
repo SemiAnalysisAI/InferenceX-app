@@ -44,7 +44,7 @@ describe('TPU publication paths', () => {
     expect(evals).toHaveLength(3);
     expect(evals.every((row) => !row.disagg && row.num_decode_gpu === 4)).toBe(true);
     expect(getVendor('tpuv7_vllm')).toBe('google');
-    expect(getVendor('jalapeno_vllm')).toBe('teacup');
+    expect(getVendor('jalapeno_vllm')).toBe('openai');
     const csv = inferenceChartToCsv([], 'Qwen-3.5-397B-A17B', '8k/1k', overlay);
     const dp8 = csv.rows.find((row) => row[csv.headers.indexOf('DP')] === 8)!;
     expect(dp8[csv.headers.indexOf('TP')]).toBe(1);

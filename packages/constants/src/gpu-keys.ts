@@ -137,10 +137,10 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costr: 0.52,
   },
   jalapeno: {
-    vendor: 'Teacup',
+    vendor: 'OpenAI',
     arch: 'Jalapeño',
     label: 'Jalapeño',
-    badgeLabel: 'Jalapeño (Teacup)',
+    badgeLabel: 'Jalapeño (OpenAI)',
     sort: 10,
     tdp: 700,
     power: 1.125,
@@ -191,7 +191,7 @@ export const GOOGLE_YELLOW = '#F4B400';
  *   170-275 (gap)
  *   275-290 unknown / fallback (violets)
  *   290-295 (gap)
- *   295-325 Teacup purples
+ *   295-325 OpenAI purples
  *   325-360 (gap)
  */
 export const VENDOR_OKLCH_ZONES: Record<
@@ -201,7 +201,7 @@ export const VENDOR_OKLCH_ZONES: Record<
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
   google: { start: 80, end: 105, chroma: { light: 0.14, dark: 0.16 } },
-  teacup: { start: 295, end: 325, chroma: { light: 0.14, dark: 0.16 } },
+  openai: { start: 295, end: 325, chroma: { light: 0.14, dark: 0.16 } },
   unknown: { start: 275, end: 290, chroma: { light: 0.14, dark: 0.16 } },
 };
 
@@ -218,7 +218,7 @@ export const VENDOR_OKLCH_ZONES: Record<
  *   NVIDIA:  60–195  (135°) — greens through cyans
  *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
  *   unknown: 240–260 (20°) — blues/violets
- *   Teacup:  260–300 (40°) — purples
+ *   OpenAI:  260–300 (40°) — purples
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
@@ -226,7 +226,7 @@ export const VENDOR_OKLCH_ZONES: Record<
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
   nvidia: [{ start: 60, span: 135 }],
   google: [{ start: 40, span: 20 }],
-  teacup: [{ start: 260, span: 40 }],
+  openai: [{ start: 260, span: 40 }],
   amd: [
     { start: 300, span: 60 },
     { start: 0, span: 40 },

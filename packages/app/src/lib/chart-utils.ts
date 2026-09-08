@@ -34,7 +34,7 @@ import type { Locale } from '@/lib/i18n';
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
-  teacup: (hue) => hue < 285 || hue > 340, // keep the purple zone
+  openai: (hue) => hue < 285 || hue > 340, // keep the purple zone
   google: (hue) => hue < 55 || hue > 100, // keep gold separate from red, green, and blue
   unknown: null,
 };
@@ -49,7 +49,7 @@ const PREFERRED_ZONE: Record<
 > = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
-  teacup: { hmin: 295, hmax: 330 }, // purples
+  openai: { hmin: 295, hmax: 330 }, // purples
   google: { hmin: 70, hmax: 95 }, // golds
   unknown: null,
 };
