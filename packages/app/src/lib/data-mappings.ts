@@ -551,6 +551,24 @@ export function isBestPerSkuDefaultOff(
   return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
 }
 
+/**
+ * Model/scenario pairs that expose the external/internal TCO Basis selector.
+ * The basis only reprices hardware with a distinct owner cost (TPUv7 today),
+ * so the control is shown only where that hardware is benchmarked.
+ */
+const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether the TCO Basis selector is shown for this model and scenario. */
+export function showsTcoBasisSelector(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
+}
+
 export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
   const config = SEQUENCE_CONFIG[sequence];
   if (!config) return sequence;

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import {
+  DEFAULT_TCO_BASIS,
   GPU_ALIAS_TO_CANONICAL,
   GPU_KEY_ALIASES,
   getGpuSpecs,
@@ -278,9 +279,9 @@ describe('getGpuSpecs', () => {
     expect(specs.costr).toBe(0);
   });
 
-  it('returns correct specs for all base GPUs in HW_REGISTRY', () => {
+  it('returns registry external rates for all base GPUs in HW_REGISTRY', () => {
     for (const [base, entry] of Object.entries(HW_REGISTRY)) {
-      const result = getGpuSpecs(base);
+      const result = getGpuSpecs(base, 'external');
       expect(result.power).toBe(entry.power);
       expect(result.tdp).toBe(entry.tdp);
       expect(result.costh).toBe(entry.costh);
@@ -301,6 +302,12 @@ describe('getGpuSpecs', () => {
       costh: 1.03,
       costr: 1.03,
     });
+  });
+
+  it('defaults to the internal owner cost basis', () => {
+    expect(DEFAULT_TCO_BASIS).toBe('internal');
+    expect(getGpuSpecs('tpuv7_vllm')).toEqual(getGpuSpecs('tpuv7_vllm', 'internal'));
+    expect(getGpuSpecs('tpuv7_vllm').costh).toBe(1.03);
   });
 
   it('keeps hardware without an owner cost on external rates', () => {

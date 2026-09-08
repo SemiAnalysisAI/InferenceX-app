@@ -33,7 +33,7 @@ describe('PARAM_DEFAULTS', () => {
 
   it('defaults TCO to External so only Internal is share-link state', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.g_tco).toBe('external');
+    expect(PARAM_DEFAULTS.g_tco).toBe('internal');
   });
 
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {

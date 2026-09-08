@@ -1,6 +1,6 @@
 'use client';
 
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
 import { useCallback, useMemo, useState } from 'react';
 
@@ -154,6 +154,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
+  const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -487,17 +488,19 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 </div>
               </div>
 
-              <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
-                <LabelWithTooltip
-                  label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
-                  tooltip={
-                    locale === 'zh'
-                      ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                      : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                  }
-                />
-                <TcoBasisToggle source="fleet" className="h-9" />
-              </div>
+              {showsTcoBasis && (
+                <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                    tooltip={
+                      locale === 'zh'
+                        ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                        : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                    }
+                  />
+                  <TcoBasisToggle source="fleet" className="h-9" />
+                </div>
+              )}
 
               {/* Target value slider + input */}
               {!loading && hasData && (

@@ -28,7 +28,7 @@ import {
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { buildDerivedChartFields, getHardwareKey, type DerivedMetricKey } from '@/lib/chart-utils';
-import { isKnownGpu, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
@@ -50,7 +50,7 @@ export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
@@ -339,7 +339,7 @@ export function useInterpolatedTrendData({
   targetInteractivity,
   tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
-  tcoBasis = 'external',
+  tcoBasis = DEFAULT_TCO_BASIS,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 

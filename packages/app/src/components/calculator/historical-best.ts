@@ -29,7 +29,7 @@
  */
 
 import type { BenchmarkRow } from '@/lib/api';
-import type { TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 import { Percentile, type Sequence } from '@/lib/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
@@ -136,7 +136,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
-    tcoBasis = 'external',
+    tcoBasis = DEFAULT_TCO_BASIS,
     visibleHwKeys,
   } = options;
   if (rows.length === 0 || precisions.length === 0) {

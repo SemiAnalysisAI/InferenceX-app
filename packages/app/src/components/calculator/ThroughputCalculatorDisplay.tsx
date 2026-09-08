@@ -59,7 +59,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -375,6 +375,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
   } = useGlobalFilterSelection();
+  const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -1057,10 +1058,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     />
                   </div>
                 </div>
-                <div className="flex min-w-0 flex-col space-y-1.5">
-                  <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source="calculator" className="h-9" />
-                </div>
+                {showsTcoBasis && (
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
+                    <TcoBasisToggle source="calculator" className="h-9" />
+                  </div>
+                )}
               </ControlPanel>
 
               <MobileControlSection

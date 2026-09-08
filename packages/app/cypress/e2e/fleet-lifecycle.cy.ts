@@ -887,7 +887,7 @@ describe('Fleet — self-contained lifecycle regressions', () => {
 
     readCapturedLifecycleCsv().then((csv) => {
       const header = csv.split('\n').find((line) => line.startsWith('Chip,'));
-      expect(csv).to.contain('TCO basis external');
+      expect(csv).to.contain('TCO basis internal');
       const dataLines = csv.split('\n').filter((line) => line && !line.startsWith('#'));
       for (const line of dataLines.slice(1)) {
         // The current fleet fixture has no commas inside cell values.
@@ -899,13 +899,9 @@ describe('Fleet — self-contained lifecycle regressions', () => {
         'Chip,Config Now,First Run,Latest Best,Improvements,Gain,Chips,tok/s/MW now,Concurrent Users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative Margin,Availability',
       );
     });
-    cy.get('[data-testid="tco-basis-internal"]').click();
-    exportMenu().click();
-    cy.get('[data-testid="export-csv-button"]').click();
-    readCapturedLifecycleCsv().then((csv) => {
-      expect(csv).to.contain('TCO basis internal');
-    });
-    cy.get('[data-testid="tco-basis-external"]').click();
+    // The TCO Basis selector is scoped to Qwen3.5 8K/1K; the fleet fixture
+    // runs DeepSeek on agentic traces, so it stays on the internal default.
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 });
 
@@ -1100,7 +1096,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       readCapturedLifecycleCsv().then((csv) => {
         expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain(header);
         expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
-          '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：外部',
+          '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：内部',
         );
         expect(csv).not.to.contain('# Assumptions:');
       });

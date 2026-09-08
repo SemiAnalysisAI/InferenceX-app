@@ -23,13 +23,16 @@ export interface GpuSpecs {
 
 export type TcoBasis = 'external' | 'internal';
 
+/** App-wide TCO basis when no explicit selection or share-link param is present. */
+export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
+
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
  * Splits on '_' or '-' to get the base (e.g. "h100_vllm" -> "h100").
  */
-export function getGpuSpecs(hwKey: string, basis: TcoBasis = 'external'): GpuSpecs {
+export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS): GpuSpecs {
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
