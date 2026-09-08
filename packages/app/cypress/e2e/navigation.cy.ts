@@ -220,27 +220,29 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
       });
       const dots = '.dot-group[data-hw-key^="tpuv7"]';
 
+      // Internal owner cost is the default basis; External is the opt-in.
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
       cy.get(dots)
         .first()
         .then(($point) => {
-          const external = { ...datum($point[0]) };
-          cy.get('[data-testid="tco-basis-internal"]').click();
+          const internal = { ...datum($point[0]) };
+          cy.get('[data-testid="tco-basis-external"]').click();
           cy.get(dots)
             .first()
-            .should(($internal) => {
-              expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
-              expect(datum($internal[0]).x).to.equal(external.x);
+            .should(($external) => {
+              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+              expect(datum($external[0]).x).to.equal(internal.x);
             });
           cy.get('[data-testid="share-button"]').first().click();
           cy.get('[data-testid="share-url-input"]')
             .invoke('val')
-            .should('include', 'g_tco=internal')
+            .should('include', 'g_tco=external')
             .then((url) => cy.visit(String(url)));
-          cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+          cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
           cy.get(dots)
             .first()
-            .should(($internal) => {
-              expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
+            .should(($external) => {
+              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
             });
           cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
           cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
@@ -248,11 +250,11 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
           cy.get('[data-testid="inference-secondary-controls"] > button').click();
           cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
           cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
-          cy.get('[data-testid="tco-basis-external"]').click();
+          cy.get('[data-testid="tco-basis-internal"]').click();
           cy.get(dots)
             .first()
             .should(($restored) => {
-              expect(datum($restored[0]).y).to.be.closeTo(external.y, 1e-8);
+              expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
             });
         });
     });
@@ -292,20 +294,30 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
     cy.get(points)
       .first()
       .then(($point) => {
-        const external = { ...datum($point[0]) };
-        cy.get('[data-testid="tco-basis-internal"]').click();
-        cy.get(points)
-          .first()
-          .should(($internal) => {
-            expect(datum($internal[0]).y).to.be.closeTo((external.y * 1.03) / 1.21, 1e-8);
-            expect(datum($internal[0]).x).to.equal(external.x);
-          });
+        const internal = { ...datum($point[0]) };
         cy.get('[data-testid="tco-basis-external"]').click();
         cy.get(points)
           .first()
+          .should(($external) => {
+            expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+            expect(datum($external[0]).x).to.equal(internal.x);
+          });
+        cy.get('[data-testid="tco-basis-internal"]').click();
+        cy.get(points)
+          .first()
           .should(($restored) => {
-            expect(datum($restored[0]).y).to.be.closeTo(external.y, 1e-8);
+            expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
           });
       });
+  });
+  it('hides the TCO basis selector outside Qwen3.5 8K/1K', () => {
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 });

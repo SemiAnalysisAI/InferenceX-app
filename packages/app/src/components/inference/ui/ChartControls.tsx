@@ -1,6 +1,6 @@
 'use client';
 
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
@@ -183,6 +183,7 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
+  const showsTcoBasis = useShowsTcoBasisSelector();
 
   const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
     useInferenceFilters();
@@ -448,7 +449,7 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && isCostMetric(selectedYAxisMetric) && (
+              {mounted && showsTcoBasis && isCostMetric(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
                   <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
                   <TcoBasisToggle source={tcoSource} className="h-9" />

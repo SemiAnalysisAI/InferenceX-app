@@ -17,7 +17,7 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -315,7 +315,7 @@ export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): Partial<DerivedChartFields> {
   const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
   const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);

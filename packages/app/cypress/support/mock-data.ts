@@ -473,7 +473,7 @@ export function createMockGlobalFilterContexts(
     setSelectedSequence: namedStub('setSelectedSequence_global'),
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_global'),
-    tcoBasis: 'external' as const,
+    tcoBasis: 'internal' as const,
     setTcoBasis: namedStub('setTcoBasis_global'),
     effectiveSequence: Sequence.EightK_OneK,
     sequenceResolved: true,

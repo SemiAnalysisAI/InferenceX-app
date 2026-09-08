@@ -4,7 +4,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
 import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
-import { getGpuSpecs, type TcoBasis } from './constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from './constants';
 
 // Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
 // built-in tracking scale (tighter…widest), so without this, e.g.
@@ -208,7 +208,7 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
  */
 export function computeOutputCostFields(
   data: InferenceData[],
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): InferenceData[] {
   return data.map((item) => {
     if (
@@ -382,7 +382,7 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
 export function computeInputCostFields(
   data: InferenceData[],
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): InferenceData[] {
   return data.map((item) => {
     if (item.costhi && item.costri && item.inputTokensPerDollarH && item.inputTokensPerDollarR) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -516,6 +516,7 @@ function ProfitEstimatorInner({
     sequenceResolved,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
+  const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
@@ -1525,17 +1526,19 @@ function ProfitEstimatorInner({
                 </div>
               )}
 
-              <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
-                <LabelWithTooltip
-                  label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
-                  tooltip={
-                    locale === 'zh'
-                      ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                      : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                  }
-                />
-                <TcoBasisToggle source="profit" className="h-9" />
-              </div>
+              {showsTcoBasis && (
+                <div className="mt-3 flex min-w-0 max-w-sm flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                    tooltip={
+                      locale === 'zh'
+                        ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                        : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                    }
+                  />
+                  <TcoBasisToggle source="profit" className="h-9" />
+                </div>
+              )}
 
               {costProvider === 'custom' && customCostBases.length > 0 && (
                 <div

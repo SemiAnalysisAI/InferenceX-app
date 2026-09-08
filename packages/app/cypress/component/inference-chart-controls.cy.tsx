@@ -1,6 +1,6 @@
 import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
@@ -239,8 +239,26 @@ describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: { selectedYAxisMetric: 'y_costh' },
-      globalFilters: {},
+      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
+  });
+
+  it('hides the TCO basis toggle for other models and scenarios', () => {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      inference: { selectedYAxisMetric: 'y_costh' },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        effectiveSequence: Sequence.EightK_OneK,
+      },
+    });
+    cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      inference: { selectedYAxisMetric: 'y_costh' },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
+    });
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 
   it('sizes the TCO basis toggle to its buttons on desktop and mobile', () => {

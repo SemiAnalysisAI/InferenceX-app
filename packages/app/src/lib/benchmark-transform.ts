@@ -17,7 +17,7 @@ import {
   getHardwareKey,
   type DerivedChartFields,
 } from '@/lib/chart-utils';
-import { getHardwareConfig, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { resolvePowerTier } from '@/lib/power-tier';
 import type { BenchmarkRow } from '@/lib/api';
@@ -385,7 +385,7 @@ export function mergeRunScopedRows(
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
-  tcoBasis: TcoBasis = 'external',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;

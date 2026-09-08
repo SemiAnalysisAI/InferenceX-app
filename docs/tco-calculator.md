@@ -2,11 +2,13 @@
 
 ## TCO basis
 
-The global **TCO Basis** control switches between external customer pricing (the default)
-and internal owner cost. TPUv7 uses **$1.21/chip/hour external** and **$1.03/chip/hour internal**;
+The global **TCO Basis** control switches between internal owner cost (the default) and
+external customer pricing. TPUv7 uses **$1.03/chip/hour internal** and **$1.21/chip/hour external**;
 other hardware retains its existing rates. The selection is shared across inference, historical
 trends, the TCO calculator, fleet lifecycle, and the profit estimator, and is encoded as
-`g_tco=internal` in share links. Explicit custom hourly costs remain user-controlled.
+`g_tco=external` in share links. The selector itself is only rendered for model/scenario pairs
+listed in `MODEL_TCO_BASIS_SELECTOR` (`data-mappings.ts`), currently Qwen3.5 on 8K/1K, since it
+only reprices hardware benchmarked there. Explicit custom hourly costs remain user-controlled.
 
 The basis changes cost per token and tokens per dollar, including unofficial overlays, without
 changing measured throughput or energy assumptions. TPUv7's Qwen3.5 snapshot uses four physical

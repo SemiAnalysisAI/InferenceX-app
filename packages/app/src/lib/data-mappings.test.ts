@@ -20,6 +20,7 @@ import {
   isSequenceDeprecatedForModel,
   getSequenceCategoryForModel,
   isBestPerSkuDefaultOff,
+  showsTcoBasisSelector,
   Model,
   Sequence,
   Precision,
@@ -280,6 +281,23 @@ describe('isBestPerSkuDefaultOff', () => {
   it('treats a missing model or scenario as the global default', () => {
     expect(isBestPerSkuDefaultOff(null, Sequence.EightK_OneK)).toBe(false);
     expect(isBestPerSkuDefaultOff(Model.Qwen3_5, undefined)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// per-model TCO Basis selector
+// ===========================================================================
+describe('showsTcoBasisSelector', () => {
+  it('shows the selector only for Qwen3.5 on 8K/1K', () => {
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+  });
+
+  it('hides the selector when the model or scenario is unknown', () => {
+    expect(showsTcoBasisSelector(null, Sequence.EightK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, undefined)).toBe(false);
   });
 });
 
