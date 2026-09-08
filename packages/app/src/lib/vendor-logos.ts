@@ -9,7 +9,7 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
  * white logo (the legacy green-arrow mark is retired), so it relies on the
  * shared dark-mode invert from `isMonochromeLogo` instead of a color variant.
  *
- * Vendors without an entry (e.g. Teacup) simply render no logo — surfaces
+ * Vendors without an entry (e.g. OpenAI) simply render no logo — surfaces
  * treat the vendor mark as optional decoration beside the hardware label.
  */
 export const HW_VENDOR_LOGOS: Record<string, string> = {
@@ -80,8 +80,8 @@ export const VENDOR_LOGO_ICONS: Record<string, VendorLogoIcon> = {
   Google: { href: svgDataUri(GOOGLE_LOGO_SVG), width: 10, height: 10 },
   NVIDIA: { href: NVIDIA_LOGO_PNG_URI, width: 10, height: 10 },
   AMD: { href: svgDataUri(AMD_LOGO_SVG), width: 10, height: 10 },
-  // Jalapeño (Teacup) is OpenAI silicon — it carries the OpenAI mark.
-  Teacup: { href: svgDataUri(OPENAI_LOGO_SVG), width: 10, height: 10 },
+  // Jalapeño (OpenAI) is OpenAI silicon — it carries the OpenAI mark.
+  OpenAI: { href: svgDataUri(OPENAI_LOGO_SVG), width: 10, height: 10 },
 };
 
 /**

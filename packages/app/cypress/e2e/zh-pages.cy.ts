@@ -374,6 +374,7 @@ describe('Chinese (/zh) pages', () => {
         .and('contain.text', '聚合推理芯片数：');
       // Disaggregated deployments split the chip pool, so their expanded
       // details localize the prefill/decode fields instead of the aggregate ones.
+      cy.get('input[placeholder="搜索配置……"]').type('atom-disagg');
       cy.contains('tr', 'Mooncake ATOMesh')
         .first()
         .find('button[aria-label="展开配置详情"]')

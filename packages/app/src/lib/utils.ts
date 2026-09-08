@@ -143,6 +143,9 @@ export function calculatePowerForGpus(
       userPowerPerHour = userPowers[baseGpuKey];
     }
     const basePower = getGpuSpecs(baseGpuKey).power;
+    // Legacy custom-power scaling needs a registered baseline. Leave metrics
+    // absent for unregistered hardware instead of dividing by zero.
+    if (!(basePower > 0) || !item.tpPerMw) return item;
     if (userPowerPerHour !== undefined) {
       const powerRounded = parseFloat(((item.tpPerMw.y / basePower) * userPowerPerHour).toFixed(3));
 
@@ -349,6 +352,7 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
     const specs = getGpuSpecs(item.hwKey);
     const hardwarePower = specs.power; // in kW
+    if (!(hardwarePower > 0)) return item;
 
     const tputPerGpu = item.tpPerGpu.y;
     const outputTputPerGpu = item.outputTputPerGpu?.y;

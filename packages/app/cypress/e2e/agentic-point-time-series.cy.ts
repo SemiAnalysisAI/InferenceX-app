@@ -548,13 +548,20 @@ describe('Agentic point request metric time series', () => {
   });
 
   it('retries the failed log-file inventory, initial content, and search queries independently', () => {
+    // Keep each endpoint failing until its Retry action, regardless of background refetches.
     let fileAttempts = 0;
+    let failFile = true;
+    let fileAttemptsBeforeRetry = 0;
     let contentAttempts = 0;
+    let failContent = true;
+    let contentAttemptsBeforeRetry = 0;
     let searchAttempts = 0;
+    let failSearch = true;
+    let searchAttemptsBeforeRetry = 0;
     cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-files' }, (request) => {
       fileAttempts += 1;
       request.reply(
-        fileAttempts <= 2
+        failFile
           ? { statusCode: 500, body: {} }
           : { statusCode: 200, body: ['results/server.log'] },
       );
@@ -562,7 +569,7 @@ describe('Agentic point request metric time series', () => {
     cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
       contentAttempts += 1;
       request.reply(
-        contentAttempts <= 2
+        failContent
           ? { statusCode: 500, body: {} }
           : {
               statusCode: 200,
@@ -579,7 +586,7 @@ describe('Agentic point request metric time series', () => {
     cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-search' }, (request) => {
       searchAttempts += 1;
       request.reply(
-        searchAttempts <= 2
+        failSearch
           ? { statusCode: 500, body: {} }
           : {
               statusCode: 200,
@@ -597,25 +604,37 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="server-log-files-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      fileAttemptsBeforeRetry = fileAttempts;
+      failFile = false;
+    });
     cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
     // Wait for the refetch to land before counting attempts — asserting right
     // after the click races the request.
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
-    cy.then(() => expect(fileAttempts).to.equal(3));
+    cy.then(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
     cy.get('[data-testid="server-log-content-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      contentAttemptsBeforeRetry = contentAttempts;
+      failContent = false;
+    });
     cy.get('[data-testid="server-log-content-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO recovered log');
-    cy.then(() => expect(contentAttempts).to.equal(3));
+    cy.then(() => expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry));
 
     cy.get('[data-testid="server-log-search"]').type('recovered');
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
+    cy.then(() => {
+      searchAttemptsBeforeRetry = searchAttempts;
+      failSearch = false;
+    });
     cy.get('[data-testid="server-log-search-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
     cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
-    cy.then(() => expect(searchAttempts).to.equal(3));
+    cy.then(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));
   });
 
   it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
@@ -690,13 +709,19 @@ describe('Agentic point request metric time series', () => {
   it('keeps request-chart, aggregate, and timeline failures distinct and retryable', () => {
     const retryRequests = [timelineRequest(0, 100, 10)];
     let requestChartAttempts = 0;
+    let failRequestChart = true;
+    let requestChartAttemptsBeforeRetry = 0;
     let aggregateAttempts = 0;
+    let failAggregate = true;
+    let aggregateAttemptsBeforeRetry = 0;
     let timelineAttempts = 0;
+    let failTimeline = true;
+    let timelineAttemptsBeforeRetry = 0;
 
     cy.intercept('GET', '/api/v1/request-chart-data*', (request) => {
       requestChartAttempts += 1;
       request.reply(
-        requestChartAttempts <= 2
+        failRequestChart
           ? { statusCode: 500, body: {} }
           : { statusCode: 200, body: requestChartPayload(retryRequests) },
       );
@@ -705,7 +730,7 @@ describe('Agentic point request metric time series', () => {
       aggregateAttempts += 1;
       const values = { mean: 10, p50: 10, p75: 10, p90: 10, p95: 10, p99: 10, n: 1 };
       request.reply(
-        aggregateAttempts <= 2
+        failAggregate
           ? { statusCode: 500, body: {} }
           : {
               statusCode: 200,
@@ -724,7 +749,7 @@ describe('Agentic point request metric time series', () => {
     cy.intercept('GET', '/api/v1/request-timeline*', (request) => {
       timelineAttempts += 1;
       request.reply(
-        timelineAttempts <= 2
+        failTimeline
           ? { statusCode: 500, body: {} }
           : {
               statusCode: 200,
@@ -743,42 +768,54 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-request-charts-query-error"]')
       .should('contain.text', '请求图表数据加载失败。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      requestChartAttemptsBeforeRetry = requestChartAttempts;
+      failRequestChart = false;
+    });
     cy.get('[data-testid="agentic-request-charts-query-error"]').contains('button', '重试').click();
     cy.contains('h2', '输入序列长度分布').should('be.visible');
-    cy.then(() => expect(requestChartAttempts).to.equal(3));
+    cy.then(() => expect(requestChartAttempts).to.be.greaterThan(requestChartAttemptsBeforeRetry));
 
     cy.get('[data-testid="detail-view-aggregates"]').click();
     cy.get('[data-testid="agentic-aggregates-query-error"]')
       .should('contain.text', '跨配置聚合数据加载失败。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      aggregateAttemptsBeforeRetry = aggregateAttempts;
+      failAggregate = false;
+    });
     cy.get('[data-testid="agentic-aggregates-query-error"]').contains('button', '重试').click();
     cy.contains('h2', '各配置的 ISL 分布').should('be.visible');
-    cy.then(() => expect(aggregateAttempts).to.equal(3));
+    cy.then(() => expect(aggregateAttempts).to.be.greaterThan(aggregateAttemptsBeforeRetry));
 
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="agentic-timeline-query-error"]')
       .should('contain.text', '请求时间线加载失败。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      timelineAttemptsBeforeRetry = timelineAttempts;
+      failTimeline = false;
+    });
     cy.get('[data-testid="agentic-timeline-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="request-timeline-svg"]').should('be.visible');
-    cy.then(() => expect(timelineAttempts).to.equal(3));
+    cy.then(() => expect(timelineAttempts).to.be.greaterThan(timelineAttemptsBeforeRetry));
   });
 
   it('retries trace metadata and the missing SKU navigator with their own queries', () => {
     let traceAttempts = 0;
+    let failTrace = true;
+    let traceAttemptsBeforeRetry = 0;
     let siblingAttempts = 0;
+    let failSibling = true;
+    let siblingAttemptsBeforeRetry = 0;
     cy.intercept('GET', '/api/v1/trace-server-metrics*', (request) => {
       traceAttempts += 1;
-      request.reply(
-        traceAttempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: null },
-      );
+      request.reply(failTrace ? { statusCode: 500, body: {} } : { statusCode: 200, body: null });
     });
     cy.intercept('GET', '/api/v1/benchmark-siblings*', (request) => {
       siblingAttempts += 1;
       request.reply(
-        siblingAttempts <= 2
-          ? { statusCode: 500, body: {} }
-          : { statusCode: 200, body: benchmarkSiblings },
+        failSibling ? { statusCode: 500, body: {} } : { statusCode: 200, body: benchmarkSiblings },
       );
     });
     cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
@@ -786,16 +823,24 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-trace-query-error"]')
       .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      traceAttemptsBeforeRetry = traceAttempts;
+      failTrace = false;
+    });
     cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-trace-query-error"]').should('not.exist');
-    cy.then(() => expect(traceAttempts).to.equal(3));
+    cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
     cy.get('[data-testid="agentic-siblings-query-error"]')
       .should('contain.text', 'SKU 导航数据加载失败。')
       .and('contain.text', '重试');
+    cy.then(() => {
+      siblingAttemptsBeforeRetry = siblingAttempts;
+      failSibling = false;
+    });
     cy.get('[data-testid="agentic-siblings-query-error"]').contains('button', '重试').click();
     cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
-    cy.then(() => expect(siblingAttempts).to.equal(3));
+    cy.then(() => expect(siblingAttempts).to.be.greaterThan(siblingAttemptsBeforeRetry));
   });
 });
 

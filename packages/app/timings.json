@@ -249,6 +249,10 @@
       "duration": 1000
     },
     {
+      "spec": "cypress/e2e/tpu-publication.cy.ts",
+      "duration": 1500
+    },
+    {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
       "duration": 8628
     },

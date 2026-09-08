@@ -313,22 +313,28 @@ describe('Inference Replay — Simplified Chinese', () => {
   it('shows an error, retries after analytics, and then renders controls', () => {
     cy.fixture('api/benchmarks-history.json').then((history) => {
       let attempts = 0;
+      let failHistory = true;
+      let attemptsBeforeRetry = 0;
       cy.intercept('GET', '/api/v1/benchmarks/history*', (request) => {
         attempts += 1;
         request.reply(
-          attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: history },
+          failHistory ? { statusCode: 500, body: {} } : { statusCode: 200, body: history },
         );
       });
       visitChineseReplay();
       cy.get('[data-testid="replay-history-query-error"]')
         .should('contain.text', '基准测试历史加载失败。')
         .and('contain.text', '重试');
+      cy.then(() => {
+        attemptsBeforeRetry = attempts;
+        failHistory = false;
+      });
       cy.get('[data-testid="replay-history-query-error"]').contains('button', '重试').click();
       cy.get('[data-testid="replay-history-query-error"]').should('not.exist');
       // The dialog scrolls internally at 390px — the controls row can sit
       // below the fold, so bring it into view before asserting visibility.
       cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
-      cy.then(() => expect(attempts).to.equal(3));
+      cy.then(() => expect(attempts).to.be.greaterThan(attemptsBeforeRetry));
     });
   });
 

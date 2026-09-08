@@ -377,7 +377,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
   } = useGlobalFilterSelection();
-  const showsTcoBasis = useShowsTcoBasisSelector();
+  const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -566,8 +566,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   ]);
 
   const barResults = useMemo(
-    () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
-    [results, overlayResults],
+    () =>
+      [...results, ...overlayResults].filter(
+        (result) => barMetric !== 'power' || getGpuSpecs(result.hwKey).power > 0,
+      ),
+    [results, overlayResults, barMetric],
   );
   const showsJalapenoPreview = useMemo(
     () => includesJalapenoResult(results.map((result) => result.hwKey)),
@@ -941,6 +944,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     );
   }
 
+  const showsTcoBasis =
+    scenarioShowsTcoBasis && barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7');
+
   return (
     <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
@@ -957,7 +963,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               <ControlPanel
                 legend={t.benchmarkGroup}
                 className={`md:grid-cols-2 ${
-                  isAgenticSequence ? 'lg:grid-cols-8' : 'lg:grid-cols-7'
+                  showsTcoBasis
+                    ? isAgenticSequence
+                      ? 'lg:grid-cols-10'
+                      : 'lg:grid-cols-9'
+                    : isAgenticSequence
+                      ? 'lg:grid-cols-8'
+                      : 'lg:grid-cols-7'
                 }`}
               >
                 <ModelSelector
@@ -1065,9 +1077,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   </div>
                 </div>
                 {showsTcoBasis && (
-                  <div className="flex min-w-0 flex-col space-y-1.5">
+                  <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 lg:col-span-2">
                     <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
-                    <TcoBasisToggle source="calculator" className="h-9" />
+                    <TcoBasisToggle source="calculator" className="md:h-9" />
                   </div>
                 )}
               </ControlPanel>
@@ -1286,11 +1298,15 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               data-testid="calculator-cost-badges"
                             >
                               {t.allInPower}
-                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                                <Badge key={base} variant="outline">
-                                  {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
-                                </Badge>
-                              ))}
+                              {Object.entries(HW_REGISTRY)
+                                .filter(([base]) =>
+                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
+                                )
+                                .map(([base, specs]) => (
+                                  <Badge key={base} variant="outline">
+                                    {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
+                                  </Badge>
+                                ))}
                             </p>
                             <p className="text-muted-foreground">
                               <small>
@@ -1314,13 +1330,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               data-testid="calculator-cost-badges"
                             >
                               {t.tcoPerHr}
-                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                                <Badge key={base} variant="outline">
-                                  {specs.badgeLabel ?? base.toUpperCase()}: $
-                                  {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
-                                  /hr
-                                </Badge>
-                              ))}
+                              {Object.entries(HW_REGISTRY)
+                                .filter(([base]) =>
+                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
+                                )
+                                .map(([base, specs]) => (
+                                  <Badge key={base} variant="outline">
+                                    {specs.badgeLabel ?? base.toUpperCase()}: $
+                                    {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
+                                    /hr
+                                  </Badge>
+                                ))}
                             </p>
                             <p className="text-muted-foreground">
                               <small>

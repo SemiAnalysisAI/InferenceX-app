@@ -1,6 +1,6 @@
 'use client';
 
-import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
@@ -60,7 +60,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
@@ -69,8 +69,8 @@ const STRINGS = {
     tcoBasis: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
-    benchmarkControls: 'Configuration',
-    chartControls: 'Chart',
+    benchmarkControls: 'Benchmark Config',
+    chartControls: 'Chart Config',
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
@@ -111,8 +111,8 @@ const STRINGS = {
     tcoBasis: 'TCO 口径',
     tcoBasisTooltip:
       '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
-    benchmarkControls: '配置',
-    chartControls: '图表',
+    benchmarkControls: '基准测试配置',
+    chartControls: '图表配置',
     compareHistory: '对比历史趋势',
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
@@ -172,37 +172,15 @@ interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
+  showTcoBasis?: boolean;
   /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
-}
-
-/**
- * TCO basis control for cost metrics. Reads the global model/scenario
- * selection only when rendered, so ChartControls itself does not need a
- * GlobalFilterProvider unless a cost metric is active.
- */
-function TcoBasisField({
-  source,
-  label,
-  tooltip,
-}: {
-  source: 'inference' | 'historical';
-  label: string;
-  tooltip: string;
-}) {
-  const showsTcoBasis = useShowsTcoBasisSelector();
-  if (!showsTcoBasis) return null;
-  return (
-    <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
-      <LabelWithTooltip label={label} tooltip={tooltip} />
-      <TcoBasisToggle source={source} className="h-9" />
-    </div>
-  );
 }
 
 export default function ChartControls({
   hideGpuComparison = false,
   tcoSource = 'inference',
+  showTcoBasis = false,
   showXAxisMode = false,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -411,6 +389,11 @@ export default function ChartControls({
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tcoVisible =
+    mounted &&
+    showTcoBasis &&
+    isCostMetric(selectedYAxisMetric) &&
+    showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
@@ -474,9 +457,12 @@ export default function ChartControls({
         >
           <ControlPanel
             legend={t.chartControls}
+            data-testid="inference-chart-configuration"
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            <div
+              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+            >
               {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
@@ -504,9 +490,13 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && isCostMetric(selectedYAxisMetric) && (
-                <TcoBasisField source={tcoSource} label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+              {tcoVisible && (
+                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
+                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
+                </div>
               )}
+
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
                   <LabelWithTooltip

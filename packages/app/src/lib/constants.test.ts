@@ -137,11 +137,12 @@ describe('getHardwareConfig', () => {
     expect(getHardwareConfig('vr200_coreweave-vera-rubin').suffix).toBe('');
   });
 
-  it('keeps the Teacup attribution in the Jalapeño display label', () => {
+  it('uses the OpenAI vendor while preserving the Teacup framework', () => {
     const config = getHardwareConfig('jalapeno_teacup');
     expect(config.label).toBe('Jalapeño');
     expect(config.suffix).toBe('(Teacup)');
-    expect(HW_REGISTRY.jalapeno.badgeLabel).toBe('Jalapeño (Teacup)');
+    expect(HW_REGISTRY.jalapeno.vendor).toBe('OpenAI');
+    expect(HW_REGISTRY.jalapeno.badgeLabel).toBe('Jalapeño (OpenAI)');
   });
 
   it('uses the published Jalapeño and VR200 power and TCO assumptions', () => {
@@ -206,9 +207,10 @@ describe('getHardwareConfig', () => {
     expect(getHardwareConfig('b200_vllm_mtp').suffix).toBe('(vLLM, MTP)');
   });
 
-  it('HW_REGISTRY has non-zero power for all entries', () => {
+  it('registered power is positive for every published hardware entry', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
       expect(entry.power).toBeGreaterThan(0);
+      expect(entry.tdp).toBeGreaterThan(0);
     }
   });
 

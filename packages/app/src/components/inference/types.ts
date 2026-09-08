@@ -56,7 +56,6 @@ export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
  */
 export interface AggDataEntry {
   /** Numeric data-parallel replica count, distinct from DP Attention. */
-  dp?: number;
   /** Metric keys present in the source row before missing values are normalized to zero. */
   rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
@@ -66,6 +65,9 @@ export interface AggDataEntry {
   hw: string;
   mtp?: string;
   hwKey: string;
+  /** Physical chips are independent of logical tensor/data parallelism. */
+  physicalChips?: number;
+  dp?: number;
   tp: number;
   conc: number;
   model: string;

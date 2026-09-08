@@ -135,7 +135,7 @@ describe('TPUv7 recorded topology and metrics', () => {
     expect(high.tp).toBe(4);
     expect(high.decode_tp).toBe(1);
     expect(high.dp).toBe(8);
-    expect(getPointLabel(high)).toBe('TP1DP8');
+    expect(getPointLabel(high)).toBe('TP1/DP8');
     expect(high.tpPerGpu.y).toBeCloseTo(9363.824997632008);
     expect(high.p90_ttft).not.toBe(high.median_ttft);
     expect(rows[0].run_url).toBeNull();

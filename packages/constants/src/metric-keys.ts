@@ -73,6 +73,7 @@ export const POWER_METRIC_KEYS = [
  * carry median/mean/p99/std for latency only.
  */
 export const METRIC_KEYS = new Set([
+  'dp',
   // throughput (tokens/sec/GPU)
   'tput_per_gpu',
   'output_tput_per_gpu',

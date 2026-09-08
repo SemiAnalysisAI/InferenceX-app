@@ -155,7 +155,7 @@ describe('Inference ChartControls', () => {
   });
 
   it('selects an axis through the existing action and closes the menu', () => {
-    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').click('right');
     cy.get('[data-testid="x-axis-mode-ttft"]').click();
     cy.get('@setSelectedXAxisMode').should('have.been.calledOnceWith', 'ttft');
     cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'aria-expanded', 'false');
@@ -179,7 +179,8 @@ describe('Inference ChartControls', () => {
         expect(y.top).to.be.greaterThan(x.bottom);
         expect(x.height).to.equal(44);
         expect(y.height).to.equal(x.height);
-        expect(x.width).to.be.closeTo(y.width, 1);
+        expect(x.width).to.be.at.most(176);
+        expect(x.width).to.be.lessThan(y.width);
       });
     });
     cy.get('#scenario-select').then(($scenario) => {
@@ -259,16 +260,24 @@ describe('Inference ChartControls', () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
-      inference: { selectedYAxisMetric: 'y_costh' },
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.EightK_OneK,
+      },
       // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
-      inference: { selectedYAxisMetric: 'y_costh' },
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.EightK_OneK,
+      },
       globalFilters: {
         selectedModel: Model.DeepSeek_V4_Pro,
         effectiveSequence: Sequence.EightK_OneK,
@@ -276,10 +285,42 @@ describe('Inference ChartControls cost metrics', () => {
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
-      inference: { selectedYAxisMetric: 'y_costh' },
+    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.AgenticTraces,
+      },
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
     });
+    cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+  });
+
+  for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
+    it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
+      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+        inference: {
+          selectedYAxisMetric,
+          selectedModel: Model.Qwen3_5,
+          selectedSequence: Sequence.EightK_OneK,
+        },
+        globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
+      });
+      cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+      cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
+    });
+  }
+
+  it('hides TCO for a cost metric when no TPU hardware is visible', () => {
+    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      inference: {
+        selectedYAxisMetric: 'y_costh',
+        selectedModel: Model.Qwen3_5,
+        selectedSequence: Sequence.EightK_OneK,
+      },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
+    });
+    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 
@@ -618,7 +659,7 @@ describe('Axis option help', () => {
   });
 
   it('navigates to help with arrow keys and restores focus on Escape', () => {
-    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').click('right');
     cy.get('[data-testid="x-axis-mode-interactivity"]')
       .should('have.focus')
       .type('{downarrow}{rightarrow}');

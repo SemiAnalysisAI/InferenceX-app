@@ -1196,7 +1196,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     description={t.inferencePerformanceDesc}
                     actions={<ShareButton />}
                   />
-                  <ChartControls showXAxisMode />
+                  <ChartControls
+                    showXAxisMode
+                    showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
+                  />
                 </>
               )}
               {embedded && (

@@ -34,7 +34,7 @@ import type { Locale } from '@/lib/i18n';
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
-  teacup: (hue) => hue < 290 || hue > 350, // keep the purple/violet zone
+  openai: (hue) => hue < 290 || hue > 350, // keep the purple/violet zone
   google: (hue) => hue < 255 || hue > 300, // keep blue separate from teal and purple
   unknown: null,
 };
@@ -49,7 +49,7 @@ const PREFERRED_ZONE: Record<
 > = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
-  teacup: { hmin: 300, hmax: 340 }, // purples/violets
+  openai: { hmin: 300, hmax: 340 }, // purples/violets
   google: { hmin: 265, hmax: 295 }, // blues (brand hue ~284)
   unknown: null,
 };
@@ -344,13 +344,14 @@ export function buildDerivedChartFields(
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
-  if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
-  if (wants('inputTputPerMw') && inputTputPerGpu) {
+  if (hardwarePower > 0 && wants('tpPerMw'))
+    fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
+  if (hardwarePower > 0 && wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
       hardwarePower ? (inputTputPerGpu * 1000) / hardwarePower : 0,
     );
   }
-  if (wants('outputTputPerMw') && outputTputPerGpu) {
+  if (hardwarePower > 0 && wants('outputTputPerMw') && outputTputPerGpu) {
     fields.outputTputPerMw = chartMetric(
       hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
     );
@@ -405,15 +406,15 @@ export function buildDerivedChartFields(
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
   }
 
-  if (wants('jTotal')) {
+  if (hardwarePower > 0 && wants('jTotal')) {
     fields.jTotal = chartMetric(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
-  if (wants('jOutput') && outputTputPerGpu) {
+  if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
-  if (wants('jInput') && inputTputPerGpu) {
+  if (hardwarePower > 0 && wants('jInput') && inputTputPerGpu) {
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
 
@@ -426,6 +427,32 @@ export function buildDerivedChartFields(
   }
 
   return fields;
+}
+
+/** Physical deployment size, retaining the legacy PP floor and TPU core/chip distinction. */
+export function deploymentChipCount(
+  entry: Pick<AggDataEntry, 'disagg' | 'num_prefill_gpu' | 'num_decode_gpu' | 'tp' | 'pp'>,
+  currentHwKey: string,
+): number {
+  // Aggregate role counts describe the same deployment, so never sum them.
+  // TP alone is not the chip count (e.g. Jalapeño TP1/EP8 uses eight chips).
+  // Ingested legacy counts can default to TP × EP without PP. Keep TP × PP
+  // as a floor even when counts are positive, including for unofficial overlays.
+  return entry.disagg
+    ? entry.num_prefill_gpu + entry.num_decode_gpu
+    : Math.max(
+        entry.num_decode_gpu > 0
+          ? entry.num_decode_gpu
+          : entry.num_prefill_gpu > 0
+            ? entry.num_prefill_gpu
+            : 0,
+        // TPU tensor widths count logical cores, not physical chips. Explicit
+        // counts are authoritative for these rows (including unofficial runs).
+        currentHwKey.split('_')[0] === 'tpuv7' &&
+          (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
+          ? 0
+          : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+      );
 }
 
 /**
@@ -441,31 +468,15 @@ export function createChartDataPoint(
   currentHwKey: string,
   derivedFields: DerivedChartFields = buildDerivedChartFields(entry, currentHwKey),
 ): InferenceData {
+  const physicalChips = deploymentChipCount(entry, currentHwKey);
   return {
     ...entry,
     date,
     x: (entry[xKey] ?? 0) as number,
     y: (entry[yKey] ?? 0) as number,
     hwKey: currentHwKey,
-    // Aggregate role counts describe the same deployment, so never sum them.
-    // TP alone is not the chip count (e.g. Jalapeño TP1/EP8 uses eight chips).
-    // Ingested legacy counts can default to TP × EP without PP. Keep TP × PP
-    // as a floor even when counts are positive, including for unofficial overlays.
-    tp: entry.disagg
-      ? entry.num_prefill_gpu + entry.num_decode_gpu
-      : Math.max(
-          entry.num_decode_gpu > 0
-            ? entry.num_decode_gpu
-            : entry.num_prefill_gpu > 0
-              ? entry.num_prefill_gpu
-              : 0,
-          // TPU tensor widths count logical cores, not physical chips. Explicit
-          // counts are authoritative for these rows (including unofficial runs).
-          currentHwKey.split('_')[0] === 'tpuv7' &&
-            (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
-            ? 0
-            : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
-        ),
+    tp: physicalChips,
+    physicalChips,
     image: entry.image ?? undefined,
     dp_attention:
       entry.dp_attention !== null && entry.dp_attention !== undefined

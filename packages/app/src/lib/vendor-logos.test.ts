@@ -28,8 +28,8 @@ describe('vendor logo icons', () => {
     expect(getLineLabelVendorIcon('gb200_dynamo')).toBe(VENDOR_LOGO_ICONS.NVIDIA);
   });
 
-  it('maps Jalapeño (Teacup/OpenAI) to the OpenAI mark', () => {
-    expect(getLineLabelVendorIcon('jalapeno')).toBe(VENDOR_LOGO_ICONS.Teacup);
+  it('maps Jalapeño (OpenAI) to the OpenAI mark', () => {
+    expect(getLineLabelVendorIcon('jalapeno')).toBe(VENDOR_LOGO_ICONS.OpenAI);
   });
 
   it('uses the same export-safe Google mark for TPU labels and hardware badges', () => {
@@ -57,7 +57,7 @@ describe('vendor logo icons', () => {
 
   it('inlines brand colors in the SVG data URIs', () => {
     expect(decodeURIComponent(VENDOR_LOGO_ICONS.AMD.href)).toContain('#000000');
-    expect(decodeURIComponent(VENDOR_LOGO_ICONS.Teacup.href)).toContain('#ffffff');
+    expect(decodeURIComponent(VENDOR_LOGO_ICONS.OpenAI.href)).toContain('#ffffff');
   });
 });
 

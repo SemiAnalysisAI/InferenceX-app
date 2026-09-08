@@ -273,7 +273,11 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls tcoSource="historical" hideGpuComparison />
+            <ChartControls
+              tcoSource="historical"
+              hideGpuComparison
+              showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+            />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -325,7 +329,11 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls tcoSource="historical" hideGpuComparison />
+          <ChartControls
+            tcoSource="historical"
+            hideGpuComparison
+            showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+          />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (

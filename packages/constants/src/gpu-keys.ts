@@ -9,7 +9,7 @@ export interface HwEntry {
   badgeLabel?: string;
   /** Chart sort order (lower = first) */
   sort: number;
-  /** Thermal design power in watts */
+  /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
   /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
    * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
@@ -137,10 +137,10 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costr: 0.52,
   },
   jalapeno: {
-    vendor: 'Teacup',
+    vendor: 'OpenAI',
     arch: 'Jalapeño',
     label: 'Jalapeño',
-    badgeLabel: 'Jalapeño (Teacup)',
+    badgeLabel: 'Jalapeño (OpenAI)',
     sort: 10,
     tdp: 700,
     power: 1.125,
@@ -191,7 +191,7 @@ export const GOOGLE_BLUE = '#4285F4';
  *   235-250 (gap)
  *   250-275 Google blues (brand hue ~260)
  *   275-290 (gap)
- *   290-330 Teacup purples
+ *   290-330 OpenAI purples
  *   330-360 (gap)
  */
 export const VENDOR_OKLCH_ZONES: Record<
@@ -200,7 +200,7 @@ export const VENDOR_OKLCH_ZONES: Record<
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
-  teacup: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
+  openai: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
   google: { start: 250, end: 275, chroma: { light: 0.16, dark: 0.18 } },
   unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
 };
@@ -209,7 +209,7 @@ export const VENDOR_OKLCH_ZONES: Record<
  * Preferred HSL hue zones for high-contrast mode.
  * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
  * from different vendors are visually distinct and vendor-appropriate
- * (NVIDIA = greens, AMD = reds/oranges, Google = blues, Teacup = purples).
+ * (NVIDIA = greens, AMD = reds/oranges, Google = blues, OpenAI = purples).
  * When a vendor has too many items to fit with sufficient spacing, the zone
  * expands symmetrically — these are preferred zones, not hard constraints.
  *
@@ -217,7 +217,7 @@ export const VENDOR_OKLCH_ZONES: Record<
  *   NVIDIA:  40–180  (140°) — yellow-greens through cyans
  *   unknown: 180–205 (25°) — cyans
  *   Google:  205–235 (30°) — blues (brand hue ~217)
- *   Teacup:  255–300 (45°) — purples/violets
+ *   OpenAI:  255–300 (45°) — purples/violets
  *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
@@ -225,7 +225,7 @@ export const VENDOR_OKLCH_ZONES: Record<
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
   nvidia: [{ start: 40, span: 140 }],
-  teacup: [{ start: 255, span: 45 }],
+  openai: [{ start: 255, span: 45 }],
   amd: [
     { start: 300, span: 60 },
     { start: 0, span: 40 },

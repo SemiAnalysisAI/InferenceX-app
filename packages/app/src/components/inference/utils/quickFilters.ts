@@ -13,7 +13,7 @@ import type { PowerTier } from '@/lib/power-tier';
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
 /** Vendor display order for the quick-filter pills. */
-const VENDOR_ORDER = ['NVIDIA', 'AMD'];
+const VENDOR_ORDER = ['NVIDIA', 'AMD', 'OpenAI', 'Google'];
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,

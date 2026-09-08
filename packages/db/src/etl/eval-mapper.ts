@@ -5,6 +5,7 @@
  *   `mapAggEvalRow()` — compiled aggregate (flat row from `agg_eval_all.json`)
  */
 
+import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
@@ -62,7 +63,9 @@ export function mapEvalRow(
   meta: Record<string, any>,
   results: Record<string, any>,
   tracker: SkipTracker,
+  runId?: string | number | null,
 ): EvalParams[] {
+  meta = normalizeLegacyTpuRow(meta, runId);
   const modelKey = resolveModelKey(meta);
   if (!modelKey) {
     tracker.skips.unmappedModel++;
@@ -116,6 +119,8 @@ export function mapEvalRow(
         if (n !== undefined) metrics[EVAL_METRIC_RENAMES[k] ?? k] = n;
       }
     }
+    const dp = physicalChipCount(meta.dp);
+    if (dp !== undefined) metrics.dp = dp;
     // Extract n_eff from top-level n-samples (not present in per-task rawMetrics).
     const nEff = parseNum(nSamples?.[taskName]?.effective);
     if (nEff !== undefined) metrics['n_eff'] = nEff;
@@ -147,7 +152,12 @@ export function mapEvalRow(
  * @param tracker - Shared skip tracker; counters are mutated in place on failure.
  * @returns A typed `EvalParams` object, or `null` if the row cannot be mapped.
  */
-export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): EvalParams | null {
+export function mapAggEvalRow(
+  row: Record<string, any>,
+  tracker: SkipTracker,
+  runId?: string | number | null,
+): EvalParams | null {
+  row = normalizeLegacyTpuRow(row, runId);
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
     tracker.skips.unmappedModel++;
@@ -192,6 +202,8 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
   add('n_eff', row.n_eff);
   add('score', row.score);
   add('score_se', row.score_se);
+  const dp = physicalChipCount(row.dp);
+  if (dp !== undefined) metrics.dp = dp;
 
   return {
     config: buildEvalConfig(row, gpuKey, framework, modelKey, precision, specMethod, disaggFromFw),
@@ -244,9 +256,17 @@ function buildEvalConfig(
     decodeDpAttn = parseBool(src.decode_dp_attention);
     decodeNumWorkers = parseInt2(src.decode_num_workers) ?? 0;
     numPrefillGpu =
-      parseInt2(src.num_prefill_gpu) ?? prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
+      roleChipCount(src.num_prefill_gpu) ??
+      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
+        ? undefined
+        : physicalChipCount(src.num_gpus)) ??
+      prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
     numDecodeGpu =
-      parseInt2(src.num_decode_gpu) ?? decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
+      roleChipCount(src.num_decode_gpu) ??
+      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
+        ? undefined
+        : physicalChipCount(src.num_gpus)) ??
+      decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
   } else {
     const tp = parseInt2(src.tp) ?? 1;
     const ep = parseInt2(src.ep) ?? 1;
@@ -259,8 +279,8 @@ function buildEvalConfig(
     decodeDpAttn = dpAttn;
     prefillNumWorkers = 0;
     decodeNumWorkers = 0;
-    numPrefillGpu = tp * ep;
-    numDecodeGpu = tp * ep;
+    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
+    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
   }
 
   const explicitDisagg = parseOptionalBool(src.disagg);

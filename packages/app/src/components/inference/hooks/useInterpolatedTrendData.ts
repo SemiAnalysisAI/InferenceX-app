@@ -70,6 +70,8 @@ export function rowToLightweightPoint(
     hwKey,
     precision: row.precision,
     tp: row.decode_tp,
+    physicalChips: entry.physicalChips,
+    dp: entry.dp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
     tput_per_gpu: entry.tput_per_gpu,
