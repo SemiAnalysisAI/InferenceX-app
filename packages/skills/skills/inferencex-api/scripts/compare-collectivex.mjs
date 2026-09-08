@@ -463,7 +463,9 @@ export function collect(options, context) {
         row.status === 'matched' &&
         row.metrics.some(
           (metricValue) =>
-            metricValue.left.status === 'value' && metricValue.right.status === 'value',
+            metricValue.unit !== 'samples' &&
+            metricValue.left.status === 'value' &&
+            metricValue.right.status === 'value',
         ),
     ).length;
     const outcome =

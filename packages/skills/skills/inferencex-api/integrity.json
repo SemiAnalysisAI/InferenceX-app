@@ -16,7 +16,7 @@
     "schemas.json": "eba70dfb190e6d94d0b0352db0f8b49631cb1fb9a6e026c97b8316b91839105c",
     "scripts/cli-contract.mjs": "accfb93d8f74fdabc9efa286bca7d426298c1a3e5c6f56f25ae3780c95260c01",
     "scripts/commands.mjs": "4893ad86494a14cac959d4b2b96e4c79fa6cb32c8a53a25012c6a28e65163657",
-    "scripts/compare-collectivex.mjs": "a196b1e37d47ea1a5835cf132438ceda912c2db69393e80556f2c71866a28d16",
+    "scripts/compare-collectivex.mjs": "ed7ec7c84de3e15f80703fa3b5a9ba21c6a19ce9322c79b6984df0d7987150a1",
     "scripts/compare-releases.mjs": "e76dc5b5b47c58954f1c3fa9861bbe65cea9f846fcc1ef967ba7d399a035c0c7",
     "scripts/compare-tco.mjs": "d483c2c4a098da9cc803ef3acc309e9a4089725a4d0ac6b02f32fb75c79f65d2",
     "scripts/coverage-policy.mjs": "8f4bcb87b25b7e1c1d6065e3abdd04efe4e744bba35874c055d54df4b7e0337c",

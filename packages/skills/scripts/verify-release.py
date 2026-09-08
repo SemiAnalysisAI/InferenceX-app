@@ -683,7 +683,7 @@ def _collective_expected(manifest, requests, bodies, result):
         if status == 'matched':
             for a, b in zip(left[0][2], right[0][2]):
                 numeric = a['status'] == b['status'] == 'value'
-                usable |= numeric
+                usable |= numeric and a['unit'] != 'samples'
                 difference = b['value'] - a['value'] if numeric else None
                 ratio = b['value'] / a['value'] if numeric and a['value'] != 0 else None
                 metrics.append({'name': a['name'], 'unit': a['unit'],

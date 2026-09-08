@@ -14,7 +14,23 @@ import {
   collectivexKvDataset,
 } from './collectivex-bundle-fixtures.mjs';
 
-const bundles = bundleSuite({ collectivex: COLLECTIVEX_BUNDLE_VARIANTS });
+const coverageVariants = ['zero-samples', 'positive-samples', 'zero-performance'];
+const coverageFixtures = Object.fromEntries(
+  coverageVariants.map((variant) => {
+    const fixture = structuredClone(COLLECTIVEX_BUNDLE_VARIANTS['kv-positive']);
+    for (const response of fixture.responses.slice(1)) {
+      const row = response.body.kv[0].rows[0];
+      row.prep_ms = variant === 'zero-performance' ? 0 : null;
+      row.latency_ms = { n: variant === 'positive-samples' ? 5 : 0 };
+      row.request_ms = { ...row.latency_ms };
+      row.gbps_p50 = null;
+    }
+    return [variant, fixture];
+  }),
+);
+const bundles = bundleSuite({
+  collectivex: { ...COLLECTIVEX_BUNDLE_VARIANTS, ...coverageFixtures },
+});
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 function manifest(directory) {
@@ -92,6 +108,37 @@ test('topology mismatches remain valid evidence with no comparable pair', () => 
   assert.equal(bundles.verify(saved.directory, []).status, 0);
   assert.equal(bundles.verify(saved.directory, ['--min-comparable-pairs', '1']).status, 3);
 });
+
+for (const variant of coverageVariants) {
+  test(`CollectiveX performance coverage excludes sample counts: ${variant}`, () => {
+    const usable = variant === 'zero-performance';
+    const policy = ['--min-comparable-pairs', '1'];
+    const saved = bundles.create('collectivex', variant, { policy });
+    assert.equal(saved.result.status, usable ? 0 : 3, saved.result.stdout);
+    const report = bundles.readResult(saved.directory);
+    assert.equal(report.summary.matched, 1);
+    const samples = report.comparisons[0].metrics.filter((metric) => metric.unit === 'samples');
+    assert.equal(samples.length, 2);
+    for (const sample of samples) {
+      assert.deepEqual(sample.left, {
+        status: 'value',
+        value: variant === 'positive-samples' ? 5 : 0,
+      });
+      assert.deepEqual(sample.right, sample.left);
+      assert.equal(sample.difference_right_minus_left, 0);
+    }
+    const verified = bundles.verify(saved.directory, policy);
+    assert.equal(verified.status, usable ? 0 : 3, verified.stderr);
+    const summary = JSON.parse(verified.stdout);
+    assert.equal(summary.validity, 'valid');
+    assert.equal(summary.policy.status, usable ? 'passed' : 'failed');
+    assert.equal(summary.coverage.comparable_pairs, usable ? 1 : 0);
+    assert.deepEqual(
+      summary.coverage.reasons,
+      usable ? [] : [{ code: 'matched_without_usable_metric', count: 1 }],
+    );
+  });
+}
 
 test('explicit and one-list bundles reconstruct exact identities, metrics, units and sources', () => {
   for (const variant of ['positive', 'one-list']) {

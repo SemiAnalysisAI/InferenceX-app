@@ -979,6 +979,44 @@ console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
         self.assertEqual(check.check_bundle(
             self.collected('collectivex', 'kv-positive'), self.VERSION)['status'], 'passed')
 
+    def test_collectivex_sample_counts_do_not_satisfy_performance_coverage(self):
+        for samples, zero_measurement, pairs in [(0, False, 0), (5, False, 0), (0, True, 1)]:
+            with self.subTest(samples=samples, zero_measurement=zero_measurement):
+                def mutate(fixture):
+                    for response in fixture['responses'][1:]:
+                        row = response['body']['kv'][0]['rows'][0]
+                        for key in ('prep_ms', 'latency_ms', 'request_ms', 'gbps_p50',
+                                    'gbps_p50_incl_prep'):
+                            row.pop(key, None)
+                        row.update(latency_ms={'n': samples}, request_ms={'n': samples})
+                        if zero_measurement:
+                            row['prep_ms'] = 0
+                directory = self.collected('collectivex', 'kv-positive', mutate)
+                self.forge_coverage(
+                    directory, status='complete' if pairs else 'partial', pairs=pairs,
+                    reasons=[] if pairs else [{'code': 'matched_without_usable_metric', 'count': 1}])
+                manifest = json.loads((directory / 'manifest.json').read_text())
+                manifest['summary']['policy'] = {
+                    'status': 'passed' if pairs else 'failed',
+                    'requirements': {'require_hardware': [], 'min_comparable_pairs': 1},
+                    'reasons': [] if pairs else [
+                        {'code': 'MIN_COMPARABLE_PAIRS_UNMET', 'required': 1, 'actual': 0}],
+                }
+                check.save(directory / 'manifest.json', manifest)
+                report = check.check_bundle(directory, self.VERSION)
+                self.assertEqual((report['comparable_pairs'], report['policy_status'],
+                                  report['policy_exit_code']),
+                                 (1, 'passed', 0) if pairs else (0, 'failed', 3))
+                metrics = json.loads((directory / 'result.json').read_text())['comparisons'][0]['metrics']
+                counts = [metric for metric in metrics if metric['unit'] == 'samples']
+                self.assertEqual([(metric['left']['value'], metric['right']['value'],
+                                   metric['difference_right_minus_left']) for metric in counts],
+                                 [(samples, samples, 0), (samples, samples, 0)])
+                if not pairs:
+                    self.forge_coverage(directory, status='complete', pairs=1, reasons=[])
+                    with self.assertRaisesRegex(ValueError, 'CollectiveX.*coverage'):
+                        check.check_bundle(directory, self.VERSION)
+
     def test_collectivex_cannot_drop_incomparable_groups_and_claim_complete(self):
         directory = self.collected('collectivex', 'positive')
         def omit(result):
