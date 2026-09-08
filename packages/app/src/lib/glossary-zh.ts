@@ -1717,10 +1717,10 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   ici: {
     term: 'ICI（芯片间互连）',
-    aliases: ['ICI', 'Inter-Chip Interconnect', 'TPU 互连', 'ICI fabric'],
+    aliases: ['ICI', 'TPU 互连', 'ICI fabric'],
     plainEnglish: 'ICI 是 TPU 专用的网络，让整个 pod 内的芯片直接交换数据，不需要经过主机 CPU。',
     definition:
-      'ICI（Inter-Chip Interconnect）是 Google 为 TPU 设计的芯片间互连，一种点对点网络，直接在芯片之间传输激活值、梯度和 KV cache，不经过 PCIe 或通用网卡。',
+      'ICI 是 Google 为 TPU 设计的芯片间互连，一种点对点网络，直接在芯片之间传输激活值、梯度和 KV cache，不经过 PCIe 或通用网卡。',
     explanation:
       '每颗 TPU 通过 ICI 链路连接 torus 中的邻居：v2 和 v3 的 2D torus 有 4 个邻居，v4 起的 3D torus 有 6 个。光电路交换机把 64 芯片立方体拼接成数千颗芯片的 pod，同时保留 wraparound 链路。结果是整个 pod 范围内都有 NVLink 级别的带宽，而不是局限在 8 个或 72 个设备之间。TPU 8i 把 ICI 带宽翻倍到每芯片 19.2 Tb/s，并从 torus 改为 Boardfly 拓扑。',
     significance:
