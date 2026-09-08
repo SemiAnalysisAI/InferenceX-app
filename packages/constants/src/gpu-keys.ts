@@ -40,7 +40,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.17,
-    costr: 1.78,
+    costr: 2,
   },
   h200: {
     vendor: 'NVIDIA',
@@ -50,7 +50,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.22,
-    costr: 2.05,
+    costr: 2.9,
   },
   b200: {
     vendor: 'NVIDIA',
@@ -60,7 +60,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.71,
     costh: 1.73,
-    costr: 2.6,
+    costr: 3.7,
   },
   b300: {
     vendor: 'NVIDIA',
@@ -70,7 +70,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.9,
     costh: 2.26,
-    costr: 3,
+    costr: 4.25,
   },
   gb200: {
     vendor: 'NVIDIA',
@@ -80,7 +80,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.87,
     costh: 1.86,
-    costr: 2.6,
+    costr: 4,
   },
   gb300: {
     vendor: 'NVIDIA',
@@ -90,7 +90,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.12,
     costh: 2.31,
-    costr: 3.3,
+    costr: 5,
   },
   mi300x: {
     vendor: 'AMD',
@@ -120,7 +120,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.09,
     costh: 1.5,
-    costr: 2.1,
+    costr: 2.9,
   },
   // NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, PCIe Gen5, 96 GB GDDR7).
   // A workstation-class PCIe card benchmarked in 8× TP configs (no NVLink/NVSwitch);

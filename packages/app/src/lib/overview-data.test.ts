@@ -211,13 +211,13 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it('prices from HW_REGISTRY costh — not the retail costr tier', () => {
-    // b200: costh 1.73 vs costr 2.60 — the two tiers disagree, so a costr
+    // b200: costh 1.73 vs costr 3.70 — the two tiers disagree, so a costr
     // regression cannot pass this assertion.
     expect(overviewCostPerMtok('b200', 7200)).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       9,
     );
-    expect(overviewCostPerMtok('b200', 7200)).not.toBeCloseTo(2_600_000 / (7200 * 3600), 9);
+    expect(overviewCostPerMtok('b200', 7200)).not.toBeCloseTo(3_700_000 / (7200 * 3600), 9);
     expect(overviewCostPerMtok('mi355x', 9000)).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (9000 * 3600),
       9,

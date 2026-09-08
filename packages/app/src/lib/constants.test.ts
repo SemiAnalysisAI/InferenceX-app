@@ -230,15 +230,15 @@ describe('getHardwareConfig', () => {
 
   it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
     const expectedRates = {
-      h100: [1.17, 1.78],
-      h200: [1.22, 2.05],
-      b200: [1.73, 2.6],
-      b300: [2.26, 3],
-      gb200: [1.86, 2.6],
-      gb300: [2.31, 3.3],
+      h100: [1.17, 2],
+      h200: [1.22, 2.9],
+      b200: [1.73, 3.7],
+      b300: [2.26, 4.25],
+      gb200: [1.86, 4],
+      gb300: [2.31, 5],
       mi300x: [0.95, 1.3],
       mi325x: [1.1, 1.6],
-      mi355x: [1.5, 2.1],
+      mi355x: [1.5, 2.9],
     } as const;
 
     for (const [gpu, [costh, costr]] of Object.entries(expectedRates)) {
@@ -256,7 +256,7 @@ describe('getGpuSpecs', () => {
     expect(specs.tdp).toBe(700);
     expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.17);
-    expect(specs.costr).toBe(1.78);
+    expect(specs.costr).toBe(2);
   });
 
   it('extracts base from compound key (e.g. h100_vllm)', () => {
