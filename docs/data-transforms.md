@@ -53,7 +53,7 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 **`createChartDataPoint(date, entry, xKey, yKey, hwKey, derivedFields?)`** spreads `entry` first, then overrides chart coordinates and metadata. The full transform passes precomputed derived fields; direct callers may omit them.
 
 - `x` / `y`: read directly from `entry[xKey]` and `entry[yKey]` (set per chart definition).
-- `tp`: for disaggregated configs, set to `num_prefill_gpu + num_decode_gpu` instead of `decode_tp`.
+- `tp` is the total chip count: disaggregated configs sum `num_prefill_gpu + num_decode_gpu`; aggregate configs prefer a positive `num_decode_gpu`, then `num_prefill_gpu`, with TP × PP as a minimum even when a positive count is present. Legacy ingest defaults can populate counts as TP × EP without PP; this floor preserves pipeline parallelism for existing rows and unofficial overlays. Aggregate role counts describe the same deployment and are not summed. The actual tensor-parallel width remains in `decode_tp`.
 - Boolean narrowing: `dp_attention`, `prefill_dp_attention`, `decode_dp_attention`, and `is_multinode` are coerced from `boolean | string` to `boolean | undefined`.
 - Disagg fields: `num_prefill_gpu` / `num_decode_gpu` are only set when `entry.disagg` is true; otherwise they are dropped.
 
