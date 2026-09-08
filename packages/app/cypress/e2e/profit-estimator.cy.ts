@@ -16,6 +16,8 @@
 //    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3 and
 //    MiniMax M3 only, and the target interactivity is a typed number, not a slider;
 //  - the cost provider has a custom $/GPU/hr option with one input per chip;
+//  - the per-GW page opens on Owning at Large Hyperscaler Volume while the
+//    per chip-hour page opens on Rent - 3 Year Commit;
 //  - the heading reads like /inference, the subtitle names the utilization, and
 //    the formula folds away under the chart;
 //  - /profit-estimator/<model> is the per-model route; switching models
@@ -103,7 +105,8 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     bars().should('have.length.greaterThan', 0);
-    // Cost tiers carry the same names as the /inference y-axis selector.
+    // Cost tiers carry the same names as the /inference y-axis selector. The
+    // GW-year basis models a fleet owner, so it opens on the owning tier.
     cy.get('button#profit-cost')
       .should('contain.text', 'Owning at Large Hyperscaler Volume')
       .click();
@@ -845,7 +848,7 @@ describe('Profit Estimator (per chip-hour)', () => {
   before(() => {
     stubOpenRouter();
     // Tall enough for the 720px chart, so the thin compute-expense segment
-    // ($2.31 of $32.72) still has room for its name.
+    // still has room for its name.
     cy.viewport(1280, 1000);
     cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
     chart().should('exist');
@@ -864,6 +867,13 @@ describe('Profit Estimator (per chip-hour)', () => {
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity',
+    );
+    // The chip-hour basis reads like a renter's P&L, so it opens on the
+    // 3-year-commit rental tier rather than the owning tier the GW-year page uses.
+    cy.get('button#profit-cost').should('contain.text', 'Rent - 3 Year Commit');
+    cy.get('[data-testid="result-context-cost-tier"]').should(
+      'contain.text',
+      'Rent - 3 Year Commit',
     );
     cy.get('[data-testid="profit-formula-notes"]').should(
       'contain.text',
