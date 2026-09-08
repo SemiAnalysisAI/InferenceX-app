@@ -832,7 +832,13 @@ describe('transformBenchmarkRows', () => {
     // (buildChartData → transformBenchmarkRows), so it exercises the overlay
     // rendering path for PP configs end to end.
     const base = makeRow();
-    const rows = [makeRow({ metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 } })];
+    const rows = [
+      makeRow({
+        num_prefill_gpu: 0,
+        num_decode_gpu: 0,
+        metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 },
+      }),
+    ];
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData.find((d) => d.length > 0)![0];
     // tp8 × pp2 = 16 total GPUs
