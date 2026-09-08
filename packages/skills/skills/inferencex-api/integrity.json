@@ -27,7 +27,7 @@
     "scripts/export-contract.mjs": "c03647ac078d10569599acac0cdd98b17d70bbfd2a2c7d5dde3a148547e4287d",
     "scripts/export-powerx.mjs": "58612a94ec5d60329b683eee326c16e19c263f110f13a2dc5c0ba844ff023946",
     "scripts/http-client.mjs": "955f61db83b3cabf6529de43931ef85c502a6e96508be99d81fcd1d12cfa5b30",
-    "scripts/inferencex.mjs": "de3449c30030b84218766a0f49418b7792228714fa5d198d97c80a6289178d40",
+    "scripts/inferencex.mjs": "15513f1ab0634c41e26ecf700d1ffe98e5f0197c85fb52a91d046167d2ab1372",
     "scripts/install-transaction.mjs": "ad4a37c7dc3c84793fe682b98fc632b075e282808e700eb46bd2076823675e2d",
     "scripts/investigate-result.mjs": "cdb07049489db870759047174228b79ae341b820d0b7121cfedaf81cfa54e019",
     "scripts/local-files.mjs": "854505b90489aad4f81036564089aecfd94206d3d39196199d07d9a16ae5a0ea",

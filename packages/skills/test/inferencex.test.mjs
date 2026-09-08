@@ -78,6 +78,24 @@ test('describe exposes fixed machine-readable metadata offline', () => {
   assert.deepEqual(powerx.operation.policies, ['require-hardware']);
 });
 
+test('schema returns the selected public schema offline', () => {
+  const result = succeeded(suite.query(['schema', 'error'], suite.project()));
+  const schemas = JSON.parse(
+    readFileSync(new URL('../skills/inferencex-api/schemas.json', import.meta.url), 'utf8'),
+  );
+  assert.deepEqual(JSON.parse(result.stdout), schemas.error);
+  assert.equal(result.stderr, '');
+});
+
+for (const name of ['not-a-schema', 'toString', '__proto__']) {
+  test(`schema rejects unlisted name ${name}`, () => {
+    const result = suite.query(['schema', name], suite.project());
+    assert.equal(result.status, 2);
+    assert.equal(result.stdout, '');
+    assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_ARGUMENT');
+  });
+}
+
 test('JSON-only offline interfaces reject unadvertised human rendering', () => {
   for (const args of [
     ['describe', '--human'],

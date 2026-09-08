@@ -267,10 +267,10 @@ await runCli({
       const schemas = JSON.parse(
         await readFile(new URL('../schemas.json', import.meta.url), 'utf8'),
       );
-      const schema = schemas[parsed.args[0]];
-      if (schema === undefined) {
+      if (!Object.hasOwn(schemas, parsed.args[0])) {
         throw argumentError(`Choose a schema: ${Object.keys(schemas).join(', ')}.`);
       }
+      const schema = schemas[parsed.args[0]];
       await writeStdout(`${JSON.stringify(schema, null, 2)}\n`, { signal });
       return;
     }
