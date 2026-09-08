@@ -198,6 +198,27 @@ describe('buildChartData', () => {
     expect(Object.keys(result)).toEqual(['DeepSeek-R1-0528_8k/1k']);
   });
 
+  it('prices TPUv7 overlay points on the external basis for later repricing', () => {
+    // processOverlayChartDataWithClipping reprices from external at render
+    // time, so the source overlay data must not already carry the internal
+    // owner cost even though internal is the app default.
+    const rows = [
+      stubRow({
+        model: 'qwen3.5-397b',
+        hardware: 'tpuv7',
+        framework: 'vllm',
+        isl: 8192,
+        osl: 1024,
+      }),
+    ];
+    const result = buildChartData(rows);
+    const [key] = Object.keys(result);
+    const point = result[key].interactivity.data[0];
+    expect(point.hwKey.startsWith('tpuv7')).toBe(true);
+    expect(point.costh!.y).toBeCloseTo(1.21 / (100 * 3600 * 1e-6));
+    expect(point.costh!.y).not.toBeCloseTo(1.03 / (100 * 3600 * 1e-6));
+  });
+
   it('skips rows with unmapped ISL/OSL', () => {
     const rows = [stubRow({ model: 'dsr1', isl: 4096, osl: 4096 })];
     const result = buildChartData(rows);
