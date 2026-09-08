@@ -297,13 +297,18 @@ describe('getGpuSpecs', () => {
     expect(external).toMatchObject({
       power: 1.207,
       costh: 1.21,
-      costr: 1.21,
+      costr: 2,
     });
     expect(internal).toMatchObject({
       power: 1.207,
       costh: 1.03,
-      costr: 1.03,
+      costr: 2,
     });
+  });
+
+  it('keeps the TPUv7 3-year rental rate at $2/hr on both bases', () => {
+    expect(getGpuSpecs('tpuv7_vllm', 'external').costr).toBe(2);
+    expect(getGpuSpecs('tpuv7_vllm', 'internal').costr).toBe(2);
   });
 
   it('defaults to the internal owner cost basis', () => {

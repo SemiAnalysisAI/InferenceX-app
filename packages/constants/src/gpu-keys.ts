@@ -155,7 +155,8 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 980,
     power: 1.207,
     costh: 1.21,
-    costr: 1.21,
+    /** GCP 3-year commit rental rate per chip-hour (SemiAnalysis AI Cloud TCO Model). */
+    costr: 2,
   },
 };
 
