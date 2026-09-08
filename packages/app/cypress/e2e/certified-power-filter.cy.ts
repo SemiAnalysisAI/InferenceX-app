@@ -89,11 +89,22 @@ function visitCertifiedPowerChart(extraParams = '') {
     },
   });
   cy.wait(['@availability', '@benchmarks']);
-  cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');
+  cy.get('[data-testid="inference-chart-display"]').should('exist');
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
 describe('Validated vs historical measured power', () => {
+  beforeEach(() => {
+    // Firefox can defer resize notifications while the Radix metric menu
+    // changes layout. Keep the chart assertions active; ignore only this
+    // browser-generated delivery notification, not application exceptions.
+    cy.on('uncaught:exception', (error) => {
+      if (error.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        return false;
+      }
+    });
+  });
+
   it('rings legacy points on a measured axis and filters them via Quick Filters', () => {
     visitCertifiedPowerChart();
 

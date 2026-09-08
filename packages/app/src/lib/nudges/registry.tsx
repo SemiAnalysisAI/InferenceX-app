@@ -52,7 +52,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const TPU_NEWSLETTER_URL = 'https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam';
+const TPU_RESULTS_URL = '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -340,13 +340,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      // External destination: the newsletter write-up rather than a dashboard
-      // route, so no locale prefixing applies.
-      href: TPU_NEWSLETTER_URL,
+      // Select the model, workload, and precision used by the TPUv7 snapshot.
+      href: TPU_RESULTS_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = TPU_NEWSLETTER_URL;
+        window.location.href = localizedNudgeHref(TPU_RESULTS_URL);
       },
     },
     analytics: {
@@ -355,7 +354,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       action: 'inference_tpuv7_banner_clicked',
       properties: {
         banner_id: 'tpuv7-inference',
-        destination: 'newsletter',
+        destination: 'inference',
       },
     },
   },
