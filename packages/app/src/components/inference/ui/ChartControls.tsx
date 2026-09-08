@@ -37,9 +37,17 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  metricChartTitle,
+  metricCostTier,
   metricOptionTitle,
   type MetricKey,
 } from '@/components/inference/metric-registry';
+import { lockedTierLabel, lockedTierValue } from '@/components/ui/locked-rent-tiers';
+import {
+  LOCKED_RENT_TIERS,
+  LockedTierBadge,
+  useLockedTierDialog,
+} from '@/components/ui/tco-model-dialog';
 import {
   cachedInputPricePerMillion,
   formatTokenPrice,
@@ -223,12 +231,14 @@ export default function ChartControls({
       ),
     [visibleGroups],
   );
+  // Locked rental tiers open the TCO model dialog instead of changing the axis.
+  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
+    useLockedTierDialog('yaxis_metric');
   const groupedYAxisOptions = useMemo(
     () =>
       visibleGroups
-        .map((group) => ({
-          groupLabel: locale === 'zh' ? group.labelZh : group.label,
-          options: group.metrics
+        .map((group) => {
+          const options = group.metrics
             .filter((m) => METRIC_TITLE_MAP.has(m))
             .map((m) => ({
               value: m,
@@ -236,8 +246,30 @@ export default function ChartControls({
               label:
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,
-            })),
-        }))
+            }));
+          // Groups that publish a Rent - 3 Year Commit axis also list the
+          // shorter-commit rental tiers, locked, so readers can see which
+          // pricing bases exist and where they are published.
+          const rentalMetric = group.metrics
+            .map((m) => m.replace(/^y_/u, '') as MetricKey)
+            .find((key) => METRIC_TITLE_MAP.has(`y_${key}`) && metricCostTier(key) === 'rental');
+          const lockedOptions = rentalMetric
+            ? LOCKED_RENT_TIERS.map((tier) => {
+                const title = metricChartTitle(rentalMetric, locale);
+                const tierLabel = lockedTierLabel(tier, locale);
+                return {
+                  value: lockedTierValue(tier.id, rentalMetric),
+                  label: locale === 'zh' ? `${title}（${tierLabel}）` : `${title} (${tierLabel})`,
+                  badge: <LockedTierBadge className="mt-0.5" />,
+                  testId: `yaxis-locked-${tier.id}-${rentalMetric}`,
+                };
+              })
+            : [];
+          return {
+            groupLabel: locale === 'zh' ? group.labelZh : group.label,
+            options: [...options, ...lockedOptions],
+          };
+        })
         .filter((g) => g.options.length > 0),
     [visibleGroups, locale],
   );
@@ -290,6 +322,7 @@ export default function ChartControls({
   };
 
   const handleYAxisMetricChange = (value: string) => {
+    if (interceptLockedTier(value)) return;
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
       metric: value,
@@ -603,6 +636,7 @@ export default function ChartControls({
           )}
         </MobileControlSection>
       </div>
+      {tcoModelDialog}
     </TooltipProvider>
   );
 }

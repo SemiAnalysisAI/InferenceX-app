@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -75,7 +76,7 @@ const STRINGS = {
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit.',
+      'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
@@ -97,7 +98,7 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。',
+      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
     costProviderPlaceholder: '成本供应商',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
@@ -140,6 +141,10 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
+  // Shorter-commit rental tiers are listed but locked; picking one opens the
+  // TCO model dialog instead of changing the cost provider.
+  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
+    useLockedTierDialog('fleet_cost_provider');
 
   const {
     selectedModel,
@@ -416,14 +421,18 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   <div data-testid="fleet-cost-selector">
                     <MultiSelect
                       triggerId="fleet-cost"
-                      options={COST_PROVIDER_OPTIONS.map((provider) => ({
-                        value: provider.value,
-                        label: locale === 'zh' ? provider.labelZh : provider.label,
-                      }))}
+                      options={[
+                        ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                          value: provider.value,
+                          label: locale === 'zh' ? provider.labelZh : provider.label,
+                        })),
+                        ...lockedCostProviderOptions(locale),
+                      ]}
                       value={[costProvider]}
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
+                        if (interceptLockedTier(next)) return;
                         setCostProvider(next as CostProvider);
                         track('fleet_cost_provider_changed', { provider: next });
                       }}
@@ -613,6 +622,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
           colorResolver={resolveColor}
         />
       )}
+      {tcoModelDialog}
     </div>
   );
 }

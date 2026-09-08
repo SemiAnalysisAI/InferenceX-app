@@ -55,6 +55,7 @@ import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { ResultContext } from '@/components/ui/result-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -187,7 +188,7 @@ const STRINGS = {
     },
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
-      'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip.',
+      'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
     priceSourceLabel: 'Token Price',
@@ -287,7 +288,7 @@ const STRINGS = {
     },
     costProviderLabel: '成本供应商',
     costProviderTooltip:
-      '算力支出分段采用的 TCO 层级：按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。',
+      '算力支出分段采用的 TCO 层级：按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。带锁的租赁期限（按需至 2 年承诺）收录于 TCO 模型。',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: '成本供应商',
     priceSourceLabel: 'Token 售价',
@@ -494,6 +495,10 @@ function ProfitEstimatorInner({
   const { setUrlParam, getUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
+  // Shorter-commit rental tiers are listed but locked; picking one opens the
+  // TCO model dialog instead of changing the cost provider.
+  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
+    useLockedTierDialog('profit_cost_provider');
 
   // Precision is not a control here: `effectivePrecisions` stays in auto mode,
   // which resolves to the densest measured precision per model, so the bars
@@ -1312,14 +1317,26 @@ function ProfitEstimatorInner({
                   <div data-testid="profit-cost-selector">
                     <MultiSelect
                       triggerId="profit-cost"
-                      options={COST_PROVIDER_OPTIONS.map((provider) => ({
-                        value: provider.value,
-                        label: locale === 'zh' ? provider.labelZh : provider.label,
-                      }))}
+                      options={[
+                        ...COST_PROVIDER_OPTIONS.filter((p) => p.value !== 'custom').map(
+                          (provider) => ({
+                            value: provider.value,
+                            label: locale === 'zh' ? provider.labelZh : provider.label,
+                          }),
+                        ),
+                        ...lockedCostProviderOptions(locale),
+                        ...COST_PROVIDER_OPTIONS.filter((p) => p.value === 'custom').map(
+                          (provider) => ({
+                            value: provider.value,
+                            label: locale === 'zh' ? provider.labelZh : provider.label,
+                          }),
+                        ),
+                      ]}
                       value={[costProvider]}
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
+                        if (interceptLockedTier(next)) return;
                         setCostProvider(next as ProfitCostProvider);
                         track('profit_cost_provider_changed', { provider: next });
                       }}
@@ -1693,6 +1710,7 @@ function ProfitEstimatorInner({
           )}
         </Card>
       )}
+      {tcoModelDialog}
     </div>
   );
 }

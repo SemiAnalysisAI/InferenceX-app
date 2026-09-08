@@ -77,6 +77,28 @@ describe('Inference ChartControls', () => {
     }
   });
 
+  it('lists locked rental tiers under each cost group and opens the TCO model dialog', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('Cost per Million Total Tokens')
+      .closest('[role="rowgroup"]')
+      .within(() => {
+        cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
+        cy.get('[data-testid="yaxis-locked-rent_1_year-costr"]')
+          .should('contain.text', 'Cost per Million Total Tokens (Rent - 1 Year Commit)')
+          .scrollIntoView()
+          .click();
+      });
+    cy.get('[data-testid="tco-model-dialog"]')
+      .should('be.visible')
+      .and('contain.text', 'Rent - 1 Year Commit');
+    cy.get('[data-testid="tco-model-dialog-link"]')
+      .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
+      .and('have.attr', 'target', '_blank');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.contains('button', 'Not now').click();
+    cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
+  });
+
   it('hides the GPU comparison section when no GPUs are selected', () => {
     // Default mock: selectedGPUs = [] — GPU date range pickers should not render
     cy.contains('Comparison Date Range').should('not.exist');
