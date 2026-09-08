@@ -249,6 +249,29 @@ describe('buildChartData', () => {
     expect(group.interactivity.data[0].x).toBe(150);
   });
 
+  it('includes pipeline stages when an unofficial artifact omits GPU counts', () => {
+    const raw = rawPowerArtifact({
+      disagg: false,
+      prefill_tp: 4,
+      decode_tp: 4,
+      prefill_pp: 2,
+      decode_pp: 2,
+    });
+    delete raw.num_prefill_gpu;
+    delete raw.num_decode_gpu;
+    const rows = normalizeArtifactRows([raw], '2026-08-12');
+    // Reproduce the ingest default that used to bypass the chart's PP fallback.
+    expect(rows[0].num_decode_gpu).toBe(4);
+    expect(rows[0].num_prefill_gpu).toBe(4);
+    const group = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'];
+    for (const chart of [group.e2e, group.interactivity]) {
+      expect(chart.data[0].tp).toBe(8);
+      expect(chart.data[0].decode_tp).toBe(4);
+      expect(chart.data[0].pp).toBe(2);
+      expect(chart.data[0].tpPerGpu.y).toBe(100.5);
+    }
+  });
+
   it('preserves all data points for disagg configs with different parallelism but same tp', () => {
     // Two configs: same hwKey/precision/tp/conc but different decode_ep/dp_attention.
     // Both must survive buildChartData; D3 dedup is a rendering concern, not a data one.

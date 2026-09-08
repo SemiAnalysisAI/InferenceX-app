@@ -439,14 +439,18 @@ export function createChartDataPoint(
     hwKey: currentHwKey,
     // Aggregate role counts describe the same deployment, so never sum them.
     // TP alone is not the chip count (e.g. Jalapeño TP1/EP8 uses eight chips).
-    // Keep TP × PP only as a fallback for older artifacts without chip counts.
+    // Ingested legacy counts can default to TP × EP without PP. Keep TP × PP
+    // as a floor even when counts are positive, including for unofficial overlays.
     tp: entry.disagg
       ? entry.num_prefill_gpu + entry.num_decode_gpu
-      : entry.num_decode_gpu > 0
-        ? entry.num_decode_gpu
-        : entry.num_prefill_gpu > 0
-          ? entry.num_prefill_gpu
-          : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+      : Math.max(
+          entry.num_decode_gpu > 0
+            ? entry.num_decode_gpu
+            : entry.num_prefill_gpu > 0
+              ? entry.num_prefill_gpu
+              : 0,
+          entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+        ),
     image: entry.image ?? undefined,
     dp_attention:
       entry.dp_attention !== null && entry.dp_attention !== undefined

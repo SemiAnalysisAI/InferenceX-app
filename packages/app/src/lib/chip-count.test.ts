@@ -70,6 +70,33 @@ describe('explicit deployment chip counts', () => {
     expect(chartData[0][0].tp).toBe(expected);
   });
 
+  it.each([
+    { decode: 4, prefill: 4, expected: 8 },
+    { decode: 0, prefill: 4, expected: 8 },
+    { decode: 0, prefill: 0, expected: 8 },
+    { decode: 16, prefill: 16, expected: 16 },
+  ])('keeps the PP floor for counts $decode / $prefill', ({ decode, prefill, expected }) => {
+    // Stored legacy rows already contain positive TP × EP defaults, without PP.
+    const { chartData } = transformBenchmarkRows([
+      {
+        ...source,
+        prefill_tp: 4,
+        decode_tp: 4,
+        prefill_ep: 1,
+        decode_ep: 1,
+        num_decode_gpu: decode,
+        num_prefill_gpu: prefill,
+        metrics: { ...source.metrics, prefill_pp: 2, decode_pp: 2 },
+      },
+    ]);
+    for (const series of chartData) {
+      expect(series[0].tp).toBe(expected);
+      expect(series[0].decode_tp).toBe(4);
+      expect(series[0].pp).toBe(2);
+      expect(series[0].tpPerGpu.y).toBe(source.metrics.tput_per_gpu);
+    }
+  });
+
   it('preserves every supplied GPT-OSS topology, including single-chip points', () => {
     const rows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.model === 'gptoss120b');
     const { chartData } = transformBenchmarkRows(rows);
