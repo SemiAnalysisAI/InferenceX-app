@@ -230,15 +230,45 @@ test('raw recipes retain complete UTF-8 and failure bodies before parsing, and r
   }
 });
 
-test('basic benchmark recipe captures the complete response while returning only its latest sample', () => {
+test('basic benchmark recipe captures full data and derives counts from its emitted sample', () => {
   const rows = Array.from({ length: 7 }, (_, index) =>
-    historyRow(`row-${index}`, `2026-09-0${index + 1}`),
+    historyRow(index === 6 ? '9007199254740993123' : `row-${index}`, `2026-09-0${index + 1}`, {
+      hardware: ['old-a', 'old-b', 'b200', 'b200', null, 'gb200', 'b300'][index],
+      framework: ['old-a', 'old-b', 'sglang', 'sglang', ' ', 'dynamo-trt', 'tilert'][index],
+    }),
   );
-  const result = run(3, { '/api/v1/benchmarks?model=DeepSeek-V4-Pro': response(rows) });
-  const output = succeeded(result);
-  assert.equal(output.matching_rows, 7);
-  assert.deepEqual(output.sample_rows, rows.toReversed().slice(0, 5));
-  assert.equal(output.retrieved_at, output.requests.at(-1).retrieved_at);
+  for (const [limit, count] of [
+    [5, 3],
+    [2, 2],
+    [0, 0],
+  ]) {
+    const result = run(
+      3,
+      { '/api/v1/benchmarks?model=DeepSeek-V4-Pro': response(rows) },
+      {
+        replacement: ['.slice(0, 5)', `.slice(0, ${limit})`],
+      },
+    );
+    const output = succeeded(result);
+    assert.equal(output.matching_rows, 7);
+    assert.deepEqual(output.sample_rows, rows.toReversed().slice(0, limit));
+    assert.equal(output.retrieved_at, output.requests.at(-1).retrieved_at);
+    const expected = {
+      sample_rows: limit,
+      result_ids: rows
+        .toReversed()
+        .slice(0, limit)
+        .map((row) => row.id),
+      hardware_count: count,
+      framework_count: count,
+    };
+    assert.deepEqual(output.sample_summary, expected);
+    const captureDir = assertCaptures(result).directories[0];
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(result.project, captureDir, 'sample-summary.json'), 'utf8')),
+      expected,
+    );
+  }
 });
 
 test('installed evaluation recipe counts the full scope and preserves raw metrics, IDs, nulls and provenance', () => {

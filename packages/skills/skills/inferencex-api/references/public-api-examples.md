@@ -26,6 +26,12 @@ null or malformed values count as unknown, without coercion. Distinct counts and
 nullable bounds describe known values only. Use these saved scalars in the report
 and final answer. The history recipe below uses the same summary.
 
+`sample_summary`, also saved as `sample-summary.json`, describes exactly the
+emitted `sample_rows`: original result IDs and distinct hardware/framework counts
+for known nonempty string keys. If you change the sample selection, call
+`summarizeSample` on the final sample and save its new summary before describing
+its coverage. Compute a separate summary for every alternative sample discussed.
+
 ```bash
 node --input-type=module <<'JS'
 import { createHash } from 'node:crypto';
@@ -74,6 +80,15 @@ const selection_summary = {
     distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
 };
 writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
+function summarizeSample(sample) {
+  const countKeys = (key) => new Set(sample.map((row) => row[key])
+    .filter((value) => typeof value === 'string' && value.trim().length > 0)).size;
+  return { sample_rows: sample.length, result_ids: sample.map((row) => row.id),
+    hardware_count: countKeys('hardware'), framework_count: countKeys('framework') };
+}
+const sample_rows = selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+const sample_summary = summarizeSample(sample_rows);
+writeFileSync(`${captureDir}/sample-summary.json`, JSON.stringify(sample_summary, null, 2), { flag: 'wx' });
 console.log(JSON.stringify({
   requests,
   query_url: url.href,
@@ -82,7 +97,7 @@ console.log(JSON.stringify({
   scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
   returned_models: [...new Set(selected.map((row) => row.model))],
   matching_rows: selected.length, selection_summary,
-  sample_rows: selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+  sample_rows, sample_summary,
 }, null, 2));
 JS
 ```
@@ -380,6 +395,9 @@ interpolation or invented dates. The API documents a complete dated-row array fo
 this model/workload, not a history of all jobs that ran or all data that could have
 been ingested. Report returned and selected counts separately. An empty range means
 no matching returned observations; absent dates do not prove no jobs ran.
+
+For a representative subset, reuse `summarizeSample` from the
+[basic lookup](#basic-benchmark-lookup) on the chosen rows and save its summary.
 
 Keep raw model keys, IDs, `run_url` (including attempt paths), original `date`,
 optional producer fields and `curve_*` snapshot metadata distinct. Rows with equal

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "package_version": "0.12.0",
   "files": {
-    "SKILL.md": "19976a825c85de6aacfa43604f6e80f1efcecc9b4e3321763fd29fbc9565fd46",
+    "SKILL.md": "dc3dad16898a87d6255d3219d23939a668b95c28e7e659c268b344670fd659f2",
     "references/agentx.md": "402458b895dcbc4c8f19b5ed67131ababe7432fe4f2435cf4d91ea11a362fb9a",
     "references/cli-contract.md": "2e45686428c04a3abef56ff872310a3638c9ecfcd38fd027f897853d5f93253f",
     "references/cli.md": "61643e5a4d145fe491b445d7919ed92df4e95d9aa6baaf42910179c9557462f7",
@@ -10,7 +10,7 @@
     "references/offline-exports.md": "276121ca533edcbe98faa6e8c9c73da4cb5c42735c79fe371bb39d69ba289cad",
     "references/powerx.md": "2cf5138cb29e8c2510bdde1f549f41df8a76cb4eb9368f7cec01bbec47c93d05",
     "references/provenance.md": "9a33a9391f5caee7260f6df3999538f860b7d2d343955c6e019487a5c8c44b1e",
-    "references/public-api-examples.md": "46e50139f087bc1e118300ff635fc5105967c95a3a168568bf17e8f2d9faf4fb",
+    "references/public-api-examples.md": "8f5cfb98bb7729852bca14c3a9fe4e1caf7d805f95b64b877c9c48eef0fe9567",
     "references/releases.md": "a4b39fb2608c9000604c042a023f72215fc82af5f6676be2a88f0d0f3834f8da",
     "references/tco.md": "76c5f2bc9085540dad65258e3aa68955a8c98a238871ca83e677ec309412320c",
     "schemas.json": "eba70dfb190e6d94d0b0352db0f8b49631cb1fb9a6e026c97b8316b91839105c",

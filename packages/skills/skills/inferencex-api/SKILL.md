@@ -85,7 +85,9 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json). Public
 reads use HTTPS without credentials.
 
-For benchmark lookup and history, use the recipe's saved `selection_summary`.
+For benchmark lookup and history, use the recipe's saved `selection_summary` for
+the selected population and `sample_summary` for every sample described. Regenerate
+`sample_summary` whenever its rows change.
 Compute and save any additional count, range, mean, or elapsed date interval from
 the exact selected records before writing reports. Copy the same computed scalars
 into supplementary files and the final answer. Retain the field, population and
