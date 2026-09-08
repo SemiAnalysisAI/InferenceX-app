@@ -530,6 +530,27 @@ export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | 
   return getSequenceCategory(sequence);
 }
 
+/**
+ * Model + scenario pairs where Best per SKU starts switched off. The Quick
+ * Filters toggle stays available and an explicit `i_best` URL value still wins;
+ * only the default for readers who have not chosen changes, so these charts
+ * open with every configuration visible.
+ *
+ * Qwen3.5 397B: both the 8K/1K sweep and Agentic coding open with all configs.
+ */
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+};
+
+/** Whether Best per SKU defaults to off for this model and scenario. */
+export function isBestPerSkuDefaultOff(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
+}
+
 export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
   const config = SEQUENCE_CONFIG[sequence];
   if (!config) return sequence;

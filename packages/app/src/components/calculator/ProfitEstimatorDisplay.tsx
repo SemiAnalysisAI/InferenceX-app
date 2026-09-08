@@ -147,6 +147,15 @@ const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh
 /** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
 const CUSTOM_COST_SEED: CostProvider = 'costh';
 
+// Each basis opens on a different published tier. Per chip-hour is the view
+// an operator renting capacity reads, so it opens on Rent - 3 Year Commit;
+// per GW-year models a fleet owner, so it stays on Owning at Large
+// Hyperscaler Volume.
+const DEFAULT_COST_PROVIDER: Record<ProfitBasis, CostProvider> = {
+  'chip-hour': 'costr',
+  'gw-year': 'costh',
+};
+
 /** Base GPU (`h200`, `gb300`) of a legend key like `gb300_dynamo-sglang`. */
 function baseGpuOf(hwKey: string): string {
   return hwKey.split('_')[0] ?? hwKey;
@@ -537,7 +546,9 @@ function ProfitEstimatorInner({
   }, [sequenceResolved, effectiveSequence, setSelectedSequence]);
   const mode = 'interactivity_to_throughput' as const;
 
-  const [costProvider, setCostProvider] = useState<ProfitCostProvider>('costh');
+  const [costProvider, setCostProvider] = useState<ProfitCostProvider>(
+    DEFAULT_COST_PROVIDER[basis],
+  );
   const [priceSource, setPriceSource] = useState<PriceSource>(() =>
     defaultPriceSource(selectedModel),
   );
@@ -799,8 +810,8 @@ function ProfitEstimatorInner({
   const loading = throughputLoading || history.loading;
 
   // Per-base-GPU $/GPU/hr typed by the reader; seeded from the hyperscaler
-  // tier the first time each chip appears so the custom view starts identical
-  // to the default one.
+  // tier the first time each chip appears so the custom view starts from the
+  // published owning rate on either basis.
   const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
   const customCostBases = useMemo(
     () =>

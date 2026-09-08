@@ -63,6 +63,7 @@ import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constant
 import { frameworkFamily } from '@/lib/framework-family';
 import {
   getOpenRouterModelId,
+  isBestPerSkuDefaultOff,
   MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
@@ -544,9 +545,17 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [bestPerSku, setBestPerSku] = useState(
-    () => activeTab === 'inference' && getUrlParam('i_best') !== '0',
-  );
+  // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
+  // mode follows the model + scenario default, so charts that open with every
+  // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
+  // default can change later without breaking share links.
+  const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
+    if (activeTab !== 'inference') return false;
+    const raw = getUrlParam('i_best');
+    return raw === '0' ? false : raw === '1' ? true : null;
+  });
+  const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
+  const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
   const labelScenarioKind = sequenceKind(effectiveSequence);
   const initialLabelState = useMemo(
     () =>
@@ -1534,7 +1543,12 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_best: bestPerSku ? '' : '0',
+      i_best:
+        bestPerSkuChoice === null || bestPerSkuChoice === bestPerSkuDefault
+          ? ''
+          : bestPerSkuChoice
+            ? '1'
+            : '0',
       i_label: serializedLabelState.i_label,
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
@@ -1565,7 +1579,8 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
-      bestPerSku,
+      bestPerSkuChoice,
+      bestPerSkuDefault,
       showPointLabels,
       highContrast,
       logScale,
