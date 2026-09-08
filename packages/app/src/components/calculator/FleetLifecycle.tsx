@@ -34,7 +34,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { exportToCsv } from '@/lib/csv-export';
 import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
-import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import {
   getModelLabel,
   getSequenceLabel,
@@ -97,6 +97,7 @@ interface FleetLifecycleProps {
 type LifecycleView = 'chart' | 'table';
 
 interface CsvAssumptions {
+  tcoBasis: TcoBasis;
   priceInput: string;
   outputPriceInput: string;
   rampInput: string;
@@ -188,8 +189,9 @@ const STRINGS = {
       recoveryInput,
       horizonInput,
       mw,
+      tcoBasis,
     }: CsvAssumptions) =>
-      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
+      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW, TCO basis ${tcoBasis}`,
     colRevenue: 'Revenue $/day',
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
@@ -314,8 +316,9 @@ const STRINGS = {
       recoveryInput,
       horizonInput,
       mw,
+      tcoBasis,
     }: CsvAssumptions) =>
-      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW`,
+      `假设：输入价格 $${priceInput}/M tok，输出价格 $${outputPriceInput}/M tok，爬坡期 ${rampInput} 个月，平均中断间隔（MTBI）${mtbiInput} 天，恢复时间 ${recoveryInput} 小时，测算期 ${horizonInput} 个月，设施功率 ${mw ?? ''} MW，TCO 口径：${tcoBasis === 'internal' ? '内部' : '外部'}`,
     colRevenue: '收入 $/天',
     colCost: '成本 $/天',
     colMargin: '利润 $/天',
@@ -775,7 +778,16 @@ export default function FleetLifecycle({
       return [{ progression, steps, costPerHour, provisionedMw, gpus, concurrentUsersNow }];
     });
     return { fleets: sized, unplottable: absent };
-  }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue, cacheReadRatio]);
+  }, [
+    mw,
+    anchorMs,
+    visibleProgressions,
+    costProvider,
+    costType,
+    targetValue,
+    cacheReadRatio,
+    tcoBasis,
+  ]);
 
   // Interrupts sell fewer tokens off the same racks, so they raise break-even.
   // The seeded price has to carry the same haircut the plotted margin does, or
@@ -1035,7 +1047,6 @@ export default function FleetLifecycle({
       r.series.paybackMonth ?? '',
       r.series.lifetimeMargin,
       r.series.availability,
-      tcoBasis,
     ]);
     exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
       // The assumptions are not in the rows, and a CSV read six months later
@@ -1048,6 +1059,7 @@ export default function FleetLifecycle({
         recoveryInput,
         horizonInput,
         mw,
+        tcoBasis,
       }),
     ]);
   }, [
@@ -1062,6 +1074,7 @@ export default function FleetLifecycle({
     recoveryInput,
     horizonInput,
     mw,
+    tcoBasis,
   ]);
 
   /**

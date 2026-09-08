@@ -239,6 +239,7 @@ describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: { selectedYAxisMetric: 'y_costh' },
+      globalFilters: {},
     });
   });
 
@@ -277,6 +278,7 @@ describe('Inference ChartControls infrastructure tokens per dollar', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
       inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },
+      globalFilters: {},
     });
   });
 
