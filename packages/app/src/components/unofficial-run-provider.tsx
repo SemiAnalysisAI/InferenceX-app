@@ -9,6 +9,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 
 import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
@@ -78,6 +79,7 @@ export interface OverlayScopeInput {
 
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
+  removeUnofficialBg: boolean;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialRunInfos: UnofficialRunInfo[];
   runIndexByUrl: Record<string, number>;
@@ -365,6 +367,7 @@ async function fetchUnofficialRuns(
 }
 
 export function UnofficialRunProvider({ children }: { children: ReactNode }) {
+  const [removeUnofficialBg, setRemoveUnofficialBg] = useState(false);
   const queryClient = useQueryClient();
   const search = useClientSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
@@ -478,6 +481,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo<UnofficialRunContextType>(
     () => ({
       isUnofficialRun: unofficialRunInfos.length > 0,
+      removeUnofficialBg,
       unofficialRunInfo,
       unofficialRunInfos,
       runIndexByUrl,
@@ -498,6 +502,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       resetOverlaySelection,
     }),
     [
+      removeUnofficialBg,
       unofficialRunInfos,
       unofficialRunInfo,
       runIndexByUrl,
@@ -524,6 +529,8 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       {unofficialRunInfos.length > 0 && (
         <UnofficialBanner
           runs={unofficialRunInfos}
+          removeUnofficialBg={removeUnofficialBg}
+          onRemoveUnofficialBgChange={setRemoveUnofficialBg}
           onDismissRun={dismissRun}
           onDismissAll={clearUnofficialRun}
         />

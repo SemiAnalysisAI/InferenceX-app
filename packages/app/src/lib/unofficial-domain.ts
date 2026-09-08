@@ -9,8 +9,9 @@ export function isUnofficialHostname(hostname: string): boolean {
 }
 
 export function getDomainAwareChartWatermark(
-  watermark: ChartWatermark,
+  watermark: ChartWatermark | 'logo-always',
   hostname: string,
 ): ChartWatermark {
+  if (watermark === 'logo-always') return 'logo';
   return watermark === 'logo' && isUnofficialHostname(hostname) ? 'none' : watermark;
 }

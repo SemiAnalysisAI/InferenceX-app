@@ -2,6 +2,9 @@
 
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
+import { useLocale } from '@/lib/use-locale';
+import { Switch } from '@/components/ui/switch';
+
 import { track } from '@/lib/analytics';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 
@@ -16,11 +19,18 @@ interface RunInfo {
 
 interface UnofficialBannerProps {
   runs: RunInfo[];
+  removeUnofficialBg?: boolean;
+  onRemoveUnofficialBgChange?: (checked: boolean) => void;
   /** Remove a single run from the URL + state. */
   onDismissRun?: (runId: string) => void;
   /** Clear all runs at once. Surfaced as "Dismiss all" when `runs.length > 1`. */
   onDismissAll?: () => void;
 }
+
+const STRINGS = {
+  en: { removeUnofficialBg: 'Remove unofficial BG' },
+  zh: { removeUnofficialBg: '移除非官方背景' },
+};
 
 /**
  * Compact banner that advertises that the page is showing unofficial run data.
@@ -32,7 +42,14 @@ interface UnofficialBannerProps {
  * run rendered its OWN full-width banner and the dismiss button cleared every
  * run, which both wasted vertical space and made partial dismissal impossible.
  */
-export function UnofficialBanner({ runs, onDismissRun, onDismissAll }: UnofficialBannerProps) {
+export function UnofficialBanner({
+  runs,
+  onDismissRun,
+  onDismissAll,
+  removeUnofficialBg = false,
+  onRemoveUnofficialBgChange,
+}: UnofficialBannerProps) {
+  const locale = useLocale();
   if (runs.length === 0) return null;
   const multiple = runs.length > 1;
 
@@ -60,6 +77,20 @@ export function UnofficialBanner({ runs, onDismissRun, onDismissAll }: Unofficia
             </div>
           </div>
         </div>
+        {onRemoveUnofficialBgChange && (
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Switch
+              data-testid="remove-unofficial-bg"
+              checked={removeUnofficialBg}
+              onCheckedChange={(checked) => {
+                track('unofficial_background_toggled', { removed: checked });
+                onRemoveUnofficialBgChange(checked);
+              }}
+              aria-label={STRINGS[locale].removeUnofficialBg}
+            />
+            {STRINGS[locale].removeUnofficialBg}
+          </label>
+        )}
         {multiple && onDismissAll && (
           <button
             type="button"

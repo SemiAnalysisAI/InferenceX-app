@@ -381,6 +381,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const legendT = EVAL_STRINGS[locale];
   const {
     isUnofficialRun,
+    removeUnofficialBg,
     unofficialRunInfo,
     unofficialRunInfos,
     activeOverlayHwTypes,
@@ -1243,7 +1244,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       displayIdentity={displayIdentity}
       height={chartHeight}
       margin={chartMargin}
-      watermark={getChartWatermark(isUnofficialRun)}
+      watermark={getChartWatermark(isUnofficialRun, removeUnofficialBg)}
       grabCursor={false}
       caption={caption}
       xScale={xScaleConfig}

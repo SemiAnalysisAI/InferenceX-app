@@ -492,6 +492,7 @@ const ScatterGraph = React.memo(
 
     const {
       isUnofficialRun,
+      removeUnofficialBg,
       activeOverlayHwTypes: providerActiveOverlayHwTypes,
       localOfficialOverride,
       resetOverlaySelection,
@@ -904,7 +905,7 @@ const ScatterGraph = React.memo(
       const buckets = new Map<string, Bucket>();
       const getBucket = (point: InferenceData) => {
         const runIndex = overlayRunIndex(point.run_url ?? null, runIndexByUrl);
-        const key = `${point.hwKey}|${point.precision}|${point.date}|run${runIndex}`;
+        const key = `${point.hwKey}|${point.precision}`;
         let bucket = buckets.get(key);
         if (!bucket) {
           bucket = {
@@ -1011,12 +1012,12 @@ const ScatterGraph = React.memo(
         points: InferenceData[];
       }
       if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
-      // Group by hwKey + precision + runIndex so overlay rooflines from different
-      // unofficial runs stay separate and can be styled with per-run hue shifts.
+      // Combine matching hardware and precision across unofficial runs. Keep
+      // the first contributing run’s style; individual points retain their provenance.
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
-          const key = `${p.hwKey}_${p.precision}_run${runIndex}`;
+          const key = `${p.hwKey}_${p.precision}`;
           if (!acc[key]) acc[key] = { hwKey: String(p.hwKey), runIndex, points: [] };
           acc[key].points.push(p);
           return acc;
@@ -1037,7 +1038,7 @@ const ScatterGraph = React.memo(
     }, [processedOverlayData, selectedYAxisMetric, chartDefinition, runIndexByUrl]);
 
     // Overlay counterpart of `optimalPointKeys`: the points on any overlay
-    // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
+    // hardware's drawn roofline (already e2e-restricted for agentic non-e2e modes).
     // Frontier arrays hold the same object references as `processedOverlayData`
     // items — the pareto fns return the refs they're handed — so identity
     // membership is exact, and unlike composite string keys it can't collide
@@ -1051,7 +1052,7 @@ const ScatterGraph = React.memo(
     }, [overlayRooflines]);
 
     // Overlay points respect the Optimal Only toggle exactly like official
-    // points do — "optimal" = on the overlay run's drawn roofline. Without
+    // points do — "optimal" = on the combined overlay hardware roofline. Without
     // this, an e2e-dominated overlay config (hidden on the official side) kept
     // its X marker sitting on the dashed roofline and read as a pareto point.
     // Hardware/precision/quick filters are applied upstream in
@@ -1525,9 +1526,7 @@ const ScatterGraph = React.memo(
         const base = `${String(point.hwKey)}_${point.precision}`;
         const candidates =
           source === 'overlay'
-            ? [
-                `overlay-roofline-${base}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`,
-              ]
+            ? [`overlay-roofline-${base}`]
             : [`roofline-${base}`, `roofline-${base}__${point.date}`];
         const curve = candidates.find(
           (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
@@ -1540,7 +1539,7 @@ const ScatterGraph = React.memo(
         chartRef.current?.dismissTooltip();
         chartRef.current?.hideTooltip();
       },
-      [runIndexByUrl, clampPerfRulerIsoXToOverlap],
+      [clampPerfRulerIsoXToOverlap],
     );
 
     // Read by long-lived D3 click closures (official tooltip config + overlay
@@ -1588,7 +1587,7 @@ const ScatterGraph = React.memo(
           .each(function () {
             // The identity token is the curve-specific class, e.g.
             // `roofline-H100_fp8`, `roofline-H100_fp8__2026-01-01`, or
-            // `overlay-roofline-H100_fp8_run0`.
+            // `overlay-roofline-H100_fp8`.
             const curve = [...this.classList].find(
               (cls) => cls !== 'roofline-path' && cls !== 'overlay-roofline-path',
             );
@@ -3444,7 +3443,7 @@ const ScatterGraph = React.memo(
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
           margin={CHART_MARGIN}
-          watermark={getChartWatermark(isUnofficialRun)}
+          watermark={getChartWatermark(isUnofficialRun, removeUnofficialBg)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}

@@ -318,9 +318,14 @@ export function hasExclusion(model: Model | string | null | undefined): boolean 
 
 /**
  * Pick the chart watermark for a given run state. Unofficial-run charts get
- * the red unofficial-run warning; everything else gets the logo.
+ * the red unofficial-run warning unless the viewer explicitly replaces it with
+ * the SemiAnalysis logo. Other charts retain the default domain-aware logo.
  */
-export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
+export function getChartWatermark(
+  isUnofficialRun = false,
+  removeUnofficialBg = false,
+): 'logo' | 'logo-always' | 'unofficial' {
+  if (isUnofficialRun && removeUnofficialBg) return 'logo-always';
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 

@@ -258,7 +258,7 @@ export interface D3ChartProps<T = any> {
   data: T[];
   height?: number;
   margin?: ChartMargin;
-  watermark?: 'logo' | 'unofficial' | 'none';
+  watermark?: 'logo' | 'logo-always' | 'unofficial' | 'none';
   testId?: string;
   grabCursor?: boolean;
   instructions?: string;
