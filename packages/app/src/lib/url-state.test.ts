@@ -31,6 +31,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');
   });
 
+  it('defaults TCO to External so only Internal is share-link state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.g_tco).toBe('external');
+  });
+
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
     // Per-route `initialSequence` seeds (e.g. /compare pages) make the no-param
     // resolution route-dependent. An '8k/1k' default would strip an explicit
@@ -120,6 +125,12 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.g_model).toBe('llama-3');
     expect(params.i_seq).toBe('2k/4k');
+  });
+
+  it('reads the Internal TCO basis from the URL', async () => {
+    setupWindow('?g_tco=internal');
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().g_tco).toBe('internal');
   });
 
   it('reads i_gradlabel and i_advlabel from URL', async () => {

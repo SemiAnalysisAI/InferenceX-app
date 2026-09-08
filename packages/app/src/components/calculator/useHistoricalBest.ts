@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
+import type { TcoBasis } from '@/lib/constants';
 import { useStableValue } from '@/hooks/useStableValue';
 import { Percentile, type Model, type Sequence } from '@/lib/data-mappings';
 
@@ -29,6 +30,7 @@ export interface UseHistoricalBestOptions {
   costProvider: CostProvider;
   costType: CostType;
   percentile?: Percentile;
+  tcoBasis?: TcoBasis;
   /**
    * Gates the fetch. This response is several MB, so it must stay false until
    * the section is actually being used.
@@ -60,6 +62,7 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     costProvider,
     costType,
     percentile = Percentile.P90,
+    tcoBasis = 'external',
     enabled,
   } = options;
 
@@ -97,8 +100,9 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
       precisions,
       percentile,
       tokenType: costType,
+      tcoBasis,
     });
-  }, [rows, sequence, precisions, percentile, costType]);
+  }, [rows, sequence, precisions, percentile, costType, tcoBasis]);
 
   // Stage two — re-read the frontiers at the current operating point. Both the
   // all-time best and the progression share one selection basis, so the table's

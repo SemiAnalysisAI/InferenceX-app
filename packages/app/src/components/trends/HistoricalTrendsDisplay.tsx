@@ -10,6 +10,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -105,6 +106,7 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 }
 
 export default function HistoricalTrendsDisplay() {
+  const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
@@ -193,6 +195,7 @@ export default function HistoricalTrendsDisplay() {
     availableDates,
     tokenRevenuePricing,
     enabled: hasInteractivityChart,
+    tcoBasis,
   });
 
   // High contrast color support
@@ -267,7 +270,7 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls hideGpuComparison />
+            <ChartControls tcoSource="historical" hideGpuComparison />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -319,7 +322,7 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls hideGpuComparison />
+          <ChartControls tcoSource="historical" hideGpuComparison />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
@@ -443,6 +446,7 @@ export default function HistoricalTrendsDisplay() {
                       activeHwKeys={activeHwTypes}
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
+                      tcoBasis={tcoBasis}
                     />
                     <UnofficialDomainNotice />
                   </>

@@ -1,3 +1,5 @@
+import { transformBenchmarkRows } from './benchmark-transform';
+import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -114,5 +116,29 @@ describe('supplemental benchmark snapshots', () => {
     expect(supportsChartTokenMetric('vr200_coreweave-vera-rubin', '2026-09-01', 'total')).toBe(
       true,
     );
+  });
+});
+
+describe('TPUv7 recorded topology and metrics', () => {
+  it('counts physical chips separately from TP and preserves the DP8 configuration', () => {
+    const rows = withSupplementalBenchmarks([], { model: 'qwen3.5' }).filter(
+      (row) => row.hardware === 'tpuv7',
+    );
+    expect(rows).toHaveLength(7);
+    expect(rows.every((row) => row.num_decode_gpu === 4 && row.num_prefill_gpu === 4)).toBe(true);
+    const { chartData } = transformBenchmarkRows(rows);
+    const low = chartData[0].find((p) => p.conc === 4)!;
+    const high = chartData[0].find((p) => p.conc === 256)!;
+    expect(low.tp).toBe(4);
+    expect(low.decode_tp).toBe(8);
+    expect(low.dp).toBe(1);
+    expect(high.tp).toBe(4);
+    expect(high.decode_tp).toBe(1);
+    expect(high.dp).toBe(8);
+    expect(getPointLabel(high)).toBe('TP1DP8');
+    expect(high.tpPerGpu.y).toBeCloseTo(9363.824997632008);
+    expect(high.p90_ttft).not.toBe(high.median_ttft);
+    expect(rows[0].run_url).toBeNull();
+    expect(rows[0].image).toBeNull();
   });
 });

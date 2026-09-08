@@ -1,5 +1,7 @@
 'use client';
 
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+
 import { BarChart3, Table2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -544,6 +546,7 @@ export default function FleetLifecycle({
   onMwInputChange,
   colorResolver,
 }: FleetLifecycleProps) {
+  const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
   /** A zero or blank budget sizes no fleet, so it is treated as unset. */
@@ -553,6 +556,7 @@ export default function FleetLifecycle({
   }, [mwInput]);
 
   const historical = useHistoricalBest({
+    tcoBasis,
     model: selectedModel,
     sequence: selectedSequence,
     precisions: selectedPrecisions,
@@ -710,7 +714,7 @@ export default function FleetLifecycle({
       // Power and $/chip/hr come from the base GPU, so they are identical across
       // the hwKeys pooled into this line — which is what keeps cost flat even
       // though the winning config changes.
-      const specs = getGpuSpecs(progression.baseGpu);
+      const specs = getGpuSpecs(progression.baseGpu, tcoBasis);
       const steps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
       // Chip count is mw / all-in power, so it is the same at every rung. Users
@@ -1031,6 +1035,7 @@ export default function FleetLifecycle({
       r.series.paybackMonth ?? '',
       r.series.lifetimeMargin,
       r.series.availability,
+      tcoBasis,
     ]);
     exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
       // The assumptions are not in the rows, and a CSV read six months later

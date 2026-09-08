@@ -44,6 +44,8 @@ import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+import type { TcoBasis } from '@/lib/constants';
+
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
@@ -59,6 +61,7 @@ export interface GlobalFilterSelectionContextType {
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];
+  tcoBasis: TcoBasis;
   effectiveSequence: Sequence;
   /**
    * Whether `effectiveSequence` reflects the selected model's real availability
@@ -69,6 +72,7 @@ export interface GlobalFilterSelectionContextType {
 }
 
 export interface GlobalFilterActionsContextType {
+  setTcoBasis: (basis: TcoBasis) => void;
   setSelectedModel: (model: Model) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
@@ -315,6 +319,7 @@ export function GlobalFilterProvider({
   );
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
+  const [tcoBasis, setTcoBasis] = useState<TcoBasis>('external');
 
   // Apply URL param overrides synchronously after the first commit. Runs only
   // on the client (useEffect on server is a no-op). Updates state before paint
@@ -413,6 +418,7 @@ export function GlobalFilterProvider({
     // cannot fight a user changing filters in place. A param-only navigation
     // within /inference is therefore not picked up — no in-app link does that
     // today, and covering it would mean the Suspense bailout above.
+    setTcoBasis(getUrlParam('g_tco') === 'internal' ? 'internal' : 'external');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -632,6 +638,7 @@ export function GlobalFilterProvider({
     setUrlParams({
       g_model: selectedModel,
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
+      g_tco: tcoBasis,
       // Don't pin the sequence to the URL until it's resolved from real
       // availability — writing the pre-load placeholder (8k/1k) would clobber a
       // shared `?i_seq=agentic-traces` link before the model's availability
@@ -652,6 +659,7 @@ export function GlobalFilterProvider({
     selectedModel,
     requestedRunDate,
     requestedRunId,
+    tcoBasis,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -664,6 +672,7 @@ export function GlobalFilterProvider({
       selectedModel,
       selectedSequence,
       selectedPrecisions,
+      tcoBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -672,6 +681,7 @@ export function GlobalFilterProvider({
       selectedModel,
       selectedSequence,
       selectedPrecisions,
+      tcoBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -680,6 +690,7 @@ export function GlobalFilterProvider({
 
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
+      setTcoBasis,
       setSelectedModel,
       setSelectedSequence,
       setSelectedPrecisions,

@@ -1,5 +1,7 @@
 'use client';
 
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -23,6 +25,7 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -55,6 +58,9 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
+    tcoBasis: 'TCO Basis',
+    tcoBasisTooltip:
+      'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
     benchmarkControls: 'Configuration',
     chartControls: 'Chart',
     compareHistory: 'Compare history',
@@ -94,6 +100,9 @@ const STRINGS = {
     changed: 'changed',
   },
   zh: {
+    tcoBasis: 'TCO 口径',
+    tcoBasisTooltip:
+      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
     benchmarkControls: '配置',
     chartControls: '图表',
     compareHistory: '对比历史趋势',
@@ -154,12 +163,14 @@ const METRIC_TITLE_ZH_MAP = new Map(
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
+  tcoSource?: 'inference' | 'historical';
   /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
 }
 
 export default function ChartControls({
   hideGpuComparison = false,
+  tcoSource = 'inference',
   showXAxisMode = false,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -437,6 +448,12 @@ export default function ChartControls({
                 />
               </div>
 
+              {mounted && isCostMetric(selectedYAxisMetric) && (
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
+                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source={tcoSource} className="h-9" />
+                </div>
+              )}
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
                   <LabelWithTooltip

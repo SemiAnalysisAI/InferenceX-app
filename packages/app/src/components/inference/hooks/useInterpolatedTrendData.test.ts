@@ -71,6 +71,18 @@ function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToLightweightPoint', () => {
+  it('uses the selected TPU cost basis for historical cost and tokens per dollar', () => {
+    const row = makeBenchmarkRow({ hardware: 'tpuv7', framework: 'vllm' });
+    const metrics = ['costhOutput', 'outputTokensPerDollarH', 'tpPerMw'] as const;
+    const external = rowToLightweightPoint(row, metrics)!;
+    const internal = rowToLightweightPoint(row, metrics, undefined, 'internal')!;
+    expect(internal.costhOutput!.y).toBeCloseTo((external.costhOutput!.y * 1.03) / 1.21);
+    expect(internal.outputTokensPerDollarH!.y).toBeCloseTo(
+      (external.outputTokensPerDollarH!.y * 1.21) / 1.03,
+    );
+    expect(internal.tpPerMw).toEqual(external.tpPerMw);
+  });
+
   it('preserves legacy output-throughput trends when the explicit field is absent', () => {
     const point = rowToLightweightPoint(makeBenchmarkRow(), [
       'outputTputPerGpu',

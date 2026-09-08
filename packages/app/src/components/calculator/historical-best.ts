@@ -29,6 +29,7 @@
  */
 
 import type { BenchmarkRow } from '@/lib/api';
+import type { TcoBasis } from '@/lib/constants';
 import { Percentile, type Sequence } from '@/lib/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
@@ -113,6 +114,7 @@ export interface GroupHistoryOptions {
   /** Agentic percentile; ignored for fixed sequences. */
   percentile?: Percentile;
   tokenType?: CostType;
+  tcoBasis?: TcoBasis;
   /**
    * Restricts grouping. Callers driving a legend should leave this unset and
    * filter for display instead, so toggling a legend entry does not rebuild
@@ -134,6 +136,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
+    tcoBasis = 'external',
     visibleHwKeys,
   } = options;
   if (rows.length === 0 || precisions.length === 0) {
@@ -149,6 +152,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     precisions,
     percentile,
     tokenType,
+    tcoBasis,
     classify: (hwKey, row) => {
       if (visibleHwKeys && !visibleHwKeys.has(hwKey)) return null;
       if (!row.date) return null;

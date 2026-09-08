@@ -14,6 +14,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
+import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -42,6 +43,13 @@ const INPUT_COST_METRICS = new Set([
   'y_inputTokensPerDollarH',
   'y_inputTokensPerDollarR',
 ]);
+export function isCostMetric(metric: string): boolean {
+  return (
+    TOTAL_COST_METRICS.has(metric) ||
+    OUTPUT_COST_METRICS.has(metric) ||
+    INPUT_COST_METRICS.has(metric)
+  );
+}
 const POWER_VALUES = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([base, specs]) => [base, `${specs.power}kW`]),
 );
@@ -143,19 +151,22 @@ function DisaggCaveat({
   );
 }
 
-function getCostValues(selectedYAxisMetric: string) {
+function getCostValues(selectedYAxisMetric: string, tcoBasis: TcoBasis) {
   return Object.fromEntries(
-    Object.entries(HW_REGISTRY).map(([base, specs]) => [
-      base,
-      selectedYAxisMetric === 'y_costh' ||
-      selectedYAxisMetric === 'y_costhOutput' ||
-      selectedYAxisMetric === 'y_costhi' ||
-      selectedYAxisMetric === 'y_tokensPerDollarH' ||
-      selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
-      selectedYAxisMetric === 'y_inputTokensPerDollarH'
-        ? specs.costh
-        : specs.costr,
-    ]),
+    Object.keys(HW_REGISTRY).map((base) => {
+      const specs = getGpuSpecs(base, tcoBasis);
+      return [
+        base,
+        selectedYAxisMetric === 'y_costh' ||
+        selectedYAxisMetric === 'y_costhOutput' ||
+        selectedYAxisMetric === 'y_costhi' ||
+        selectedYAxisMetric === 'y_tokensPerDollarH' ||
+        selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
+        selectedYAxisMetric === 'y_inputTokensPerDollarH'
+          ? specs.costh
+          : specs.costr,
+      ];
+    }),
   );
 }
 
@@ -168,6 +179,7 @@ export function MetricAssumptionNotes({
   activeHwKeys,
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
+  tcoBasis = 'external',
 }: {
   selectedYAxisMetric: string;
   /**
@@ -182,6 +194,7 @@ export function MetricAssumptionNotes({
   // the tab's existing caption contract while sharing the same helper as inference.
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
+  tcoBasis?: TcoBasis;
 }) {
   const locale = useLocale();
   // Legend keys are `{base}` or `{base}_{framework/variant}`; badge maps are
@@ -222,7 +235,7 @@ export function MetricAssumptionNotes({
 
   const costValues =
     showTotalCostSource || showOutputCostSource || showInputCostSource
-      ? getCostValues(selectedYAxisMetric)
+      ? getCostValues(selectedYAxisMetric, tcoBasis)
       : null;
 
   const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';

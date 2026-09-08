@@ -21,6 +21,7 @@ const URL_STATE_KEYS = [
   'g_model',
   'g_rundate',
   'g_runid',
+  'g_tco',
   // Inference
   'i_seq',
   'i_prec',
@@ -122,6 +123,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
+  g_tco: 'external',
   // No strippable default: per-route `initialSequence` seeds (e.g. the /compare
   // pages) make the no-param resolution route-dependent, so stripping '8k/1k'
   // (the global default) would revert an explicit 8K/1K pick back to the route's

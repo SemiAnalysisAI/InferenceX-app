@@ -1346,6 +1346,34 @@ describe('buildGpuGroups', () => {
     });
   });
 
+  it('applies Internal TPUv7 owner cost to every calculator token basis', () => {
+    const row = makeRow({
+      hardware: 'tpuv7',
+      framework: 'vllm',
+      precision: 'fp8',
+      metrics: {
+        median_intvty: 50,
+        tput_per_gpu: 900,
+        output_tput_per_gpu: 300,
+        input_tput_per_gpu: 600,
+      },
+    });
+    const options = {
+      sequence: Sequence.OneK_OneK,
+      precisions: ['fp8'],
+      classify: singlePrecisionClassify,
+    };
+    const external = Object.values(buildGpuGroups([row], options).grouped)[0][0];
+    const internal = Object.values(
+      buildGpuGroups([row], { ...options, tcoBasis: 'internal' }).grouped,
+    )[0][0];
+
+    expect(internal.costh).toBeCloseTo((1.03 / 1.21) * external.costh);
+    expect(internal.costhi).toBeCloseTo((1.03 / 1.21) * external.costhi);
+    expect(internal.costhOutput).toBeCloseTo((1.03 / 1.21) * external.costhOutput);
+    expect(internal.tpPerMw).toBe(external.tpPerMw);
+  });
+
   it('drops rows whose isl/osl do not match the selected sequence', () => {
     const { grouped } = buildGpuGroups(
       [makeRow({ isl: 8192, osl: 1024 }), makeRow({ isl: null, osl: null })],

@@ -286,6 +286,26 @@ describe('getGpuSpecs', () => {
       expect(result.costh).toBe(entry.costh);
     }
   });
+
+  it('switches TPUv7 to owner cost without changing power', () => {
+    const external = getGpuSpecs('tpuv7_vllm', 'external');
+    const internal = getGpuSpecs('tpuv7_vllm', 'internal');
+
+    expect(external).toMatchObject({
+      power: 1.207,
+      costh: 1.21,
+      costr: 1.21,
+    });
+    expect(internal).toMatchObject({
+      power: 1.207,
+      costh: 1.03,
+      costr: 1.03,
+    });
+  });
+
+  it('keeps hardware without an owner cost on external rates', () => {
+    expect(getGpuSpecs('h100_vllm', 'internal')).toEqual(getGpuSpecs('h100_vllm', 'external'));
+  });
 });
 
 // ===========================================================================

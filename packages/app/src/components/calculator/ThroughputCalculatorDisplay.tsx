@@ -58,6 +58,7 @@ import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -68,7 +69,7 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/data-mappings';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -197,6 +198,9 @@ const STRINGS = {
     tokenTypeTooltip:
       'Whether to show costs for total tokens, input tokens only, or output tokens only.',
     tokenTypePlaceholder: 'Token type',
+    tcoBasisLabel: 'TCO Basis',
+    tcoBasisTooltip:
+      'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7.',
     metricLabel: 'Metric',
     metricTooltip:
       'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
@@ -257,6 +261,9 @@ const STRINGS = {
     tokenTypeLabel: 'token 类型',
     tokenTypeTooltip: '选择显示总 token、仅输入 token 还是仅输出 token 的成本。',
     tokenTypePlaceholder: 'token 类型',
+    tcoBasisLabel: 'TCO 口径',
+    tcoBasisTooltip:
+      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
     metricLabel: '指标',
     metricTooltip:
       '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
@@ -360,6 +367,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     selectedModel,
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
+    tcoBasis,
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
@@ -435,6 +443,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     undefined,
     true,
     costType,
+    tcoBasis,
   );
   const error = throughputError;
 
@@ -935,7 +944,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               <ControlPanel
                 legend={t.benchmarkGroup}
                 className={`md:grid-cols-2 ${
-                  isAgenticSequence ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
+                  isAgenticSequence ? 'lg:grid-cols-8' : 'lg:grid-cols-7'
                 }`}
               >
                 <ModelSelector
@@ -1037,6 +1046,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       showSelectionSummary={false}
                     />
                   </div>
+                </div>
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source="calculator" className="h-9" />
                 </div>
               </ControlPanel>
 
@@ -1284,9 +1297,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
                                   {specs.badgeLabel ?? base.toUpperCase()}: $
-                                  {(costProvider === 'costh' ? specs.costh : specs.costr).toFixed(
-                                    2,
-                                  )}
+                                  {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
                                   /hr
                                 </Badge>
                               ))}

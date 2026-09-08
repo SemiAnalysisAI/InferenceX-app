@@ -17,7 +17,7 @@ import {
   getHardwareKey,
   type DerivedChartFields,
 } from '@/lib/chart-utils';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { resolvePowerTier } from '@/lib/power-tier';
 import type { BenchmarkRow } from '@/lib/api';
@@ -260,6 +260,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // it from there. Undefined for artifacts predating the field.
     pp: aggregatePp,
     dp_attention: aggregateDpAttention,
+    dp: m.dp,
     is_multinode: row.is_multinode,
     prefill_tp: row.disagg ? row.prefill_tp : aggregateTp,
     prefill_ep: row.disagg ? row.prefill_ep : aggregateEp,
@@ -384,6 +385,7 @@ export function mergeRunScopedRows(
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
+  tcoBasis: TcoBasis = 'external',
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -409,7 +411,7 @@ export function transformBenchmarkRows(
       entry,
       hwKey,
       date: row.date,
-      derivedFields: buildDerivedChartFields(entry, hwKey),
+      derivedFields: buildDerivedChartFields(entry, hwKey, undefined, tcoBasis),
     };
   }
 

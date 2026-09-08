@@ -28,7 +28,7 @@ import {
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { buildDerivedChartFields, getHardwareKey, type DerivedMetricKey } from '@/lib/chart-utils';
-import { isKnownGpu } from '@/lib/constants';
+import { isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
@@ -50,6 +50,7 @@ export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
+  tcoBasis: TcoBasis = 'external',
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
@@ -82,7 +83,7 @@ export function rowToLightweightPoint(
     server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
-    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
+    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics, tcoBasis),
   } as InferenceData;
 
   return requestedMetrics.includes('tokenRevenuePerGpuHour')
@@ -311,6 +312,7 @@ interface UseInterpolatedTrendDataParams {
   availableDates: string[];
   tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
+  tcoBasis?: TcoBasis;
 }
 
 interface UseInterpolatedTrendDataResult {
@@ -337,6 +339,7 @@ export function useInterpolatedTrendData({
   targetInteractivity,
   tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
+  tcoBasis = 'external',
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
@@ -365,7 +368,7 @@ export function useInterpolatedTrendData({
       if (!selectedPrecisions.includes(row.precision)) continue;
       if (!rowSupportsTrendMetric(row, selectedYAxisMetric)) continue;
 
-      const point = rowToLightweightPoint(row, requestedMetrics, tokenRevenuePricing);
+      const point = rowToLightweightPoint(row, requestedMetrics, tokenRevenuePricing, tcoBasis);
       if (!point) continue;
 
       const curveDate = benchmarkCurveDate(row);
@@ -387,7 +390,14 @@ export function useInterpolatedTrendData({
     }
 
     return result;
-  }, [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric, tokenRevenuePricing]);
+  }, [
+    allRows,
+    selectedPrecisions,
+    requestedMetrics,
+    selectedYAxisMetric,
+    tokenRevenuePricing,
+    tcoBasis,
+  ]);
 
   // Interpolation memo — instant when slider moves or metric changes
   const { trendLines, hwKeysWithData } = useMemo(() => {

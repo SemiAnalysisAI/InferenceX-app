@@ -4,7 +4,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
 import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
-import { getGpuSpecs } from './constants';
+import { getGpuSpecs, type TcoBasis } from './constants';
 
 // Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
 // built-in tracking scale (tighter…widest), so without this, e.g.
@@ -206,7 +206,10 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
  *
  * If outputTputPerGpu is not available, falls back to using the total throughput ratio.
  */
-export function computeOutputCostFields(data: InferenceData[]): InferenceData[] {
+export function computeOutputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = 'external',
+): InferenceData[] {
   return data.map((item) => {
     if (
       item.costhOutput &&
@@ -218,7 +221,7 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     }
 
     // Compute output cost fields from existing data
-    const specs = getGpuSpecs(item.hwKey);
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
 
     // Get output throughput - either from outputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
@@ -377,14 +380,17 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
   });
 }
 
-export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
+export function computeInputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = 'external',
+): InferenceData[] {
   return data.map((item) => {
     if (item.costhi && item.costri && item.inputTokensPerDollarH && item.inputTokensPerDollarR) {
       return item;
     }
 
     // Compute input cost fields from existing data
-    const specs = getGpuSpecs(item.hwKey);
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
 
     // Get input throughput - either from inputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
