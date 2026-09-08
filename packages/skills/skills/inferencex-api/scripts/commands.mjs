@@ -50,6 +50,7 @@ function formalOptions(domain, { timeoutMs, policy, formats = ['json'] }) {
 function operation(value) {
   return Object.freeze({
     ...value,
+    command: value.route.join(' '),
     route: Object.freeze(value.route),
     formats: Object.freeze(value.formats),
     policies: Object.freeze(value.policies),
@@ -60,7 +61,6 @@ function operation(value) {
 
 export const FORMAL_OPERATIONS = Object.freeze([
   operation({
-    command: 'powerx export',
     route: ['powerx', 'export'],
     kind: 'powerx',
     module: './export-powerx.mjs',
@@ -87,7 +87,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'agentx export',
     route: ['agentx', 'export'],
     kind: 'agentx',
     module: './export-agentx.mjs',
@@ -118,7 +117,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'result inspect',
     route: ['result', 'inspect'],
     kind: 'result',
     module: './investigate-result.mjs',
@@ -149,7 +147,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'tco compare',
     route: ['tco', 'compare'],
     kind: 'tco',
     module: './compare-tco.mjs',
@@ -187,7 +184,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'releases compare',
     route: ['releases', 'compare'],
     kind: 'releases',
     module: './compare-releases.mjs',
@@ -234,7 +230,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'collectivex compare',
     route: ['collectivex', 'compare'],
     kind: 'collectivex',
     module: './compare-collectivex.mjs',
@@ -261,7 +256,6 @@ export const FORMAL_OPERATIONS = Object.freeze([
 
 const UTILITY_OPERATIONS = Object.freeze([
   operation({
-    command: 'discover',
     route: ['discover'],
     kind: 'discovery',
     description: 'Discover capabilities, models, dates, datasets, and observed configs.',
@@ -292,7 +286,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     },
   }),
   operation({
-    command: 'verify',
     route: ['verify'],
     kind: 'verification',
     description: 'Verify a completed evidence directory without network access.',
@@ -312,7 +305,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     network: null,
   }),
   operation({
-    command: 'describe',
     route: ['describe'],
     kind: 'description',
     description: 'Print fixed command metadata offline.',
@@ -328,7 +320,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     network: null,
   }),
   operation({
-    command: 'schema',
     route: ['schema'],
     kind: 'schema',
     description: 'Print one public JSON Schema offline.',
@@ -344,7 +335,6 @@ const UTILITY_OPERATIONS = Object.freeze([
     network: null,
   }),
   operation({
-    command: 'doctor',
     route: ['doctor'],
     kind: 'doctor',
     description: 'Inspect the runtime and installed package; API check is opt-in.',

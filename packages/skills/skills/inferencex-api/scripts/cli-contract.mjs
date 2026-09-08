@@ -82,7 +82,6 @@ export async function responseBoundary(action, signal) {
   } catch (error) {
     const cancelled = cancellation(error, signal);
     if (cancelled) throw cancelled;
-    if (error instanceof CliError) throw error;
     throw new CliError(
       error?.name === 'TimeoutError' ? 'TIMEOUT' : 'INVALID_RESPONSE',
       error instanceof Error ? error.message : String(error),
@@ -98,7 +97,6 @@ export async function outputBoundary(action, signal) {
   } catch (error) {
     const cancelled = cancellation(error, signal);
     if (cancelled) throw cancelled;
-    if (error instanceof CliError) throw error;
     throw new CliError('OUTPUT_ERROR', error instanceof Error ? error.message : String(error), {
       cause: error,
     });
