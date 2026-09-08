@@ -19,6 +19,7 @@ import {
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
   getSequenceCategoryForModel,
+  isBestPerSkuDefaultOff,
   Model,
   Sequence,
   Precision,
@@ -258,6 +259,27 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   it('leaves MiniMax M3 agentic traces active', () => {
     expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.AgenticTraces)).toBe(false);
     expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.MiniMax_M3)).toBe('default');
+  });
+});
+
+// ===========================================================================
+// per-model Best per SKU default
+// ===========================================================================
+describe('isBestPerSkuDefaultOff', () => {
+  it('opens Qwen3.5 8K/1K and agentic charts with every configuration', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(true);
+  });
+
+  it('keeps Best per SKU on for other Qwen3.5 scenarios and other models', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_8_Flash_Next, Sequence.AgenticTraces)).toBe(false);
+  });
+
+  it('treats a missing model or scenario as the global default', () => {
+    expect(isBestPerSkuDefaultOff(null, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, undefined)).toBe(false);
   });
 });
 
