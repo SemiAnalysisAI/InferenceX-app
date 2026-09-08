@@ -47,6 +47,41 @@ Keep `coverage.reasons` separate from `policy.reasons`. A valid empty or partial
 bundle is scoped evidence. A required hardware key passes only with a usable record;
 a matching label is insufficient. Missing values remain missing, never zero.
 
+## Deliver the requested result
+
+Use the formal result and its metadata for values already computed by the CLI.
+Calculate only the additional quantities needed for the user's question. Preserve
+the user's selectors and acceptance criteria throughout classification and costing.
+
+1. Select the exact records and fields needed for the requested output. Keep the
+   complete raw responses as evidence; record which subset the analysis uses.
+   Read units and denominators from saved metadata or the API contract, and
+   eligibility rules from the relevant cookbook.
+2. If the user requests a report, or the raw-API task needs a derived analysis,
+   write a small script that reads the saved results and writes the requested
+   report file directly (Markdown by default). Its quantitative content uses the same
+   variables for quantities, populations, dates, IDs and units. Reuse existing
+   valid calculations for that scope; compute missing quantities in this script.
+3. Keep that report on the requested findings: a direct answer, the requested
+   measures with their scope and units, the applicable limitations, and links to
+   the results and source manifests. Request metadata and file inventories stay
+   in the linked evidence. State the selected analysis scope positively;
+   downloaded records, selected rows and individually investigated points are
+   different sets. Check exact object paths for missing-field claims.
+4. Check the deliverable's claims against the saved results and perform the
+   applicable verification. Finish when the requested outputs, evidence and
+   necessary caveats are complete. Give a short
+   qualitative conclusion, artifact links and the verification outcome in the
+   final reply; keep the quantitative analysis in the generated deliverable unless
+   the user explicitly requests quantities or another format in the reply.
+
+For benchmark lookup and history, start from the saved `selection_summary` and
+`sample_summary`; regenerate the sample summary when its rows change. Distinct
+counts use known values, with missing values reported separately. A flag's
+population includes true, false and missing. Observation pairs, metric
+comparisons and individual rows are separate populations. Report date endpoints;
+when a duration is requested, compute and label elapsed or inclusive days.
+
 ## Choose the workflow
 
 - **PowerX measured power or energy:** read
@@ -60,10 +95,10 @@ a matching label is insufficient. Missing values remain missing, never zero.
 - **A result's producer, configuration, image, or bounded log:** read
   [provenance](references/provenance.md), then use `inferencex result inspect`.
   Keep the original producer separate from the snapshot carrying the row.
-- **Cost at a fixed interactivity target:** read [TCO](references/tco.md), then use
-  `inferencex tco compare`. Compute rental-rate estimates from reported output
-  throughput and explicit USD/GPU-hour prices; measured power is a separate workflow. Retain
-  unavailable points and source dates.
+- **Cost comparison:** read [TCO](references/tco.md). For a median interactivity
+  target, use `inferencex tco compare`; for a P99 ITL constraint, use its raw
+  observation recipe. Both use the requested criteria and explicit USD/GPU-hour
+  prices. Retain unavailable points and source dates; measured power is separate.
 - **vLLM/SGLang before and after observations:** read
   [releases](references/releases.md), then use `inferencex releases compare`.
   Select exact observation dates and producer identities. Report descriptive
@@ -86,20 +121,22 @@ Use the [public API reference](https://inferencex.semianalysis.com/api) and
 [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json). Public
 reads use HTTPS without credentials.
 
-For benchmark lookup and history, use the recipe's saved `selection_summary` for
-the selected population and `sample_summary` for every sample described. Regenerate
-`sample_summary` whenever its rows change.
-Compute and save any additional count, range, mean, or elapsed date interval from
-the exact selected records before writing reports. Copy the same computed scalars
-into supplementary files and the final answer. Retain the field, population and
-denominator: observation pairs differ from metric comparisons and individual rows.
-Calculate intervals from explicit date endpoints. Cite the request URL, retrieval time, scope, source identities,
-and observation dates. Scope conclusions to the records checked; a recorded zero
-is a source value, not proof of physical absence or a causal explanation.
+Bundle manifests and raw-capture sidecars retain request URLs, retrieval times,
+HTTP statuses, response paths, decoded byte counts and SHA-256 hashes. Those hashes
+identify the retained decoded bytes; they do not authenticate the remote source,
+record compressed wire bytes or prove remote immutability. Link this evidence
+using the delivery rules above.
 
-Match comparisons on workload and configuration. Keep per-GPU watts, deployment
-GPU joules, token units, and TCO assumptions distinct. Preserve numeric-looking IDs
-as strings. The benchmark API array is not chronological; sort by each row's
+Scope conclusions to the records checked; a recorded zero
+is a source value, not proof of physical absence or a causal explanation.
+High latency or concurrency alone cannot identify queueing, saturation, or another
+bottleneck. Report observed values and unresolved causes.
+
+Match comparisons on workload and configuration. Claims of "same configuration"
+or "only X differs" require comparing all recorded configuration fields; retain
+additional differences and unknowns instead of matching just a display label.
+Keep per-GPU watts, deployment GPU joules, token units, and TCO assumptions distinct.
+Preserve numeric-looking IDs as strings. The benchmark API array is not chronological; sort by each row's
 `date` before taking a latest-observation sample.
 
 **GPU topology:** report `num_prefill_gpu` and `num_decode_gpu` as raw role counts,

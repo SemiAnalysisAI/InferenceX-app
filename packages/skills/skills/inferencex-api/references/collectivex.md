@@ -54,16 +54,12 @@ node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
   --left <left-run-id> --right <right-run-id> --output-dir evidence/collectivex-pair
 ```
 
-The versioned command saves a formal bundle with a 120-second total deadline and
-a shared 32 MiB response budget. The explicit pair uses three logical reads;
-discovery uses at most four. Retry attempts follow the [CLI contract](cli.md). Finish any
-report in a sibling path, then run `inferencex verify` on that output directory.
-
 ### Request boundary
 
-The explicit pair makes three logical reads; discovery makes at most four. The CLI
-applies its shared deadline, decoded-byte budget, retry ledger, and create-new bundle
-rules. It never substitutes a different run after a failed read.
+The command has a 120-second total deadline and a shared 32 MiB response budget.
+An explicit pair uses three logical reads; discovery uses at most four. Retry
+attempts and output handling follow the [CLI contract](cli.md). A failed read
+never substitutes a different run.
 
 The public operations require `version=1`:
 
@@ -92,7 +88,8 @@ discovery has a bounded upstream window, artifacts expire, and retained runs can
 outlive their artifacts. The export therefore always sets `history_complete=false`.
 Stored fallback data can also be served when upstream refresh fails. Compare each
 detail's returned `run_attempt` with its discovery summary; a later attempt is a
-different snapshot, even under the same run ID.
+different snapshot, even under the same run ID. Equal attempt numbers do not prove
+identical snapshots; data can refresh within an attempt.
 
 ## 2. Check comparability before interpreting differences
 
@@ -136,6 +133,8 @@ disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
 coverage; absence of the optional `kv` field does not imply a failed KV suite.
+Pending data and a cancelled run do not establish whether a case started or why
+measurements are missing. Keep those returned states separate from explanations.
 
 For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
 by outcome. Reconcile their combined totals with the run's `requested_cases`,
@@ -145,11 +144,14 @@ reporting them. An EP case is terminal only when all its points have a non-pendi
 `failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
 These case counters combine EP and KV; `kv_requested_cases` and
 `kv_measured_cases` identify the KV subset, while the run's point counters are
-EP-only. A listed subset of SKUs or reasons is not the total. If the returned
+EP-only. Run-list summaries expose this subset at `kv_cases.requested` and
+`kv_cases.measured`; the flat names above belong to run details. Inspect the
+returned object at the appropriate path when reporting availability.
+A listed subset of SKUs or reasons is not the total. If the returned
 arrays and counters do not reconcile, report that inconsistency.
 
-For EP point accounting, count `coverage[].points[]` by `terminal_status` with
-code and reconcile the result with the point counters. Compute pending points as
+For EP point accounting, compute a histogram of `coverage[].points[].terminal_status`
+and reconcile it with the point counters. Compute pending points as
 `requested_points - terminal_points` and terminal-but-unmeasured points as
 `terminal_points - measured_points`. Carry those computed values and labels into
 the report; pending and terminal-but-unmeasured are separate populations.
@@ -194,18 +196,20 @@ returned fields without inventing defaults. The server's shared reader has its
 own compatibility fallbacks, so returned defaults are not independently verified
 artifact provenance.
 
-Keep the bundle with the answer. `manifest.json` records each exact request URL,
-HTTP status, retrieval timestamp, response size, SHA-256, and relative
-`responses/*.body` path, including for OpenAPI. Parse those complete decoded body
-files to inspect the original datasets; the result's `sources[]` entries and
-comparison source pointers identify the corresponding response index and JSON
-Pointer. Run IDs remain exact strings, and `runs[].run` retains the returned
+Follow the shared [delivery rules](../SKILL.md#deliver-the-requested-result) for
+bundle metadata, retention, and verification. The manifest includes the OpenAPI
+capture. Inspect original datasets in the decoded `responses/*.body` files; the
+result's `sources[]` entries and comparison pointers identify their response
+indices and JSON Pointers. Run IDs remain exact strings, and `runs[].run` retains the returned
 attempt, `generated_at`, conclusion, and source SHA. Retrieval time and generated
-time describe different events. Cite URLs and timestamps from **this bundle**,
+time describe different events. Use URLs and timestamps from **this bundle**,
 never from another selection or an older example.
 
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and
 relevant unmeasured coverage. Summarize numerical differences only from the
-complete requested set of `matched` groups. Keep the result scoped to the two
+complete requested set of `matched` groups. With no matches, explain the actual
+identity differences and unavailable fields. Do not invent relaxed counterpart
+counts or performance pairs unless the user requests that separate analysis.
+Keep the result scoped to the two
 returned snapshots and state that no new benchmarks were run.

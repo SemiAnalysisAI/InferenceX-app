@@ -378,12 +378,14 @@ const selection_summary = {
     distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
 };
 writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
-const definitions = schema.components?.schemas?.BenchmarkRows?.items?.properties?.metrics?.properties ?? {};
+const metricsSchema = schema.components?.schemas?.BenchmarkRows?.items?.properties?.metrics;
+const definitions = metricsSchema?.properties ?? {};
 const metricKeys = [...new Set(selected.flatMap((row) => Object.keys(row.metrics)))].toSorted();
 console.log(JSON.stringify({
   scope, requests, returned_rows: rows.length, selected_rows: selected.length, selection_summary,
   available_hardware: [...new Set(rows.map((row) => row.hardware))].toSorted(),
   observed_dates: [...new Set(selected.map((row) => row.date))],
+  metrics_description: metricsSchema?.description ?? null,
   metric_descriptions: Object.fromEntries(metricKeys.map((key) => [key, definitions[key]?.description ?? null])),
   outcome: selected.length ? 'observations' : 'no_matching_observations', rows: selected,
 }, null, 2));
@@ -405,8 +407,11 @@ dates can represent different configurations; keep framework, precision, concurr
 parallelism, topology and image/recipe fields rather than aggregating them into one
 GPU result. A fixed workload alone does not make every configuration comparable.
 
-Metric values and missing fields remain unchanged. `metric_descriptions` copies
-available OpenAPI definitions, including units; `null` means no definition is
-published there, so leave that metric's unit unspecified rather than guessing or
-converting it. History is not a strictV2 export: apply the documented numeric
+Metric values and missing fields remain unchanged. `metrics_description` retains
+the enclosing OpenAPI map contract, including shared units; `metric_descriptions`
+retains field-specific definitions and exceptions. A null field description does
+not erase the enclosing contract: it specifies time metrics in seconds and
+throughput in tokens/s/GPU unless named otherwise. Leave a unit unspecified only
+when neither level documents it; do not guess or silently convert values.
+History is not a strictV2 export: apply the documented numeric
 validation before making measured-power claims. No new benchmarks are run.

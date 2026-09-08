@@ -721,6 +721,129 @@ test('status rechecks installation when cleanup removes a marker before open', (
   assert.equal(existsSync(transaction), false);
 });
 
+test('status rechecks an atomically replaced transaction marker during its read', () => {
+  const cwd = project();
+  succeeded(run(['install'], cwd));
+  const destination = join(cwd, '.claude/skills/inferencex-api');
+  const transaction = `${destination}.inferencex-skills-transaction`;
+  const before = snapshot(destination);
+  mkdirSync(transaction);
+  const { path, record } = writeTransactionMarker(transaction, destination, {
+    ownerPid: process.pid,
+    phase: 'staging',
+  });
+  const replacement = JSON.stringify({ ...record, phase: 'staged' });
+  const injected = join(cwd, 'marker-replaced');
+  const result = runWithPreload(
+    ['status', '--json'],
+    cwd,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      import { setTimeout } from 'node:timers/promises';
+      const original = fs.promises.open;
+      let replaced = false;
+      fs.promises.open = async (path, ...args) => {
+        const handle = await original(path, ...args);
+        if (path === ${JSON.stringify(path)}) {
+          const stat = handle.stat.bind(handle);
+          let calls = 0;
+          handle.stat = async (...options) => {
+            if (++calls === 2 && !replaced) {
+              replaced = true;
+              // Unlinking the open inode changes ctime even though its bytes stay intact.
+              await setTimeout(20);
+              fs.writeFileSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(replacement)});
+              fs.renameSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, path);
+              fs.writeFileSync(${JSON.stringify(injected)}, 'replaced');
+            }
+            return stat(...options);
+          };
+        }
+        return handle;
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+
+  assert.equal(readFileSync(injected, 'utf8'), 'replaced');
+  const status = JSON.parse(succeeded(result).stdout);
+  assert.equal(status.transaction_state, 'busy', status.reason);
+  assert.equal(status.transaction_phase, 'staged');
+  assert.deepEqual(snapshot(destination), before);
+  assert.equal(readFileSync(path, 'utf8'), replacement);
+});
+
+for (const mutation of ['same-inode', 'malformed', 'oversized', 'continuous']) {
+  test(`transaction marker rescans still block ${mutation} changes`, () => {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const transaction = `${destination}.inferencex-skills-transaction`;
+    const before = snapshot(destination);
+    mkdirSync(transaction);
+    const { path, record } = writeTransactionMarker(transaction, destination, {
+      ownerPid: process.pid,
+      phase: 'staging',
+    });
+    const valid = JSON.stringify({ ...record, phase: 'staged' });
+    const contents =
+      mutation === 'malformed'
+        ? '{broken'
+        : mutation === 'oversized'
+          ? valid.padEnd(64 * 1024 + 1)
+          : valid;
+    const injected = join(cwd, 'marker-mutations');
+    const result = runWithPreload(
+      ['status', '--json'],
+      cwd,
+      `
+        import fs from 'node:fs';
+        import { syncBuiltinESMExports } from 'node:module';
+        import { setTimeout } from 'node:timers/promises';
+        const original = fs.promises.open;
+        let changes = 0;
+        fs.promises.open = async (path, ...args) => {
+          const handle = await original(path, ...args);
+          if (path === ${JSON.stringify(path)}) {
+            const stat = handle.stat.bind(handle);
+            let calls = 0;
+            handle.stat = async (...options) => {
+              if (++calls === 2 && (changes === 0 || ${JSON.stringify(mutation)} === 'continuous')) {
+                await setTimeout(20);
+                if (${JSON.stringify(mutation)} === 'same-inode') {
+                  fs.writeFileSync(path, ${JSON.stringify(contents)});
+                } else {
+                  fs.writeFileSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(contents)});
+                  fs.renameSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, path);
+                }
+                fs.writeFileSync(${JSON.stringify(injected)}, String(++changes));
+              }
+              return stat(...options);
+            };
+          }
+          return handle;
+        };
+        syncBuiltinESMExports();
+      `,
+    );
+
+    const status = JSON.parse(succeeded(result).stdout);
+    assert.equal(status.transaction_state, 'blocked', status.reason);
+    assert.equal(Number(readFileSync(injected, 'utf8')), mutation === 'continuous' ? 3 : 1);
+    assert.match(
+      status.reason,
+      mutation === 'malformed'
+        ? /malformed/u
+        : mutation === 'oversized'
+          ? /byte limit/u
+          : /changed while/u,
+    );
+    assert.deepEqual(snapshot(destination), before);
+    assert.equal(readFileSync(path, 'utf8'), contents);
+  });
+}
+
 test('a contender waits while the transaction owner writes its initial marker', async () => {
   const cwd = project();
   const destination = join(cwd, '.claude/skills/inferencex-api');
