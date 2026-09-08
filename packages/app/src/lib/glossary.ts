@@ -61,6 +61,7 @@ const AGENTX_QWEN_B300 = 'qwen3-5-397b-agentx-b300-fp4-vs-h100';
 const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
+const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
 
 const entries = [
   {
@@ -464,7 +465,14 @@ const entries = [
       'iso-interactivity',
       'throughput',
     ],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, MI355X_GLM5, AGENTX_DSV4_MI355X_B200],
+    articleSlugs: [
+      B200_GLM5,
+      B200_MINIMAX,
+      B200_KIMI,
+      MI355X_GLM5,
+      AGENTX_DSV4_MI355X_B200,
+      TPU_IRONWOOD,
+    ],
   },
   {
     slug: 'total-cost-of-ownership',
