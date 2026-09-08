@@ -123,7 +123,7 @@ const REQUIRED_INTEGER_FIELDS = [
   'num_decode_gpu',
   'conc',
 ];
-const AGGREGATE_GROUPS = ['isl', 'osl', 'kvCacheUtil', 'prefixCacheHitRate'];
+export const AGGREGATE_GROUPS = Object.freeze(['isl', 'osl', 'kvCacheUtil', 'prefixCacheHitRate']);
 const PERCENTILE_FIELDS = ['mean', 'p50', 'p75', 'p90', 'p95', 'p99'];
 const FILTERS = [
   ['raw_model', 'model'],

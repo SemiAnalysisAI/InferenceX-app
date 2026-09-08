@@ -144,11 +144,14 @@ The new `--output-dir` is the evidence bundle. It contains every decoded respons
 the result, and a manifest linking their hashes and request attempts.
 
 JSON retains every selected benchmark object separately from its `agentx`
-enrichment. CSV repeats package, request, and filter context on every row. Its
-`metrics.*` columns are the sorted union of scalar metric keys in the selected
-rows; arrays and objects are not embedded in cells. Missing and null cells stay
-blank, while real zero and `false` values remain explicit. JSON metadata and each
-populated CSV row record request, filter, and retrieval context; `manifest.json`
+enrichment. CSV uses fixed columns and repeats package, request, and filter context
+on every row. The `metrics_json` cell contains the JSON-encoded `metrics` object,
+including any nested arrays or objects. Parse the CSV with a CSV parser first,
+then use `JSON.parse(row.metrics_json)` to read its metrics. Ordinary CSV cells are
+blank for missing or null values; within `metrics_json`, explicit `null` values
+and absent keys remain distinct. Real zero and `false` values remain explicit in
+both. JSON metadata and each populated CSV row record request, filter, and
+retrieval context; `manifest.json`
 always records normalized arguments, the request ledger, result hash, coverage,
 and policy, including for a header-only CSV. In JSON, `no_agentx_rows` means the
 complete benchmark response contained no AgentX observations;

@@ -9,7 +9,19 @@ import { AGENTX_CSV_COLUMNS } from '../skills/inferencex-api/scripts/export-cont
 import { AGENTX_BUNDLE_VARIANTS, agentxAggregate } from './agentx-bundle-fixtures.mjs';
 import { bundleSuite } from './bundle-harness.mjs';
 
-const bundles = bundleSuite({ agentx: AGENTX_BUNDLE_VARIANTS });
+const coverageAggregates = {
+  'null-groups': { id: 1, isl: null, osl: null, kvCacheUtil: null, prefixCacheHitRate: null },
+  'zero-samples': agentxAggregate(1, 0),
+  'known-samples': { ...agentxAggregate(1, 0), osl: agentxAggregate(1).osl },
+};
+const coverageFixtures = Object.fromEntries(
+  Object.entries(coverageAggregates).map(([name, aggregate]) => {
+    const fixture = structuredClone(AGENTX_BUNDLE_VARIANTS.positive);
+    fixture.responses[1].body = { 1: { ...aggregate, extra: { n: 1 } } };
+    return [name, fixture];
+  }),
+);
+const bundles = bundleSuite({ agentx: { ...AGENTX_BUNDLE_VARIANTS, ...coverageFixtures } });
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 function manifest(directory) {
@@ -95,6 +107,33 @@ test('captured no-trace evidence verifies offline without requesting trace detai
     false,
   );
 });
+
+for (const variant of Object.keys(coverageAggregates)) {
+  test(`AgentX coverage counts only recognized aggregate samples: ${variant}`, () => {
+    const usable = variant === 'known-samples';
+    for (const format of ['json', 'csv']) {
+      const saved = bundles.create('agentx', variant, {
+        format,
+        policy: ['--require-hardware', 'b300'],
+      });
+      assert.equal(saved.result.status, usable ? 0 : 3, saved.result.stdout);
+      const value = manifest(saved.directory);
+      assert.equal(value.coverage.status, usable ? 'complete' : 'partial');
+      assert.deepEqual(value.coverage.hardware, [
+        { hardware: 'b300', valid_records: usable ? 1 : 0 },
+      ]);
+      assert.equal(JSON.parse(saved.result.stdout).policy.status, usable ? 'passed' : 'failed');
+      if (format === 'json') {
+        const row = bundles.readResult(saved.directory).rows[0];
+        assert.deepEqual(row.agentx.aggregates.value.extra, { n: 1 });
+      }
+      const verified = bundles.verify(saved.directory, ['--require-hardware', 'b300']);
+      assert.equal(verified.status, usable ? 0 : 3, verified.stderr);
+      assert.equal(JSON.parse(verified.stdout).validity, 'valid');
+      assert.equal(JSON.parse(verified.stdout).policy.status, usable ? 'passed' : 'failed');
+    }
+  });
+}
 
 test('AgentX replay rejects missing chunks, response substitution, changed scope and rebuilt output', () => {
   {

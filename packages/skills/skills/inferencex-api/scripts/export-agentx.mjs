@@ -2,7 +2,12 @@ import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 import { argumentError, isMain } from './cli-contract.mjs';
-import { buildAgentxExport, selectAgentxRows, validateAgentxChunk } from './export-contract.mjs';
+import {
+  AGGREGATE_GROUPS,
+  buildAgentxExport,
+  selectAgentxRows,
+  validateAgentxChunk,
+} from './export-contract.mjs';
 
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 
@@ -200,7 +205,7 @@ export async function collect(options, context) {
   for (const row of built.rows) {
     const usable =
       row.agentx.aggregates.status === 'available' &&
-      Object.values(row.agentx.aggregates.value).some((group) => group !== null && group.n > 0);
+      AGGREGATE_GROUPS.some((group) => row.agentx.aggregates.value[group]?.n > 0);
     hardware.set(
       row.benchmark.hardware,
       (hardware.get(row.benchmark.hardware) ?? 0) + Number(usable),
