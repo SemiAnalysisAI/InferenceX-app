@@ -23,6 +23,7 @@ import {
   parseNum,
   parseInt2,
 } from './normalizers';
+import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -61,6 +62,7 @@ const NON_METRIC_KEYS = new Set([
   'decode_ep',
   'decode_dp_attention',
   'decode_num_workers',
+  'num_gpus',
   'num_prefill_gpu',
   'num_decode_gpu',
   // agentic scenario
@@ -172,11 +174,12 @@ export function mapBenchmarkRow(
   row: Record<string, any>,
   tracker: SkipTracker,
   islOslFallback?: { isl: number; osl: number } | null,
+  runId?: string | number | null,
 ): BenchmarkParams | null {
   // v3 agentic rows nest their metrics; flatten to the canonical flat schema
   // first so the rest of the mapper (auto-capture, intvty invariant, guards)
   // is version-agnostic. No-op for v1/v2 rows.
-  row = flattenAgenticAggRow(row);
+  row = normalizeLegacyTpuRow(flattenAgenticAggRow(row), runId);
 
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
@@ -244,7 +247,7 @@ export function mapBenchmarkRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  let parallelism = resolveParallelism(row);
+  let parallelism = resolveParallelism(row, frameworkDisagg);
   // An explicit non-disagg Dynamo artifact is authoritative for direct
   // deployments such as one distributed vLLM server. A non-zero decode worker
   // pool, however, is structural proof of disaggregation and preserves older
@@ -401,7 +404,7 @@ type ParallelismParams = Pick<
  * carry full disagg fields keyed by the presence of `prefill_tp`; v1 rows have
  * a single `tp`/`ep` that applies to both phases.
  */
-function resolveParallelism(row: Record<string, any>): ParallelismParams {
+function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean): ParallelismParams {
   if ('prefill_tp' in row) {
     // v2 schema: full disagg parallelism fields
     const prefillTp = parseInt2(row.prefill_tp) ?? 1;
@@ -417,8 +420,18 @@ function resolveParallelism(row: Record<string, any>): ParallelismParams {
       decodeEp,
       decodeDpAttn: parseBool(row.decode_dp_attention),
       decodeNumWorkers: parseInt2(row.decode_num_workers) ?? 0,
-      numPrefillGpu: parseInt2(row.num_prefill_gpu) ?? prefillTp * prefillEp,
-      numDecodeGpu: parseInt2(row.num_decode_gpu) ?? decodeTp * decodeEp,
+      numPrefillGpu:
+        roleChipCount(row.num_prefill_gpu) ??
+        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
+          ? undefined
+          : physicalChipCount(row.num_gpus)) ??
+        prefillTp * prefillEp,
+      numDecodeGpu:
+        roleChipCount(row.num_decode_gpu) ??
+        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
+          ? undefined
+          : physicalChipCount(row.num_gpus)) ??
+        decodeTp * decodeEp,
     };
   }
   // v1 schema: single tp/ep, prefill = decode
@@ -434,8 +447,8 @@ function resolveParallelism(row: Record<string, any>): ParallelismParams {
     decodeEp: ep,
     decodeDpAttn: dpAttn,
     decodeNumWorkers: 0,
-    numPrefillGpu: tp * ep,
-    numDecodeGpu: tp * ep,
+    numPrefillGpu: physicalChipCount(row.num_gpus) ?? tp * ep,
+    numDecodeGpu: physicalChipCount(row.num_gpus) ?? tp * ep,
   };
 }
 

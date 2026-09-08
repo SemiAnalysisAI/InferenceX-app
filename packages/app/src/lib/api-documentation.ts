@@ -283,8 +283,16 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     decode_ep: integerSchema,
     decode_dp_attention: booleanSchema,
     decode_num_workers: integerSchema,
-    num_prefill_gpu: integerSchema,
-    num_decode_gpu: integerSchema,
+    num_prefill_gpu: {
+      ...integerSchema,
+      description:
+        'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+    },
+    num_decode_gpu: {
+      ...integerSchema,
+      description:
+        'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+    },
     benchmark_type: stringSchema,
     isl: nullableNumberSchema,
     osl: nullableNumberSchema,
@@ -384,8 +392,16 @@ const evaluationsSchema = arraySchema(
     decode_ep: integerSchema,
     decode_dp_attention: booleanSchema,
     decode_num_workers: integerSchema,
-    num_prefill_gpu: integerSchema,
-    num_decode_gpu: integerSchema,
+    num_prefill_gpu: {
+      ...integerSchema,
+      description:
+        'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+    },
+    num_decode_gpu: {
+      ...integerSchema,
+      description:
+        'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+    },
     task: stringSchema,
     date: { type: 'string', format: 'date' },
     conc: nullableNumberSchema,
@@ -451,8 +467,16 @@ const submissionsSchema = objectSchema({
       spec_method: stringSchema,
       disagg: booleanSchema,
       is_multinode: booleanSchema,
-      num_prefill_gpu: integerSchema,
-      num_decode_gpu: integerSchema,
+      num_prefill_gpu: {
+        ...integerSchema,
+        description:
+          'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+      },
+      num_decode_gpu: {
+        ...integerSchema,
+        description:
+          'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+      },
       prefill_tp: integerSchema,
       prefill_ep: integerSchema,
       decode_tp: integerSchema,
@@ -2676,8 +2700,8 @@ const overview = {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),
       description: text(
-        'Configuration fields sit beside a metrics map. Metric keys evolve independently; values are numbers, time metrics are seconds, and throughput metrics use tokens per second per GPU unless their name states otherwise. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
-        '配置字段与 metrics 映射位于同一层级。metrics 的键可独立扩展，各项指标值均为数字；时间指标以秒为单位。除非指标名另有说明，吞吐量指标均以 token/s/GPU 为单位。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
+        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so only disaggregated counts should be summed. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
+        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数，只有分离式部署才应将两列相加。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],

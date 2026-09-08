@@ -75,6 +75,7 @@ export const getPointLabel = (d: InferenceData): string => {
     // into it for aggregated rows) — the label wants the actual TP width, so
     // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
     tp: d.decode_tp ?? d.tp,
+    dp: d.dp,
     ep: d.ep,
     pp: d.pp,
     dcp: d.disagg ? (d.decode_dcp_size ?? d.prefill_dcp_size) : aggregateDcp,
@@ -97,7 +98,7 @@ export const getPointLabel = (d: InferenceData): string => {
     decodeDpAttention: asBool(d.decode_dp_attention),
     decodeNumWorkers: d.decode_num_workers,
   });
-  return d.dp && d.dp > 1 ? `${label}DP${d.dp}` : label;
+  return label;
 };
 
 const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
@@ -483,7 +484,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   ) {
     return (
       tooltipLine(t.deployment, deployment) +
-      tooltipLine(t.strategy, t.gpuCount(d.tp)) +
+      tooltipLine(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)) +
       (aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : '') +
       (aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : '')
     );
@@ -571,7 +572,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.tp)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -613,7 +614,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.tp)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -672,7 +673,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.tp)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}

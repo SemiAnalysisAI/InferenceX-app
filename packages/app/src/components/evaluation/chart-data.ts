@@ -10,6 +10,7 @@ import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getFrameworkLabel } from '@/lib/utils';
 
 interface EvalLabelParams {
+  dp?: number;
   disagg?: boolean;
   /** Decode-side (or single-node) TP. Not shown when undefined. */
   decodeTp?: number;
@@ -69,6 +70,7 @@ function buildConfigLabel(
   if (precision && showPrecision) detailSuffixes.push(precision.toUpperCase());
   if (conc) detailSuffixes.push(`C${conc}`);
 
+  if (params.dp && params.dp > 1) detailSuffixes.push(`DP${params.dp}`);
   if (params.disagg) {
     if (params.prefillTp !== undefined && params.prefillEp !== undefined) {
       detailSuffixes.push(
@@ -150,6 +152,7 @@ export function buildEvaluationChartRows(
           item.conc,
           {
             disagg: item.disagg,
+            dp: item.metrics.dp,
             decodeTp: item.decode_tp,
             decodeEp: item.decode_ep,
             decodeDpa: item.decode_dp_attention,
@@ -172,6 +175,10 @@ export function buildEvaluationChartRows(
         precision: item.precision,
         framework: item.framework,
         tp: item.decode_tp,
+        dp: item.metrics.dp,
+        physicalChips: item.disagg
+          ? item.num_prefill_gpu + item.num_decode_gpu
+          : item.num_decode_gpu,
         ep: item.decode_ep,
         dp_attention: item.decode_dp_attention,
         conc: item.conc ?? 0,
@@ -311,6 +318,7 @@ export function buildEvalChangelogEntries(
           item.conc,
           {
             disagg: item.disagg,
+            dp: item.metrics.dp,
             prefillDpa: item.prefill_dp_attention,
             decodeDpa: item.decode_dp_attention,
           },

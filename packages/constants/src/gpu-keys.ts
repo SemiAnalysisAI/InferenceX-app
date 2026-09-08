@@ -9,7 +9,7 @@ export interface HwEntry {
   badgeLabel?: string;
   /** Chart sort order (lower = first) */
   sort: number;
-  /** Thermal design power in watts */
+  /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
   /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
    * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
@@ -188,11 +188,11 @@ export const GOOGLE_YELLOW = '#F4B400';
  *   80-105  Google golds
  *   105-120 (gap)
  *   120-170 NVIDIA greens
- *   170-235 (gap)
- *   235-270 Teacup blues
- *   270-275 (gap)
- *   275-330 unknown / fallback (purples)
- *   330-360 (gap)
+ *   170-275 (gap)
+ *   275-290 unknown / fallback (violets)
+ *   290-295 (gap)
+ *   295-325 Teacup purples
+ *   325-360 (gap)
  */
 export const VENDOR_OKLCH_ZONES: Record<
   string,
@@ -200,9 +200,9 @@ export const VENDOR_OKLCH_ZONES: Record<
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
-  teacup: { start: 235, end: 270, chroma: { light: 0.14, dark: 0.16 } },
   google: { start: 80, end: 105, chroma: { light: 0.14, dark: 0.16 } },
-  unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
+  teacup: { start: 295, end: 325, chroma: { light: 0.14, dark: 0.16 } },
+  unknown: { start: 275, end: 290, chroma: { light: 0.14, dark: 0.16 } },
 };
 
 /**
@@ -217,19 +217,19 @@ export const VENDOR_OKLCH_ZONES: Record<
  *   Google:  40–60 (20°) — golds
  *   NVIDIA:  60–195  (135°) — greens through cyans
  *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
- *   Teacup:  195–240 (45°) — cyan/blues
- *   unknown: 240–300 (60°) — blues/purples
+ *   unknown: 240–260 (20°) — blues/violets
+ *   Teacup:  260–300 (40°) — purples
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
   nvidia: [{ start: 60, span: 135 }],
-  teacup: [{ start: 195, span: 45 }],
+  google: [{ start: 40, span: 20 }],
+  teacup: [{ start: 260, span: 40 }],
   amd: [
     { start: 300, span: 60 },
     { start: 0, span: 40 },
   ],
-  google: [{ start: 40, span: 20 }],
-  unknown: [{ start: 240, span: 60 }],
+  unknown: [{ start: 240, span: 20 }],
 };

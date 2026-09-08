@@ -557,8 +557,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   ]);
 
   const barResults = useMemo(
-    () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
-    [results, overlayResults],
+    () =>
+      [...results, ...overlayResults].filter(
+        (result) => barMetric !== 'power' || getGpuSpecs(result.hwKey).power > 0,
+      ),
+    [results, overlayResults, barMetric],
   );
   const showsJalapenoPreview = useMemo(
     () => includesJalapenoResult(results.map((result) => result.hwKey)),
@@ -1047,10 +1050,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     />
                   </div>
                 </div>
-                <div className="flex min-w-0 flex-col space-y-1.5">
-                  <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source="calculator" className="h-9" />
-                </div>
               </ControlPanel>
 
               <MobileControlSection
@@ -1216,6 +1215,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           <figure data-testid="calculator-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="calculator-chart"
+              settingsControls={
+                <TcoBasisToggle
+                  visible={barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7')}
+                  source="calculator"
+                />
+              }
               analyticsPrefix="calculator"
               zoomResetEvent="d3chart_zoom_reset_calculator-chart"
               onExportCsv={handleExportCsv}
@@ -1266,11 +1271,15 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               data-testid="calculator-cost-badges"
                             >
                               {t.allInPower}
-                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                                <Badge key={base} variant="outline">
-                                  {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
-                                </Badge>
-                              ))}
+                              {Object.entries(HW_REGISTRY)
+                                .filter(([base]) =>
+                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
+                                )
+                                .map(([base, specs]) => (
+                                  <Badge key={base} variant="outline">
+                                    {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
+                                  </Badge>
+                                ))}
                             </p>
                             <p className="text-muted-foreground">
                               <small>
@@ -1294,13 +1303,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               data-testid="calculator-cost-badges"
                             >
                               {t.tcoPerHr}
-                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                                <Badge key={base} variant="outline">
-                                  {specs.badgeLabel ?? base.toUpperCase()}: $
-                                  {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
-                                  /hr
-                                </Badge>
-                              ))}
+                              {Object.entries(HW_REGISTRY)
+                                .filter(([base]) =>
+                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
+                                )
+                                .map(([base, specs]) => (
+                                  <Badge key={base} variant="outline">
+                                    {specs.badgeLabel ?? base.toUpperCase()}: $
+                                    {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
+                                    /hr
+                                  </Badge>
+                                ))}
                             </p>
                             <p className="text-muted-foreground">
                               <small>

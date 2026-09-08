@@ -17,6 +17,7 @@ import ChartControls from '@/components/inference/ui/ChartControls';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
@@ -397,6 +398,12 @@ export default function HistoricalTrendsDisplay() {
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
+              settingsControls={
+                <TcoBasisToggle
+                  visible={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+                  source="gpu_timeseries"
+                />
+              }
               analyticsPrefix="historical"
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}

@@ -49,12 +49,12 @@
       "duration": 9822
     },
     {
-      "spec": "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
-      "duration": 4000
-    },
-    {
       "spec": "cypress/e2e/certified-power-filter.cy.ts",
       "duration": 1000
+    },
+    {
+      "spec": "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
+      "duration": 4000
     },
     {
       "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
@@ -247,6 +247,10 @@
     {
       "spec": "cypress/e2e/tokens-per-currency.cy.ts",
       "duration": 1000
+    },
+    {
+      "spec": "cypress/e2e/tpu-publication.cy.ts",
+      "duration": 1500
     },
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",

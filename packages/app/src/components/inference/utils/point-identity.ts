@@ -16,6 +16,8 @@ export function scatterPointConfigId(point: InferenceData): string {
   if (point.disagg) {
     key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
   }
+  if (point.physicalChips !== undefined) key += `|chips-${point.physicalChips}`;
+  if (point.dp !== undefined) key += `|dp-${point.dp}`;
   if (point.offload_mode) key += `|offload-${point.offload_mode}`;
   if (point.recipe_fingerprint) key += `|recipe-${point.recipe_fingerprint}`;
   // Agentic series omit spec decoding from hwKey so one curve can mix methods.

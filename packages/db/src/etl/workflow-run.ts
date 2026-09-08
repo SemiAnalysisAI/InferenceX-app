@@ -42,7 +42,11 @@ export interface GithubRunInfo {
  *   When omitted, `fetchGithubRun` always returns `null`.
  * @returns An object with `fetchGithubRun` and `getOrCreateWorkflowRun`.
  */
-export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
+export function createWorkflowRunServices(
+  sql: Sql,
+  githubToken?: string,
+  repos: readonly string[] = GITHUB_REPOS,
+) {
   const workflowRunCache = new Map<string, number>();
   const githubRunCache = new Map<number, GithubRunInfo | null>();
 
@@ -64,7 +68,7 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
 
     try {
       let resp: Response | null = null;
-      for (const repo of GITHUB_REPOS) {
+      for (const repo of repos) {
         resp = await fetch(`${GITHUB_API_BASE}/repos/${repo}/actions/runs/${runId}`, {
           headers: {
             Authorization: `Bearer ${githubToken}`,

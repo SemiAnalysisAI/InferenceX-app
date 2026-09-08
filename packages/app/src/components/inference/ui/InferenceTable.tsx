@@ -38,6 +38,7 @@ export function inferenceTableHeaderLabels(
     chip: locale === 'zh' ? '芯片' : 'Chip',
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
+    physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
@@ -82,9 +83,23 @@ export default function InferenceTable({
       {
         header: headers.tensorParallelism,
         align: 'right',
-        cell: (row) => row.tp,
-        sortValue: (row) => row.tp,
+        cell: (row) => row.decode_tp ?? row.tp,
+        sortValue: (row) => row.decode_tp ?? row.tp,
         className: 'tabular-nums',
+        importance: 'secondary',
+      },
+      {
+        header: headers.physicalChips,
+        align: 'right',
+        cell: (row) => row.physicalChips ?? row.tp,
+        sortValue: (row) => row.physicalChips ?? row.tp,
+        importance: 'secondary',
+      },
+      {
+        header: 'DP',
+        align: 'right',
+        cell: (row) => row.dp ?? '—',
+        sortValue: (row) => row.dp ?? 0,
         importance: 'secondary',
       },
       {

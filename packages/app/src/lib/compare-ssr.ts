@@ -390,7 +390,7 @@ export function jsonLdEntryFor(key: string, summary: PairSummary, position: numb
     props.push(
       { name: 'Vendor', value: meta.vendor },
       { name: 'Architecture', value: meta.arch },
-      { name: 'TDP (W)', value: meta.tdp },
+      ...(meta.tdp > 0 ? [{ name: 'TDP (W)', value: meta.tdp }] : []),
     );
   }
   if (summary.bestThroughputPerGpu !== null) {

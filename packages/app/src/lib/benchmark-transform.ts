@@ -14,6 +14,7 @@ import type {
 import {
   buildDerivedChartFields,
   createChartDataPoint,
+  deploymentChipCount,
   getHardwareKey,
   type DerivedChartFields,
 } from '@/lib/chart-utils';
@@ -249,6 +250,16 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.
     workers: measuredPowerValid && Array.isArray(row.workers) ? row.workers : undefined,
+    physicalChips: deploymentChipCount(
+      {
+        disagg: row.disagg,
+        num_prefill_gpu: row.num_prefill_gpu,
+        num_decode_gpu: row.num_decode_gpu,
+        tp: aggregateTp,
+        pp: aggregatePp,
+      },
+      row.hardware,
+    ),
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
@@ -346,6 +357,9 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.osl,
     r.offload_mode ?? 'off',
     r.recipe_fingerprint ?? null,
+    r.num_prefill_gpu,
+    r.num_decode_gpu,
+    r.metrics.dp ?? null,
   ]);
 
 /**

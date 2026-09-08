@@ -1,7 +1,5 @@
 'use client';
 
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
-
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -25,7 +23,6 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -170,7 +167,6 @@ interface ChartControlsProps {
 
 export default function ChartControls({
   hideGpuComparison = false,
-  tcoSource = 'inference',
   showXAxisMode = false,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -448,12 +444,6 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && isCostMetric(selectedYAxisMetric) && (
-                <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
-                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source={tcoSource} className="h-9" />
-                </div>
-              )}
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">
                   <LabelWithTooltip

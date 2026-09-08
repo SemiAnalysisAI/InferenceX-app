@@ -34,11 +34,12 @@ export const configSegmentLabel = (
   pp?: number,
   dcp?: number,
   pcp?: number,
+  dp?: number,
 ): string => {
   const ppSuffix = pp !== null && pp !== undefined && pp > 1 ? `PP${pp}` : '';
   const dcpSuffix = dcp !== null && dcp !== undefined && dcp > 1 ? `/DCP${dcp}` : '';
   const pcpSuffix = pcp !== null && pcp !== undefined && pcp > 1 ? `/PCP${pcp}` : '';
-  const suffix = `${ppSuffix}${dcpSuffix}${pcpSuffix}`;
+  const suffix = `${ppSuffix}${dcpSuffix}${pcpSuffix}${dp && dp > 1 ? `/DP${dp}` : ''}`;
   if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     return `${dpAttention ? 'DEP' : 'TEP'}${tp}${suffix}`;
   }
@@ -50,6 +51,7 @@ export const configSegmentLabel = (
 /** Parallelism params for one benchmark config, framework-agnostic. */
 export interface ParallelismFields {
   tp: number;
+  dp?: number;
   ep?: number;
   /** Pipeline parallelism. Only rendered when > 1. */
   pp?: number;
@@ -91,7 +93,7 @@ export const parallelismLabel = (f: ParallelismFields): string => {
     (f.ep === null || f.ep === undefined) &&
     (f.prefillEp === null || f.prefillEp === undefined)
   ) {
-    return String(f.tp);
+    return f.dp && f.dp > 1 ? `TP${f.tp}/DP${f.dp}` : String(f.tp);
   }
 
   if (f.isMultinode && f.disagg) {
@@ -120,5 +122,5 @@ export const parallelismLabel = (f: ParallelismFields): string => {
     return `${pw}x${prefillLabel}+${dw}x${decodeLabel}`;
   }
 
-  return configSegmentLabel(f.tp, f.ep, f.dpAttention, f.pp, f.dcp, f.pcp);
+  return configSegmentLabel(f.tp, f.ep, f.dpAttention, f.pp, f.dcp, f.pcp, f.dp);
 };

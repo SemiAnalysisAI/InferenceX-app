@@ -312,7 +312,7 @@ async function mapWorkflowDir(
         local.skips.badZip++;
         continue;
       }
-      const mapped = mapBenchmarkRow(row, local, islOslFallback);
+      const mapped = mapBenchmarkRow(row, local, islOslFallback, githubRunId);
       if (mapped) rows.push(mapped);
     }
     const d = local.diff(snap);
@@ -391,7 +391,7 @@ async function mapWorkflowDir(
       continue;
     }
     const snap = local.snapshot();
-    const mapped = mapEvalRow(meta, results, local);
+    const mapped = mapEvalRow(meta, results, local, githubRunId);
     if (mapped.length === 0) {
       const d = local.diff(snap);
       const parts: string[] = [];
@@ -436,7 +436,7 @@ async function mapWorkflowDir(
     for (const row of agg) {
       if (typeof row !== 'object' || row === null) continue;
       const snap = local.snapshot();
-      const mapped = mapAggEvalRow(row as Record<string, any>, local);
+      const mapped = mapAggEvalRow(row as Record<string, any>, local, githubRunId);
       if (!mapped) {
         const d = local.diff(snap);
         const parts: string[] = [];

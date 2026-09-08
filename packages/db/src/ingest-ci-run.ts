@@ -133,7 +133,10 @@ if (isDownloadMode) {
   }
 
   runIdStr = parsedId;
-  REPO = args[1] ?? DEFAULT_REPO;
+  REPO =
+    args[1] ??
+    input.match(/^https:\/\/github\.com\/(?<repo>[^/]+\/[^/]+)\/actions\/runs\/\d+/u)?.[1] ??
+    DEFAULT_REPO;
 
   // Download artifacts
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ingest-'));
@@ -269,7 +272,9 @@ async function main(): Promise<void> {
   const tracker = createSkipTracker();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
-  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN);
+  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN, [
+    REPO,
+  ]);
 
   const runId = parseInt(runIdStr, 10);
   const ghInfo = await fetchGithubRun(runId);
@@ -503,7 +508,7 @@ async function main(): Promise<void> {
 
       const rows = rawRows
         .filter((r) => typeof r === 'object' && r !== null)
-        .map((r) => mapBenchmarkRow(r, tracker))
+        .map((r) => mapBenchmarkRow(r, tracker, undefined, runIdStr))
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -815,7 +820,7 @@ async function main(): Promise<void> {
 
     for (const row of data) {
       if (typeof row !== 'object' || row === null) continue;
-      const mapped = mapAggEvalRow(row as Record<string, any>, tracker);
+      const mapped = mapAggEvalRow(row as Record<string, any>, tracker, runIdStr);
       if (!mapped) continue;
 
       try {
@@ -860,7 +865,7 @@ async function main(): Promise<void> {
     const results = readJson(path.join(dir, resultsName)) as Record<string, any> | null;
     if (!meta || !results) continue;
 
-    const evalParamsList = mapEvalRow(meta, results, tracker);
+    const evalParamsList = mapEvalRow(meta, results, tracker, runIdStr);
     if (evalParamsList.length === 0) continue;
 
     // Map each task name → samples jsonl text. lm-eval names them

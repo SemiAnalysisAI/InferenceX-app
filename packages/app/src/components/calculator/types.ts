@@ -46,6 +46,8 @@ export interface GPUDataPoint {
    */
   inputTokenShare?: number;
   concurrency: number;
+  physicalChips?: number;
+  dp?: number;
   tp: number;
   precision: string;
   ep?: number;

@@ -29,6 +29,8 @@ export interface EvaluationChartData {
   datetime: string;
   precision: string;
   framework: string; // vllm, trt, etc.
+  physicalChips?: number;
+  dp?: number;
   tp: number; // tensor parallelism (decode-side for disagg)
   ep: number; // expert parallelism (decode-side for disagg)
   dp_attention: boolean; // data parallel attention (decode-side for disagg)

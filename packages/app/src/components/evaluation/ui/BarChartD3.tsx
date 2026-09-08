@@ -124,6 +124,8 @@ const parallelismHTML = (data: EvaluationChartData, locale: Locale): string => {
   if (!data.disagg) {
     return (
       row(t.tensorParallelism, String(data.tp)) +
+      row(t.chips, String(data.physicalChips ?? data.numDecodeGpu)) +
+      (data.dp ? row('DP', String(data.dp)) : '') +
       row(t.expertParallelism, String(data.ep)) +
       row(t.dataParallelAttention, data.dp_attention ? t.yes : t.no)
     );

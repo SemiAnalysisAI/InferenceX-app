@@ -73,10 +73,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
-      zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable.',
+      zh: '仅供界面叠加非官方工作流产物。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。',
     },
-    sourceSha256: '4a3f3da8399c741c26f0f502d44b1870a8ccdc05775edfd6ea3dee4e020df25c',
+    sourceSha256: '3f6d0c4dbb1decb2c109ea8a572c1bb1b7db2b84652a4a2717ccb35b41995b5b',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',

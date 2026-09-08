@@ -68,6 +68,7 @@ describe('explicit deployment chip counts', () => {
       },
     ]);
     expect(chartData[0][0].tp).toBe(expected);
+    expect(chartData[0][0].physicalChips).toBe(expected);
   });
 
   it.each([
@@ -91,6 +92,7 @@ describe('explicit deployment chip counts', () => {
     ]);
     for (const series of chartData) {
       expect(series[0].tp).toBe(expected);
+      expect(series[0].physicalChips).toBe(expected);
       expect(series[0].decode_tp).toBe(4);
       expect(series[0].pp).toBe(2);
       expect(series[0].tpPerGpu.y).toBe(source.metrics.tput_per_gpu);
