@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
@@ -54,12 +55,43 @@ export function packedSkillSuite() {
       { cwd },
     );
   }
+  function query(args, cwd, packageArchive = archive) {
+    return command(
+      'npm',
+      ['exec', '--yes', '--offline', '--package', packageArchive, '--', 'inferencex', ...args],
+      { cwd },
+    );
+  }
   function install(target, cwd = project()) {
     succeeded(run(['install', '--target', target], cwd));
     return join(cwd, target === 'codex' ? '.agents' : '.claude', 'skills/inferencex-api');
   }
-  const suite = { temporaryRoot, environment, project, node, run, install };
+  const suite = { temporaryRoot, environment, project, node, run, query, install };
   before(() => {
+    const suppliedArchive = process.env.INFERENCEX_SKILLS_ARCHIVE;
+    const suppliedHash = process.env.INFERENCEX_SKILLS_ARCHIVE_SHA256;
+    assert.equal(
+      suppliedArchive === undefined,
+      suppliedHash === undefined,
+      'Supply both INFERENCEX_SKILLS_ARCHIVE and INFERENCEX_SKILLS_ARCHIVE_SHA256',
+    );
+    if (suppliedArchive !== undefined) {
+      assert.match(suppliedHash, /^[a-f\d]{64}$/u, 'Supplied archive SHA-256 is invalid');
+      archive = realpathSync(suppliedArchive);
+      assert.equal(
+        createHash('sha256').update(readFileSync(archive)).digest('hex'),
+        suppliedHash,
+        'Supplied archive SHA-256 differs',
+      );
+      const listing = succeeded(command('tar', ['-tzf', archive])).stdout;
+      suite.archive = archive;
+      suite.packedFiles = listing
+        .trim()
+        .split('\n')
+        .filter((path) => path.startsWith('package/') && !path.endsWith('/'))
+        .map((path) => path.slice('package/'.length));
+      return;
+    }
     const result = succeeded(
       command('npm', ['pack', '--json', '--pack-destination', temporaryRoot], { cwd: packageRoot }),
     );

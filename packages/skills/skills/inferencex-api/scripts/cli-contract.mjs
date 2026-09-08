@@ -1,6 +1,8 @@
+import { realpathSync } from 'node:fs';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
-const PACKAGE_VERSION = '0.11.0';
+const PACKAGE_VERSION = '0.12.0';
 export { PACKAGE_VERSION };
 export const PACKAGE_NAME = '@semianalysisai/inferencex-skills';
 
@@ -10,23 +12,36 @@ const CODES = new Set([
   'NETWORK_ERROR',
   'TIMEOUT',
   'INVALID_RESPONSE',
+  'INVALID_EVIDENCE',
+  'UNSUPPORTED_CONTRACT',
+  'INSTALLATION_UNHEALTHY',
   'OUTPUT_ERROR',
   'CANCELLED',
   'INTERNAL_ERROR',
 ]);
 
 export class CliError extends Error {
-  constructor(code, message, { cause, httpStatus } = {}) {
+  constructor(code, message, { cause, httpStatus, details } = {}) {
     super(message, { cause });
     if (!CODES.has(code)) throw new TypeError(`Unknown CLI error code: ${code}`);
     this.name = 'CliError';
     this.code = code;
     if (httpStatus !== undefined) this.httpStatus = httpStatus;
+    if (details !== undefined) this.details = details;
   }
 }
 
 export function argumentError(message, cause) {
   return new CliError('INVALID_ARGUMENT', message, { cause });
+}
+
+export function isMain(moduleUrl) {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return pathToFileURL(realpathSync(process.argv[1])).href === moduleUrl;
+  } catch {
+    return false;
+  }
 }
 
 export function httpError(status, message = `HTTP ${status}`) {
@@ -67,7 +82,6 @@ export async function responseBoundary(action, signal) {
   } catch (error) {
     const cancelled = cancellation(error, signal);
     if (cancelled) throw cancelled;
-    if (error instanceof CliError) throw error;
     throw new CliError(
       error?.name === 'TimeoutError' ? 'TIMEOUT' : 'INVALID_RESPONSE',
       error instanceof Error ? error.message : String(error),
@@ -83,7 +97,6 @@ export async function outputBoundary(action, signal) {
   } catch (error) {
     const cancelled = cancellation(error, signal);
     if (cancelled) throw cancelled;
-    if (error instanceof CliError) throw error;
     throw new CliError('OUTPUT_ERROR', error instanceof Error ? error.message : String(error), {
       cause: error,
     });
@@ -140,6 +153,7 @@ export function diagnostic(error, command, packageVersion = PACKAGE_VERSION) {
       code: error.code,
       message: error.message,
       ...(error.httpStatus === undefined ? {} : { http_status: error.httpStatus }),
+      ...(error.details === undefined ? {} : { details: error.details }),
     },
   };
 }
@@ -161,8 +175,9 @@ export async function runCli({
   run,
   textError = (error) => `${command}: ${error.message}`,
   textUsageExitCode = 1,
+  defaultErrorFormat = 'text',
 }) {
-  let format = 'text';
+  let format = defaultErrorFormat;
   const controller = new AbortController();
   const cancel = (signal) => {
     if (!controller.signal.aborted) {
@@ -187,9 +202,10 @@ export async function runCli({
     if (formats.length > 1) {
       throw argumentError('Specify --error-format only once; choose json or text.');
     }
-    if (formats.length === 1 && !['json', 'text'].includes(formats[0] ?? 'text')) {
+    if (formats.length === 1 && !['json', 'text'].includes(formats[0])) {
       throw argumentError('--error-format must be json or text.');
     }
+    if (formats.length === 1) format = formats[0];
     await run({ args, signal: controller.signal, errorFormat: format });
   } catch (error) {
     const normalized = normalize(error);

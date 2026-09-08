@@ -11,6 +11,10 @@ on:
         description: 'Archive SHA-256 after clean installed-agent acceptance'
         required: true
         type: string
+      qualification_json:
+        description: 'Reviewed evidence declaration: exact archive, Actions job metadata, all maintained cases per runtime, allowed limitation codes'
+        required: true
+        type: string
 
 permissions: {}
 
@@ -25,11 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: read
+      contents: write # Create the immutable package-specific GitHub release after public verification.
       id-token: write # npm trusted publishing; no long-lived publishing token
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       REVIEWED_SHA256: ${{ inputs.reviewed_sha256 }}
+      QUALIFICATION_JSON: ${{ inputs.qualification_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,14 +53,50 @@ jobs:
         run: node --test packages/skills/test/*.test.mjs
       - name: Prepare the exact accepted archive
         run: node packages/skills/scripts/release.mjs prepare "$RELEASE_VERSION" "$RUNNER_TEMP/skills-release" "$REVIEWED_SHA256"
+      - name: Validate reviewed platform and native evidence declarations before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module -e 'import {writeFileSync} from "node:fs"; const input=process.env.QUALIFICATION_JSON; if (!input || Buffer.byteLength(input)>1048576) throw Error("Qualification JSON is missing or too large"); const record=JSON.parse(input); writeFileSync(`${process.env.RUNNER_TEMP}/skills-release/qualification.json`, JSON.stringify(record), {flag:"wx"});'
+          node packages/skills/scripts/release-summary.mjs check-qualification "$RUNNER_TEMP/skills-release/release.json" "$RUNNER_TEMP/skills-release/qualification.json"
+          tag="inferencex-skills-v${RELEASE_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite its assets." >&2
+            exit 1
+          fi
       - name: Verify candidate installation and public API behavior
-        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-candidate-verification"
+        run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-candidate-verification"
       - name: Publish the verified archive with OIDC
         run: |
           node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
           npm publish "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" --access public --ignore-scripts --registry https://registry.npmjs.org
       - name: Verify anonymous pinned public installation and behavior
-        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 --evidence "$RUNNER_TEMP/skills-public-verification"
+        run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-public-verification"
+      - name: Create the sanitized durable release summary
+        run: >-
+          node packages/skills/scripts/release-summary.mjs
+          "$RUNNER_TEMP/skills-release/release.json"
+          "$RUNNER_TEMP/skills-candidate-verification/verification.json"
+          "$RUNNER_TEMP/skills-public-verification/verification.json"
+          "$RUNNER_TEMP/skills-release/qualification.json"
+          "$RUNNER_TEMP/skills-release/release-summary.json"
+      - name: Publish immutable durable release assets
+        # If npm succeeded and a later step fails, use the artifact recovery in docs/inferencex-skills-release.md.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="inferencex-skills-v${RELEASE_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite its assets." >&2
+            exit 1
+          fi
+          gh release create "$tag" \
+            "$RUNNER_TEMP/skills-release/semianalysisai-inferencex-skills-${RELEASE_VERSION}.tgz" \
+            "$RUNNER_TEMP/skills-release/release.json" \
+            "$RUNNER_TEMP/skills-release/release-summary.json" \
+            --target "$GITHUB_SHA" \
+            --title "InferenceX skills ${RELEASE_VERSION}" \
+            --notes "Accepted public package archive, release identity, and sanitized qualification summary."
       - name: Preserve release and verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

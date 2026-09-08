@@ -6,6 +6,19 @@ is run. Public GETs can populate the service's documented lazy cache from existi
 GitHub artifacts. No database credentials, admin operations, or launch tools are
 needed.
 
+For a replayable contract 1 comparison:
+
+```bash
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left 90071992547409930001 --right 90071992547409930002 \
+  --output-dir evidence/collectivex --min-comparable-pairs 1
+```
+
+No comparable rows is valid scoped output without the predicate. With it, the
+bundle is retained and the command exits 3. Keep run attempts, revisions, source
+pointers, and units with the comparison. See the [CLI contract](cli.md).
+
 ## 1. Discover and export
 
 Example request: "Find two recent measured communication runs and compare their
@@ -15,16 +28,20 @@ cases, and explain which observations cannot be compared."
 Run from a project with the npm skill installed for Codex:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/compare-collectivex.mjs --output collectivex-comparison.json
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
 ```
 
 For Claude Code, use the corresponding installed path:
 
 ```bash
-node .claude/skills/inferencex-api/scripts/compare-collectivex.mjs --output collectivex-comparison.json
+mkdir -p evidence
+node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
 ```
 
-Requires Node 24+. The helper checks the current OpenAPI operations, reads the run
+Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
 bounded example selection, not a representative sample. A cancelled or failed
@@ -33,16 +50,20 @@ workflow can still contain measured cases; its conclusion remains in the export.
 For a requested pair, supply both exact string IDs from discovery:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/compare-collectivex.mjs --left <left-run-id> --right <right-run-id> --output collectivex-pair.json
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left <left-run-id> --right <right-run-id> --output-dir evidence/collectivex-pair
 ```
 
-The explicit pair makes three GETs; discovery makes at most four. Each request has
-a 30-second timeout, and all decoded responses share a 32 MiB budget. There are no
-retries or polling. The output is JSON only. `--output` requires an existing parent
-directory and a **new file path**; it refuses to overwrite a file, directory, or
-symlink. It publishes the file only after every read and comparison succeeds.
-Omitting `--output` writes to stdout; shell redirection can truncate a destination
-before the helper runs, so use `--output` when preserving files matters.
+The versioned command saves a formal bundle with a 120-second total deadline and
+a shared 32 MiB response budget. The explicit pair uses three logical reads;
+discovery uses at most four. Retry attempts follow the [CLI contract](cli.md). Finish any
+report in a sibling path, then run `inferencex verify` on that output directory.
+
+### Request boundary
+
+The explicit pair makes three logical reads; discovery makes at most four. The CLI
+applies its shared deadline, decoded-byte budget, retry ledger, and create-new bundle
+rules. It never substitutes a different run after a failed read.
 
 The public operations require `version=1`:
 
@@ -56,7 +77,7 @@ All paths above are under `/api/v1`. Consult the [public API reference](https://
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
 current contract. A missing/unsupported version is HTTP 400. HTTP 404, an upstream
 502/503, malformed data, a redirect, or an interrupted response is a failed read,
-not an empty comparison. The helper exits nonzero and publishes no export on
+not an empty comparison. The command exits nonzero without a completed manifest on
 those failures; it never substitutes a different run.
 
 `discovery_complete=false` means further bounded discovery passes may reveal more
@@ -102,6 +123,12 @@ Read every comparison status:
 - `incomparable`: an identity field or byte count is missing/invalid, an EP
   component is unavailable, or a KV case/verification is not successful.
 
+Determine a group's side from its non-empty `left[]` and `right[]` source-pointer
+arrays, not its status. `incomparable` and `ambiguous` groups can contain pointers
+from either or both sides. For per-run series or topology counts, count that
+selected source dataset's `series[]`; unavailable component groups do not add
+measured series.
+
 `summary` counts comparison groups, including EP operation groups, not runs or
 requested cases. Cases with **no measured rows** have no comparison group. Inspect
 the complete datasets' `coverage` and optional `kv` arrays for their outcome,
@@ -109,6 +136,23 @@ disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
 coverage; absence of the optional `kv` field does not imply a failed KV suite.
+
+For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
+by outcome. Reconcile their combined totals with the run's `requested_cases`,
+`terminal_cases`, `measured_cases`, `unsupported_cases`, and `failed_cases` before
+reporting them. An EP case is terminal only when all its points have a non-pending
+`terminal_status`; a KV case is terminal when its outcome is not `pending`.
+`failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
+These case counters combine EP and KV; `kv_requested_cases` and
+`kv_measured_cases` identify the KV subset, while the run's point counters are
+EP-only. A listed subset of SKUs or reasons is not the total. If the returned
+arrays and counters do not reconcile, report that inconsistency.
+
+For EP point accounting, count `coverage[].points[]` by `terminal_status` with
+code and reconcile the result with the point counters. Compute pending points as
+`requested_points - terminal_points` and terminal-but-unmeasured points as
+`terminal_points - measured_points`. Carry those computed values and labels into
+the report; pending and terminal-but-unmeasured are separate populations.
 
 Matching is deliberately conservative: a changed case ID remains unmatched even
 if visible labels look alike. `comparison_scope.basis=exact_public_identity`
@@ -129,6 +173,11 @@ effect. Equal SHAs also do not establish identical runtime conditions.
 | KV `latency_ms` / `request_ms`                       | Whole-burst latency / per-request completion latency in milliseconds; `n` is sample count. A missing `request_ms` is not whole-burst latency. |
 | KV `prep_ms`, `gbps_p50`, `gbps_p50_incl_prep`       | Preparation time in ms per burst, GB/s excluding preparation, and GB/s including preparation.                                                 |
 
+`roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
+`components`. The latency, activation/payload data rates, and `payload_bytes`
+belong inside each component. Check availability at the field's documented object
+path: absence from a component does not mean a point-level metric is absent.
+
 The spelling `gbps` in field names does not mean gigabits/s. Rate-at-latency-p99 is
 a rate derived at p99 latency, not an independently measured p99 bandwidth.
 Keep EP microseconds and KV milliseconds distinct. The reader can use wire-byte
@@ -145,14 +194,15 @@ returned fields without inventing defaults. The server's shared reader has its
 own compatibility fallbacks, so returned defaults are not independently verified
 artifact provenance.
 
-Save the JSON beside the answer. `responses[]` contains each exact request URL,
-HTTP status, retrieval timestamp, SHA-256 of the decoded response bytes, and
-complete `body_text`, including the OpenAPI response. Parse `body_text` to inspect
-the original dataset; comparison source pointers identify a response index and
-JSON Pointer within that parsed body. Run IDs remain exact strings, and
-`runs[].run` retains the returned attempt, `generated_at`, conclusion, and source
-SHA. Retrieval time and generated time describe different events. Cite URLs and
-timestamps from **this export**, never from another selection or an older example.
+Keep the bundle with the answer. `manifest.json` records each exact request URL,
+HTTP status, retrieval timestamp, response size, SHA-256, and relative
+`responses/*.body` path, including for OpenAPI. Parse those complete decoded body
+files to inspect the original datasets; the result's `sources[]` entries and
+comparison source pointers identify the corresponding response index and JSON
+Pointer. Run IDs remain exact strings, and `runs[].run` retains the returned
+attempt, `generated_at`, conclusion, and source SHA. Retrieval time and generated
+time describe different events. Cite URLs and timestamps from **this bundle**,
+never from another selection or an older example.
 
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and

@@ -11,7 +11,12 @@ import {
   writeStdout,
 } from '../skills/inferencex-api/scripts/cli-contract.mjs';
 
-import { inspectInstallTransaction, runInstallTransaction } from './install-transaction.mjs';
+import {
+  inspectInstallTransaction,
+  runInstallTransaction,
+} from '../skills/inferencex-api/scripts/install-transaction.mjs';
+import { diagnose } from '../skills/inferencex-api/scripts/doctor.mjs';
+import { readBoundedRegular } from '../skills/inferencex-api/scripts/local-files.mjs';
 
 const SKILL_NAME = 'inferencex-api';
 const INSTALL_METADATA = '.inferencex-skills.json';
@@ -43,7 +48,8 @@ Install and status options:
   --error-format <mode> Failure diagnostics: text (default) or json
 
 Existing skills are skipped unless --force is supplied.
-Status reads local installation metadata without changing files or using the network.
+Status identifies older installs from receipts and checks managed file integrity from 0.12.0 onward.
+It never changes files or uses the network.
 Interrupted owned installs recover on the next install; status and dry-run remain read-only.
 Recovery covers process crashes, without an fsync or power-loss durability guarantee.
 --version reports the executing installer, not an installed skill.
@@ -54,7 +60,7 @@ function unknownState(reason) {
   return { installation_state: 'unknown', installed_version: null, reason };
 }
 
-function installedState(destination, packageName) {
+async function installedState(destination, packageName, signal) {
   const directory = lstatSync(destination, { throwIfNoEntry: false });
   if (!directory) {
     return { installation_state: 'not_installed', installed_version: null, reason: null };
@@ -70,7 +76,9 @@ function installedState(destination, packageName) {
     const file = lstatSync(metadataPath, { throwIfNoEntry: false });
     if (!file) return unknownState('no installation metadata; legacy or manually copied skill');
     if (!file.isFile()) return unknownState('installation metadata is not a regular file');
-    metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    metadata = JSON.parse(
+      await readBoundedRegular(metadataPath, 64 * 1024, 'installer receipt', { signal }),
+    );
     versionMatch =
       typeof metadata?.version === 'string'
         ? /^(?<major>\d+)\.(?<minor>\d+)\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?$/.exec(
@@ -81,66 +89,29 @@ function installedState(destination, packageName) {
       return unknownState('invalid installation metadata');
     }
   } catch (error) {
+    signal?.throwIfAborted();
     return error instanceof SyntaxError
       ? unknownState('invalid installation metadata')
-      : unknownState(`could not read installation metadata: ${error.code ?? 'read error'}`);
+      : unknownState(`could not read installation metadata: ${error.cause?.code ?? error.message}`);
   }
 
-  // Only require helpers shipped by the receipt's version. A forced downgrade
-  // merges files and can retain newer helpers that the older package did not own.
-  const exporters = [
-    { file: 'export-powerx.mjs', name: 'exporter', minor: 0n },
-    { file: 'export-agentx.mjs', name: 'AgentX exporter', minor: 4n },
-    { file: 'investigate-result.mjs', name: 'provenance helper', minor: 5n },
-    { file: 'compare-tco.mjs', name: 'TCO helper', minor: 6n },
-    { file: 'compare-releases.mjs', name: 'release comparison helper', minor: 7n },
-    { file: 'compare-collectivex.mjs', name: 'CollectiveX helper', minor: 8n },
-    { file: 'response-budget.mjs', name: 'response reader', minor: 9n },
-    { file: 'cli-contract.mjs', name: 'CLI contract', minor: 10n },
-    { file: 'export-contract.mjs', name: 'export contract', minor: 11n },
-    { file: 'verify-export.mjs', name: 'offline verifier', minor: 11n },
-  ].filter(
-    ({ minor }) =>
-      BigInt(versionMatch.groups.major) > 0n || BigInt(versionMatch.groups.minor) >= minor,
-  );
-  const scripts = join(destination, 'scripts');
-  for (const exporter of exporters) {
+  if (BigInt(versionMatch.groups.major) >= 1n || BigInt(versionMatch.groups.minor) >= 12n) {
     try {
-      const path = join(scripts, exporter.file);
-      if (
-        !lstatSync(scripts, { throwIfNoEntry: false })?.isDirectory() ||
-        !lstatSync(path, { throwIfNoEntry: false })?.isFile()
-      ) {
-        return unknownState(`installed ${exporter.name} is missing or not a regular file`);
-      }
-      const declarations = [
-        ...readFileSync(path, 'utf8').matchAll(
-          /^const PACKAGE_VERSION = ['"](?<version>[^'"\r\n]+)['"];$/gmu,
-        ),
-      ];
-      if (declarations.length !== 1) {
-        return unknownState(`installed ${exporter.name} version is missing`);
-      }
-      const version = declarations[0].groups.version;
-      if (version !== metadata.version) {
-        return unknownState(
-          `installation metadata disagrees with the installed ${exporter.name} version`,
-        );
-      }
+      await diagnose(['--dir', dirname(destination)], { signal });
     } catch (error) {
-      return unknownState(
-        `could not read installed ${exporter.name}: ${error.code ?? 'read error'}`,
-      );
+      if (error.code !== 'INSTALLATION_UNHEALTHY') throw error;
+      const failure = error.details.failures[0];
+      return unknownState(`${failure.path ? `${failure.path}: ` : ''}${failure.reason}`);
     }
   }
   return { installation_state: 'installed', installed_version: metadata.version, reason: null };
 }
 
-function statusRecord(destination, packageInfo) {
-  const transaction = inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
+async function statusRecord(destination, packageInfo, signal) {
+  const transaction = await inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
   const installation =
     transaction.state === 'none'
-      ? installedState(destination, packageInfo.name)
+      ? await installedState(destination, packageInfo.name, signal)
       : {
           ...unknownState(transaction.reason),
           transaction_state:
@@ -154,20 +125,15 @@ function statusRecord(destination, packageInfo) {
             : {}),
         };
   return {
-    schema_version: 1,
-    package: packageInfo.name,
-    installer_version: packageInfo.version,
-    skill_path: destination,
-    ...installation,
+    record: {
+      schema_version: 1,
+      package: packageInfo.name,
+      installer_version: packageInfo.version,
+      skill_path: destination,
+      ...installation,
+    },
+    transaction,
   };
-}
-
-function recoveryLeavesDestination(record) {
-  return (
-    record.transaction_phase === 'activated' ||
-    record.transaction_had_destination === true ||
-    record.transaction_projected_destination_exists === true
-  );
 }
 
 function showStatus(record) {
@@ -180,8 +146,9 @@ function showStatus(record) {
   console.log(`Skill path: ${record.skill_path}`);
 }
 
-function installationPlan(source, destination, force) {
-  const existing = lstatSync(destination, { throwIfNoEntry: false });
+function installationPlan(source, destination, force, existingRoot = destination) {
+  const existing =
+    existingRoot === null ? undefined : lstatSync(existingRoot, { throwIfNoEntry: false });
   if (existing && !force) return { outcome: 'skipped', write_paths: [] };
   if (existing && !existing.isDirectory()) {
     throw new Error(`Cannot overwrite ${destination}: the existing skill is not a directory.`);
@@ -200,7 +167,10 @@ function installationPlan(source, destination, force) {
   for (const path of [...paths, INSTALL_METADATA]) {
     const target = join(destination, path);
     const directory = path !== INSTALL_METADATA && lstatSync(join(source, path)).isDirectory();
-    const entry = lstatSync(target, { throwIfNoEntry: false });
+    const entry =
+      existingRoot === null
+        ? undefined
+        : lstatSync(join(existingRoot, path), { throwIfNoEntry: false });
     if (entry?.isSymbolicLink()) {
       throw new Error(`Cannot overwrite symbolic link at ${target}.`);
     }
@@ -306,20 +276,22 @@ async function main(args, signal) {
 
   const root = resolve(values.dir ?? TARGET_DIRS[values.target ?? 'claude']);
   const destination = join(root, SKILL_NAME);
-  let record = statusRecord(destination, packageInfo);
+  const initialStatus = await statusRecord(destination, packageInfo, signal);
+  const { transaction } = initialStatus;
+  let { record } = initialStatus;
   if (command === 'status') {
     if (values.json) await writeStdout(`${JSON.stringify(record)}\n`, { signal });
     else showStatus(record);
     return;
   }
   const dryRun = values['dry-run'] ?? false;
-  const recoveredDestinationExists = recoveryLeavesDestination(record);
+  const recoveredDestinationExists = typeof transaction.recovery_source === 'string';
   const plan = dryRun
     ? record.transaction_state === undefined
       ? installationPlan(source, destination, values.force)
       : record.transaction_state === 'recovery_needed' &&
           (values.force || !recoveredDestinationExists)
-        ? installationPlan(source, destination, true)
+        ? installationPlan(source, destination, true, transaction.recovery_source)
         : { outcome: 'skipped', write_paths: [] }
     : await installTransaction({
         source,
@@ -331,7 +303,10 @@ async function main(args, signal) {
         signal,
         prepare: () => installationPlan(source, destination, values.force),
       });
-  if (!dryRun) record = statusRecord(destination, packageInfo);
+  if (!dryRun) {
+    const installedStatus = await statusRecord(destination, packageInfo);
+    record = installedStatus.record;
+  }
   const result = {
     ...record,
     dry_run: dryRun,

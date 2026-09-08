@@ -19,9 +19,38 @@ Do not infer values that the response omits. Closed-loop systems can progress
 through different requests during the same run window, so workload mix can drift,
 especially at low concurrency. If identity cannot be confirmed, describe the
 comparison as incomplete.
+In configuration tables, report `disagg`, `num_prefill_gpu`, and `num_decode_gpu`
+as separate source fields. With `disagg: false`, the roles can share the same GPU
+pool: prefill 8 and decode 8 do not establish a 16-GPU deployment. A deployment
+total requires verified allocation semantics; do not unconditionally sum the role
+counts. See the [topology guidance](powerx.md#export-and-provenance) when a
+user requests a derived total.
 When counting distinct images or recipe fingerprints, count known values separately
 from rows whose field is missing or null. Report the missing-row count alongside
 the known distinct count; null is not another image or fingerprint.
+
+Keep each aggregate group's `n` with that group. Equal numbers of non-null benchmark
+rows do not imply equal sample counts or sample-size ranges; compute and label
+those statistics separately for each group.
+
+For a queried, supported result ID, omission from a successful complete
+trace-availability response confirms **no stored trace** in that snapshot. The
+export records `status: no_stored_trace`, `value: false`, and
+`response_key_present: false`; this is not unknown availability. Keep it separate
+from nullable aggregates or an unsupported ID that was not queried.
+
+For a replayable contract 1 summary bundle:
+
+```bash
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
+  --model DeepSeek-V4-Pro --hardware b300 --output-dir evidence/agentx \
+  --require-hardware b300
+```
+
+A valid empty selection exits 0; the explicit hardware predicate commits that
+bundle and exits 3 when no usable b300 summary exists. See the
+[CLI contract](cli.md) for exit and verification handling.
 
 Public timelines contain sanitized replay structure. They do not expose original
 prompts, code, or tool payloads. Preserve every phase, replay-lane field, and
@@ -34,8 +63,18 @@ so reserialized parsed values cannot establish their exact original digits.
 
 Inspect each server-metric series' returned fields before calculating statistics.
 For example, `queueDepth` carries `running`, `waiting`, and `total`, while scalar
-series can use `value`. Summarize the actual fields and their missing values;
-absence of `value` alone does not mean a queue-depth sample is missing.
+series use `value`. Report each series' own sample, finite, nonzero, and missing
+counts; their array lengths can differ. A nonzero fraction uses that field's
+finite count as its denominator, with missing samples reported separately.
+An empty series has no samples; zero-valued samples remain recorded observations.
+
+For timeline accounting, `sum(end - start)` is cumulative request latency and can
+exceed elapsed time when requests overlap. The union of `[start, end]` intervals
+is time with at least one request in flight. Neither measures GPU utilization or
+server busy time. Keep every phase and cancelled request in the default summary;
+label any narrower selection explicitly. A sampled KV-cache maximum or a slow
+first request describes that observation; it cannot establish that cache capacity
+was never limiting or that a cold cache caused the latency.
 
 This workflow reads existing observations and runs no new benchmark. AgentX does
 not evaluate model answer quality. If AgentX rows contain power fields, interpret
@@ -66,9 +105,10 @@ not establish a dataset association for every sibling or exported row.
 From the project root, the equivalent summary export is:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs agentx export \
   --model DeepSeek-V4-Pro --raw-model dsv4 --format json \
-  --output agentx.json --evidence-dir agentx-evidence
+  --output-dir evidence/agentx
 ```
 
 For Claude Code, replace `.agents/skills` with `.claude/skills`. Use a fresh evidence
@@ -88,21 +128,11 @@ quality, and do not create a new benchmark run.
 
 ## Export AgentX summaries
 
-Use the bundled Node 24 exporter to read the complete benchmark response, select
-AgentX observations, and join only the bounded summary enrichments. A display model
-is required; `--date` adds an as-of cutoff, and `--raw-model` selects one exact
-returned model key. CSV is the default; request JSON explicitly with `--format
-json`.
+`inferencex agentx export` reads the complete benchmark response, selects AgentX
+observations, and joins only the bounded summary enrichments. A display model is
+required; `--date` adds an as-of cutoff, `--raw-model` selects one exact returned
+model key, and JSON is the default. Add `--format csv` when needed.
 
-```bash
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
-  --model DeepSeek-V4-Pro --output agentx.csv
-
-node .agents/skills/inferencex-api/scripts/export-agentx.mjs \
-  --model DeepSeek-V4-Pro --format json --output agentx.json
-```
-
-For Claude Code, use `.claude/skills/inferencex-api/scripts/export-agentx.mjs`.
 Optional `--hardware`, `--framework`, `--precision`, `--spec-method`,
 `--offload-mode`, and `--concurrency` filters use exact, case-sensitive returned
 values. Concurrency must be a positive integer. No aliases or fuzzy matching are
@@ -110,22 +140,26 @@ applied. Metadata marks every filter as applied or omitted and lists values pres
 in the returned AgentX rows so an empty exact selection can be diagnosed without
 making claims about jobs or artifacts outside that response.
 
-Add `--evidence-dir agentx-evidence` with a path that does not exist to save every
-decoded response consumed by the export and an atomic manifest linking those
-responses to the output hash. Keep the evidence directory separate from `--output`.
+The new `--output-dir` is the evidence bundle. It contains every decoded response,
+the result, and a manifest linking their hashes and request attempts.
 
 JSON retains every selected benchmark object separately from its `agentx`
-enrichment. CSV repeats package, request, and filter context on every row. Its
-`metrics.*` columns are the sorted union of scalar metric keys in the selected
-rows; arrays and objects are not embedded in cells. Missing and null cells stay
-blank, while real zero and `false` values remain explicit. Both formats record
-request URLs, retrieval context, row counts, missing enrichment entries, nullable
-groups, and trace availability. The first stderr line is machine-readable metadata,
-including for a header-only CSV. `no_agentx_rows` means the complete benchmark
-response contained no AgentX observations; `no_matching_rows` means exact local
-filters excluded the returned AgentX observations. Neither outcome says whether
-other benchmark jobs, failed runs, source artifacts, or data outside that response
-exist.
+enrichment. CSV uses fixed columns and repeats package, request, and filter context
+on every row. The `metrics_json` cell contains the JSON-encoded `metrics` object,
+including any nested arrays or objects. Parse the CSV with a CSV parser first,
+then use `JSON.parse(row.metrics_json)` to read its metrics. Ordinary CSV cells are
+blank for missing or null values; within `metrics_json`, explicit `null` values
+and absent keys remain distinct. Real zero and `false` values remain explicit in
+both. JSON metadata and each populated CSV row record request, filter, and
+retrieval context; `manifest.json`
+always records normalized arguments, the request ledger, result hash, coverage,
+and policy, including for a header-only CSV. In JSON, `no_agentx_rows` means the
+complete benchmark response contained no AgentX observations;
+`no_matching_rows` means exact local filters excluded the returned AgentX
+observations. A header-only CSV does not encode that distinction in a data row;
+validate the bundle with `inferencex verify`, then inspect the saved benchmark
+response. Neither outcome says whether other benchmark jobs, failed runs, source
+artifacts, or data outside that response exist.
 
 An unsupported raw ID remains in the export but is not sent to numeric enrichment
 endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
@@ -241,7 +275,9 @@ if (!traceAvailable) {
           !object(request) || typeof request.cid !== 'string' || !integer(request.ti) ||
           typeof request.wid !== 'string' || !integer(request.ad) ||
           typeof request.phase !== 'string' || !integer(request.credit) ||
-          !integer(request.start) || !finiteOrNull(request.ack) || !integer(request.end) ||
+          !Number.isSafeInteger(request.start) || request.start < 0 ||
+          !finiteOrNull(request.ack) || !Number.isSafeInteger(request.end) ||
+          request.end < request.start ||
           !finiteOrNull(request.ttftMs) || !finiteOrNull(request.tpotMs) ||
           !finiteOrNull(request.isl) || !finiteOrNull(request.osl) ||
           typeof request.cancelled !== 'boolean' ||
@@ -281,12 +317,50 @@ if (!traceAvailable) {
       throw new Error('Unexpected aggregate server metrics response');
     }
 
+    // Summarize returned samples separately; series are not aligned by array index.
+    const sampleCounts = (points, fields = ['value']) => ({
+      sample_count: points.length,
+      fields: Object.fromEntries(fields.map((field) => {
+        const values = points.map((point) => point[field]).filter(finite);
+        return [field, {
+          finite_count: values.length,
+          nonzero_count: values.filter((value) => value !== 0).length,
+          missing_or_nonfinite_count: points.length - values.length,
+        }];
+      })),
+    });
+    const scalarSeries = series.filter((key) => key !== 'queueDepth' && key !== 'kvCacheUsageByEngine');
+    const serverMetricSamples = {
+      ...Object.fromEntries(scalarSeries.map((key) => [key, sampleCounts(serverMetrics[key])])),
+      queueDepth: sampleCounts(serverMetrics.queueDepth, ['running', 'waiting', 'total']),
+      promptTokensBySource: Object.fromEntries(Object.entries(serverMetrics.promptTokensBySource)
+        .map(([source, points]) => [source, sampleCounts(points)])),
+      kvCacheUsageByEngine: serverMetrics.kvCacheUsageByEngine.map(({ engineLabel, points }) => ({
+        engineLabel, ...sampleCounts(points),
+      })),
+    };
+    let cumulativeRequestLatencyS = 0;
+    let requestInflightUnionS = 0;
+    let coveredEnd = 0;
+    for (const { start, end } of [...timeline.requests].sort((a, b) => a.start - b.start)) {
+      cumulativeRequestLatencyS += (end - start) / 1e9;
+      requestInflightUnionS += Math.max(0, end - Math.max(start, coveredEnd)) / 1e9;
+      coveredEnd = Math.max(coveredEnd, end);
+    }
+
     console.log(JSON.stringify({
       ...common(),
       outcome: 'trace_diagnostics',
       timeline,
       histograms,
       server_metrics: serverMetrics,
+      trace_summary: {
+        request_count: timeline.requests.length,
+        cancelled_request_count: timeline.requests.filter((request) => request.cancelled).length,
+        cumulative_request_latency_s: cumulativeRequestLatencyS,
+        request_inflight_union_s: requestInflightUnionS,
+        server_metric_samples: serverMetricSamples,
+      },
     }, null, 2));
   } catch (error) {
     throw new Error(

@@ -1,55 +1,10 @@
-#!/usr/bin/env node
-
-import { createHash, randomUUID } from 'node:crypto';
-import { link, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
-import {
-  argumentError,
-  httpError,
-  outputBoundary,
-  requestBoundary,
-  responseBoundary,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, isMain, responseError } from './cli-contract.mjs';
 
-const PACKAGE_VERSION = '0.11.0';
-const RESPONSE_BYTE_BUDGET = 16 * 1024 * 1024;
 // History omits mean/std latency and interactivity; QPS statistics are retained.
 const PERFORMANCE_METRIC =
   /^(?:(?:median|p75|p90|p95|p99|p99\.9)_(?:ttft|tpot|itl|e2el|intvty|qps)|(?:mean|std)_qps|(?:total|output|input)_tput_tps|(?:output_|input_)?tput_per_gpu)$/u;
-const HELP = `compare-releases — investigate observed changes between explicit producer identities
-
-Requires Node 24 or later.
-
-Usage:
-  node compare-releases.mjs --model <display-name> --hardware <raw-key> \\
-    --framework <vllm|sglang> --isl <tokens> --osl <tokens> --metric <raw-key> \\
-    --before-date <YYYY-MM-DD> --after-date <YYYY-MM-DD> \\
-    --before-image <exact-image> --after-image <exact-image> [options]
-
-Each side requires an exact image, an exact producer run URL, or both:
-  --before-run-url <url> / --after-run-url <url>  Use the returned run_url, including attempt
-  --before-image <text> / --after-image <text>   Match the returned image string exactly
-  --raw-model <key>       Select one raw model within the requested display bucket
-  --output <new-file>     Exclusively create a JSON file; default stdout
-  --error-format <mode>   Failure diagnostics: text (default) or json
-  --version          Show the installed package version offline
-  --help                 Show help offline
-
-Dates select original observation date, never curve_date. Makes one history request.
-Reports one-to-one public-configuration matches and missing/ambiguous observations.
-The full response is retained with a SHA-256; one 30s request, 16 MiB byte budget.
-Image-to-release mapping and causal attribution remain unverified. See references/releases.md.
-Metrics retained by history, when recorded:
-  median/p75/p90/p95/p99/p99.9 of ttft/tpot/itl/e2el/intvty/qps (e.g. median_ttft)
-  mean_qps, std_qps
-  tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu
-  total_tput_tps, output_tput_tps, input_tput_tps
-History omits mean/std latency and interactivity. Retained metrics may still be missing.
-Power/energy comparisons require PowerX validation.
-`;
 const CONFIG_FIELDS = [
   'model',
   'hardware',
@@ -228,33 +183,39 @@ function compareMetric(before, after, name) {
   };
 }
 
-async function saveOutput(path, output, signal) {
-  if (path === undefined) {
-    await writeStdout(output, { signal });
-    return;
+function positiveInteger(value, option) {
+  const number = Number(value);
+  if (!value || !/^\d+$/u.test(String(value)) || !Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`--${option} requires a positive integer`);
   }
-  const target = resolve(path);
-  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
-  await outputBoundary(async () => {
-    try {
-      await writeFile(temporary, output, { flag: 'wx' });
-      signal.throwIfAborted();
-      // Linking a complete sibling file installs it atomically and refuses existing targets/symlinks.
-      await link(temporary, target);
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  }, signal);
+  return number;
 }
 
-async function run(args, signal) {
-  let argumentsValidated = false;
+const CANONICAL_KEYS = [
+  'model',
+  'hardware',
+  'framework',
+  'isl',
+  'osl',
+  'metric',
+  'raw_model',
+  'before_date',
+  'after_date',
+  'before_image',
+  'after_image',
+  'before_run_url',
+  'after_run_url',
+];
+
+// The closed canonical object is replayed from the manifest during offline verification.
+export function normalizeArgs(args) {
   try {
-    const { values, tokens } = parseArgs({
-      args,
-      tokens: true,
-      options: {
-        ...Object.fromEntries(
+    let values;
+    if (Array.isArray(args)) {
+      const parsed = parseArgs({
+        args,
+        tokens: true,
+        options: Object.fromEntries(
           [
             'model',
             'hardware',
@@ -269,291 +230,349 @@ async function run(args, signal) {
             'after-image',
             'before-run-url',
             'after-run-url',
-            'output',
           ].map((name) => [name, { type: 'string' }]),
         ),
-        version: { type: 'boolean' },
-        help: { type: 'boolean' },
-        'error-format': { type: 'string' },
-      },
-      allowPositionals: false,
-      strict: true,
-    });
-    const options = tokens.filter((token) => token.kind === 'option').map((token) => token.name);
-    if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
-    if (values.version) {
-      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-      return;
+        strict: true,
+        allowPositionals: false,
+      });
+      const seen = new Set();
+      for (const token of parsed.tokens.filter(({ kind }) => kind === 'option')) {
+        if (seen.has(token.name)) throw new Error(`Duplicate option --${token.name}`);
+        seen.add(token.name);
+      }
+      values = {
+        model: parsed.values.model,
+        hardware: parsed.values.hardware,
+        framework: parsed.values.framework,
+        isl: positiveInteger(parsed.values.isl, 'isl'),
+        osl: positiveInteger(parsed.values.osl, 'osl'),
+        metric: parsed.values.metric,
+        raw_model: parsed.values['raw-model'] ?? null,
+        before_date: parsed.values['before-date'],
+        after_date: parsed.values['after-date'],
+        before_image: parsed.values['before-image'] ?? null,
+        after_image: parsed.values['after-image'] ?? null,
+        before_run_url: parsed.values['before-run-url'] ?? null,
+        after_run_url: parsed.values['after-run-url'] ?? null,
+      };
+    } else {
+      if (
+        !object(args) ||
+        Object.keys(args).length !== CANONICAL_KEYS.length ||
+        CANONICAL_KEYS.some((key) => !Object.hasOwn(args, key))
+      ) {
+        throw new Error('Invalid saved release comparison options');
+      }
+      values = { ...args };
     }
-    if (values.help) {
-      await saveOutput(undefined, HELP, signal);
-      return;
-    }
-    for (const [key, value] of Object.entries(values)) {
-      if (typeof value === 'string' && !value.trim())
-        throw new Error(`--${key} requires a nonempty value`);
-    }
+
     for (const key of ['model', 'hardware', 'metric']) {
-      if (!values[key]) throw new Error(`--${key} is required`);
+      if (typeof values[key] !== 'string' || !values[key].trim()) {
+        throw new Error(`--${key} requires a nonempty value`);
+      }
     }
     if (!PERFORMANCE_METRIC.test(values.metric)) {
       throw new Error(
-        'Choose a metric retained by benchmark history (see --help); use the PowerX cookbook for validated power and energy',
+        'Choose a metric retained by benchmark history (see --help); use PowerX for validated power and energy',
       );
     }
-    if (!['vllm', 'sglang'].includes(values.framework))
+    if (!['vllm', 'sglang'].includes(values.framework)) {
       throw new Error('--framework must be vllm or sglang');
+    }
     for (const key of ['isl', 'osl']) {
-      if (
-        !/^\d+$/u.test(values[key]) ||
-        !Number.isSafeInteger(Number(values[key])) ||
-        Number(values[key]) <= 0
-      )
+      if (!Number.isSafeInteger(values[key]) || values[key] <= 0) {
         throw new Error(`--${key} requires a positive integer`);
+      }
+    }
+    if (
+      values.raw_model !== null &&
+      (typeof values.raw_model !== 'string' || !values.raw_model.trim())
+    ) {
+      throw new Error('--raw-model requires a nonempty value');
     }
     for (const side of ['before', 'after']) {
-      if (!validDate(values[`${side}-date`]))
+      if (!validDate(values[`${side}_date`])) {
         throw new Error(`--${side}-date requires a valid YYYY-MM-DD date`);
-      if (values[`${side}-image`] === undefined && values[`${side}-run-url`] === undefined)
-        throw new Error(`Provide --${side}-image or --${side}-run-url`);
-      if (values[`${side}-run-url`] !== undefined && !runUrl(values[`${side}-run-url`]))
+      }
+      const image = values[`${side}_image`];
+      const producerRun = values[`${side}_run_url`];
+      if (image !== null && (typeof image !== 'string' || !image.trim())) {
+        throw new Error(`--${side}-image requires a nonempty value`);
+      }
+      if (producerRun !== null && !runUrl(producerRun)) {
         throw new Error(`--${side}-run-url requires an exact GitHub Actions run URL`);
+      }
+      if (image === null && producerRun === null) {
+        throw new Error(`Provide --${side}-image or --${side}-run-url`);
+      }
     }
-    if (values['before-date'] > values['after-date'])
+    if (values.before_date > values.after_date) {
       throw new Error('--before-date must not be after --after-date');
-    argumentsValidated = true;
-    const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
-    await responseBoundary(async () => {
-      const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks/history');
-      for (const name of ['model', 'isl', 'osl']) url.searchParams.set(name, values[name]);
-      const response = await requestBoundary(
-        () =>
-          fetch(url, {
-            signal: requestSignal,
-            redirect: 'error',
-          }),
-        requestSignal,
-      );
-      if (response.redirected || (response.url && response.url !== url.href))
-        throw new Error('Unexpected history response URL');
-      if (!response.ok) throw httpError(response.status, `HTTP ${response.status}: ${url.href}`);
-      const { bytes, body } = await responseBoundary(async () => {
-        const chunks = [];
-        let received = 0;
-        for await (const chunk of response.body ?? []) {
-          received += chunk.byteLength;
-          if (received > RESPONSE_BYTE_BUDGET)
-            throw new Error('Exceeded the 16 MiB response byte budget');
-          chunks.push(chunk);
-        }
-        const responseBytes = Buffer.concat(chunks);
-        const responseBody = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
-          responseBytes,
-        );
-        return { bytes: responseBytes, body: responseBody };
-      }, requestSignal);
-      const evidence = [
-        {
-          operation: 'benchmark-history',
-          url: url.href,
-          http_status: response.status,
-          retrieved_at: new Date().toISOString(),
-          body_utf8: body,
-          decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
-          checksum_covers: 'exact decoded UTF-8 response body',
-        },
-      ];
-      const rows = JSON.parse(body.replace(/^\uFEFF/u, ''), (_key, value) => {
-        if (typeof value === 'number' && !Number.isFinite(value))
-          throw new Error('Unexpected benchmark response: non-finite number');
-        return value;
-      });
-      if (
-        !Array.isArray(rows) ||
-        rows.some(
-          (row) =>
-            !benchmarkRow(row) ||
-            (Object.hasOwn(row.metrics, values.metric) &&
-              row.metrics[values.metric] !== null &&
-              !Number.isFinite(row.metrics[values.metric])),
-        )
-      ) {
-        throw new Error(
-          'Unexpected benchmark response: invalid identity, configuration, date, or metric',
-        );
-      }
-      const originals = new Map();
-      for (const row of rows) {
-        const key = String(row.id);
-        const original = originalObservation(row);
-        if (originals.has(key) && !isDeepStrictEqual(originals.get(key), original))
-          throw new Error(`Conflicting observation for result ID ${key}`);
-        originals.set(key, original);
-      }
-      const scoped = rows.filter(
-        (row) =>
-          row.hardware === values.hardware &&
-          row.framework === values.framework &&
-          row.benchmark_type === 'single_turn' &&
-          row.isl === Number(values.isl) &&
-          row.osl === Number(values.osl) &&
-          (values['raw-model'] === undefined || row.model === values['raw-model']),
-      );
-      const selection = {};
-      const unique = {};
-      for (const side of ['before', 'after']) {
-        const selected = [];
-        const excluded = [];
-        for (const row of scoped.filter((candidate) => candidate.date === values[`${side}-date`])) {
-          const reasons = [];
-          if (values[`${side}-image`] !== undefined && row.image !== values[`${side}-image`])
-            reasons.push(row.image === null ? 'missing_image_identity' : 'image_mismatch');
-          if (values[`${side}-run-url`] !== undefined && row.run_url !== values[`${side}-run-url`])
-            reasons.push(row.run_url === null ? 'missing_run_identity' : 'run_url_mismatch');
-          if (reasons.length > 0) excluded.push({ row, reasons });
-          else selected.push(row);
-        }
-        unique[side] = [...new Map(selected.map((row) => [String(row.id), row])).values()];
-        selection[side] = {
-          rows: selected,
-          excluded,
-          unique_observations: unique[side].length,
-          snapshot_reuses: selected.length - unique[side].length,
-        };
-      }
-      const groups = Object.fromEntries(
-        ['before', 'after'].map((side) => [
-          side,
-          Map.groupBy(unique[side], (row) =>
-            JSON.stringify([
-              ...CONFIG_FIELDS.map((key) => row[key]),
-              ...CONFIG_METRICS.map((key) => [Object.hasOwn(row.metrics, key), row.metrics[key]]),
-            ]),
-          ),
-        ]),
-      );
-      const comparisons = [];
-      const unmatched = { before: [], after: [] };
-      for (const configKey of new Set([...groups.before.keys(), ...groups.after.keys()])) {
-        const before = groups.before.get(configKey) ?? [];
-        const after = groups.after.get(configKey) ?? [];
-        const reason =
-          before.length === 0 || after.length === 0
-            ? 'no_matching_configuration'
-            : before.length !== 1 || after.length !== 1
-              ? 'ambiguous_configuration'
-              : String(before[0].id) === String(after[0].id)
-                ? 'reused_observation'
-                : null;
-        if (reason) {
-          for (const [side, records] of [
-            ['before', before],
-            ['after', after],
-          ]) {
-            unmatched[side].push(...records.map((row) => ({ id: row.id, reason })));
-          }
-          continue;
-        }
-        const first = before[0];
-        const second = after[0];
-        const fingerprintMatch =
-          first.recipe_fingerprint && second.recipe_fingerprint
-            ? first.recipe_fingerprint === second.recipe_fingerprint
-            : null;
-        const unknownFields = CONFIG_METRICS.filter(
-          (key) => first.metrics[key] === null || first.metrics[key] === undefined,
-        ).map((key) => `metrics.${key}`);
-        const confounders = [
-          fingerprintMatch === false
-            ? 'recipe_fingerprint_changed_includes_image_and_unexposed_config'
-            : fingerprintMatch === null
-              ? 'recipe_fingerprint_unavailable'
-              : 'recipe_contents_not_independently_verified',
-        ];
-        if (first.image === null || second.image === null)
-          confounders.push('image_identity_unavailable');
-        if (first.run_url === null || second.run_url === null)
-          confounders.push('producer_run_identity_unavailable');
-        if (unknownFields.length > 0) confounders.push('optional_configuration_fields_unavailable');
-        comparisons.push({
-          before_id: first.id,
-          after_id: second.id,
-          configuration: Object.fromEntries(CONFIG_FIELDS.map((name) => [name, first[name]])),
-          configuration_metrics: Object.fromEntries(
-            CONFIG_METRICS.filter((key) => Object.hasOwn(first.metrics, key)).map((key) => [
-              key,
-              first.metrics[key],
-            ]),
-          ),
-          configuration_verification: 'public_fields_only',
-          configuration_completeness:
-            unknownFields.length > 0 ? 'incomplete_optional_fields' : 'known_fields_present',
-          configuration_unknown_fields: unknownFields,
-          producer: {
-            before: { image: first.image, run_url: first.run_url },
-            after: { image: second.image, run_url: second.run_url },
-          },
-          recipe_fingerprint_match: fingerprintMatch,
-          full_recipe_verified: false,
-          confounders,
-          metric: compareMetric(first, second, values.metric),
-        });
-      }
-      const comparableValues = comparisons.filter(
-        ({ metric }) => Number.isFinite(metric.before) && Number.isFinite(metric.after),
-      ).length;
-      const output = `${JSON.stringify(
-        {
-          schema_version: 1,
-          metadata: {
-            package_version: PACKAGE_VERSION,
-            query_url: url.href,
-            retrieved_at: evidence[0].retrieved_at,
-            requested: Object.fromEntries(
-              Object.entries(values).filter(([name]) => name !== 'error-format'),
-            ),
-            ran_new_benchmark: false,
-            returned_rows: rows.length,
-            outside_requested_scope: rows.length - scoped.length,
-            outside_selected_dates: scoped.filter(
-              (row) => ![values['before-date'], values['after-date']].includes(row.date),
-            ).length,
-            date_field: 'date',
-            metric_coverage: {
-              comparable_values: comparableValues,
-              missing_values: comparisons.length - comparableValues,
-            },
-            release_mapping: 'unknown',
-            causal_attribution: 'not_established',
-            statistical_verdict: 'not_established',
-          },
-          outcome: comparisons.length > 0 ? 'observed_comparisons' : 'no_comparable_pairs',
-          limitations: [
-            'Descriptive existing observations only; no causal or statistical regression verdict.',
-            'Dates select original observations; history contains latest attempts and carried curve snapshots, not every historical attempt.',
-            'Matching covers declared public configuration fields only; unavailable fields and recipe changes remain confounders.',
-            'Image strings and run URLs do not independently establish immutable images or framework release versions.',
-          ],
-          selection,
-          comparisons,
-          unmatched,
-          evidence,
-        },
-        null,
-        2,
-      )}\n`;
-      await saveOutput(values.output, output, signal);
-    }, signal);
-  } catch (error) {
-    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
-      throw argumentError(error.message, error);
     }
-    throw error;
+    return Object.fromEntries(CANONICAL_KEYS.map((key) => [key, values[key]]));
+  } catch (error) {
+    throw argumentError(error.message, error);
   }
 }
 
-await runCli({
-  command: 'compare-releases',
-  packageVersion: PACKAGE_VERSION,
-  run: ({ args, signal }) => run(args, signal),
-});
+function validateRows(rows, metric) {
+  if (
+    !Array.isArray(rows) ||
+    rows.some(
+      (row) =>
+        !benchmarkRow(row) ||
+        (Object.hasOwn(row.metrics, metric) &&
+          row.metrics[metric] !== null &&
+          !Number.isFinite(row.metrics[metric])),
+    )
+  ) {
+    throw responseError(
+      'Unexpected benchmark response: invalid identity, configuration, date, or metric',
+    );
+  }
+}
+
+function buildReleaseComparison({ scope, rows, source, packageVersion }) {
+  const resultId = String;
+  validateRows(rows, scope.metric);
+  const originals = new Map();
+  for (const row of rows) {
+    const key = String(row.id);
+    const original = originalObservation(row);
+    if (originals.has(key) && !isDeepStrictEqual(originals.get(key), original)) {
+      throw responseError(`Conflicting observation for result ID ${key}`);
+    }
+    originals.set(key, original);
+  }
+
+  const scoped = rows.filter(
+    (row) =>
+      row.hardware === scope.hardware &&
+      row.framework === scope.framework &&
+      row.benchmark_type === 'single_turn' &&
+      row.isl === scope.isl &&
+      row.osl === scope.osl &&
+      (scope.raw_model === null || row.model === scope.raw_model),
+  );
+  const selection = {};
+  const unique = {};
+  for (const side of ['before', 'after']) {
+    const selected = [];
+    const excluded = [];
+    for (const row of scoped.filter((candidate) => candidate.date === scope[`${side}_date`])) {
+      const reasons = [];
+      if (scope[`${side}_image`] !== null && row.image !== scope[`${side}_image`]) {
+        reasons.push(row.image === null ? 'missing_image_identity' : 'image_mismatch');
+      }
+      if (scope[`${side}_run_url`] !== null && row.run_url !== scope[`${side}_run_url`]) {
+        reasons.push(row.run_url === null ? 'missing_run_identity' : 'run_url_mismatch');
+      }
+      if (reasons.length > 0) excluded.push({ row, reasons });
+      else selected.push(row);
+    }
+    unique[side] = [...new Map(selected.map((row) => [String(row.id), row])).values()];
+    selection[side] = {
+      rows: selected.map(stringIdentities),
+      excluded: excluded.map(({ row, reasons }) => ({ row: stringIdentities(row), reasons })),
+      unique_observations: unique[side].length,
+      snapshot_reuses: selected.length - unique[side].length,
+    };
+  }
+
+  const groups = Object.fromEntries(
+    ['before', 'after'].map((side) => [
+      side,
+      Map.groupBy(unique[side], (row) =>
+        JSON.stringify([
+          ...CONFIG_FIELDS.map((key) => row[key]),
+          ...CONFIG_METRICS.map((key) => [Object.hasOwn(row.metrics, key), row.metrics[key]]),
+        ]),
+      ),
+    ]),
+  );
+  const comparisons = [];
+  const unmatched = { before: [], after: [] };
+  for (const configKey of new Set([...groups.before.keys(), ...groups.after.keys()])) {
+    const before = groups.before.get(configKey) ?? [];
+    const after = groups.after.get(configKey) ?? [];
+    const reason =
+      before.length === 0 || after.length === 0
+        ? 'no_matching_configuration'
+        : before.length !== 1 || after.length !== 1
+          ? 'ambiguous_configuration'
+          : String(before[0].id) === String(after[0].id)
+            ? 'reused_observation'
+            : null;
+    if (reason) {
+      for (const [side, records] of [
+        ['before', before],
+        ['after', after],
+      ]) {
+        unmatched[side].push(...records.map((row) => ({ id: resultId(row.id), reason })));
+      }
+      continue;
+    }
+    const first = before[0];
+    const second = after[0];
+    const fingerprintMatch =
+      first.recipe_fingerprint && second.recipe_fingerprint
+        ? first.recipe_fingerprint === second.recipe_fingerprint
+        : null;
+    const unknownFields = CONFIG_METRICS.filter(
+      (key) => first.metrics[key] === null || first.metrics[key] === undefined,
+    ).map((key) => `metrics.${key}`);
+    const confounders = [
+      fingerprintMatch === false
+        ? 'recipe_fingerprint_changed_includes_image_and_unexposed_config'
+        : fingerprintMatch === null
+          ? 'recipe_fingerprint_unavailable'
+          : 'recipe_contents_not_independently_verified',
+    ];
+    if (first.image === null || second.image === null)
+      confounders.push('image_identity_unavailable');
+    if (first.run_url === null || second.run_url === null) {
+      confounders.push('producer_run_identity_unavailable');
+    }
+    if (unknownFields.length > 0) confounders.push('optional_configuration_fields_unavailable');
+    comparisons.push({
+      before_id: resultId(first.id),
+      after_id: resultId(second.id),
+      configuration: Object.fromEntries(CONFIG_FIELDS.map((name) => [name, first[name]])),
+      configuration_metrics: Object.fromEntries(
+        CONFIG_METRICS.filter((key) => Object.hasOwn(first.metrics, key)).map((key) => [
+          key,
+          first.metrics[key],
+        ]),
+      ),
+      configuration_verification: 'public_fields_only',
+      configuration_completeness:
+        unknownFields.length > 0 ? 'incomplete_optional_fields' : 'known_fields_present',
+      configuration_unknown_fields: unknownFields,
+      producer: {
+        before: { image: first.image, run_url: first.run_url },
+        after: { image: second.image, run_url: second.run_url },
+      },
+      recipe_fingerprint_match: fingerprintMatch,
+      full_recipe_verified: false,
+      confounders,
+      metric: compareMetric(first, second, scope.metric),
+    });
+  }
+
+  const comparablePairs = comparisons.filter(
+    ({ metric }) => Number.isFinite(metric.before) && Number.isFinite(metric.after),
+  ).length;
+  const selectedRecords =
+    selection.before.unique_observations + selection.after.unique_observations;
+  const unmatchedRecords = unmatched.before.length + unmatched.after.length;
+  const missingMetrics = comparisons.length - comparablePairs;
+  const result = {
+    schema_version: 1,
+    metadata: {
+      package_version: packageVersion,
+      query_url: source.url,
+      retrieved_at: source.retrievedAt,
+      requested: scope,
+      ran_new_benchmark: false,
+      returned_rows: rows.length,
+      outside_requested_scope: rows.length - scoped.length,
+      outside_selected_dates: scoped.filter(
+        (row) => ![scope.before_date, scope.after_date].includes(row.date),
+      ).length,
+      date_field: 'date',
+      metric_coverage: {
+        comparable_values: comparablePairs,
+        missing_values: missingMetrics,
+      },
+      release_mapping: 'unknown',
+      causal_attribution: 'not_established',
+      statistical_verdict: 'not_established',
+    },
+    outcome: comparisons.length > 0 ? 'observed_comparisons' : 'no_comparable_pairs',
+    limitations: [
+      'Descriptive existing observations only; no causal or statistical regression verdict.',
+      'Dates select original observations; history contains latest attempts and carried curve snapshots, not every historical attempt.',
+      'Matching covers declared public configuration fields only; unavailable fields and recipe changes remain confounders.',
+      'Image strings and run URLs do not independently establish immutable images or framework release versions.',
+    ],
+    selection,
+    comparisons,
+    unmatched,
+    sources: [
+      {
+        operation: 'benchmark-history',
+        response_id: source.responseId,
+        status: source.status,
+        retrieved_at: source.retrievedAt,
+        url: source.url,
+      },
+    ],
+  };
+  return {
+    result,
+    coverage: {
+      status:
+        selectedRecords === 0
+          ? 'empty'
+          : unmatchedRecords > 0 || missingMetrics > 0 || comparisons.length === 0
+            ? 'partial'
+            : 'complete',
+      selected_records: selectedRecords,
+      comparable_pairs: comparablePairs,
+      hardware: [{ hardware: scope.hardware, valid_records: comparablePairs }],
+      reasons: [
+        ...(unmatchedRecords > 0
+          ? [{ code: 'unmatched_configuration', count: unmatchedRecords }]
+          : []),
+        ...(missingMetrics > 0 ? [{ code: 'missing_metric', count: missingMetrics }] : []),
+      ],
+    },
+  };
+}
+
+function stringIdentities(row) {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      key,
+      ['id', 'workflow_run_id', 'curve_workflow_run_id'].includes(key) && value !== null
+        ? String(value)
+        : value,
+    ]),
+  );
+}
+
+export async function collect(options, context) {
+  const scope = normalizeArgs(options);
+  const url = new URL('https://inferencex.semianalysis.com/api/v1/benchmarks/history');
+  url.searchParams.set('model', scope.model);
+  url.searchParams.set('isl', String(scope.isl));
+  url.searchParams.set('osl', String(scope.osl));
+  const saved = await context.get({
+    operation: 'benchmark-history',
+    url: url.href,
+    allowedStatuses: [200],
+  });
+  const built = buildReleaseComparison({
+    scope,
+    rows: saved.body,
+    source: {
+      responseId: saved.id,
+      status: saved.status,
+      retrievedAt: saved.retrievedAt,
+      url: url.href,
+    },
+    packageVersion: context.producerVersion,
+  });
+  return {
+    format: 'json',
+    bytes: Buffer.from(`${JSON.stringify(built.result, null, 2)}\n`),
+    coverage: built.coverage,
+  };
+}
+
+if (isMain(import.meta.url)) {
+  process.stderr.write(
+    'compare-releases.mjs is internal. Use inferencex releases compare instead.\n',
+  );
+  process.exitCode = 2;
+}

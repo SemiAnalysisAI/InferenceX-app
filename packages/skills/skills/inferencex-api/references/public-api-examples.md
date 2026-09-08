@@ -2,9 +2,109 @@
 
 These Node 24 recipes use public HTTPS and the current OpenAPI document. Run them
 from your project; no repository checkout, database credentials, or extra packages
-are needed. Each prints JSON only after successful reads and records each request
-URL and retrieval time. Save the output with the answer. HTTP errors, malformed
-JSON, and unexpected response shapes are failures, not empty results.
+are needed. Each creates a fresh `api-evidence-*` directory and saves complete
+decoded response bodies before parsing or filtering. Adjacent JSON records retain
+the request URL, retrieval time, status, byte count and SHA-256; HTTP and malformed
+JSON bodies remain available on failure. Save this directory and the printed JSON
+with the answer. Repeating a recipe creates a new directory and preserves earlier
+attempts. A hash identifies saved bytes, not remote authenticity.
+
+The versioned CLI can list supported capabilities and public model scopes with
+`inferencex discover capabilities` and `inferencex discover models`. See the
+[CLI contract](cli.md). The recipes below remain useful for API operations that
+do not have a formal evidence-bundle command.
+
+## Basic benchmark lookup
+
+This Node 24 example prints up to five latest available single-turn observations
+with 8192 input and 1024 output tokens, ordered by observation date newest first.
+It reports the full matching count before limiting the sample and retains each
+observation's actual date and provenance. `selection_summary` is also saved as
+`selection-summary.json` beside the captures. It summarizes all selected rows
+before sampling: concurrency is known only for positive safe integers; missing,
+null or malformed values count as unknown, without coercion. Distinct counts and
+nullable bounds describe known values only. Use these saved scalars in the report
+and final answer. The history recipe below uses the same summary.
+
+`sample_summary`, also saved as `sample-summary.json`, describes exactly the
+emitted `sample_rows`: original result IDs and distinct hardware/framework counts
+for known nonempty string keys. If you change the sample selection, call
+`summarizeSample` on the final sample and save its new summary before describing
+its coverage. Compute a separate summary for every alternative sample discussed.
+
+```bash
+node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+const base = 'https://inferencex.semianalysis.com';
+const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
+async function read(path) {
+  const query_url = new URL(path, base).href;
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+}
+const schema = await read(`${base}/api/openapi.json`);
+const operation = schema.paths['/api/v1/benchmarks']?.get;
+const models = operation?.parameters.find((p) => p.name === 'model')?.schema.enum;
+const model = 'DeepSeek-V4-Pro';
+if (!models?.includes(model)) throw new Error('Check the current model enum in OpenAPI');
+const url = new URL('/api/v1/benchmarks', base);
+url.searchParams.set('model', model);
+const rows = await read(url);
+if (!Array.isArray(rows)) throw new Error('Expected a benchmark row array');
+const selected = rows.filter((row) =>
+  row.benchmark_type === 'single_turn' && row.isl === 8192 && row.osl === 1024);
+const knownConcurrency = selected.map((row) => row.conc)
+  .filter((value) => Number.isSafeInteger(value) && value > 0);
+const concurrencyValues = [...new Set(knownConcurrency)].toSorted((a, b) => a - b);
+const selection_summary = {
+  selected_rows: selected.length,
+  concurrency: { known_rows: knownConcurrency.length, unknown_rows: selected.length - knownConcurrency.length,
+    distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
+};
+writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
+function summarizeSample(sample) {
+  const countKeys = (key) => new Set(sample.map((row) => row[key])
+    .filter((value) => typeof value === 'string' && value.trim().length > 0)).size;
+  return { sample_rows: sample.length, result_ids: sample.map((row) => row.id),
+    hardware_count: countKeys('hardware'), framework_count: countKeys('framework') };
+}
+const sample_rows = selected.toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+const sample_summary = summarizeSample(sample_rows);
+writeFileSync(`${captureDir}/sample-summary.json`, JSON.stringify(sample_summary, null, 2), { flag: 'wx' });
+console.log(JSON.stringify({
+  requests,
+  query_url: url.href,
+  retrieved_at: requests.at(-1).retrieved_at,
+  requested_model: model,
+  scope: { date: 'latest available', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
+  returned_models: [...new Set(selected.map((row) => row.model))],
+  matching_rows: selected.length, selection_summary,
+  sample_rows, sample_summary,
+}, null, 2));
+JS
+```
+
+For a dated lookup, add the documented `date` parameter to the URL and record it in
+`scope.date` as the exact `YYYY-MM-DD` query value, without explanatory text inside
+that value. Retain the rows' own dates and source links in the answer.
 
 ## Evaluation lookup
 
@@ -19,17 +119,33 @@ lists available values so an empty match does not require guessing another alias
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'dsv4', task: 'gsm8k', sample_limit: 5 };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/evaluations']?.get;
@@ -87,18 +203,34 @@ example choice, not a representative sample.
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const requestedSlug = null;
 const scope = { requested_slug: requestedSlug, limit: 3, offset: 0, sort: 'id' };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const paths = ['/api/v1/datasets', '/api/v1/datasets/{slug}/conversations',
@@ -183,10 +315,13 @@ Edit `scope` to match the user's request; discover raw hardware keys from the AP
 
 ```bash
 node --input-type=module <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'DeepSeek-V4-Pro', hardware: 'b200', benchmark_type: 'single_turn',
   isl: 8192, osl: 1024, date_from: '2026-08-01', date_to: '2026-09-04', date_field: 'date' };
 const requests = [];
+const captureDir = mkdtempSync('api-evidence-');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
@@ -196,11 +331,24 @@ if (!validDate(scope.date_from) || !validDate(scope.date_to) || scope.date_from 
 }
 async function read(path) {
   const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, { signal: AbortSignal.timeout(30_000) });
+  const stem = `${captureDir}/${requests.length + 1}`;
+  let response, bytes;
+  try {
+    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
+      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
+    throw error;
+  }
+  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  writeFileSync(record.body_path, bytes, { flag: 'wx' });
+  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
+  requests.push(record);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const data = await response.json();
-  requests.push({ query_url, retrieved_at: new Date().toISOString() });
-  return data;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/benchmarks/history']?.get;
@@ -221,10 +369,19 @@ if (!Array.isArray(rows) || rows.some((row) => !object(row) || !object(row.metri
 const selected = rows.filter((row) => row.hardware === scope.hardware &&
   row.benchmark_type === scope.benchmark_type && row.isl === scope.isl && row.osl === scope.osl &&
   row.date >= scope.date_from && row.date <= scope.date_to).toSorted((a, b) => a.date.localeCompare(b.date));
+const knownConcurrency = selected.map((row) => row.conc)
+  .filter((value) => Number.isSafeInteger(value) && value > 0);
+const concurrencyValues = [...new Set(knownConcurrency)].toSorted((a, b) => a - b);
+const selection_summary = {
+  selected_rows: selected.length,
+  concurrency: { known_rows: knownConcurrency.length, unknown_rows: selected.length - knownConcurrency.length,
+    distinct_count: concurrencyValues.length, min: concurrencyValues[0] ?? null, max: concurrencyValues.at(-1) ?? null },
+};
+writeFileSync(`${captureDir}/selection-summary.json`, JSON.stringify(selection_summary, null, 2), { flag: 'wx' });
 const definitions = schema.components?.schemas?.BenchmarkRows?.items?.properties?.metrics?.properties ?? {};
 const metricKeys = [...new Set(selected.flatMap((row) => Object.keys(row.metrics)))].toSorted();
 console.log(JSON.stringify({
-  scope, requests, returned_rows: rows.length, selected_rows: selected.length,
+  scope, requests, returned_rows: rows.length, selected_rows: selected.length, selection_summary,
   available_hardware: [...new Set(rows.map((row) => row.hardware))].toSorted(),
   observed_dates: [...new Set(selected.map((row) => row.date))],
   metric_descriptions: Object.fromEntries(metricKeys.map((key) => [key, definitions[key]?.description ?? null])),
@@ -238,6 +395,9 @@ interpolation or invented dates. The API documents a complete dated-row array fo
 this model/workload, not a history of all jobs that ran or all data that could have
 been ingested. Report returned and selected counts separately. An empty range means
 no matching returned observations; absent dates do not prove no jobs ran.
+
+For a representative subset, reuse `summarizeSample` from the
+[basic lookup](#basic-benchmark-lookup) on the chosen rows and save its summary.
 
 Keep raw model keys, IDs, `run_url` (including attempt paths), original `date`,
 optional producer fields and `curve_*` snapshot metadata distinct. Rows with equal

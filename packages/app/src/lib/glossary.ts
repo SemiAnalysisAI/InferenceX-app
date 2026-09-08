@@ -465,7 +465,14 @@ const entries = [
       'iso-interactivity',
       'throughput',
     ],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, MI355X_GLM5, AGENTX_DSV4_MI355X_B200],
+    articleSlugs: [
+      B200_GLM5,
+      B200_MINIMAX,
+      B200_KIMI,
+      MI355X_GLM5,
+      AGENTX_DSV4_MI355X_B200,
+      TPU_IRONWOOD,
+    ],
   },
   {
     slug: 'total-cost-of-ownership',

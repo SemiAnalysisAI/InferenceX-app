@@ -1,75 +1,53 @@
 # PowerX measured-data export
 
-Use the bundled Node 24 exporter for measured GPU power and energy in an exact
-single-turn workload. Consult the current
+Use the bundled exporter through the versioned CLI on Node 24 or 26 for measured
+GPU power and energy in an exact single-turn workload. Consult the current
 [OpenAPI benchmark operation](https://inferencex.semianalysis.com/api/openapi.json)
 for supported display models and metric descriptions. The exporter consumes the
 complete public JSON response; an extracted web-page summary cannot establish
 coverage or supply missing observations.
 
-## Run the installed exporter
-
-Resolve the script relative to the loaded `SKILL.md`. From the user's project,
-the default Codex location is `.agents/skills/inferencex-api`; Claude Code uses
-`.claude/skills/inferencex-api`. Use the actual location for a custom installation.
-Output paths are relative to the caller's working directory.
+For a replayable contract 1 bundle, prefer the versioned entry:
 
 ```bash
-INFERENCEX_SKILL_DIR='.agents/skills/inferencex-api'
-node "$INFERENCEX_SKILL_DIR/scripts/export-powerx.mjs" \
-  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --date 2026-09-04 --format csv --output powerx.csv 2> powerx-report.log
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
+  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --format csv \
+  --output-dir evidence/powerx --require-hardware b200
 ```
 
-For JSON, use `--format json --output powerx.json`. The date above is an example
-as-of cutoff; source observations can be older. Omit `--date` for latest available
-data. Require the user's display model and positive integer input/output lengths;
-`--raw-model` optionally narrows the returned raw model key within a display bucket.
-Discover that key from current responses instead of guessing an alias.
+A valid empty scope exits 0 unless the explicit hardware predicate fails, which
+commits the bundle and exits 3. See the [CLI contract](cli.md).
 
-`--format` defaults to CSV. Without `--output`, data goes to stdout. Coverage and
-error messages go to stderr, so redirecting stdout does not mix them into the
-export. Successful exports also emit a JSON metadata record to stderr; retain the
-report log so even a header-only CSV has request, scope, and package-version
-evidence. Run the script with `--help` for the complete CLI interface.
+## Run the installed exporter
+
+Use `inferencex powerx export`. JSON is the default; add `--format csv` when needed.
+`--date` is an as-of cutoff and source observations can be older. `--raw-model`
+optionally narrows the returned raw key within a display bucket; discover that key
+from current responses.
 
 ## Save the response used by an export
 
-Add `--evidence-dir` when the user needs reproducible input evidence. Use a fresh
-path for each invocation, including separate CSV and JSON exports:
+The required `--output-dir` is a new evidence bundle. The exporter saves each
+complete decoded response before filtering. `manifest.json` links it to the result:
 
-```bash
-node "$INFERENCEX_SKILL_DIR/scripts/export-powerx.mjs" \
-  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --format csv --output powerx.csv --evidence-dir './powerx evidence'
-```
+- Top-level `schema_version`, `kind`, `contract_version`, `created_at`, and
+  `producer.package_version` identify the bundle contract and producer.
+- `normalized_arguments` records the display model, workload, date, raw-model filter,
+  and result format.
+- Each `requests[]` entry records the operation, exact URL, allowed statuses, every
+  attempt, and the accepted response's status, retrieval time, relative body path,
+  SHA-256, size, and decoded encoding.
+- `result` records the relative `result.json` or `result.csv` path, format, SHA-256,
+  and size. `coverage` and `summary` retain selection and policy outcomes, including
+  a valid empty selection.
 
-The exporter makes one benchmark request and saves its complete response before
-filtering. `response.json` contains the received decoded body, even when it is an
-HTTP error or malformed JSON. Its SHA-256 covers those saved decoded bytes, not
-compressed wire bytes. `manifest.json` links that response to the export:
+Only a manifest committed last means the bundle completed. HTTP, JSON, shape, or
+write errors exit unsuccessfully; retain the incomplete directory for diagnosis.
+Existing output directories are refused.
 
-- `schema_version: 1`, `package_version`, and `status` (`pending`, `complete`, `failed`).
-- `request`: URL, GET method and all requested API/local filters.
-- `response`: HTTP status, retrieval time, body filename, SHA-256 and checksum meaning;
-  `null` means no HTTP response was received. A received but unreadable body is distinct.
-- `export`: format, absolute destination or `stdout`, output SHA-256 and the existing
-  extraction metadata. An empty successful selection still has context and evidence.
-- `error`: failure explanation when present.
-
-Only `complete` means both the requested export and evidence finished. HTTP, JSON,
-shape, output or evidence-write errors exit unsuccessfully; retain the failed or
-pending manifest and captured body for diagnosis. Existing evidence directories
-are refused; keep output paths outside the evidence directory. Use paths containing
-spaces normally, with shell quotes. Omitting this option saves no response files
-and preserves the existing CSV columns, JSON shape, and stdout/stderr roles.
-
-For verification, hash `response.json` and the actual output, compare the manifest,
-then select rows from that saved response using the recorded filters. A later API
-request is separate evidence and may return different observations. Lookup and
-empty-result diagnostics still record their own request context; if original-input
-evidence is requested for those reads, save each complete consumed response before
-selecting its rows.
+Use `inferencex verify <directory>` to reconstruct the result from the saved
+responses. A later API request is separate evidence and may return different data.
 
 ## Selection and coverage
 
@@ -88,8 +66,8 @@ projection cannot be combined with `powerValid`. The first exporter covers
 single-turn snapshots. For other public reads, return to the general skill;
 history has no `powerValid` parameter.
 
-The summary reports rows returned by the strict API request, rows selected by the
-local scope, and both sets of raw model keys. A requested display bucket can cover
+The result metadata reports rows returned by the strict API request, rows selected
+by the local scope, and both sets of raw model keys. A requested display bucket can cover
 multiple releases. Report the returned keys alongside the requested display name;
 the latter does not establish an exact release for every row.
 
@@ -111,9 +89,10 @@ subset of the selected rows.
 Before making any all, none, or single-value claim about a categorical field such
 as `disagg`, check every selected row; never infer the claim from a sample or subset.
 
-An empty selection succeeds with a header-only CSV or JSON `rows: []` and reports
-**No strictV2 rows matched the requested scope.** This establishes no eligible
-observations for that selection, not an absence of all underlying benchmarks.
+An empty selection succeeds with a header-only CSV or JSON `rows: []`.
+`manifest.json` records `coverage.status: "empty"`; JSON result metadata records
+`selected_rows: 0`. This establishes no eligible observations for that selection,
+not an absence of all underlying benchmarks.
 Non-success HTTP responses, malformed JSON, or unexpected response shapes fail
 with a nonzero status and no successful export. If the complete response cannot
 be obtained, report the access failure rather than reconstructing rows from a
@@ -121,13 +100,16 @@ summary or relaxing strict validity.
 
 ## Diagnose an empty strict selection
 
-Start from the successful export's `powerx-report.log`, whose first line records
-the strict request metadata. Use this recipe only when `selected_rows` is zero
-and the user needs an explanation. It makes **one** unfiltered benchmark request
-by removing only `powerValid`, then reapplies the exact local workload/raw-model
-scope. Keep the original export unchanged and save diagnostic output separately.
-Do not rerun this recipe automatically, broaden the date/model, or merge its rows
-into the validated export.
+Start from a successfully verified JSON bundle, whose `result.json` metadata
+records the strict request and whose `rows` array is empty. Use this recipe only
+when `selected_rows` is zero and the user needs an explanation. It makes **one**
+unfiltered benchmark request by removing only `powerValid`, then reapplies the
+exact local workload/raw-model scope. Keep the original export unchanged and save
+diagnostic output separately. Each attempt saves its complete decoded response and
+URL/time/status/byte-count/SHA-256 record in a new `api-evidence-*` directory before
+parsing or filtering, including HTTP and JSON failures. Keep this directory with
+the diagnostic output. Do not rerun this recipe automatically, broaden the
+date/model, or merge its rows into the validated export.
 
 Validation and measurement availability are independent. Apply these rules in
 order, using the original numeric fields without coercion:
@@ -137,7 +119,7 @@ order, using the original numeric fields without coercion:
 | Numeric `power_valid === 0`                                                                              | `invalid`; any remaining measurements are unreliable.     |
 | A present verdict other than numeric `0` or `1`, or a present schema that is not a positive safe integer | `unknown`.                                                |
 | Numeric schema `>= 3`                                                                                    | `unsupported_schema`; future semantics are not schema v2. |
-| Absent verdict, absent schema, or schema `1`                                                             | `legacy_unverified` for strictV2.                         |
+| Absent verdict, absent schema, or schema `1`                                                             | `legacy_unverified` for strictV2; cause and age unknown.  |
 | Numeric verdict `1` and schema `2`                                                                       | `strictV2_eligible`.                                      |
 
 Check the nine named watts/joules fields separately. `some_recorded` means at
@@ -146,18 +128,36 @@ least one is a finite number, including zero; `missing` means none is. The
 malformed values. Optional role-specific fields can legitimately be absent.
 Temperature/utilization alone does not establish recorded power or energy.
 Missing audit data does not establish invalidity; quote reported reason codes
-only as supplied and leave an unreported cause unknown.
+only as supplied and leave an unreported cause unknown. `legacy_unverified` is
+this recipe's eligibility label, not evidence that a row predates validation.
 
 ```bash
-node --input-type=module - powerx-report.log <<'JS'
-import { readFile } from 'node:fs/promises';
+node --input-type=module - evidence/powerx <<'JS'
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import process from 'node:process';
 
 let strictEmptyConfirmed = false;
 async function diagnose() {
-  if (process.argv.length !== 3) throw new Error('Provide the saved exporter report path');
-  const firstLine = (await readFile(process.argv[2], 'utf8')).split(/\r?\n/u, 1)[0];
-  const { metadata: strict } = JSON.parse(firstLine);
+  if (process.argv.length !== 3) throw new Error('Provide the saved PowerX bundle directory');
+  const manifest = JSON.parse(await readFile(join(process.argv[2], 'manifest.json'), 'utf8'));
+  if (
+    manifest?.schema_version !== 1 || manifest.kind !== 'powerx' ||
+    manifest.contract_version !== 1 || manifest.result?.format !== 'json' ||
+    manifest.result?.path !== 'result.json' ||
+    !/^[a-f0-9]{64}$/u.test(manifest.result?.sha256 ?? '') ||
+    !Number.isSafeInteger(manifest.result?.size) || manifest.result.size < 0 ||
+    manifest.coverage?.status !== 'empty' || manifest.coverage?.selected_records !== 0
+  ) throw new Error('Expected a completed empty PowerX JSON bundle');
+  const resultBytes = await readFile(join(process.argv[2], manifest.result.path));
+  if (
+    resultBytes.length !== manifest.result.size ||
+    createHash('sha256').update(resultBytes).digest('hex') !== manifest.result.sha256
+  ) throw new Error('PowerX result size or hash differs from manifest.json');
+  const document = JSON.parse(resultBytes.toString('utf8'));
+  const strict = document?.metadata;
+  const args = manifest.normalized_arguments;
   const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   const positiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
   const date = strict?.requested_date;
@@ -167,6 +167,11 @@ async function diagnose() {
     new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
   );
   if (
+    !object(args) || args.format !== 'json' || args.model !== strict?.requested_model ||
+    args.date !== strict?.requested_date || args.isl !== strict?.isl || args.osl !== strict?.osl ||
+    args.raw_model !== strict?.raw_model ||
+    !object(document) || document.schema_version !== 1 || document.kind !== 'powerx' ||
+    !Array.isArray(document.rows) || document.rows.length !== 0 ||
     !object(strict) || strict.selected_rows !== 0 ||
     !Array.isArray(strict.selected_models) || strict.selected_models.length !== 0 ||
     !Number.isSafeInteger(strict.returned_rows) || strict.returned_rows < 0 ||
@@ -179,7 +184,7 @@ async function diagnose() {
     !positiveInteger(strict.isl) || !positiveInteger(strict.osl) || !validDate ||
     strict.date_selection !== (date === null ? 'latest' : 'as-of') ||
     !(strict.raw_model === null || typeof strict.raw_model === 'string' && strict.raw_model.trim())
-  ) throw new Error('Expected a successful empty strict export report with valid scope metadata');
+  ) throw new Error('Expected a successful empty strict PowerX JSON result with valid scope metadata');
   const url = new URL(strict.query_url);
   if (
     url.origin !== 'https://inferencex.semianalysis.com' ||
@@ -191,10 +196,24 @@ async function diagnose() {
   ) throw new Error('Recorded URL does not match the strict benchmark scope');
   strictEmptyConfirmed = true;
   url.searchParams.delete('powerValid');
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+  const captureDir = await mkdtemp('api-evidence-');
+  let response, bytes;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    bytes = Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    await writeFile(join(captureDir, 'response.json'), JSON.stringify({ query_url: url.href,
+      failed_at: new Date().toISOString(), status: response?.status ?? null, error: error.message }),
+      { flag: 'wx' });
+    throw error;
+  }
+  const capture = { query_url: url.href, retrieved_at: new Date().toISOString(), status: response.status,
+    body_path: join(captureDir, 'response.body'), decoded_bytes: bytes.byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex') };
+  await writeFile(capture.body_path, bytes, { flag: 'wx' });
+  await writeFile(join(captureDir, 'response.json'), JSON.stringify(capture), { flag: 'wx' });
   if (!response.ok) throw new Error(`Diagnostic request returned HTTP ${response.status}`);
-  const rows = await response.json();
-  const retrievedAt = new Date().toISOString();
+  const rows = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   function benchmarkRow(row) {
     if (!object(row) || !object(row.metrics)) return false;
     const date = new Date(`${row.date}T00:00:00Z`);
@@ -253,7 +272,7 @@ async function diagnose() {
   console.log(JSON.stringify({
     strict,
     diagnostic: {
-      query_url: url.href, retrieved_at: retrievedAt, returned_rows: rows.length, scoped_rows: scoped.length,
+      ...capture, returned_rows: rows.length, scoped_rows: scoped.length,
       scope: { requested_model: strict.requested_model, requested_date: date, raw_model: strict.raw_model,
         benchmark_type: 'single_turn', isl: strict.isl, osl: strict.osl },
       outcome: validationCounts.strictV2_eligible ? 'response_discrepancy' : scoped.length ? 'classified' : 'no_observations',
@@ -264,7 +283,7 @@ async function diagnose() {
 diagnose().catch((error) => {
   const status = strictEmptyConfirmed
     ? 'The earlier strict selection remains empty; underlying availability is unknown.'
-    : 'No diagnostic request was made; inspect the report.';
+    : 'No diagnostic request was made; inspect the saved result.';
   console.error(`Diagnostic failed: ${error.message}. ${status}`);
   process.exitCode = 1;
 });
@@ -347,14 +366,11 @@ Single-turn rows commonly omit producer workflow IDs/start times, while snapshot
 fields remain present. Keep those producer fields absent; a snapshot ID does not
 identify the producer of every observation. Preserve source timestamps as supplied.
 
-Preserve raw topology alongside `disagg`. On non-disaggregated rows, prefill and
-decode roles can share the same GPUs: `num_prefill_gpu=8` and `num_decode_gpu=8`
-are not evidence of a 16-GPU deployment. Do not sum those role fields or invent a
-deployment-total column or range. Report the original configuration fields; if a
-user requests a derived total, first verify the allocation semantics for that
-configuration. A disaggregated configuration can have distinct role pools, but
-that rule cannot be applied to aggregated rows. This follows the distinction in
-the [existing data-transform documentation](https://github.com/SemiAnalysisAI/InferenceX-app/blob/cc5d87cd37a3a502ce63b58c8985fa034fa07965/docs/data-transforms.md).
+Apply the [shared GPU topology rule](../SKILL.md#evidence-and-interpretation) to
+CSV additions and prose. For example, raw role counts `64/64`, `disagg=false` and
+TP8/EP8 establish neither 64 nor 8 physical GPUs. Keep those configuration values
+and an unknown physical total until producer allocation evidence resolves it.
+Equal roles can overlap; verified disaggregated pools can be distinct.
 
 Optional `workers`, `power_audit`, and `power_invalid_reasons` are top-level row
 fields, separate from `metrics`. JSON retains them when present, including null

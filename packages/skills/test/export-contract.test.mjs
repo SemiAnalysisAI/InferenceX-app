@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import { selectAgentxRows } from '../skills/inferencex-api/scripts/export-contract.mjs';
 import { packageInfo, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
@@ -103,20 +104,21 @@ const bodies = {
   'trace-availability': { 1: false },
 };
 const powerUrl = `${origin}benchmarks?model=GLM-5&powerValid=strictV2`;
+const responseIdFor = (body) => createHash('sha256').update(JSON.stringify(body)).digest('hex');
+const responseId = responseIdFor(powerBenchmarks);
 const requestUrls = [
-  { operation: 'benchmarks', url: `${origin}benchmarks?model=DeepSeek-V4-Pro&date=2026-09-04` },
+  {
+    operation: 'benchmarks',
+    url: `${origin}benchmarks?model=DeepSeek-V4-Pro&date=2026-09-04`,
+    response_id: responseIdFor(agentBenchmarks),
+  },
   ...Object.keys(bodies).map((operation) => ({
     operation,
     url: `${origin}${operation}?ids=2%2C1`,
+    response_id: responseIdFor(bodies[operation]),
+    requested_ids: ['2', '1'],
   })),
 ];
-// Captured from the accepted 0.10 exporter before extraction; hashes cover every byte.
-const golden = {
-  'powerx.json': '0b8a1f25f5c0531bd5515941e16cafa8d15e70bd078c3f547c2633c837a0e651',
-  'powerx.csv': 'ad965a8195cba28a3bb5e9d66482f24f88a3d4ce8cf0529f077ee1b9697a8c2b',
-  'agentx.json': '67add35ceb56cc37792be30cad7d2b6108d9c8856e17a636a72c96a07f45ad1d',
-  'agentx.csv': '444f5ff8f3ea9f3f89356a1607c46c04d0a35ce09e678e9b97311b5ac4cace9e',
-};
 let installed;
 let preload;
 
@@ -144,6 +146,7 @@ globalThis.fetch = async input => {
 function online(kind, format) {
   const cwd = suite.project();
   const fixture = join(cwd, 'fixture.json');
+  const output = join(cwd, 'bundle');
   writeFileSync(
     fixture,
     JSON.stringify(
@@ -156,19 +159,25 @@ function online(kind, format) {
     kind === 'powerx'
       ? ['--model', 'GLM-5', '--isl', '8192', '--osl', '1024']
       : ['--model', 'DeepSeek-V4-Pro', '--date', '2026-09-04', '--hardware', 'b300'];
-  return succeeded(
+  succeeded(
     suite.node(
       [
         '--import',
         pathToFileURL(preload).href,
-        join(installed, `scripts/export-${kind}.mjs`),
+        join(installed, 'scripts/inferencex.mjs'),
+        kind,
+        'export',
         ...args,
         '--format',
         format,
+        '--output-dir',
+        output,
       ],
       { cwd, env: { ...suite.environment, INFERENCEX_TEST_FIXTURE: fixture } },
     ),
-  ).stdout;
+  );
+  const manifest = JSON.parse(readFileSync(join(output, 'manifest.json'), 'utf8'));
+  return readFileSync(join(output, manifest.result.path));
 }
 
 function contract() {
@@ -191,6 +200,7 @@ function agentInput(api, format = 'json', producerVersion = packageInfo.version)
   );
   return {
     producerVersion,
+    contractVersion: 1,
     format,
     scope: agentScope,
     selection,
@@ -200,40 +210,18 @@ function agentInput(api, format = 'json', producerVersion = packageInfo.version)
   };
 }
 
-test('builders retain the exact captured 0.10 JSON and CSV bytes', async () => {
-  const api = await contract();
-  for (const format of ['json', 'csv']) {
-    const power = api.buildPowerxExport({
-      producerVersion: '0.10.0',
-      format,
-      benchmarks: powerBenchmarks,
-      scope: powerScope,
-      queryUrl: powerUrl,
-      retrievedAt,
-    });
-    const agent = api.buildAgentxExport(agentInput(api, format, '0.10.0'));
-    for (const [kind, built] of [
-      ['powerx', power],
-      ['agentx', agent],
-    ]) {
-      assert.equal(
-        createHash('sha256').update(built.outputBytes).digest('hex'),
-        golden[`${kind}.${format}`],
-      );
-    }
-  }
-});
-
 test('packed pure builders reconstruct the complete online bytes and metadata', async () => {
   const api = await contract();
   for (const format of ['json', 'csv']) {
     const power = api.buildPowerxExport({
       producerVersion: packageInfo.version,
+      contractVersion: 1,
       format,
       benchmarks: powerBenchmarks,
       scope: powerScope,
       queryUrl: powerUrl,
       retrievedAt,
+      responseId,
     });
     const agent = api.buildAgentxExport(agentInput(api, format));
     for (const [kind, built] of [
@@ -241,59 +229,18 @@ test('packed pure builders reconstruct the complete online bytes and metadata', 
       ['agentx', agent],
     ]) {
       assert.ok(Buffer.isBuffer(built.outputBytes));
-      assert.equal(built.outputBytes.toString(), online(kind, format));
+      assert.deepEqual(built.outputBytes, online(kind, format));
       assert.equal(built.metadata.package_version, packageInfo.version);
       if (format === 'json')
         assert.deepEqual(JSON.parse(built.outputBytes), {
           schema_version: 1,
+          kind,
           metadata: built.metadata,
+          ...(kind === 'powerx' ? { units: api.POWERX_UNITS } : {}),
           rows: built.rows,
         });
       else assert.ok(built.outputBytes.toString().endsWith('\r\n'));
     }
-  }
-});
-
-test('historical versions use their exact envelopes and reject unknown contracts', async () => {
-  const api = await contract();
-  for (const producerVersion of ['0.9.0', '0.10.0', '0.11.0']) {
-    const power = api.buildPowerxExport({
-      producerVersion,
-      format: 'json',
-      benchmarks: powerBenchmarks,
-      scope: powerScope,
-      queryUrl: powerUrl,
-      retrievedAt,
-    });
-    assert.deepEqual(
-      Object.keys(JSON.parse(power.outputBytes)),
-      producerVersion === '0.9.0' ? ['metadata', 'rows'] : ['schema_version', 'metadata', 'rows'],
-    );
-    assert.equal(power.metadata.package_version, producerVersion);
-    const agent = api.buildAgentxExport(agentInput(api, 'json', producerVersion));
-    assert.equal(JSON.parse(agent.outputBytes).schema_version, 1);
-    assert.equal(agent.metadata.package_version, producerVersion);
-  }
-  for (const producerVersion of ['0.8.0', '0.12.0', '0.11.0-beta.1', 'v0.10.0', undefined]) {
-    assert.throws(
-      () =>
-        api.buildPowerxExport({
-          producerVersion,
-          format: 'json',
-          benchmarks: [],
-          scope: powerScope,
-          queryUrl: powerUrl,
-          retrievedAt,
-        }),
-      { code: 'INVALID_RESPONSE' },
-    );
-    assert.throws(
-      () =>
-        api.buildAgentxExport(
-          agentInput(api, 'json', producerVersion === undefined ? null : producerVersion),
-        ),
-      { code: 'INVALID_RESPONSE' },
-    );
   }
 });
 
@@ -307,7 +254,10 @@ test('AgentX retains duplicate rows, first-seen IDs and exact omitted enrichment
     [2, '1', 2, '900719925474099312345', '01', 0],
   );
   const { rows, metadata } = api.buildAgentxExport(input);
-  assert.equal(rows[0].agentx.aggregates.value, bodies['agentic-aggregates'][2]);
+  assert.deepEqual(rows[0].agentx.aggregates.value, {
+    ...bodies['agentic-aggregates'][2],
+    id: '2',
+  });
   assert.equal(rows[1].agentx.aggregates.value.extra, false);
   assert.deepEqual(rows[0].agentx.trace_availability, {
     status: 'no_stored_trace',
@@ -339,14 +289,60 @@ test('AgentX retains duplicate rows, first-seen IDs and exact omitted enrichment
   );
 });
 
+test('AgentX public filters are exact, case-sensitive, independent, and composable', () => {
+  const selected = observation('1');
+  const filters = [
+    ['raw_model', 'model', 'dsv4', 'DSV4'],
+    ['hardware', 'hardware', 'b300', 'B300'],
+    ['framework', 'framework', 'sglang', 'SGLANG'],
+    ['precision', 'precision', 'fp4', 'FP4'],
+    ['spec_method', 'spec_method', 'mtp', 'MTP'],
+    ['offload_mode', 'offload_mode', 'off', 'OFF'],
+    ['concurrency', 'conc', 1, 2],
+  ];
+  const scope = {
+    ...agentScope,
+    ...Object.fromEntries(filters.map(([name, _field, value]) => [name, value])),
+  };
+  const decoys = filters.map(([_name, field, _value, decoy], index) =>
+    observation(String(index + 2), { [field]: decoy }),
+  );
+  const combined = selectAgentxRows([selected, ...decoys], scope);
+  assert.deepEqual(
+    combined.selected.map((row) => row.id),
+    ['1'],
+  );
+  assert.deepEqual(combined.ids, [1]);
+  assert.equal(combined.outcome, 'selected_rows');
+
+  for (const [name, field, value, decoy] of filters) {
+    const oneFilterScope = {
+      ...agentScope,
+      [name]: value,
+      hardware: name === 'hardware' ? value : null,
+    };
+    const result = selectAgentxRows(
+      [selected, observation('2', { [field]: decoy })],
+      oneFilterScope,
+    );
+    assert.deepEqual(
+      result.selected.map((row) => row.id),
+      ['1'],
+      name,
+    );
+  }
+});
+
 test('distinct row validators check unselected rows and chunk validation stays strict', async () => {
   const api = await contract();
   const powerInput = {
     producerVersion: packageInfo.version,
+    contractVersion: 1,
     format: 'json',
     scope: powerScope,
     queryUrl: powerUrl,
     retrievedAt,
+    responseId,
   };
   const withoutRecipe = { ...powerRow };
   delete withoutRecipe.recipe_fingerprint;
@@ -415,6 +411,7 @@ test('builders are deterministic without clocks or input mutation and sanitize s
   const selection = api.selectAgentxRows(benchmarks, scope);
   const input = freeze({
     producerVersion: packageInfo.version,
+    contractVersion: 1,
     format: 'json',
     scope,
     selection,
@@ -446,11 +443,13 @@ test('builders are deterministic without clocks or input mutation and sanitize s
     assert.equal(benchmarks[0].metrics.overflow, Infinity);
     const power = api.buildPowerxExport({
       producerVersion: packageInfo.version,
+      contractVersion: 1,
       format: 'json',
       benchmarks: freeze([{ ...powerRow, metrics: { ...powerRow.metrics, other: Infinity } }]),
       scope: freeze(powerScope),
       queryUrl: powerUrl,
       retrievedAt,
+      responseId,
     });
     assert.equal(power.metadata.non_finite_values, 1);
     assert.equal(power.rows[0].metrics.other, null);

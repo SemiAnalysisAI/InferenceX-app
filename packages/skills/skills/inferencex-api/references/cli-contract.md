@@ -1,135 +1,78 @@
-# Command errors and unattended exports
+# Command errors, scheduling, and installation recovery
 
-Read this when a scheduler consumes an InferenceX helper, a command fails, or an
-installed skill needs an upgrade. Domain selection, units and interpretation stay
-in the relevant PowerX, AgentX or comparison cookbook.
+Read this when automation consumes `inferencex`, a command fails, or an installed
+skill needs an upgrade. Domain selection and interpretation stay in the domain
+cookbooks; the complete interface is in [the CLI contract](cli.md).
 
-## Keep success and failure separate
+## Handle one attempt
 
-All six data helpers and the installer accept `--error-format json`. This changes
-failure diagnostics, not the successful export format. A failed command writes
-one JSON document to stderr:
+Each attempt needs a new output directory. Branch on the exit code before parsing
+stdout or stderr:
 
-```json
-{
-  "schema_version": 1,
-  "package": "@semianalysisai/inferencex-skills",
-  "package_version": "0.10.0",
-  "command": "export-powerx",
-  "error": {
-    "code": "INVALID_ARGUMENT",
-    "message": "--model requires a display model name"
-  }
-}
-```
+| Exit  | Meaning                                                 |
+| ----- | ------------------------------------------------------- |
+| `0`   | Complete bundle; requested policy passed or was absent  |
+| `3`   | Complete, valid bundle; explicit coverage policy failed |
+| `2`   | Invalid arguments                                       |
+| `1`   | Operational, response, verification, or output failure  |
+| `130` | Cancelled before the bundle committed                   |
 
-Branch on the exit code first. Parse stderr as this error envelope only when the
-command fails in JSON error mode. Successful commands may put domain coverage or
-status information on stderr. Read the successful export from its selected
-destination; an empty selection is a successful, scoped result.
-
-| Exit  | Meaning in JSON error mode                          |
-| ----- | --------------------------------------------------- |
-| `0`   | Command completed, including valid empty selections |
-| `2`   | Invalid arguments                                   |
-| `1`   | An operational or unexpected failure                |
-| `130` | Graceful cancellation                               |
-
-| `error.code`       | Meaning                                                             |
-| ------------------ | ------------------------------------------------------------------- |
-| `INVALID_ARGUMENT` | Invalid or missing command input                                    |
-| `HTTP_ERROR`       | The server returned a non-success status; `http_status` is included |
-| `NETWORK_ERROR`    | The HTTP request could not complete                                 |
-| `TIMEOUT`          | A request or HTTP sequence deadline expired                         |
-| `INVALID_RESPONSE` | The response failed decoding, shape or domain validation            |
-| `OUTPUT_ERROR`     | An export, evidence or output-stream write failed                   |
-| `CANCELLED`        | The process handled an interrupt or termination signal              |
-| `INTERNAL_ERROR`   | An unexpected failure outside the classified boundaries             |
-
-Use `error.code` and optional `http_status` for decisions; retain `message` for
-diagnosis. Human-readable wording is not a stable parsing interface. The default
-and `--error-format text` preserve the existing text diagnostics and argument exit
-behavior. The installer's existing `--json` controls its stdout result; explicit
-`--error-format json` takes precedence for failures and emits no legacy stdout
-error object.
-
-For example, run the installed PowerX helper and preserve each result separately:
+Machine errors are one JSON document on stderr. Use `error.code` and optional
+`http_status`; retain `message` for diagnosis. `--error-format text` selects text
+errors. `--human` changes successful stdout only.
 
 ```python
 import json
 import subprocess
-import sys
 from pathlib import Path
 
-attempt = Path("powerx-attempt-1")
-attempt.mkdir()  # A fresh directory preserves earlier successes and failures.
+attempt = Path("attempt-1")
+attempt.mkdir()
 command = [
-    "node", ".agents/skills/inferencex-api/scripts/export-powerx.mjs",
+    "inferencex", "powerx", "export",
     "--model", "DeepSeek-V4-Pro", "--isl", "8192", "--osl", "1024",
-    "--format", "json", "--output", str(attempt / "powerx.json"),
-    "--evidence-dir", str(attempt / "evidence"), "--error-format", "json",
+    "--output-dir", str(attempt / "powerx"),
 ]
 result = subprocess.run(command, capture_output=True, text=True, check=False)
 (attempt / "stdout.txt").write_text(result.stdout)
 (attempt / "stderr.txt").write_text(result.stderr)
 (attempt / "exit-code.txt").write_text(f"{result.returncode}\n")
-if result.returncode:
+if result.returncode not in (0, 3):
     failure = json.loads(result.stderr)
-    print(f"{failure['error']['code']}: {failure['error']['message']}", file=sys.stderr)
-    raise SystemExit(result.returncode)
-export = json.loads((attempt / "powerx.json").read_text())
-print(f"Selected observations: {len(export['rows'])}")
+    raise SystemExit(failure["error"]["code"])
+summary = json.loads(result.stdout)
 ```
 
-Use the `.claude/skills` path for a Claude installation. The helpers do not retry
-HTTP automatically. After an operational failure, inspect the retained evidence
-and fix the reported condition before choosing a fresh attempt.
-Before delivering an export command for a scheduler, run that exact command once
-with a fresh attempt path. Verify directory creation, child exit status and retained
-output files, including when the proposed command calls a wrapper you created.
-If a command was denied or only a different invocation ran, label the delivered
-command as unverified. Equivalent arguments do not prove its shell setup or wrapper ran.
+Exit 3 is a policy outcome, not invalid evidence. Consume the committed bundle only
+after reviewing the failed predicate in `policy.reasons`. A directory without
+`manifest.json` is incomplete. If stdout fails after the manifest commits, the
+error records `bundle_complete: true`; verify that directory offline.
 
-## Output and cancellation limits
-
-PowerX JSON carries `schema_version: 1` from package 0.10.0; its `metadata` and
-`rows` retain their existing meanings. AgentX and comparison payloads retain
-their own schema and domain fields. CSV contracts are unchanged.
-
-Graceful `SIGINT`/`SIGTERM` cancellation aborts active HTTP work and follows the
-helper's existing output rollback. The installer checks cancellation between filesystem
-phases and while waiting for another installer; each synchronous filesystem operation
-finishes before cancellation is observed. Before committed activation, cancellation rolls
-back and exits 130. Once activation is committed, the installer finishes cleanup and reports
-the completed installation instead of reporting cancellation for an already installed version.
-Stdout must finish writing within five seconds; a stalled consumer yields
-`OUTPUT_ERROR`. A consumer may already
-have received part of a failed stdout stream: accept the export only after exit 0. A file export and its evidence manifest remain separate writes; verify both
-before treating an evidence bundle as complete. `SIGKILL` prevents immediate cleanup
-in the killed process. A later installer invocation can still recover supported
-persisted installation transactions after `SIGKILL`, as described below.
+The CLI bounds decoded response bytes, total bytes, deadlines, and attempts per
+command. A completed bundle records the request attempts and accepted responses.
+`SIGINT` and `SIGTERM` cancel active work. Before commit, retain any files already
+written and the wrapper's stdout, stderr, and exit code; the incomplete directory
+does not guarantee a persisted request ledger. A completed bundle is immutable.
 
 ## Inspect and recover an installation
 
-Run the pinned installer's `status --json` to inspect the destination and
-`install --force --dry-run --json` to preview the selected package. Both operations
-leave files unchanged and report pending recovery. The invoking installer version
-and the destination's installed version are separate facts. Count planned writes
-from the returned `write_paths` entries.
+Use the pinned installer to inspect the destination and preview an upgrade:
 
-An upgrade stages a complete merged skill directory and version receipt before
-activation. Packaged files replace matching files; unrelated and obsolete files
-are retained. Supported interrupted activation is recovered by the next real
-installation. Keep transaction data intact when inspection reports a live owner,
-foreign metadata or an unsafe path; resolve that reported condition before retrying.
+```bash
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+  inferencex-skills status --target codex --json
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+  inferencex-skills install --target codex --force --dry-run --json
+```
 
-Recovery follows the persisted commit state. Before committed activation, supported
-failure recovery restores the previous installation (or removes an unfinished first
-installation). After committed activation, cleanup failure keeps the new installation;
-a later real install finishes supported cleanup. An install error alone does not
-identify which version is active: inspect the pending state and recover it before
-claiming that the old or new version is installed.
+`status` and `--dry-run` do not change the installation. A real install stages the
+merged destination and receipt, then recovers supported interrupted transactions.
+Before committed activation it restores the previous installation; after commit it
+keeps the new installation and finishes cleanup. Unsafe or foreign transaction
+state remains blocked for inspection.
 
-These guarantees cover detected failures and supported process interruption.
-They do not promise durability after power loss, repair arbitrary external edits,
-or replace a backup of local changes.
+Receipts from 0.12.0 onward use package integrity checks. A receipt from 0.11 or earlier identifies
+the installed version only and can be upgraded with `--force`. The installer
+preserves unmanaged files, so an old helper such as `verify-export.mjs` may remain
+after upgrade; its presence does not make it a supported 0.12.0 command. Review local
+edits before overwriting packaged files.

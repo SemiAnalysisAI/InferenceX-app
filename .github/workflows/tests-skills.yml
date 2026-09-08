@@ -1,6 +1,7 @@
 name: 'Tests (Skills)'
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -16,16 +17,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  packed-skills:
-    name: Packed skills (Node ${{ matrix.node-version }})
-    if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 10
+  pack-archive:
+    name: Pack skills archive (Linux, Node 24)
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft }}
+    timeout-minutes: 5
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    outputs:
+      filename: ${{ steps.pack.outputs.filename }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+      artifact-name: ${{ steps.pack.outputs.artifact-name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          check-latest: true
+          package-manager-cache: false
+      - name: Pack the single platform-test archive
+        id: pack
+        working-directory: packages/skills
+        shell: bash
+        run: |
+          destination="$RUNNER_TEMP/inferencex-skills-archive"
+          mkdir -p "$destination"
+          npm pack --json --pack-destination "$destination" > "$destination/pack.json"
+          filename="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1]))[0].filename)" "$destination/pack.json")"
+          archive="$destination/$filename"
+          sha256="$(node -e "const fs=require('node:fs'),crypto=require('node:crypto'); console.log(crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$archive")"
+          printf '%s  %s\n' "$sha256" "$filename" > "$destination/archive.sha256"
+          rm "$destination/pack.json"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "artifact-name=inferencex-skills-platform-archive-attempt-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Upload the exact platform-test archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.pack.outputs.artifact-name }}
+          path: |
+            ${{ runner.temp }}/inferencex-skills-archive/${{ steps.pack.outputs.filename }}
+            ${{ runner.temp }}/inferencex-skills-archive/archive.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  packed-skills:
+    name: Packed skills (${{ matrix.os.name }}, Node ${{ matrix.node-version }})
+    needs: pack-archive
+    if: ${{ needs.pack-archive.result == 'success' }}
+    timeout-minutes: 10
+    runs-on: ${{ matrix.os.runner }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - id: linux
+            name: Linux
+            runner: blacksmith-2vcpu-ubuntu-2404
+          - id: macos
+            name: macOS
+            runner: macos-latest
         node-version: ['24', '26']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,5 +91,47 @@ jobs:
           node-version: ${{ matrix.node-version }}
           check-latest: true
           package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Install pinned schema-consumer dependencies
+        run: bun install --frozen-lockfile
+      - name: Download the exact Node 24 archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.pack-archive.outputs.artifact-name }}
+          path: ${{ runner.temp }}/inferencex-skills-archive
+      - name: Record runtime and runner inventory
+        shell: bash
+        run: |
+          node -p 'JSON.stringify({node: process.version, platform: process.platform, architecture: process.arch})'
+          npm --version
+          uname -a
+          if [[ "$RUNNER_OS" == "macOS" ]]; then sw_vers; else cat /etc/os-release; fi
       - name: Test the packed interfaces
+        env:
+          INFERENCEX_SKILLS_ARCHIVE: ${{ runner.temp }}/inferencex-skills-archive/${{ needs.pack-archive.outputs.filename }}
+          INFERENCEX_SKILLS_ARCHIVE_SHA256: ${{ needs.pack-archive.outputs.sha256 }}
         run: node --test packages/skills/test/*.test.mjs
+      - name: Validate published schemas
+        env:
+          INFERENCEX_SKILLS_ARCHIVE: ${{ runner.temp }}/inferencex-skills-archive/${{ needs.pack-archive.outputs.filename }}
+          INFERENCEX_SKILLS_ARCHIVE_SHA256: ${{ needs.pack-archive.outputs.sha256 }}
+        run: node packages/skills/test/schema-consumers.mjs
+      - name: Record successful platform acceptance
+        env:
+          ACCEPTANCE_OS: ${{ matrix.os.id }}
+          ACCEPTANCE_NODE: ${{ matrix.node-version }}
+          ACCEPTANCE_JOB: Packed skills (${{ matrix.os.name }}, Node ${{ matrix.node-version }})
+          ARCHIVE_SHA256: ${{ needs.pack-archive.outputs.sha256 }}
+        shell: bash
+        run: |
+          destination="$RUNNER_TEMP/inferencex-skills-platform-acceptance"
+          mkdir -p "$destination"
+          node -e "const fs=require('node:fs'); const record={os:process.env.ACCEPTANCE_OS,node:process.env.ACCEPTANCE_NODE,arch:process.arch,status:'passed',archive_sha256:process.env.ARCHIVE_SHA256,run_id:process.env.GITHUB_RUN_ID,run_attempt:process.env.GITHUB_RUN_ATTEMPT,head_sha:process.env.GITHUB_SHA,job_name:process.env.ACCEPTANCE_JOB,evidence_url:'https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/'+process.env.GITHUB_RUN_ID}; fs.writeFileSync(process.argv[1], JSON.stringify(record,null,2)+'\n',{flag:'wx'})" "$destination/${ACCEPTANCE_OS}-node-${ACCEPTANCE_NODE}.json"
+          cp "$RUNNER_TEMP/inferencex-skills-archive/archive.sha256" "$destination/archive.sha256"
+      - name: Upload platform acceptance record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: inferencex-skills-${{ matrix.os.id }}-node-${{ matrix.node-version }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/inferencex-skills-platform-acceptance/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@0.11.0` to query existing
+Use `@semianalysisai/inferencex-skills@0.12.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -8,24 +8,25 @@ constructing requests.
 
 ## Install
 
-The commands below install the verified public 0.11.0 release advertised on
-[/api](https://inferencex.semianalysis.com/api) and
-[/zh/api](https://inferencex.semianalysis.com/zh/api). For a future unpublished
-candidate, use the [local archive instructions](../packages/skills/README.md#review-a-local-archive).
+The commands below apply after 0.12.0 is published and publicly verified. During
+candidate review, use the [local archive instructions](../packages/skills/README.md#review-a-local-archive).
 
 With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.11.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
 InferenceX checkout or database credentials. The skill uses HTTP directly; the
 repository's MCP server is a separate integration.
+
+The [migration guide](./inferencex-cli-compatibility.md) explains the 0.12.0 command
+and evidence-directory contract.
 
 To upgrade, choose a new published version and add `--force`. Existing skills are
 otherwise skipped. Save local edits first: force overwrites matching files and
@@ -48,22 +49,23 @@ cutoff unless `exact=true`, and even an exact snapshot can carry older observati
 
 ## Export measured PowerX data
 
-Run the installed exporter from the same project:
+Run the installed CLI from the same project:
 
 ```bash
-node .agents/skills/inferencex-api/scripts/export-powerx.mjs \
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
   --model DeepSeek-V4-Pro --raw-model dsv4 --isl 8192 --osl 1024 \
-  --output powerx.csv 2> powerx-report.log
+  --format csv --output-dir evidence/powerx-csv
 
-node .agents/skills/inferencex-api/scripts/export-powerx.mjs \
+node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \
   --model DeepSeek-V4-Pro --raw-model dsv4 --isl 8192 --osl 1024 \
-  --format json --output powerx.json
+  --output-dir evidence/powerx-json
 ```
 
 For Claude Code, replace `.agents/skills` with `.claude/skills`. Add
 `--date YYYY-MM-DD` for an as-of cutoff. The exporter requests
 `powerValid=strictV2` and selects the exact single-turn workload locally. Keep the
-CSV report log: it records the request URL, retrieval time, filters,
+bundle manifest: it records the request URL, retrieval time, filters,
 returned/selected counts and metric coverage even when no rows match. JSON keeps
 complete selected rows and extraction metadata, including available producer
 identities and separate `curve_*` snapshot fields.

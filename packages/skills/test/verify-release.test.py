@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -22,6 +23,21 @@ check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 VERSION = '0.4.0'
 ETARGET = f'npm error code ETARGET\nnpm error notarget No matching version found for {check.PACKAGE}@{VERSION}.\n'
+POWERX_UNITS = {
+    'avg_power_w': 'measured W per GPU',
+    'prefill_avg_power_w': 'role-local measured W per GPU',
+    'decode_avg_power_w': 'role-local measured W per GPU',
+    'joules_per_successful_query': 'whole-deployment accelerator J/query',
+    'joules_per_input_token': 'whole-deployment accelerator J/input token',
+    'joules_per_output_token': 'whole-deployment accelerator J/output token',
+    'joules_per_total_token': 'whole-deployment accelerator J/total token',
+    'prefill_joules_per_input_token': 'role-local accelerator J/input token',
+    'decode_joules_per_output_token': 'role-local accelerator J/output token',
+    'avg_temp_c': 'per-GPU degrees C',
+    'peak_temp_c': 'per-GPU degrees C',
+    'avg_util_pct': 'per-GPU percent',
+    'avg_mem_used_mb': 'per-GPU MB',
+}
 
 
 class Clock:
@@ -228,17 +244,20 @@ class RetryTests(unittest.TestCase):
             entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
             entry.size = len(content)
             packed.addfile(entry, io.BytesIO(content))
+            cli = tarfile.TarInfo('package/skills/inferencex-api/scripts/inferencex.mjs')
+            cli.size = len(content)
+            packed.addfile(cli, io.BytesIO(content))
         body = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
+        version = '0.12.0'
+        record = {'name': check.PACKAGE, 'version': version, 'filename': 'candidate.tgz',
                   'sha256': hashlib.sha256(body).hexdigest(),
                   'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
         (self.root / 'candidate.tgz').write_bytes(body)
         check.save(self.root / 'release.json', record)
         command = ['verify-release.py', 'public', str(self.root / 'release.json'), '--model', 'Example',
                    '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example',
-                   '--agentx-point-id', '7', '--agentx-no-trace-id', '8',
                    '--evidence', str(self.root / 'evidence')]
-        metadata = {'name': check.PACKAGE, 'version': VERSION, 'dist': {'integrity': 'wrong'}}
+        metadata = {'name': check.PACKAGE, 'version': version, 'dist': {'integrity': 'wrong'}}
         with patch.object(sys, 'argv', command), patch.object(check, 'fetch_public', return_value=json.dumps(metadata)) as fetch, \
                 patch.object(check, 'install_target') as install, patch('builtins.print'):
             with self.assertRaisesRegex(ValueError, 'Public metadata differs'):
@@ -251,1403 +270,1468 @@ class RetryTests(unittest.TestCase):
         self.assertIn('Public metadata differs', report['error'])
         self.assertEqual(report['public_retry_policy']['total_deadline_seconds'], 300)
 
-    def test_csv_request_metadata_must_match_its_own_capture(self):
-        url = check.API + '?model=Example&powerValid=strictV2'
-        args = SimpleNamespace(model='Example', date=None, isl=8192, osl=1024, raw_model=None, strict_url=url)
-        row = {'id': '9007199254740993', 'model': 'example', 'benchmark_type': 'single_turn',
-               'isl': 8192, 'osl': 1024, 'metrics': {'power_valid': 1, 'power_metric_schema_version': 2, 'avg_power_w': 0}}
-        metadata = {'package_version': VERSION, 'query_url': url, 'requested_model': 'Example', 'requested_date': None,
-                    'date_selection': 'latest', 'raw_model': None, 'benchmark_type': 'single_turn', 'isl': 8192, 'osl': 1024,
-                    'retrieved_at': '2026-09-05T00:00:00Z', 'returned_rows': 1, 'selected_rows': 1,
-                    'returned_models': ['example'], 'selected_models': ['example'],
-                    'excluded_rows': {'outside_requested_scope': 0, 'not_strict_v2': 0}, 'metric_coverage': {}}
-        for key in check.METRIC_COLUMNS - {'power_valid', 'power_metric_schema_version'}:
-            present = int(key == 'avg_power_w')
-            metadata['metric_coverage'][key] = {'available_rows': present, 'unavailable_rows': 1 - present}
-        evidence = self.root / 'powerx-csv-evidence'
-        evidence.mkdir()
-        body = json.dumps([row]).encode()
-        (evidence / 'response.json').write_bytes(body)
-        manifest = {'schema_version': 1, 'status': 'complete', 'package_version': VERSION,
-                    'request': {'url': url, 'method': 'GET', 'filters': {'model': 'Example', 'date': None,
-                                'powerValid': 'strictV2', 'benchmark_type': 'single_turn', 'isl': 8192, 'osl': 1024, 'raw_model': None}},
-                    'response': {'status': 200, 'body_file': 'response.json', 'checksum_covers': 'saved decoded response body',
-                                 'sha256': hashlib.sha256(body).hexdigest(), 'retrieved_at': metadata['retrieved_at']},
-                    'export': {'format': 'csv', 'destination': str(self.root / 'powerx.csv'), 'metadata': metadata}}
-        csv_row = {field: metadata.get(field) if field in check.REQUEST_COLUMNS else
-                   row['metrics'].get(field) if field in check.METRIC_COLUMNS else row.get(field) for field in check.CSV_COLUMNS}
+class UnifiedAcceptanceSurfaceTests(unittest.TestCase):
+    def test_contract_one_starts_at_012(self):
+        for version, expected in (('0.11.0', False), ('0.11.99', False),
+                                  ('0.12.0', True), ('0.12.1', True),
+                                  ('0.13.0', True), ('1.0.0', True)):
+            with self.subTest(version=version):
+                self.assertEqual(check.contract_one_required(version), expected)
 
-        def write():
-            with (self.root / 'powerx.csv').open('w', newline='') as handle:
-                writer = csv.DictWriter(handle, fieldnames=check.CSV_COLUMNS)
-                writer.writeheader()
-                writer.writerow(csv_row)
-            manifest['export']['sha256'] = hashlib.sha256((self.root / 'powerx.csv').read_bytes()).hexdigest()
-            check.save(evidence / 'manifest.json', manifest)
-
-        write()
-        self.assertEqual(check.captured_export(self.root, evidence.name, 'powerx.csv', args, VERSION), [row])
-        csv_row['retrieved_at'] = '2026-09-06T00:00:00Z'
-        write()
-        with self.assertRaisesRegex(ValueError, 'CSV extraction metadata.*retrieved_at'):
-            check.captured_export(self.root, evidence.name, 'powerx.csv', args, VERSION)
-
-    def test_lookup_evidence_must_match_openapi_and_saved_output(self):
-        responses = self.root / 'raw-responses'
-        responses.mkdir()
-        schema = {'paths': {'/api/v1/benchmarks': {'get': {'parameters': [
-            {'name': 'model', 'in': 'query', 'schema': {'enum': ['Example']}}]}}}}
-        openapi_body = json.dumps(schema).encode()
-
-        def write_openapi(body, **changes):
-            (responses / 'lookup-openapi.response.json').write_bytes(body)
-            context = {'query_url': check.OPENAPI, 'status': 200,
-                       'retrieved_at': '2026-09-05T00:00:00Z',
-                       'sha256': hashlib.sha256(body).hexdigest()}
-            context.update(changes)
-            check.save(responses / 'lookup-openapi.request.json', context)
-
-        write_openapi(openapi_body)
-        check.check_lookup_openapi(
-            check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
-        write_openapi(openapi_body, unexpected=True)
-        with self.assertRaisesRegex(ValueError, 'Original request evidence'):
-            check.captured_request(self.root, 'lookup-openapi', check.OPENAPI)
-
-        altered = json.loads(json.dumps(schema))
-        altered['paths']['/api/v1/benchmarks']['get']['parameters'][0]['schema']['enum'] = ['Other']
-        altered_body = json.dumps(altered).encode()
-        write_openapi(altered_body)
-        with self.assertRaisesRegex(ValueError, 'OpenAPI model contract'):
-            check.check_lookup_openapi(
-                check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
-        altered['paths']['/api/v1/benchmarks']['get']['parameters'][0] |= {
-            'in': 'header', 'schema': {'enum': ['Example']}}
-        write_openapi(json.dumps(altered).encode())
-        with self.assertRaisesRegex(ValueError, 'OpenAPI model contract'):
-            check.check_lookup_openapi(
-                check.captured_request(self.root, 'lookup-openapi', check.OPENAPI), 'Example')
-
-        body = b'[]'
-        (responses / 'lookup.response.json').write_bytes(body)
-        context = {'query_url': check.API + '?model=Example', 'status': 200,
-                   'retrieved_at': '2026-09-05T00:00:00Z', 'sha256': hashlib.sha256(body).hexdigest()}
-        check.save(responses / 'lookup.request.json', context)
-        self.assertEqual(check.captured_request(self.root, 'lookup', context['query_url'], context), [])
-        with self.assertRaisesRegex(ValueError, 'original request context'):
-            check.captured_request(self.root, 'lookup', context['query_url'], context | {'retrieved_at': '2026-09-06T00:00:00Z'})
+    def test_native_prompt_uses_only_the_unified_query_entry(self):
+        args = SimpleNamespace(
+            model='GLM-5', date='2026-09-07', isl=8192, osl=1024,
+            raw_model='glm5', empty_isl=7, empty_osl=13,
+            agentx_model='DeepSeek-V4-Pro')
+        text = check.prompt(args, 'codex', Path('/tmp/candidate.tgz'))
+        for route in ('inferencex powerx export', 'inferencex agentx export',
+                      'inferencex result inspect', 'inferencex tco compare',
+                      'inferencex releases compare', 'inferencex collectivex compare',
+                      'inferencex verify'):
+            self.assertIn(route, text)
+        for removed in ('export-powerx.mjs', 'export-agentx.mjs', 'verify-export.mjs',
+                        'investigate-result.mjs', 'compare-tco.mjs',
+                        'compare-releases.mjs', 'compare-collectivex.mjs'):
+            self.assertNotIn(removed, text)
 
 
-class StructuredErrorVerifierTests(unittest.TestCase):
-    @staticmethod
-    def envelope(**changes):
-        document = {
+class ContractOneBundleOracleTests(unittest.TestCase):
+    VERSION = '0.12.0'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.package_root = Path(__file__).resolve().parents[1]
+        script = """
+import { provenanceBundleFixtures } from './test/provenance-bundle-fixtures.mjs';
+import { COLLECTIVEX_BUNDLE_VARIANTS } from './test/collectivex-bundle-fixtures.mjs';
+import { AGENTX_BUNDLE_VARIANTS } from './test/agentx-bundle-fixtures.mjs';
+import { TCO_BUNDLE_VARIANTS } from './test/tco-bundle-fixtures.mjs';
+console.log(JSON.stringify({ ...provenanceBundleFixtures(),
+  collectivex: COLLECTIVEX_BUNDLE_VARIANTS, agentx: AGENTX_BUNDLE_VARIANTS,
+  tco: TCO_BUNDLE_VARIANTS }));
+"""
+        cls.collector_fixtures = json.loads(subprocess.check_output(
+            ['node', '--input-type=module', '-e', script], cwd=cls.package_root))
+        cls.collector_outputs = {}
+
+    def collected(self, kind, variant, mutate=None):
+        fixture = json.loads(json.dumps(variant if type(variant) is dict else
+                                        self.collector_fixtures[kind][variant]))
+        if mutate:
+            mutate(fixture)
+        fixture['raw'] = [json.dumps(item['body'], separators=(',', ':'))
+                          for item in fixture['responses']]
+        script = """
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+const fixture = JSON.parse(readFileSync(0, 'utf8'));
+const modules = { result: 'investigate-result', collectivex: 'compare-collectivex',
+  agentx: 'export-agentx', tco: 'compare-tco', releases: 'compare-releases' };
+const mod = await import(`./skills/inferencex-api/scripts/${modules[fixture.kind]}.mjs`);
+const options = mod.normalizeArgs(fixture.args.slice(2));
+let cursor = 0;
+const built = await mod.collect(options, {
+  producerVersion: '0.12.0', generatedAt: '2026-09-07T00:00:00.000Z',
+  async get(spec) {
+    const response = fixture.responses[cursor];
+    assert.equal(spec.url, response.url);
+    response.operation = spec.operation;
+    const bytes = Buffer.from(fixture.raw[cursor++]);
+    return { id: createHash('sha256').update(bytes).digest('hex'), bytes,
+      body: response.body, status: response.status ?? 200,
+      retrievedAt: '2026-09-07T00:00:01.000Z' };
+  },
+});
+assert.equal(cursor, fixture.responses.length);
+console.log(JSON.stringify({ options, result: JSON.parse(built.bytes),
+  coverage: built.coverage, responses: fixture.responses }));
+"""
+        cache_key = (kind, variant) if mutate is None and type(variant) is str else None
+        built = self.collector_outputs.get(cache_key)
+        if built is None:
+            built = json.loads(subprocess.check_output(
+                ['node', '--input-type=module', '-e', script], cwd=self.package_root,
+                input=json.dumps({**fixture, 'kind': kind}).encode()))
+            if cache_key is not None:
+                self.collector_outputs[cache_key] = built
+        return self.bundle(kind, [(item['operation'], item['url'], item['body'], item['status'])
+                                 for item in built['responses']],
+                           lambda _: built['result'], built['coverage'],
+                           normalized_arguments=built['options'])
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.serial = 0
+
+    def bundle(self, kind, responses, build_result, coverage=None, requirements=None,
+               result_format='json', normalized_arguments=None):
+        self.serial += 1
+        root = self.root / f'{kind}-{self.serial}'
+        response_root = root / 'responses'
+        response_root.mkdir(parents=True)
+        ledger, response_ids = [], []
+        for operation, url, body, status in responses:
+            raw = json.dumps(body, separators=(',', ':')).encode()
+            response_id = hashlib.sha256(raw).hexdigest()
+            (response_root / f'{response_id}.body').write_bytes(raw)
+            response_ids.append(response_id)
+            ledger.append({
+                'operation': operation,
+                'url': url,
+                'allowed_statuses': [200, 404] if status == 404 else [200],
+                'attempts': [{
+                    'operation': operation,
+                    'url': url,
+                    'ordinal': 1,
+                    'startedAt': '2026-09-07T00:00:00.000Z',
+                    'endedAt': '2026-09-07T00:00:01.000Z',
+                    'status': status,
+                    'consumedBytes': len(raw),
+                    'retry': {'decision': 'accepted', 'reason': 'allowed_status'},
+                }],
+                'response': {
+                    'encoding': 'decoded',
+                    'id': response_id,
+                    'path': f'responses/{response_id}.body',
+                    'retrieved_at': '2026-09-07T00:00:01.000Z',
+                    'sha256': response_id,
+                    'size': len(raw),
+                    'status': status,
+                },
+            })
+        result = build_result(response_ids)
+        result_bytes = result.encode() if result_format == 'csv' else \
+            (json.dumps(result, indent=2) + '\n').encode()
+        (root / f'result.{result_format}').write_bytes(result_bytes)
+        coverage = coverage or {
+            'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+            'hardware': [], 'reasons': []}
+        requirements = requirements or {'require_hardware': [], 'min_comparable_pairs': None}
+        requested = bool(requirements['require_hardware']) or \
+            requirements['min_comparable_pairs'] is not None
+        hardware = {entry['hardware']: entry['valid_records'] for entry in coverage['hardware']}
+        passed = all(hardware.get(name, 0) > 0 for name in requirements['require_hardware']) and \
+            (requirements['min_comparable_pairs'] is None or
+             (coverage['comparable_pairs'] or 0) >= requirements['min_comparable_pairs'])
+        policy_status = 'not_requested' if not requested else 'passed' if passed else 'failed'
+        if normalized_arguments is None:
+            normalized_arguments = {
+                'powerx': {'model': 'GLM-5', 'date': None, 'isl': 8192, 'osl': 1024,
+                           'raw_model': None, 'format': result_format},
+                'agentx': {'model': 'DeepSeek-V4-Pro', 'date': None, 'raw_model': None,
+                           'hardware': None, 'framework': None, 'precision': None,
+                           'spec_method': None, 'offload_mode': None, 'concurrency': None,
+                           'format': result_format},
+                'tco': {'model': 'dsv4', 'date': None, 'workloads': ['1024x1024'],
+                        'target_output_tokens_per_second_per_user': 50,
+                        'gpu_hourly_prices_usd': {'b200': 3.6}, 'units': {}},
+                'releases': {'model': 'GLM-5', 'raw_model': 'glm5', 'hardware': 'h200_sxm',
+                             'framework': 'sglang', 'isl': 8192, 'osl': 1024,
+                             'metric': 'median_ttft', 'before_date': '2026-09-06',
+                             'after_date': '2026-09-07', 'before_image': 'before',
+                             'after_image': 'after', 'before_run_url': None,
+                             'after_run_url': None},
+            }.get(kind, {})
+        manifest = {
             'schema_version': 1,
-            'package': check.PACKAGE,
-            'package_version': '0.10.0',
-            'command': 'export-powerx',
-            'error': {'code': 'INVALID_ARGUMENT', 'message': 'Unknown option --invalid-argument'},
+            'contract_version': 1,
+            'kind': kind,
+            'producer': {'package_version': self.VERSION},
+            'normalized_arguments': normalized_arguments,
+            'result': {
+                'format': result_format, 'path': f'result.{result_format}', 'size': len(result_bytes),
+                'sha256': hashlib.sha256(result_bytes).hexdigest()},
+            'requests': ledger,
+            'coverage': coverage,
+            'summary': {
+                'schema_version': 1,
+                'command': f'{kind} test',
+                'kind': kind,
+                'package_version': self.VERSION,
+                'created_at': '2026-09-07T00:00:02.000Z',
+                'validity': 'valid',
+                'coverage': coverage,
+                'policy': {'status': policy_status, 'requirements': requirements, 'reasons': []},
+                'output': {'result': f'result.{result_format}', 'manifest': 'manifest.json'},
+            },
         }
-        document.update(changes)
-        return document
+        check.save(root / 'manifest.json', manifest)
+        return root
 
-    @staticmethod
-    def failure(document, *, returncode=2, stdout='', extra_stderr=''):
-        return subprocess.CalledProcessError(
-            returncode,
-            ['node', 'export-powerx.mjs'],
-            output=stdout,
-            stderr=json.dumps(document, separators=(',', ':')) + '\n' + extra_stderr,
-        )
+    def fixtures(self):
+        origin = 'https://inferencex.semianalysis.com'
+        base = {
+            'model': 'glm5', 'hardware': 'h200_sxm', 'framework': 'sglang',
+            'image': None, 'precision': 'fp8', 'spec_method': 'none',
+            'benchmark_type': 'single_turn', 'isl': 8192, 'osl': 1024, 'conc': 1,
+            'disagg': False, 'is_multinode': False, 'offload_mode': 'none',
+            'recipe_fingerprint': None, 'prefill_tp': 1, 'prefill_ep': 1,
+            'prefill_dp_attention': False, 'prefill_num_workers': 1,
+            'decode_tp': 1, 'decode_ep': 1, 'decode_dp_attention': False,
+            'decode_num_workers': 1, 'num_prefill_gpu': 1, 'num_decode_gpu': 1,
+            'date': '2026-09-07', 'workflow_run_id': '101', 'run_started_at': None,
+            'run_url': None, 'curve_date': '2026-09-07',
+            'curve_workflow_run_id': '101', 'curve_run_started_at': None,
+        }
+        power_row = {**base, 'id': 1,
+                     'metrics': {'power_valid': 1, 'power_metric_schema_version': 2,
+                                 'avg_power_w': 700}}
+        power = self.bundle(
+            'powerx', [('benchmarks', origin +
+                        '/api/v1/benchmarks?model=GLM-5&powerValid=strictV2', [power_row], 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'powerx',
+                         'metadata': {
+                             'package_version': self.VERSION,
+                             'query_url': origin +
+                                 '/api/v1/benchmarks?model=GLM-5&powerValid=strictV2',
+                             'retrieved_at': '2026-09-07T00:00:01.000Z',
+                             'requested_model': 'GLM-5', 'requested_date': None,
+                             'date_selection': 'latest', 'benchmark_type': 'single_turn',
+                             'isl': 8192, 'osl': 1024, 'raw_model': None,
+                             'returned_rows': 1, 'selected_rows': 1,
+                             'returned_models': ['glm5'], 'selected_models': ['glm5'],
+                             'excluded_rows': {'outside_requested_scope': 0,
+                                               'not_strict_v2': 0},
+                             'metric_coverage': {
+                                 key: {'available_rows': int(key == 'avg_power_w'),
+                                       'unavailable_rows': int(key != 'avg_power_w')}
+                                 for key in POWERX_UNITS},
+                             'non_finite_values': 0, 'contract_version': 1,
+                             'source_response_id': ids[0]},
+                         'units': POWERX_UNITS,
+                         'rows': [{**power_row, 'id': '1'}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
 
-    def test_structured_error_requires_exact_process_and_envelope_contract(self):
-        expected = self.envelope()
-        self.assertEqual(
-            check.check_structured_error(self.failure(expected), 'export-powerx', '0.10.0'),
-            expected,
-        )
-        mutations = [
-            ('missing schema', {key: value for key, value in self.envelope().items()
-                                if key != 'schema_version'}),
-            ('malformed schema', self.envelope(schema_version='1')),
-            ('wrong schema', self.envelope(schema_version=2)),
-            ('wrong version', self.envelope(package_version='0.10.1')),
-            ('wrong command', self.envelope(command='export-agentx')),
-            ('wrong code', self.envelope(error={'code': 'INTERNAL_ERROR', 'message': 'bad'})),
-            ('empty message', self.envelope(error={'code': 'INVALID_ARGUMENT', 'message': ''})),
-            ('extra envelope field', self.envelope(debug=True)),
+        benchmark = {**base, 'id': 2, 'hardware': 'b300',
+                     'benchmark_type': 'agentic_traces', 'metrics': {'median_ttft': 10}}
+        group = {'mean': 10, 'p50': 10, 'p75': 11, 'p90': 12, 'p95': 13, 'p99': 14, 'n': 1}
+        aggregate = {'id': 2, 'isl': group, 'osl': None, 'kvCacheUtil': None,
+                     'prefixCacheHitRate': None}
+        derived = {'id': 2, 'p75_e2e_norm_intvty': 4, 'p90_e2e_norm_intvty': 5}
+        agent_responses = [
+            ('benchmarks', origin + '/api/v1/benchmarks?model=DeepSeek-V4-Pro', [benchmark], 200),
+            ('agentic-aggregates', origin + '/api/v1/agentic-aggregates?ids=2',
+             {'2': aggregate}, 200),
+            ('derived-agentic-metrics', origin + '/api/v1/derived-agentic-metrics?ids=2',
+             {'2': derived}, 200),
+            ('trace-availability', origin + '/api/v1/trace-availability?ids=2', {'2': False}, 200),
         ]
-        for name, document in mutations:
-            with self.subTest(name=name), self.assertRaises(ValueError):
-                check.check_structured_error(self.failure(document), 'export-powerx', '0.10.0')
-        for name, failure in [
-            ('nonempty stdout', self.failure(expected, stdout='diagnostic\n')),
-            ('extra stderr diagnostic', self.failure(expected, extra_stderr='debug\n')),
-            ('wrong exit code', self.failure(expected, returncode=1)),
-        ]:
-            with self.subTest(name=name), self.assertRaises(ValueError):
-                check.check_structured_error(failure, 'export-powerx', '0.10.0')
+        agent = self.bundle(
+            'agentx', agent_responses,
+            lambda ids: {'schema_version': 1, 'kind': 'agentx',
+                         'metadata': {
+                             'package_version': self.VERSION,
+                             'retrieved_at': '2026-09-07T00:00:01.000Z',
+                             'request_urls': [
+                                 {'operation': operation, 'url': url,
+                                  'response_id': response_id,
+                                  **({} if operation == 'benchmarks' else
+                                     {'requested_ids': ['2']})}
+                                 for (operation, url, _body, _status), response_id
+                                 in zip(agent_responses, ids)],
+                             'requested_scope': {
+                                 'display_model': 'DeepSeek-V4-Pro', 'date': None,
+                                 'date_selection': 'latest', 'raw_model': None,
+                                 'hardware': None, 'framework': None, 'precision': None,
+                                 'spec_method': None, 'offload_mode': None,
+                                 'concurrency': None, 'benchmark_type': 'agentic_traces'},
+                             'filters': {
+                                 name: {'status': 'omitted', 'value': None}
+                                 for name, _field in check.AGENTX_FILTERS},
+                             'outcome': 'selected_rows', 'returned_rows': 1,
+                             'returned_agentx_rows': 1, 'selected_rows': 1,
+                             'available_filter_values': {
+                                 'raw_model': ['glm5'], 'hardware': ['b300'],
+                                 'framework': ['sglang'], 'precision': ['fp8'],
+                                 'spec_method': ['none'], 'offload_mode': ['none'],
+                                 'concurrency': [1]},
+                             'returned_model_keys': ['glm5'],
+                             'selected_model_keys': ['glm5'],
+                             'enrichment_coverage': {
+                                 'safe_id_rows': 1, 'unsupported_id_rows': 0,
+                                 'unique_safe_ids': 1,
+                                 'aggregates': {
+                                     name: {'available_rows': int(name == 'isl'),
+                                            'null_rows': int(name != 'isl'),
+                                            'missing_entry_rows': 0,
+                                            'unsupported_id_rows': 0}
+                                     for name in check.AGENTX_GROUPS},
+                                 'derived_metrics': {'available_rows': 1,
+                                                     'missing_entry_rows': 0,
+                                                     'unsupported_id_rows': 0},
+                                 'trace_availability': {'stored_trace_rows': 0,
+                                                        'no_stored_trace_rows': 1,
+                                                        'response_key_rows': 1,
+                                                        'missing_key_rows': 0,
+                                                        'unsupported_id_rows': 0}},
+                             'non_finite_values': 0,
+                             'observation_context':
+                                 'Existing observations were read; no new benchmark was run.',
+                             'contract_version': 1, 'source_response_ids': ids},
+                         'rows': [{'benchmark': {**benchmark, 'id': '2'}, 'agentx': {
+                             'status': 'complete', 'result_id': '2',
+                             'aggregates': {'status': 'available', 'value': {**aggregate, 'id': '2'}},
+                             'derived_metrics': {'status': 'available', 'value': {**derived, 'id': '2'}},
+                             'trace_availability': {'status': 'no_stored_trace', 'value': False,
+                                                    'response_key_present': True}}}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b300', 'valid_records': 1}], 'reasons': []})
 
-    def test_structured_contract_is_explicitly_gated_to_0_10_and_later(self):
-        self.assertFalse(check.structured_errors_required('0.4.0'))
-        self.assertFalse(check.structured_errors_required('0.9.9'))
-        self.assertTrue(check.structured_errors_required('0.10.0'))
-        self.assertTrue(check.structured_errors_required('1.0.0'))
+        provenance = self.collected('result', 'producer-differs-from-curve')
 
-    def test_powerx_schema_is_additive_from_0_10(self):
-        legacy = {'metadata': {'package_version': '0.9.9'}, 'rows': []}
-        check.check_powerx_schema(legacy, '0.9.9')
-        current = {'schema_version': 1, 'metadata': {'package_version': '0.10.0'}, 'rows': []}
-        check.check_powerx_schema(current, '0.10.0')
-        for name, document in [
-            ('missing', legacy),
-            ('malformed', current | {'schema_version': '1'}),
-            ('wrong', current | {'schema_version': 2}),
-            ('extra field', current | {'debug': True}),
-        ]:
-            with self.subTest(name=name), self.assertRaises(ValueError):
-                check.check_powerx_schema(document, '0.10.0')
+        point = {'hardware': 'b200', 'workload': '1024x1024', 'tier': 50,
+                 'output_tput_per_gpu': 1000, 'boundary': 'interpolated',
+                 'is_interpolated': True, 'frontier_points': 2,
+                 'frontier_min_interactivity': 40, 'frontier_max_interactivity': 60,
+                 'latest_date': '2026-09-07', 'oldest_frontier_date': '2026-09-06',
+                 'evidence_date': {'from': '2026-09-06', 'to': '2026-09-07'}}
+        tco_url = (origin + '/api/v1/tco-feed?model=dsv4&workloads=1024x1024&tiers=50'
+                   '&view=points&format=json')
+        tco_feed = {'model': 'dsv4', 'date': None, 'db_model_keys': ['dsv4'],
+                    'workloads': ['1024x1024'], 'tiers': [50], 'rows': [point]}
+        tco_units = {
+            'gpu_hourly_price': 'USD per GPU-hour',
+            'target_output_throughput': 'output tokens per second per user',
+            'gpu_output_throughput': 'output tokens per second per GPU',
+            'modeled_cost': 'USD per million output tokens'}
+        tco = self.bundle(
+            'tco', [('tco-feed', tco_url, tco_feed, 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'tco',
+                         'metadata': {
+                             'package_version': self.VERSION, 'contract_version': 1,
+                             'requested_model': 'dsv4', 'db_model_keys': ['dsv4'],
+                             'requested_date': None, 'date_selection': 'latest',
+                             'benchmark_type': 'single_turn', 'workloads': ['1024x1024'],
+                             'target_output_tokens_per_second_per_user': 50,
+                             'interactivity_statistic': 'median',
+                             'gpu_hourly_prices_usd': {'b200': 3.6},
+                             'price_source': 'user-supplied',
+                             'cost_unit': 'USD per million output tokens',
+                             'throughput_unit': 'output tokens per second per GPU',
+                             'formula': ('USD/GPU-hour * 1000000 / '
+                                         '(output tokens/second/GPU * 3600)'),
+                             'assumed_throughput_fraction': 1,
+                             'cost_scope': ('Supplied GPU hourly rate applied to API-reported '
+                                            'output throughput; GPU divisor may be role-specific '
+                                            'or unverified; not verified whole-deployment GPU '
+                                            'rental cost or total ownership cost'),
+                             'frontier_scope': ('API frontier across frameworks, precisions, '
+                                                'speculative methods and deployment '
+                                                'configurations on API-reported throughput bases; '
+                                                'no observation IDs, verified whole-deployment '
+                                                'GPU denominator or '
+                                                'matched-configuration proof'),
+                             'offline_verification_scope': ('Saved API interpolation is an input; '
+                                 'offline verification recalculates costs from saved points and '
+                                 'does not independently revalidate benchmark frontier '
+                                 'interpolation methodology.')},
+                         'units': tco_units,
+                         'source': {'response_id': ids[0], 'query_url': tco_url,
+                                    'retrieved_at': '2026-09-07T00:00:01.000Z',
+                                    'http_status': 200, 'sha256': ids[0],
+                                    'body_encoding': 'utf8',
+                                    'body_bytes': len(json.dumps(
+                                        tco_feed, separators=(',', ':')).encode())},
+                         'coverage': {'status': 'complete', 'requested_points': 1,
+                                      'returned_points': 1, 'available_points': 1,
+                                      'status_counts': {'available': 1, 'missing_point': 0,
+                                                        'clamped_low': 0, 'unreachable': 0,
+                                                        'zero_throughput': 0},
+                                      'returned_hardware': ['b200']},
+                         'rows': [{'hardware': 'b200', 'workload': '1024x1024',
+                                   'status': 'available', 'usd_per_gpu_hour': 3.6,
+                                   'usd_per_million_output_tokens': 1, 'point': point}]},
+            {'status': 'complete', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b200', 'valid_records': 1}], 'reasons': []},
+            normalized_arguments={
+                'model': 'dsv4', 'date': None, 'workloads': ['1024x1024'],
+                'target_output_tokens_per_second_per_user': 50,
+                'gpu_hourly_prices_usd': {'b200': 3.6}, 'units': tco_units})
 
-    def test_powerx_export_check_enforces_the_0_10_schema_before_payload_checks(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary)
-            check.save(project / 'powerx.json', {'metadata': {}, 'rows': []})
-            with patch.object(check, 'check_metadata') as metadata, \
-                    self.assertRaisesRegex(ValueError, 'PowerX JSON schema version'):
-                check.check_exports(project, [], [], SimpleNamespace(), '0.10.0')
-        metadata.assert_not_called()
+        history = [{**base, 'id': 4, 'date': '2026-09-06', 'image': 'before',
+                    'metrics': {'median_ttft': 10}},
+                   {**base, 'id': 5, 'image': 'after', 'metrics': {'median_ttft': 15}}]
+        configuration = {key: base[key] for key in (
+            'model', 'hardware', 'framework', 'precision', 'spec_method', 'benchmark_type',
+            'isl', 'osl', 'conc', 'offload_mode', 'disagg', 'is_multinode', 'prefill_tp',
+            'prefill_ep', 'prefill_dp_attention', 'prefill_num_workers', 'decode_tp',
+            'decode_ep', 'decode_dp_attention', 'decode_num_workers', 'num_prefill_gpu',
+            'num_decode_gpu')}
+        releases = self.bundle(
+            'releases', [('benchmark-history', origin +
+                          '/api/v1/benchmarks/history?model=GLM-5&isl=8192&osl=1024', history, 200)],
+            lambda ids: {'schema_version': 1, 'kind': 'releases',
+                         'metadata': {'causal_attribution': 'not_established',
+                                      'statistical_verdict': 'not_established'},
+                         'sources': [{'response_id': ids[0]}],
+                         'selection': {
+                             'before': {'rows': [{**history[0], 'id': '4'}], 'excluded': [],
+                                        'unique_observations': 1, 'snapshot_reuses': 0},
+                             'after': {'rows': [{**history[1], 'id': '5'}], 'excluded': [],
+                                       'unique_observations': 1, 'snapshot_reuses': 0}},
+                         'comparisons': [{'before_id': '4', 'after_id': '5',
+                                          'configuration': configuration,
+                                          'configuration_metrics': {}, 'metric': {
+                             'name': 'median_ttft', 'before': 10, 'after': 15,
+                             'delta': 5, 'percent_change': 50}}]},
+            {'status': 'complete', 'selected_records': 2, 'comparable_pairs': 1,
+             'hardware': [{'hardware': 'h200_sxm', 'valid_records': 1}], 'reasons': []})
 
+        collective = self.collected('collectivex', 'positive')
+        return {name: value for name, value in (
+            ('powerx', power), ('agentx', agent), ('result', provenance), ('tco', tco),
+            ('releases', releases), ('collectivex', collective))}
 
-class OfflineVerifierReleaseTests(unittest.TestCase):
-    CAPTURES = (
-        ('powerx-json', 'powerx-json-evidence', 'powerx.json'),
-        ('powerx-csv', 'powerx-csv-evidence', 'powerx.csv'),
-        ('agentx-json', 'agentx-json-evidence', 'agentx.json'),
-        ('agentx-csv', 'agentx-csv-evidence', 'agentx.csv'),
-        ('agentx-excluded', 'agentx-excluded-evidence', 'agentx-excluded.json'),
-    )
+    def rehash_result(self, directory, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        result = json.loads(result_path.read_text())
+        mutate(result)
+        raw = (json.dumps(result, indent=2) + '\n').encode()
+        result_path.write_bytes(raw)
+        manifest['result']['size'] = len(raw)
+        manifest['result']['sha256'] = hashlib.sha256(raw).hexdigest()
+        check.save(manifest_path, manifest)
 
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.installed = self.root / 'installed'
-        (self.installed / 'scripts').mkdir(parents=True)
-        (self.installed / 'scripts/verify-export.mjs').write_text('installed verifier')
-        for label, evidence_name, output_name in self.CAPTURES:
-            evidence = self.root / evidence_name
-            evidence.mkdir()
-            (evidence / 'manifest.json').write_text(f'{label} manifest')
-            (evidence / 'response.json').write_text(f'{label} response')
-            (self.root / output_name).write_text(f'{label} output')
+    def rehash_response(self, directory, index, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        response = manifest['requests'][index]['response']
+        old_id = response['id']
+        old_path = directory / response['path']
+        body = json.loads(old_path.read_text())
+        mutate(body)
+        raw = json.dumps(body, separators=(',', ':')).encode()
+        new_id = hashlib.sha256(raw).hexdigest()
+        new_path = directory / 'responses' / f'{new_id}.body'
+        new_path.write_bytes(raw)
+        old_path.unlink()
+        response.update(id=new_id, sha256=new_id, path=f'responses/{new_id}.body', size=len(raw))
+        manifest['requests'][index]['attempts'][-1]['consumedBytes'] = len(raw)
+        result_path = directory / manifest['result']['path']
+        result = json.loads(result_path.read_text())
 
-    def test_replays_all_five_captures_twice_with_deterministic_reports(self):
-        def input_bytes():
-            paths = []
-            for _label, evidence_name, output_name in self.CAPTURES:
-                paths.extend((self.root / evidence_name).iterdir())
-                paths.append(self.root / output_name)
-            return {str(path.relative_to(self.root)): path.read_bytes() for path in paths}
+        def replace(value):
+            if value == old_id:
+                return new_id
+            if type(value) is list:
+                return [replace(item) for item in value]
+            if type(value) is dict:
+                return {key: replace(item) for key, item in value.items()}
+            return value
 
-        before = input_bytes()
+        result = replace(result)
+        if result.get('source', {}).get('response_id') == new_id:
+            result['source']['body_bytes'] = len(raw)
+        result_raw = (json.dumps(result, indent=2) + '\n').encode()
+        result_path.write_bytes(result_raw)
+        manifest['result']['size'] = len(result_raw)
+        manifest['result']['sha256'] = hashlib.sha256(result_raw).hexdigest()
+        check.save(manifest_path, manifest)
 
-        def execute(command, project, _environment, label, _deadline):
-            self.assertEqual(project, self.root)
-            evidence = Path(command[command.index('--evidence-dir') + 1])
-            output = Path(command[command.index('--export') + 1])
-            self.assertTrue(evidence.is_dir())
-            self.assertTrue(output.is_file())
-            report = f'# Verified {output.name}\n'
-            (project / f'{label}.stdout.log').write_text(report)
-            (project / f'{label}.stderr.log').write_text('')
-            return report
+    def rehash_overflow_response(self, directory, index, needle, mutate_result):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        response = manifest['requests'][index]['response']
+        old_id = response['id']
+        old_path = directory / response['path']
+        original = old_path.read_bytes()
+        self.assertEqual(original.count(needle), 1)
+        raw = original.replace(needle, needle.split(b':', 1)[0] + b':1e400')
+        new_id = hashlib.sha256(raw).hexdigest()
+        new_path = directory / 'responses' / f'{new_id}.body'
+        new_path.write_bytes(raw)
+        old_path.unlink()
+        response.update(id=new_id, sha256=new_id, path=f'responses/{new_id}.body', size=len(raw))
+        manifest['requests'][index]['attempts'][-1]['consumedBytes'] = len(raw)
+        result_path = directory / manifest['result']['path']
+        result = json.loads(result_path.read_text())
 
-        with patch.object(check, 'run', side_effect=execute) as run:
-            reports = check.verify_saved_exports(
-                '/runtime/node', self.installed, self.root, {'PATH': '/runtime'}, '0.11.0')
+        def replace(value):
+            if value == old_id:
+                return new_id
+            if type(value) is list:
+                return [replace(item) for item in value]
+            if type(value) is dict:
+                return {key: replace(item) for key, item in value.items()}
+            return value
 
-        self.assertEqual([report['capture'] for report in reports],
-                         [capture[0] for capture in self.CAPTURES])
-        self.assertEqual(run.call_count, 10)
-        for call in run.call_args_list:
-            command = [str(part) for part in call.args[0]]
-            self.assertEqual(command[0], '/runtime/node')
-            self.assertEqual(command[1], '--import')
-            self.assertEqual(command[3], str(self.installed / 'scripts/verify-export.mjs'))
-            self.assertIn('--evidence-dir', command)
-            self.assertIn('--export', command)
-        denial = self.root / 'verify-export-deny-network.mjs'
-        self.assertIn('globalThis.fetch', denial.read_text())
-        self.assertEqual(input_bytes(), before)
+        result = replace(result)
+        mutate_result(result)
+        result_raw = (json.dumps(result, indent=2) + '\n').encode()
+        result_path.write_bytes(result_raw)
+        manifest['result']['size'] = len(result_raw)
+        manifest['result']['sha256'] = hashlib.sha256(result_raw).hexdigest()
+        check.save(manifest_path, manifest)
 
-    def test_rejects_input_mutation_and_nondeterministic_reports(self):
-        def mutate(*_args):
-            (self.root / 'powerx.json').write_text('changed')
-            (self.root / 'verify-powerx-json-1.stdout.log').write_text('# Verified\n')
-            return '# Verified\n'
+    def forge_coverage(self, directory, *, status=None, selected=None, pairs=None,
+                       hardware=None, reasons=None, requirements=None):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        coverage = manifest['coverage']
+        if status is not None:
+            coverage['status'] = status
+        if selected is not None:
+            coverage['selected_records'] = selected
+        if pairs is not None:
+            coverage['comparable_pairs'] = pairs
+        if hardware is not None:
+            coverage['hardware'] = hardware
+        if reasons is not None:
+            coverage['reasons'] = reasons
+        manifest['summary']['coverage'] = coverage
+        if requirements is not None:
+            manifest['summary']['policy'] = {
+                'status': 'passed', 'requirements': requirements, 'reasons': []}
+        check.save(manifest_path, manifest)
 
-        with patch.object(check, 'run', side_effect=mutate), \
-                self.assertRaisesRegex(ValueError, 'modified.*powerx-json'):
-            check.verify_saved_exports(
-                '/runtime/node', self.installed, self.root, {}, '0.11.0')
-
-        (self.root / 'powerx.json').write_text('powerx-json output')
-        reports = iter([b'# first\n', b'# second\n'])
-
-        def nondeterministic(_command, project, _environment, label, _deadline):
-            report = next(reports)
-            (project / f'{label}.stdout.log').write_bytes(report)
-            return report.decode()
-
-        with patch.object(check, 'run', side_effect=nondeterministic), \
-                self.assertRaisesRegex(ValueError, 'deterministic.*powerx-json'):
-            check.verify_saved_exports(
-                '/runtime/node', self.installed, self.root, {}, '0.11.0')
-
-    def test_is_required_only_from_0_11(self):
-        with patch.object(check, 'run') as run:
-            self.assertEqual(check.verify_saved_exports(
-                '/runtime/node', self.installed, self.root, {}, '0.10.0'), [])
-        run.assert_not_called()
-        (self.installed / 'scripts/verify-export.mjs').unlink()
-        with self.assertRaisesRegex(ValueError, 'installed offline verifier is missing'):
-            check.verify_saved_exports('/runtime/node', self.installed, self.root, {}, '0.11.0')
-
-
-class AgentXVerifierTests(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.fixture_index = 0
-        self.args = SimpleNamespace(agentx_model='Example', agentx_point_id='7', agentx_no_trace_id='8',
-                                    model='Example', date=None, isl=8192, osl=1024, raw_model=None,
-                                    empty_isl=7, empty_osl=13)
-
-    @staticmethod
-    def row():
-        return {
-            'id': '7', 'model': 'model-a', 'hardware': 'h200', 'framework': 'vllm', 'image': None,
-            'precision': 'fp8', 'spec_method': 'none', 'benchmark_type': 'agentic_traces', 'conc': 1,
-            'offload_mode': 'off', 'recipe_fingerprint': None, 'disagg': False, 'is_multinode': False,
-            'prefill_tp': 1, 'prefill_ep': 1, 'prefill_dp_attention': False, 'prefill_num_workers': 1,
-            'decode_tp': 1, 'decode_ep': 1, 'decode_dp_attention': False, 'decode_num_workers': 1,
-            'num_prefill_gpu': 1, 'num_decode_gpu': 1, 'isl': 32, 'osl': 16, 'date': '2026-09-05',
-            'workflow_run_id': 'run-1', 'run_started_at': '2026-09-05T00:00:00Z', 'run_url': None,
-            'curve_date': None, 'curve_workflow_run_id': None, 'curve_run_started_at': None,
-            'metrics': {'z': 0, 'a': False, 'nullish': None, 'object': {'kept': True}, 'é': 1}}
-
-    @staticmethod
-    def scope(excluded):
-        raw_model = check.AGENTX_EXCLUDED_RAW_MODEL if excluded else None
-        requested = {
-            'display_model': 'Example', 'date': None, 'date_selection': 'latest', 'raw_model': raw_model,
-            'hardware': None, 'framework': None, 'precision': None, 'spec_method': None,
-            'offload_mode': None, 'concurrency': None, 'benchmark_type': 'agentic_traces'}
-        applied = {
-            'display_model': {'status': 'applied', 'value': 'Example'},
-            'date': {'status': 'omitted', 'value': None},
-            'benchmark_type': {'status': 'applied', 'value': 'agentic_traces'},
-            'raw_model': {'status': 'applied' if excluded else 'omitted', 'value': raw_model},
-            'hardware': {'status': 'omitted', 'value': None},
-            'framework': {'status': 'omitted', 'value': None},
-            'precision': {'status': 'omitted', 'value': None},
-            'spec_method': {'status': 'omitted', 'value': None},
-            'offload_mode': {'status': 'omitted', 'value': None},
-            'concurrency': {'status': 'omitted', 'value': None}}
-        return requested, applied
-
-    @staticmethod
-    def coverage(selected):
-        count = int(selected)
-        return {
-            'safe_id_rows': count, 'unsupported_id_rows': 0, 'unique_safe_ids': count,
-            'aggregates': {group: {'available_rows': 0, 'null_rows': count, 'missing_entry_rows': 0,
-                                   'unsupported_id_rows': 0} for group in check.AGENTX_GROUPS},
-            'derived_metrics': {'available_rows': count, 'missing_entry_rows': 0, 'unsupported_id_rows': 0},
-            'trace_availability': {'stored_trace_rows': 0, 'no_stored_trace_rows': count,
-                                   'response_key_rows': count, 'missing_key_rows': 0,
-                                   'unsupported_id_rows': 0}}
-
-    def write_summary(self, output_format, *, excluded=False):
-        self.fixture_index += 1
-        row = self.row()
-        requested, applied = self.scope(excluded)
-        selected = [] if excluded else [row]
-        benchmark_url = check.API + '?model=Example'
-        responses = [('benchmarks', benchmark_url, None, [row])]
-        if selected:
-            query = '?ids=7'
-            responses += [
-                ('agentic-aggregates', check.AGENTX_ORIGIN + '/api/v1/agentic-aggregates' + query, [7],
-                 {'7': {'id': 7, **dict.fromkeys(check.AGENTX_GROUPS)}}),
-                ('derived-agentic-metrics', check.AGENTX_ORIGIN + '/api/v1/derived-agentic-metrics' + query, [7],
-                 {'7': {'id': 7, 'p75_e2e_norm_intvty': 0, 'p90_e2e_norm_intvty': None}}),
-                ('trace-availability', check.AGENTX_ORIGIN + '/api/v1/trace-availability' + query, [7],
-                 {'7': False})]
-        suffix = f'{"excluded" if excluded else output_format}-{self.fixture_index}'
-        evidence = self.root / f'agentx-{suffix}-evidence'
-        evidence.mkdir()
+    def convert_to_csv(self, directory, kind):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        document = json.loads(result_path.read_text())
         records = []
-        for number, (operation, url, chunk, body) in enumerate(responses, 1):
-            body_bytes = json.dumps(body, ensure_ascii=False, separators=(',', ':')).encode()
-            filename = f'response-{number:04d}-{operation}.json'
-            (evidence / filename).write_bytes(body_bytes)
-            records.append({'operation': operation, 'request_number': number, 'url': url, 'method': 'GET',
-                            'retrieved_at': f'2026-09-05T00:00:0{number}Z', 'http_status': 200,
-                            'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
-                            'requested_chunk_ids': chunk,
-                            'checksum_covers': 'saved decoded response body'})
-        outcome = 'no_matching_rows' if excluded else 'selected_rows'
-        counts = {'returned_rows': 1, 'returned_agentx_rows': 1, 'selected_rows': len(selected)}
-        filters = {name: applied[name] for name, _field in check.AGENTX_FILTERS}
-        enriched = [] if excluded else [{
-            'benchmark': row,
-            'agentx': {
-                'status': 'complete', 'result_id': 7,
-                'aggregates': {'status': 'available', 'value': {'id': 7, **dict.fromkeys(check.AGENTX_GROUPS)}},
-                'derived_metrics': {'status': 'available', 'value': {
-                    'id': 7, 'p75_e2e_norm_intvty': 0, 'p90_e2e_norm_intvty': None}},
-                'trace_availability': {'status': 'no_stored_trace', 'value': False,
-                                       'response_key_present': True}}}]
-        metadata = {
-            'package_version': VERSION, 'retrieved_at': '2026-09-05T00:00:05Z',
-            'request_urls': [{'operation': item['operation'], 'url': item['url']} for item in records],
-            'requested_scope': requested, 'filters': filters, 'outcome': outcome, **counts,
-            'available_filter_values': {'raw_model': ['model-a'], 'hardware': ['h200'],
-                                        'framework': ['vllm'], 'precision': ['fp8'],
-                                        'spec_method': ['none'], 'offload_mode': ['off'], 'concurrency': [1]},
-            'returned_model_keys': ['model-a'], 'selected_model_keys': [] if excluded else ['model-a'],
-            'enrichment_coverage': self.coverage(not excluded), 'non_finite_values': 0,
-            'observation_context': 'Existing observations were read; no new benchmark was run.'}
-        output = self.root / f'agentx-{suffix}.{output_format}'
-        if output_format == 'json':
-            output.write_text(json.dumps({'schema_version': 1, 'metadata': metadata, 'rows': enriched},
-                                         ensure_ascii=False, indent=2) + '\n')
+        if kind == 'powerx':
+            for row in document['rows']:
+                records.append({
+                    'package_version': self.VERSION,
+                    'query_url': manifest['requests'][0]['url'],
+                    'retrieved_at': manifest['requests'][0]['response']['retrieved_at'],
+                    'requested_model': manifest['normalized_arguments']['model'],
+                    'requested_date': manifest['normalized_arguments']['date'],
+                    'date_selection': 'latest',
+                    'raw_model': manifest['normalized_arguments']['raw_model'],
+                    'source_response_id': manifest['requests'][0]['response']['id'],
+                    **row, **row['metrics'],
+                })
+            columns = check.CONTRACT_POWERX_CSV_COLUMNS
         else:
-            metric_columns = ['metrics.a', 'metrics.nullish', 'metrics.z', 'metrics.é']
-            columns = [*check.AGENTX_CONTEXT_COLUMNS, *check.AGENTX_BENCHMARK_COLUMNS, *metric_columns,
-                       *check.AGENTX_ENRICHMENT_COLUMNS]
-            context = {'package_version': VERSION, 'query_url': benchmark_url,
-                       'retrieved_at': metadata['retrieved_at'], 'requested_model': 'Example',
-                       'requested_date': None, 'date_selection': 'latest',
-                       'requested_benchmark_type': 'agentic_traces',
-                       **{f'filter.{name}': requested[name] for name, _field in check.AGENTX_FILTERS}}
-            values = {**context, **{field: row.get(field) for field in check.AGENTX_BENCHMARK_COLUMNS},
-                      'metrics.a': False, 'metrics.nullish': None, 'metrics.z': 0, 'metrics.é': 1,
-                      **{f'aggregate.{group}.{field}': None for group in check.AGENTX_GROUPS
-                         for field in (*check.AGENTX_PERCENTILES, 'n')},
-                      'derived.p75_e2e_norm_intvty': 0, 'derived.p90_e2e_norm_intvty': None,
-                      'trace.available': False, 'trace.response_key_present': True,
-                      'enrichment.status': 'complete', 'enrichment.aggregates_status': 'available',
-                      'enrichment.derived_metrics_status': 'available',
-                      'enrichment.trace_availability_status': 'no_stored_trace'}
-            with output.open('w', newline='') as handle:
-                writer = csv.writer(handle, lineterminator='\r\n')
-                writer.writerow(columns)
-                writer.writerow(['' if values.get(column) is None else
-                                 str(values[column]).lower() if type(values.get(column)) is bool else
-                                 values[column] for column in columns])
-        manifest = {
-            'schema_version': 1, 'package_version': VERSION, 'status': 'complete',
-            'started_at': '2026-09-05T00:00:00Z', 'finished_at': '2026-09-05T00:00:06Z',
-            'outcome': outcome, 'requested_filters': requested, 'applied_filters': applied, 'counts': counts,
-            'responses': records,
-            'export': {'format': output_format, 'destination': str(output.resolve()),
-                       'sha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'metadata': metadata,
-                       'source_request_numbers': list(range(1, len(records) + 1))},
-            'error': None}
-        check.save(evidence / 'manifest.json', manifest)
-        return evidence, output, manifest
+            source_ids = [request['response']['id'] for request in manifest['requests']]
+            options = manifest['normalized_arguments']
+            for row in document['rows']:
+                benchmark, agentx = row['benchmark'], row['agentx']
+                aggregate = agentx['aggregates']['value'] or {}
+                enrichment = {
+                    **{f'aggregate.{group}.{field}': (aggregate.get(group) or {}).get(field)
+                       for group in check.AGENTX_GROUPS
+                       for field in (*check.AGENTX_PERCENTILES, 'n')},
+                    'derived.p75_e2e_norm_intvty':
+                        (agentx['derived_metrics']['value'] or {}).get('p75_e2e_norm_intvty'),
+                    'derived.p90_e2e_norm_intvty':
+                        (agentx['derived_metrics']['value'] or {}).get('p90_e2e_norm_intvty'),
+                    'trace.available': agentx['trace_availability']['value'],
+                    'trace.response_key_present': agentx['trace_availability']['response_key_present'],
+                    'enrichment.status': agentx['status'],
+                    'enrichment.aggregates_status': agentx['aggregates']['status'],
+                    'enrichment.derived_metrics_status': agentx['derived_metrics']['status'],
+                    'enrichment.trace_availability_status': agentx['trace_availability']['status'],
+                }
+                records.append({
+                    'package_version': self.VERSION,
+                    'query_url': manifest['requests'][0]['url'],
+                    'retrieved_at': manifest['requests'][0]['response']['retrieved_at'],
+                    'requested_model': options['model'], 'requested_date': options['date'],
+                    'date_selection': 'latest', 'requested_benchmark_type': 'agentic_traces',
+                    **{f'filter.{name}': options[name] for name, _field in check.AGENTX_FILTERS},
+                    'source_response_ids': json.dumps(source_ids, separators=(',', ':')),
+                    **benchmark, 'metrics_json': json.dumps(benchmark['metrics'], separators=(',', ':')),
+                    **enrichment,
+                })
+            columns = check.CONTRACT_AGENTX_CSV_COLUMNS
+        output = io.StringIO(newline='')
+        writer = csv.DictWriter(output, fieldnames=columns, lineterminator='\r\n', extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows({key: str(value).lower() if type(value) is bool else value
+                          for key, value in record.items()} for record in records)
+        raw = output.getvalue().encode()
+        csv_path = directory / 'result.csv'
+        csv_path.write_bytes(raw)
+        result_path.unlink()
+        manifest['normalized_arguments']['format'] = 'csv'
+        manifest['result'].update(path='result.csv', format='csv', size=len(raw),
+                                  sha256=hashlib.sha256(raw).hexdigest())
+        manifest['summary']['output']['result'] = 'result.csv'
+        check.save(manifest_path, manifest)
+        return directory
 
-    def write_multichunk_summary(self):
-        self.fixture_index += 1
-        rows = []
-        for result_id in range(1, 502):
-            row = self.row() | {'id': str(result_id)}
-            rows.append(row)
-        requested, applied = self.scope(False)
-        benchmark_url = check.API + '?model=Example'
-        responses = [('benchmarks', benchmark_url, None, rows)]
-        for operation, limit in [('agentic-aggregates', 200), ('derived-agentic-metrics', 200),
-                                 ('trace-availability', 500)]:
-            for offset in range(0, len(rows), limit):
-                chunk = list(range(offset + 1, min(offset + limit, len(rows)) + 1))
-                if operation == 'agentic-aggregates':
-                    body = {str(result_id): {'id': result_id, **dict.fromkeys(check.AGENTX_GROUPS)}
-                            for result_id in chunk if result_id != 2}
-                elif operation == 'derived-agentic-metrics':
-                    body = {str(result_id): {'id': result_id, 'p75_e2e_norm_intvty': 0,
-                                             'p90_e2e_norm_intvty': None}
-                            for result_id in chunk if result_id != 3}
-                else:
-                    body = {str(result_id): result_id == 1 for result_id in chunk if result_id != 4}
-                responses.append((operation, check.AGENTX_ORIGIN + f'/api/v1/{operation}?' +
-                                  check.urlencode({'ids': ','.join(map(str, chunk))}), chunk, body))
-        evidence = self.root / f'agentx-multichunk-{self.fixture_index}-evidence'
-        evidence.mkdir()
-        records = []
-        for number, (operation, url, chunk, body) in enumerate(responses, 1):
-            body_bytes = json.dumps(body, ensure_ascii=False, separators=(',', ':')).encode()
-            filename = f'response-{number:04d}-{operation}.json'
-            (evidence / filename).write_bytes(body_bytes)
-            records.append({'operation': operation, 'request_number': number, 'url': url, 'method': 'GET',
-                            'retrieved_at': f'2026-09-05T00:00:{number:02d}Z', 'http_status': 200,
-                            'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
-                            'requested_chunk_ids': chunk,
-                            'checksum_covers': 'saved decoded response body'})
-        enriched = []
-        for result_id, row in enumerate(rows, 1):
-            aggregates = None if result_id == 2 else {'id': result_id, **dict.fromkeys(check.AGENTX_GROUPS)}
-            derived = None if result_id == 3 else {
-                'id': result_id, 'p75_e2e_norm_intvty': 0, 'p90_e2e_norm_intvty': None}
-            trace_key = result_id != 4
-            trace = result_id == 1
-            enriched.append({'benchmark': row, 'agentx': {
-                'status': 'complete' if aggregates is not None and derived is not None else 'partial',
-                'result_id': result_id,
-                'aggregates': {'status': 'available' if aggregates is not None else 'not_returned',
-                               'value': aggregates},
-                'derived_metrics': {'status': 'available' if derived is not None else 'not_returned',
-                                    'value': derived},
-                'trace_availability': {'status': 'stored_trace' if trace else 'no_stored_trace',
-                                       'value': trace, 'response_key_present': trace_key}}})
-        counts = {'returned_rows': 501, 'returned_agentx_rows': 501, 'selected_rows': 501}
-        filters = {name: applied[name] for name, _field in check.AGENTX_FILTERS}
-        coverage = {
-            'safe_id_rows': 501, 'unsupported_id_rows': 0, 'unique_safe_ids': 501,
-            'aggregates': {group: {'available_rows': 0, 'null_rows': 500, 'missing_entry_rows': 1,
-                                   'unsupported_id_rows': 0} for group in check.AGENTX_GROUPS},
-            'derived_metrics': {'available_rows': 500, 'missing_entry_rows': 1, 'unsupported_id_rows': 0},
-            'trace_availability': {'stored_trace_rows': 1, 'no_stored_trace_rows': 500,
-                                   'response_key_rows': 500, 'missing_key_rows': 1,
-                                   'unsupported_id_rows': 0}}
-        metadata = {
-            'package_version': VERSION, 'retrieved_at': '2026-09-05T00:00:10Z',
-            'request_urls': [{'operation': record['operation'], 'url': record['url']} for record in records],
-            'requested_scope': requested, 'filters': filters, 'outcome': 'selected_rows', **counts,
-            'available_filter_values': {'raw_model': ['model-a'], 'hardware': ['h200'],
-                                        'framework': ['vllm'], 'precision': ['fp8'],
-                                        'spec_method': ['none'], 'offload_mode': ['off'], 'concurrency': [1]},
-            'returned_model_keys': ['model-a'], 'selected_model_keys': ['model-a'],
-            'enrichment_coverage': coverage, 'non_finite_values': 0,
-            'observation_context': 'Existing observations were read; no new benchmark was run.'}
-        output = self.root / f'agentx-multichunk-{self.fixture_index}.json'
-        check.save(output, {'schema_version': 1, 'metadata': metadata, 'rows': enriched})
-        manifest = {
-            'schema_version': 1, 'package_version': VERSION, 'status': 'complete',
-            'started_at': '2026-09-05T00:00:00Z', 'finished_at': '2026-09-05T00:00:11Z',
-            'outcome': 'selected_rows', 'requested_filters': requested, 'applied_filters': applied,
-            'counts': counts, 'responses': records,
-            'export': {'format': 'json', 'destination': str(output.resolve()),
-                       'sha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'metadata': metadata,
-                       'source_request_numbers': list(range(1, len(records) + 1))},
-            'error': None}
-        check.save(evidence / 'manifest.json', manifest)
-        return evidence, output, manifest
+    def mutate_csv(self, directory, mutate):
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        result_path = directory / manifest['result']['path']
+        with result_path.open(newline='') as handle:
+            reader = csv.DictReader(handle)
+            columns, records = reader.fieldnames, list(reader)
+        mutate(records)
+        output = io.StringIO(newline='')
+        writer = csv.DictWriter(output, fieldnames=columns, lineterminator='\r\n')
+        writer.writeheader()
+        writer.writerows(records)
+        raw = output.getvalue().encode()
+        result_path.write_bytes(raw)
+        manifest['result']['size'] = len(raw)
+        manifest['result']['sha256'] = hashlib.sha256(raw).hexdigest()
+        check.save(manifest_path, manifest)
 
-    @staticmethod
-    def point_openapi():
-        return {'paths': {path: {'get': {'parameters': [
-            {'name': parameter, 'in': 'query', 'required': True}]}}
-            for _operation, path, parameter in check.POINT_OPERATIONS[1:]}}
-
-    def write_point(self, *, trace):
-        self.fixture_index += 1
-        selected_id = '7'
-        siblings = {'sku': {'model': 'model-a'}, 'siblings': [{'id': selected_id, 'model': 'model-a'}]}
-        availability = {selected_id: True} if trace else {}
-        bodies = [self.point_openapi(), siblings, availability]
-        if trace:
-            timeline = {'version': 1, 'startNs': 0, 'endNs': 1, 'durationS': 1, 'requests': []}
-            histograms = {selected_id: {'id': 7, 'isl': [1], 'osl': [2]}}
-            server = {'meta': {'id': 7}, 'startNs': 0, 'endNs': 1, 'durationS': 1,
-                      'timeslicesCount': 0, 'kvCacheUsage': [], 'prefixCacheHitRate': [], 'queueDepth': [],
-                      'prefillTps': [], 'decodeTps': [], 'prefixCacheHitsTps': [], 'hostKvCacheUsage': [],
-                      'kvCacheUsageByEngine': [], 'promptTokensBySource': {}, 'kvCachePoolTokens': None,
-                      'metricSources': []}
-            bodies += [timeline, histograms, server]
-        specs = check.POINT_OPERATIONS if trace else check.POINT_OPERATIONS[:3]
-        name = f'{"trace" if trace else "no-trace"}-{self.fixture_index}'
-        evidence = self.root / f'{name}-evidence'
-        evidence.mkdir()
-        records = []
-        for number, ((operation, path, parameter), body) in enumerate(zip(specs, bodies), 1):
-            body_bytes = json.dumps(body, separators=(',', ':')).encode()
-            filename = f'response-{number:04d}-{operation}.json'
-            (evidence / filename).write_bytes(body_bytes)
-            records.append({'operation': operation, 'request_number': number,
-                            'url': check.point_url(path, parameter, selected_id), 'method': 'GET',
-                            'retrieved_at': f'2026-09-05T00:00:{number * 2 - 1:02d}Z', 'http_status': 200,
-                            'decoded_body_sha256': hashlib.sha256(body_bytes).hexdigest(), 'body_file': filename,
-                            'checksum_covers': 'saved decoded response body'})
-        output = self.root / f'{name}.json'
-        requests = [{'query_url': record['url'], 'retrieved_at': record['retrieved_at'],
-                     'body_utf8': (evidence / record['body_file']).read_text()}
-                    for record in records]
-        document = {
-            'schema_version': 1,
-            'metadata': {'selected_result_id': selected_id, 'retrieved_at': '2026-09-05T00:00:20Z',
-                         'requests': requests, 'ran_new_benchmark': False,
-                         'event_timestamp_unit': 'nanoseconds',
-                         'event_timestamp_origin': 'offset from timeline.startNs; not wall-clock'},
-            'benchmark_siblings': siblings, 'selected_point': siblings['siblings'][0],
-            'trace_availability': {'response': availability, 'key_present': trace, 'available': trace},
-            'outcome': 'trace_diagnostics' if trace else 'trace_unavailable',
-            'timeline': bodies[3] if trace else None, 'histograms': bodies[4] if trace else None,
-            'server_metrics': bodies[5] if trace else None}
-        output.write_text(json.dumps(document, indent=2) + '\n')
-        manifest = {
-            'schema_version': 1, 'package_version': VERSION, 'selected_result_id': selected_id,
-            'status': 'complete', 'started_at': '2026-09-05T00:00:00Z',
-            'finished_at': '2026-09-05T00:00:21Z', 'responses': records,
-            'output': {'format': 'json', 'destination': str(output.resolve()),
-                       'sha256': hashlib.sha256(output.read_bytes()).hexdigest(),
-                       'source_request_numbers': list(range(1, len(records) + 1))}, 'error': None}
-        check.save(evidence / 'manifest.json', manifest)
-        return evidence, output, manifest, document
-
-    def test_summary_oracle_accepts_json_csv_and_excluded_selection(self):
-        for output_format, excluded in [('json', False), ('csv', False), ('json', True)]:
-            with self.subTest(output_format=output_format, excluded=excluded):
-                evidence, output, _manifest = self.write_summary(output_format, excluded=excluded)
-                result = check.check_agentx_capture(self.root, evidence.name, output.name, self.args,
-                                                    VERSION, excluded=excluded)
-                self.assertEqual(result['outcome'], 'no_matching_rows' if excluded else 'selected_rows')
-        self.assertIsNone(check.safe_result_id(True))
-        self.assertIsNone(check.safe_result_id('07'))
-        self.assertIsNone(check.safe_result_id(str(check.MAX_SAFE_INTEGER + 1)))
-        self.assertEqual(check.js_sorted(['\ue000', '😀']), ['😀', '\ue000'])
-
-    def test_summary_oracle_rejects_altered_values_ids_chunks_and_incomplete_evidence(self):
-        evidence, output, manifest = self.write_summary('json')
-        document = json.loads(output.read_text())
-        document['rows'][0]['benchmark']['metrics']['z'] = False
-        check.save(output, document)
-        manifest['export']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'AgentX JSON'):
-            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-        evidence, output, manifest = self.write_summary('csv')
-        with output.open(newline='') as handle:
-            rows = list(csv.reader(handle))
-        column = rows[0].index('derived.p75_e2e_norm_intvty')
-        rows[1][column] = '1'
-        with output.open('w', newline='') as handle:
-            csv.writer(handle, lineterminator='\r\n').writerows(rows)
-        manifest['export']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'AgentX CSV value'):
-            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-        evidence, output, manifest = self.write_summary('csv')
-        with output.open(newline='') as handle:
-            rows = list(csv.reader(handle))
-        rows[1].append('surplus')
-        with output.open('w', newline='') as handle:
-            csv.writer(handle, lineterminator='\r\n').writerows(rows)
-        manifest['export']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'row width'):
-            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-        for mutation, message in [('chunk', 'identity'), ('id', 'result ID'), ('manifest', 'manifest')]:
-            with self.subTest(mutation=mutation):
-                evidence, output, manifest = self.write_summary('json')
-                if mutation == 'chunk':
-                    manifest['responses'][1]['requested_chunk_ids'] = [8]
-                elif mutation == 'id':
-                    body_path = evidence / manifest['responses'][1]['body_file']
-                    body = json.loads(body_path.read_text())
-                    body['8'] = body.pop('7')
-                    body_path.write_text(json.dumps(body))
-                    manifest['responses'][1]['decoded_body_sha256'] = hashlib.sha256(body_path.read_bytes()).hexdigest()
-                else:
-                    del manifest['export']['source_request_numbers']
-                check.save(evidence / 'manifest.json', manifest)
-                with self.assertRaisesRegex((ValueError, KeyError), message):
-                    check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-        evidence, output, manifest = self.write_summary('json')
-        (evidence / manifest['responses'][2]['body_file']).unlink()
-        with self.assertRaises(FileNotFoundError):
-            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-    def test_summary_oracle_joins_real_multichunk_responses_and_missing_states(self):
-        evidence, output, manifest = self.write_multichunk_summary()
-        operations = [record['operation'] for record in manifest['responses']]
-        self.assertEqual(operations.count('agentic-aggregates'), 3)
-        self.assertEqual(operations.count('derived-agentic-metrics'), 3)
-        self.assertEqual(operations.count('trace-availability'), 2)
-        result = check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-        self.assertEqual(result['selected_rows'], 501)
-        rows = json.loads(output.read_text())['rows']
-        self.assertEqual(rows[1]['agentx']['aggregates']['status'], 'not_returned')
-        self.assertEqual(rows[2]['agentx']['derived_metrics']['status'], 'not_returned')
-        self.assertFalse(rows[3]['agentx']['trace_availability']['response_key_present'])
-
-        evidence, output, manifest = self.write_multichunk_summary()
-        first, second = manifest['responses'][1:3]
-        first_path, second_path = evidence / first['body_file'], evidence / second['body_file']
-        first_body, second_body = first_path.read_bytes(), second_path.read_bytes()
-        first_path.write_bytes(second_body)
-        second_path.write_bytes(first_body)
-        first['decoded_body_sha256'] = hashlib.sha256(second_body).hexdigest()
-        second['decoded_body_sha256'] = hashlib.sha256(first_body).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'Unexpected agentic-aggregates result ID'):
-            check.check_agentx_capture(self.root, evidence.name, output.name, self.args, VERSION)
-
-    def test_point_oracle_accepts_bounded_trace_and_no_trace_and_rejects_invalid_diagnostics(self):
-        for trace in [False, True]:
-            evidence, output, _manifest, _document = self.write_point(trace=trace)
-            self.assertEqual(check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION),
-                             'trace_diagnostics' if trace else 'trace_unavailable')
-        self.assertEqual(check.check_point_outcomes(['trace_diagnostics', 'trace_unavailable']),
-                         ['trace_diagnostics', 'trace_unavailable'])
-        with self.assertRaisesRegex(ValueError, 'one traced and one no-trace'):
-            check.check_point_outcomes(['trace_unavailable', 'trace_unavailable'])
-
-        evidence, output, manifest, document = self.write_point(trace=True)
-        document['timeline']['version'] = True
-        check.save(output, document)
-        manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'Trace diagnostic differs'):
-            check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
-
-        evidence, output, manifest, document = self.write_point(trace=True)
-        timeline_record = manifest['responses'][3]
-        timeline_path = evidence / timeline_record['body_file']
-        timeline = json.loads(timeline_path.read_text())
-        timeline['version'] = True
-        timeline_path.write_text(json.dumps(timeline))
-        timeline_record['decoded_body_sha256'] = hashlib.sha256(timeline_path.read_bytes()).hexdigest()
-        document['metadata']['requests'][3]['body_utf8'] = timeline_path.read_text()
-        check.save(output, document)
-        manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'timeline'):
-            check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
-
-        evidence, output, manifest, document = self.write_point(trace=False)
-        document['selected_point']['id'] = '8'
-        check.save(output, document)
-        manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-        check.save(evidence / 'manifest.json', manifest)
-        with self.assertRaisesRegex(ValueError, 'differs from complete responses'):
-            check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
-
-    def test_native_point_recipe_allows_only_the_selected_id_seam(self):
-        installed = self.root / 'installed'
-        reference = installed / 'references'
-        reference.mkdir(parents=True)
-        reference.joinpath('agentx.md').write_text("""```bash
-node --input-type=module <<'JS'
-const selectedResultId = '421';
-console.log(selectedResultId);
-JS
-```
-""")
-        expected = check.point_recipe(installed, '7').encode()
-        script = self.root / 'agentx-point-recipe.mjs'
-        script.write_bytes(expected)
-        check.check_point_recipe(self.root, installed, 'agentx-point', '7')
-
-        for mutation in [expected + b'\n', expected.replace(b'\n', b'\r\n'),
-                         expected.replace(b'console.log', b'process.stdout.write')]:
-            with self.subTest(mutation=mutation):
-                script.write_bytes(mutation)
-                with self.assertRaisesRegex(ValueError, 'changed beyond its selected ID'):
-                    check.check_point_recipe(self.root, installed, 'agentx-point', '7')
-
-        outside = self.root / 'outside.mjs'
-        outside.write_bytes(expected)
-        script.unlink()
-        script.symlink_to(outside)
-        with self.assertRaisesRegex(ValueError, 'changed beyond its selected ID'):
-            check.check_point_recipe(self.root, installed, 'agentx-point', '7')
-
-    def test_point_oracle_requires_one_chronological_capture_request_output_chain(self):
-        for mutation in ['capture-order', 'request-time-mismatch', 'output-before-request',
-                         'finish-before-output']:
-            with self.subTest(mutation=mutation):
-                evidence, output, manifest, document = self.write_point(trace=False)
-                if mutation == 'capture-order':
-                    manifest['responses'][0]['retrieved_at'] = '2026-09-05T00:00:04Z'
-                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:04Z'
-                elif mutation == 'request-time-mismatch':
-                    document['metadata']['requests'][0]['retrieved_at'] = '2026-09-05T00:00:01+00:00'
-                elif mutation == 'output-before-request':
-                    document['metadata']['retrieved_at'] = '2026-09-05T00:00:04Z'
-                else:
-                    manifest['finished_at'] = '2026-09-05T00:00:19Z'
-                check.save(output, document)
-                manifest['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-                check.save(evidence / 'manifest.json', manifest)
-                error = 'not linked' if mutation == 'request-time-mismatch' else 'timestamps are not chronological'
-                with self.assertRaisesRegex(ValueError, error):
-                    check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
-
-    def test_run_point_finalizes_capture_with_recipe_owned_request_times(self):
-        source_evidence, source_output, source_manifest, document = self.write_point(trace=False)
-        installed = self.root / 'installed'
-        references = installed / 'references'
-        references.mkdir(parents=True)
-        references.joinpath('agentx.md').write_text("""```bash
-node --input-type=module <<'JS'
-const selectedResultId = '421';
-console.log(selectedResultId);
-JS
-```
-""")
-
-        def run(_command, project, environment, label, _deadline):
-            evidence = Path(environment['INFERENCEX_POINT_EVIDENCE'])
-            evidence.mkdir()
-            capture = json.loads(json.dumps(source_manifest))
-            capture.update(status='pending', finished_at=None)
-            capture['output'] = {
-                'format': 'json',
-                'destination': environment['INFERENCEX_POINT_OUTPUT'],
-                'sha256': None,
-                'source_request_numbers': [],
-            }
-            for index, response in enumerate(capture['responses'], 1):
-                response['retrieved_at'] = f'2026-09-05T00:00:{index * 2:02d}Z'
-                check.shutil.copyfile(source_evidence / response['body_file'],
-                                      evidence / response['body_file'])
-            check.save(evidence / 'manifest.json', capture)
-            self.assertEqual(project, self.root)
-            self.assertEqual(label, 'agentx-point')
-            return source_output.read_text()
-
-        with patch.object(check, 'run', side_effect=run):
-            outcome = check.run_point('node', installed, self.root, {}, 'agentx-point', '7', VERSION)
-        self.assertEqual(outcome, 'trace_unavailable')
-        manifest = json.loads((self.root / 'agentx-point-evidence/manifest.json').read_text())
-        self.assertEqual(manifest['status'], 'complete')
-        self.assertEqual(
-            [response['retrieved_at'] for response in manifest['responses']],
-            [request['retrieved_at'] for request in document['metadata']['requests']],
-        )
-
-    def run_shipped_point(self, *, trace):
-        source_evidence, _output, source_manifest, _document = self.write_point(trace=trace)
-        fixtures = {}
-        for response in source_manifest['responses']:
-            body = (source_evidence / response['body_file']).read_text()
-            if response['operation'] == 'benchmark-siblings':
-                body = body.replace('"sku":{', '"sku":{"recorded_ns":9007199254740993,')
-            elif response['operation'] == 'request-timeline':
-                body = body.replace('"startNs":0', '"startNs":1000000000000000128')
-            fixtures[response['url']] = body
-        preload = self.root / f'fixture-{self.fixture_index}.mjs'
-        preload.write_text(f"""const bodies = {json.dumps(fixtures)};
-globalThis.fetch = async (input) => {{
-  const url = input instanceof Request ? input.url : String(input);
-  if (!Object.hasOwn(bodies, url)) throw new Error(`Unexpected fixture request: ${{url}}`);
-  const response = new Response(bodies[url], {{ status: 200 }});
-  Object.defineProperty(response, 'url', {{ value: url }});
-  return response;
-}};
-""")
-        installed = Path(__file__).resolve().parents[1] / 'skills/inferencex-api'
-        environment = dict(check.os.environ, NODE_OPTIONS=f'--import={preload.as_uri()}')
-        label = f'shipped-point-{self.fixture_index}'
-        outcome = check.run_point(check.shutil.which('node'), installed, self.root,
-                                  environment, label, '7', VERSION)
-        evidence, output = self.root / f'{label}-evidence', self.root / f'{label}.json'
-        return outcome, evidence, output, json.loads((evidence / 'manifest.json').read_text())
-
-    def test_shipped_point_recipe_preserves_exact_text_despite_javascript_number_rounding(self):
-        for trace in [False, True]:
-            with self.subTest(trace=trace):
-                outcome, evidence, output, capture = self.run_shipped_point(trace=trace)
-                self.assertEqual(outcome, 'trace_diagnostics' if trace else 'trace_unavailable')
-                self.assertEqual(check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION), outcome)
-                document = json.loads(output.read_text())
-                for request, response in zip(document['metadata']['requests'], capture['responses']):
-                    self.assertEqual(set(request), {'query_url', 'retrieved_at', 'body_utf8'})
-                    self.assertEqual(request['body_utf8'].encode(), (evidence / response['body_file']).read_bytes())
-                self.assertIn('9007199254740993', document['metadata']['requests'][1]['body_utf8'])
-                self.assertEqual(document['benchmark_siblings']['sku']['recorded_ns'], 9007199254740992)
-                if trace:
-                    self.assertIn('1000000000000000128', document['metadata']['requests'][3]['body_utf8'])
-                    self.assertEqual(document['timeline']['startNs'], 1000000000000000100)
-
-    def test_point_verifiers_reject_missing_or_changed_recipe_response_text(self):
-        original_run = check.run
-        for interface in ['run_point', 'check_agentx_point']:
-            for mutation in ['missing', 'not-text', 'whitespace', 'rounded-integer']:
-                with self.subTest(interface=interface, mutation=mutation):
-                    def change(stdout):
-                        document = json.loads(stdout)
-                        request = document['metadata']['requests'][1]
-                        if mutation == 'missing':
-                            del request['body_utf8']
-                        elif mutation == 'not-text':
-                            request['body_utf8'] = 1
-                        elif mutation == 'whitespace':
-                            request['body_utf8'] += ' '
-                        else:
-                            request['body_utf8'] = request['body_utf8'].replace('9007199254740993', '9007199254740992')
-                        return json.dumps(document)
-
-                    error = 'request identity differs' if mutation == 'missing' else 'raw response text differs'
-                    if interface == 'run_point':
-                        with patch.object(check, 'run', side_effect=lambda *args: change(original_run(*args))):
-                            with self.assertRaisesRegex(ValueError, error):
-                                self.run_shipped_point(trace=False)
-                        capture = self.root / f'shipped-point-{self.fixture_index}-evidence/manifest.json'
-                        self.assertEqual(json.loads(capture.read_text())['status'], 'pending')
-                    else:
-                        _outcome, evidence, output, capture = self.run_shipped_point(trace=False)
-                        output.write_text(change(output.read_text()))
-                        capture['output']['sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
-                        check.save(evidence / 'manifest.json', capture)
-                        with self.assertRaisesRegex(ValueError, error):
-                            check.check_agentx_point(self.root, evidence.name, output.name, '7', VERSION)
-
-    def test_point_capture_preload_rejects_effective_post_request(self):
-        node = check.shutil.which('node')
-        self.assertIsNotNone(node)
-        preload = self.root / 'capture.mjs'
-        script = self.root / 'post.mjs'
-        evidence = self.root / 'post-evidence'
-        preload.write_text(check.POINT_CAPTURE_PRELOAD)
-        script.write_text("""try {
-  await fetch(new Request('https://inferencex.semianalysis.com/api/openapi.json', { method: 'POST' }));
-  throw new Error('POST was accepted');
-} catch (error) {
-  if (!String(error).includes('allow only GET requests')) throw error;
-}
-""")
-        environment = dict(check.os.environ)
-        environment.update(INFERENCEX_POINT_EVIDENCE=str(evidence), INFERENCEX_POINT_ID='7',
-                           INFERENCEX_POINT_OUTPUT=str(self.root / 'point.json'),
-                           INFERENCEX_PACKAGE_VERSION=VERSION)
-        completed = subprocess.run([node, '--import', preload.as_uri(), script], env=environment,
-                                   capture_output=True, text=True, check=False)
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(json.loads((evidence / 'manifest.json').read_text())['responses'], [])
-
-    def test_point_capture_preload_requires_redirect_rejection(self):
-        node = check.shutil.which('node')
-        self.assertIsNotNone(node)
-        preload = self.root / 'capture.mjs'
-        script = self.root / 'redirect.mjs'
-        evidence = self.root / 'redirect-evidence'
-        preload.write_text(check.POINT_CAPTURE_PRELOAD)
-        script.write_text("""try {
-  await fetch('https://inferencex.semianalysis.com/api/openapi.json');
-  throw new Error('Default redirect handling was accepted');
-} catch (error) {
-  if (!String(error).includes('must reject redirects')) throw error;
-}
-""")
-        environment = dict(check.os.environ)
-        environment.update(INFERENCEX_POINT_EVIDENCE=str(evidence), INFERENCEX_POINT_ID='7',
-                           INFERENCEX_POINT_OUTPUT=str(self.root / 'point.json'),
-                           INFERENCEX_PACKAGE_VERSION=VERSION)
-        completed = subprocess.run([node, '--import', preload.as_uri(), script], env=environment,
-                                   capture_output=True, text=True, check=False)
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(json.loads((evidence / 'manifest.json').read_text())['responses'], [])
-
-    def test_installed_boundary_and_public_archive_bytes_are_exact(self):
-        installed = self.root / 'installed'
-        installed.mkdir()
-        (installed / 'SKILL.md').write_bytes(b'skill')
-        check.save(installed / '.inferencex-skills.json', {'package': check.PACKAGE, 'version': VERSION})
-        check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
-        (installed / 'unexpected.txt').write_text('extra')
-        with self.assertRaisesRegex(ValueError, 'Unexpected installed files'):
-            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
-        (installed / 'unexpected.txt').unlink()
-        outside_file = self.root / 'outside.txt'
-        outside_file.write_text('outside')
-        (installed / 'file-link').symlink_to(outside_file)
-        with self.assertRaisesRegex(ValueError, 'symlink'):
-            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
-        (installed / 'file-link').unlink()
-        outside_directory = self.root / 'outside-directory'
-        outside_directory.mkdir()
-        (installed / 'directory-link').symlink_to(outside_directory, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, 'symlink'):
-            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
-        (installed / 'directory-link').unlink()
-        check.os.mkfifo(installed / 'named-pipe')
-        with self.assertRaisesRegex(ValueError, 'regular file'):
-            check.check_installed(installed, {'SKILL.md': b'skill'}, VERSION)
-        (installed / 'named-pipe').unlink()
-
-        stream = io.BytesIO()
-        with tarfile.open(fileobj=stream, mode='w:gz') as packed:
-            entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
-            entry.size = 5
-            packed.addfile(entry, io.BytesIO(b'skill'))
-        archive = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
-                  'sha256': hashlib.sha256(archive).hexdigest(),
-                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(archive).digest()).decode()}
-        (self.root / 'candidate.tgz').write_bytes(archive)
-        check.save(self.root / 'release.json', record)
-        metadata = {'name': check.PACKAGE, 'version': VERSION,
-                    'dist': {'integrity': record['integrity'], 'tarball': check.REGISTRY + '/different.tgz'}}
-        command = ['verify-release.py', 'public', str(self.root / 'release.json'), '--model', 'Example',
-                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
-                   '--agentx-no-trace-id', '8', '--evidence', str(self.root / 'public-verification')]
-        with patch.object(sys, 'argv', command), \
-                patch.object(check, 'fetch_public', side_effect=[json.dumps(metadata).encode(), b'different']) as fetch, \
-                patch.object(check, 'install_target') as install, patch('builtins.print'):
-            with self.assertRaisesRegex(ValueError, 'Public tarball differs'):
-                check.main()
-        self.assertEqual(fetch.call_count, 2)
-        install.assert_not_called()
-
-    def test_candidate_orchestrates_all_six_helpers_for_both_targets(self):
-        contract_version = '0.11.0'
-        stream = io.BytesIO()
-        with tarfile.open(fileobj=stream, mode='w:gz') as packed:
-            content = b'skill'
-            entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
-            entry.size = len(content)
-            packed.addfile(entry, io.BytesIO(content))
-        body = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': contract_version, 'filename': 'candidate.tgz',
+    def check_native_agent(self, fixtures, **scope):
+        attempt = Path(tempfile.mkdtemp(dir=self.root))
+        archive = attempt / 'candidate.tgz'
+        skill_files = {'SKILL.md': b'fixture', 'scripts/inferencex.mjs': b'// fixture'}
+        with tarfile.open(archive, 'w:gz') as packed:
+            for name, body in skill_files.items():
+                member = tarfile.TarInfo('package/skills/inferencex-api/' + name)
+                member.size = len(body)
+                packed.addfile(member, io.BytesIO(body))
+        body = archive.read_bytes()
+        record = {'name': check.PACKAGE, 'version': self.VERSION, 'filename': archive.name,
                   'sha256': hashlib.sha256(body).hexdigest(),
                   'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
-        (self.root / 'candidate.tgz').write_bytes(body)
-        check.save(self.root / 'release.json', record)
-        command = ['verify-release.py', 'candidate', str(self.root / 'release.json'), '--model', 'Example',
-                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
-                   '--agentx-no-trace-id', '8', '--evidence', str(self.root / 'verification')]
-        projects = {}
-
-        def install(clean_root, target, *_args, **_kwargs):
-            project = Path(clean_root) / target
-            project.mkdir(parents=True)
-            projects[target] = project
-            return project, {}
-
-        def execute(command, *_args):
-            command = [str(part) for part in command]
-            if '--invalid-argument' not in command:
-                return ''
-            helper = 'inferencex-skills' if 'inferencex-skills' in command else Path(command[1]).stem
-            envelope = {
-                'schema_version': 1,
-                'package': check.PACKAGE,
-                'package_version': contract_version,
-                'command': helper,
-                'error': {'code': 'INVALID_ARGUMENT', 'message': 'Unknown option --invalid-argument'},
-            }
-            raise subprocess.CalledProcessError(
-                2, command, output='', stderr=json.dumps(envelope, separators=(',', ':')) + '\n')
-
-        with patch.object(sys, 'argv', command), patch.object(check, 'install_target', side_effect=install) as installs, \
-                patch.object(check, 'check_installed') as installed_checks, \
-                patch.object(check, 'run', side_effect=execute) as runs, \
-                patch.object(check, 'captured_export', return_value=[]), \
-                patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
-                patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}), \
-                patch.object(check, 'verify_saved_exports', return_value=[{'capture': 'verified'}]) as offline, \
-                patch.object(check, 'check_additional_workflows', return_value={'status': 'passed'}), \
-                patch.object(check, 'run_point', side_effect=['trace_diagnostics', 'trace_unavailable'] * 2), \
-                patch('builtins.print'):
-            check.main()
-        self.assertEqual([call.args[1] for call in installs.call_args_list], ['codex', 'claude'])
-        self.assertEqual(installed_checks.call_count, 4)
-        self.assertEqual(offline.call_count, 2)
-        commands = [[str(part) for part in call.args[0]] for call in runs.call_args_list]
-        for target, project in projects.items():
-            target_commands = [command for command, call in zip(commands, runs.call_args_list)
-                               if call.args[1] == project]
-            positive_commands = [command for command in target_commands if '--invalid-argument' not in command]
-            self.assertEqual(sum('export-powerx.mjs' in ' '.join(command) for command in positive_commands), 2, target)
-            self.assertEqual(sum('export-agentx.mjs' in ' '.join(command) for command in positive_commands), 3, target)
-            for helper in ['investigate-result', 'compare-tco', 'compare-releases', 'compare-collectivex']:
-                self.assertEqual(sum(f'{helper}.mjs' in ' '.join(command) for command in positive_commands), 1, target)
-            negatives = [command for command in target_commands if '--invalid-argument' in command]
-            self.assertEqual(len(negatives), 7, target)
-            self.assertTrue(all(command[-3:] == ['--error-format', 'json', '--invalid-argument']
-                                for command in negatives), target)
-            helper_names = {
-                'inferencex-skills' if 'inferencex-skills' in command else Path(command[1]).stem
-                for command in negatives
-            }
-            self.assertEqual(helper_names, {
-                'export-powerx', 'export-agentx', 'investigate-result', 'compare-tco',
-                'compare-releases', 'compare-collectivex', 'inferencex-skills'}, target)
-            installer, = [command for command in negatives if 'inferencex-skills' in command]
-            self.assertIn('--offline', installer)
-        report = json.loads((self.root / 'verification/verification.json').read_text())
-        self.assertTrue(all(target['offline_verification'] == [{'capture': 'verified'}]
-                            for target in report['targets']))
-
-    def test_agents_prepares_canonical_projects_with_only_archive_and_hashed_prompt(self):
-        stream = io.BytesIO()
-        with tarfile.open(fileobj=stream, mode='w:gz') as packed:
-            entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
-            entry.size = 5
-            packed.addfile(entry, io.BytesIO(b'skill'))
-        archive = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
-                  'sha256': hashlib.sha256(archive).hexdigest(),
-                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(archive).digest()).decode()}
-        (self.root / 'candidate.tgz').write_bytes(archive)
-        check.save(self.root / 'release.json', record)
-        evidence = self.root / 'agents-verification'
-        canonical_root = self.root / 'canonical-acceptance'
-        canonical_root.mkdir()
-        alias_root = self.root / 'aliased-acceptance'
-        alias_root.symlink_to(canonical_root, target_is_directory=True)
-        command = ['verify-release.py', 'agents', str(self.root / 'release.json'), '--model', 'Example',
-                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
-                   '--agentx-no-trace-id', '8', '--evidence', str(evidence)]
-        with patch.object(sys, 'argv', command), \
-                patch.object(check.tempfile, 'mkdtemp', return_value=str(alias_root)), \
-                patch.object(check, 'install_target') as install, \
-                patch.object(check.shutil, 'which') as which, patch('builtins.print'):
-            check.main()
-        install.assert_not_called()
-        which.assert_not_called()
-        report = json.loads((evidence / 'verification.json').read_text())
-        clean_root = Path(report['clean_root'])
-        self.assertEqual(clean_root, canonical_root.resolve())
-        self.addCleanup(check.shutil.rmtree, clean_root, True)
-        acceptance = json.loads((clean_root / 'acceptance.json').read_text())
-        self.assertEqual(acceptance['status'], 'prepared')
-        for prepared in acceptance['targets']:
-            project = Path(prepared['project'])
-            self.assertEqual(project, project.resolve())
-            self.assertEqual({path.name for path in project.iterdir()}, {'candidate.tgz', 'prompt.txt'})
-            self.assertEqual((project / 'candidate.tgz').read_bytes(), archive)
-            prompt_bytes = (project / 'prompt.txt').read_bytes()
-            self.assertEqual(prepared, {'target': prepared['target'], 'project': str(project),
-                                        'status': 'awaiting-native-agent',
-                                        'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()})
-            prompt_text = prompt_bytes.decode()
-            self.assertIn(f'install --target {prepared["target"]}', prompt_text)
-            self.assertIn(str((project / 'candidate.tgz').resolve()), prompt_text)
-            skill_root = '.agents' if prepared['target'] == 'codex' else '.claude'
-            self.assertIn(f'The installed skill must be exactly {project / skill_root}/skills/inferencex-api.',
-                          prompt_text)
-
-    def test_agent_prompt_pins_project_commands_and_exact_point_manifest_contract(self):
-        for target, install_root in [('codex', '.agents'), ('claude', '.claude')]:
-            target_project = (self.root / f'prepared/{target}').resolve()
-            target_archive = target_project / 'candidate.tgz'
-            target_prompt = check.prompt(self.args, target, target_archive)
-            commands = [
-                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills install --target {target}',
-                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills status --target {target} --json > status.json',
-                f'npm exec --yes --offline --package {target_archive} -- inferencex-skills install --target {target} --force --dry-run --json > preview.json',
-            ]
-            with self.subTest(target=target):
-                self.assertTrue(target_prompt.startswith(
-                    'Your first three tool calls must be shell calls containing exactly these commands, one per call, in this order:\n'))
-                self.assertEqual([line[3:] for line in target_prompt.splitlines()[2:5]], commands)
-                for number, command in enumerate(commands, 1):
-                    self.assertEqual(target_prompt.count(f'\n{number}. {command}\n'), 1)
-                self.assertIn(
-                    f'The installed skill must be exactly {target_project / install_root}/skills/inferencex-api.',
-                    target_prompt,
-                )
-                direct_shell = (
-                    f'Every shell already starts in {target_project}; a shell call containing `cd` or any path at '
-                    'or below `/dev`, including `/dev/null.txt`, fails acceptance even when `cd` names this exact project'
-                )
-                self.assertIn(direct_shell, target_prompt)
-                self.assertLess(target_prompt.index(direct_shell),
-                                target_prompt.index('Use only the exact candidate archive'))
-
-        project = (self.root / 'prepared/codex').resolve()
-        archive = project / 'candidate.tgz'
-        prompt_text = check.prompt(self.args, 'codex', archive)
+        check.save(attempt / 'release.json', record)
+        args = SimpleNamespace(
+            model='GLM-5', date=None, isl=8192, osl=1024, raw_model=None,
+            agentx_model='DeepSeek-V4-Pro', empty_isl=7, empty_osl=13)
+        vars(args).update(scope)
+        targets = []
+        for target in ('codex', 'claude'):
+            project = attempt / target
+            project.mkdir()
+            local_archive = project / archive.name
+            local_archive.write_bytes(body)
+            prompt = check.prompt(args, target, local_archive).encode()
+            (project / 'prompt.txt').write_bytes(prompt)
+            targets.append({'target': target, 'project': str(project),
+                            'status': 'awaiting-native-agent',
+                            'prompt_sha256': hashlib.sha256(prompt).hexdigest()})
+        check.save(attempt / 'acceptance.json', {
+            'mode': 'agents', 'status': 'prepared', 'candidate': record,
+            'scope': vars(args).copy(), 'targets': targets})
+        project = attempt / 'codex'
         installed = project / '.agents/skills/inferencex-api'
-        for required in [
-                f'The prepared project root is {project}.',
-                'This prepared project is the only writable boundary',
-                'Every shell redirection destination, including a throwaway check, must resolve inside this project',
-                'Every path at or below `/dev` is outside the project and forbidden',
-                'do not run `cd`, even back to this same path',
-                'Never create, extract, or delete task files in `/tmp`, `$TMPDIR`, `$HOME`, or another directory',
-                'Do not list or extract the candidate archive',
-                'Do not list or inventory the prepared project root with `ls`, `find`, `tree`, a shell glob, or an equivalent command',
-                'Any root listing exposes `.npm-cache` and fails acceptance',
-                'Inspect only explicitly named installed-skill files and explicitly named deliverable paths or directories',
-                'never list, read, or inspect `.npm-cache`',
-                'Make exactly one shell tool call at a time, and wait for it to finish successfully before issuing the next',
-                'Until all three finish, make no tool calls except the next required shell call',
-                'Do not prefix, suffix, or combine the commands with `pwd`, `ls`, `cat`, `&&`, `;`, a pipe, or any other command',
-                'Run the required install, status, and preview commands from that exact directory',
-                'Do not change directories or pass --dir or --cwd',
-                f'The installed skill must be exactly {installed}.',
-                'status --target codex --json',
-                'install --target codex --force --dry-run --json',
-                'Do not run a connectivity or schema preflight with `curl` or any other tool',
-                "The task's first two HTTP requests must be the captured OpenAPI request and captured benchmark request",
-                'only after both response captures and lookup.json exist may an exporter or diagnostic make an HTTP request',
-                'Do not make a preliminary, uncaptured, retry, or evidence-only repeat request',
-                'Perform HTTP-producing work strictly in this order: lookup; PowerX CSV; PowerX JSON; ' +
-                'unavailable PowerX; diagnostic; AgentX CSV; AgentX JSON; excluded AgentX; traced point; no-trace point',
-                'Before issuing an HTTP-producing command, resolve every redirect destination and use its final ' +
-                'in-project path in that first command',
-                'The first command issued for an operation consumes its only attempt, even if shell parsing, ' +
-                'redirection, preload/import, or process startup fails before any HTTP request',
-                'never issue a second command for that operation',
-                'If one fails, stop and preserve the failure; do not retry it, delete its evidence, or replace its output',
-                'The lookup must make exactly two HTTP requests',
-                'fetch `/api/openapi.json` once and then the exact benchmark URL once',
-                'raw-responses/lookup-openapi.response.json',
-                'raw-responses/lookup-openapi.request.json',
-                'raw-responses/lookup.response.json',
-                'raw-responses/lookup.request.json',
-                'Run the installed bounded diagnostic exactly once',
-                'It must make exactly one HTTP request in total, the unfiltered benchmark request',
-                'raw-responses/diagnostic.response.json',
-                'raw-responses/diagnostic.request.json',
-                'finish reading the body before creating `retrieved_at`',
-                'save and parse the same complete body bytes consumed by the output',
-                'Each request record must contain exactly query_url, status, retrieved_at, and sha256 of its saved body',
-                "The benchmark response time must also be lookup.json's retrieved_at",
-                "the diagnostic response time must be diagnostic.json's diagnostic.retrieved_at",
-                'raw-responses contains exactly those six files',
-                '`schema_version`, `package_version`, `selected_result_id`, `status`, `started_at`, ',
-                '`finished_at`, `responses`, `output`, and `error`',
-                '`operation`, `request_number`, `url`, `method`, `retrieved_at`, `http_status`, ',
-                '`decoded_body_sha256`, `body_file`, and `checksum_covers`',
-                '`response-0001-openapi.json`',
-                '`response-NNNN-<operation>.json`',
-                '`format`, `destination`, `sha256`, and `source_request_numbers`',
-                'The final manifest is accepted only with `status: "complete"` and `error: null`',
-                'Run the installed one-point recipe as written',
-                'agentx-point-recipe.mjs',
-                'agentx-second-point-recipe.mjs',
-                'every other recipe byte must remain identical',
-                'the file must end at that final `}` byte with no trailing newline or other byte',
-                'Do not create an outside-project scratch copy while extracting or comparing the recipe files',
-                'Do not use shell process substitution (`<(...)` or `>(...)`)',
-                'because it materializes paths below `/dev/fd`',
-                'Do not use owner-bearing listings such as `ls -l` or `ls -la`',
-                'Plain `ls` is allowed only for an explicitly named deliverable directory',
-                'separate Node `--import` capture preload',
-                "redirect that recipe process's stdout directly",
-                'must not write their output or evidence, replace `response.json()`, replace `console.log()`',
-                'Do not reimplement the request flow or reconstruct the JSON output',
-                "Read the recipe-owned `metadata.requests` only after that run's final fetch has completed",
-                'Each item contains exactly `query_url`, `retrieved_at`, and `body_utf8`',
-                'its UTF-8 bytes must equal the captured response file, including large-integer digits and whitespace',
-                'Do not rebuild it from parsed JSON',
-                'for every manifest response in identical order (six for a traced run and three for a no-trace run)',
-                'each `query_url` must match the corresponding manifest response `url`',
-                "each manifest response `retrieved_at` must equal the recipe output's corresponding `metadata.requests` value byte-for-byte",
-                'Keep the manifest pending until the redirected recipe output exists',
-                'Do not describe an omitted availability key as an explicit `false` response value',
-                'report the unweighted arithmetic mean across every selected row with a finite value',
-                'together with each finite and missing count; do not substitute ranges for these means',
-                'Report the exact selected-row counts for `disagg: false` and `disagg: true` from powerx.json',
-                'never describe a mixed topology as entirely non-disaggregated',
-                'Never characterize GPU counts, worker counts, or topology flags from sample rows',
-                'either report their complete value-frequency distribution across every selected row or omit that narrative',
-                'without inferring deployment design from them',
-                'write an explicit `key_present: <value>; available: <value>` pair for each point',
-                "keep the strict export's returned-row count separate from `diagnostic.json`'s unfiltered returned-row count",
-                "report every aggregate group's available, null, and missing-entry counts",
-                'do not infer coverage from one sample row',
-                'Describe that key only as unmatched in the current complete response',
-                'cross-check every numeric, coverage, missing-state, and request-count claim',
-                'Include one response-count ledger that names lookup, PowerX CSV, PowerX JSON, unavailable PowerX, diagnostic, AgentX CSV, AgentX JSON, excluded AgentX, traced point, and no-trace point separately',
-                'Do not call a multi-response artifact single-response',
-        ]:
-            with self.subTest(required=required):
-                self.assertIn(required, prompt_text)
-
-    def test_agents_rejects_archive_filename_collision_before_creating_projects(self):
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'prompt.txt',
-                  'sha256': '0' * 64, 'integrity': 'sha512-invalid'}
-        check.save(self.root / 'unsafe-release.json', record)
-        command = ['verify-release.py', 'agents', str(self.root / 'unsafe-release.json'), '--model', 'Example',
-                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
-                   '--agentx-no-trace-id', '8', '--evidence', str(self.root / 'unsafe-verification')]
-        with patch.object(sys, 'argv', command), patch.object(check.tempfile, 'mkdtemp') as projects:
-            with self.assertRaisesRegex(ValueError, r'safe \.tgz basename'):
-                check.main()
-        projects.assert_not_called()
-        self.assertFalse((self.root / 'unsafe-verification').exists())
-
-    def test_check_agent_runs_both_workload_and_point_oracles(self):
-        stream = io.BytesIO()
-        with tarfile.open(fileobj=stream, mode='w:gz') as packed:
-            entry = tarfile.TarInfo('package/skills/inferencex-api/SKILL.md')
-            entry.size = 5
-            packed.addfile(entry, io.BytesIO(b'skill'))
-        archive = stream.getvalue()
-        record = {'name': check.PACKAGE, 'version': VERSION, 'filename': 'candidate.tgz',
-                  'sha256': hashlib.sha256(archive).hexdigest(),
-                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(archive).digest()).decode()}
-        (self.root / 'candidate.tgz').write_bytes(archive)
-        check.save(self.root / 'release.json', record)
-        project = self.root / 'prepared/codex'
-        project.mkdir(parents=True)
-        (project / 'candidate.tgz').write_bytes(archive)
-        prompt_bytes = check.prompt(self.args, 'codex', project / 'candidate.tgz').encode()
-        (project / 'prompt.txt').write_bytes(prompt_bytes)
-        scope = {'model': 'Example', 'date': None, 'isl': 8192, 'osl': 1024, 'raw_model': None,
-                 'empty_isl': 7, 'empty_osl': 13, 'agentx_model': 'Example',
-                 'agentx_point_id': '7', 'agentx_no_trace_id': '8'}
-        claude_project = project.parent / 'claude'
-        claude_prompt = check.prompt(self.args, 'claude', claude_project / 'candidate.tgz').encode()
-        acceptance = {
-            'status': 'prepared', 'mode': 'agents', 'started_at': '2026-09-05T00:00:00Z',
-            'candidate': record, 'new_benchmark_runs': False, 'requests': [], 'scope': scope,
-            'clean_root': str(project.parent),
-            'targets': [
-                {'target': 'codex', 'project': str(project), 'status': 'awaiting-native-agent',
-                 'prompt_sha256': hashlib.sha256(prompt_bytes).hexdigest()},
-                {'target': 'claude', 'project': str(claude_project), 'status': 'awaiting-native-agent',
-                 'prompt_sha256': hashlib.sha256(claude_prompt).hexdigest()}]}
-        check.save(project.parent / 'acceptance.json', acceptance)
-        check.save(project / 'lookup.json', {})
-        check.save(project / 'unavailable.json', {'metadata': {}, 'rows': []})
-        check.save(project / 'diagnostic.json', {'diagnostic': {}})
-        (project / 'result.md').write_text('Checked both public workflows.')
-        raw_responses = project / 'raw-responses'
-        raw_responses.mkdir()
-        for name in ['lookup-openapi.request.json', 'lookup-openapi.response.json',
-                     'lookup.request.json', 'lookup.response.json',
-                     'diagnostic.request.json', 'diagnostic.response.json']:
-            (raw_responses / name).write_text('{}')
-        command = ['verify-release.py', 'check-agent', str(self.root / 'release.json'), '--model', 'Example',
-                   '--isl', '8192', '--osl', '1024', '--agentx-model', 'Example', '--agentx-point-id', '7',
-                   '--agentx-no-trace-id', '8', '--project', str(project),
-                   '--evidence', str(self.root / 'check-agent')]
-        for mutation in ['missing-status', 'running-status', 'failed-status', 'wrong-mode',
-                         'changed-target', 'missing-target', 'changed-target-status', 'same-project']:
-            with self.subTest(mutation=mutation):
-                altered = json.loads(json.dumps(acceptance))
-                if mutation == 'missing-status':
-                    del altered['status']
-                elif mutation in {'running-status', 'failed-status'}:
-                    altered['status'] = mutation.removesuffix('-status')
-                elif mutation == 'wrong-mode':
-                    altered['mode'] = 'candidate'
-                elif mutation == 'changed-target':
-                    altered['targets'][1]['target'] = 'other'
-                elif mutation == 'missing-target':
-                    altered['targets'].pop()
-                elif mutation == 'changed-target-status':
-                    altered['targets'][1]['status'] = 'complete'
-                else:
-                    altered['targets'][1]['project'] = altered['targets'][0]['project']
-                check.save(project.parent / 'acceptance.json', altered)
-                rejected = command[:-1] + [str(self.root / f'rejected-{mutation}')]
-                message = 'preparation state' if mutation in {
-                    'missing-status', 'running-status', 'failed-status', 'wrong-mode'} else 'target set'
-                with patch.object(sys, 'argv', rejected), patch.object(check, 'check_installed') as installed, \
-                        patch('builtins.print'):
-                    with self.assertRaisesRegex(ValueError, message):
-                        check.main()
-                installed.assert_not_called()
-        check.save(project.parent / 'acceptance.json', acceptance)
-        (project / 'prompt.txt').write_text('changed')
-        tampered = command[:-1] + [str(self.root / 'tampered-check-agent')]
-        with patch.object(sys, 'argv', tampered), patch.object(check, 'check_installed') as installed, \
-                patch('builtins.print'):
-            with self.assertRaisesRegex(ValueError, 'prompt differs'):
-                check.main()
-        installed.assert_not_called()
-        (project / 'prompt.txt').write_bytes(prompt_bytes)
-
-        def reject_inventory(label):
-            rejected = command[:-1] + [str(self.root / f'{label}-check-agent')]
-            with patch.object(sys, 'argv', rejected), patch.object(check, 'check_installed'), \
-                    patch.object(check, 'captured_export', return_value=[]), \
-                    patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
-                    patch('builtins.print'):
-                with self.assertRaisesRegex(ValueError, 'six required regular files'):
-                    check.main()
-
-        openapi_response = raw_responses / 'lookup-openapi.response.json'
-        openapi_response.unlink()
-        reject_inventory('missing-openapi')
-        openapi_response.write_text('{}')
-        extra = raw_responses / 'extra.json'
-        extra.write_text('{}')
-        reject_inventory('extra-raw-response')
-        extra.unlink()
-        outside_raw_responses = self.root / 'outside-raw-responses'
-        raw_responses.rename(outside_raw_responses)
-        raw_responses.symlink_to(outside_raw_responses, target_is_directory=True)
-        reject_inventory('raw-responses-symlink')
-        raw_responses.unlink()
-        outside_raw_responses.rename(raw_responses)
-        symlink_target = project / 'symlink-target.json'
-        symlink_target.write_text('{}')
-        openapi_response.unlink()
-        openapi_response.symlink_to(symlink_target)
-        reject_inventory('response-symlink')
-        openapi_response.unlink()
-        openapi_response.write_text('{}')
-
-        openapi = {'paths': {'/api/v1/benchmarks': {'get': {'parameters': [
-            {'name': 'model', 'in': 'query', 'schema': {'enum': ['Example']}}]}}}}
-        with patch.object(sys, 'argv', command), patch.object(check, 'check_installed'), \
-                patch.object(check, 'captured_export', return_value=[]), \
-                patch.object(check, 'check_exports', return_value={'selected_rows': 1}), \
-                patch.object(check, 'captured_request', side_effect=[openapi, [], []]) as requests, \
-                patch.object(check, 'check_lookup'), \
-                patch.object(check, 'check_metadata', return_value=[]), \
-                patch.object(check, 'check_empty_diagnostic'), \
-                patch.object(check, 'check_agentx_capture', return_value={'selected_rows': 1}) as summaries, \
-                patch.object(check, 'check_point_recipe') as recipes, \
-                patch.object(check, 'check_agentx_point',
-                             side_effect=['trace_diagnostics', 'trace_unavailable']) as points, \
-                patch('builtins.print'):
+        for name, content in skill_files.items():
+            destination = installed / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+        check.save(installed / '.inferencex-skills.json', {
+            'package': check.PACKAGE, 'version': self.VERSION})
+        for kind, directory in fixtures.items():
+            shutil.copytree(directory, project / 'bundles' / kind)
+        (project / 'result.md').write_text('Fixture narrative; independent review still required.\n')
+        vars(args).update(mode='check-agent', manifest=attempt / 'release.json',
+                          evidence=attempt / 'evidence', project=project)
+        with patch.object(check.argparse.ArgumentParser, 'parse_args', return_value=args), \
+                patch('sys.stdout', new=io.StringIO()):
             check.main()
-        self.assertEqual(requests.call_count, 3)
-        self.assertEqual(requests.call_args_list[0].args, (project, 'lookup-openapi', check.OPENAPI))
-        expected_url = check.API + '?model=Example'
-        self.assertEqual(requests.call_args_list[1].args, (project, 'lookup', expected_url, {}))
-        self.assertEqual(requests.call_args_list[2].args, (project, 'diagnostic', expected_url, {}))
-        self.assertEqual(summaries.call_count, 3)
-        self.assertEqual(recipes.call_count, 2)
-        self.assertEqual(points.call_count, 2)
-        report = json.loads((self.root / 'check-agent/verification.json').read_text())
+        return json.loads((args.evidence / 'verification.json').read_text())
+
+    def test_check_agent_rejects_substituted_bundle_families(self):
+        fixtures = self.fixtures()
+        with self.assertRaisesRegex(ValueError, 'family'):
+            self.check_native_agent({kind: fixtures['powerx'] for kind in fixtures})
+
+    def test_check_agent_rejects_bundles_for_a_different_prepared_scope(self):
+        with self.assertRaisesRegex(ValueError, 'scope'):
+            self.check_native_agent(self.fixtures(), model='DeepSeek-V4-Pro', isl=32, osl=64)
+
+    def test_check_agent_accepts_six_source_derived_bundles_for_the_prepared_tasks(self):
+        fixtures = self.fixtures()
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro')
+        commands = check.contract_one_commands(args, '1')
+        manifest = json.loads((fixtures['powerx'] / 'manifest.json').read_text())
+        power_rows = json.loads((fixtures['powerx'] / manifest['requests'][0]['response']['path']).read_text())
+
+        def link_result(fixture):
+            fixture['args'] = commands['result']
+            fixture['responses'][0].update(body=power_rows,
+                url='https://inferencex.semianalysis.com/api/v1/benchmarks?model=GLM-5')
+            fixture['responses'][1]['url'] = 'https://inferencex.semianalysis.com/api/v1/server-log?id=1&offset=0&limit=16384'
+            fixture['responses'][1]['body']['id'] = 1
+
+        fixtures['result'] = self.collected('result', 'missing-optional-provenance', link_result)
+
+        def tco_scope(fixture):
+            fixture['args'] = commands['tco']
+            response = fixture['responses'][0]
+            response['url'] = 'https://inferencex.semianalysis.com/api/v1/tco-feed?model=DeepSeek-V4-Pro&workloads=8192x1024&tiers=50&view=points&format=json&date=2026-09-06'
+            response['body'].update(model='DeepSeek-V4-Pro', workloads=['8192x1024'])
+            for row in response['body']['rows']:
+                row['workload'] = '8192x1024'
+
+        fixtures['tco'] = self.collected('tco', 'positive', tco_scope)
+        manifest = json.loads((fixtures['releases'] / 'manifest.json').read_text())
+        history = json.loads((fixtures['releases'] / manifest['requests'][0]['response']['path']).read_text())
+        for row, date, run_id in zip(history, ('2026-05-30', '2026-07-02'),
+                                      ('26694739752', '28571158239')):
+            row.update(model='glm5.1', hardware='mi355x', date=date,
+                       run_url=f'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id}/attempts/1')
+        fixtures['releases'] = self.collected('releases', {
+            'args': commands['releases'], 'responses': [{
+                'operation': 'benchmark-history', 'url': manifest['requests'][0]['url'],
+                'body': history, 'status': 200}]})
+
+        def collective_scope(fixture):
+            fixture['args'] = commands['collectivex']
+            for response, run_id in zip(fixture['responses'][1:], ('33378604574', '33412478973')):
+                response['url'] = f'https://inferencex.semianalysis.com/api/v1/collectivex/runs/{run_id}?version=1'
+                response['body']['run']['run_id'] = run_id
+
+        fixtures['collectivex'] = self.collected('collectivex', 'positive', collective_scope)
+        report = self.check_native_agent(fixtures)
         self.assertEqual(report['status'], 'data-checks-passed')
+        self.assertEqual({kind: audit['kind'] for kind, audit in report['targets'][0]['bundles'].items()},
+                         {kind: kind for kind in fixtures})
 
-    def test_workflow_gates_candidate_before_publish_and_public_after(self):
-        workflow = (Path(__file__).resolve().parents[3] / '.github/workflows/publish-skills.yml').read_text()
-        candidate = workflow.index('verify-release.py candidate')
-        publish = workflow.index('npm publish')
-        public = workflow.index('verify-release.py public')
-        self.assertLess(candidate, publish)
-        self.assertLess(publish, public)
-        for flag in ['--agentx-model', '--agentx-point-id', '--agentx-no-trace-id']:
-            self.assertEqual(workflow.count(flag), 2)
+    def test_json_derivations_distinguish_boolean_and_numeric_values(self):
+        fixtures = self.fixtures()
+        mutations = [
+            ('powerx', lambda result: result['rows'][0].update(disagg=0)),
+            ('agentx', lambda result: result['rows'][0]['agentx']['trace_availability'].update(value=0)),
+            ('tco', lambda result: result['rows'][0]['point'].update(is_interpolated=1)),
+            ('result', lambda result: result['metadata']['log_window'].update(offset=False)),
+            ('releases', lambda result: result['comparisons'][0]['configuration'].update(disagg=0)),
+            ('collectivex', lambda result: result['comparisons'][0]['left'][0].update(response_index=True)),
+        ]
+        for kind, mutate in mutations:
+            with self.subTest(kind=kind):
+                self.rehash_result(fixtures[kind], mutate)
+                with self.assertRaises(ValueError):
+                    check.check_bundle(fixtures[kind], self.VERSION)
 
+    def test_native_scope_binds_each_task_and_the_selected_powerx_observation(self):
+        fixtures = self.fixtures()
+        bundles = self.root / 'native-scope'
+        for kind, directory in fixtures.items():
+            shutil.copytree(directory, bundles / kind)
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro')
+        # Domain replay is covered above; this fixture isolates the prepared task boundary.
+        scopes = {
+            'result': {'id': '1', 'model': 'GLM-5', 'date': None, 'run_id': None,
+                       'log_file': None, 'log_offset': 0, 'log_limit': 16384},
+            'tco': {'model': 'DeepSeek-V4-Pro', 'date': '2026-09-06',
+                    'workloads': ['8192x1024'],
+                    'target_output_tokens_per_second_per_user': 50.0,
+                    'gpu_hourly_prices_usd': {'mi355x': 1.8, 'b200': 3.6},
+                    'units': check.TCO_UNITS},
+            'releases': {'model': 'GLM-5', 'raw_model': 'glm5.1', 'hardware': 'mi355x',
+                         'framework': 'sglang', 'isl': 8192, 'osl': 1024,
+                         'metric': 'median_ttft', 'before_date': '2026-05-30',
+                         'after_date': '2026-07-02', 'before_image': None, 'after_image': None,
+                         'before_run_url': 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26694739752/attempts/1',
+                         'after_run_url': 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/28571158239/attempts/1'},
+            'collectivex': {'left': '33378604574', 'right': '33412478973'},
+        }
+        for kind, scope in scopes.items():
+            path = bundles / kind / 'manifest.json'
+            manifest = json.loads(path.read_text())
+            manifest['normalized_arguments'] = scope
+            check.save(path, manifest)
+        power = json.loads((bundles / 'powerx/result.json').read_text())
+        selected = power['rows'][0]
+        result_path = bundles / 'result/result.json'
+        check.save(result_path, {'selected_result': selected})
+        check.check_native_scope(bundles, args)
+        for kind, field, value in (
+            ('powerx', 'model', 'wrong'), ('powerx', 'isl', 32),
+            ('powerx', 'osl', 64), ('powerx', 'date', '2026-08-01'),
+            ('powerx', 'raw_model', 'another-raw-model'), ('agentx', 'model', 'wrong'),
+            ('result', 'model', 'wrong'), ('result', 'date', '2026-08-01'),
+            ('tco', 'date', None), ('tco', 'gpu_hourly_prices_usd', {'b200': 0}),
+            ('releases', 'before_date', '2026-05-31'),
+            ('releases', 'after_run_url', None), ('collectivex', 'right', '33378604574'),
+        ):
+            with self.subTest(kind=kind, field=field):
+                path = bundles / kind / 'manifest.json'
+                original = path.read_text()
+                changed = json.loads(original)
+                changed['normalized_arguments'][field] = value
+                check.save(path, changed)
+                with self.assertRaisesRegex(ValueError, 'scope'):
+                    check.check_native_scope(bundles, args)
+                path.write_text(original)
+        for field, value in (('id', '999'), ('model', 'wrong'), ('hardware', 'wrong'),
+                             ('isl', 32), ('osl', 64)):
+            with self.subTest(selected_field=field):
+                check.save(result_path, {'selected_result': {**selected, field: value}})
+                with self.assertRaisesRegex(ValueError, 'selected PowerX context'):
+                    check.check_native_scope(bundles, args)
 
-class AdditionalWorkflowEvidenceTests(unittest.TestCase):
-    def test_same_response_hash_url_status_and_time_are_required(self):
-        body = '{"observations":[1,2]}'
-        source = dict(body_utf8=body, decoded_body_sha256=hashlib.sha256(body.encode()).hexdigest(),
-                      url=check.OPENAPI, http_status=200, retrieved_at='2026-09-06T00:00:00Z')
-        self.assertEqual(check.workflow_source(source, check.OPENAPI), {'observations': [1, 2]})
-        for key, value in [('body_utf8', '{}'), ('decoded_body_sha256', '0' * 64),
-                           ('url', check.API), ('http_status', 500), ('retrieved_at', 'invalid')]:
-            with self.subTest(key=key), self.assertRaises((AssertionError, ValueError)):
-                check.workflow_source({**source, key: value}, check.OPENAPI)
+    def test_six_family_bundles_are_checked_against_consumed_responses(self):
+        reports = {kind: check.check_bundle(directory, self.VERSION)
+                   for kind, directory in self.fixtures().items()}
+        self.assertEqual(set(reports), {
+            'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'})
+        self.assertTrue(all(report['status'] == 'passed' for report in reports.values()))
+        self.assertEqual(reports['collectivex']['comparable_pairs'], 1)
 
-    def test_new_workflow_identity_cannot_be_missing_or_from_another_archive(self):
-        document = {'schema_version': 1, 'metadata': {'package_version': VERSION}}
-        check.workflow_identity(document, VERSION)
-        for changed in [{}, {'schema_version': 2, 'metadata': document['metadata']},
-                        {'schema_version': 1, 'metadata': {'package_version': 'wrong'}}]:
-            with self.assertRaises(ValueError):
-                check.workflow_identity(changed, VERSION)
+    def test_provenance_arguments_must_match_the_selected_result_and_requests(self):
+        for change in ({'id': '999'}, {'model': 'GLM-5'}, {'run_id': '999', 'date': None},
+                       {'log_limit': 1}, {'log_file': 'other.log'}):
+            with self.subTest(change=change):
+                directory = self.collected('result', 'producer-differs-from-curve')
+                path = directory / 'manifest.json'
+                manifest = json.loads(path.read_text())
+                manifest['normalized_arguments'].update(change)
+                check.save(path, manifest)
+                with self.assertRaisesRegex(ValueError, 'Provenance.*scope|Provenance.*arguments'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_provenance_partial_coverage_cannot_be_promoted_to_complete(self):
+        directory = self.collected('result', 'missing-log')
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.forge_coverage(directory, status='complete', reasons=[])
+        with self.assertRaisesRegex(ValueError, 'Provenance.*coverage'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_provenance_accepts_agentic_logical_run_and_missing_optional_paths(self):
+        def agentic(fixture):
+            fixture['responses'][0]['body'][0]['benchmark_type'] = 'agentic_traces'
+            fixture['responses'][1]['url'] += '&benchmarkType=agentic_traces'
+        def logical_run(fixture):
+            fixture['args'][-2:] = ['--run-id', '123456789']
+            fixture['responses'][0]['url'] = (
+                'https://inferencex.semianalysis.com/api/v1/benchmarks?'
+                'model=DeepSeek-R1-0528&runId=123456789&exactRun=true')
+        def nested_metadata(fixture):
+            fixture['responses'][1]['body']['runs'][0]['metadata'] = {'id': 7}
+            fixture['responses'][1]['body']['runConfigs'][0]['metadata'] = {'run_attempt': 3}
+        for mutate in (agentic, logical_run, nested_metadata):
+            directory = self.collected('result', 'producer-differs-from-curve', mutate)
+            self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.assertEqual(check.check_bundle(self.collected(
+            'result', 'missing-optional-provenance'), self.VERSION)['status'], 'passed')
+
+    def test_agentx_enrichment_scope_is_derived_from_selected_ids(self):
+        directory = self.fixtures()['agentx']
+        path = directory / 'manifest.json'
+        manifest = json.loads(path.read_text())
+        for request in manifest['requests'][1:]:
+            request['url'] += '%2C999'
+            request['attempts'][-1]['url'] = request['url']
+        check.save(path, manifest)
+        def extend(result):
+            for entry in result['metadata']['request_urls'][1:]:
+                entry['url'] += '%2C999'
+                entry['requested_ids'].append('999')
+        self.rehash_result(directory, extend)
+        with self.assertRaisesRegex(ValueError, 'AgentX.*request.*scope'):
+            check.check_bundle(directory, self.VERSION)
+        self.assertEqual(check.check_bundle(
+            self.collected('agentx', 'multi-chunk'), self.VERSION)['selected_records'], 401)
+
+    def test_tco_point_cannot_be_borrowed_from_another_hardware_row(self):
+        directory = self.collected('tco', 'positive')
+        def swap(result):
+            source, target = result['rows']
+            target['point'] = source['point']
+            target['usd_per_million_output_tokens'] = target['usd_per_gpu_hour'] * 1e6 / (
+                target['point']['output_tput_per_gpu'] * 3600)
+        self.rehash_result(directory, swap)
+        with self.assertRaisesRegex(ValueError, 'TCO point.*scope'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_agentx_csv_metrics_compare_json_values_instead_of_spelling(self):
+        directory = self.fixtures()['agentx']
+        metrics = {'median_ttft': 1e-7, 'note': '中文', 'flag': True}
+        self.rehash_response(directory, 0, lambda rows: rows[0].update(metrics=metrics))
+        self.rehash_result(directory, lambda result: result['rows'][0]['benchmark'].update(metrics=metrics))
+        self.convert_to_csv(directory, 'agentx')
+        self.mutate_csv(directory, lambda rows: rows[0].update(
+            metrics_json='{"flag":true,"note":"中文","median_ttft":1e-7}'))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.mutate_csv(directory, lambda rows: rows[0].update(
+            metrics_json='{"flag":1,"note":"中文","median_ttft":1e-7}'))
+        with self.assertRaisesRegex(ValueError, 'CSV.*metrics_json'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_optional_percentiles_and_parent_roundtrip_metrics(self):
+        def missing(fixture):
+            del fixture['responses'][1]['body']['series'][0]['points'][0][
+                'components']['dispatch']['latency_us']['p99']
+        def roundtrip(fixture):
+            for response in fixture['responses'][1:]:
+                point = response['body']['series'][0]['points'][0]
+                point['components']['roundtrip'] = point['components']['dispatch']
+                point['roundtrip_token_rate_at_latency_percentile']['p50'] = 700
+        for name, mutate in [('missing', missing), ('roundtrip', roundtrip)]:
+            with self.subTest(name=name):
+                directory = self.collected('collectivex', 'positive', mutate)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+        self.assertEqual(check.check_bundle(
+            self.collected('collectivex', 'kv-positive'), self.VERSION)['status'], 'passed')
+
+    def test_collectivex_sample_counts_do_not_satisfy_performance_coverage(self):
+        for samples, zero_measurement, pairs in [(0, False, 0), (5, False, 0), (0, True, 1)]:
+            with self.subTest(samples=samples, zero_measurement=zero_measurement):
+                def mutate(fixture):
+                    for response in fixture['responses'][1:]:
+                        row = response['body']['kv'][0]['rows'][0]
+                        for key in ('prep_ms', 'latency_ms', 'request_ms', 'gbps_p50',
+                                    'gbps_p50_incl_prep'):
+                            row.pop(key, None)
+                        row.update(latency_ms={'n': samples}, request_ms={'n': samples})
+                        if zero_measurement:
+                            row['prep_ms'] = 0
+                directory = self.collected('collectivex', 'kv-positive', mutate)
+                self.forge_coverage(
+                    directory, status='complete' if pairs else 'partial', pairs=pairs,
+                    reasons=[] if pairs else [{'code': 'matched_without_usable_metric', 'count': 1}])
+                manifest = json.loads((directory / 'manifest.json').read_text())
+                manifest['summary']['policy'] = {
+                    'status': 'passed' if pairs else 'failed',
+                    'requirements': {'require_hardware': [], 'min_comparable_pairs': 1},
+                    'reasons': [] if pairs else [
+                        {'code': 'MIN_COMPARABLE_PAIRS_UNMET', 'required': 1, 'actual': 0}],
+                }
+                check.save(directory / 'manifest.json', manifest)
+                report = check.check_bundle(directory, self.VERSION)
+                self.assertEqual((report['comparable_pairs'], report['policy_status'],
+                                  report['policy_exit_code']),
+                                 (1, 'passed', 0) if pairs else (0, 'failed', 3))
+                metrics = json.loads((directory / 'result.json').read_text())['comparisons'][0]['metrics']
+                counts = [metric for metric in metrics if metric['unit'] == 'samples']
+                self.assertEqual([(metric['left']['value'], metric['right']['value'],
+                                   metric['difference_right_minus_left']) for metric in counts],
+                                 [(samples, samples, 0), (samples, samples, 0)])
+                if not pairs:
+                    self.forge_coverage(directory, status='complete', pairs=1, reasons=[])
+                    with self.assertRaisesRegex(ValueError, 'CollectiveX.*coverage'):
+                        check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_cannot_drop_incomparable_groups_and_claim_complete(self):
+        directory = self.collected('collectivex', 'positive')
+        def omit(result):
+            result['comparisons'] = [row for row in result['comparisons'] if row['status'] == 'matched']
+            result['summary']['incomparable'] = 0
+        self.rehash_result(directory, omit)
+        self.forge_coverage(directory, status='complete', selected=1, reasons=[])
+        with self.assertRaisesRegex(ValueError, 'CollectiveX.*(set|coverage)'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_ambiguous_and_unverified_groups_are_not_matches(self):
+        def duplicate(fixture):
+            series = fixture['responses'][1]['body']['series'][0]
+            series['points'].append(json.loads(json.dumps(series['points'][0])))
+        def unverified(fixture):
+            fixture['responses'][1]['body']['kv'][0]['rows'][0]['verify_passed'] = False
+        for variant, mutate in [('positive', duplicate), ('kv-positive', unverified)]:
+            with self.subTest(variant=variant):
+                directory = self.collected('collectivex', variant, mutate)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 0)
+                self.forge_coverage(directory, status='complete', reasons=[])
+                with self.assertRaisesRegex(ValueError, 'CollectiveX.*coverage'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_discovery_and_empty_selections_use_saved_run_list(self):
+        for variant in ('one-list', 'empty', 'topology-mismatch'):
+            with self.subTest(variant=variant):
+                directory = self.collected('collectivex', variant)
+                self.assertEqual(check.check_bundle(directory, self.VERSION)['status'], 'passed')
+
+    def test_rehashed_contract_metadata_units_coverage_and_sources_are_rejected(self):
+        mutations = [
+            ('powerx', lambda result: result['metadata'].update(requested_date='2026-09-01'),
+             'PowerX metadata'),
+            ('powerx', lambda result: result['units'].update(avg_power_w='watts'),
+             'PowerX units'),
+            ('powerx', lambda result: result['metadata']['metric_coverage'][
+                'avg_power_w'].update(available_rows=0, unavailable_rows=1),
+             'PowerX metadata'),
+            ('agentx', lambda result: result['metadata']['request_urls'][1].update(
+                requested_ids=['999']), 'AgentX metadata'),
+            ('agentx', lambda result: result['metadata']['requested_scope'].update(
+                hardware='forged'), 'AgentX metadata'),
+            ('agentx', lambda result: result['metadata']['enrichment_coverage'][
+                'trace_availability'].update(response_key_rows=0), 'AgentX metadata'),
+            ('tco', lambda result: result['metadata'].update(price_source='market'),
+             'TCO metadata'),
+            ('tco', lambda result: result['units'].update(modeled_cost='USD/token'),
+             'TCO units'),
+            ('tco', lambda result: result['source'].update(
+                retrieved_at='2026-09-01T00:00:00.000Z'), 'TCO source'),
+            ('tco', lambda result: result['coverage'].update(returned_points=0),
+             'TCO coverage'),
+        ]
+        for kind, mutate, message in mutations:
+            with self.subTest(kind=kind, message=message):
+                directory = self.fixtures()[kind]
+                self.rehash_result(directory, mutate)
+                with self.assertRaisesRegex(ValueError, message):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_supported_overflow_numbers_are_sanitized_and_counted(self):
+        power = self.fixtures()['powerx']
+        self.rehash_overflow_response(
+            power, 0, b'"avg_power_w":700',
+            lambda result: (
+                result['rows'][0]['metrics'].update(avg_power_w=None),
+                result['metadata']['metric_coverage']['avg_power_w'].update(
+                    available_rows=0, unavailable_rows=1),
+                result['metadata'].update(non_finite_values=1)))
+        self.forge_coverage(
+            power, status='partial',
+            hardware=[{'hardware': 'h200_sxm', 'valid_records': 0}],
+            reasons=[{'code': 'measurement_unavailable', 'count': 1}])
+        self.assertEqual(check.check_bundle(power, self.VERSION)['eligible_records'], 0)
+
+        agent = self.fixtures()['agentx']
+        self.rehash_overflow_response(
+            agent, 0, b'"median_ttft":10',
+            lambda result: (
+                result['rows'][0]['benchmark']['metrics'].update(median_ttft=None),
+                result['metadata'].update(non_finite_values=1)))
+        self.assertEqual(check.check_bundle(agent, self.VERSION)['eligible_records'], 1)
+
+    def test_release_pairs_require_captured_scope_and_matching_configuration(self):
+        for changed in ({'conc': 2}, {'image': 'unselected'},
+                        {'metrics': {'median_ttft': 15, 'prefill_pp': 2}}):
+            with self.subTest(changed=changed):
+                directory = self.fixtures()['releases']
+                self.rehash_response(directory, 0, lambda body: body[1].update(changed))
+                self.rehash_result(directory, lambda result:
+                                   result['selection']['after']['rows'][0].update(changed))
+                with self.assertRaisesRegex(ValueError, 'Release (selection|matching)'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_release_zero_baseline_requires_null_percent_change(self):
+        directory = self.fixtures()['releases']
+        self.rehash_response(directory, 0, lambda rows:
+                             rows[0]['metrics'].update(median_ttft=0))
+        self.rehash_result(directory, lambda result: (
+            result['selection']['before']['rows'][0]['metrics'].update(median_ttft=0),
+            result['comparisons'][0]['metric'].update(
+                before=0, delta=15, percent_change=None, status='zero_baseline')))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        for percent, status in ((999, 'zero_baseline'), (None, 'observed_change')):
+            with self.subTest(percent=percent, status=status):
+                self.rehash_result(directory, lambda result:
+                                   result['comparisons'][0]['metric'].update(
+                                       percent_change=percent, status=status))
+                with self.assertRaisesRegex(ValueError, 'Release zero baseline'):
+                    check.check_bundle(directory, self.VERSION)
+
+    def test_release_snapshot_reuse_requires_one_consistent_producer_observation(self):
+        directory = self.fixtures()['releases']
+        def carried(row):
+            return {**row, 'curve_date': '2026-09-08', 'curve_workflow_run_id': '102'}
+        self.rehash_response(directory, 0, lambda rows: rows.append(carried(rows[0])))
+        self.rehash_result(directory, lambda result: (
+            result['selection']['before']['rows'].append(
+                carried(result['selection']['before']['rows'][0])),
+            result['selection']['before'].update(snapshot_reuses=1)))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        self.rehash_response(directory, 0, lambda rows:
+                             rows[-1].update(metrics={'median_ttft': 11}))
+        self.rehash_result(directory, lambda result: (
+            result['selection']['before']['rows'][-1].update(metrics={'median_ttft': 11}),
+            result['comparisons'][0]['metric'].update(before=11, delta=4, percent_change=400/11)))
+        with self.assertRaisesRegex(ValueError, 'Release observation identity'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_release_matching_normalizes_numbers_without_merging_booleans(self):
+        directory = self.fixtures()['releases']
+        def configure(rows):
+            rows[0]['conc'] = 1.0
+            rows[0]['metrics']['prefill_pp'] = 1.0
+            rows[1]['metrics']['prefill_pp'] = 1
+        self.rehash_response(directory, 0, configure)
+        self.rehash_result(directory, lambda result: (
+            configure([result['selection'][side]['rows'][0] for side in ('before', 'after')]),
+            result['comparisons'][0]['configuration_metrics'].update(prefill_pp=1)))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        manifest_path = directory / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['normalized_arguments'].update(isl=8192.0, osl=1024.0)
+        manifest_path.write_text(json.dumps(manifest))
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        self.rehash_response(directory, 0, lambda rows: rows[1].update(disagg=0))
+        self.rehash_result(directory, lambda result:
+                           result['selection']['after']['rows'][0].update(disagg=0))
+        with self.assertRaisesRegex(ValueError, 'Release matching'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_matched_pairs_require_exact_source_topology(self):
+        directory = self.fixtures()['collectivex']
+        self.rehash_response(directory, 2, lambda body:
+                             body['series'][0]['system'].update(nodes=2))
+        with self.assertRaisesRegex(ValueError, 'CollectiveX.*identity'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_pair_cannot_use_the_left_run_as_both_sources(self):
+        directory = self.fixtures()['collectivex']
+        self.rehash_result(directory, lambda result: (
+            result['comparisons'][0]['right'][0].update(response_index=1),
+            result['comparisons'][0]['metrics'][0].update(
+                right={'status': 'value', 'value': 20},
+                difference_right_minus_left=0, ratio_right_over_left=1)))
+        with self.assertRaisesRegex(ValueError, 'CollectiveX.*run'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_collectivex_kv_pairs_require_exact_source_workload(self):
+        directory = self.collected('collectivex', 'kv-positive')
+        self.assertEqual(check.check_bundle(directory, self.VERSION)['comparable_pairs'], 1)
+        self.rehash_response(directory, 2, lambda value: value['kv'][0]['rows'][0].update(isl=2048))
+        with self.assertRaisesRegex(ValueError, 'CollectiveX.*identity'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_partial_agentx_evidence_remains_valid_with_zero_usable_hardware(self):
+        origin = 'https://inferencex.semianalysis.com'
+        seed = self.fixtures()['agentx']
+        seed_manifest = json.loads((seed / 'manifest.json').read_text())
+        benchmark = json.loads((seed / seed_manifest['requests'][0]['response']['path']).read_text())[0]
+        benchmark['id'] = 8
+        responses = [
+            ('benchmarks', origin + '/api/v1/benchmarks?model=DeepSeek-V4-Pro',
+             [benchmark], 200),
+            ('agentic-aggregates', origin + '/api/v1/agentic-aggregates?ids=8', {}, 200),
+            ('derived-agentic-metrics', origin + '/api/v1/derived-agentic-metrics?ids=8', {}, 200),
+            ('trace-availability', origin + '/api/v1/trace-availability?ids=8', {}, 200),
+        ]
+        def partial_result(ids):
+            metadata = json.loads((seed / 'result.json').read_text())['metadata']
+            metadata.update(
+                request_urls=[{
+                    'operation': operation, 'url': url, 'response_id': response_id,
+                    **({} if operation == 'benchmarks' else {'requested_ids': ['8']})}
+                    for (operation, url, _body, _status), response_id in zip(responses, ids)],
+                source_response_ids=ids,
+                enrichment_coverage={
+                    'safe_id_rows': 1, 'unsupported_id_rows': 0, 'unique_safe_ids': 1,
+                    'aggregates': {
+                        name: {'available_rows': 0, 'null_rows': 0,
+                               'missing_entry_rows': 1, 'unsupported_id_rows': 0}
+                        for name in check.AGENTX_GROUPS},
+                    'derived_metrics': {'available_rows': 0, 'missing_entry_rows': 1,
+                                        'unsupported_id_rows': 0},
+                    'trace_availability': {'stored_trace_rows': 0,
+                                           'no_stored_trace_rows': 1,
+                                           'response_key_rows': 0,
+                                           'missing_key_rows': 1,
+                                           'unsupported_id_rows': 0}})
+            return {'schema_version': 1, 'kind': 'agentx', 'metadata': metadata,
+                    'rows': [{
+                        'benchmark': {**benchmark, 'id': '8'},
+                        'agentx': {'status': 'partial', 'result_id': '8',
+                                   'aggregates': {'status': 'not_returned', 'value': None},
+                                   'derived_metrics': {'status': 'not_returned', 'value': None},
+                                   'trace_availability': {'status': 'no_stored_trace',
+                                                          'value': False,
+                                                          'response_key_present': False}}}]}
+        directory = self.bundle(
+            'agentx', responses, partial_result,
+            {'status': 'partial', 'selected_records': 1, 'comparable_pairs': None,
+             'hardware': [{'hardware': 'b300', 'valid_records': 0}],
+             'reasons': [{'code': 'aggregate_unavailable', 'count': 1}]})
+        report = check.check_bundle(directory, self.VERSION)
+        self.assertEqual(report['selected_records'], 1)
+
+    def test_rehashed_tco_derivation_tamper_is_rejected(self):
+        directory = self.fixtures()['tco']
+        self.rehash_result(directory, lambda result:
+                           result['rows'][0].update(usd_per_million_output_tokens=2))
+        with self.assertRaisesRegex(ValueError, 'TCO arithmetic'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_contract_csv_rows_and_response_references_are_source_derived(self):
+        fixtures = self.fixtures()
+        power = self.convert_to_csv(fixtures['powerx'], 'powerx')
+        agent = self.convert_to_csv(fixtures['agentx'], 'agentx')
+        self.assertEqual(check.check_bundle(power, self.VERSION)['eligible_records'], 1)
+        self.assertEqual(check.check_bundle(agent, self.VERSION)['eligible_records'], 1)
+
+        forged_reference = self.convert_to_csv(self.fixtures()['powerx'], 'powerx')
+        self.mutate_csv(
+            forged_reference,
+            lambda rows: rows[0].update(source_response_id='f' * 64))
+        with self.assertRaisesRegex(ValueError, 'CSV value'):
+            check.check_bundle(forged_reference, self.VERSION)
+
+        bogus_value = self.convert_to_csv(self.fixtures()['agentx'], 'agentx')
+        self.mutate_csv(bogus_value, lambda rows: rows[0].update(**{'aggregate.isl.mean': '999'}))
+        with self.assertRaisesRegex(ValueError, 'CSV value'):
+            check.check_bundle(bogus_value, self.VERSION)
+
+        fabricated = self.convert_to_csv(self.fixtures()['powerx'], 'powerx')
+        self.mutate_csv(fabricated, lambda rows: rows.append({**rows[0], 'id': '999'}))
+        self.forge_coverage(
+            fabricated, selected=2,
+            hardware=[{'hardware': 'h200_sxm', 'valid_records': 2}])
+        with self.assertRaisesRegex(ValueError, 'row count|derivation'):
+            check.check_bundle(fabricated, self.VERSION)
+
+    def test_incomplete_bundle_and_wrong_request_scope_are_rejected(self):
+        fixtures = self.fixtures()
+        (fixtures['result'] / 'manifest.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'Manifest'):
+            check.check_bundle(fixtures['result'], self.VERSION)
+        directory = fixtures['powerx']
+        manifest = json.loads((directory / 'manifest.json').read_text())
+        changed = 'https://inferencex.semianalysis.com/api/v1/evaluations'
+        manifest['requests'][0]['url'] = changed
+        manifest['requests'][0]['attempts'][-1]['url'] = changed
+        check.save(directory / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'request scope'):
+            check.check_bundle(directory, self.VERSION)
+
+    def test_failed_policy_is_valid_evidence_and_maps_to_exit_three(self):
+        power = self.fixtures()['powerx']
+        manifest = json.loads((power / 'manifest.json').read_text())
+        manifest['summary']['policy'] = {
+            'status': 'failed',
+            'requirements': {'require_hardware': ['mi355x'], 'min_comparable_pairs': None},
+            'reasons': [{'code': 'required_hardware_missing', 'hardware': 'mi355x'}],
+        }
+        check.save(power / 'manifest.json', manifest)
+        report = check.check_bundle(power, self.VERSION)
+        self.assertEqual((report['policy_status'], report['policy_exit_code']), ('failed', 3))
+        manifest['summary']['policy']['status'] = 'passed'
+        check.save(power / 'manifest.json', manifest)
+        with self.assertRaisesRegex(ValueError, 'policy decision'):
+            check.check_bundle(power, self.VERSION)
+
+    def test_manifest_cannot_forge_eligible_hardware_or_comparable_pairs(self):
+        fixtures = self.fixtures()
+        self.rehash_response(
+            fixtures['powerx'], 0,
+            lambda body: body[0]['metrics'].update(avg_power_w=None))
+        self.rehash_result(
+            fixtures['powerx'],
+            lambda result: (
+                result['rows'][0]['metrics'].update(avg_power_w=None),
+                result['metadata']['metric_coverage']['avg_power_w'].update(
+                    available_rows=0, unavailable_rows=1)))
+        self.forge_coverage(
+            fixtures['powerx'], hardware=[{'hardware': 'h200_sxm', 'valid_records': 1}],
+            requirements={'require_hardware': ['h200_sxm'], 'min_comparable_pairs': None})
+        self.rehash_response(
+            fixtures['agentx'], 1,
+            lambda body: body['2']['isl'].update(n=0))
+        self.rehash_result(
+            fixtures['agentx'],
+            lambda result: result['rows'][0]['agentx']['aggregates']['value']['isl'].update(n=0))
+        self.forge_coverage(
+            fixtures['agentx'], hardware=[{'hardware': 'b300', 'valid_records': 1}],
+            requirements={'require_hardware': ['b300'], 'min_comparable_pairs': None})
+        self.rehash_response(
+            fixtures['tco'], 0,
+            lambda body: body['rows'][0].update(boundary='unreachable'))
+        self.rehash_result(fixtures['tco'], lambda result: result['rows'][0].update(
+            status='unreachable', usd_per_million_output_tokens=None,
+            point={**result['rows'][0]['point'], 'boundary': 'unreachable'}))
+        self.rehash_result(fixtures['tco'], lambda result: result['coverage'].update(
+            status='incomplete', available_points=0,
+            status_counts={'available': 0, 'missing_point': 0, 'clamped_low': 0,
+                           'unreachable': 1, 'zero_throughput': 0}))
+        self.forge_coverage(
+            fixtures['tco'], hardware=[{'hardware': 'b200', 'valid_records': 1}],
+            requirements={'require_hardware': ['b200'], 'min_comparable_pairs': None})
+        self.rehash_result(fixtures['releases'], lambda result: result.update(comparisons=[]))
+        self.forge_coverage(
+            fixtures['releases'], pairs=1,
+            requirements={'require_hardware': [], 'min_comparable_pairs': 1})
+        self.rehash_result(
+            fixtures['collectivex'],
+            lambda result: result['comparisons'][0].update(metrics=[]))
+        self.forge_coverage(
+            fixtures['collectivex'], pairs=1,
+            requirements={'require_hardware': [], 'min_comparable_pairs': 1})
+        for kind in ['powerx', 'agentx', 'tco', 'releases', 'collectivex']:
+            with self.subTest(kind=kind), self.assertRaisesRegex(
+                    ValueError, 'coverage|validity|comparable|point|policy|matching|metric'):
+                check.check_bundle(fixtures[kind], self.VERSION)
+
+    def test_result_source_fields_and_release_claims_cannot_be_rehashed(self):
+        fixtures = self.fixtures()
+        self.rehash_result(
+            fixtures['result'],
+            lambda result: result['selected_result'].update(hardware='forged-gpu'))
+        with self.assertRaisesRegex(ValueError, 'Provenance'):
+            check.check_bundle(fixtures['result'], self.VERSION)
+        producer = self.fixtures()['result']
+        self.rehash_result(
+            producer,
+            lambda result: result['producer'].update(
+                status='confirmed', github_run_id='123', run_attempt='1'))
+        with self.assertRaisesRegex(ValueError, 'producer meaning'):
+            check.check_bundle(producer, self.VERSION)
+        self.rehash_result(
+            fixtures['releases'],
+            lambda result: result['metadata'].update(statistical_verdict='regression'))
+        with self.assertRaisesRegex(ValueError, 'statistical'):
+            check.check_bundle(fixtures['releases'], self.VERSION)
+
+    def test_valid_partial_domain_evidence_keeps_zero_eligibility(self):
+        fixtures = self.fixtures()
+        self.rehash_response(fixtures['tco'], 0, lambda body: body.update(rows=[]))
+        self.rehash_result(fixtures['tco'], lambda result: (
+            result['rows'][0].update(
+                status='missing_point', point=None, usd_per_million_output_tokens=None),
+            result['coverage'].update(
+                status='incomplete', returned_points=0, available_points=0,
+                status_counts={'available': 0, 'missing_point': 1, 'clamped_low': 0,
+                               'unreachable': 0, 'zero_throughput': 0},
+                returned_hardware=[])))
+        self.forge_coverage(
+            fixtures['tco'], status='partial',
+            hardware=[{'hardware': 'b200', 'valid_records': 0}],
+            reasons=[{'code': 'missing_point', 'count': 1}])
+        self.rehash_response(
+            fixtures['releases'], 0,
+            lambda body: body[1]['metrics'].update(median_ttft=None))
+        self.rehash_result(
+            fixtures['releases'],
+            lambda result: (
+                result['comparisons'][0]['metric'].update(
+                    after=None, delta=None, percent_change=None, status='missing_after'),
+                result['selection']['after']['rows'][0]['metrics'].update(median_ttft=None)))
+        self.forge_coverage(fixtures['releases'], pairs=0,
+                            hardware=[{'hardware': 'h200_sxm', 'valid_records': 0}])
+        fixtures['collectivex'] = self.collected('collectivex', 'kv-positive', lambda fixture:
+            fixture['responses'][1]['body']['kv'][0]['rows'][0].update(verify_passed=False))
+        for kind in ['tco', 'releases', 'collectivex']:
+            report = check.check_bundle(fixtures[kind], self.VERSION)
+            self.assertEqual(report['eligible_records'], 0)
+
+    def test_result_missing_log_is_valid_partial_evidence(self):
+        directory = self.collected('result', 'missing-log')
+        report = check.check_bundle(directory, self.VERSION)
+        self.assertEqual(report['eligible_records'], 1)
+
+    def test_contract_one_candidate_runs_six_bundles_offline_and_an_exit_three_policy(self):
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        args = SimpleNamespace(model='GLM-5', date='2026-09-07', isl=8192, osl=1024,
+                               raw_model='glm5', agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+        calls = []
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            calls.append(([str(part) for part in command], label))
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'},
+                    'coverage': {'available_items': 1},
+                    'sources': [{'response_id': 'a' * 64}],
+                    'items': [{'result_id': '41', 'raw_model': 'glm5', 'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}],
+                })
+            if label == 'contract-one-policy-exit-3':
+                output = json.dumps({'validity': 'valid', 'policy': {'status': 'failed'}})
+                raise subprocess.CalledProcessError(3, command, output=output, stderr='')
+            return '{}\n'
+
+        def audit(directory, version, expected_kind):
+            self.assertEqual(version, self.VERSION)
+            name = Path(directory).name
+            return {'kind': 'powerx' if name == 'powerx-empty' else name,
+                    'status': 'passed', 'selected_records': 0 if name == 'powerx-empty' else 1,
+                    'eligible_records': 0 if name == 'powerx-empty' else 1,
+                    'comparable_pairs': 1 if name in {'releases', 'collectivex'} else None,
+                    'response_ids': ['a' * 64], 'policy_status': 'not_requested',
+                    'policy_exit_code': 0}
+
+        with patch.object(check, 'run', side_effect=execute), \
+                patch.object(check, 'check_bundle', side_effect=audit) as audits:
+            report = check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
+        self.assertEqual(report['status'], 'passed')
+        self.assertEqual(report['policy_exit_code'], 3)
+        self.assertEqual(report['discovery']['result_id'], '41')
+        self.assertEqual(audits.call_count, 7)
+        commands = [command for command, _label in calls]
+        self.assertEqual(sum('--output-dir' in command for command in commands), 7)
+        self.assertEqual(sum('verify' in command for command in commands), 8)
+        self.assertTrue(all('--import' in command for command in commands if 'verify' in command))
+        collective_command = next(command for command, label in calls
+                                  if label == 'contract-one-collectivex')
+        self.assertEqual(
+            collective_command[collective_command.index('--left') + 1],
+            check.COLLECTIVEX_POSITIVE_RUN_IDS[0])
+        self.assertEqual(
+            collective_command[collective_command.index('--right') + 1],
+            check.COLLECTIVEX_POSITIVE_RUN_IDS[1])
+        pinned = json.loads((project / 'contract-one-scope.json').read_text())
+        self.assertEqual(pinned['raw_model'], 'glm5')
+        empty_command = next(command for command, label in calls
+                             if label == 'contract-one-powerx-empty')
+        self.assertIn('--date', empty_command)
+        self.assertEqual(empty_command[empty_command.index('--date') + 1], '2026-09-07')
+        self.assertIn('--raw-model', empty_command)
+        self.assertEqual(empty_command[empty_command.index('--raw-model') + 1], 'glm5')
+
+    def test_contract_one_candidate_rejects_a_wrong_bundle_family(self):
+        power = self.fixtures()['powerx']
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'}, 'coverage': {'available_items': 1},
+                    'items': [{'result_id': '1', 'raw_model': 'glm5', 'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}]})
+            if '--output-dir' in command:
+                shutil.copytree(power, command[command.index('--output-dir') + 1])
+            return '{}\n'
+
+        with patch.object(check, 'run', side_effect=execute), \
+                self.assertRaisesRegex(ValueError, 'family differs from requested task'):
+            check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
+
+    def test_contract_one_collectivex_positive_gate_rejects_zero_comparable_pairs(self):
+        installed = self.root / 'installed'
+        (installed / 'scripts').mkdir(parents=True)
+        (installed / 'scripts/inferencex.mjs').write_text('// fixture')
+        project = self.root / 'project'
+        project.mkdir()
+        args = SimpleNamespace(model='GLM-5', date=None, isl=8192, osl=1024,
+                               raw_model=None, agentx_model='DeepSeek-V4-Pro',
+                               empty_isl=7, empty_osl=13)
+
+        def execute(command, _project, _environment, label, _deadline=None):
+            if label == 'contract-one-discovery':
+                return json.dumps({
+                    'schema_version': 1, 'kind': 'configs',
+                    'scope': {'requested_model': 'GLM-5'},
+                    'coverage': {'available_items': 1},
+                    'items': [{'result_id': '41', 'raw_model': 'glm5',
+                               'hardware': 'h200_sxm',
+                               'workload': {'benchmark_type': 'single_turn',
+                                            'input_tokens': 8192, 'output_tokens': 1024},
+                               'power': {'strict_v2': 'eligible'}}],
+                })
+            return '{}\n'
+
+        def audit(directory, _version, expected_kind):
+            kind = Path(directory).name
+            return {'eligible_records': 1,
+                    'comparable_pairs': 0 if kind == 'collectivex' else 1}
+
+        with patch.object(check, 'run', side_effect=execute), \
+                patch.object(check, 'check_bundle', side_effect=audit), \
+                self.assertRaisesRegex(ValueError, 'collectivex positive bundle'):
+            check.run_contract_one_workflows(
+                '/runtime/node', installed, project, {}, args, self.VERSION, None)
 
 
 if __name__ == '__main__':

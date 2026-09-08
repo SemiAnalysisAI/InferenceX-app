@@ -25,7 +25,8 @@ Settings with these exact values:
 For new configurations created after September 3, 2026, npm permits staged
 publishing by default; direct `npm publish` must be selected explicitly. This
 workflow uses GitHub-hosted runners, Node 24, npm >=11.5.1, and job-scoped
-`contents: read` / `id-token: write`; it needs no npm token secret. npm checks the
+`contents: write` / `id-token: write`; the contents permission creates the GitHub
+release assets after public verification. It needs no npm token secret. npm checks the
 repository and workflow identity during publication, not when settings are saved.
 See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
@@ -37,13 +38,15 @@ the trust relationship.
 
 ## Prepare and review a candidate
 
-The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs the packed-install
-suite on Node 24 and 26 for package and skill-workflow changes. That suite also runs the
-Python release-verifier tests. Publication remains on Node 24 with one publisher runtime.
+The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs one exact
+packed archive on Node 24 and 26 across Linux and macOS. A separate schema-consumer
+step installs the pinned development dependency from `bun.lock` and validates actual
+packed outputs. The suite also runs the Python release-verifier tests. Publication
+remains on Node 24 with one publisher runtime.
 
 1. Modify the source, choose a new stable version, and update package metadata,
-   all shipped helpers' standalone versions, installation examples, and installed-version
-   expectations together. Run the package tests and the relevant repository checks.
+   the unified CLI version, installation examples, and installed-version
+   expectations together. Run the package tests and relevant repository checks.
    Merge the reviewed source before preparing the final accepted archive.
 2. Run the following from the repository root using Node 24/npm and Python 3 on
    Linux or macOS (the public verification deadline uses Unix process groups and timers).
@@ -58,36 +61,66 @@ skills_release_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-release.XXXXXX")
 skills_release_dir="$skills_release_attempt/candidate"
 
 node --test packages/skills/test/*.test.mjs
+bun install --frozen-lockfile
+node packages/skills/test/schema-consumers.mjs
 node packages/skills/scripts/release.mjs prepare "$skills_release_version" "$skills_release_dir"
 python3 packages/skills/scripts/verify-release.py candidate "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/candidate-check"
 ```
 
+After editing packaged skill files, run `node packages/skills/scripts/update-integrity.mjs`
+and commit the refreshed `integrity.json` with the source change. The preparer
+checks this inventory without modifying files; it intentionally skips npm lifecycle
+scripts so release preparation cannot silently repair unreviewed source.
+
 The preparer requires and records a clean package source state. It rejects dirty
-source before registry access or candidate output, and also rejects a version
+source or a stale integrity inventory before registry access or candidate output, and also rejects a version
 mismatch, an already published version, or an unavailable registry check. It packs
 once, checks the public file boundary, and records the source commit,
 `source_dirty: false`, file list, SHA-256, and npm integrity. Maintainer tools,
 tests, credentials, and acceptance artifacts are outside the public package.
 The verifier creates two projects outside the repository with fresh npm caches,
 empty npm configuration, and an allowlisted environment. It installs the exact
-archive for Codex and Claude Code. It checks PowerX and AgentX CSV/JSON against the
-complete public responses consumed by each exporter, exercises an exact excluded
-AgentX selection, and checks one traced and one no-trace point. Missing and null
-values remain missing; real `0` and `false` values remain explicit. No new
-benchmarks run.
+archive for Codex and Claude Code, runs all six formal `inferencex` families, replays
+each bundle offline, and audits every result against its saved responses with an
+independent Python implementation. Missing and null values remain missing; real
+`0` and `false` values remain explicit. No new benchmarks run.
 
-From 0.9.0, candidate and public verification also run all four newer installed
-helpers for both targets. The provenance case selects result `416696` from logical
-run `26694739752`. The release case matches GLM-5.1/MI355X/SGLang observations from
-2026-05-30 and 2026-07-02 by their exact producer attempts and checks `median_ttft`
-arithmetic. The TCO case uses the 2026-09-06 DeepSeek-V4-Pro 8192x1024 snapshot at
-50 output tok/s/user with explicit **test assumptions** of $3.60/B200 GPU-hour and
-$1.80/MI355X GPU-hour; these are not market prices. CollectiveX discovers two
-measured runs and verifies retained run identities, source pointers and summary
-counts. No comparable CollectiveX rows is a valid, explicit outcome.
+For the 0.12.0 candidate, retain the exact four platform results (Linux/macOS by Node
+24/26) and both native runtime results. Each native result covers PowerX, AgentX,
+result provenance, TCO, releases, CollectiveX, and offline replay, with archive,
+case-set, prompt transcript, and answer transcript hashes. Keep
+`tested_source_commit` separate from the archive identity; merging and repreparing
+identical bytes must not rewrite which source was actually tested.
+
+Each platform entry also records the Actions run and attempt as numeric strings,
+the tested 40-hex commit SHA, the exact matrix job name, and the matching
+`SemiAnalysisAI/InferenceX-app` Actions evidence URL. A retried matrix cell may have
+a later attempt than the other cells; all four must still share the run, tested
+commit, and archive SHA-256. Download each selected successful record from
+`inferencex-skills-<linux|macos>-node-<24|26>-attempt-<attempt>`. The pack job retains
+`inferencex-skills-platform-archive-attempt-<attempt>` and passes its exact artifact
+name to the matrix, so retrying a failed cell reuses that successful pack. Full
+reruns save new artifacts without replacing earlier attempts. Each native entry retains its
+aggregate hashes and every maintained case record (13 per runtime); every case records its case ID,
+runtime and assessor pass statuses, and prompt/answer transcript hashes. Known
+limitations use the maintained stable codes with descriptions.
+
+The maintained cases include discovery, topology interpretation, a selected trace, result-ID-only provenance, missing prices, and a P99 ITL requirement. Assess final prose and supplemental derived files against the captured responses as well as verifying formal bundles. Preserve failures and grade any retry separately.
+
+The qualification JSON is a reviewed evidence declaration. Its validation checks
+the declared archive, matrix, scopes, identities, and hashes before npm mutation;
+it is not cryptographic proof that the declared executions occurred. Preserve the
+underlying Actions artifacts and native transcripts so reviewers can inspect the
+evidence behind each declaration.
+
+The maintained positive scopes cover one strict-v2 PowerX configuration, AgentX
+summaries, its result provenance, the dated GLM-5.1/MI355X/SGLang comparison,
+explicit TCO test assumptions, and an exact CollectiveX pair. The verifier also
+keeps a valid empty PowerX bundle and an exit-3 policy result. These scopes are
+release fixtures, not market prices or causal performance claims.
 
 These are live smoke checks, not exhaustive domain or native-agent acceptance.
 Missing provenance/logs, unavailable TCO points or missing historical comparison
@@ -101,16 +134,10 @@ when intentionally selecting a particular returned model. A positive example tha
 no longer returns validated observations fails visibly; review the API and choose
 an available workload instead of silently passing an empty export.
 
-From 0.11.0, candidate and public verification also replay five saved captures per
-target with the installed offline verifier: PowerX JSON/CSV, AgentX summary JSON/CSV,
-and the excluded AgentX JSON selection. The independent Python oracle still checks
-their source data and exports first. Each capture is replayed twice
-for each target, totaling 20 runs across Codex and Claude Code per verification.
-The replay subprocesses reject `fetch` calls and must exit successfully. Each
-Markdown report pair must be nonempty and byte-identical; export/evidence file
-lists, modes, sizes and SHA-256 fingerprints must remain unchanged. These automatic
-checks supplement the live checks and native discovery acceptance; they do not
-replace either.
+Every formal bundle is verified with network access disabled. The independent
+oracle checks the six domain derivations, fixed CSV columns, IDs, dates, units,
+provenance, coverage and policy decisions from the exact saved bytes. These checks
+supplement native discovery acceptance; they do not replace narrative review.
 
 ## Independent native-agent acceptance
 
@@ -128,7 +155,7 @@ accepting the archive for publication.
 ```bash
 python3 packages/skills/scripts/verify-release.py agents "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/agent-preparation"
 
 skills_agent_root="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["clean_root"])' "$skills_release_attempt/agent-preparation/verification.json")"
@@ -137,9 +164,8 @@ skills_agent_root="$(python3 -c 'import json, sys; print(json.load(open(sys.argv
 The output identifies a new temporary root with `codex/` and `claude/` projects.
 Each initially contains only the exact candidate archive and `prompt.txt`; these are
 prepared projects, **not completed agent runs**. The prompt asks the agent to install
-the archive, inspect status, preview a forced reinstall, run the lookup and PowerX
-flows, export AgentX CSV and JSON, retain an exactly excluded AgentX selection, and
-inspect one traced and one no-trace point with complete same-request evidence.
+the archive, inspect status, preview a forced reinstall, run all six formal families,
+and verify each resulting directory offline.
 Review installer results and filesystem preservation independently; `check-agent`
 reports only its data checks. `acceptance.json` identifies both prepared targets and
 the candidate archive. The PowerX empty workload defaults to 7/13 tokens; override
@@ -167,17 +193,22 @@ After each agent completes, independently check its generated files:
 python3 packages/skills/scripts/verify-release.py check-agent "$skills_release_dir/release.json" \
   --project "$skills_agent_root/codex" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_release_attempt/codex-result-check"
 ```
 
 Repeat for Claude Code with a new evidence directory. Use the **same scope arguments**
-used during preparation. The checker validates the original responses captured by each operation, including
-all CSV values, complete JSON observations, requested scope, exclusions, metric
-coverage, latest-observation selection, and exact empty/diagnostic scope. It checks
-the exporter manifests, body/output hashes, and each operation's own retrieval
-time. No later refetch replaces the consumed input. A later live comparison, if
-needed, is separate evidence and may legitimately contain different observations.
+used during preparation. The checker independently reconstructs all six bundle
+families from their original response bytes and validates the manifests, hashes,
+scope, coverage, policy, dates, units, and provenance. No later refetch replaces
+the consumed input.
+
+The six directory names must contain their corresponding bundle families and the
+prepared task scopes. The inspected result must appear in the selected PowerX
+observations. A valid bundle for a different task does not satisfy this acceptance
+check. JSON comparisons preserve boolean values separately from numeric zero and
+one. These explicit command instructions do not establish implicit discovery;
+use the separate maintained natural-language cases for that assessment.
 
 The checker reports `data-checks-passed`, leaving narrative review explicit. A
 different reviewer must inspect the transcript and explanation for:
@@ -188,21 +219,13 @@ different reviewer must inspect the transcript and explanation for:
 - Original observation dates remain separate from snapshot dates and retrieval
   time. API reads are not described as new benchmark runs, and absent observations
   are not treated as proof that no benchmark jobs occurred on a date.
-- The empty result is retained, diagnosis keeps its exact scope, and uncertainty
-  is explained if the diagnostic request fails.
 - AgentX filters remain exact and case-sensitive; an empty or excluded selection
   makes no claims beyond its response. Aggregates, derived metrics and trace
   availability are not presented as model-quality scores or rankings.
-- Each AgentX point flow uses only its selected safe-integer ID. A no-trace result
-  stops before timeline, histogram and server-metric requests; a traced result does
-  not expand to sibling IDs.
-- The installed skill actually supplied the workflow and the agent used no
-  repository or private-data access. All claims have complete response evidence.
-  Confirm that the agent retained its full unfiltered, strict-before-filtering,
-  and diagnostic responses with request context. The checker validates the originals;
-  a later independent refetch is separate evidence.
-  A separate agent request to the same URL is also a refetch; require the response
-  consumed by each operation, including separate CSV and JSON exporter invocations.
+- The installed skill actually supplied the workflow, the agent used no repository
+  or private-data access, and every claim has complete response evidence.
+- The checker validates the original consumed responses. A later independent
+  refetch is separate evidence and may legitimately contain different observations.
 
 Record the reviewer, accepted SHA-256, agent invocations, evidence paths, and any
 limitations. A failed agent attempt remains failed; identify and address the cause,
@@ -215,10 +238,26 @@ packed-example tests and should also be exercised naturally when they change.
 ## Publish and verify
 
 After source integration, dispatch **Publish InferenceX skills** on the repository's
-default branch. Supply the manifest version and the SHA-256 from the accepted
-archive. A different branch is refused. CI runs packed-interface tests, repacks the
-source, and requires byte-for-byte identity with the reviewed SHA-256 before any
-publication. It performs a clean candidate install/export, checks the digest again,
+default branch. Supply the manifest version, accepted archive SHA-256, and reviewed
+qualification JSON. Avoid expanding the large nested JSON directly in the command.
+Build a workflow-input file and let `gh` read it from standard input:
+
+```bash
+export SKILLS_RELEASE_VERSION="$skills_release_version"
+export SKILLS_REVIEWED_SHA256='<accepted archive sha256>'
+jq -n --rawfile qualification qualification.json \
+  '{version: env.SKILLS_RELEASE_VERSION,
+    reviewed_sha256: env.SKILLS_REVIEWED_SHA256,
+    qualification_json: $qualification}' > publish-inputs.json
+gh workflow run publish-skills.yml --ref master --json < publish-inputs.json
+```
+
+Inspect and retain `publish-inputs.json` before dispatch. A different branch is
+refused. CI runs packed-interface tests, prepares the source archive, and requires
+byte-for-byte identity with the reviewed SHA-256. Before npm mutation, it validates
+the record's exact archive, four platform jobs, two native runtimes, all maintained assessed
+cases per runtime, hashes, and known limitations.
+It performs a clean candidate install/export, checks the digest again,
 and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.
@@ -246,7 +285,7 @@ saved failure and rerun **only the read-only verifier**, preserving a new attemp
 skills_public_attempt="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-public-check.XXXXXX")"
 python3 packages/skills/scripts/verify-release.py public "$skills_release_dir/release.json" \
   --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
-  --agentx-model DeepSeek-V4-Pro --agentx-point-id 441083 --agentx-no-trace-id 440998 \
+  --agentx-model DeepSeek-V4-Pro \
   --evidence "$skills_public_attempt/evidence"
 ```
 
@@ -255,14 +294,86 @@ Announce availability only after the public verification passes. A prepared
 workflow, saved npm settings, and a successful upload each establish less than a
 successful end-to-end release.
 
-## Structured failures and recoverable upgrades from 0.10
+### Recover missing GitHub release assets after npm publication
 
-The six data helpers and installer share an opt-in `--error-format json`
-failure contract. Candidate and public verification deliberately run invalid
-arguments against every entry point for both installation targets. These checks
-retain command, stdout, stderr and exit code; they require exit 2, empty stdout,
-and the exact package/version/command identity with `INVALID_ARGUMENT`.
-PowerX JSON must also carry `schema_version: 1` from this version onward.
+If npm publication succeeded but a later step failed, do not rerun the publishing
+workflow: its unpublished-version check intentionally rejects that version.
+Recover the original run's `inferencex-skills-release-<run-id>` artifact before its
+30-day expiry. Use a new download directory and the reviewed hash from the original
+dispatch; do not repackage the current checkout or replace that hash with a newly
+calculated value.
+
+```bash
+skills_publish_run_id='<original publish workflow run ID>'
+skills_recovery_dir="$(mktemp -d "${TMPDIR:-/tmp}/inferencex-release-recovery.XXXXXX")"
+gh run download "$skills_publish_run_id" \
+  --repo SemiAnalysisAI/InferenceX-app \
+  --name "inferencex-skills-release-${skills_publish_run_id}" \
+  --dir "$skills_recovery_dir/original"
+skills_release_dir="$skills_recovery_dir/original/skills-release"
+skills_release_commit="$(jq -er .source_commit "$skills_release_dir/release.json")"
+gh run view "$skills_publish_run_id" --repo SemiAnalysisAI/InferenceX-app \
+  --json headSha,workflowName,url
+```
+
+Confirm the manifest's version and hash match the original dispatch and its
+`source_commit` matches that publish run's `headSha`. Before running any maintainer
+script below, use a clean checkout at that commit:
+
+```bash
+test "$(git rev-parse HEAD)" = "$skills_release_commit"
+node packages/skills/scripts/release.mjs check \
+  "$skills_release_dir/release.json" "$SKILLS_REVIEWED_SHA256"
+node packages/skills/scripts/release-summary.mjs check-qualification \
+  "$skills_release_dir/release.json" "$skills_release_dir/qualification.json"
+```
+
+Inspect `original/skills-candidate-verification/verification.json` under the
+recovery directory: it must have `status: "passed"` and `mode: "candidate"`.
+Rerun only public verification as above, using every value in the candidate's
+`scope` (including optional fields and empty-workload values) and a fresh evidence directory.
+Keep any earlier public verification or release summary unchanged. Build a new
+summary from the original candidate and qualification plus the successful public
+attempt:
+
+```bash
+node packages/skills/scripts/release-summary.mjs \
+  "$skills_release_dir/release.json" \
+  "$skills_recovery_dir/original/skills-candidate-verification/verification.json" \
+  "$skills_public_attempt/evidence/verification.json" \
+  "$skills_release_dir/qualification.json" \
+  "$skills_recovery_dir/release-summary.json"
+skills_release_version="$(jq -r .version "$skills_release_dir/release.json")"
+skills_release_tag="inferencex-skills-v${skills_release_version}"
+```
+
+Inspect `gh release view "$skills_release_tag" --repo SemiAnalysisAI/InferenceX-app`
+before any write. Only a confirmed missing release permits creation; authentication
+or network errors do not establish absence. If the tag already exists, verify it
+resolves to `skills_release_commit` first (`--target` does not move an existing tag).
+Create the missing release with the original archive and manifest plus the newly
+verified summary:
+
+```bash
+gh release create "$skills_release_tag" \
+  "$skills_release_dir/semianalysisai-inferencex-skills-${skills_release_version}.tgz" \
+  "$skills_release_dir/release.json" "$skills_recovery_dir/release-summary.json" \
+  --repo SemiAnalysisAI/InferenceX-app --target "$skills_release_commit" \
+  --title "InferenceX skills ${skills_release_version}" \
+  --notes "Accepted public package archive, release identity, and sanitized qualification summary."
+```
+
+If the release already exists, download and verify its assets first. A timeout may
+have occurred after creation succeeded. Do not overwrite existing assets; missing
+or differing assets require maintainer review. If the original candidate or
+qualification evidence cannot be recovered, stop rather than manufacture a passed
+release record. Recovery never invokes `npm publish`.
+
+## Structured failures and recoverable upgrades
+
+The unified CLI emits machine-readable failures by default. Candidate and public
+verification cover its invalid-input, operational, cancellation, bundle-completion,
+and policy exit codes through the packed suite and six installed workflows.
 
 Packed tests cover operational error categories, graceful cancellation and output
 rollback, the five-second stdout deadline, failed staging and receipt writes,

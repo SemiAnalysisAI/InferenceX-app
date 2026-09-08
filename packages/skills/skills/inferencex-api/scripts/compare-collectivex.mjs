@@ -1,43 +1,10 @@
-#!/usr/bin/env node
-
-import { createHash } from 'node:crypto';
-import { link, lstat, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
-import {
-  argumentError,
-  httpError,
-  outputBoundary,
-  requestBoundary,
-  responseBoundary,
-  runCli,
-  writeStdout,
-} from './cli-contract.mjs';
+import { argumentError, isMain, responseBoundary } from './cli-contract.mjs';
 
-// Installed skills run independently of package.json; release preparation updates this version.
-const PACKAGE_VERSION = '0.11.0';
 const ORIGIN = 'https://inferencex.semianalysis.com';
 const VERSION = 1;
-const BYTE_BUDGET = 32 * 1024 * 1024;
 const PERCENTILES = ['p50', 'p90', 'p95', 'p99'];
-const HELP = `compare-collectivex — compare two existing public communication sweeps
-
-Requires Node 24+. No credentials or new benchmarks. JSON output only.
-
-Usage:
-  node compare-collectivex.mjs [--left <run-id> --right <run-id>] [--output <new-file>]
-
-With no IDs, read the run list once and select its two newest measured runs by
-numeric run ID (older = left). This is a bounded example selection, not history.
-Explicit IDs must be distinct positive decimal strings. Contract version: 1.
-At most four GETs: OpenAPI, optional run list, and two run details. No retries.
-Responses share a 32 MiB decoded-body budget; each request times out after 30s.
---output creates a new file atomically and refuses to replace an existing path.
-Without --output, print JSON after all reads and validation succeed.
---error-format <mode> selects text (default) or json failure diagnostics.
---version prints the installed package version offline. --help makes no requests. See references/collectivex.md for matching and units.
-`;
-
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
 const id = (value) => typeof value === 'string' && /^[1-9]\d*$/u.test(value);
@@ -328,244 +295,243 @@ function compare(left, right) {
   });
 }
 
-async function outputJson(output, path, signal) {
-  const bytes = `${JSON.stringify(output, null, 2)}\n`;
-  if (path === null) {
-    await writeStdout(bytes, { signal });
-    return;
-  }
-  await outputBoundary(async () => {
-    const staging = await mkdtemp(join(dirname(path), '.collectivex-'));
-    try {
-      const file = join(staging, 'export.json');
-      await writeFile(file, bytes, { flag: 'wx' });
-      signal.throwIfAborted();
-      await link(file, path); // Atomic publication; a racing file or symlink is never replaced.
-    } finally {
-      await rm(staging, { recursive: true, force: true });
+function validateSchema(schema) {
+  for (const path of ['/api/v1/collectivex/runs', '/api/v1/collectivex/runs/{runId}']) {
+    const operation = schema.paths?.[path]?.get;
+    if (
+      !operation?.parameters
+        ?.find((parameter) => parameter.name === 'version')
+        ?.schema?.enum?.includes(VERSION) ||
+      operation.parameters.some(
+        (parameter) => parameter.required && !['version', 'runId'].includes(parameter.name),
+      )
+    ) {
+      throw new Error(
+        'Inspect the current CollectiveX OpenAPI operations before using this version-1 helper',
+      );
     }
-  }, signal);
+  }
 }
 
-async function main(args, signal) {
-  let argumentsValidated = false;
+function validateRunList(list) {
+  if (
+    !object(list) ||
+    list.version !== VERSION ||
+    typeof list.discovery_complete !== 'boolean' ||
+    !Array.isArray(list.runs) ||
+    list.runs.some((run) => !runIdentity(run) || !count(run.measured_cases)) ||
+    new Set(list.runs.map((run) => run.run_id)).size !== list.runs.length
+  ) {
+    throw new Error('Invalid CollectiveX run list; discovery coverage is unknown');
+  }
+}
+
+function selectRunIds(list) {
+  return list.runs
+    .filter((run) => run.measured_cases > 0)
+    .toSorted((a, b) => (BigInt(a.run_id) < BigInt(b.run_id) ? 1 : -1))
+    .slice(0, 2)
+    .map((run) => run.run_id)
+    .toReversed();
+}
+
+function validateDataset(data, runId) {
+  if (
+    !object(data) ||
+    data.version !== VERSION ||
+    !runIdentity(data.run) ||
+    data.run.run_id !== runId ||
+    !text(data.run.source_sha) ||
+    !Array.isArray(data.coverage) ||
+    !Array.isArray(data.series) ||
+    (data.kv !== undefined && !Array.isArray(data.kv))
+  ) {
+    throw new Error('Invalid or mismatched CollectiveX run dataset');
+  }
+}
+
+function comparisonRows(datasets) {
+  if (datasets.length !== 2) return [];
+  return compare(
+    [
+      ...epRows(datasets[0].body, datasets[0].index),
+      ...kvRows(datasets[0].body, datasets[0].index),
+    ],
+    [
+      ...epRows(datasets[1].body, datasets[1].index),
+      ...kvRows(datasets[1].body, datasets[1].index),
+    ],
+  );
+}
+
+function comparisonSummary(comparisons) {
+  return Object.fromEntries(
+    ['matched', 'only_left', 'only_right', 'ambiguous', 'incomparable'].map((status) => [
+      status,
+      comparisons.filter((row) => row.status === status).length,
+    ]),
+  );
+}
+
+export function normalizeArgs(args) {
   try {
-    const { values } = parseArgs({
-      args,
-      options: {
-        left: { type: 'string' },
-        right: { type: 'string' },
-        output: { type: 'string' },
-        version: { type: 'boolean' },
-        help: { type: 'boolean' },
-        'error-format': { type: 'string' },
-      },
-      strict: true,
-      allowPositionals: false,
-    });
-    if (values.version) {
-      await writeStdout(`${PACKAGE_VERSION}\n`, { signal });
-      return;
+    let values;
+    if (Array.isArray(args)) {
+      const parsed = parseArgs({
+        args,
+        options: { left: { type: 'string' }, right: { type: 'string' } },
+        tokens: true,
+        strict: true,
+        allowPositionals: false,
+      });
+      const seen = new Set();
+      for (const token of parsed.tokens) {
+        if (seen.has(token.name)) throw new Error(`Duplicate option --${token.name}`);
+        seen.add(token.name);
+      }
+      values = { left: parsed.values.left ?? null, right: parsed.values.right ?? null };
+    } else {
+      const keys = ['left', 'right'];
+      if (
+        !object(args) ||
+        Object.keys(args).length !== keys.length ||
+        keys.some((key) => !Object.hasOwn(args, key))
+      ) {
+        throw new Error('Invalid saved CollectiveX options');
+      }
+      values = { ...args };
     }
-    if (values.help) {
-      await writeStdout(HELP, { signal });
-      return;
-    }
-    const explicit = values.left !== undefined || values.right !== undefined;
+    const explicit = values.left !== null || values.right !== null;
     if (explicit && (!id(values.left) || !id(values.right) || values.left === values.right)) {
       throw new Error('--left and --right require two distinct positive decimal run-ID strings');
     }
-    if (values.output !== undefined && !text(values.output))
-      throw new Error('--output needs a new file path');
-    const outputPath = values.output === undefined ? null : resolve(values.output);
-    if (outputPath !== null) {
-      if (
-        await outputBoundary(
-          () =>
-            lstat(outputPath).catch((error) => {
-              if (error.code === 'ENOENT') return null;
-              if (error.code === 'ENOTDIR') throw argumentError(error.message, error);
-              throw error;
-            }),
-          signal,
-        )
-      ) {
-        throw new Error('--output already exists; choose a new file');
-      }
-      const parent = await outputBoundary(() => stat(dirname(outputPath)), signal);
-      if (!parent.isDirectory()) throw new Error('--output parent must be a directory');
-    }
-    argumentsValidated = true;
-
-    await responseBoundary(async () => {
-      const responses = [];
-      let remaining = BYTE_BUDGET;
-      async function read(path) {
-        const query_url = new URL(path, ORIGIN).href;
-        const requestSignal = AbortSignal.any([AbortSignal.timeout(30_000), signal]);
-        const response = await requestBoundary(
-          () =>
-            fetch(query_url, {
-              method: 'GET',
-              redirect: 'error',
-              signal: requestSignal,
-            }),
-          requestSignal,
-        );
-        if (response.redirected || (response.url && response.url !== query_url)) {
-          throw new Error('Unexpected CollectiveX response URL');
-        }
-        if (!response.ok) throw httpError(response.status, `HTTP ${response.status}: ${query_url}`);
-        const { bytes, body_text } = await responseBoundary(async () => {
-          const chunks = [];
-          for await (const chunk of response.body ?? []) {
-            remaining -= chunk.byteLength;
-            if (remaining < 0)
-              throw new Error('CollectiveX reads exceeded the 32 MiB response budget');
-            chunks.push(chunk);
-          }
-          const responseBytes = Buffer.concat(chunks);
-          const responseText = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
-            responseBytes,
-          );
-          return { bytes: responseBytes, body_text: responseText };
-        }, requestSignal);
-        const body = JSON.parse(body_text);
-        const index = responses.length;
-        responses.push({
-          query_url,
-          retrieved_at: new Date().toISOString(),
-          http_status: response.status,
-          decoded_body_sha256: createHash('sha256').update(bytes).digest('hex'),
-          body_text,
-        });
-        return { body, index };
-      }
-      const { body: schema } = await read('/api/openapi.json');
-      for (const path of ['/api/v1/collectivex/runs', '/api/v1/collectivex/runs/{runId}']) {
-        const operation = schema.paths?.[path]?.get;
-        if (
-          !operation?.parameters
-            ?.find((parameter) => parameter.name === 'version')
-            ?.schema?.enum?.includes(VERSION) ||
-          operation.parameters.some(
-            (parameter) => parameter.required && !['version', 'runId'].includes(parameter.name),
-          )
-        ) {
-          throw new Error(
-            'Inspect the current CollectiveX OpenAPI operations before using this version-1 helper',
-          );
-        }
-      }
-      let runIds = explicit ? [values.left, values.right] : [];
-      let discovery = null;
-      if (!explicit) {
-        const { body: list, index } = await read('/api/v1/collectivex/runs?version=1');
-        if (
-          !object(list) ||
-          list.version !== VERSION ||
-          typeof list.discovery_complete !== 'boolean' ||
-          !Array.isArray(list.runs) ||
-          list.runs.some((run) => !runIdentity(run) || !count(run.measured_cases)) ||
-          new Set(list.runs.map((run) => run.run_id)).size !== list.runs.length
-        ) {
-          throw new Error('Invalid CollectiveX run list; discovery coverage is unknown');
-        }
-        runIds = list.runs
-          .filter((run) => run.measured_cases > 0)
-          .toSorted((a, b) => (BigInt(a.run_id) < BigInt(b.run_id) ? 1 : -1))
-          .slice(0, 2)
-          .map((run) => run.run_id)
-          .toReversed();
-        discovery = {
-          response_index: index,
-          returned_runs: list.runs.length,
-          discovery_complete: list.discovery_complete,
-          history_complete: false,
-        };
-      }
-      const datasets = [];
-      if (runIds.length === 2) {
-        for (const runId of runIds) {
-          const response = await read(`/api/v1/collectivex/runs/${runId}?version=1`);
-          const data = response.body;
-          if (
-            !object(data) ||
-            data.version !== VERSION ||
-            !runIdentity(data.run) ||
-            data.run.run_id !== runId ||
-            !text(data.run.source_sha) ||
-            !Array.isArray(data.coverage) ||
-            !Array.isArray(data.series) ||
-            (data.kv !== undefined && !Array.isArray(data.kv))
-          ) {
-            throw new Error('Invalid or mismatched CollectiveX run dataset');
-          }
-          datasets.push(response);
-        }
-      }
-      const comparisons =
-        datasets.length === 2
-          ? compare(
-              [
-                ...epRows(datasets[0].body, datasets[0].index),
-                ...kvRows(datasets[0].body, datasets[0].index),
-              ],
-              [
-                ...epRows(datasets[1].body, datasets[1].index),
-                ...kvRows(datasets[1].body, datasets[1].index),
-              ],
-            )
-          : [];
-      const summary = Object.fromEntries(
-        ['matched', 'only_left', 'only_right', 'ambiguous', 'incomparable'].map((status) => [
-          status,
-          comparisons.filter((row) => row.status === status).length,
-        ]),
-      );
-      await outputJson(
-        {
-          schema_version: 1,
-          package_version: PACKAGE_VERSION,
-          selection: {
-            mode: explicit ? 'explicit_run_ids' : 'newest_two_measured_from_one_list',
-            run_ids: runIds,
-          },
-          outcome:
-            datasets.length < 2
-              ? 'fewer_than_two_measured_runs'
-              : summary.matched
-                ? 'compared'
-                : 'no_comparable_rows',
-          discovery,
-          comparison_scope: {
-            contract_version: VERSION,
-            basis: 'exact_public_identity',
-            source_sha_equal:
-              datasets.length === 2
-                ? datasets[0].body.run.source_sha === datasets[1].body.run.source_sha
-                : null,
-          },
-          runs: datasets.map(({ body, index }) => ({ run: body.run, response_index: index })),
-          summary,
-          comparisons,
-          responses,
-          observation_context: 'Existing observations were read; no new benchmark was run.',
-        },
-        outputPath,
-        signal,
-      );
-    }, signal);
+    return values;
   } catch (error) {
-    if (!argumentsValidated && error?.code !== 'CANCELLED' && error?.code !== 'OUTPUT_ERROR') {
-      throw argumentError(error.message, error);
-    }
-    throw error;
+    throw argumentError(error.message, error);
   }
 }
 
-await runCli({
-  command: 'compare-collectivex',
-  packageVersion: PACKAGE_VERSION,
-  run: ({ args, signal }) => main(args, signal),
-});
+export function collect(options, context) {
+  const normalized = normalizeArgs(options);
+  return responseBoundary(async () => {
+    const sources = [];
+    async function read(operation, url) {
+      const saved = await context.get({ operation, url, allowedStatuses: [200] });
+      const index = sources.length;
+      sources.push({
+        operation,
+        url,
+        response_id: saved.id,
+        retrieved_at: saved.retrievedAt,
+        http_status: saved.status,
+      });
+      return { body: saved.body, index };
+    }
+
+    const schema = await read('openapi', `${ORIGIN}/api/openapi.json`);
+    validateSchema(schema.body);
+    const explicit = normalized.left !== null;
+    let runIds = explicit ? [normalized.left, normalized.right] : [];
+    let discovery = null;
+    if (!explicit) {
+      const listed = await read('collectivex-runs', `${ORIGIN}/api/v1/collectivex/runs?version=1`);
+      validateRunList(listed.body);
+      runIds = selectRunIds(listed.body);
+      discovery = {
+        response_index: listed.index,
+        response_id: sources[listed.index].response_id,
+        returned_runs: listed.body.runs.length,
+        discovery_complete: listed.body.discovery_complete,
+        history_complete: false,
+      };
+    }
+    const datasets = [];
+    if (runIds.length === 2) {
+      for (const runId of runIds) {
+        const response = await read(
+          'collectivex-run',
+          `${ORIGIN}/api/v1/collectivex/runs/${runId}?version=1`,
+        );
+        validateDataset(response.body, runId);
+        datasets.push(response);
+      }
+    }
+    const comparisons = comparisonRows(datasets);
+    const summary = comparisonSummary(comparisons);
+    const comparablePairs = comparisons.filter(
+      (row) =>
+        row.status === 'matched' &&
+        row.metrics.some(
+          (metricValue) =>
+            metricValue.unit !== 'samples' &&
+            metricValue.left.status === 'value' &&
+            metricValue.right.status === 'value',
+        ),
+    ).length;
+    const outcome =
+      datasets.length < 2
+        ? 'fewer_than_two_measured_runs'
+        : summary.matched
+          ? 'compared'
+          : 'no_comparable_rows';
+    const document = {
+      schema_version: 1,
+      kind: 'collectivex',
+      package_version: context.producerVersion,
+      contract_version: 1,
+      selection: {
+        mode: explicit ? 'explicit_run_ids' : 'newest_two_measured_from_one_list',
+        run_ids: runIds,
+      },
+      outcome,
+      discovery,
+      comparison_scope: {
+        contract_version: VERSION,
+        basis: 'exact_public_identity',
+        source_sha_equal:
+          datasets.length === 2
+            ? datasets[0].body.run.source_sha === datasets[1].body.run.source_sha
+            : null,
+      },
+      runs: datasets.map(({ body, index }) => ({
+        run: body.run,
+        response_index: index,
+        response_id: sources[index].response_id,
+      })),
+      summary,
+      comparisons,
+      sources,
+      observation_context: 'Existing observations were read; no new benchmark was run.',
+    };
+    const reasons = ['only_left', 'only_right', 'ambiguous', 'incomparable']
+      .filter((status) => summary[status] > 0)
+      .map((status) => ({ code: status, count: summary[status] }));
+    const matchedWithoutValues = summary.matched - comparablePairs;
+    if (matchedWithoutValues > 0) {
+      reasons.push({ code: 'matched_without_usable_metric', count: matchedWithoutValues });
+    }
+    return {
+      format: 'json',
+      bytes: Buffer.from(`${JSON.stringify(document, null, 2)}\n`),
+      coverage: {
+        status:
+          datasets.length < 2 || comparisons.length === 0
+            ? 'empty'
+            : comparablePairs === comparisons.length
+              ? 'complete'
+              : 'partial',
+        selected_records: comparisons.length,
+        comparable_pairs: comparablePairs,
+        hardware: [],
+        reasons,
+      },
+    };
+  }, context.signal);
+}
+
+if (isMain(import.meta.url)) {
+  process.stderr.write(
+    'compare-collectivex.mjs is internal. Use inferencex collectivex compare instead.\n',
+  );
+  process.exitCode = 2;
+}

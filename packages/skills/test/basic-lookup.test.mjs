@@ -30,8 +30,13 @@ test('the installed basic lookup limits the newest scoped observation dates and 
   const project = suite.project();
   const skillRoot = suite.install('claude', project);
   const skill = readFileSync(join(skillRoot, 'SKILL.md'), 'utf8');
-  const section = skill.split('## Basic benchmark lookup\n')[1];
-  assert.ok(section, 'the installed skill contains the worked lookup');
+  assert.match(
+    skill,
+    /\[public API examples\]\(references\/public-api-examples\.md#basic-benchmark-lookup\)/,
+  );
+  const examples = readFileSync(join(skillRoot, 'references', 'public-api-examples.md'), 'utf8');
+  const section = examples.split('## Basic benchmark lookup\n')[1];
+  assert.ok(section, 'the installed public API reference contains the worked lookup');
   const snippet = section.match(
     /```bash\nnode --input-type=module <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/,
   );

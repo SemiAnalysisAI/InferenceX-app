@@ -69,16 +69,15 @@ its as-of date when latest data does not contain the selected point. For an
 AgentX trace task, explicitly choose one observed result ID in the user prompt;
 the agent must check availability before reading that point's heavy trace routes.
 
-For offline discovery, provide intact saved 0.9/0.10 PowerX or AgentX summary
-bundles and one copy with only its export deliberately altered. Keep the original
-source evidence and assessor's expected results outside the project. Example:
+For offline discovery, provide intact, partial, and deliberately tampered contract
+1 bundle directories across all six formal families. Keep the assessor's expected
+results outside the project. Example:
 
-> Verify the saved InferenceX exports under inputs/ against their complete evidence,
-> entirely offline. Write separate Markdown reports under reports/ with producer
-> versions, scope, dates, units, coverage and limitations. Preserve the inputs.
-> Copy an unchanged bundle to another project-local path and compare report bytes.
-> For the deliberately altered export, retain the provided command's own JSON
-> failure, stdout, stderr and exit code. Run no new benchmarks.
+> Verify every InferenceX evidence directory under inputs/ entirely offline. For
+> PowerX, AgentX, result provenance, and TCO, require one usable b200 observation;
+> for release and CollectiveX comparisons, require one comparable pair. Preserve
+> the inputs, write optional reports under reports/, and separate valid partial
+> evidence, policy failures, and invalid tampering. Run no new benchmarks.
 
 ## Independently accept or reject
 
@@ -110,9 +109,13 @@ project, an explicit-use run, or unreviewed model prose as accepted discovery.
   helper `--version` checks.
 - 0.10.0: structured CLI failures and supported installer process-crash recovery.
 - 0.11.0: offline PowerX/AgentX summary verification and deterministic Markdown reports.
+- 0.12.0 candidate: versioned discovery, six formal evidence-bundle families,
+  contract 1 schemas and CSV columns, offline bundle replay, coverage predicates,
+  and read-only installation diagnostics.
 
 Versions 0.5.0 through 0.11.0 are published releases; 0.11.0 includes these cumulative
-capabilities. Accept live-query and offline discovery with tasks that exercise each
+capabilities. The 0.12.0 entry remains a candidate until publication and public
+verification succeed. Accept live-query and offline discovery with tasks that exercise each
 workflow; one task does not establish discovery of every capability. For future
 candidates, validate the exact archive; local acceptance alone does not establish
 npm publication.

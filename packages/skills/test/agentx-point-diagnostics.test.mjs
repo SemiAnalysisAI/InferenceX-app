@@ -57,6 +57,16 @@ globalThis.fetch = async (input, options) => {
 });
 
 const response = (value, status = 200) => ({ body: JSON.stringify(value), status });
+const counts = (samples, finite, nonzero, missing) => ({
+  sample_count: samples,
+  fields: {
+    value: {
+      finite_count: finite,
+      nonzero_count: nonzero,
+      missing_or_nonfinite_count: missing,
+    },
+  },
+});
 const siblingResponse = {
   sku: {
     hardware: 'h200_sxm',
@@ -151,15 +161,15 @@ const serverMetrics = {
   endNs: 2_400_000_000,
   durationS: 1.4,
   timeslicesCount: 2,
-  kvCacheUsage: [{ t: 0, v: 0.44 }],
-  prefixCacheHitRate: [{ t: 0, v: 0 }],
-  queueDepth: [{ t: 0, v: 2 }],
-  promptTokensBySource: { agent: [{ t: 0, v: 100 }] },
-  prefillTps: [{ t: 0, v: 80 }],
-  decodeTps: [{ t: 0, v: 40 }],
+  kvCacheUsage: [{ t: 0, value: 0.44 }],
+  prefixCacheHitRate: [{ t: 0, value: 0 }],
+  queueDepth: [{ t: 0, running: 2, waiting: 0, total: 2 }],
+  promptTokensBySource: { agent: [{ t: 0, value: 100 }] },
+  prefillTps: [{ t: 0, value: 80 }],
+  decodeTps: [{ t: 0, value: 40 }],
   prefixCacheHitsTps: [],
   hostKvCacheUsage: [],
-  kvCacheUsageByEngine: [{ engine: '0', t: 0, v: 0.44 }],
+  kvCacheUsageByEngine: [{ engineLabel: '0', points: [{ t: 0, value: 0.44 }] }],
   kvCachePoolTokens: 983_040,
   metricSources: [{ key: 'aggregate', label: 'Aggregate' }],
 };
@@ -290,6 +300,69 @@ test('installed recipe retains original timestamp digits beyond JavaScript safe 
   assert.equal(JSON.stringify(output.timeline).includes('1700000001400000001'), false);
 });
 
+test('trace summaries keep each series denominator and distinguish cumulative from inflight time', () => {
+  const result = run({
+    ...heavyResponses,
+    '/api/v1/request-timeline?id=421': response({
+      ...timeline,
+      endNs: 6e9,
+      durationS: 5,
+      requests: [
+        request('main-agent', { start: 1e9, end: 3e9 }),
+        request('warmup', { start: 0, end: 2e9 }),
+        request('replay-lane', { start: 4e9, end: 4.5e9, cancelled: true }),
+      ],
+    }),
+    '/api/v1/trace-server-metrics?id=421': response({
+      ...serverMetrics,
+      prefillTps: [
+        { t: 0, value: 80 },
+        { t: 1, value: 0 },
+        { t: 2, value: null },
+      ],
+      decodeTps: [{ t: 0, value: 40 }, { t: 1 }, { t: 2, value: 20 }, { t: 3, value: 0 }],
+      prefixCacheHitsTps: [{ t: 0, value: 10 }],
+    }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const summary = JSON.parse(result.stdout).trace_summary;
+  assert.ok(summary, 'recipe must compute the maintained trace summary');
+  assert.equal(summary.request_count, 3);
+  assert.equal(summary.cancelled_request_count, 1);
+  assert.equal(summary.cumulative_request_latency_s, 4.5);
+  assert.equal(summary.request_inflight_union_s, 3.5);
+  assert.deepEqual(summary.server_metric_samples.prefillTps, counts(3, 2, 1, 1));
+  assert.deepEqual(summary.server_metric_samples.decodeTps, counts(4, 3, 2, 1));
+  assert.deepEqual(summary.server_metric_samples.prefixCacheHitsTps, counts(1, 1, 1, 0));
+  assert.deepEqual(summary.server_metric_samples.hostKvCacheUsage, counts(0, 0, 0, 0));
+  assert.deepEqual(summary.server_metric_samples.queueDepth, {
+    sample_count: 1,
+    fields: {
+      running: { finite_count: 1, nonzero_count: 1, missing_or_nonfinite_count: 0 },
+      waiting: { finite_count: 1, nonzero_count: 0, missing_or_nonfinite_count: 0 },
+      total: { finite_count: 1, nonzero_count: 1, missing_or_nonfinite_count: 0 },
+    },
+  });
+  assert.deepEqual(summary.server_metric_samples.promptTokensBySource.agent, counts(1, 1, 1, 0));
+  assert.deepEqual(summary.server_metric_samples.kvCacheUsageByEngine, [
+    { engineLabel: '0', ...counts(1, 1, 1, 0) },
+  ]);
+});
+
+test('an empty timeline has zero requests and durations without inventing server samples', () => {
+  const result = run({
+    ...heavyResponses,
+    '/api/v1/request-timeline?id=421': response({ ...timeline, requests: [] }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const summary = JSON.parse(result.stdout).trace_summary;
+  assert.ok(summary, 'recipe must compute the maintained trace summary');
+  assert.equal(summary.request_count, 0);
+  assert.equal(summary.cancelled_request_count, 0);
+  assert.equal(summary.cumulative_request_latency_s, 0);
+  assert.equal(summary.request_inflight_union_s, 0);
+});
+
 test('one positive safe result ID is required before any HTTP request', () => {
   for (const value of ['0', '1.5', '9007199254740992', '0421']) {
     const result = run(
@@ -327,6 +400,17 @@ test('advertised traces fail as inconsistencies on HTTP and malformed heavy resp
         '/api/v1/request-timeline?id=421': response({ ...timeline, requests: [{}] }),
       },
     },
+    ...[{ start: 2, end: 1 }, { start: -1 }, { end: Number.MAX_SAFE_INTEGER + 1 }].map(
+      (overrides) => ({
+        responses: {
+          ...heavyResponses,
+          '/api/v1/request-timeline?id=421': response({
+            ...timeline,
+            requests: [request('main-agent', overrides)],
+          }),
+        },
+      }),
+    ),
     {
       responses: { ...heavyResponses, '/api/v1/trace-histograms?ids=421': response({}) },
     },

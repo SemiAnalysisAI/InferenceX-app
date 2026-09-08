@@ -1,7 +1,7 @@
 {
   "name": "@semianalysisai/inferencex-skills",
-  "version": "0.11.0",
-  "description": "Install the InferenceX public API skill for Codex and Claude Code.",
+  "version": "0.12.0",
+  "description": "Query InferenceX benchmarks and verify replayable evidence with a CLI and agent skill.",
   "keywords": [
     "agent-skills",
     "agentx",
@@ -22,19 +22,23 @@
     "directory": "packages/skills"
   },
   "bin": {
+    "inferencex": "skills/inferencex-api/scripts/inferencex.mjs",
     "inferencex-skills": "bin/install.mjs"
   },
   "files": [
     "bin/install.mjs",
-    "bin/install-transaction.mjs",
     "skills/inferencex-api",
     "README.md",
     "LICENSE"
   ],
   "type": "module",
   "scripts": {
+    "prepack": "node scripts/update-integrity.mjs",
     "list": "node bin/install.mjs list",
     "test:unit": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
   },
   "engines": {
     "node": ">=24"
