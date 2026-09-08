@@ -468,6 +468,8 @@ export function collect(options, context) {
             throw responseError(`Invalid ${operation} 404 response`);
           return null;
         }
+        if (operation === 'server-log' && saved.body === null)
+          throw responseError('Invalid server-log 200 response');
         return saved.body;
       },
       evidence,

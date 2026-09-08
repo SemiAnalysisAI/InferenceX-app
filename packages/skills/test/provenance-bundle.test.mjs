@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import * as provenance from '../skills/inferencex-api/scripts/investigate-result.mjs';
@@ -94,7 +94,7 @@ test('exact logical run scope retains the selected row older producing identity'
   assert.equal(execution.requests.length, 3);
 });
 
-test('a documented log 404 remains complete evidence with limited coverage', () => {
+test('a documented log 404 remains valid evidence but null log bodies fail', () => {
   const saved = bundles.create('result', 'missing-log');
   const report = bundles.readResult(saved.directory);
   assert.equal(report.log.status, 'not_found');
@@ -107,6 +107,26 @@ test('a documented log 404 remains complete evidence with limited coverage', () 
   assert.equal(summary.validity, 'valid');
   assert.equal(summary.coverage.status, 'partial');
   assert.equal(summary.policy.status, 'passed');
+
+  const fixture = provenanceBundleFixtures().result['producer-differs-from-curve'];
+  fixture.responses[2].body = null;
+  for (const status of [200, 404]) {
+    fixture.responses[2].status = status;
+    const fixturePath = join(saved.directory, '..', `null-log-${status}.json`);
+    const outputDirectory = join(saved.directory, '..', `null-log-${status}`);
+    writeFileSync(fixturePath, JSON.stringify(fixture));
+    const failed = bundles.invoke([...fixture.args, '--output-dir', outputDirectory], {
+      env: {
+        INFERENCEX_BUNDLE_FIXTURE: fixturePath,
+        INFERENCEX_BUNDLE_REQUESTS: join(saved.directory, '..', `requests-${status}.jsonl`),
+      },
+    });
+    assert.equal(failed.status, 1, failed.stdout);
+    assert.equal(failed.stdout, '');
+    assert.equal(JSON.parse(failed.stderr).error.code, 'INVALID_RESPONSE');
+    assert.equal(existsSync(join(outputDirectory, 'manifest.json')), false);
+    assert.equal(existsSync(join(outputDirectory, 'result.json')), false);
+  }
 });
 
 test('missing optional provenance stays missing without guessing a producer', () => {
