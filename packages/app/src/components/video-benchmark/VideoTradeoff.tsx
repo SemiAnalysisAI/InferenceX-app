@@ -29,7 +29,7 @@ const STRINGS = {
     title: 'Video serving tradeoffs',
     subtitle: 'Compare identical workloads across hardware and runtime configurations.',
     scope:
-      'Runs you open are collected in this browser session. Reloading clears the comparison and cost assumptions.',
+      'Share this page’s link to reopen the same CI results. Cost assumptions stay in this browser session and reset on reload.',
     workload: 'Matched workload',
     x: 'Latency axis · lower is better',
     y: 'Efficiency axis · higher is better',
@@ -101,7 +101,8 @@ const STRINGS = {
   zh: {
     title: '视频服务延迟与效率权衡',
     subtitle: '在相同工作负载下比较硬件与运行时配置。',
-    scope: '打开的运行会加入当前浏览器会话；刷新页面将清除对比集合与成本假设。',
+    scope:
+      '分享当前页面链接即可重新打开同一组 CI 结果。成本假设仅保留在当前浏览器会话中，刷新后重置。',
     workload: '匹配的工作负载',
     x: '延迟轴 · 越低越好',
     y: '效率轴 · 越高越好',
