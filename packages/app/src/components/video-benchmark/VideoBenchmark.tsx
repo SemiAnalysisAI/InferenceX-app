@@ -550,7 +550,7 @@ export default function VideoBenchmark({
       )}
       {b && loaded && (
         <>
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.8fr)]">
+          <div className="grid items-start gap-5 xl:grid-cols-[minmax(400px,1fr)_minmax(0,1.5fr)]">
             <ResultSummary bundle={b} stored={Boolean(published)} />
             <div className="min-w-0 space-y-4">
               <div className="grid gap-5 lg:grid-cols-2">
@@ -593,9 +593,7 @@ export default function VideoBenchmark({
                               if (node) node.textContent = s.mediaError;
                             }}
                           />
-                          <p role="status" className="text-xs text-muted-foreground">
-                            {s.audio}
-                          </p>
+                          <p role="status" className="text-xs text-destructive empty:hidden" />
                           <a
                             download={`${role}-${slot}.mp4`}
                             className="text-sm text-primary underline"
@@ -678,18 +676,18 @@ export default function VideoBenchmark({
                   );
                 })}
               </div>
+              <p className="text-xs text-muted-foreground">{s.audio}</p>
               {slots.length > 0 && (
                 <Card className="gap-4">
                   <label className="text-sm font-medium">
                     {s.slot}
                     <select
-                      className="mt-2 block w-full max-w-full rounded-md sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto border bg-background p-2"
+                      className="mt-2 block h-11 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
                       value={slot}
                       onChange={(e) => setSlot(e.target.value)}
                     >
                       {slots.map((o) => (
                         <option key={text(at(o, 'slot_id'))} value={text(at(o, 'slot_id'))}>
-                          {text(at(o, 'case_id'))} ·{' '}
                           {at(o, 'phase') === 'warmup' ? s.warmup : s.measured} ·{' '}
                           {text(at(o, 'slot_id'))}
                         </option>
@@ -697,6 +695,9 @@ export default function VideoBenchmark({
                     </select>
                   </label>
                   <div>
+                    <p className="mb-2 break-words text-sm font-medium">
+                      {text(at(clip, 'case_id'))}
+                    </p>
                     <span className="text-xs text-muted-foreground">
                       {s.prompt} · {s.seed} {fmt(at(clip, 'seed'))}
                     </span>

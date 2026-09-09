@@ -110,17 +110,19 @@ export async function GET(request: NextRequest) {
       return new Response(stream, { headers: { ...headers, 'Content-Type': 'application/zip' } });
     }
     if (runId) {
-      const runResponse = await github(`/actions/runs/${runId}`);
+      const [runResponse, artifactsResponse, saved] = await Promise.all([
+        github(`/actions/runs/${runId}`),
+        github(`/actions/runs/${runId}/artifacts?per_page=100`),
+        storedArtifacts(runId).catch(() => []),
+      ]);
       if (!runResponse.ok)
         return NextResponse.json(
           { error: 'CI run unavailable' },
           { status: runResponse.status, headers },
         );
-      const artifactsResponse = await github(`/actions/runs/${runId}/artifacts?per_page=100`);
       if (!artifactsResponse.ok)
         return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
       const data = await artifactsResponse.json();
-      const saved = await storedArtifacts(runId).catch(() => []);
       const artifacts = (data.artifacts ?? []).filter((a: { name: string }) => {
         const match = artifactName.exec(a.name);
         return match?.groups?.runId === runId;

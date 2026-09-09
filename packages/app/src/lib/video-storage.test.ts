@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { head, put } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
-import { storeVideoArtifact } from './video-storage';
+import { readStoredArtifact, storeVideoArtifact } from './video-storage';
 import { storedBundle } from '@/components/video-benchmark/stored';
 
 vi.mock('@vercel/blob', async (original) => ({
@@ -53,7 +53,22 @@ beforeEach(() => {
   vi.mocked(put).mockClear();
   vi.mocked(head).mockClear();
 });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 describe('persistent H3 media', () => {
+  it('reads the trusted listed index URL without a redundant HEAD request', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const indexUrl =
+      'https://test.public.blob.vercel-storage.com/h3-video-media/v1/runs/10/h3-video-10-1_20.json';
+    const saved = { storageVersion: 1, runId: '10', artifact, sources: [] };
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(saved));
+    expect(await readStoredArtifact('10', { ...artifact, indexUrl })).toEqual(saved);
+    expect(head).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledWith(indexUrl, { signal: expect.any(AbortSignal) });
+  });
+
   it('publishes verified files before the index and restores metadata without media bytes', async () => {
     const result = await storeVideoArtifact(
       '10',

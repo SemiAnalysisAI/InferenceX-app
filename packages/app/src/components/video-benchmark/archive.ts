@@ -7,6 +7,7 @@ export interface CIArtifact {
   size_in_bytes: number;
   digest?: string;
   stored?: boolean;
+  indexUrl?: string;
 }
 export interface CIRun {
   id: number;
