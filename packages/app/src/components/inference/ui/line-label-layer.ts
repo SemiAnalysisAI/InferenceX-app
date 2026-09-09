@@ -60,9 +60,87 @@ export function horizontalShiftIntoBounds(rect: RectBounds, bounds: RectBounds):
   return 0;
 }
 
+/**
+ * Vertical shift that slides `rect` fully inside `bounds`, or `null` when it
+ * is taller than the bounds and cannot fit at any offset. Zero when it already
+ * fits; positive moves down, negative moves up.
+ */
+export function verticalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): number | null {
+  if (rect.bottom - rect.top > bounds.bottom - bounds.top) return null;
+  if (rect.top < bounds.top) return bounds.top - rect.top;
+  if (rect.bottom > bounds.bottom) return bounds.bottom - rect.bottom;
+  return 0;
+}
+
 /** Whether `rect` lies fully inside `bounds` on the vertical axis. */
 export function fitsVertically(rect: RectBounds, bounds: RectBounds): boolean {
   return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+}
+
+/**
+ * Translation that keeps a line-label pill fully inside the plot.
+ *
+ * `rect` is the pill's background box in zoom-group coordinates, i.e. its
+ * group translate plus the `.ll-bg` offset. A pill that would spill past an
+ * edge slides back until it touches that edge; a pill larger than the plot on
+ * an axis (a very narrow or very short chart) is pinned to the plot's top-left
+ * on that axis so its start stays readable rather than being clipped at an
+ * arbitrary point.
+ */
+export function pillShiftIntoBounds(rect: RectBounds, bounds: RectBounds): CartesianPoint {
+  return {
+    x: horizontalShiftIntoBounds(rect, bounds) ?? bounds.left - rect.left,
+    y: verticalShiftIntoBounds(rect, bounds) ?? bounds.top - rect.top,
+  };
+}
+
+/**
+ * The `.ll-bg` box of a rendered pill, in the pill group's own coordinates, or
+ * `null` before the sizing pass has run (or when the rect is degenerate).
+ */
+function pillLocalBox(node: SVGGElement): RectBounds | null {
+  const background = node.querySelector<SVGRectElement>('.ll-bg');
+  if (!background) return null;
+  const x = Number(background.getAttribute('x'));
+  const y = Number(background.getAttribute('y'));
+  const width = Number(background.getAttribute('width'));
+  const height = Number(background.getAttribute('height'));
+  if (![x, y, width, height].every((value) => Number.isFinite(value))) return null;
+  if (!(width > 0) || !(height > 0)) return null;
+  return { left: x, top: y, right: x + width, bottom: y + height };
+}
+
+/**
+ * `translate(...)` for a pill anchored at (`x`, `y`) with the given offsets,
+ * shifted so the pill's `.ll-bg` box (if already sized) stays inside `bounds`.
+ * With no bounds — a chart that clips nothing — the anchor offset is used as
+ * is.
+ */
+function pillTransform(
+  node: SVGGElement,
+  x: number,
+  y: number,
+  offsetX: number,
+  offsetY: number,
+  bounds: RectBounds | null,
+): string {
+  let tx = x + offsetX;
+  let ty = y + offsetY;
+  const local = bounds ? pillLocalBox(node) : null;
+  if (bounds && local) {
+    const shift = pillShiftIntoBounds(
+      {
+        left: tx + local.left,
+        right: tx + local.right,
+        top: ty + local.top,
+        bottom: ty + local.bottom,
+      },
+      bounds,
+    );
+    tx += shift.x;
+    ty += shift.y;
+  }
+  return `translate(${tx},${ty})`;
 }
 
 /**
@@ -295,11 +373,18 @@ export function renderLineLabels(
       labelGroup: d3.Selection<SVGGElement, LineLabelPlacement, null, undefined>,
       label: LineLabelPlacement,
     ) => void;
+    /**
+     * Strict bounding box, in zoom-group coordinates, every pill must lie
+     * fully inside. Defaults to the plot's clip rect ({@link plotAreaBounds});
+     * pass `null` to skip the constraint (charts that clip nothing).
+     */
+    bounds?: RectBounds | null;
   },
 ): void {
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
+  const bounds = options.bounds === undefined ? plotAreaBounds(group) : options.bounds;
   const selection = group
     .selectAll<SVGGElement, LineLabelPlacement>('.line-label')
     .data(labels, (label) => label.key)
@@ -372,18 +457,31 @@ export function renderLineLabels(
       .attr('y', (d) => bbox.y + bbox.height / 2 - d.height / 2)
       .attr('width', (d) => d.width)
       .attr('height', (d) => d.height);
+
+    // Now that the pill has its final size, slide it back inside the plot if
+    // the anchor offset pushed any part of it past an edge — a label anchored
+    // on the last point of a line otherwise pokes out past the right edge and
+    // the clip path slices the run name in half.
+    labelGroup.attr('transform', pillTransform(node, label.x, label.y, offsetX, offsetY, bounds));
   }
 }
 
 export function updateRenderedLineLabels(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   labels: readonly LineLabelPlacement[],
-  options: { opacity?: number; offsetX?: number; offsetY?: number } = {},
+  options: {
+    opacity?: number;
+    offsetX?: number;
+    offsetY?: number;
+    /** See {@link renderLineLabels}. */
+    bounds?: RectBounds | null;
+  } = {},
 ): void {
   const byKey = new Map(labels.map((label) => [label.key, label]));
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
+  const bounds = options.bounds === undefined ? plotAreaBounds(group) : options.bounds;
   group.selectAll<SVGGElement, unknown>('.line-label').each(function () {
     const element = d3.select(this);
     const label = byKey.get(element.attr('data-line-key'));
@@ -391,8 +489,10 @@ export function updateRenderedLineLabels(
       element.style('opacity', 0);
       return;
     }
+    // The pill keeps the size it was given on render, so the zoom pass only
+    // needs to move it — and keep it inside the plot while doing so.
     element
-      .attr('transform', `translate(${label.x + offsetX},${label.y + offsetY})`)
+      .attr('transform', pillTransform(this, label.x, label.y, offsetX, offsetY, bounds))
       .style('opacity', label.visible ? opacity : 0);
   });
 }
