@@ -281,6 +281,14 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片实测平均功耗',
     polarity: 'lower',
   },
+  modeledChassisPowerPerGpu: {
+    field: 'modeledChassisPowerPerGpu.y',
+    label: 'Modeled Chassis AC Power per GPU (W/GPU)',
+    labelZh: '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
+    title: 'Modeled Chassis AC Power per GPU (8k1k)',
+    titleZh: '每 GPU 分摊的机箱交流功耗估算（8k1k）',
+    polarity: 'lower',
+  },
   measuredPrefillAvgPower: {
     field: 'measuredPrefillAvgPower.y',
     label: 'Measured Prefill Power per Chip (W)',
@@ -579,6 +587,11 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     label: 'Measured Energy',
     labelZh: '实测能耗',
     metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+  },
+  {
+    label: 'Modeled System Power',
+    labelZh: '系统功耗估算',
+    metrics: ['y_modeledChassisPowerPerGpu'],
   },
   {
     label: 'Custom User Values',

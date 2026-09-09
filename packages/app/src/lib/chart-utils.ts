@@ -426,6 +426,10 @@ export function buildDerivedChartFields(
     if (wants(key)) fields[key] = value;
   }
 
+  if (wants('modeledChassisPowerPerGpu') && entry.modeledSystemPower?.status === 'supported') {
+    fields.modeledChassisPowerPerGpu = chartMetric(entry.modeledSystemPower.chassisAcWattsPerGpu);
+  }
+
   return fields;
 }
 

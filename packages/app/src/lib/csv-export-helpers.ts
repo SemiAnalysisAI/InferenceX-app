@@ -53,6 +53,7 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
+  const showModeledPower = displayedMetrics?.yPath === 'modeledChassisPowerPerGpu.y';
   const headers = [
     'Model',
     'ISL',
@@ -106,6 +107,7 @@ export function inferenceChartToCsv(
     'Run URL',
     'Physical Chips',
     'DP',
+    ...(showModeledPower ? ['Configured Chip Count'] : []),
   ];
 
   const displayedColumns = displayedMetrics
@@ -168,8 +170,11 @@ export function inferenceChartToCsv(
         d.dp_attention ?? '',
         d.is_multinode ?? '',
         d.run_url ?? '',
-        d.physicalChips ?? d.tp,
+        showModeledPower && d.modeledSystemPower?.status === 'supported'
+          ? d.modeledSystemPower.gpuCount
+          : (d.physicalChips ?? d.tp),
         d.dp ?? '',
+        ...(showModeledPower ? [d.physicalChips ?? d.tp] : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;

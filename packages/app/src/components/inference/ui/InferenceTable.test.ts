@@ -6,6 +6,8 @@ import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceT
 // Test the pure logic used by InferenceTable — sorting and value resolution
 import { getNestedYValue } from '@/lib/chart-utils';
 import * as inferenceTableModule from './InferenceTable';
+import { chartDefinitions } from '../metric-registry';
+import { sortRowsByYMetric } from './inference-table-sort';
 
 const CHART_DEF = {
   chartType: 'interactivity',
@@ -48,6 +50,23 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
+  it('shows modeled chassis AC units and sorts the supported estimates by ascending power', () => {
+    const definition = chartDefinitions[0];
+    const metric = 'y_modeledChassisPowerPerGpu';
+    const points = [
+      makePoint({ modeledChassisPowerPerGpu: { y: 1200, roof: false } }),
+      makePoint({ modeledChassisPowerPerGpu: { y: 750, roof: false } }),
+    ];
+    const sorted = sortRowsByYMetric(points, definition, metric);
+    expect(sorted.map((point) => point.modeledChassisPowerPerGpu?.y)).toEqual([750, 1200]);
+    expect(inferenceTableModule.inferenceTableHeaderLabels(definition, metric, 'en').yMetric).toBe(
+      'Modeled Chassis AC Power per GPU (W/GPU)',
+    );
+    expect(inferenceTableModule.inferenceTableHeaderLabels(definition, metric, 'zh').yMetric).toBe(
+      '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
+    );
+  });
+
   it('provides locale-aware table headers without changing the English source', () => {
     const headerLabels = (
       inferenceTableModule as typeof inferenceTableModule & {

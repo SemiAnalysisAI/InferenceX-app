@@ -39,6 +39,7 @@ export function inferenceTableHeaderLabels(
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
     physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
+    configuredChips: locale === 'zh' ? '配置中的芯片数' : 'Configured Chip Count',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
@@ -53,6 +54,7 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
+  const showModeledPower = selectedYAxisMetric === 'y_modeledChassisPowerPerGpu';
   const headers = useMemo(
     () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
     [chartDefinition, selectedYAxisMetric, locale],
@@ -91,10 +93,27 @@ export default function InferenceTable({
       {
         header: headers.physicalChips,
         align: 'right',
-        cell: (row) => row.physicalChips ?? row.tp,
-        sortValue: (row) => row.physicalChips ?? row.tp,
+        cell: (row) =>
+          showModeledPower && row.modeledSystemPower?.status === 'supported'
+            ? row.modeledSystemPower.gpuCount
+            : (row.physicalChips ?? row.tp),
+        sortValue: (row) =>
+          showModeledPower && row.modeledSystemPower?.status === 'supported'
+            ? row.modeledSystemPower.gpuCount
+            : (row.physicalChips ?? row.tp),
         importance: 'secondary',
       },
+      ...(showModeledPower
+        ? [
+            {
+              header: headers.configuredChips,
+              align: 'right' as const,
+              cell: (row: InferenceData) => row.physicalChips ?? row.tp,
+              sortValue: (row: InferenceData) => row.physicalChips ?? row.tp,
+              importance: 'secondary' as const,
+            },
+          ]
+        : []),
       {
         header: 'DP',
         align: 'right',
@@ -135,7 +154,7 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers],
+    [yPath, headers, showModeledPower],
   );
 
   return (

@@ -2,9 +2,68 @@ import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import InferenceTable from '@/components/inference/ui/InferenceTable';
+import { chartDefinitions } from '@/components/inference/metric-registry';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
+import { createMockInferenceData } from '../support/mock-data';
+
+describe('Modeled system-power table', () => {
+  it('shows validated eight-GPU topology separately from the configured 64-chip alias in both locales', () => {
+    const data = createMockInferenceData({
+      physicalChips: 64,
+      modeledChassisPowerPerGpu: { y: 750, roof: false },
+      modeledSystemPower: {
+        status: 'supported',
+        hardware: 'h100',
+        modelRevision: 'reference-revision',
+        modelPath: 'chassis/H100.py',
+        gpuCount: 8,
+        chassisCount: 1,
+        chassisAcWatts: 6000,
+        chassisAcWattsPerGpu: 750,
+        facilityWatts: 7200,
+        pue: 1.2,
+        measuredGpuWattsPerGpu: 500,
+        measuredTotalGpuWatts: 4000,
+        topologyBasis: 'single-node-eight-gpu',
+        telemetryBasis: 'validated-unversioned-single-node',
+        roles: [],
+      },
+    });
+    for (const locale of ['en', 'zh'] as const) {
+      mountWithProviders(
+        <PathnameContext.Provider value={locale === 'en' ? '/inference' : '/zh/inference'}>
+          <InferenceTable
+            data={[data]}
+            chartDefinition={chartDefinitions[0]}
+            selectedYAxisMetric="y_modeledChassisPowerPerGpu"
+          />
+        </PathnameContext.Provider>,
+      );
+      cy.get('[data-testid="inference-results-table"]').within(() => {
+        cy.get('[data-testid="data-table-preset-all"]').click();
+        for (const [header, value] of [
+          [locale === 'en' ? 'Physical Chips' : '物理芯片数', '8'],
+          [locale === 'en' ? 'Configured Chip Count' : '配置中的芯片数', '64'],
+          [
+            locale === 'en'
+              ? 'Modeled Chassis AC Power per GPU (W/GPU)'
+              : '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
+            '750',
+          ],
+        ]) {
+          cy.contains('th', header)
+            .invoke('index')
+            .then((index) => {
+              cy.get('tbody tr').first().children().eq(index).should('have.text', value);
+            });
+        }
+      });
+    }
+  });
+});
 
 describe('Inference ChartControls', () => {
   beforeEach(() => {
@@ -75,6 +134,28 @@ describe('Inference ChartControls', () => {
         });
       cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', option.key);
     }
+  });
+
+  it('offers modeled chassis power separately and explains its measurement boundary', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('input[aria-label="Search options"]').type('Modeled Chassis');
+    cy.contains('Modeled System Power')
+      .closest('[role="rowgroup"]')
+      .within(() => {
+        cy.get('[data-testid="option-help-y_modeledChassisPowerPerGpu"]').scrollIntoView().click();
+      });
+    cy.get('[data-testid="option-help-content-y_modeledChassisPowerPerGpu"]')
+      .should('contain.text', 'validated measured GPU power')
+      .and('contain.text', 'fully occupied eight-GPU chassis')
+      .and('contain.text', 'PUE after chassis AC');
+    cy.get('body').type('{esc}');
+    cy.contains('[data-slot="select-item"]', 'Modeled Chassis AC Power per GPU (8k1k)')
+      .scrollIntoView()
+      .click();
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledOnceWith',
+      'y_modeledChassisPowerPerGpu',
+    );
   });
 
   it('lists locked rental tiers under each cost group and opens the TCO model dialog', () => {

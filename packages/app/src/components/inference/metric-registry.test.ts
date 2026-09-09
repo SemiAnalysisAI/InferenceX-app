@@ -176,6 +176,18 @@ describe('metric registry', () => {
     expect(isMeasuredEnergyConfigKey('y_tpPerGpu')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y_jTotal')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y')).toBe(false);
+    expect(isMeasuredEnergyConfigKey('y_modeledChassisPowerPerGpu')).toBe(false);
+  });
+
+  it('keeps modeled chassis AC separate from measured and provisioned power', () => {
+    const group = METRIC_CONTROL_GROUPS.find((item) => item.label === 'Modeled System Power');
+    expect(group?.metrics).toEqual(['y_modeledChassisPowerPerGpu']);
+    expect(resolveMetricConfigKey('y_modeledChassisPowerPerGpu')).toBe(
+      'y_modeledChassisPowerPerGpu',
+    );
+    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu).toBe('modeledChassisPowerPerGpu.y');
+    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu_roofline).toBe('lower_right');
+    expect(chartDefinitions[1].y_modeledChassisPowerPerGpu_roofline).toBe('lower_left');
   });
 });
 

@@ -21,6 +21,7 @@ import {
 import { DEFAULT_TCO_BASIS, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { resolvePowerTier } from '@/lib/power-tier';
+import { modelSystemPower } from '@/lib/modeled-system-power';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
@@ -219,6 +220,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     power_valid: m.power_valid,
     power_metric_schema_version: m.power_metric_schema_version,
+    modeledSystemPower: modelSystemPower(row),
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,
       wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,
