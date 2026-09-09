@@ -48,6 +48,23 @@ describe('H3 artifact contract', () => {
     expect(b.report).toBeNull();
     expect(b.files.size).toBe(3);
   });
+  it.each(['', '{"interrupted":'])(
+    'retains interrupted stdout without parsing it: %j',
+    async (log) => {
+      const path = 'gpu/c2/supervisor/baseline/client.stdout.json';
+      const f = await fixture({ [path]: log });
+      const b = await loadBundle(f.read);
+      expect(at(b.ci, 'phase')).toBe('failed');
+      expect(await b.files.get(path)!.text()).toBe(log);
+      expect(b.documents.has(path)).toBe(false);
+      f.files.set(path, new Blob(['changed after sealing']));
+      await expect(loadBundle(f.read)).rejects.toThrow(`SHA256 mismatch: ${path}`);
+    },
+  );
+  it('still rejects malformed structured result documents', async () => {
+    const f = await fixture({ 'gpu/c2/gpu-job.json': '{"status":' });
+    await expect(loadBundle(f.read)).rejects.toThrow(SyntaxError);
+  });
   it('rejects modified bytes and missing files', async () => {
     const f = await fixture();
     f.files.set('ci.json', new Blob(['tampered']));
