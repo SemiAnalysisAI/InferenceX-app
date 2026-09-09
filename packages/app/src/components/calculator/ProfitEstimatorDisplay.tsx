@@ -1366,19 +1366,14 @@ function ProfitEstimatorInner({
                       <MultiSelect
                         triggerId="profit-cost"
                         options={[
-                          ...COST_PROVIDER_OPTIONS.filter((p) => p.value !== 'custom').map(
-                            (provider) => ({
-                              value: provider.value,
-                              label: locale === 'zh' ? provider.labelZh : provider.label,
-                            }),
-                          ),
+                          // Unlocked tiers first, then Custom $/GPU/hr, then the locked
+                          // rent tiers so the free-form option is never buried below
+                          // rows that only open the TCO model dialog.
+                          ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                            value: provider.value,
+                            label: locale === 'zh' ? provider.labelZh : provider.label,
+                          })),
                           ...lockedCostProviderOptions(locale),
-                          ...COST_PROVIDER_OPTIONS.filter((p) => p.value === 'custom').map(
-                            (provider) => ({
-                              value: provider.value,
-                              label: locale === 'zh' ? provider.labelZh : provider.label,
-                            }),
-                          ),
                         ]}
                         value={[costProvider]}
                         onChange={(values) => {
