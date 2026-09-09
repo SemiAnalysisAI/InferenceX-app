@@ -1,8 +1,6 @@
 import profileData from './system-power-model.profiles.json';
 
 export const SYSTEM_POWER_MODEL_REVISION = profileData.modelRevision;
-export const SYSTEM_POWER_MODEL_SOURCE = profileData.source;
-export const SYSTEM_POWER_MODEL_STATUS = profileData.status;
 export const SYSTEM_POWER_ASSUMPTIONS = profileData.assumptions;
 export const SYSTEM_POWER_PROFILES = profileData.profiles;
 export type SystemPowerHardware = keyof typeof SYSTEM_POWER_PROFILES;

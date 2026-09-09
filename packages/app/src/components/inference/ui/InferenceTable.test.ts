@@ -50,7 +50,7 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
-  it('shows modeled chassis AC units and sorts the supported estimates by ascending power', () => {
+  it('sorts supported modeled estimates by ascending power', () => {
     const definition = chartDefinitions[0];
     const metric = 'y_modeledChassisPowerPerGpu';
     const points = [
@@ -59,12 +59,6 @@ describe('InferenceTable sorting logic', () => {
     ];
     const sorted = sortRowsByYMetric(points, definition, metric);
     expect(sorted.map((point) => point.modeledChassisPowerPerGpu?.y)).toEqual([750, 1200]);
-    expect(inferenceTableModule.inferenceTableHeaderLabels(definition, metric, 'en').yMetric).toBe(
-      'Modeled Chassis AC Power per GPU (W/GPU)',
-    );
-    expect(inferenceTableModule.inferenceTableHeaderLabels(definition, metric, 'zh').yMetric).toBe(
-      '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
-    );
   });
 
   it('provides locale-aware table headers without changing the English source', () => {
