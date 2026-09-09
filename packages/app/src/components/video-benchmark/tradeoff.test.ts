@@ -222,10 +222,39 @@ describe('Serving matrix tradeoff metrics (synthetic contract fixture)', () => {
     const initial = tradeoffPoints(run)[0].group;
     const server = at(run.bundle.documents!.get('gpu/c2/spec.json'), 'server');
     replace(server, 'ulysses_degree', 4);
+    replace(server, 'attention_backend', 'aiter');
     expect(tradeoffPoints(run)[1].group).toBe(initial);
     replace(server, 'performance_mode', 'quality');
     expect(tradeoffPoints(run)[1].group).not.toBe(initial);
     expect(tradeoffPoints(run)[1].server).toEqual(server);
+  });
+  it('counts all eight AMD allocations only with a matching physical step inventory', () => {
+    const run = matrixFixture();
+    const ids = Array.from(
+      { length: 8 },
+      (_, i) => `75ff75a3-0000-1000-80e3-${String(i).padStart(12, '0')}`,
+    );
+    replace(run.bundle.ci ?? null, 'site', { cluster: 'mi355x-amds' });
+    replace(run.bundle.ci ?? null, 'slurm_job', {
+      AllocTRES: 'cpu=128,mem=512G,node=1,billing=128',
+      TresPerNode: 'gres/gpu:8',
+      OverSubscribe: 'NO',
+      NumNodes: '1',
+    });
+    run.bundle.documents!.set('binding.json', {
+      slurm: { H3_AMD_ALLOCATION_UUIDS: ids.join(',') },
+    });
+    run.bundle.documents!.set(
+      'amd-allocated-devices.json',
+      ids.map((uuid) => ({ uuid })),
+    );
+    expect(tradeoffPoints(run)[0].allocated).toBe(8);
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBe(3.75);
+    run.bundle.documents!.set(
+      'amd-allocated-devices.json',
+      ids.slice(1).map((uuid) => ({ uuid })),
+    );
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBeNull();
   });
   it('withholds incomplete latency data and invalid power without dropping their cells', () => {
     const run = matrixFixture();

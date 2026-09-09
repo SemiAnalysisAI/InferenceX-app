@@ -9,6 +9,7 @@ import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
 import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
 import type { ServingCell } from './serving';
+import { allocatedGpus } from './allocation';
 
 const STRINGS = {
   en: {
@@ -278,10 +279,7 @@ export default function ServingResults({
   const warmup = at(record, 'phase') === 'warmup';
   const telemetry = at(job, 'roles', 'baseline', 'telemetry_summary');
   const devices = rows(at(telemetry, 'gpu_identity'));
-  const allocatedMatch = /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
-    text(at(bundle.ci, 'slurm_job', 'AllocTRES')),
-  );
-  const allocated = number(allocatedMatch ? Number(allocatedMatch.groups?.count) : null);
+  const allocated = allocatedGpus(bundle);
   const gpuRate = (value: Json) =>
     allocated !== null && allocated > 0 ? multiply(value, 3600 / allocated) : null;
   const powerData = at(power, 'phases', phase);

@@ -14,6 +14,7 @@ import { servingCells, type ServingCell } from './serving';
 import { renderReportHtml } from './report';
 import { storedBundle, type StoredSource } from './stored';
 import ResultSummary from './ResultSummary';
+import { allocatedGpus } from './allocation';
 import {
   at,
   entries,
@@ -387,10 +388,8 @@ export default function VideoBenchmark({
         rows(at(bundle.report, 'roles', 'baseline', 'observations'))[0] ??
         rows(at(bundle.report, 'roles', 'candidate', 'observations'))[0];
       setSlot(text(at(first, 'slot_id')));
-      setBilled(
-        /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(text(at(bundle.ci, 'slurm_job', 'AllocTRES')))
-          ?.groups?.count ?? '',
-      );
+      const allocated = allocatedGpus(bundle);
+      setBilled(allocated === null ? '' : String(allocated));
       track('video_bundle_loaded');
     } catch (error) {
       urls.forEach(URL.revokeObjectURL);

@@ -1,5 +1,6 @@
 import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
 import { servingCells } from './serving';
+import { allocatedGpus } from './allocation';
 
 export interface TradeoffRun {
   bundle: Pick<Bundle, 'manifest' | 'result' | 'manifestSha256'> &
@@ -155,10 +156,7 @@ function servingTradeoffPoints(run: TradeoffRun) {
     manifest: b.manifest,
     ci: b.ci ?? null,
   });
-  const allocatedMatch = /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
-    text(at(b.ci, 'slurm_job', 'AllocTRES')),
-  );
-  const allocated = allocatedMatch ? positive(Number(allocatedMatch.groups?.count)) : null;
+  const allocated = allocatedGpus(b);
   return cells.map((item) => {
     const measurement = at(item.run, 'measurement');
     const server = at(item.spec, 'server');
@@ -187,7 +185,13 @@ function servingTradeoffPoints(run: TradeoffRun) {
       server: Object.fromEntries(
         entries(server).filter(
           ([key]) =>
-            !['tp_size', 'ulysses_degree', 'encoder_parallel', 'dit_cpu_offload'].includes(key),
+            ![
+              'tp_size',
+              'ulysses_degree',
+              'encoder_parallel',
+              'dit_cpu_offload',
+              'attention_backend',
+            ].includes(key),
         ),
       ),
     });
