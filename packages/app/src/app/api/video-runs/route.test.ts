@@ -1,13 +1,23 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
+import { readStoredArtifact, storedArtifacts, videoStorageEnabled } from '@/lib/video-storage';
 
+vi.mock('@/lib/video-storage', () => ({
+  videoStorageEnabled: vi.fn(() => false),
+  storedArtifacts: vi.fn(() => Promise.resolve([])),
+  readStoredArtifact: vi.fn(),
+  storeVideoArtifact: vi.fn(),
+}));
 const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 const response = (body: unknown, status = 200) => Response.json(body, { status });
 const request = (query = '') => new NextRequest(`http://localhost/api/video-runs${query}`);
 afterEach(() => {
   fetchMock.mockReset();
+  vi.mocked(videoStorageEnabled).mockReturnValue(false);
+  vi.mocked(storedArtifacts).mockResolvedValue([]);
+  vi.mocked(readStoredArtifact).mockReset();
   vi.restoreAllMocks();
 });
 
@@ -54,7 +64,7 @@ describe('H3 CI artifact access', () => {
     const deadline = new AbortController().signal;
     const timeout = vi
       .spyOn(AbortSignal, 'timeout')
-      .mockImplementation((ms) => (ms === 110000 ? deadline : new AbortController().signal));
+      .mockImplementation((ms) => (ms === 270000 ? deadline : new AbortController().signal));
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(
@@ -67,7 +77,7 @@ describe('H3 CI artifact access', () => {
       )
       .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
     const result = await GET(request('?run=10&artifact=20'));
-    expect(timeout).toHaveBeenCalledWith(110000);
+    expect(timeout).toHaveBeenCalledWith(270000);
     expect(fetchMock.mock.calls[2][1]?.signal).toBe(deadline);
     expect(fetchMock.mock.calls[0][1]?.signal).not.toBe(deadline);
     expect(result.headers.get('content-type')).toBe('application/zip');
@@ -98,6 +108,46 @@ describe('H3 CI artifact access', () => {
       run: { id: 10, conclusion: 'failure' },
       artifacts: [],
     });
+  });
+  it('falls back to the CI ZIP when object storage is not configured', async () => {
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(result.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('serves a persisted result without fetching an expired GitHub artifact', async () => {
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    const artifact = {
+      id: 20,
+      name: 'h3-results-10-1',
+      expired: false,
+      size_in_bytes: 4,
+      stored: true,
+    };
+    const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
+    vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(await result.json()).toEqual(saved);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('retains stored artifacts after GitHub removes them from the run', async () => {
+    const artifact = {
+      id: 20,
+      name: 'h3-results-10-1',
+      expired: false,
+      size_in_bytes: 0,
+      stored: true,
+    };
+    vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response({ id: 10, conclusion: 'success' }))
+      .mockResolvedValueOnce(response({ artifacts: [] }));
+    const result = await GET(request('?run=10'));
+    const data = await result.json();
+    expect(data.artifacts).toEqual([artifact]);
   });
   it('rejects invalid identifiers without making requests', async () => {
     const result5 = await GET(request('?run=../secret'));

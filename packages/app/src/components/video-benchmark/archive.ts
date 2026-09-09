@@ -6,6 +6,7 @@ export interface CIArtifact {
   expired: boolean;
   size_in_bytes: number;
   digest?: string;
+  stored?: boolean;
 }
 export interface CIRun {
   id: number;

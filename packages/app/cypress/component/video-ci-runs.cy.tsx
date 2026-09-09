@@ -15,6 +15,7 @@ const run = (id: number, conclusion: string) => ({
 
 describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
   beforeEach(() => {
+    cy.intercept('GET', '**/api/video-runs*format=media', { statusCode: 204 });
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
   });
   it('loads the newest run automatically and switches to a failed run without inventing media', () => {
@@ -37,8 +38,36 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.contains('No result artifact for this run yet').should('be.visible');
     cy.get('select[aria-label="CI run"]').select('10');
     cy.wait('@failed');
+    cy.contains('summary', 'Run details and artifact selection').click();
     cy.contains('a', '#10 · completed / failure').should('be.visible');
     cy.get('video').should('not.exist');
+  });
+  it('keeps the shared run selected when browsing the first catalog page', () => {
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?run=30`),
+    );
+    cy.intercept('GET', '/api/video-runs?run=30', { run: run(30, 'success'), artifacts: [] }).as(
+      'shared',
+    );
+    cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(20, 'success')], nextPage: 2 }).as(
+      'browse',
+    );
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@shared');
+    cy.get('select[aria-label="CI run"]').should('have.value', '30');
+    cy.contains('button', 'Older runs').should('not.exist');
+    cy.contains('button', 'Browse CI runs').click();
+    cy.wait('@browse');
+    cy.get('select[aria-label="CI run"]')
+      .should('have.value', '30')
+      .find('option[value="20"]')
+      .should('exist');
+    cy.contains('button', 'Older runs').should('be.visible');
+    cy.location('search').should('contain', 'run=30');
   });
   it('keeps a direct selection and its download active when an older catalog arrives', () => {
     let releaseList: (() => void) | undefined;
@@ -68,6 +97,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
       </PathnameContext.Provider>,
     );
     cy.wrap(null).should(() => expect(releaseList).to.be.a('function'));
+    cy.contains('summary', 'Run details and artifact selection').click();
     cy.get('input[aria-label="GitHub run ID"]').type('30');
     cy.contains('button', 'Open run').click();
     cy.wait('@direct');
@@ -75,9 +105,74 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.then(() => releaseList?.());
     cy.wait('@catalog');
     cy.get('select[aria-label="CI run"]').should('have.value', '30');
-    cy.get('[role="status"]').should('contain', 'Loading CI results');
+    cy.get('[role="status"]').should('be.visible');
     cy.wait('@zip');
     cy.get('[role="alert"]').should('contain', 'Synthetic download failure');
+  });
+  it('shows stored measurements without downloading the archive', () => {
+    const artifact = {
+      id: 40,
+      name: 'h3-results-30-1',
+      expired: false,
+      size_in_bytes: 100,
+      stored: true,
+    };
+    cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(30, 'success')], nextPage: null });
+    cy.intercept('GET', '/api/video-runs?run=30', {
+      run: run(30, 'success'),
+      artifacts: [artifact],
+    });
+    cy.intercept('GET', '/api/video-runs?run=30&artifact=40', () => {
+      throw new Error('Stored results must not fetch the ZIP');
+    });
+    cy.intercept('GET', '**/api/video-runs*format=media', {
+      storageVersion: 1,
+      runId: '30',
+      artifact,
+      sources: [
+        {
+          id: '30',
+          assets: [],
+          texts: [],
+          checksums: [['manifest.json', 'a'.repeat(64)]],
+          documents: [
+            ['manifest.json', { run_id: '30' }],
+            [
+              'ci.json',
+              { phase: 'complete', regression_status: 'inconclusive', release_qualified: false },
+            ],
+            [
+              'report/evidence.json',
+              {
+                policy: { calibration_status: 'uncalibrated' },
+                roles: {
+                  baseline: {
+                    summary: { latency_median_seconds: 150, valid_clips_per_second: 0.01 },
+                  },
+                  candidate: {
+                    summary: { latency_median_seconds: 120, valid_clips_per_second: 0.02 },
+                  },
+                },
+              },
+            ],
+          ],
+        },
+      ],
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="result-summary"]')
+      .should('contain', 'Media stored for direct playback')
+      .and('contain', 'uncalibrated');
+    cy.contains('tr', 'Latency')
+      .should('contain', '150')
+      .and('contain', '120')
+      .and('contain', '-20%');
+    cy.contains('tr', 'Valid clips').should('contain', '36').and('contain', '72');
+    cy.contains('tr', 'Mean GPU power').should('contain', 'Unavailable');
   });
   it('reports expiration without downloading or substituting another artifact', () => {
     cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(30, 'success')], nextPage: null });

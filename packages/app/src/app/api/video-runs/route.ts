@@ -1,9 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github-artifacts';
+import {
+  readStoredArtifact,
+  storedArtifacts,
+  storeVideoArtifact,
+  videoStorageEnabled,
+} from '@/lib/video-storage';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 300;
 const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
@@ -32,7 +38,7 @@ export async function GET(request: NextRequest) {
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
-  const deadline = AbortSignal.timeout(110000);
+  const deadline = AbortSignal.timeout(270000);
   try {
     // This public viewer must never expose artifacts from a repository that becomes private.
     const repository = await github('');
@@ -43,6 +49,16 @@ export async function GET(request: NextRequest) {
         { status: 503, headers },
       );
     if (artifactId) {
+      const media = query.get('format') === 'media';
+      if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
+      if (media) {
+        const saved = await storedArtifacts(runId!);
+        const stored = saved.find((a) => String(a.id) === artifactId);
+        if (stored) {
+          const result = await readStoredArtifact(runId!, stored);
+          if (result) return NextResponse.json(result, { headers });
+        }
+      }
       const metaResponse = await github(`/actions/artifacts/${artifactId}`);
       if (!metaResponse.ok)
         return NextResponse.json(
@@ -82,6 +98,15 @@ export async function GET(request: NextRequest) {
           },
         }),
       );
+      if (media) {
+        const result = await storeVideoArtifact(
+          runId!,
+          artifact,
+          await new Response(stream).blob(),
+          deadline,
+        );
+        return NextResponse.json(result, { headers });
+      }
       return new Response(stream, { headers: { ...headers, 'Content-Type': 'application/zip' } });
     }
     if (runId) {
@@ -95,10 +120,16 @@ export async function GET(request: NextRequest) {
       if (!artifactsResponse.ok)
         return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
       const data = await artifactsResponse.json();
+      const saved = await storedArtifacts(runId).catch(() => []);
       const artifacts = (data.artifacts ?? []).filter((a: { name: string }) => {
         const match = artifactName.exec(a.name);
         return match?.groups?.runId === runId;
       });
+      for (const stored of saved) {
+        const index = artifacts.findIndex((a: { id: number }) => a.id === stored.id);
+        if (index === -1) artifacts.push(stored);
+        else artifacts[index] = { ...artifacts[index], expired: false, stored: true };
+      }
       return NextResponse.json({ run: await runResponse.json(), artifacts }, { headers });
     }
     const response = await github(`/actions/runs?per_page=100&page=${page}`);
