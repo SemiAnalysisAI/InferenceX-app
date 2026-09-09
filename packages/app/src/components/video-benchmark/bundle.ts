@@ -75,7 +75,10 @@ export async function loadBundle(read: (path: string) => Promise<Blob>): Promise
       throw new Error('Bundle exceeds browser memory limit');
     if ((await sha256(blob)) !== hash) throw new Error(`SHA256 mismatch: ${path}`);
     files.set(path, blob);
-    if (path.endsWith('.json')) documents.set(path, JSON.parse(await blob.text()));
+    // Supervisor stdout may be empty or truncated when a request is interrupted.
+    // Retain and verify those raw logs without treating them as result documents.
+    if (path.endsWith('.json') && !path.endsWith('.stdout.json'))
+      documents.set(path, JSON.parse(await blob.text()));
   }
   const manifest = documents.get('manifest.json') ?? null;
   if (

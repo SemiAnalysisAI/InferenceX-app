@@ -1,5 +1,6 @@
 import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
 import { servingCells } from './serving';
+import { allocatedGpus } from './allocation';
 
 export interface TradeoffRun {
   bundle: Pick<Bundle, 'manifest' | 'result' | 'manifestSha256'> &
@@ -155,10 +156,7 @@ function servingTradeoffPoints(run: TradeoffRun) {
     manifest: b.manifest,
     ci: b.ci ?? null,
   });
-  const allocatedMatch = /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
-    text(at(b.ci, 'slurm_job', 'AllocTRES')),
-  );
-  const allocated = allocatedMatch ? positive(Number(allocatedMatch.groups?.count)) : null;
+  const allocated = allocatedGpus(b);
   return cells.map((item) => {
     const measurement = at(item.run, 'measurement');
     const server = at(item.spec, 'server');
@@ -187,7 +185,13 @@ function servingTradeoffPoints(run: TradeoffRun) {
       server: Object.fromEntries(
         entries(server).filter(
           ([key]) =>
-            !['tp_size', 'ulysses_degree', 'encoder_parallel', 'dit_cpu_offload'].includes(key),
+            ![
+              'tp_size',
+              'ulysses_degree',
+              'encoder_parallel',
+              'dit_cpu_offload',
+              'attention_backend',
+            ].includes(key),
         ),
       ),
     });
@@ -228,6 +232,33 @@ export type TradeoffPoint =
 export function tradeoffPoints(run: TradeoffRun): TradeoffPoint[] {
   const serving = servingTradeoffPoints(run);
   return serving.length > 0 ? serving : pairedTradeoffPoints(run);
+}
+
+export function tradeoffCurves<T extends TradeoffPoint & { x: number; y: number }>(
+  points: T[],
+): Record<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const p of points) {
+    if (!p.hardware || !p.revision) continue;
+    const key = canonical({
+      workload: p.group,
+      hardware: p.hardware,
+      revision: p.revision,
+      role: p.role,
+      allocated: p.allocated,
+      participating: p.participating,
+      server: p.server,
+    });
+    const group = groups.get(key);
+    if (group) group.push(p);
+    else groups.set(key, [p]);
+  }
+  return Object.fromEntries(
+    [...groups.values()].flatMap((group, index) => {
+      const curve = group.toSorted((a, b) => a.x - b.x);
+      return curve.length > 1 ? [[`curve-${index}`, curve]] : [];
+    }),
+  );
 }
 
 export function latencyValue(point: TradeoffPoint, axis: LatencyAxis): number | null {

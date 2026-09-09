@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { schemeTableau10, type Selection } from 'd3';
+import { curveLinear, schemeTableau10, type Selection } from 'd3';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
 import {
   tradeoffPoints,
+  tradeoffCurves,
   latencyValue,
   efficiencyValue,
   type TradeoffRun,
@@ -29,7 +30,7 @@ const STRINGS = {
     title: 'Video serving tradeoffs',
     subtitle: 'Compare identical workloads across hardware and runtime configurations.',
     scope:
-      'Runs you open are collected in this browser session. Reloading clears the comparison and cost assumptions.',
+      'Share this page’s link to reopen the same CI results. Cost assumptions stay in this browser session and reset on reload.',
     workload: 'Matched workload',
     x: 'Latency axis · lower is better',
     y: 'Efficiency axis · higher is better',
@@ -94,14 +95,16 @@ const STRINGS = {
     deliveryBoundary: 'Submission to downloaded media; local validation excluded',
     load: 'Load pattern',
     closedLoop: 'Closed loop',
-    observed: 'Observed points; no fitted frontier or hardware winner.',
+    observed:
+      'Lines connect measured concurrency settings for each hardware/runtime configuration. Select any dot for its videos, metrics and exact CI run.',
     controls:
       'Shift+scroll to zoom; drag to pan; double-click to reset. Select a point or table row for details.',
   },
   zh: {
     title: '视频服务延迟与效率权衡',
     subtitle: '在相同工作负载下比较硬件与运行时配置。',
-    scope: '打开的运行会加入当前浏览器会话；刷新页面将清除对比集合与成本假设。',
+    scope:
+      '分享当前页面链接即可重新打开同一组 CI 结果。成本假设仅保留在当前浏览器会话中，刷新后重置。',
     workload: '匹配的工作负载',
     x: '延迟轴 · 越低越好',
     y: '效率轴 · 越高越好',
@@ -166,7 +169,8 @@ const STRINGS = {
     deliveryBoundary: '从提交到媒体下载完成；不含本地验证',
     load: '负载模式',
     closedLoop: '闭环',
-    observed: '仅显示观测点，不拟合前沿曲线，也不判定硬件优胜者。',
+    observed:
+      '线条连接同一硬件与运行时配置下各并发数的实测结果。点击任意数据点，即可查看视频、指标及对应的 CI 运行。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。选择数据点或表格行查看详情。',
   },
 };
@@ -195,14 +199,20 @@ export default function VideoTradeoff({
     ? workload
     : (all.find((p) => p.sourceId === sourceId)?.group ?? groups[0]?.[0]);
   const points = all.filter((p) => p.group === group);
-  const active = points.find((p) => p.id === selected) ?? points[0];
+  const active =
+    points.find((p) => p.id === selected) ??
+    points.find((p) => p.sourceId === sourceId) ??
+    points[0];
   const isServing = points.some((p) => p.role === 'serving');
-  const xAxis = latencyAxis ?? (isServing ? 'median' : 'p90');
+  const xAxis =
+    latencyAxis ??
+    (isServing && !points.some((p) => latencyValue(p, 'p90') !== null) ? 'median' : 'p90');
   const plotted = points.flatMap((p) => {
     const x = latencyValue(p, xAxis),
       y = efficiencyValue(p, yAxis, costs[p.id]);
     return p.completeWorkload && x !== null && y !== null ? [{ ...p, x, y }] : [];
   });
+  const curves = tradeoffCurves(plotted);
   const drawPointLabels = (
     labelGroup: Selection<SVGGElement, unknown, null, undefined>,
     x: ContinuousScale,
@@ -319,6 +329,16 @@ export default function VideoTradeoff({
               xAxis={{ label: s[xAxis], tickCount: 5 }}
               yAxis={{ label: s[yAxis], tickCount: 5 }}
               layers={[
+                {
+                  type: 'line',
+                  key: 'measured-curves',
+                  lines: curves,
+                  config: {
+                    getColor: (key) => color(curves[key][0]),
+                    strokeWidth: 2.5,
+                    curve: curveLinear,
+                  },
+                },
                 {
                   type: 'point',
                   data: plotted,

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   tradeoffPoints,
+  tradeoffCurves,
   latencyValue,
   efficiencyValue,
   costValue,
@@ -79,6 +80,42 @@ function fixture(
   };
 }
 const cost = { hourly: '2', source: 'Synthetic all-in cost', date: '2026-09-09' };
+
+it('connects measured load settings within a known configuration, including dominated points', () => {
+  const base = { ...tradeoffPoints(fixture())[0], revision: 'synthetic-runtime' };
+  const c1 = { ...base, id: 'c1', concurrency: 1, x: 119.5, y: 15.062 };
+  const c2 = { ...base, id: 'c2', concurrency: 2, x: 237.7, y: 15.129 };
+  const c4 = { ...base, id: 'c4', concurrency: 4, x: 297.7, y: 15.134 };
+  const points = [
+    c4,
+    { ...c2, id: 'slower', x: 280 },
+    { ...c1, id: 'less-efficient', y: 14 },
+    c1,
+    c2,
+    { ...c4, id: 'tied-efficiency', x: 320 },
+  ];
+  expect(Object.values(tradeoffCurves(points))).toEqual([
+    [points[2], c1, c2, points[1], c4, points[5]],
+  ]);
+  expect(points[0]).toBe(c4);
+  for (const change of [
+    { hardware: 'Other GPU' },
+    { revision: 'other-runtime' },
+    { group: 'other-workload' },
+    { allocated: 16 },
+    { participating: 2 },
+    { server: { tp_size: 2 } },
+    { hardware: '' },
+    { revision: '' },
+  ]) {
+    expect(tradeoffCurves([c1, { ...c2, ...change }])).toEqual({});
+  }
+  const flat = { ...c2, y: c1.y };
+  expect(Object.values(tradeoffCurves([c1, flat]))).toEqual([[c1, flat]]);
+  const splitRun = { ...c4, sourceId: 'another-ci-run' };
+  expect(Object.values(tradeoffCurves([c1, c2, splitRun]))).toEqual([[c1, c2, splitRun]]);
+  expect(tradeoffCurves([])).toEqual({});
+});
 
 describe('H3 tradeoff metrics (synthetic result-contract fixtures)', () => {
   it('uses nearest-rank P90 and excludes warmup while preserving failures', () => {
@@ -222,10 +259,39 @@ describe('Serving matrix tradeoff metrics (synthetic contract fixture)', () => {
     const initial = tradeoffPoints(run)[0].group;
     const server = at(run.bundle.documents!.get('gpu/c2/spec.json'), 'server');
     replace(server, 'ulysses_degree', 4);
+    replace(server, 'attention_backend', 'aiter');
     expect(tradeoffPoints(run)[1].group).toBe(initial);
     replace(server, 'performance_mode', 'quality');
     expect(tradeoffPoints(run)[1].group).not.toBe(initial);
     expect(tradeoffPoints(run)[1].server).toEqual(server);
+  });
+  it('counts all eight AMD allocations only with a matching physical step inventory', () => {
+    const run = matrixFixture();
+    const ids = Array.from(
+      { length: 8 },
+      (_, i) => `75ff75a3-0000-1000-80e3-${String(i).padStart(12, '0')}`,
+    );
+    replace(run.bundle.ci ?? null, 'site', { cluster: 'mi355x-amds' });
+    replace(run.bundle.ci ?? null, 'slurm_job', {
+      AllocTRES: 'cpu=128,mem=512G,node=1,billing=128',
+      TresPerNode: 'gres/gpu:8',
+      OverSubscribe: 'NO',
+      NumNodes: '1',
+    });
+    run.bundle.documents!.set('binding.json', {
+      slurm: { H3_AMD_ALLOCATION_UUIDS: ids.join(',') },
+    });
+    run.bundle.documents!.set(
+      'amd-allocated-devices.json',
+      ids.map((uuid) => ({ uuid })),
+    );
+    expect(tradeoffPoints(run)[0].allocated).toBe(8);
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBe(3.75);
+    run.bundle.documents!.set(
+      'amd-allocated-devices.json',
+      ids.slice(1).map((uuid) => ({ uuid })),
+    );
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBeNull();
   });
   it('withholds incomplete latency data and invalid power without dropping their cells', () => {
     const run = matrixFixture();

@@ -23,7 +23,7 @@ vi.mock('@vercel/blob', async (original) => ({
 }));
 const artifact = { id: 20, name: 'h3-video-10-1', size_in_bytes: 100, expired: false };
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
-function archive(corrupt = false) {
+function archive(corrupt = false, extra: Record<string, string> = {}) {
   const files = {
     'manifest.json': JSON.stringify({
       schema_version: 1,
@@ -33,6 +33,7 @@ function archive(corrupt = false) {
       ci: { repository: 'SemiAnalysisAI/InferenceX' },
     }),
     'synthetic.mp4': 'Synthetic test bytes, not a playable benchmark clip',
+    ...extra,
   };
   const sums = Object.entries(files)
     .map(([path, body]) => `${digest(body)}  ${path}`)
@@ -92,6 +93,48 @@ describe('persistent H3 media', () => {
     const bundle = storedBundle(source);
     expect(bundle.manifestSha256).toHaveLength(64);
     expect(bundle.files.has('synthetic.mp4')).toBe(false);
+  });
+  it('keeps serving telemetry downloadable without embedding it in the page data', async () => {
+    const serving = 'gpu/c1/supervisor/baseline/telemetry.jsonl';
+    const legacy = 'gpu/supervisor/baseline/telemetry.jsonl';
+    const result = await storeVideoArtifact(
+      '10',
+      artifact,
+      archive(false, { [serving]: 'synthetic serving log', [legacy]: 'synthetic legacy log' }),
+      new AbortController().signal,
+    );
+    expect(result.sources[0].texts).toEqual([[legacy, 'synthetic legacy log']]);
+    expect(result.sources[0].assets.some(([path]) => path === serving)).toBe(true);
+    expect(result.sources[0].checksums).toContainEqual([serving, digest('synthetic serving log')]);
+  });
+  it('removes embedded serving logs from existing indexes while preserving downloads', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const path = 'gpu/c2/supervisor/baseline/telemetry.jsonl';
+    const assets = [
+      [path, { url: 'https://media.test/raw', downloadUrl: 'https://media.test/raw?download=1' }],
+    ];
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        storageVersion: 1,
+        runId: '10',
+        artifact,
+        sources: [
+          {
+            id: '10',
+            documents: [],
+            checksums: [],
+            assets,
+            texts: [
+              [path, 'old embedded log'],
+              ['report/index.html', '<p>Report</p>'],
+            ],
+          },
+        ],
+      }),
+    );
+    const result = await readStoredArtifact('10', artifact);
+    expect(result?.sources[0].texts).toEqual([['report/index.html', '<p>Report</p>']]);
+    expect(result?.sources[0].assets).toEqual(assets);
   });
   it('reuses an immutable object regardless of SDK conflict wording', async () => {
     vi.mocked(put).mockRejectedValueOnce(new Error('Different SDK conflict wording'));

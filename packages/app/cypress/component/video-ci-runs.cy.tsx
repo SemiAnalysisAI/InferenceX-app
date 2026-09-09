@@ -2,48 +2,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
 import ResultPower from '@/components/video-benchmark/ResultPower';
 import VideoSelect from '@/components/video-benchmark/VideoSelect';
-import { servingFixture } from '@/components/video-benchmark/serving.fixture';
-import type { StoredArtifact } from '@/components/video-benchmark/stored';
-
-function servingArtifact(): StoredArtifact {
-  const fixture = servingFixture();
-  fixture.documents.set('manifest.json', fixture.manifest);
-  fixture.documents.set('ci.json', fixture.ci);
-  fixture.checksums.set('manifest.json', 'a'.repeat(64));
-  return {
-    storageVersion: 1,
-    runId: '123',
-    artifact: { id: 40, name: 'h3-video-123-1', expired: false, size_in_bytes: 100, stored: true },
-    sources: [
-      {
-        id: '123',
-        documents: [...fixture.documents],
-        checksums: [...fixture.checksums],
-        texts: [],
-        assets: [...fixture.checksums.keys()]
-          .filter((path) => path.endsWith('.mp4'))
-          .map((path) => [
-            path,
-            {
-              url: `https://media.test/${path}`,
-              downloadUrl: `https://media.test/${path}?download=1`,
-            },
-          ]),
-      },
-    ],
-  };
-}
-
-const run = (id: number, conclusion: string) => ({
-  id,
-  name: `H3 fixture ${id}`,
-  run_attempt: 1,
-  head_sha: 'a'.repeat(40),
-  created_at: '2026-09-09T00:00:00Z',
-  status: 'completed',
-  conclusion,
-  html_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`,
-});
+import { servingArtifact, videoRun as run } from '../support/video-artifacts';
 
 describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
   beforeEach(() => {

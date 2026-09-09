@@ -137,6 +137,29 @@ const matrix = (): TradeoffRun => ({
 });
 
 describe('Video serving matrix chart (synthetic contract fixture)', () => {
+  it('defaults to P90 when individual serving cells have enough samples', () => {
+    const formal = matrix();
+    formal.bundle = {
+      ...servingFixture('123', 'NVIDIA H200', 20),
+      result: null,
+      manifestSha256: 'synthetic-formal',
+    };
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[formal]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'P90 client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.get('tbody tr')
+      .should('have.length', 3)
+      .each((row) => {
+        cy.wrap(row).should('contain', '20 / 20 / 20');
+      });
+  });
   it('shows three labeled cell medians and opens the selected concurrency result', () => {
     const open = cy.stub().as('openCell');
     cy.mount(
@@ -149,6 +172,23 @@ describe('Video serving matrix chart (synthetic contract fixture)', () => {
       'Median client-ready latency (s)',
     );
     cy.get('circle.point').should('have.length', 3);
+    cy.get('path.line-path')
+      .should('have.length', 1)
+      .invoke('attr', 'd')
+      .should('match', /^M[^L]+L[^L]+L[^L]+$/u);
+    cy.contains('Lines connect measured concurrency settings').should('be.visible');
+    cy.get('path.line-path')
+      .invoke('attr', 'd')
+      .then((before) => {
+        cy.get('[data-testid="video-tradeoff-chart"] svg').trigger('wheel', {
+          deltaY: -200,
+          shiftKey: true,
+          clientX: 400,
+          clientY: 300,
+          force: true,
+        });
+        cy.get('path.line-path').invoke('attr', 'd').should('not.equal', before);
+      });
     cy.get('text.serving-point-label')
       .should('have.length', 3)
       .then((labels) => {
@@ -163,9 +203,11 @@ describe('Video serving matrix chart (synthetic contract fixture)', () => {
     cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').click();
     cy.contains('[role="option"]', 'P90 client-ready latency (s)').click();
     cy.get('circle.point').should('not.exist');
+    cy.get('path.line-path').should('not.exist');
     cy.contains('No points qualify for these axes yet.').should('be.visible');
     cy.contains('button', 'Show cell medians').click();
     cy.get('circle.point').should('have.length', 3);
+    cy.get('path.line-path').should('have.length', 1);
     cy.contains('tbody button', 'Client concurrency 4').click();
     cy.contains('button', 'Open videos and full result').click();
     cy.get('@openCell')
@@ -184,6 +226,8 @@ describe('Video serving matrix chart (synthetic contract fixture)', () => {
       '客户端就绪延迟中位数（秒）',
     );
     cy.get('circle.point').should('have.length', 3);
+    cy.get('path.line-path').should('have.length', 1);
+    cy.contains('各并发数的实测结果').should('be.visible');
     cy.contains('客户端并发数 2').should('be.visible');
     cy.contains('闭环冒烟测试 · 服务容量未经验证').should('be.visible');
   });
