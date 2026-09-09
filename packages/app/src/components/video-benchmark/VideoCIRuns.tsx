@@ -148,13 +148,15 @@ export default function VideoCIRuns() {
     }
   }
   async function list(page: number, auto = false) {
-    const selectionAtStart = request.current;
+    const current = ++request.current;
+    download.current?.abort();
     setLoading(true);
     setError('');
     try {
       const data: { runs: CIRun[]; nextPage: number | null } = await json(
         `/api/video-runs?page=${page}`,
       );
+      if (current !== request.current) return;
       setRuns((old) =>
         page === 1
           ? data.runs
@@ -171,15 +173,16 @@ export default function VideoCIRuns() {
         await list(data.nextPage, true);
         return;
       }
-      if (auto && selectionAtStart === request.current) {
+      if (auto) {
         const params = new URLSearchParams(location.search);
         const selected = params.get('run') ?? (data.runs[0] ? String(data.runs[0].id) : null);
         if (selected) await selectRun(selected, params.get('artifact'), params.get('source'));
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      if (current === request.current)
+        setError(error instanceof Error ? error.message : String(error));
     } finally {
-      setLoading(false);
+      if (current === request.current) setLoading(false);
     }
   }
   useEffect(() => {

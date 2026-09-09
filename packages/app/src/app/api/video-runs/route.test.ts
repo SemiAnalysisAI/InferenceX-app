@@ -6,7 +6,10 @@ const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 const response = (body: unknown, status = 200) => Response.json(body, { status });
 const request = (query = '') => new NextRequest(`http://localhost/api/video-runs${query}`);
-afterEach(() => fetchMock.mockReset());
+afterEach(() => {
+  fetchMock.mockReset();
+  vi.restoreAllMocks();
+});
 
 describe('H3 CI artifact access', () => {
   it('discovers benchmark runs without including branch-named unit jobs', async () => {
@@ -47,7 +50,11 @@ describe('H3 CI artifact access', () => {
     const result3 = await GET(request('?run=10&artifact=20'));
     expect(result3.status).toBe(410);
   });
-  it('streams the verified run artifact through a fixed GitHub API path', async () => {
+  it('streams the verified run artifact with a deadline longer than metadata requests', async () => {
+    const deadline = new AbortController().signal;
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation((ms) => (ms === 110000 ? deadline : new AbortController().signal));
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(
@@ -60,6 +67,9 @@ describe('H3 CI artifact access', () => {
       )
       .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
     const result = await GET(request('?run=10&artifact=20'));
+    expect(timeout).toHaveBeenCalledWith(110000);
+    expect(fetchMock.mock.calls[2][1]?.signal).toBe(deadline);
+    expect(fetchMock.mock.calls[0][1]?.signal).not.toBe(deadline);
     expect(result.headers.get('content-type')).toBe('application/zip');
     expect([...new Uint8Array(await result.arrayBuffer())]).toEqual([80, 75, 3, 4]);
     expect(String(fetchMock.mock.calls[2][0])).toBe(

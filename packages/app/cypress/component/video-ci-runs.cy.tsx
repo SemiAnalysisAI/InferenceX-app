@@ -40,6 +40,45 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.contains('a', '#10 · completed / failure').should('be.visible');
     cy.get('video').should('not.exist');
   });
+  it('keeps a direct selection and its download active when an older catalog arrives', () => {
+    let releaseList: (() => void) | undefined;
+    cy.intercept(
+      'GET',
+      '/api/video-runs?page=1',
+      (req) =>
+        new Promise<void>((resolve) => {
+          releaseList = () => {
+            req.reply({ runs: [run(20, 'success')], nextPage: null });
+            resolve();
+          };
+        }),
+    ).as('catalog');
+    cy.intercept('GET', '/api/video-runs?run=30', {
+      run: run(30, 'success'),
+      artifacts: [{ id: 40, name: 'h3-results-30-1', expired: false, size_in_bytes: 100 }],
+    }).as('direct');
+    cy.intercept('GET', '/api/video-runs?run=30&artifact=40', {
+      delay: 3000,
+      statusCode: 502,
+      body: { error: 'Synthetic download failure' },
+    }).as('zip');
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wrap(null).should(() => expect(releaseList).to.be.a('function'));
+    cy.get('input[aria-label="GitHub run ID"]').type('30');
+    cy.contains('button', 'Open run').click();
+    cy.wait('@direct');
+    cy.get('select[aria-label="Result artifact"]').should('have.value', '40');
+    cy.then(() => releaseList?.());
+    cy.wait('@catalog');
+    cy.get('select[aria-label="CI run"]').should('have.value', '30');
+    cy.get('[role="status"]').should('contain', 'Loading CI results');
+    cy.wait('@zip');
+    cy.get('[role="alert"]').should('contain', 'Synthetic download failure');
+  });
   it('reports expiration without downloading or substituting another artifact', () => {
     cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(30, 'success')], nextPage: null });
     cy.intercept('GET', '/api/video-runs?run=30', {

@@ -10,7 +10,7 @@ const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
 const artifactName = /^h3-(?:results|video)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
-function github(path: string) {
+function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
   return fetch(`${ROOT}${path}`, {
     headers: {
@@ -18,7 +18,7 @@ function github(path: string) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     cache: 'no-store',
-    signal: AbortSignal.timeout(30000),
+    signal,
   });
 }
 
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
+  const deadline = AbortSignal.timeout(110000);
   try {
     // This public viewer must never expose artifacts from a repository that becomes private.
     const repository = await github('');
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
           { error: 'Artifact exceeds the 256 MiB viewer limit' },
           { status: 413, headers },
         );
-      const zip = await github(`/actions/artifacts/${artifactId}/zip`);
+      const zip = await github(`/actions/artifacts/${artifactId}/zip`, deadline);
       if (!zip.ok || !zip.body)
         return NextResponse.json(
           { error: `Artifact download failed (${zip.status})` },
