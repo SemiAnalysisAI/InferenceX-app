@@ -321,3 +321,32 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 });
+
+describe('H3 video artifact viewer', () => {
+  it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
+    cy.viewport(1440, 1000);
+    cy.visit('/video', {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    cy.get('[data-testid="video-benchmark"]').should('contain', 'Open a real CI result to begin');
+    cy.get('video[data-role]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').click();
+    cy.contains('a', 'Video').should('have.attr', 'href', '/video');
+    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
+  });
+  it('shows a recoverable load error and the Chinese empty state', () => {
+    cy.visit('/video');
+    cy.get('[data-testid="video-benchmark"]').contains('summary', 'Manifest URL').click();
+    cy.get('input[aria-label="Manifest URL"]').type('https://example.com/wrong.json');
+    cy.contains('button', 'Load manifest').click();
+    cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
+    cy.get('video[data-role]').should('not.exist');
+    cy.visit('/zh/video');
+    cy.get('[data-testid="video-benchmark"]').should('contain', '打开真实 CI 结果开始查看');
+    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
+  });
+});
