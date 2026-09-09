@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
@@ -61,8 +62,8 @@ const STRINGS = {
   },
 };
 
-async function json(url: string) {
-  const response = await fetch(url, { cache: 'no-store' });
+async function json(url: string, signal?: AbortSignal) {
+  const response = await fetch(url, { signal, cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
   return data;
@@ -100,20 +101,22 @@ export default function VideoCIRuns() {
     selectedRun: CIRun,
     selected: CIArtifact,
     current: number,
+    controller: AbortController,
     source?: string,
+    prepared?: Promise<Response | null>,
   ) {
     setArtifact(selected);
     setSources([]);
-    const controller = new AbortController();
-    download.current = controller;
     setProgress(s.preparing);
     const endpoint = `/api/video-runs?run=${selectedRun.id}&artifact=${selected.id}`;
     let found:
       | { id: string; read?: (path: string) => Promise<Blob>; stored?: StoredSource }[]
       | null = null;
     try {
-      const response = await fetch(`${endpoint}&format=media`, { signal: controller.signal });
-      if (response.ok && response.status !== 204) {
+      const response = prepared
+        ? await prepared
+        : await fetch(`${endpoint}&format=media`, { signal: controller.signal });
+      if (response?.ok && response.status !== 204) {
         const saved: StoredArtifact = await response.json();
         if (
           saved.storageVersion !== 1 ||
@@ -170,9 +173,18 @@ export default function VideoCIRuns() {
     setSources([]);
     setArtifact(null);
     setArtifacts([]);
+    const controller = new AbortController();
+    download.current = controller;
+    const prepared = artifactId
+      ? fetch(
+          `/api/video-runs?run=${encodeURIComponent(runId)}&artifact=${encodeURIComponent(artifactId)}&format=media`,
+          { signal: controller.signal },
+        ).catch(() => null)
+      : undefined;
     try {
       const data: { run: CIRun; artifacts: CIArtifact[] } = await json(
         `/api/video-runs?run=${encodeURIComponent(runId)}`,
+        controller.signal,
       );
       if (current !== request.current) return;
       setRun(data.run);
@@ -188,7 +200,15 @@ export default function VideoCIRuns() {
               b.id - a.id,
           )[0];
       share(data.run.id);
-      if (selected) await loadArtifact(data.run, selected, current, source ?? undefined);
+      if (selected)
+        await loadArtifact(
+          data.run,
+          selected,
+          current,
+          controller,
+          source ?? undefined,
+          String(selected.id) === artifactId ? prepared : undefined,
+        );
     } catch (error) {
       if (current === request.current)
         setError(error instanceof Error ? error.message : String(error));
@@ -248,18 +268,40 @@ export default function VideoCIRuns() {
   }, []);
   const selectedSource = sources.find((item) => item.id === sourceId);
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-6" data-testid="video-ci-runs">
-      <Card className="gap-3 p-4">
-        <Heading as="h1" level="section">
-          {s.title}
-        </Heading>
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-ci-runs">
+      <Card className="min-w-0 gap-3 p-4">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <Heading as="h1" level="section">
+            {s.title}
+          </Heading>
+          <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto">
+            <Button
+              className="min-w-0 flex-1 sm:flex-none"
+              variant="outline"
+              disabled={loading}
+              onClick={() => void list(1, true)}
+            >
+              {s.refresh}
+            </Button>
+            {nextPage && (
+              <Button
+                className="min-w-0 flex-1 sm:flex-none"
+                variant="outline"
+                disabled={loading}
+                onClick={() => void list(nextPage)}
+              >
+                {nextPage === 1 ? s.browse : s.older}
+              </Button>
+            )}
+          </div>
+        </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-0 flex-1 space-y-1 text-sm">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <label className="min-w-0 space-y-2 text-sm font-medium">
             {s.select}
             <select
               aria-label={s.select}
-              className="w-full rounded border bg-background p-2"
+              className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:ring-2 focus-visible:ring-ring"
               value={run?.id ?? ''}
               onChange={(e) => void selectRun(e.target.value)}
             >
@@ -268,17 +310,17 @@ export default function VideoCIRuns() {
               </option>
               {runs.map((r) => (
                 <option key={r.id} value={r.id}>
-                  #{r.id} · {r.name} · {r.conclusion ?? r.status}
+                  #{r.id} · {r.conclusion ?? r.status}
                 </option>
               ))}
             </select>
           </label>
           {sources.length > 1 && (
-            <label className="w-full min-w-0 space-y-1 text-sm sm:w-52">
+            <label className="min-w-0 space-y-2 text-sm font-medium">
               {s.source}
               <select
                 aria-label={s.source}
-                className="w-full rounded border bg-background p-2"
+                className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:ring-2 focus-visible:ring-ring"
                 value={sourceId}
                 onChange={(e) => {
                   setSourceId(e.target.value);
@@ -293,15 +335,15 @@ export default function VideoCIRuns() {
               </select>
             </label>
           )}
-          <Button variant="outline" disabled={loading} onClick={() => void list(1, true)}>
-            {s.refresh}
-          </Button>
-          {nextPage && (
-            <Button variant="outline" disabled={loading} onClick={() => void list(nextPage)}>
-              {nextPage === 1 ? s.browse : s.older}
-            </Button>
-          )}
         </div>
+        {run && (
+          <p
+            className="min-w-0 break-words text-sm text-muted-foreground"
+            data-testid="selected-run-title"
+          >
+            {run.name}
+          </p>
+        )}
         {runs.length === 0 && !loading && <p>{s.empty}</p>}
         <details>
           <summary className="cursor-pointer text-sm text-muted-foreground">{s.advanced}</summary>
@@ -342,7 +384,7 @@ export default function VideoCIRuns() {
               {s.artifact}
               <select
                 aria-label={s.artifact}
-                className="mt-1 w-full rounded border bg-background p-2"
+                className="mt-2 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
                 value={artifact?.id ?? ''}
                 onChange={(e) => run && void selectRun(String(run.id), e.target.value)}
               >
@@ -386,6 +428,13 @@ export default function VideoCIRuns() {
         )}
         {run && !loading && !loadError && artifacts.length === 0 && <p>{s.none}</p>}
       </Card>
+      {loading && !selectedSource && (
+        <div className="grid gap-4 lg:grid-cols-3" aria-hidden="true">
+          <Skeleton className="h-72" />
+          <Skeleton className="aspect-video" />
+          <Skeleton className="aspect-video" />
+        </div>
+      )}
       {selectedSource && (
         <VideoBenchmark
           key={`${artifact?.id}-${sourceId}`}

@@ -25,6 +25,7 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
           expired: false,
           size_in_bytes: 0,
           stored: true,
+          indexUrl: blob.url,
         });
     }
     cursor = page.hasMore ? page.cursor : undefined;
@@ -37,8 +38,12 @@ export async function readStoredArtifact(
 ): Promise<StoredArtifact | null> {
   if (!videoStorageEnabled()) return null;
   try {
-    const meta = await head(`${runPrefix(runId)}${artifact.name}_${artifact.id}.json`);
-    const response = await fetch(meta.url);
+    let url = artifact.indexUrl;
+    if (!url) {
+      const meta = await head(`${runPrefix(runId)}${artifact.name}_${artifact.id}.json`);
+      url = meta.url;
+    }
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new Error('Stored result unavailable');
     const result: StoredArtifact = await response.json();
     if (result.storageVersion !== 1 || result.runId !== runId || result.artifact.id !== artifact.id)

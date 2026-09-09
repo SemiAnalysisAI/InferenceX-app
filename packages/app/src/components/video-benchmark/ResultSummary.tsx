@@ -68,10 +68,11 @@ const STRINGS = {
     counts: '计数仅涵盖正式测量时段，不含 warmup。',
   },
 };
+const fmt = (v: number | null, digits = 2) =>
+  v === null ? '—' : v.toLocaleString('en-US', { maximumFractionDigits: digits });
+
 export default function ResultSummary({ bundle: b, stored }: { bundle: Bundle; stored: boolean }) {
   const s = STRINGS[useLocale()];
-  const fmt = (v: number | null, digits = 2) =>
-    v === null ? s.missing : v.toLocaleString('en-US', { maximumFractionDigits: digits });
   const roleMetric = (role: string, metric: string): number | null => {
     const summary = at(b.report, 'roles', role, 'summary');
     const phase = at(b.result, 'roles', role, 'power', 'phases', 'measurement');
@@ -173,9 +174,9 @@ export default function ResultSummary({ bundle: b, stored }: { bundle: Bundle; s
           <thead>
             <tr className="border-b text-xs text-muted-foreground">
               <th className="pb-2 font-normal">{s.metric}</th>
-              <th className="pb-2 text-right font-normal">{s.baseline}</th>
-              <th className="pb-2 text-right font-normal">{s.candidate}</th>
-              <th className="pb-2 text-right font-normal">{s.change}</th>
+              <th className="pb-2 pl-3 text-right font-normal">{s.baseline}</th>
+              <th className="pb-2 pl-3 text-right font-normal">{s.candidate}</th>
+              <th className="pb-2 pl-3 text-right font-normal">{s.change}</th>
             </tr>
           </thead>
           <tbody>
@@ -196,16 +197,23 @@ export default function ResultSummary({ bundle: b, stored }: { bundle: Bundle; s
                   : null;
               return (
                 <tr key={metric} className="border-b last:border-0">
-                  <th className="py-2 pr-3 font-normal">
+                  <th className="py-2 pr-3 font-normal" title={hint || undefined}>
                     <span className="font-medium">{label}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {unit}
-                      {hint ? ` · ${hint}` : ''}
-                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{unit}</span>
                   </th>
-                  <td className="px-2 py-2 text-right">{fmt(baseline)}</td>
-                  <td className="px-2 py-2 text-right font-semibold">{fmt(candidate)}</td>
-                  <td className="pl-2 py-2 text-right text-muted-foreground">
+                  <td
+                    className="whitespace-nowrap px-2 py-2 text-right"
+                    aria-label={baseline === null ? s.missing : undefined}
+                  >
+                    {baseline === null ? '—' : fmt(baseline)}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-2 py-2 text-right font-semibold"
+                    aria-label={candidate === null ? s.missing : undefined}
+                  >
+                    {candidate === null ? '—' : fmt(candidate)}
+                  </td>
+                  <td className="whitespace-nowrap pl-2 py-2 text-right text-muted-foreground">
                     {change === null ? '—' : `${change > 0 ? '+' : ''}${fmt(change)}%`}
                   </td>
                 </tr>
@@ -221,7 +229,11 @@ export default function ResultSummary({ bundle: b, stored }: { bundle: Bundle; s
         </table>
       </div>
       <p className="text-xs text-muted-foreground">
-        {s.counts} {s.noClaim}
+        — = {s.missing}
+        <br />
+        {s.counts}
+        <br />
+        {s.noClaim}
       </p>
       <details>
         <summary className="cursor-pointer text-xs text-muted-foreground">

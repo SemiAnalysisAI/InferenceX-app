@@ -149,6 +149,23 @@ describe('H3 CI artifact access', () => {
     const data = await result.json();
     expect(data.artifacts).toEqual([artifact]);
   });
+  it('loads independent run lookups together after checking repository visibility', async () => {
+    let finishRun!: (response: Response) => void;
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishRun = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(response({ artifacts: [] }));
+    const pending = GET(request('?run=10'));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/actions/runs/10/artifacts');
+    finishRun(response({ id: 10 }));
+    const result = await pending;
+    expect(result.status).toBe(200);
+  });
   it('rejects invalid identifiers without making requests', async () => {
     const result5 = await GET(request('?run=../secret'));
     expect(result5.status).toBe(400);

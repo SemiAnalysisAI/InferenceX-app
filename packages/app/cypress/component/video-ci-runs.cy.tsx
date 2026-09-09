@@ -42,6 +42,49 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.contains('a', '#10 · completed / failure').should('be.visible');
     cy.get('video').should('not.exist');
   });
+  it('starts shared-artifact loading before run metadata finishes', () => {
+    let releaseRun: (() => void) | undefined;
+    let mediaStarted = false;
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?run=30&artifact=40`),
+    );
+    cy.intercept(
+      'GET',
+      '/api/video-runs?run=30',
+      (req) =>
+        new Promise<void>((resolve) => {
+          releaseRun = () => {
+            req.reply({
+              run: run(30, 'success'),
+              artifacts: [{ id: 40, name: 'h3-results-30-1', expired: false, size_in_bytes: 100 }],
+            });
+            resolve();
+          };
+        }),
+    );
+    cy.intercept('GET', '**/api/video-runs*format=media', (req) => {
+      mediaStarted = true;
+      req.reply({ statusCode: 204 });
+    });
+    cy.intercept('GET', '/api/video-runs?run=30&artifact=40', {
+      statusCode: 502,
+      body: { error: 'Synthetic ZIP fallback' },
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wrap(null).should(() => {
+      expect(mediaStarted).to.equal(true);
+      expect(releaseRun).to.be.a('function');
+    });
+    cy.then(() => releaseRun?.());
+    cy.get('[data-testid="video-ci-runs"] [role="alert"]').should(
+      'contain',
+      'Synthetic ZIP fallback',
+    );
+  });
   it('keeps the shared run selected when browsing the first catalog page', () => {
     cy.window().then((win) =>
       win.history.replaceState(null, '', `${win.location.pathname}?run=30`),
@@ -172,7 +215,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
       .and('contain', '120')
       .and('contain', '-20%');
     cy.contains('tr', 'Valid clips').should('contain', '36').and('contain', '72');
-    cy.contains('tr', 'Mean GPU power').should('contain', 'Unavailable');
+    cy.contains('tr', 'Mean GPU power').find('[aria-label="Unavailable"]').should('have.length', 2);
   });
   it('reports expiration without downloading or substituting another artifact', () => {
     cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(30, 'success')], nextPage: null });
