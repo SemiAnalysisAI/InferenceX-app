@@ -158,6 +158,9 @@ describe('H3 serving results (synthetic fixtures)', () => {
   it('follows chart-driven cell changes while the result remains mounted', () => {
     cy.mount(<LinkedSelection />);
     cy.contains('button', 'C1').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[aria-label="Clip / request"]').click();
+    cy.contains('[role="option"]', 'Warmup').click();
+    cy.get('video').should('have.attr', 'src', 'https://media.example.test/c1/warmup-001.mp4');
     cy.contains('button', 'Open C4 from chart').click();
     cy.contains('button', /^C4$/u).should('have.attr', 'aria-pressed', 'true');
     cy.get('video').should(
@@ -168,6 +171,32 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('button', 'C2').click();
     cy.contains('button', 'C2').should('have.attr', 'aria-pressed', 'true');
   });
+  it('renders a parent-created blob in the report while keeping scripts disabled', () => {
+    cy.window().then((win) => {
+      const blobUrl = win.URL.createObjectURL(
+        new Blob(
+          [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="red"/></svg>',
+          ],
+          { type: 'image/svg+xml' },
+        ),
+      );
+      mount({
+        html: `<img src="${blobUrl}" alt="Synthetic blob image"><a href="${blobUrl}" download="fixture.svg">Download synthetic blob</a><script>document.body.dataset.scriptRan='yes'</script>`,
+      });
+      cy.contains('summary', 'Original report').click();
+      cy.get<HTMLIFrameElement>('iframe')
+        .should('have.attr', 'sandbox', 'allow-same-origin allow-downloads')
+        .should(($frame) => {
+          const doc = $frame[0].contentDocument;
+          expect(doc?.querySelector('img')?.naturalWidth).to.equal(2);
+          expect(doc?.querySelector('a')?.getAttribute('href')).to.equal(blobUrl);
+          expect(doc?.body.dataset.scriptRan).to.equal(undefined);
+        })
+        .then(() => win.URL.revokeObjectURL(blobUrl));
+    });
+  });
+
   it('shows each concurrency without manufacturing a candidate and uses allocated GPU count', () => {
     const change = cy.stub().as('change');
     mount({ onCellChange: change });

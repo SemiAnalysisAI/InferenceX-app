@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -252,6 +252,9 @@ export default function ServingResults({
   const [failedMedia, setFailedMedia] = useState('');
   const selectedId = onCellChange ? (initialCell ?? selected) : selected;
   const current = cells.find((cell) => cell.id === selectedId) ?? cells[0];
+  useEffect(() => {
+    setSlot('');
+  }, [current?.id]);
   const fmt = (value: Json, digits = 2): string => {
     const n = number(value);
     return n === null
@@ -695,7 +698,7 @@ export default function ServingResults({
             <iframe
               title={s.report}
               srcDoc={html}
-              sandbox="allow-downloads"
+              sandbox="allow-same-origin allow-downloads"
               className="h-[640px] w-full rounded-lg border bg-white"
             />
           </details>

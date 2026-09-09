@@ -366,6 +366,13 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
       'src',
       'https://media.test/gpu/c4/baseline/artifacts/measurement-r001-c001.mp4',
     );
+    cy.get('[data-testid="serving-media"] [aria-label="Clip / request"]').click();
+    cy.contains('[role="option"]', 'Warmup').click();
+    cy.get('[data-testid="serving-media"] video').should(
+      'have.attr',
+      'src',
+      'https://media.test/gpu/c4/baseline/artifacts/warmup-001.mp4',
+    );
     cy.contains('button', 'Hardware tradeoffs').click();
     cy.get('[data-testid="video-tradeoff"] tbody tr')
       .should('have.length', 3)
