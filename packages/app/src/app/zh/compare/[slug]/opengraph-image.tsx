@@ -2,17 +2,22 @@ import { notFound } from 'next/navigation';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { renderCompareOg } from '@/lib/compare-og';
-import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare-slug';
+import { parseCompareSlug } from '@/lib/compare-slug';
 
 export const alt = '芯片推理基准测试对比';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export async function generateStaticParams() {
-  const slugs = await getAllComparableCompareSlugs();
-  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
+// Rendered on demand (then cached) rather than prerendered at build time.
+// Enumerating every comparable slug here queued ~700 satori renders per build
+// across the compare-family OG routes, dominating `next build` static
+// generation time. These images are only fetched by link-preview crawlers, so
+// on-demand rendering with the default ISR cache serves them at the same URLs
+// with no build-time cost. Returning [] (vs deleting generateStaticParams)
+// keeps the route statically cacheable instead of per-request dynamic.
+export function generateStaticParams(): { slug: string }[] {
+  return [];
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
