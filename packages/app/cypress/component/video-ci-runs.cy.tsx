@@ -2,6 +2,37 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
 import ResultPower from '@/components/video-benchmark/ResultPower';
 import VideoSelect from '@/components/video-benchmark/VideoSelect';
+import { servingFixture } from '@/components/video-benchmark/serving.fixture';
+import type { StoredArtifact } from '@/components/video-benchmark/stored';
+
+function servingArtifact(): StoredArtifact {
+  const fixture = servingFixture();
+  fixture.documents.set('manifest.json', fixture.manifest);
+  fixture.documents.set('ci.json', fixture.ci);
+  fixture.checksums.set('manifest.json', 'a'.repeat(64));
+  return {
+    storageVersion: 1,
+    runId: '123',
+    artifact: { id: 40, name: 'h3-video-123-1', expired: false, size_in_bytes: 100, stored: true },
+    sources: [
+      {
+        id: '123',
+        documents: [...fixture.documents],
+        checksums: [...fixture.checksums],
+        texts: [],
+        assets: [...fixture.checksums.keys()]
+          .filter((path) => path.endsWith('.mp4'))
+          .map((path) => [
+            path,
+            {
+              url: `https://media.test/${path}`,
+              downloadUrl: `https://media.test/${path}?download=1`,
+            },
+          ]),
+      },
+    ],
+  };
+}
 
 const run = (id: number, conclusion: string) => ({
   id,
@@ -302,6 +333,98 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
       .and('contain', '-20%');
     cy.contains('tr', 'Valid clips').should('contain', '36').and('contain', '72');
     cy.contains('tr', 'Mean GPU power').find('[aria-label="Unavailable"]').should('have.length', 2);
+  });
+  it('opens the shared serving cell and switches from the chart without reloading the CI artifact', () => {
+    const saved = servingArtifact();
+    cy.window().then((win) =>
+      win.history.replaceState(
+        null,
+        '',
+        `${win.location.pathname}?run=123&artifact=40&source=123&cell=c4`,
+      ),
+    );
+    cy.intercept('GET', '/api/video-runs?run=123', {
+      run: run(123, 'success'),
+      artifacts: [saved.artifact],
+    }).as('servingRun');
+    cy.intercept('GET', '**/api/video-runs*format=media', saved).as('servingMedia');
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.intercept('GET', '/api/video-runs?run=123&artifact=40', () => {
+      throw new Error('Stored serving results must not fetch the ZIP');
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wait(['@servingRun', '@servingMedia']);
+    cy.get('[data-testid="serving-selected-metrics"]')
+      .should('contain', 'C4')
+      .and('contain', '300 s');
+    cy.get('[data-testid="serving-media"] video').should(
+      'have.attr',
+      'src',
+      'https://media.test/gpu/c4/baseline/artifacts/measurement-r001-c001.mp4',
+    );
+    cy.get('[data-testid="serving-media"] [aria-label="Clip / request"]').click();
+    cy.contains('[role="option"]', 'Warmup').click();
+    cy.get('[data-testid="serving-media"] video').should(
+      'have.attr',
+      'src',
+      'https://media.test/gpu/c4/baseline/artifacts/warmup-001.mp4',
+    );
+    cy.contains('button', 'Hardware tradeoffs').click();
+    cy.get('[data-testid="video-tradeoff"] tbody tr')
+      .should('have.length', 3)
+      .first()
+      .find('button')
+      .click();
+    cy.contains('button', 'Open videos and full result').click();
+    cy.get('[data-testid="serving-selected-metrics"]')
+      .should('be.visible')
+      .and('contain', 'C1')
+      .and('contain', '120 s');
+    cy.get('[data-testid="serving-media"] video').should(
+      'have.attr',
+      'src',
+      'https://media.test/gpu/c1/baseline/artifacts/measurement-r001-c001.mp4',
+    );
+    cy.location('search').should('contain', 'cell=c1');
+    cy.get('@servingRun.all').should('have.length', 1);
+    cy.get('@servingMedia.all').should('have.length', 1);
+    cy.get('[data-testid="result-summary"]').should('not.exist');
+  });
+  it('shows a malformed serving matrix error instead of empty paired results', () => {
+    const saved = servingArtifact();
+    const source = saved.sources[0];
+    source.documents = source.documents.map(([path, document]) => [
+      path,
+      path === 'serving-smoke.json'
+        ? { schema_version: '9.0.0', bundle_type: 'h3_serving_smoke_matrix' }
+        : document,
+    ]);
+    cy.window().then((win) =>
+      win.history.replaceState(
+        null,
+        '',
+        `${win.location.pathname}?run=123&artifact=40&view=tradeoff`,
+      ),
+    );
+    cy.intercept('GET', '/api/video-runs?run=123', {
+      run: run(123, 'success'),
+      artifacts: [saved.artifact],
+    });
+    cy.intercept('GET', '**/api/video-runs*format=media', saved);
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('[role="alert"]', 'Invalid H3 serving matrix: unsupported matrix contract').should(
+      'be.visible',
+    );
+    cy.get('[data-testid="serving-results"], [data-testid="result-summary"]').should('not.exist');
+    cy.get('video').should('not.exist');
   });
   it('reports expiration without downloading or substituting another artifact', () => {
     cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(30, 'success')], nextPage: null });

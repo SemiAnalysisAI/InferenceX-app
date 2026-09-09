@@ -2,6 +2,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import VideoTradeoff from '@/components/video-benchmark/VideoTradeoff';
 import type { TradeoffRun } from '@/components/video-benchmark/tradeoff';
 import type { Json } from '@/components/video-benchmark/bundle';
+import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 
 const role = {
   metrics: {
@@ -50,21 +51,23 @@ const run: TradeoffRun = {
 };
 
 describe('Video tradeoff chart (synthetic fixtures)', () => {
-  it('withholds missing cost, plots measured axes and drills into the original run', () => {
+  it('plots allocated GPU efficiency by default and requires assumptions for the cost axis', () => {
     const open = cy.stub().as('open');
     cy.mount(
       <PathnameContext.Provider value="/video">
         <VideoTradeoff runs={[run]} onOpen={open} />
       </PathnameContext.Provider>,
     );
-    cy.contains('No points qualify for these axes yet.').should('be.visible');
-    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
-    cy.contains('[role="option"]', 'Valid clips / allocated GPU-hour').click();
+    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').should(
+      'contain',
+      'Valid clips / allocated GPU-hour',
+    );
     cy.get('[data-testid="video-tradeoff-chart"] circle.point').should('have.length', 2);
     cy.contains('td', '1.25').should('be.visible');
     cy.contains('dd', '8 / 4').should('be.visible');
     cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
     cy.contains('[role="option"]', 'Valid clips / USD').click();
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
     cy.get('input[aria-label="Whole deployment cost (USD/hour)"]').type('2');
     cy.get('circle.point').should('not.exist');
     cy.get('input[aria-label="Cost source and included items"]').type(
@@ -75,6 +78,27 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     cy.contains('td', '5').should('be.visible');
     cy.contains('button', 'Open videos and full result').click();
     cy.get('@open').should('have.been.calledOnce');
+  });
+  it('still withholds P90 for single-request results until median diagnostics are selected', () => {
+    const single = structuredClone(run);
+    const result = single.bundle.result as { roles: Record<string, typeof role> };
+    for (const point of Object.values(result.roles)) {
+      point.records = point.records.slice(0, 1);
+      point.metrics.completion = { valid: 1, completed: 1, scheduled: 1, failed: 0 };
+    }
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[single]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
+    cy.get('circle.point').should('not.exist');
+    cy.contains('button', 'Inspect available serial results').click();
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'Median client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 2);
   });
   it('shows an empty state without inventing fixture results', () => {
     cy.mount(
@@ -103,5 +127,64 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     cy.contains('[role="option"]', '#2').click();
     cy.contains('summary', 'Matched workload').click();
     cy.get('[data-testid="tradeoff-detail"] pre').first().should('contain', '"guidance_scale": 4');
+  });
+});
+
+const matrix = (): TradeoffRun => ({
+  exportRun: '123',
+  artifact: '456',
+  bundle: { ...servingFixture(), result: null, manifestSha256: 'synthetic-serving' },
+});
+
+describe('Video serving matrix chart (synthetic contract fixture)', () => {
+  it('shows three labeled cell medians and opens the selected concurrency result', () => {
+    const open = cy.stub().as('openCell');
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[matrix()]} onOpen={open} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'Median client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.get('text.serving-point-label')
+      .should('have.length', 3)
+      .then((labels) => {
+        expect([...labels].map((label) => label.textContent)).to.deep.equal(['C1', 'C2', 'C4']);
+      });
+    cy.contains('Closed-loop smoke · serving capacity not qualified').should('be.visible');
+    cy.get('tbody tr')
+      .should('have.length', 3)
+      .each((row) => {
+        cy.wrap(row).should('contain', '4 / 4 / 4').and('contain', '15');
+      });
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').click();
+    cy.contains('[role="option"]', 'P90 client-ready latency (s)').click();
+    cy.get('circle.point').should('not.exist');
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
+    cy.contains('button', 'Show cell medians').click();
+    cy.get('circle.point').should('have.length', 3);
+    cy.contains('tbody button', 'Client concurrency 4').click();
+    cy.contains('button', 'Open videos and full result').click();
+    cy.get('@openCell')
+      .should('have.been.calledOnce')
+      .its('firstCall.args.0.cellId')
+      .should('equal', 'c4');
+  });
+  it('shows the Chinese serving labels with per-cell medians', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/zh/video">
+        <VideoTradeoff runs={[matrix()]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="延迟轴 · 越低越好"]').should(
+      'contain',
+      '客户端就绪延迟中位数（秒）',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.contains('客户端并发数 2').should('be.visible');
+    cy.contains('闭环冒烟测试 · 服务容量未经验证').should('be.visible');
   });
 });

@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   tradeoffPoints,
@@ -6,7 +8,8 @@ import {
   costValue,
   type TradeoffRun,
 } from './tradeoff';
-import type { Json } from './bundle';
+import { at, loadBundle, type Json } from './bundle';
+import { servingFixture } from './serving.fixture';
 
 function fixture(
   records: Json[] = Array.from({ length: 10 }, (_, i) => ({
@@ -163,3 +166,136 @@ describe('H3 tradeoff metrics (synthetic result-contract fixtures)', () => {
     expect(tradeoffPoints(b)).toEqual([]);
   });
 });
+
+function matrixFixture(): TradeoffRun {
+  return {
+    exportRun: '123',
+    artifact: '456',
+    bundle: { ...servingFixture(), result: null, manifestSha256: 'synthetic-serving' },
+  };
+}
+function replace(value: Json, key: string, replacement: Json) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Expected object');
+  value[key] = replacement;
+}
+
+describe('Serving matrix tradeoff metrics (synthetic contract fixture)', () => {
+  it('plots one point per concurrency and never pools twelve requests into P90', () => {
+    const points = tradeoffPoints(matrixFixture());
+    expect(points.map((p) => [p.cellId, p.concurrency, p.role, p.latencies.length])).toEqual([
+      ['c1', 1, 'serving', 4],
+      ['c2', 2, 'serving', 4],
+      ['c4', 4, 'serving', 4],
+    ]);
+    expect(points.map((p) => latencyValue(p, 'median'))).toEqual([120, 240, 300]);
+    expect(points.map((p) => latencyValue(p, 'p90'))).toEqual([null, null, null]);
+    expect(new Set(points.map((p) => p.group)).size).toBe(1);
+    expect(points.every((p) => p.completeWorkload)).toBe(true);
+  });
+  it('uses the delivery window, all allocated GPUs, actual durations and one shared power envelope', () => {
+    const points = tradeoffPoints(matrixFixture());
+    for (const p of points) {
+      expect(p.boundary).toBe('submit_to_downloaded_media');
+      expect(p.allocated).toBe(2);
+      expect(p.participating).toBe(2);
+      expect(p.rate).toBe(30);
+      expect(efficiencyValue(p, 'clipsGpu')).toBe(15);
+      expect(efficiencyValue(p, 'secondsGpu')).toBeCloseTo(66.875);
+      expect(p.power).toBe(1400);
+      expect(p.energy).toBe(168000);
+      expect(efficiencyValue(p, 'energy')).toBeCloseTo(3600000 / 168000);
+      expect(p.powerWindow).toBe(480);
+    }
+  });
+  it('does not substitute requested or participating GPUs for missing allocation evidence', () => {
+    const run = matrixFixture();
+    replace(at(run.bundle.ci, 'slurm_job'), 'AllocTRES', 'cpu=32,mem=512G,node=1');
+    expect(tradeoffPoints(run).map((p) => efficiencyValue(p, 'clipsGpu'))).toEqual([
+      null,
+      null,
+      null,
+    ]);
+  });
+  it('keeps changed quality semantics separate while allowing parallel layout comparisons', () => {
+    const run = matrixFixture();
+    const initial = tradeoffPoints(run)[0].group;
+    const server = at(run.bundle.documents!.get('gpu/c2/spec.json'), 'server');
+    replace(server, 'ulysses_degree', 4);
+    expect(tradeoffPoints(run)[1].group).toBe(initial);
+    replace(server, 'performance_mode', 'quality');
+    expect(tradeoffPoints(run)[1].group).not.toBe(initial);
+    expect(tradeoffPoints(run)[1].server).toEqual(server);
+  });
+  it('withholds incomplete latency data and invalid power without dropping their cells', () => {
+    const run = matrixFixture();
+    replace(
+      at(run.bundle.documents!.get('gpu/c1/baseline/run.json'), 'records', 1),
+      'submit_to_media_seconds',
+      null,
+    );
+    const phase = at(run.bundle.documents!.get('gpu/c2/power.json'), 'phases', 'measurement');
+    replace(phase, 'valid', false);
+    replace(
+      at(
+        run.bundle.documents!.get('serving-smoke.json'),
+        'cells',
+        1,
+        'power',
+        'phases',
+        'measurement',
+      ),
+      'valid',
+      false,
+    );
+    const points = tradeoffPoints(run);
+    expect(points).toHaveLength(3);
+    expect(points[0].latencies).toEqual([]);
+    expect(points[1].energy).toBeNull();
+    expect(points[1].power).toBeNull();
+    expect(points[2].energy).toBe(168000);
+  });
+  it('withholds stale latency and power for an unverified cell while retaining verified siblings', () => {
+    const run = matrixFixture();
+    const matrix = run.bundle.documents!.get('serving-smoke.json');
+    replace(matrix!, 'status', 'failed');
+    replace(at(matrix, 'cells', 0), 'status', 'failed');
+    replace(at(matrix, 'cells', 0), 'verified', false);
+    const points = tradeoffPoints(run);
+    expect(points).toHaveLength(3);
+    expect(points[0].valid).toBe(4);
+    expect(points[0].completeWorkload).toBe(false);
+    expect(latencyValue(points[0], 'median')).toBeNull();
+    expect(points[0].rate).toBeNull();
+    expect(points[0].energy).toBeNull();
+    expect(points[0].power).toBeNull();
+    expect(points[0].powerWindow).toBeNull();
+    expect(latencyValue(points[1], 'median')).toBe(240);
+    expect(points[1].completeWorkload).toBe(true);
+    expect(points[1].energy).toBe(168000);
+  });
+});
+
+it.skipIf(!process.env.H3_SERVING_ARTIFACT_DIR)(
+  'extracts three measured points from the original serving CI artifact',
+  async () => {
+    const bundle = await loadBundle(
+      async (path) => new Blob([await readFile(join(process.env.H3_SERVING_ARTIFACT_DIR!, path))]),
+    );
+    const points = tradeoffPoints({ bundle, exportRun: '34318467752', artifact: 'original' });
+    expect(points).toHaveLength(3);
+    const expected = [119.5026524469722, 237.67639482504455, 297.68666791851865];
+    for (const [index, p] of points.entries()) {
+      expect(latencyValue(p, 'median')).toBeCloseTo(expected[index]);
+      expect(latencyValue(p, 'p90')).toBeNull();
+      expect(p.valid).toBe(4);
+      expect(p.hardware).toBe('NVIDIA H200');
+      expect(p.allocated).toBe(2);
+      expect(p.participating).toBe(2);
+      expect(p.completeWorkload).toBe(true);
+    }
+    expect(new Set(points.map((p) => p.group)).size).toBe(1);
+    expect(points[0].energy).toBeCloseTo(164180.49905077327);
+    expect(efficiencyValue(points[0], 'clipsGpu')).toBeCloseTo(15.0621776301);
+  },
+);

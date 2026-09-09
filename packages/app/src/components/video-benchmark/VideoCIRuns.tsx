@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
 import VideoSelect from './VideoSelect';
+import { servingCells } from './serving';
 import VideoTradeoff from './VideoTradeoff';
 import type { TradeoffRun } from './tradeoff';
 import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
@@ -79,7 +80,7 @@ async function json(url: string, signal?: AbortSignal) {
   return data;
 }
 
-function share(runId: number, artifactId?: number, source?: string) {
+function share(runId: number, artifactId?: number, source?: string, cell?: string) {
   const url = new URL(location.href);
   const view = url.searchParams.get('view');
   url.search = '';
@@ -87,6 +88,7 @@ function share(runId: number, artifactId?: number, source?: string) {
   url.searchParams.set('run', String(runId));
   if (artifactId) url.searchParams.set('artifact', String(artifactId));
   if (source) url.searchParams.set('source', source);
+  if (cell) url.searchParams.set('cell', cell);
   history.replaceState(null, '', url);
 }
 
@@ -106,6 +108,7 @@ export default function VideoCIRuns() {
   const [progress, setProgress] = useState('');
   const [direct, setDirect] = useState('');
   const [manual, setManual] = useState(false);
+  const [cellId, setCellId] = useState('');
   const [view, setView] = useState('results');
   const [compared, setCompared] = useState<TradeoffRun[]>([]);
   const changeView = (value: string) => {
@@ -116,6 +119,7 @@ export default function VideoCIRuns() {
     history.replaceState(null, '', url);
   };
   const collect = useCallback((bundle: Bundle, exportRun: string, artifactId: string) => {
+    servingCells(bundle);
     setCompared((old) =>
       old.some((item) => item.bundle.manifestSha256 === bundle.manifestSha256)
         ? old
@@ -126,6 +130,9 @@ export default function VideoCIRuns() {
                 manifest: bundle.manifest,
                 result: bundle.result,
                 manifestSha256: bundle.manifestSha256,
+                documents: bundle.documents,
+                checksums: bundle.checksums,
+                ci: bundle.ci,
               },
               exportRun,
               artifact: artifactId,
@@ -149,6 +156,7 @@ export default function VideoCIRuns() {
     controller: AbortController,
     source?: string,
     prepared?: Promise<Response | null>,
+    preferredCell?: string,
   ) {
     setArtifact(selected);
     setSources([]);
@@ -210,15 +218,21 @@ export default function VideoCIRuns() {
     if (!chosen) throw new Error(s.none);
     setSources(found);
     setSourceId(chosen.id);
-    share(selectedRun.id, selected.id, chosen.id);
+    share(selectedRun.id, selected.id, chosen.id, preferredCell);
   }
-  async function selectRun(runId: string, artifactId?: string | null, source?: string | null) {
+  async function selectRun(
+    runId: string,
+    artifactId?: string | null,
+    source?: string | null,
+    selectedCell?: string | null,
+  ) {
     const current = ++request.current;
     download.current?.abort();
     setLoading(true);
     setProgress('');
     setError('');
     setRun(null);
+    setCellId(selectedCell ?? '');
     setSources([]);
     setArtifact(null);
     setArtifacts([]);
@@ -257,6 +271,7 @@ export default function VideoCIRuns() {
           controller,
           source ?? undefined,
           String(selected.id) === artifactId ? prepared : undefined,
+          selectedCell ?? undefined,
         );
     } catch (error) {
       if (current === request.current)
@@ -295,7 +310,13 @@ export default function VideoCIRuns() {
       if (auto) {
         const params = new URLSearchParams(location.search);
         const selected = params.get('run') ?? (data.runs[0] ? String(data.runs[0].id) : null);
-        if (selected) await selectRun(selected, params.get('artifact'), params.get('source'));
+        if (selected)
+          await selectRun(
+            selected,
+            params.get('artifact'),
+            params.get('source'),
+            params.get('cell'),
+          );
       }
     } catch (error) {
       if (current === request.current)
@@ -308,7 +329,8 @@ export default function VideoCIRuns() {
     const params = new URLSearchParams(location.search);
     if (params.get('view') === 'tradeoff') setView('tradeoff');
     const directRun = params.get('run');
-    if (directRun) void selectRun(directRun, params.get('artifact'), params.get('source'));
+    if (directRun)
+      void selectRun(directRun, params.get('artifact'), params.get('source'), params.get('cell'));
     else void list(1, true);
     return () => {
       request.current++;
@@ -362,6 +384,7 @@ export default function VideoCIRuns() {
               value={sourceId}
               onValueChange={(value) => {
                 setSourceId(value);
+                setCellId('');
                 if (run && artifact) share(run.id, artifact.id, value);
               }}
               options={sources.map((item) => ({ value: item.id, label: `#${item.id}` }))}
@@ -481,7 +504,15 @@ export default function VideoCIRuns() {
           sourceId={sourceId}
           onOpen={(point) => {
             changeView('results');
-            void selectRun(point.run.exportRun, point.run.artifact, point.sourceId);
+            if (
+              String(run?.id) === point.run.exportRun &&
+              String(artifact?.id) === point.run.artifact &&
+              sourceId === point.sourceId
+            ) {
+              setCellId(point.cellId ?? '');
+              share(run!.id, artifact!.id, sourceId, point.cellId);
+            } else
+              void selectRun(point.run.exportRun, point.run.artifact, point.sourceId, point.cellId);
           }}
         />
       </div>
@@ -491,6 +522,11 @@ export default function VideoCIRuns() {
             key={`${artifact?.id}-${sourceId}`}
             reader={selectedSource.read}
             published={selectedSource.stored}
+            initialCell={cellId}
+            onCellChange={(id) => {
+              setCellId(id);
+              if (run && artifact) share(run.id, artifact.id, sourceId, id);
+            }}
             onLoaded={collectLoaded}
             onError={() => changeView('results')}
           />

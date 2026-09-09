@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { schemeTableau10 } from 'd3';
+import { schemeTableau10, type Selection } from 'd3';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Heading } from '@/components/ui/heading';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/use-locale';
 import { escapeHtml } from '@/lib/utils';
 import { track } from '@/lib/analytics';
@@ -44,7 +46,7 @@ const STRINGS = {
     qualityNote:
       'Matching fixes the model revision, generation settings and prompt/seed/input workload. Precision, caching and runtime changes still require fidelity review. Technical validity does not establish perceptual quality; uncalibrated points are not qualified winners.',
     energyNote:
-      'Energy efficiency uses the backend generation-window joules per valid clip. It covers participating GPU boards only, excluding other allocated GPUs, CPUs, cooling and storage. It is not facility efficiency.',
+      'Energy efficiency uses the backend measurement-phase joules per valid clip. It covers participating GPU boards only, excluding other allocated GPUs, CPUs, cooling and storage. It is not facility efficiency.',
     noPoints: 'No points qualify for these axes yet.',
     diagnose: 'Inspect available serial results',
     empty: 'Open a CI result to add its baseline and candidate.',
@@ -68,7 +70,7 @@ const STRINGS = {
     window: 'Measurement window (s)',
     power: 'Mean total participating-board power (W)',
     energyClip: 'GPU-board energy / valid clip (J)',
-    powerWindow: 'Generation power window (s)',
+    powerWindow: 'Measured power window (s)',
     batch: 'Replica layout / actual batch size / offered arrival rate',
     queue: 'Queue delay / server-ready timestamp / deadline attainment',
     unavailable: 'Unavailable in this result contract',
@@ -84,6 +86,14 @@ const STRINGS = {
       'Enter the total hourly cost of the complete deployment, including all billed GPUs and host, power, cooling, network, storage and operating costs. Clips/USD = valid clips/hour ÷ deployment USD/hour. User-entered estimates; no selling price or profit is implied.',
     methods: 'Measurement definitions and comparison limits',
     diagnostic: 'Serial diagnostics · serving capacity not measured',
+    servingSmoke: 'Closed-loop smoke · serving capacity not qualified',
+    servingNote:
+      'Each point is one concurrency cell. Latency samples are never pooled across cells; P90 needs at least 10 valid samples in that cell. Throughput covers submission to fully downloaded media, including failures and transfer; local validation runs afterwards. GPU-board energy integrates the shared measurement envelope once, without summing overlapping request windows.',
+    servingMedian: 'Show cell medians',
+    boundary: 'Throughput measurement boundary',
+    deliveryBoundary: 'Submission to downloaded media; local validation excluded',
+    load: 'Load pattern',
+    closedLoop: 'Closed loop',
     observed: 'Observed points; no fitted frontier or hardware winner.',
     controls:
       'Shift+scroll to zoom; drag to pan; double-click to reset. Select a point or table row for details.',
@@ -108,7 +118,7 @@ const STRINGS = {
     qualityNote:
       '工作负载匹配固定了模型版本、生成设置以及 prompt、seed 和输入工作负载。精度、缓存和运行时变更仍需审查保真度。技术有效性不代表感知质量；未校准的点不能作为合格的性能优胜结果。',
     energyNote:
-      '能效使用后端生成时段内每个有效视频的 GPU 板卡能耗（焦耳），仅涵盖参与计算的 GPU 板卡，不含其他已分配 GPU、CPU、散热或存储，也不代表设施能效。',
+      '能效使用后端测量阶段每个有效视频的 GPU 板卡能耗（焦耳），仅涵盖参与计算的 GPU 板卡，不含其他已分配 GPU、CPU、散热或存储，也不代表设施能效。',
     noPoints: '当前坐标轴下尚无满足条件的数据点。',
     diagnose: '查看已有串行诊断结果',
     empty: '打开 CI 结果即可加入基线与候选数据。',
@@ -118,7 +128,7 @@ const STRINGS = {
     baseline: '基线',
     candidate: '候选',
     samples: '有效延迟样本数',
-    counts: '有效 / 已完成 / 已调度',
+    counts: '有效 / 已完成 / 计划',
     failed: '失败或无效',
     status: '绘图状态',
     missing: '缺少工作负载、延迟样本、GPU 数量、能耗或成本假设',
@@ -132,7 +142,7 @@ const STRINGS = {
     window: '测量时段（秒）',
     power: '参与计算板卡总功率均值（W）',
     energyClip: '每有效视频 GPU 板卡能耗（J）',
-    powerWindow: '生成阶段功率测量窗口（秒）',
+    powerWindow: '功率测量窗口（秒）',
     batch: '副本布局 / 实际批次大小 / 施加的请求到达率',
     queue: '排队延迟 / 服务端就绪时间戳 / 时限达标情况',
     unavailable: '此结果格式未提供',
@@ -148,6 +158,14 @@ const STRINGS = {
       '填写完整部署每小时总成本，涵盖所有计费 GPU、主机、电力、散热、网络、存储和运营成本。有效视频数/USD = 每小时有效视频数 ÷ 部署每小时 USD 成本。数值为用户填写的估算，不代表售价或利润。',
     methods: '测量定义与比较限制',
     diagnostic: '串行诊断 · 尚未测量服务容量',
+    servingSmoke: '闭环冒烟测试 · 服务容量未经验证',
+    servingNote:
+      '每个点对应一个并发配置，延迟样本按配置独立统计；P90 要求该配置至少有 10 个有效样本。吞吐量窗口从提交到媒体完整下载，涵盖失败请求和传输，本地验证在此后执行。GPU 板卡能耗仅对共享测量窗口积分一次，不累加相互重叠的请求窗口。',
+    servingMedian: '显示各配置的延迟中位数',
+    boundary: '吞吐量测量边界',
+    deliveryBoundary: '从提交到媒体下载完成；不含本地验证',
+    load: '负载模式',
+    closedLoop: '闭环',
     observed: '仅显示观测点，不拟合前沿曲线，也不判定硬件优胜者。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。选择数据点或表格行查看详情。',
   },
@@ -168,8 +186,8 @@ export default function VideoTradeoff({
   const s = STRINGS[useLocale()];
   const all = useMemo(() => runs.flatMap(tradeoffPoints), [runs]);
   const [workload, setWorkload] = useState('');
-  const [xAxis, setX] = useState<LatencyAxis>('p90');
-  const [yAxis, setY] = useState<EfficiencyAxis>('dollar');
+  const [latencyAxis, setX] = useState<LatencyAxis | null>(null);
+  const [yAxis, setY] = useState<EfficiencyAxis>('clipsGpu');
   const [selected, setSelected] = useState('');
   const [costs, setCosts] = useState<Record<string, DeploymentCost>>({});
   const groups = [...new Map(all.map((p) => [p.group, p.workloadLabel])).entries()];
@@ -178,15 +196,39 @@ export default function VideoTradeoff({
     : (all.find((p) => p.sourceId === sourceId)?.group ?? groups[0]?.[0]);
   const points = all.filter((p) => p.group === group);
   const active = points.find((p) => p.id === selected) ?? points[0];
+  const isServing = points.some((p) => p.role === 'serving');
+  const xAxis = latencyAxis ?? (isServing ? 'median' : 'p90');
   const plotted = points.flatMap((p) => {
     const x = latencyValue(p, xAxis),
       y = efficiencyValue(p, yAxis, costs[p.id]);
     return p.completeWorkload && x !== null && y !== null ? [{ ...p, x, y }] : [];
   });
+  const drawPointLabels = (
+    labelGroup: Selection<SVGGElement, unknown, null, undefined>,
+    x: ContinuousScale,
+    y: ContinuousScale,
+  ) => {
+    labelGroup
+      .selectAll<SVGTextElement, (typeof plotted)[number]>('text.serving-point-label')
+      .data(
+        plotted.filter((p) => p.role === 'serving'),
+        (p) => p.id,
+      )
+      .join('text')
+      .attr('class', 'serving-point-label')
+      .attr('x', (p) => x(p.x) + 10)
+      .attr('y', (p) => y(p.y) - 10)
+      .attr('font-size', px(CHART_TYPE.axisLabel))
+      .attr('font-weight', 600)
+      .attr('fill', 'var(--foreground)')
+      .attr('pointer-events', 'none')
+      .text((p) => `C${p.concurrency}`);
+  };
   const hardware = [...new Set(all.map((p) => p.hardware))].sort();
   const color = (p: TradeoffPoint) =>
     schemeTableau10[hardware.indexOf(p.hardware) % schemeTableau10.length];
-  const label = (p: TradeoffPoint) => `${p.hardware || '—'} · ${s[p.role]} · #${p.sourceId}`;
+  const label = (p: TradeoffPoint) =>
+    `${p.hardware || '—'} · ${p.role === 'serving' ? `${s.concurrency} ${p.concurrency}` : s[p.role]} · #${p.sourceId}`;
   const choose = (p: TradeoffPoint) => {
     setSelected(p.id);
     track('video_tradeoff_point_selected', { role: p.role, source: p.sourceId });
@@ -249,9 +291,9 @@ export default function VideoTradeoff({
                 {name}
               </span>
             ))}
-            {points.every((p) => p.concurrency === 1) && (
+            {(isServing || points.every((p) => p.concurrency === 1)) && (
               <span className="rounded-md border px-2 py-1 text-muted-foreground">
-                {s.diagnostic}
+                {isServing ? s.servingSmoke : s.diagnostic}
               </span>
             )}
           </div>
@@ -292,6 +334,22 @@ export default function VideoTradeoff({
                     keyFn: (p) => p.id,
                   },
                 },
+                {
+                  type: 'custom',
+                  key: 'serving-point-labels',
+                  render: (labelGroup, ctx) =>
+                    drawPointLabels(
+                      labelGroup,
+                      (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+                      (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+                    ),
+                  onZoom: (labelGroup, ctx) =>
+                    drawPointLabels(
+                      labelGroup,
+                      ctx.newXScale as ContinuousScale,
+                      ctx.newYScale as ContinuousScale,
+                    ),
+                },
               ]}
               tooltip={{
                 rulerType: 'none',
@@ -317,14 +375,14 @@ export default function VideoTradeoff({
                   setY('clipsGpu');
                 }}
               >
-                {s.diagnose}
+                {isServing ? s.servingMedian : s.diagnose}
               </Button>
             </div>
           )}
           <details className="space-y-2 text-xs text-muted-foreground">
             <summary className="cursor-pointer font-medium">{s.methods}</summary>
             <p>{s.latencyNote}</p>
-            <p>{s.throughputNote}</p>
+            <p>{isServing ? s.servingNote : s.throughputNote}</p>
             <p>{s.qualityNote}</p>
             {yAxis === 'energy' && <p>{s.energyNote}</p>}
           </details>
@@ -379,6 +437,12 @@ export default function VideoTradeoff({
                     [s.model, active.modelRevision || '—'],
                     [s.allocated, `${fmt(active.allocated)} / ${fmt(active.participating)}`],
                     [s.concurrency, fmt(active.concurrency)],
+                    ...(active.role === 'serving'
+                      ? [
+                          [s.load, s.closedLoop],
+                          [s.boundary, s.deliveryBoundary],
+                        ]
+                      : []),
                     [s.window, fmt(active.wall)],
                     [s.power, fmt(active.power)],
                     [s.energyClip, fmt(active.energy)],
