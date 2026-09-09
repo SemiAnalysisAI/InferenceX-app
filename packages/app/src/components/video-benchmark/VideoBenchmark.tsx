@@ -278,9 +278,11 @@ const field = (label: string, value: string, change: (value: string) => void, ty
 export default function VideoBenchmark({
   reader,
   published,
+  onLoaded,
 }: {
   reader?: (path: string) => Promise<Blob>;
   published?: StoredSource;
+  onLoaded?: (bundle: Bundle) => void;
 }) {
   const s = STRINGS[useLocale()];
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -431,6 +433,9 @@ export default function VideoBenchmark({
   }, [reader, published]);
 
   const b = loaded?.bundle;
+  useEffect(() => {
+    if (b) onLoaded?.(b);
+  }, [b, onLoaded]);
   const participating = rows(
     at(b?.job, 'roles', 'baseline', 'telemetry_summary', 'gpu_identity'),
   ).length;

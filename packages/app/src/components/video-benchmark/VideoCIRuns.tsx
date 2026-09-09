@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -9,12 +9,18 @@ import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
 import VideoSelect from './VideoSelect';
-import type { StoredArtifact, StoredSource } from './stored';
+import VideoTradeoff from './VideoTradeoff';
+import type { TradeoffRun } from './tradeoff';
+import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
+import type { Bundle } from './bundle';
 import { archiveSources, type CIArtifact, type CIRun } from './archive';
 
 const STRINGS = {
   en: {
     title: 'H3 video benchmark',
+    results: 'Videos & result',
+    tradeoffs: 'Hardware tradeoffs',
+    view: 'Benchmark view',
     preparing: 'Loading results and preparing media. The first publication of a run takes longer.',
     downloading: 'Downloading CI archive',
     advanced: 'Run details and artifact selection',
@@ -39,6 +45,9 @@ const STRINGS = {
   },
   zh: {
     title: 'H3 视频基准测试',
+    results: '视频与结果',
+    tradeoffs: '硬件延迟与效率权衡',
+    view: '基准测试视图',
     preparing: '正在加载结果并准备媒体。首次发布该运行的产物需要更多时间。',
     downloading: '正在下载 CI 产物',
     advanced: '运行详情与产物选择',
@@ -72,7 +81,9 @@ async function json(url: string, signal?: AbortSignal) {
 
 function share(runId: number, artifactId?: number, source?: string) {
   const url = new URL(location.href);
+  const view = url.searchParams.get('view');
   url.search = '';
+  if (view === 'tradeoff') url.searchParams.set('view', view);
   url.searchParams.set('run', String(runId));
   if (artifactId) url.searchParams.set('artifact', String(artifactId));
   if (source) url.searchParams.set('source', source);
@@ -95,6 +106,39 @@ export default function VideoCIRuns() {
   const [progress, setProgress] = useState('');
   const [direct, setDirect] = useState('');
   const [manual, setManual] = useState(false);
+  const [view, setView] = useState('results');
+  const [compared, setCompared] = useState<TradeoffRun[]>([]);
+  const changeView = (value: string) => {
+    setView(value);
+    const url = new URL(location.href);
+    if (value === 'tradeoff') url.searchParams.set('view', 'tradeoff');
+    else url.searchParams.delete('view');
+    history.replaceState(null, '', url);
+  };
+  const collect = useCallback((bundle: Bundle, exportRun: string, artifactId: string) => {
+    setCompared((old) =>
+      old.some((item) => item.bundle.manifestSha256 === bundle.manifestSha256)
+        ? old
+        : [
+            ...old,
+            {
+              bundle: {
+                manifest: bundle.manifest,
+                result: bundle.result,
+                manifestSha256: bundle.manifestSha256,
+              },
+              exportRun,
+              artifact: artifactId,
+            },
+          ],
+    );
+  }, []);
+  const collectLoaded = useCallback(
+    (bundle: Bundle) => {
+      if (run && artifact) collect(bundle, String(run.id), String(artifact.id));
+    },
+    [run, artifact, collect],
+  );
   const request = useRef(0);
   const download = useRef<AbortController | null>(null);
 
@@ -156,6 +200,10 @@ export default function VideoCIRuns() {
       found = await archiveSources(new Blob(chunks), selected);
     }
     if (current !== request.current) return;
+    for (const item of found) {
+      if (item.stored)
+        collect(storedBundle(item.stored), String(selectedRun.id), String(selected.id));
+    }
     const chosen =
       found.find((item) => item.id === source) ??
       found.toSorted((a, b) => Number(b.id) - Number(a.id))[0];
@@ -258,6 +306,7 @@ export default function VideoCIRuns() {
   }
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    if (params.get('view') === 'tradeoff') setView('tradeoff');
     const directRun = params.get('run');
     if (directRun) void selectRun(directRun, params.get('artifact'), params.get('source'));
     else void list(1, true);
@@ -410,12 +459,43 @@ export default function VideoCIRuns() {
           <Skeleton className="aspect-video" />
         </div>
       )}
-      {selectedSource && (
-        <VideoBenchmark
-          key={`${artifact?.id}-${sourceId}`}
-          reader={selectedSource.read}
-          published={selectedSource.stored}
+      {compared.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label={s.view}>
+          <Button
+            variant={view === 'results' ? 'default' : 'outline'}
+            aria-pressed={view === 'results'}
+            onClick={() => changeView('results')}
+          >
+            {s.results}
+          </Button>
+          <Button
+            variant={view === 'tradeoff' ? 'default' : 'outline'}
+            aria-pressed={view === 'tradeoff'}
+            onClick={() => changeView('tradeoff')}
+          >
+            {s.tradeoffs}
+          </Button>
+        </div>
+      )}
+      <div hidden={view !== 'tradeoff'}>
+        <VideoTradeoff
+          runs={compared}
+          sourceId={sourceId}
+          onOpen={(point) => {
+            changeView('results');
+            void selectRun(point.run.exportRun, point.run.artifact, point.sourceId);
+          }}
         />
+      </div>
+      {selectedSource && (
+        <div hidden={view !== 'results'}>
+          <VideoBenchmark
+            key={`${artifact?.id}-${sourceId}`}
+            reader={selectedSource.read}
+            published={selectedSource.stored}
+            onLoaded={collectLoaded}
+          />
+        </div>
       )}
       <details onToggle={(event) => setManual(event.currentTarget.open)}>
         <summary className="cursor-pointer text-sm text-muted-foreground">{s.local}</summary>
