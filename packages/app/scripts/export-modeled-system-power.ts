@@ -259,7 +259,7 @@ export function buildComparison(input: ComparisonInput, pue = profileData.assump
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
-        'Measured GPU-board inputs; modeled chassis AC includes model components and PSU loss; facility power applies PUE after chassis AC.',
+        'Measured GPU-board inputs; modeled GPU-chassis AC includes their CPU/DRAM, other model components, and PSU loss. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after GPU-chassis AC.',
       energy_caveat:
         'Energy from modeled average power is an estimate. Nonlinear fan/PSU behavior is not integrated over time. Energy requires an exact matching audit window and successful token counts.',
       model: profileData,
@@ -360,6 +360,9 @@ async function main() {
     telemetry_basis: row.modeled.status === 'supported' ? row.modeled.telemetryBasis : null,
     topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
     model_revision: row.modeled.modelRevision,
+    model_status: profileData.status,
+    calculation_boundary: metadata.boundary,
+    energy_caveat: metadata.energy_caveat,
     model_path: row.model_path,
     pue: metadata.pue,
     assumptions: row.assumptions,

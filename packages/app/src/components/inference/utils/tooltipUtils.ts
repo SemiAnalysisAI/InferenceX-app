@@ -220,8 +220,8 @@ const SYSTEM_POWER_STRINGS = {
     platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
     sweep: 'Fixed README inference sweep',
     topology: (chassis: number, gpus: number) => `${chassis} full eight-GPU chassis · ${gpus} GPUs`,
-    normalization:
-      'AC power for GPU chassis (including their CPUs) is divided by all deployment GPUs, including prefill and decode. Separate CPU-only frontend/router hosts are excluded.',
+    normalization: 'AC power is divided by all deployment GPUs, including prefill and decode.',
+    boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
     reasons: {
@@ -245,8 +245,8 @@ const SYSTEM_POWER_STRINGS = {
     platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
     sweep: 'README 中的固定推理参数扫描',
     topology: (chassis: number, gpus: number) => `${chassis} 个完整八卡机箱 · ${gpus} 张 GPU`,
-    normalization:
-      'GPU 机箱的交流功耗（含机箱内 CPU）按整个部署的 GPU 总数分摊，包括 Prefill 与 Decode。不计入独立的纯 CPU 前端或路由主机。',
+    normalization: '交流功耗按整个部署的 GPU 总数分摊，包括 Prefill 与 Decode。',
+    boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
     reasons: {
@@ -292,7 +292,7 @@ const modeledSystemPowerHTML = (
         ? `
       ${tooltipLine(t.deploymentAc, `${fmt(estimate.chassisAcWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.facilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount)}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}</div>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount)}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
       <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
     `

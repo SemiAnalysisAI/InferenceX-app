@@ -104,8 +104,9 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
     expect(html).toContain('CPU/DRAM utilization: 20%');
-    expect(html).toContain('GPU chassis (including their CPUs)');
-    expect(html).toContain('Separate CPU-only frontend/router hosts are excluded.');
+    expect(html).toContain(
+      'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+    );
     expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
     expect(html).not.toContain('12,000 W/GPU');
   });
@@ -160,8 +161,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('数据中心功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
     expect(html).toContain('CPU/DRAM 利用率：20%');
-    expect(html).toContain('GPU 机箱的交流功耗（含机箱内 CPU）');
+    expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
+  });
+
+  it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      const html = generateTooltipContent(config({ locale }));
+      const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
+      expect(match?.groups?.normalization).toContain(
+        locale === 'en' ? 'all deployment GPUs' : 'GPU 总数',
+      );
+      expect(match?.groups?.boundary).toContain(
+        locale === 'en' ? 'frontend/router hosts' : '前端或路由主机',
+      );
+      expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
+      expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
+    }
   });
 
   it('uses validated model topology while preserving legacy configuration counts separately', () => {
