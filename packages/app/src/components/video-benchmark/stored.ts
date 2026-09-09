@@ -15,7 +15,7 @@ export function storedFidelityBundle(source: StoredSource): FidelityBundle {
   const documents = new Map(source.documents);
   const checksums = new Map(source.checksums);
   return {
-    ...fidelityEvidence(documents, checksums, source.id),
+    ...fidelityEvidence(documents, checksums, source.id, new Map(source.texts)),
     documents,
     checksums,
     files: new Map(source.texts.map(([path, value]) => [path, new Blob([value])])),

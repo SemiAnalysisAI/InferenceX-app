@@ -6,6 +6,7 @@ export interface CIArtifact {
   expired: boolean;
   size_in_bytes: number;
   digest?: string;
+  workflow_run?: { id: number; head_sha: string };
   stored?: boolean;
   indexUrl?: string;
 }
@@ -73,7 +74,10 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     const comparison: Json = JSON.parse(await read('comparison.json').text());
     if (
       at(comparison, 'producer', 'run_id') !== identity.run ||
-      at(comparison, 'producer', 'run_attempt') !== identity.attempt
+      at(comparison, 'producer', 'run_attempt') !== identity.attempt ||
+      (artifact.workflow_run !== undefined &&
+        (String(artifact.workflow_run.id) !== identity.run ||
+          artifact.workflow_run.head_sha !== at(comparison, 'producer', 'git_commit')))
     )
       throw new Error('Comparison and GitHub artifact identify different runs');
     return [

@@ -81,7 +81,7 @@ export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
       expired: false,
       size_in_bytes: 1,
       digest: `sha256:${sealHash}`,
-      workflow_run: { id: Number(id), head_sha: at(manifest, 'git_commit') },
+      workflow_run: { id: Number(id), head_sha: text(at(manifest, 'git_commit')) },
     };
     sourceArtifacts.push({
       ci: {
@@ -225,13 +225,17 @@ export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
     'SHA256SUMS',
     new Blob([[...checksums].map(([path, hash]) => `${hash}  ${path}`).join('\n')]),
   );
+  const texts: StoredSource['texts'] = [['report/index.html', html]];
+  for (const [path, file] of files)
+    if (/^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path))
+      texts.push([path, await file.text()]);
   const published: StoredSource = {
     id: runId,
     kind: 'fidelity',
     documents: [...documents],
     checksums: [...checksums],
     assets: [...files.keys()].map((path) => [path, asset(runId, path)]),
-    texts: [['report/index.html', html]],
+    texts,
   };
   const read = (path: string) => {
     const file = files.get(path);

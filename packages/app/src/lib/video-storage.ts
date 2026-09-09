@@ -21,6 +21,7 @@ import { servingCells } from '@/components/video-benchmark/serving';
 const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
+const sourceSeal = (path: string) => /^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path);
 const legacyTelemetry = (path: string) =>
   /^gpu\/supervisor\/(?:baseline|candidate)\/telemetry\.jsonl$/u.test(path);
 
@@ -134,7 +135,7 @@ export async function readStoredArtifact(
     // indexes embedded their full logs; keep those in downloadable assets only.
     for (const source of result.sources)
       source.texts = source.texts.filter(
-        ([path]) => path === 'report/index.html' || legacyTelemetry(path),
+        ([path]) => path === 'report/index.html' || legacyTelemetry(path) || sourceSeal(path),
       );
     return result;
   } catch (error) {
@@ -213,6 +214,7 @@ export async function storeVideoArtifact(
     for (const [path, body] of bundle.files) {
       if (
         path === 'report/index.html' ||
+        (fidelity && sourceSeal(path)) ||
         (!('result' in bundle && bundle.result) && legacyTelemetry(path))
       )
         texts.push([path, await body.text()]);

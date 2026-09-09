@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { head, put } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
 import { readStoredArtifact, storeVideoArtifact } from './video-storage';
-import { storedBundle } from '@/components/video-benchmark/stored';
+import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
 vi.mock('@vercel/blob', async (original) => ({
@@ -91,6 +91,11 @@ describe('persistent H3 media', () => {
       new AbortController().signal,
     );
     expect(result.sources[0].kind).toBe('fidelity');
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json(result));
+    const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
+    expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
+      fixture.checksums.get('comparison.json'),
+    );
     expect(result.sources[0].assets.filter(([path]) => path.endsWith('.mp4'))).toHaveLength(4);
     expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
       '/101/gpu/c1/baseline/artifacts/',

@@ -65,6 +65,33 @@ describe('CI ZIP import', () => {
       ),
     ).rejects.toThrow('different runs');
   });
+  it('binds fidelity processing provenance to GitHub metadata when available', async () => {
+    const comparison = JSON.stringify({
+      producer: { run_id: '10', run_attempt: '1', git_commit: 'a'.repeat(40) },
+    });
+    const blob = archive({
+      'comparison.json': comparison,
+      SHA256SUMS: `${hash(comparison)}  comparison.json`,
+    });
+    const fidelity = { ...artifact, name: 'h3-fidelity-10-1' };
+    const [source] = await archiveSources(blob, {
+      ...fidelity,
+      workflow_run: { id: 10, head_sha: 'a'.repeat(40) },
+    });
+    expect(source.id).toBe('10');
+    await expect(
+      archiveSources(blob, {
+        ...fidelity,
+        workflow_run: { id: 10, head_sha: 'b'.repeat(40) },
+      }),
+    ).rejects.toThrow('different runs');
+    await expect(
+      archiveSources(blob, {
+        ...fidelity,
+        workflow_run: { id: 11, head_sha: 'a'.repeat(40) },
+      }),
+    ).rejects.toThrow('different runs');
+  });
   it('rejects corrupted GitHub archive digests', async () => {
     await expect(
       archiveSources(archive({}), { ...artifact, digest: `sha256:${'0'.repeat(64)}` }),

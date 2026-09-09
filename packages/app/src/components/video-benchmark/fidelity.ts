@@ -23,6 +23,7 @@ export function fidelityEvidence(
   documents: Map<string, Json>,
   checksums: Map<string, string>,
   runId?: string,
+  originalSeals = new Map<string, string>(),
 ) {
   const comparison = documents.get('comparison.json') ?? null;
   const portable = documents.get('report/index.comparison.json') ?? null;
@@ -133,6 +134,25 @@ export function fidelityEvidence(
       matchedRoles.has(role)
     )
       throw new Error('Fidelity source snapshots do not match original CI identities');
+    const seal = originalSeals.get(`${prefix}original-SHA256SUMS`);
+    if (!seal) throw new Error('Missing original fidelity checksum inventory');
+    const originalHashes = new Map<string, string>();
+    for (const line of seal.trim().split('\n')) {
+      const match = /^(?<hash>[a-f0-9]{64})  (?<path>.+)$/u.exec(line);
+      if (!match || originalHashes.has(match.groups!.path))
+        throw new Error('Malformed or duplicate original fidelity checksum inventory');
+      originalHashes.set(safePath(match.groups!.path), match.groups!.hash);
+    }
+    for (const [snapshot, originalPath] of [
+      ['manifest.json', 'manifest.json'],
+      ['ci.json', 'ci.json'],
+      ['serving-smoke.json', 'serving-smoke.json'],
+      ['c1-run.json', 'gpu/c1/baseline/run.json'],
+    ]) {
+      const expected = originalHashes.get(originalPath);
+      if (!expected || checksums.get(`${prefix}${snapshot}`) !== expected)
+        throw new Error(`Fidelity source snapshot differs from original inventory: ${snapshot}`);
+    }
     matchedRoles.add(role);
   }
   return { comparison, portable, comparisonSha256: checksums.get('comparison.json')! };
@@ -153,5 +173,9 @@ export async function loadFidelityBundle(
   runId?: string,
 ): Promise<FidelityBundle> {
   const data = await readVerifiedFiles(read, 'comparison.json');
-  return { ...data, ...fidelityEvidence(data.documents, data.checksums, runId) };
+  const originalSeals = new Map<string, string>();
+  for (const [path, file] of data.files)
+    if (/^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path))
+      originalSeals.set(path, await file.text());
+  return { ...data, ...fidelityEvidence(data.documents, data.checksums, runId, originalSeals) };
 }
