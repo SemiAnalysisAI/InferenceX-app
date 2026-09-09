@@ -13,10 +13,12 @@ uploaded, persisted in localStorage, or bundled into the website. Reload or
 Clear results releases the import. The 1 GiB bundle / 512 MiB file limits keep
 this small smoke viewer bounded; larger runs need streaming storage.
 
-The reference download link is the real
-[run 34291306687, artifact 10081961245](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34291306687/artifacts/10081961245)
-at backend commit `45c9d055dd17d2f023ce42ab7a6024fe2351b23a`.
-The default reference link now points to the newer [eight-second clockwork-fox run 34293342829, artifact 10082823150](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34293342829/artifacts/10082823150) at `65699f7c6f1c4d69a3226793251e6d2739ab60f4`; it uses the same contract. Both are identical-revision A/A runs, not optimized candidates. GitHub may
+The default reference download is the real
+[eight-second clockwork-fox run 34293342829, artifact 10082823150](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34293342829/artifacts/10082823150)
+at backend commit `65699f7c6f1c4d69a3226793251e6d2739ab60f4`.
+The earlier [four-second run 34291306687, artifact 10081961245](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34291306687/artifacts/10081961245)
+at `45c9d055dd17d2f023ce42ab7a6024fe2351b23a` uses the same contract.
+Both are identical-revision A/A runs, not optimized candidates. GitHub may
 require sign-in and expires these artifacts after 14 days. Download before
 expiry. No fixture is preloaded as a result.
 

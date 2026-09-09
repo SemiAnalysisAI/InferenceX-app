@@ -95,6 +95,18 @@ const STRINGS = {
     identical: 'Identical frames; finite PSNR undefined',
     checks: 'Recorded checks',
     hardware: 'Hardware & revisions',
+    videoPsnr: 'Video PSNR (dB)',
+    videoMae: 'Video MAE (normalized 0–1)',
+    audioSpectral: 'Audio spectral cosine',
+    audioRms: 'Audio RMS ratio (candidate / baseline)',
+    audioMae: 'Audio waveform MAE (PCM amplitude)',
+    videoCoverage: 'Video coverage (fraction)',
+    audioCoverage: 'Audio coverage (fraction)',
+    node: 'Node',
+    model: 'Model',
+    modelRevision: 'Model revision',
+    runtimeRevision: 'Runtime revision',
+    sourceHash: 'Source SHA256',
     participating: 'Participating GPUs',
     allocated: 'Allocated GPUs',
     provenance: 'Provenance & downloads',
@@ -141,7 +153,7 @@ const STRINGS = {
       '从 GitHub Actions 下载 H3 产物并解压，选择包含 manifest.json 的文件夹。文件仅在当前浏览器中读取，不会上传；刷新页面后需要重新导入。',
     sample: '下载参考 CI 产物',
     remote:
-      '也可加载启用 CORS 的 HTTPS 产物目录。私有文件请通过本地文件夹打开；隐藏导航不提供访问控制。',
+      '也可加载启用 CORS 的 HTTPS 产物目录。私有产物包请通过本地文件夹打开；隐藏导航不等于访问控制。',
     error: '无法加载此产物包',
     retry: '请选择完整的产物文件夹，或修正 manifest URL 后重试。此前的结果已清除。',
     verified: '文件校验和通过',
@@ -151,7 +163,7 @@ const STRINGS = {
     comparison: '回归结论',
     calibration: '校准状态',
     qualification: '发布验收通过',
-    unavailable: '暂无数据',
+    unavailable: '无数据',
     yes: '是',
     no: '否',
     baseline: '基线',
@@ -169,7 +181,7 @@ const STRINGS = {
     latency: '端到端延迟中位数',
     throughput: '每秒有效视频数',
     counts: '完成情况',
-    memory: 'GPU 显存采样',
+    memory: 'GPU 显存采样峰值',
     timing:
       '延迟从提交请求计时，直到媒体下载并验证完成，包含轮询、传输与分析。吞吐量 = 有效测量视频数 ÷ 串行测量时段秒数，不含 warmup。这些是点估计，不代表饱和服务容量。',
     window: '正式测量时段',
@@ -185,7 +197,7 @@ const STRINGS = {
     coverage: '遥测覆盖时段',
     samples: '采样数',
     memoryNote:
-      '各 GPU 在客户端工作负载期间采到的显存占用最大值，包含 warmup。MiB = 2²⁰ 字节。采样可能漏掉峰值，不等同于分配器峰值。',
+      '各 GPU 在客户端工作负载期间采样到的显存占用最大值，包含 warmup。MiB = 2²⁰ 字节。采样可能漏掉峰值，不等同于分配器峰值。',
     integrity: '视频与音频完整性',
     fidelity: '配对保真度',
     fidelityNote:
@@ -193,6 +205,18 @@ const STRINGS = {
     identical: '帧完全一致，有限 PSNR 无定义',
     checks: '已记录的检查',
     hardware: '硬件与版本',
+    videoPsnr: '视频 PSNR（dB）',
+    videoMae: '视频 MAE（归一化至 0–1）',
+    audioSpectral: '音频频谱余弦相似度',
+    audioRms: '音频 RMS 比值（候选 / 基线）',
+    audioMae: '音频波形 MAE（PCM 振幅）',
+    videoCoverage: '视频覆盖比例',
+    audioCoverage: '音频覆盖比例',
+    node: '节点',
+    model: '模型',
+    modelRevision: '模型版本',
+    runtimeRevision: '运行时版本',
+    sourceHash: '源码 SHA256',
     participating: '参与计算的 GPU',
     allocated: '分配的 GPU',
     provenance: '来源记录与下载',
@@ -209,17 +233,17 @@ const STRINGS = {
     cost: '完整成本（USD / 计费 GPU 小时）',
     billed: '计费 GPU 数',
     assumption: '价格与成本来源 / 假设',
-    date: '假设日期',
-    revenueParticipant: '每个参与 GPU 小时的收入',
-    revenueBilled: '每个计费 GPU 小时的收入',
-    profitParticipant: '每个参与 GPU 小时的利润',
-    profitBilled: '每个计费 GPU 小时的利润',
+    date: '假设基准日期',
+    revenueParticipant: '每 GPU 小时收入（参与计算）',
+    revenueBilled: '每 GPU 小时收入（计费）',
+    profitParticipant: '每 GPU 小时利润（参与计算）',
+    profitBilled: '每 GPU 小时利润（计费）',
     currency: 'USD',
     estimate: '估算',
-    needAssumptions: '请填写售价、来源、日期与计费 GPU 数。成本留空时，利润显示为暂无数据。',
+    needAssumptions: '请填写售价、来源、日期与计费 GPU 数。成本留空时，利润显示为无数据。',
     missing: '后端字段与局限',
     missingNote:
-      '缺失值显示为暂无数据。当前协议不提供逐请求且排除 warmup 的功耗边界、设施能耗、售价或完整成本模型，也未提供传感器校准与独立硬件认证。此查看器未配置私有对象存储访问。',
+      '缺失值显示为无数据。当前后端数据契约不提供逐请求且排除 warmup 的功耗边界、设施能耗、售价或完整成本模型，也未提供传感器校准与独立硬件认证。此查看器未配置私有对象存储访问。',
   },
 };
 
@@ -748,23 +772,17 @@ export default function VideoBenchmark() {
             <p className="text-sm text-muted-foreground">{s.fidelityNote}</p>
             {table([
               [
-                'Video PSNR (dB)',
+                s.videoPsnr,
                 at(pair, 'metrics', 'video_identical') === true
                   ? s.identical
                   : at(pair, 'metrics', 'video_psnr_db'),
               ],
-              ['Video MAE (normalized 0–1)', at(pair, 'metrics', 'video_mae')],
-              ['Audio spectral cosine', at(pair, 'metrics', 'audio_spectral_cosine')],
-              ['Audio RMS ratio (candidate / baseline)', at(pair, 'metrics', 'audio_rms_ratio')],
-              ['Audio waveform MAE (PCM amplitude)', at(rawPair, 'metrics', 'audio_waveform_mae')],
-              [
-                'Video coverage (fraction)',
-                at(rawPair, 'metrics', 'video_sample_coverage_fraction'),
-              ],
-              [
-                'Audio coverage (fraction)',
-                at(rawPair, 'metrics', 'audio_sample_coverage_fraction'),
-              ],
+              [s.videoMae, at(pair, 'metrics', 'video_mae')],
+              [s.audioSpectral, at(pair, 'metrics', 'audio_spectral_cosine')],
+              [s.audioRms, at(pair, 'metrics', 'audio_rms_ratio')],
+              [s.audioMae, at(rawPair, 'metrics', 'audio_waveform_mae')],
+              [s.videoCoverage, at(rawPair, 'metrics', 'video_sample_coverage_fraction')],
+              [s.audioCoverage, at(rawPair, 'metrics', 'audio_sample_coverage_fraction')],
             ])}
             <details>
               <summary className="cursor-pointer text-sm">{s.checks}</summary>
@@ -786,9 +804,9 @@ export default function VideoBenchmark() {
                 )?.groups?.count,
               ],
               ['Slurm', at(b.manifest, 'slurm_allocation', 'identity', 'JobId')],
-              ['Node', at(b.ci, 'slurm_job', 'NodeList')],
-              ['Model', at(b.manifest, 'workload_plan', 'model_id')],
-              ['Model revision', at(b.manifest, 'workload_plan', 'model_revision')],
+              [s.node, at(b.ci, 'slurm_job', 'NodeList')],
+              [s.model, at(b.manifest, 'workload_plan', 'model_id')],
+              [s.modelRevision, at(b.manifest, 'workload_plan', 'model_revision')],
             ])}
             <div className="grid gap-6 lg:grid-cols-2">
               {ROLES.map((role) => (
@@ -796,13 +814,10 @@ export default function VideoBenchmark() {
                   <Heading level="card">{s[role]}</Heading>
                   {table([
                     [
-                      'Runtime revision',
+                      s.runtimeRevision,
                       at(b.report, 'roles', role, 'configuration', 'runtime_revision'),
                     ],
-                    [
-                      'Source SHA256',
-                      at(b.report, 'roles', role, 'source_identity', 'source_sha256'),
-                    ],
+                    [s.sourceHash, at(b.report, 'roles', role, 'source_identity', 'source_sha256')],
                     [
                       'GPU',
                       rows(at(b.job, 'roles', role, 'telemetry_summary', 'gpu_identity'))

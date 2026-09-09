@@ -128,7 +128,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供 AI 驱动的图表生成工具：用自然语言描述您想查看的图表，系统会根据 InferenceX 基准测试数据自动生成可视化结果。',
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
-  video: '在浏览器中查看 H3 CI 产物，分别检查执行结果、测量数据与未经校准的比较结论。',
+  video:
+    '本页面在浏览器中读取 H3 CI 产物，展示执行状态、测量数据与比较结论；比较阈值在后端标注校准前保持未校准。',
   feedback:
     '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
