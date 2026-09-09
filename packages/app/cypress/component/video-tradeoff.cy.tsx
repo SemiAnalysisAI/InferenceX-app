@@ -185,6 +185,6 @@ describe('Video serving matrix chart (synthetic contract fixture)', () => {
     );
     cy.get('circle.point').should('have.length', 3);
     cy.contains('客户端并发数 2').should('be.visible');
-    cy.contains('闭环冒烟测试 · 尚未通过服务容量验证').should('be.visible');
+    cy.contains('闭环冒烟测试 · 服务容量未经验证').should('be.visible');
   });
 });
