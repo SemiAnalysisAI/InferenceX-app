@@ -50,21 +50,23 @@ const run: TradeoffRun = {
 };
 
 describe('Video tradeoff chart (synthetic fixtures)', () => {
-  it('withholds missing cost, plots measured axes and drills into the original run', () => {
+  it('plots allocated GPU efficiency by default and requires assumptions for the cost axis', () => {
     const open = cy.stub().as('open');
     cy.mount(
       <PathnameContext.Provider value="/video">
         <VideoTradeoff runs={[run]} onOpen={open} />
       </PathnameContext.Provider>,
     );
-    cy.contains('No points qualify for these axes yet.').should('be.visible');
-    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
-    cy.contains('[role="option"]', 'Valid clips / allocated GPU-hour').click();
+    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').should(
+      'contain',
+      'Valid clips / allocated GPU-hour',
+    );
     cy.get('[data-testid="video-tradeoff-chart"] circle.point').should('have.length', 2);
     cy.contains('td', '1.25').should('be.visible');
     cy.contains('dd', '8 / 4').should('be.visible');
     cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
     cy.contains('[role="option"]', 'Valid clips / USD').click();
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
     cy.get('input[aria-label="Whole deployment cost (USD/hour)"]').type('2');
     cy.get('circle.point').should('not.exist');
     cy.get('input[aria-label="Cost source and included items"]').type(
@@ -75,6 +77,27 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     cy.contains('td', '5').should('be.visible');
     cy.contains('button', 'Open videos and full result').click();
     cy.get('@open').should('have.been.calledOnce');
+  });
+  it('still withholds P90 for single-request results until median diagnostics are selected', () => {
+    const single = structuredClone(run);
+    const result = single.bundle.result as { roles: Record<string, typeof role> };
+    for (const point of Object.values(result.roles)) {
+      point.records = point.records.slice(0, 1);
+      point.metrics.completion = { valid: 1, completed: 1, scheduled: 1, failed: 0 };
+    }
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[single]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
+    cy.get('circle.point').should('not.exist');
+    cy.contains('button', 'Inspect available serial results').click();
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'Median client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 2);
   });
   it('shows an empty state without inventing fixture results', () => {
     cy.mount(

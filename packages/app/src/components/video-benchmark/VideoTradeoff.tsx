@@ -169,7 +169,7 @@ export default function VideoTradeoff({
   const all = useMemo(() => runs.flatMap(tradeoffPoints), [runs]);
   const [workload, setWorkload] = useState('');
   const [xAxis, setX] = useState<LatencyAxis>('p90');
-  const [yAxis, setY] = useState<EfficiencyAxis>('dollar');
+  const [yAxis, setY] = useState<EfficiencyAxis>('clipsGpu');
   const [selected, setSelected] = useState('');
   const [costs, setCosts] = useState<Record<string, DeploymentCost>>({});
   const groups = [...new Map(all.map((p) => [p.group, p.workloadLabel])).entries()];
