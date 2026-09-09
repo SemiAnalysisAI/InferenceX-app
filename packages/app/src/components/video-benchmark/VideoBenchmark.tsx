@@ -8,6 +8,7 @@ import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 import ResultPower from './ResultPower';
+import VideoSelect from './VideoSelect';
 import { storedBundle, type StoredSource } from './stored';
 import ResultSummary from './ResultSummary';
 import {
@@ -679,21 +680,15 @@ export default function VideoBenchmark({
               <p className="text-xs text-muted-foreground">{s.audio}</p>
               {slots.length > 0 && (
                 <Card className="gap-4">
-                  <label className="text-sm font-medium">
-                    {s.slot}
-                    <select
-                      className="mt-2 block h-11 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
-                      value={slot}
-                      onChange={(e) => setSlot(e.target.value)}
-                    >
-                      {slots.map((o) => (
-                        <option key={text(at(o, 'slot_id'))} value={text(at(o, 'slot_id'))}>
-                          {at(o, 'phase') === 'warmup' ? s.warmup : s.measured} ·{' '}
-                          {text(at(o, 'slot_id'))}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <VideoSelect
+                    label={s.slot}
+                    value={slot}
+                    onValueChange={setSlot}
+                    options={slots.map((o) => ({
+                      value: text(at(o, 'slot_id')),
+                      label: `${at(o, 'phase') === 'warmup' ? s.warmup : s.measured} · ${text(at(o, 'slot_id'))}`,
+                    }))}
+                  />
                   <div>
                     <p className="mb-2 break-words text-sm font-medium">
                       {text(at(clip, 'case_id'))}
