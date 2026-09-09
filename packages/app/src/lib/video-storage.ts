@@ -65,8 +65,11 @@ async function immutable(
       abortSignal: signal,
     });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) return head(path);
-    throw error;
+    try {
+      return await head(path);
+    } catch {
+      throw error;
+    }
   }
 }
 export async function storeVideoArtifact(
@@ -82,7 +85,7 @@ export async function storeVideoArtifact(
     const assets: StoredSource['assets'] = [];
     const files = [...bundle.files];
     for (let start = 0; start < files.length; start += 8) {
-      await Promise.all(
+      const batch = await Promise.allSettled(
         files.slice(start, start + 8).map(async ([path, body]) => {
           const hash = bundle.checksums.get(path) ?? (await sha256(body));
           const key = `${PREFIX}/objects/${hash}/${path.split('/').at(-1)}`;
@@ -100,6 +103,8 @@ export async function storeVideoArtifact(
           assets.push([path, { url: saved.url, downloadUrl: saved.downloadUrl }]);
         }),
       );
+      const failed = batch.find((result) => result.status === 'rejected');
+      if (failed) throw failed.reason;
     }
     const texts: StoredSource['texts'] = [];
     for (const [path, body] of bundle.files) {

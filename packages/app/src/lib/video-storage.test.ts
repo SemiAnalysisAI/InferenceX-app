@@ -1,13 +1,19 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { put } from '@vercel/blob';
+import { head, put } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
 import { storeVideoArtifact } from './video-storage';
 import { storedBundle } from '@/components/video-benchmark/stored';
 
 vi.mock('@vercel/blob', async (original) => ({
   ...(await original<typeof BlobSdk>()),
+  head: vi.fn((path: string) =>
+    Promise.resolve({
+      url: `https://test.public.blob.vercel-storage.com/${path}`,
+      downloadUrl: `https://test.public.blob.vercel-storage.com/${path}?download=1`,
+    }),
+  ),
   put: vi.fn((path: string) =>
     Promise.resolve({
       url: `https://test.public.blob.vercel-storage.com/${path}`,
@@ -43,7 +49,10 @@ function archive(corrupt = false) {
     ).buffer,
   ]);
 }
-beforeEach(() => vi.mocked(put).mockClear());
+beforeEach(() => {
+  vi.mocked(put).mockClear();
+  vi.mocked(head).mockClear();
+});
 describe('persistent H3 media', () => {
   it('publishes verified files before the index and restores metadata without media bytes', async () => {
     const result = await storeVideoArtifact(
@@ -68,6 +77,25 @@ describe('persistent H3 media', () => {
     const bundle = storedBundle(source);
     expect(bundle.manifestSha256).toHaveLength(64);
     expect(bundle.files.has('synthetic.mp4')).toBe(false);
+  });
+  it('reuses an immutable object regardless of SDK conflict wording', async () => {
+    vi.mocked(put).mockRejectedValueOnce(new Error('Different SDK conflict wording'));
+    const result = await storeVideoArtifact(
+      '10',
+      artifact,
+      archive(),
+      new AbortController().signal,
+    );
+    expect(result.artifact.stored).toBe(true);
+    expect(head).toHaveBeenCalledTimes(1);
+  });
+  it('preserves upload failures when no immutable object exists', async () => {
+    vi.mocked(put).mockRejectedValueOnce(new Error('Storage upload failed'));
+    vi.mocked(head).mockRejectedValueOnce(new Error('Object missing'));
+    await expect(
+      storeVideoArtifact('10', artifact, archive(), new AbortController().signal),
+    ).rejects.toThrow('Storage upload failed');
+    expect(vi.mocked(put).mock.calls.some(([path]) => path.includes('/runs/'))).toBe(false);
   });
   it('does not publish unverified bytes', async () => {
     await expect(
