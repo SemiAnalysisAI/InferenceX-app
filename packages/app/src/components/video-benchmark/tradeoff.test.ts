@@ -105,6 +105,7 @@ it('connects measured load settings within a known configuration, including domi
     { allocated: 16 },
     { participating: 2 },
     { server: { tp_size: 2 } },
+    { powerLimit: { watts: 1000, percent: 90 } },
     { hardware: '' },
     { revision: '' },
   ]) {
@@ -147,13 +148,17 @@ describe('H3 tradeoff metrics (synthetic result-contract fixtures)', () => {
     expect(latencyValue(p, 'p90')).toBeNull();
     expect(latencyValue(p, 'median')).toBe(149);
   });
-  it('uses all allocated GPUs and actual valid video durations', () => {
+  it('distinguishes participating and allocated GPUs with actual valid video durations', () => {
     const p = tradeoffPoints(fixture())[0];
-    expect(efficiencyValue(p, 'clipsGpu')).toBe(1.25);
-    expect(efficiencyValue(p, 'secondsGpu')).toBe(10);
+    expect(efficiencyValue(p, 'clipsGpu')).toBe(2.5);
+    expect(efficiencyValue(p, 'clipsAllocatedGpu')).toBe(1.25);
+    expect(efficiencyValue(p, 'secondsGpu')).toBe(20);
+    expect(efficiencyValue(p, 'secondsAllocatedGpu')).toBe(10);
     expect(efficiencyValue(p, 'dollar', cost)).toBe(5);
     expect(efficiencyValue(p, 'energy')).toBe(10);
-    expect(efficiencyValue({ ...p, allocated: null }, 'clipsGpu')).toBeNull();
+    expect(efficiencyValue({ ...p, allocated: null }, 'clipsAllocatedGpu')).toBeNull();
+    expect(efficiencyValue({ ...p, participating: null }, 'clipsGpu')).toBeNull();
+    expect(efficiencyValue({ ...p, participating: 0.5 }, 'clipsGpu')).toBeNull();
     expect(efficiencyValue({ ...p, energy: null }, 'energy')).toBeNull();
   });
   it('rejects incomplete latency populations instead of reporting a fast subset', () => {
@@ -248,7 +253,7 @@ describe('Serving matrix tradeoff metrics (synthetic contract fixture)', () => {
   it('does not substitute requested or participating GPUs for missing allocation evidence', () => {
     const run = matrixFixture();
     replace(at(run.bundle.ci, 'slurm_job'), 'AllocTRES', 'cpu=32,mem=512G,node=1');
-    expect(tradeoffPoints(run).map((p) => efficiencyValue(p, 'clipsGpu'))).toEqual([
+    expect(tradeoffPoints(run).map((p) => efficiencyValue(p, 'clipsAllocatedGpu'))).toEqual([
       null,
       null,
       null,
@@ -286,12 +291,13 @@ describe('Serving matrix tradeoff metrics (synthetic contract fixture)', () => {
       ids.map((uuid) => ({ uuid })),
     );
     expect(tradeoffPoints(run)[0].allocated).toBe(8);
-    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBe(3.75);
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBe(15);
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsAllocatedGpu')).toBe(3.75);
     run.bundle.documents!.set(
       'amd-allocated-devices.json',
       ids.slice(1).map((uuid) => ({ uuid })),
     );
-    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsGpu')).toBeNull();
+    expect(efficiencyValue(tradeoffPoints(run)[0], 'clipsAllocatedGpu')).toBeNull();
   });
   it('withholds incomplete latency data and invalid power without dropping their cells', () => {
     const run = matrixFixture();
@@ -362,6 +368,8 @@ it.skipIf(!process.env.H3_SERVING_ARTIFACT_DIR)(
     }
     expect(new Set(points.map((p) => p.group)).size).toBe(1);
     expect(points[0].energy).toBeCloseTo(164180.49905077327);
+    expect(points[0].powerLimit?.watts).toBe(1400);
+    expect(points[0].powerLimit?.percent).toBeCloseTo(98.133354354);
     expect(efficiencyValue(points[0], 'clipsGpu')).toBeCloseTo(15.0621776301);
   },
 );

@@ -51,7 +51,7 @@ const run: TradeoffRun = {
 };
 
 describe('Video tradeoff chart (synthetic fixtures)', () => {
-  it('plots allocated GPU efficiency by default and requires assumptions for the cost axis', () => {
+  it('plots participating GPU efficiency by default and requires assumptions for the cost axis', () => {
     const open = cy.stub().as('open');
     cy.mount(
       <PathnameContext.Provider value="/video">
@@ -60,9 +60,12 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     );
     cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').should(
       'contain',
-      'Valid clips / allocated GPU-hour',
+      'Valid clips / participating GPU-hour',
     );
     cy.get('[data-testid="video-tradeoff-chart"] circle.point').should('have.length', 2);
+    cy.contains('td', '2.5').should('be.visible');
+    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
+    cy.contains('[role="option"]', 'Valid clips / allocated GPU-hour').click();
     cy.contains('td', '1.25').should('be.visible');
     cy.contains('dd', '8 / 4').should('be.visible');
     cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();

@@ -1,6 +1,7 @@
 import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
 import { servingCells } from './serving';
 import { allocatedGpus } from './allocation';
+import { powerLimitComparison } from './power-limit';
 
 export interface TradeoffRun {
   bundle: Pick<Bundle, 'manifest' | 'result' | 'manifestSha256'> &
@@ -9,7 +10,13 @@ export interface TradeoffRun {
   artifact: string;
 }
 export type LatencyAxis = 'p90' | 'median';
-export type EfficiencyAxis = 'dollar' | 'clipsGpu' | 'secondsGpu' | 'energy';
+export type EfficiencyAxis =
+  | 'dollar'
+  | 'clipsGpu'
+  | 'secondsGpu'
+  | 'clipsAllocatedGpu'
+  | 'secondsAllocatedGpu'
+  | 'energy';
 export interface DeploymentCost {
   hourly: string;
   source: string;
@@ -116,6 +123,14 @@ function pairedTradeoffPoints(run: TradeoffRun) {
         ? positive(at(phase, 'aggregate', 'joules_per_valid_clip'))
         : null;
     const devices = rows(at(result, 'hardware', 'devices'));
+    const limits = at(result, 'hardware', 'configured_power_limits', 'by_role', role);
+    const powerLimit = powerLimitComparison(
+      phase,
+      at(limits, 'before'),
+      at(limits, 'after'),
+      at(result, 'hardware', 'gpu_uuids'),
+      at(result, 'definitions', 'gpu_power', 'unit'),
+    );
     return {
       id: `${b.manifestSha256}:${role}`,
       role,
@@ -139,6 +154,7 @@ function pairedTradeoffPoints(run: TradeoffRun) {
       allocated: positive(at(result, 'hardware', 'reserved_gpu_count')),
       participating: positive(at(result, 'hardware', 'selected_gpu_count')),
       energy,
+      powerLimit,
       power: at(phase, 'valid') === true ? number(at(phase, 'aggregate', 'avg_power_w')) : null,
       powerWindow: at(phase, 'valid') === true ? number(at(phase, 'duration_seconds')) : null,
       server: at(result, 'workload', 'server'),
@@ -218,6 +234,15 @@ function servingTradeoffPoints(run: TradeoffRun) {
       energy: powerValid ? positive(at(phase, 'aggregate', 'joules_per_valid_clip')) : null,
       power: powerValid ? number(at(phase, 'aggregate', 'avg_power_w')) : null,
       powerWindow: powerValid ? number(at(phase, 'duration_seconds')) : null,
+      powerLimit: powerValid
+        ? powerLimitComparison(
+            phase,
+            at(item.job, 'roles', 'baseline', 'power_configuration_before'),
+            at(item.job, 'roles', 'baseline', 'power_configuration_after'),
+            at(item.spec, 'gpu_uuids'),
+            at(item.power, 'semantics', 'power_unit'),
+          )
+        : null,
       server,
       fidelity: null,
       policy: at(item.spec, 'policy'),
@@ -248,6 +273,7 @@ export function tradeoffCurves<T extends TradeoffPoint & { x: number; y: number 
       allocated: p.allocated,
       participating: p.participating,
       server: p.server,
+      enforcedPowerLimitWatts: p.powerLimit?.watts ?? null,
     });
     const group = groups.get(key);
     if (group) group.push(p);
@@ -287,10 +313,26 @@ export function efficiencyValue(
     const hourly = costValue(cost);
     if (point.rate !== null && hourly !== null) value = point.rate / hourly;
   }
-  if (axis === 'clipsGpu' && point.rate !== null && point.allocated !== null)
-    value = point.rate / point.allocated;
-  if (axis === 'secondsGpu' && point.secondsRate !== null && point.allocated !== null)
-    value = point.secondsRate / point.allocated;
+  const gpuCount =
+    axis === 'clipsAllocatedGpu' || axis === 'secondsAllocatedGpu'
+      ? point.allocated
+      : point.participating;
+  if (
+    (axis === 'clipsGpu' || axis === 'clipsAllocatedGpu') &&
+    point.rate !== null &&
+    gpuCount !== null &&
+    Number.isSafeInteger(gpuCount) &&
+    gpuCount > 0
+  )
+    value = point.rate / gpuCount;
+  if (
+    (axis === 'secondsGpu' || axis === 'secondsAllocatedGpu') &&
+    point.secondsRate !== null &&
+    gpuCount !== null &&
+    Number.isSafeInteger(gpuCount) &&
+    gpuCount > 0
+  )
+    value = point.secondsRate / gpuCount;
   if (axis === 'energy' && point.energy !== null) value = 3600000 / point.energy;
   return value !== null && Number.isFinite(value) ? value : null;
 }
