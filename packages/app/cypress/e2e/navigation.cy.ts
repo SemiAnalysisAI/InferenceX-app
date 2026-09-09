@@ -348,12 +348,14 @@ describe('H3 video artifact viewer', () => {
     cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
     cy.visit('/video?view=tradeoff&run=123&artifact=40&source=123&compare=123.40,456.41,789.42');
     cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
     cy.get('[data-testid="video-tradeoff"]')
       .should('contain', 'NVIDIA H200')
       .and('contain', 'NVIDIA B200');
     cy.get('[role="alert"]').should('contain', 'Some comparison results could not be loaded');
     cy.reload();
     cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
     cy.contains(
       '[data-testid="video-tradeoff"] tbody button',
       /NVIDIA B200.*Client concurrency 4/,

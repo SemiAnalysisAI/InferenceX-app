@@ -196,7 +196,10 @@ export default function VideoTradeoff({
     ? workload
     : (all.find((p) => p.sourceId === sourceId)?.group ?? groups[0]?.[0]);
   const points = all.filter((p) => p.group === group);
-  const active = points.find((p) => p.id === selected) ?? points[0];
+  const active =
+    points.find((p) => p.id === selected) ??
+    points.find((p) => p.sourceId === sourceId) ??
+    points[0];
   const isServing = points.some((p) => p.role === 'serving');
   const xAxis =
     latencyAxis ??
