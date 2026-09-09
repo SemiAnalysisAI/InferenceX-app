@@ -137,6 +137,29 @@ const matrix = (): TradeoffRun => ({
 });
 
 describe('Video serving matrix chart (synthetic contract fixture)', () => {
+  it('defaults to P90 when individual serving cells have enough samples', () => {
+    const formal = matrix();
+    formal.bundle = {
+      ...servingFixture('123', 'NVIDIA H200', 20),
+      result: null,
+      manifestSha256: 'synthetic-formal',
+    };
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[formal]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'P90 client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.get('tbody tr')
+      .should('have.length', 3)
+      .each((row) => {
+        cy.wrap(row).should('contain', '20 / 20 / 20');
+      });
+  });
   it('shows three labeled cell medians and opens the selected concurrency result', () => {
     const open = cy.stub().as('openCell');
     cy.mount(

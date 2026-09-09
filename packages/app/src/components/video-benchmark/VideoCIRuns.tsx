@@ -15,6 +15,7 @@ import type { TradeoffRun } from './tradeoff';
 import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
 import type { Bundle } from './bundle';
 import { archiveSources, type CIArtifact, type CIRun } from './archive';
+import { comparisonRefs, rememberComparison } from './comparison';
 
 const STRINGS = {
   en: {
@@ -43,6 +44,9 @@ const STRINGS = {
     note: 'Results preserve their original GitHub CI identities. Stored media loads separately from the benchmark data; unpublished artifacts use the CI archive fallback.',
     expired: 'Expired',
     noMedia: 'Artifact unavailable',
+    comparisonLoading: 'Loading the other CI results in this comparison…',
+    comparisonError:
+      'Some comparison results could not be loaded. Check the run IDs or retry. A shared comparison supports up to 8 CI artifacts.',
   },
   zh: {
     title: 'H3 视频基准测试',
@@ -70,6 +74,9 @@ const STRINGS = {
     note: '结果保留原始 GitHub CI 运行标识。已存储的媒体与基准测试数据分别加载；尚未发布的产物则回退为下载 CI 产物压缩包。',
     expired: '已过期',
     noMedia: '产物不可用',
+    comparisonLoading: '正在加载对比中的其他 CI 结果…',
+    comparisonError:
+      '部分对比结果未能加载，请检查运行 ID 或重试。一个分享链接最多可包含 8 份 CI 产物。',
   },
 };
 
@@ -83,8 +90,10 @@ async function json(url: string, signal?: AbortSignal) {
 function share(runId: number, artifactId?: number, source?: string, cell?: string) {
   const url = new URL(location.href);
   const view = url.searchParams.get('view');
+  const comparison = url.searchParams.get('compare');
   url.search = '';
   if (view === 'tradeoff') url.searchParams.set('view', view);
+  if (comparison) url.searchParams.set('compare', comparison);
   url.searchParams.set('run', String(runId));
   if (artifactId) url.searchParams.set('artifact', String(artifactId));
   if (source) url.searchParams.set('source', source);
@@ -111,6 +120,9 @@ export default function VideoCIRuns() {
   const [cellId, setCellId] = useState('');
   const [view, setView] = useState('results');
   const [compared, setCompared] = useState<TradeoffRun[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState(false);
+  const comparisonDownload = useRef<AbortController | null>(null);
   const changeView = (value: string) => {
     setView(value);
     const url = new URL(location.href);
@@ -120,6 +132,15 @@ export default function VideoCIRuns() {
   };
   const collect = useCallback((bundle: Bundle, exportRun: string, artifactId: string) => {
     servingCells(bundle);
+    try {
+      history.replaceState(
+        null,
+        '',
+        rememberComparison(new URL(location.href), exportRun, artifactId),
+      );
+    } catch {
+      setComparisonError(true);
+    }
     setCompared((old) =>
       old.some((item) => item.bundle.manifestSha256 === bundle.manifestSha256)
         ? old
@@ -148,6 +169,45 @@ export default function VideoCIRuns() {
   );
   const request = useRef(0);
   const download = useRef<AbortController | null>(null);
+
+  async function restoreComparison() {
+    comparisonDownload.current?.abort();
+    const controller = new AbortController();
+    comparisonDownload.current = controller;
+    const params = new URLSearchParams(location.search);
+    setComparisonError(false);
+    setComparisonLoading(true);
+    try {
+      const selected = `${params.get('run')}.${params.get('artifact')}`;
+      const refs = comparisonRefs(params.get('compare')).filter((ref) => ref !== selected);
+      const results = await Promise.allSettled(
+        refs.map(async (ref) => {
+          const [runId, artifactId] = ref.split('.');
+          const saved: StoredArtifact = await json(
+            `/api/video-runs?run=${runId}&artifact=${artifactId}&format=media`,
+            controller.signal,
+          );
+          if (
+            saved.storageVersion !== 1 ||
+            saved.runId !== runId ||
+            String(saved.artifact.id) !== artifactId ||
+            saved.sources.length === 0
+          )
+            throw new Error('Stored comparison identity mismatch');
+          const bundles = saved.sources.map(storedBundle);
+          for (const bundle of bundles) servingCells(bundle);
+          if (!controller.signal.aborted)
+            for (const bundle of bundles) collect(bundle, runId, artifactId);
+        }),
+      );
+      if (!controller.signal.aborted && results.some((result) => result.status === 'rejected'))
+        setComparisonError(true);
+    } catch {
+      if (!controller.signal.aborted) setComparisonError(true);
+    } finally {
+      if (!controller.signal.aborted) setComparisonLoading(false);
+    }
+  }
 
   async function loadArtifact(
     selectedRun: CIRun,
@@ -328,6 +388,7 @@ export default function VideoCIRuns() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('view') === 'tradeoff') setView('tradeoff');
+    if (params.has('compare')) void restoreComparison();
     const directRun = params.get('run');
     if (directRun)
       void selectRun(directRun, params.get('artifact'), params.get('source'), params.get('cell'));
@@ -335,6 +396,7 @@ export default function VideoCIRuns() {
     return () => {
       request.current++;
       download.current?.abort();
+      comparisonDownload.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -499,6 +561,19 @@ export default function VideoCIRuns() {
         </Button>
       </div>
       <div hidden={view !== 'tradeoff'}>
+        {comparisonLoading && (
+          <p role="status" className="mb-3 text-sm text-muted-foreground">
+            {s.comparisonLoading}
+          </p>
+        )}
+        {comparisonError && (
+          <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+            <p>{s.comparisonError}</p>
+            <Button variant="outline" size="sm" onClick={() => void restoreComparison()}>
+              {s.retry}
+            </Button>
+          </div>
+        )}
         <VideoTradeoff
           runs={compared}
           sourceId={sourceId}

@@ -197,7 +197,9 @@ export default function VideoTradeoff({
   const points = all.filter((p) => p.group === group);
   const active = points.find((p) => p.id === selected) ?? points[0];
   const isServing = points.some((p) => p.role === 'serving');
-  const xAxis = latencyAxis ?? (isServing ? 'median' : 'p90');
+  const xAxis =
+    latencyAxis ??
+    (isServing && !points.some((p) => latencyValue(p, 'p90') !== null) ? 'median' : 'p90');
   const plotted = points.flatMap((p) => {
     const x = latencyValue(p, xAxis),
       y = efficiencyValue(p, yAxis, costs[p.id]);

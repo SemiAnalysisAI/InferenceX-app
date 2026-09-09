@@ -1,5 +1,6 @@
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
+import { servingArtifact, videoRun } from '../support/video-artifacts';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
 
@@ -325,6 +326,44 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
 describe('H3 video artifact viewer', () => {
   beforeEach(() => {
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+  });
+  it('restores a cross-hardware comparison on reload and retains good results when one artifact fails', () => {
+    const h200 = servingArtifact(123, 40, 'NVIDIA H200');
+    const b200 = servingArtifact(456, 41, 'NVIDIA B200');
+    for (const saved of [h200, b200]) {
+      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
+        run: videoRun(Number(saved.runId), 'success'),
+        artifacts: [saved.artifact],
+      });
+      cy.intercept(
+        'GET',
+        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
+        saved,
+      );
+    }
+    cy.intercept('GET', '/api/video-runs?run=789&artifact=42&format=media', {
+      statusCode: 503,
+      body: { error: 'Synthetic unavailable artifact' },
+    });
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.visit('/video?view=tradeoff&run=123&artifact=40&source=123&compare=123.40,456.41,789.42');
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.get('[data-testid="video-tradeoff"]')
+      .should('contain', 'NVIDIA H200')
+      .and('contain', 'NVIDIA B200');
+    cy.get('[role="alert"]').should('contain', 'Some comparison results could not be loaded');
+    cy.reload();
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.contains(
+      '[data-testid="video-tradeoff"] tbody button',
+      /NVIDIA B200.*Client concurrency 4/,
+    ).click();
+    cy.contains('button', 'Open videos and full result').click();
+    cy.get('[data-testid="serving-selected-metrics"]').should('contain', 'C4');
+    cy.location('search').should('include', 'run=456').and('include', 'compare=');
+    cy.get('[data-testid="serving-media"] video')
+      .should('have.attr', 'src')
+      .and('include', '/gpu/c4/');
   });
   it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
     cy.viewport(1440, 1000);

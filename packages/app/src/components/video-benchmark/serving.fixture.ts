@@ -3,7 +3,11 @@ import type { Bundle, Json } from './bundle';
 const hash = (name: string) => name.padEnd(64, '0');
 
 // Synthetic contract data, shaped after the C1/C2/C4 backend artifact.
-export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'> {
+export function servingFixture(
+  runId = '123',
+  hardware = 'NVIDIA H200',
+  requests = 4,
+): Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'> {
   const plan = {
     model_id: 'MiniMaxAI/MiniMax-H3',
     model_revision: 'a'.repeat(40),
@@ -21,7 +25,7 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
       audio_flow_shift: 3,
     },
     cases: [{ case_id: 'drum-taps', prompt: 'A drummer taps a snare drum.', seed: 11 }],
-    repetitions: 4,
+    repetitions: requests,
     warmup_runs: 1,
   };
   const runtime = {
@@ -38,12 +42,12 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
   };
   const cells = [1, 2, 4].map((concurrency) => {
     const root = `gpu/c${concurrency}`;
-    const latencies =
-      concurrency === 1
-        ? [120, 120, 120, 120]
-        : concurrency === 2
-          ? [120, 240, 240, 240]
-          : [120, 240, 360, 480];
+    const latencies = Array.from(
+      { length: requests },
+      (_, i) => Math.min(i + 1, concurrency) * 120,
+    );
+    const median =
+      (latencies[Math.floor((requests - 1) / 2)] + latencies[Math.ceil((requests - 1) / 2)]) / 2;
     const serving = {
       concurrency,
       mode: 'closed_loop',
@@ -51,34 +55,38 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
       peak_client_in_flight: concurrency,
       valid_video_seconds_per_second: 107 / 24 / 120,
       client_ready_latency_seconds: {
-        p50: concurrency === 4 ? 300 : 120 * concurrency,
-        p90: null,
+        p50: median,
+        p90: requests >= 10 ? latencies[Math.ceil(requests * 0.9) - 1] : null,
         p95: null,
-        sample_count: 4,
+        sample_count: requests,
         values: latencies,
       },
     };
     const measurement = {
       concurrency,
       boundary: 'submit_to_downloaded_media',
-      wall_seconds: 480,
+      wall_seconds: requests * 120,
       warmup_runs: 1,
       warmup_qualified: true,
     };
     const completion = {
-      scheduled: 4,
-      attempted: 4,
-      completed: 4,
-      valid: 4,
+      scheduled: requests,
+      attempted: requests,
+      completed: requests,
+      valid: requests,
       failed: 0,
       not_started: 0,
     };
     const phases = {
       measurement: {
         valid: true,
-        valid_clips: 4,
-        duration_seconds: 480,
-        aggregate: { avg_power_w: 1400, energy_j: 672000, joules_per_valid_clip: 168000 },
+        valid_clips: requests,
+        duration_seconds: requests * 120,
+        aggregate: {
+          avg_power_w: 1400,
+          energy_j: 168000 * requests,
+          joules_per_valid_clip: 168000,
+        },
       },
     };
     const runHash = hash(`a${concurrency}`),
@@ -88,10 +96,10 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
     const runPath = `${root}/baseline/run.json`;
     const records = [
       'warmup-001',
-      'measurement-r001-c001',
-      'measurement-r002-c001',
-      'measurement-r003-c001',
-      'measurement-r004-c001',
+      ...Array.from(
+        { length: requests },
+        (_, i) => `measurement-r${String(i + 1).padStart(3, '0')}-c001`,
+      ),
     ].map((slot, index) => {
       const mediaHash = hash(`e${concurrency}${index}`);
       checksums.set(`${root}/baseline/artifacts/${slot}.mp4`, mediaHash);
@@ -149,7 +157,7 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
       {
         schema_version: '0.1.0',
         bundle_type: 'controlled_serving_smoke',
-        job_id: `github-123-1-c${concurrency}`,
+        job_id: `github-${runId}-1-c${concurrency}`,
         spec_sha256: specHash,
         plan_sha256: hash('f'),
         status: 'complete',
@@ -160,9 +168,9 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
           baseline: {
             run_path: 'baseline/run.json',
             run_sha256: runHash,
-            gpu_before: { gpus: devices.map((uuid) => ({ uuid, name: 'NVIDIA H200' })) },
+            gpu_before: { gpus: devices.map((uuid) => ({ uuid, name: hardware })) },
             telemetry_summary: {
-              gpu_identity: devices.map((uuid) => ({ uuid, name: 'NVIDIA H200' })),
+              gpu_identity: devices.map((uuid) => ({ uuid, name: hardware })),
             },
           },
         },
@@ -204,7 +212,7 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
     checksums,
     manifest: {
       mode: 'serving-smoke',
-      run_id: '123',
+      run_id: runId,
       run_attempt: '1',
       git_commit: 'c'.repeat(40),
       workload_plan: plan,
@@ -212,7 +220,7 @@ export function servingFixture(): Pick<Bundle, 'documents' | 'checksums' | 'mani
     },
     ci: {
       mode: 'serving-smoke',
-      run_id: '123',
+      run_id: runId,
       run_attempt: '1',
       source_sha: 'c'.repeat(40),
       slurm_job: { AllocTRES: 'cpu=32,mem=512G,node=1,gres/gpu=2' },
