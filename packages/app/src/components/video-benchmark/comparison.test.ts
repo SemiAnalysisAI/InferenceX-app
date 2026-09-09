@@ -14,13 +14,13 @@ describe('shared CI comparison identities', () => {
     expect(rememberComparison(url, '456', '41').searchParams.get('compare')).toBe('123.40,456.41');
   });
 
-  it('does not turn one loaded artifact into a multi-run comparison', () => {
+  it('saves the first loaded artifact before navigation replaces its run identity', () => {
     const url = rememberComparison(
       new URL('https://example.test/video?run=123&artifact=40'),
       '123',
       '40',
     );
-    expect(url.searchParams.has('compare')).toBe(false);
+    expect(url.searchParams.get('compare')).toBe('123.40');
     expect(comparisonRefs(null)).toEqual([]);
   });
 

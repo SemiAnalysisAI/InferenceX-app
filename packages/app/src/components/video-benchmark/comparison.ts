@@ -16,6 +16,6 @@ export function rememberComparison(url: URL, run: string, artifact: string): URL
       `${run}.${artifact}`,
     ].join(','),
   );
-  if (refs.length > 1) url.searchParams.set('compare', refs.join(','));
+  url.searchParams.set('compare', refs.join(','));
   return url;
 }

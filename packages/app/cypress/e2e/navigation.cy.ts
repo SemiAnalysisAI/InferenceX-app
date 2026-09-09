@@ -327,6 +327,39 @@ describe('H3 video artifact viewer', () => {
   beforeEach(() => {
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
   });
+  it('shares a comparison built by opening two CI runs through the page', () => {
+    for (const saved of [
+      servingArtifact(123, 40, 'NVIDIA H200'),
+      servingArtifact(456, 41, 'NVIDIA B200'),
+    ]) {
+      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
+        run: videoRun(Number(saved.runId), 'success'),
+        artifacts: [saved.artifact],
+      });
+      cy.intercept(
+        'GET',
+        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
+        saved,
+      );
+    }
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.visit('/video?view=tradeoff&run=123&artifact=40');
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 3);
+    cy.contains('summary', 'Run details and artifact selection').click();
+    cy.get('[data-testid="video-ci-runs"] form input').type('456');
+    cy.get('[data-testid="video-ci-runs"] form').submit();
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.location().should((location) => {
+      const params = new URLSearchParams(location.search);
+      expect(params.get('run')).to.equal('456');
+      expect(params.get('compare')).to.equal('123.40,456.41');
+    });
+    cy.reload();
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.get('[data-testid="video-tradeoff"]')
+      .should('contain', 'NVIDIA H200')
+      .and('contain', 'NVIDIA B200');
+  });
   it('restores a cross-hardware comparison on reload and retains good results when one artifact fails', () => {
     const h200 = servingArtifact(123, 40, 'NVIDIA H200');
     const b200 = servingArtifact(456, 41, 'NVIDIA B200');
