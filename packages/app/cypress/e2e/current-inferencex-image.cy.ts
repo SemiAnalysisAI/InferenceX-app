@@ -17,20 +17,20 @@ describe('Current InferenceX Image localized routes', () => {
       precision: 'fp8',
       spec_method: 'none',
       disagg: false,
-      isl: 1024,
+      isl: 8192,
       osl: 1024,
       benchmark_type: 'single_turn',
       image: 'lmsysorg/sglang:v0.5.2',
       date: today,
     },
     {
-      model: 'gptoss',
+      model: 'dsv4',
       hardware: 'b200',
       framework: 'vllm',
       precision: 'fp4',
       spec_method: 'mtp',
       disagg: false,
-      isl: 1024,
+      isl: 8192,
       osl: 1024,
       benchmark_type: 'single_turn',
       image: 'vllm/vllm-openai:v0.10.1',
@@ -209,6 +209,70 @@ describe('Current InferenceX Image localized routes', () => {
       .should('have.length', 1)
       .and('have.attr', 'style')
       .and('match', /oklch/u);
+  });
+
+  it('lists only model-scenario pairs that are still benchmarked', () => {
+    cy.viewport(1440, 900);
+    const retiredImage = 'lmsysorg/sglang:v0.4.9-minimax-8k1k-retired';
+    const activeMiniMaxImage = 'lmsysorg/sglang:v0.5.2-minimax-agentic';
+    const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
+    cy.intercept('GET', '**/api/v1/latest-images', [
+      ...imageRows,
+      // MiniMax M3 retired its 8K/1K sweep on 2026-08-04; AgentX stays active.
+      {
+        ...imageRows[0],
+        model: 'minimaxm3',
+        framework: 'sglang',
+        image: retiredImage,
+        date: '2026-08-04',
+      },
+      {
+        ...imageRows[0],
+        model: 'minimaxm3',
+        framework: 'sglang',
+        isl: null,
+        osl: null,
+        benchmark_type: 'agentic_traces',
+        image: activeMiniMaxImage,
+        date: today,
+      },
+      // Kimi K2.5 is a fully deprecated model: no scenario should surface it.
+      { ...imageRows[1], model: 'kimik2.5', image: deprecatedModelImage },
+      // The globally retired 1K/1K sweep must not surface for any model.
+      { ...imageRows[1], isl: 1024, osl: 1024, image: 'vllm/vllm-openai:v0.8.0-1k1k' },
+    ]);
+    cy.intercept('GET', '**/api/v1/framework-releases', {
+      sglang: 'v0.5.2',
+      vllm: 'v0.10.1',
+    });
+    cy.visit('/current-inferencex-image');
+
+    // Default 8K/1K view across all models: the still-swept rows only.
+    cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
+    cy.get('table')
+      .should('contain.text', 'lmsysorg/sglang:v0.5.2')
+      .and('contain.text', 'vllm/vllm-openai:v0.10.1')
+      .and('not.contain.text', retiredImage)
+      .and('not.contain.text', deprecatedModelImage);
+
+    cy.get('#image-sequence-select').click();
+    cy.get('[data-slot="select-item"]').should('not.contain.text', '1k/1k');
+    cy.get('[data-slot="select-item"]').contains('8k/1k').click();
+
+    cy.get('#image-model-select').click();
+    cy.get('[data-slot="select-item"]').should('not.contain.text', 'Kimi-K2.5');
+    cy.get('[data-slot="select-item"]').contains('MiniMax-M3').click();
+
+    // Selecting MiniMax M3 removes 8K/1K from the scenario list and moves the
+    // table onto the model's only active scenario.
+    cy.get('#image-sequence-select').should('contain.text', 'Agentic');
+    cy.get('#image-sequence-select').click();
+    cy.get('[data-slot="select-item"]').should('have.length', 1).and('contain.text', 'Agentic');
+    cy.get('[data-slot="select-item"]').contains('Agentic').click();
+    cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
+    cy.get('table')
+      .should('contain.text', activeMiniMaxImage)
+      .and('not.contain.text', retiredImage);
   });
 
   it('labels agentic rows with the reviewed Chinese scenario copy', () => {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { Model, Sequence } from '@/lib/data-mappings';
+
 import {
   AGE_MAX_RED_DAYS,
   AGENTX_MAX_AGE_DAYS,
@@ -9,8 +11,14 @@ import {
   daysSince,
   getActualLatestTag,
   getCurrentImageNodeTypeTooltip,
+  imageRowDisplayModel,
+  imageRowModel,
+  imageRowSequence,
+  isActiveImageRow,
   isOutdated,
   isStaleAgentx,
+  resolveSelectedSequence,
+  sequenceOptionsForModel,
 } from './latest-image-utils';
 
 const lightnessOf = (s: string) =>
@@ -181,5 +189,139 @@ describe('getCurrentImageNodeTypeTooltip', () => {
     expect(getCurrentImageNodeTypeTooltip('zh')).toBe(
       '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
     );
+  });
+});
+
+/** Fixed-sequence or agentic row shape the catalog helpers read. */
+function imageRow(
+  model: string,
+  scenario: 'agentic' | '1k/1k' | '1k/8k' | '8k/1k' | { isl: number; osl: number },
+) {
+  if (scenario === 'agentic') {
+    return { model, isl: null, osl: null, benchmark_type: 'agentic_traces' };
+  }
+  const islOsl =
+    typeof scenario === 'string'
+      ? { '1k/1k': [1024, 1024], '1k/8k': [1024, 8192], '8k/1k': [8192, 1024] }[scenario]
+      : [scenario.isl, scenario.osl];
+  return { model, isl: islOsl[0], osl: islOsl[1], benchmark_type: 'single_turn' };
+}
+
+describe('imageRowDisplayModel / imageRowModel', () => {
+  it('maps DB keys to the configured display model, grouping point releases', () => {
+    expect(imageRowDisplayModel({ model: 'minimaxm3' })).toBe('MiniMax-M3');
+    expect(imageRowModel({ model: 'minimaxm3' })).toBe(Model.MiniMax_M3);
+    expect(imageRowModel({ model: 'glm5.1' })).toBe(Model.GLM_5);
+    expect(imageRowModel({ model: 'kimik2.7-code' })).toBe(Model.Kimi_K2_5);
+  });
+
+  it('keeps unmapped DB keys as raw display names with no configured model', () => {
+    expect(imageRowDisplayModel({ model: 'brand-new-model' })).toBe('brand-new-model');
+    expect(imageRowModel({ model: 'brand-new-model' })).toBeNull();
+  });
+});
+
+describe('imageRowSequence', () => {
+  it('classifies agentic rows regardless of isl/osl and maps fixed sequences', () => {
+    expect(imageRowSequence(imageRow('dsv4', 'agentic'))).toBe(Sequence.AgenticTraces);
+    expect(imageRowSequence(imageRow('dsv4', '8k/1k'))).toBe(Sequence.EightK_OneK);
+    expect(imageRowSequence(imageRow('dsv4', '1k/1k'))).toBe(Sequence.OneK_OneK);
+  });
+
+  it('falls back to the raw isl/osl pair for unmapped fixed-sequence combos', () => {
+    expect(imageRowSequence(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe('4096/512');
+  });
+});
+
+describe('isActiveImageRow', () => {
+  it('keeps active models on scenarios they still sweep', () => {
+    expect(isActiveImageRow(imageRow('dsv4', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(true);
+    // Maintenance is not deprecation: DeepSeek R1 stays listed on 8K/1K.
+    expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
+  });
+
+  it('drops the per-model retired MiniMax M3 8K/1K sweep while keeping 8K/1K elsewhere', () => {
+    expect(isActiveImageRow(imageRow('minimaxm3', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
+  });
+
+  it('drops globally retired 1K/1K and 1K/8K sweeps for every model', () => {
+    expect(isActiveImageRow(imageRow('dsv4', '1k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('qwen3.5', '1k/8k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('dsr1', '1k/1k'))).toBe(false);
+  });
+
+  it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('kimik2.5', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('kimik2.6', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('minimaxm2.5', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('gptoss120b', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('glm5', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('glm5.1', 'agentic'))).toBe(false);
+  });
+
+  it('keeps unconfigured models, applying only the global scenario retirements', () => {
+    expect(isActiveImageRow(imageRow('brand-new-model', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('brand-new-model', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('brand-new-model', '1k/1k'))).toBe(false);
+  });
+
+  it('keeps unmapped isl/osl combos so a new sweep shape is not silently hidden', () => {
+    expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(true);
+  });
+});
+
+describe('sequenceOptionsForModel', () => {
+  const rows = [
+    imageRow('dsv4', '8k/1k'),
+    imageRow('dsv4', 'agentic'),
+    imageRow('minimaxm3', 'agentic'),
+    imageRow('kimik3', 'agentic'),
+    imageRow('qwen3.5', '8k/1k'),
+  ];
+
+  it('unions every scenario across models for the all-models filter', () => {
+    expect(sequenceOptionsForModel(rows, 'all')).toEqual([
+      Sequence.EightK_OneK,
+      Sequence.AgenticTraces,
+    ]);
+  });
+
+  it('narrows to the scenarios the selected model runs', () => {
+    expect(sequenceOptionsForModel(rows, 'MiniMax-M3')).toEqual([Sequence.AgenticTraces]);
+    expect(sequenceOptionsForModel(rows, 'Kimi-K3')).toEqual([Sequence.AgenticTraces]);
+    expect(sequenceOptionsForModel(rows, 'DeepSeek-V4-Pro')).toEqual([
+      Sequence.EightK_OneK,
+      Sequence.AgenticTraces,
+    ]);
+  });
+
+  it('returns no options for a model with no rows', () => {
+    expect(sequenceOptionsForModel(rows, 'Qwen3.8-Flash-Next')).toEqual([]);
+    expect(sequenceOptionsForModel([], 'all')).toEqual([]);
+  });
+});
+
+describe('resolveSelectedSequence', () => {
+  it('honours the selection when the model still offers it', () => {
+    expect(
+      resolveSelectedSequence(
+        [Sequence.EightK_OneK, Sequence.AgenticTraces],
+        Sequence.AgenticTraces,
+      ),
+    ).toBe(Sequence.AgenticTraces);
+  });
+
+  it('falls back to the first offered scenario when the selection is retired for the model', () => {
+    expect(resolveSelectedSequence([Sequence.AgenticTraces], Sequence.EightK_OneK)).toBe(
+      Sequence.AgenticTraces,
+    );
+  });
+
+  it('returns the selection unchanged when nothing is offered so the empty state renders', () => {
+    expect(resolveSelectedSequence([], Sequence.EightK_OneK)).toBe(Sequence.EightK_OneK);
   });
 });
