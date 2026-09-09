@@ -117,6 +117,15 @@ describe('Profit Estimator per GW', () => {
         'Rent - 3 Year Commit',
         'Custom $/GPU/hr',
       ]);
+      // Custom $/GPU/hr sits directly after the published tiers, ahead of the
+      // locked rent tiers that only open the TCO model dialog.
+      const customIdx = labels.indexOf('Custom $/GPU/hr');
+      expect(customIdx).to.equal(labels.indexOf('Rent - 3 Year Commit') + 1);
+      const lockedIdx = [...$opts].flatMap((el, i) =>
+        el.dataset.testid?.startsWith('cost-provider-locked-') ? [i] : [],
+      );
+      expect(lockedIdx).to.have.length.greaterThan(0);
+      expect(Math.min(...lockedIdx)).to.be.greaterThan(customIdx);
     });
     cy.get('body').type('{esc}');
     // Segments are labelled in place; there is no separate key under the title.
