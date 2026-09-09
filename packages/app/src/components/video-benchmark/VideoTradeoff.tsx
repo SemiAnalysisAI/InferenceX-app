@@ -214,7 +214,10 @@ export default function VideoTradeoff({
             label={s.workload}
             value={group ?? ''}
             onValueChange={setWorkload}
-            options={groups.map(([value, name]) => ({ value, label: name }))}
+            options={groups.map(([value, name], index) => ({
+              value,
+              label: `#${index + 1} · ${name}`,
+            }))}
           />
           <div className="grid gap-3 md:grid-cols-2">
             <VideoSelect
@@ -402,6 +405,12 @@ export default function VideoTradeoff({
                     {s.ci}
                   </a>
                 </div>
+                <details>
+                  <summary className="cursor-pointer text-xs">{s.workload}</summary>
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
+                    {JSON.stringify(active.workload, null, 2)}
+                  </pre>
+                </details>
                 <details>
                   <summary className="cursor-pointer text-xs">{s.server}</summary>
                   <pre className="mt-2 whitespace-pre-wrap break-all text-xs">

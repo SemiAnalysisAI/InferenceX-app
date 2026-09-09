@@ -1,6 +1,7 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import VideoTradeoff from '@/components/video-benchmark/VideoTradeoff';
 import type { TradeoffRun } from '@/components/video-benchmark/tradeoff';
+import type { Json } from '@/components/video-benchmark/bundle';
 
 const role = {
   metrics: {
@@ -83,5 +84,24 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     );
     cy.contains('Open a CI result').should('be.visible');
     cy.get('circle.point').should('not.exist');
+  });
+  it('distinguishes groups with the same short label and exposes their full workload', () => {
+    const other = structuredClone(run);
+    other.bundle.manifestSha256 = 'different-synthetic-workload';
+    const result = other.bundle.result as {
+      workload: { plan: { generation: Record<string, Json> } };
+    };
+    result.workload.plan.generation.guidance_scale = 4;
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[run, other]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="Matched workload"]').click();
+    cy.get('[role="option"]').should('have.length', 2);
+    cy.contains('[role="option"]', '#1').should('be.visible');
+    cy.contains('[role="option"]', '#2').click();
+    cy.contains('summary', 'Matched workload').click();
+    cy.get('[data-testid="tradeoff-detail"] pre').first().should('contain', '"guidance_scale": 4');
   });
 });

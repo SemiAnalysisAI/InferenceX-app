@@ -144,6 +144,7 @@ describe('H3 tradeoff metrics (synthetic result-contract fixtures)', () => {
     result.workload.plan.plan_id = 'renamed';
     result.workload.plan.repetitions = 20;
     expect(tradeoffPoints(a)[0].group).toBe(tradeoffPoints(b)[0].group);
+    expect(tradeoffPoints(a)[0].workloadLabel).toBe(tradeoffPoints(b)[0].workloadLabel);
     result.workload.plan.model_revision = 'changed';
     expect(tradeoffPoints(a)[0].group).not.toBe(tradeoffPoints(b)[0].group);
   });
@@ -153,6 +154,7 @@ describe('H3 tradeoff metrics (synthetic result-contract fixtures)', () => {
     const result = b.bundle.result as { workload: { plan: Record<string, Json> } };
     result.workload.plan.cases = [{ prompt: 'Synthetic fixture', seed: 2 }];
     expect(tradeoffPoints(a)[0].group).not.toBe(tradeoffPoints(b)[0].group);
+    expect(tradeoffPoints(a)[0].workloadLabel).not.toBe(tradeoffPoints(b)[0].workloadLabel);
     result.workload.plan.cases = [{ prompt: 'Synthetic fixture', seed: 1 }];
     result.workload.plan.generation = { width: 1920, height: 1080 };
     expect(tradeoffPoints(a)[0].group).not.toBe(tradeoffPoints(b)[0].group);

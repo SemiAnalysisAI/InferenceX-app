@@ -55,7 +55,9 @@ export function tradeoffPoints(run: TradeoffRun) {
     `${number(at(generation, 'duration_seconds')) ?? '?'} s`,
     `${number(at(generation, 'fps')) ?? '?'} fps`,
     `${number(at(generation, 'num_inference_steps')) ?? '?'} steps`,
-    text(at(plan, 'plan_id')),
+    `${text(at(plan, 'model_id'))} @ ${text(at(plan, 'model_revision')).slice(0, 12)}`,
+    `seed ${cases.map((item) => number(at(item, 'seed')) ?? '?').join(', ')}`,
+    text(at(cases[0], 'prompt')).slice(0, 80),
   ].join(' · ');
   return ROLES.map((role) => {
     const metrics = at(result, 'roles', role, 'metrics');
@@ -94,6 +96,7 @@ export function tradeoffPoints(run: TradeoffRun) {
       run,
       group,
       workloadLabel,
+      workload,
       completeWorkload: Boolean(completeWorkload),
       sourceId: text(at(b.manifest, 'run_id')),
       model: text(at(plan, 'model_id')),

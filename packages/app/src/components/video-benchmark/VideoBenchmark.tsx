@@ -279,10 +279,12 @@ export default function VideoBenchmark({
   reader,
   published,
   onLoaded,
+  onError,
 }: {
   reader?: (path: string) => Promise<Blob>;
   published?: StoredSource;
   onLoaded?: (bundle: Bundle) => void;
+  onError?: () => void;
 }) {
   const s = STRINGS[useLocale()];
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -404,8 +406,10 @@ export default function VideoBenchmark({
       track('video_bundle_loaded');
     } catch (error) {
       urls.forEach(URL.revokeObjectURL);
-      if (current === generation.current)
+      if (current === generation.current) {
         setError(error instanceof Error ? error.message : String(error));
+        onError?.();
+      }
     } finally {
       if (current === generation.current) setLoading(false);
     }

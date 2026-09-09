@@ -459,24 +459,22 @@ export default function VideoCIRuns() {
           <Skeleton className="aspect-video" />
         </div>
       )}
-      {compared.length > 0 && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label={s.view}>
-          <Button
-            variant={view === 'results' ? 'default' : 'outline'}
-            aria-pressed={view === 'results'}
-            onClick={() => changeView('results')}
-          >
-            {s.results}
-          </Button>
-          <Button
-            variant={view === 'tradeoff' ? 'default' : 'outline'}
-            aria-pressed={view === 'tradeoff'}
-            onClick={() => changeView('tradeoff')}
-          >
-            {s.tradeoffs}
-          </Button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2" role="group" aria-label={s.view}>
+        <Button
+          variant={view === 'results' ? 'default' : 'outline'}
+          aria-pressed={view === 'results'}
+          onClick={() => changeView('results')}
+        >
+          {s.results}
+        </Button>
+        <Button
+          variant={view === 'tradeoff' ? 'default' : 'outline'}
+          aria-pressed={view === 'tradeoff'}
+          onClick={() => changeView('tradeoff')}
+        >
+          {s.tradeoffs}
+        </Button>
+      </div>
       <div hidden={view !== 'tradeoff'}>
         <VideoTradeoff
           runs={compared}
@@ -494,6 +492,7 @@ export default function VideoCIRuns() {
             reader={selectedSource.read}
             published={selectedSource.stored}
             onLoaded={collectLoaded}
+            onError={() => changeView('results')}
           />
         </div>
       )}
