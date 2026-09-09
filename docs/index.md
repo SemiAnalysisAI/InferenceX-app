@@ -4,6 +4,8 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
+- [H3 Video Viewer](./h3-video.md) — CI artifact contract, local/preview access, measurements and storage boundaries
+
 - [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
 - [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
 - [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects

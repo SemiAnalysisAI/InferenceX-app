@@ -91,6 +91,10 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Current InferenceX Docker image tags per model, chip SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
   },
+  video: {
+    title: 'H3 Video Benchmark',
+    description: 'Inspect original H3 video, audio, measurements and CI provenance.',
+  },
   feedback: {
     title: 'User Feedback',
     description: 'Internal: decrypt and review user-submitted feedback.',

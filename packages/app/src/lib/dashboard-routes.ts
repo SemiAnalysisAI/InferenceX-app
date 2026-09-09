@@ -51,6 +51,12 @@ interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
  */
 export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   {
+    path: '/video',
+    includeChildren: false,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+  },
+  {
     path: '/inference/agentic',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
@@ -72,6 +78,16 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
  * importing React or locale content.
  */
 export const DASHBOARD_ROUTES = [
+  {
+    key: 'video',
+    path: '/video',
+    canonicalPath: '/video',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
+  },
   {
     key: 'inference',
     path: '/inference',

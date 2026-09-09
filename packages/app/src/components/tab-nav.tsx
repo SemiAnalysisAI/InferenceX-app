@@ -56,6 +56,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   'ai-chart': 'AI Chart',
   'gpu-metrics': 'PowerX',
   'current-inferencex-image': 'Images',
+  video: 'Video',
   feedback: 'Feedback',
 };
 
