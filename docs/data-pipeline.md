@@ -436,9 +436,10 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 
 ### Schema Version Detection
 
-`mapBenchmarkRow()` detects which artifact schema version is present by checking for the `prefill_tp` field:
+`mapBenchmarkRow()` distinguishes legacy flat and role-shaped topology with the `prefill_tp` field, and recognizes modern AgentX single-node metadata separately:
 
 - **v1 (pre-2025-12-19)**: Only `tp`, `ep`, and `dp_attention` are present. These are copied symmetrically: `prefillTp = decodeTp = tp`, `prefillEp = decodeEp = ep`. Both `numPrefillGpu` and `numDecodeGpu` are set to `tp * ep`.
 - **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
+- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
-Detection is a single `'prefill_tp' in row` check — no version field is required in the artifact.
+The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
