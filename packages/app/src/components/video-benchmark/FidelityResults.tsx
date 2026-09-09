@@ -152,6 +152,7 @@ export default function FidelityResults({
   const [loadError, setError] = useState('');
   const [slotId, setSlotId] = useState('');
   const [mediaError, setMediaError] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const created: string[] = [];
@@ -459,14 +460,16 @@ export default function FidelityResults({
           </a>
         )}
         {loaded.html && (
-          <details>
+          <details onToggle={(event) => setReportOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-sm">{s.report}</summary>
-            <iframe
-              title={s.report}
-              sandbox="allow-same-origin allow-downloads"
-              srcDoc={loaded.html}
-              className="mt-3 h-[36rem] w-full rounded-lg border"
-            />
+            {reportOpen && (
+              <iframe
+                title={s.report}
+                sandbox="allow-same-origin allow-downloads"
+                srcDoc={loaded.html}
+                className="mt-3 h-[36rem] w-full rounded-lg border"
+              />
+            )}
           </details>
         )}
         <details>

@@ -64,6 +64,7 @@ describe('Native paired fidelity UI (synthetic artifacts)', () => {
   it('rewrites report media/download links and removes scripts and external resources', () => {
     cy.then(() => fidelityFixture()).then((fixture) => {
       mount({ published: fixture.published, runId: fixture.runId });
+      cy.get('iframe').should('not.exist');
       cy.contains('summary', 'Original report').click();
       cy.get<HTMLIFrameElement>('iframe')
         .should('have.attr', 'sandbox', 'allow-same-origin allow-downloads')
@@ -81,6 +82,8 @@ describe('Native paired fidelity UI (synthetic artifacts)', () => {
           expect(doc.querySelector('img')?.hasAttribute('src')).to.equal(false);
           expect(doc.body.dataset.scriptRan).to.equal(undefined);
         });
+      cy.contains('summary', 'Original report').click();
+      cy.get('iframe').should('not.exist');
     });
   });
 
