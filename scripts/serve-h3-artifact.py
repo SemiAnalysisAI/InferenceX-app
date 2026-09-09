@@ -22,8 +22,10 @@ for line in (root / "SHA256SUMS").read_text().splitlines():
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         origin = self.headers.get("Origin")
-        if origin in {"http://127.0.0.1:3000", "http://localhost:3000"}:
-            self.send_header("Access-Control-Allow-Origin", origin)
+        if origin == "http://127.0.0.1:3000":
+            self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1:3000")
+        elif origin == "http://localhost:3000":
+            self.send_header("Access-Control-Allow-Origin", "http://localhost:3000")
         self.send_header("Vary", "Origin")
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
