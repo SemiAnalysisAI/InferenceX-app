@@ -1,6 +1,98 @@
 import type { CSSProperties } from 'react';
 
-import type { FrameworkReleases } from '@/lib/api';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+
+import type { FrameworkReleases, LatestImageRow } from '@/lib/api';
+import {
+  Model,
+  Sequence,
+  getModelCategory,
+  getSequenceCategoryForModel,
+} from '@/lib/data-mappings';
+
+const MODEL_VALUES = new Set<string>(Object.values(Model));
+const SEQUENCE_VALUES = new Set<string>(Object.values(Sequence));
+
+/**
+ * Display name for an image row — the `Model` enum value when the DB key is
+ * mapped, otherwise the raw DB key so unconfigured models still render.
+ */
+export function imageRowDisplayModel(row: Pick<LatestImageRow, 'model'>): string {
+  return DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
+}
+
+/** The configured `Model` behind an image row, or null for DB keys the app has no config for. */
+export function imageRowModel(row: Pick<LatestImageRow, 'model'>): Model | null {
+  const display = imageRowDisplayModel(row);
+  return MODEL_VALUES.has(display) ? (display as Model) : null;
+}
+
+/**
+ * Scenario key for a row: 'agentic-traces' for AgentX rows (null isl/osl), the
+ * mapped '1k/1k'-style string for fixed-sequence rows, raw `isl/osl` fallback
+ * for unmapped fixed-sequence combos so they stay selectable rather than vanishing.
+ */
+export function imageRowSequence(
+  row: Pick<LatestImageRow, 'isl' | 'osl' | 'benchmark_type'>,
+): string {
+  return rowToSequence(row) ?? `${row.isl}/${row.osl}`;
+}
+
+/**
+ * Whether an image row belongs to a model × scenario pair InferenceX still
+ * benchmarks. The latest-images query returns the newest image per config
+ * regardless of age, so without this gate retired combinations (every
+ * deprecated model, the globally retired 1K/1K and 1K/8K sweeps, and
+ * per-model retirements such as MiniMax M3's 8K/1K) keep presenting as live
+ * images that need refreshing. The rules mirror the scenario selector:
+ *
+ * - deprecated or hidden models are out on every scenario;
+ * - a scenario is out when `getSequenceCategoryForModel` marks it deprecated
+ *   for the row's model (or globally, when the model is unconfigured);
+ * - unconfigured models and unmapped isl/osl combos stay in, because nothing
+ *   in the app declares them retired and hiding a brand-new sweep would be
+ *   worse than showing it.
+ */
+export function isActiveImageRow(
+  row: Pick<LatestImageRow, 'model' | 'isl' | 'osl' | 'benchmark_type'>,
+): boolean {
+  const model = imageRowModel(row);
+  if (model) {
+    const category = getModelCategory(model);
+    if (category === 'deprecated' || category === 'hidden') return false;
+  }
+  const sequence = imageRowSequence(row);
+  if (!SEQUENCE_VALUES.has(sequence)) return true;
+  return getSequenceCategoryForModel(sequence as Sequence, model) !== 'deprecated';
+}
+
+/**
+ * Scenario keys offered for the model filter, sorted. `'all'` unions every
+ * active row; a specific display model narrows to the scenarios that model
+ * still runs, so MiniMax M3 offers Agentic only while Qwen3.5 offers 8K/1K and
+ * Agentic. Callers pass rows already filtered through `isActiveImageRow`.
+ */
+export function sequenceOptionsForModel(
+  rows: readonly Pick<LatestImageRow, 'model' | 'isl' | 'osl' | 'benchmark_type'>[],
+  selectedModel: string,
+): string[] {
+  const sequences = new Set<string>();
+  for (const row of rows) {
+    if (selectedModel !== 'all' && imageRowDisplayModel(row) !== selectedModel) continue;
+    sequences.add(imageRowSequence(row));
+  }
+  return [...sequences].toSorted();
+}
+
+/**
+ * The scenario the table actually filters on: the user's pick when the model
+ * still offers it, else the first offered scenario, else the pick itself so an
+ * empty catalog renders its no-match state rather than a phantom selection.
+ */
+export function resolveSelectedSequence(options: readonly string[], selected: string): string {
+  if (options.includes(selected)) return selected;
+  return options[0] ?? selected;
+}
 
 /** Map framework variants to their base framework for release lookup. */
 export const FRAMEWORK_TO_BASE: Record<string, string> = {

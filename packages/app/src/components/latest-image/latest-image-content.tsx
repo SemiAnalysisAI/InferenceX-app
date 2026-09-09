@@ -3,8 +3,6 @@
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useMemo, useState } from 'react';
 
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
-
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -34,14 +32,20 @@ import {
   daysSince,
   getActualLatestTag,
   getCurrentImageNodeTypeTooltip,
+  imageRowDisplayModel,
+  imageRowSequence,
+  isActiveImageRow,
   isOutdated,
   isStaleAgentx,
+  resolveSelectedSequence,
+  sequenceOptionsForModel,
 } from './latest-image-utils';
 
 const STRINGS = {
   en: {
     title: 'Current InferenceX Image',
-    description: 'Docker image tags for each model and chip configuration.',
+    description:
+      'Docker image tags for each actively benchmarked model, scenario, and chip configuration. Retired models and scenarios are not listed.',
     benchmarkGroup: 'Configuration',
     runtimeGroup: 'Hardware & runtime',
     imageVersions: 'Images & versions',
@@ -93,7 +97,8 @@ const STRINGS = {
   },
   zh: {
     title: 'InferenceX 当前镜像',
-    description: '各模型与芯片配置的 Docker 镜像标签。',
+    description:
+      '仍在基准测试中的各模型、场景与芯片配置的 Docker 镜像标签，已停用的模型和场景不再列出。',
     benchmarkGroup: '配置',
     runtimeGroup: '硬件与运行环境',
     imageVersions: '镜像与版本',
@@ -146,33 +151,26 @@ const STRINGS = {
 
 type NodeType = 'single' | 'disagg' | 'all';
 
-/**
- * Scenario key for a row: 'agentic-traces' for AgentX rows (null isl/osl), the
- * mapped '1k/1k'-style string for fixed-sequence rows, raw `isl/osl` fallback
- * for unmapped fixed-sequence combos so they stay selectable rather than vanishing.
- */
-function rowSequence(row: LatestImageRow): string {
-  return rowToSequence(row) ?? `${row.isl}/${row.osl}`;
-}
-
 /** Human label for a scenario key — AgentX rows read "Agentic"/"智能体", never "null/null". */
 function sequenceOptionLabel(seq: string, locale: 'en' | 'zh'): string {
   return seq === Sequence.AgenticTraces ? getSequenceLabel(Sequence.AgenticTraces, locale) : seq;
 }
 
+/**
+ * Filter options from the active catalog. Scenarios are derived separately per
+ * selected model (`sequenceOptionsForModel`) so a retired model × scenario
+ * pair never appears in the ISL/OSL dropdown.
+ */
 function deriveOptions(data: LatestImageRow[]) {
   const models = new Set<string>();
   const precisions = new Set<string>();
-  const sequences = new Set<string>();
   const specMethods = new Set<string>();
   const hardwares = new Set<string>();
   const frameworks = new Set<string>();
 
   for (const row of data) {
-    const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-    models.add(displayModel);
+    models.add(imageRowDisplayModel(row));
     precisions.add(row.precision);
-    sequences.add(rowSequence(row));
     specMethods.add(row.spec_method);
     hardwares.add(row.hardware);
     frameworks.add(baseFramework(row.framework));
@@ -181,7 +179,6 @@ function deriveOptions(data: LatestImageRow[]) {
   return {
     models: [...models].toSorted(),
     precisions: [...precisions].toSorted(),
-    sequences: [...sequences].filter((s) => s !== '1k/8k').toSorted(),
     specMethods: [...specMethods].toSorted(),
     hardwares: [...hardwares].toSorted(),
     frameworks: [...frameworks].toSorted(),
@@ -205,7 +202,9 @@ export function CurrentImageContent() {
 
   const [selectedModel, setSelectedModel] = useState<string>('all');
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
-  const [selectedSequence, setSelectedSequence] = useState<string>('1k/1k');
+  // 8K/1K is the fixed-sequence scenario still swept across models; 1K/1K and
+  // 1K/8K are retired, so they never reach the dropdown.
+  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.EightK_OneK);
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('single');
@@ -213,21 +212,32 @@ export function CurrentImageContent() {
   // limits the table to rows whose base framework is in the set.
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
-  const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
+  // Only model × scenario pairs InferenceX still benchmarks. Retired pairs keep
+  // their newest image in the DB, but that image is not a refresh candidate.
+  const activeRows = useMemo(() => data?.filter(isActiveImageRow), [data]);
+
+  const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
+
+  // Scenario choices follow the selected model: picking MiniMax M3 offers
+  // Agentic only, because its 8K/1K sweep is retired.
+  const sequenceOptions = useMemo(
+    () => (activeRows ? sequenceOptionsForModel(activeRows, selectedModel) : []),
+    [activeRows, selectedModel],
+  );
+  // When the model does not run the chosen scenario, filter on the first one
+  // it does run instead of showing an empty table for a phantom selection.
+  const effectiveSequence = resolveSelectedSequence(sequenceOptions, selectedSequence);
 
   // Stable "today" per render — recomputed on each mount, which is fine for the
   // page's read-only display (no need to tick every minute).
   const today = useMemo(() => new Date(), []);
 
   const filtered = useMemo(() => {
-    if (!data) return [];
-    const rows = data.filter((row) => {
-      if (selectedModel !== 'all') {
-        const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-        if (displayModel !== selectedModel) return false;
-      }
+    if (!activeRows) return [];
+    const rows = activeRows.filter((row) => {
+      if (selectedModel !== 'all' && imageRowDisplayModel(row) !== selectedModel) return false;
       if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
-      if (rowSequence(row) !== selectedSequence) return false;
+      if (imageRowSequence(row) !== effectiveSequence) return false;
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       if (selectedNodeType !== 'all') {
@@ -246,10 +256,10 @@ export function CurrentImageContent() {
     // users primarily care about "what hasn't been refreshed in a while".
     return rows.toSorted((a, b) => a.date.localeCompare(b.date));
   }, [
-    data,
+    activeRows,
     selectedModel,
     selectedPrecision,
-    selectedSequence,
+    effectiveSequence,
     selectedSpecMethod,
     selectedHardware,
     selectedNodeType,
@@ -322,6 +332,12 @@ export function CurrentImageContent() {
                     onValueChange={(v) => {
                       track('current_image_model_changed', { model: v });
                       setSelectedModel(v);
+                      // Commit the scenario fallback so it sticks when the user
+                      // later widens the model filter again.
+                      const next = sequenceOptionsForModel(activeRows ?? [], v);
+                      if (next.length > 0 && !next.includes(selectedSequence)) {
+                        setSelectedSequence(next[0]);
+                      }
                     }}
                   >
                     <SelectTrigger id="image-model-select" className="w-full min-w-0">
@@ -372,7 +388,7 @@ export function CurrentImageContent() {
                     tooltip={t.tooltipIslOsl}
                   />
                   <Select
-                    value={selectedSequence}
+                    value={effectiveSequence}
                     onValueChange={(v) => {
                       track('current_image_sequence_changed', { sequence: v });
                       setSelectedSequence(v);
@@ -382,7 +398,7 @@ export function CurrentImageContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {options.sequences.map((s) => (
+                      {sequenceOptions.map((s) => (
                         <SelectItem key={s} value={s}>
                           {sequenceOptionLabel(s, locale)}
                         </SelectItem>
@@ -502,7 +518,7 @@ export function CurrentImageContent() {
         </TooltipProvider>
       )}
 
-      {data && filtered.length === 0 && (
+      {activeRows && filtered.length === 0 && (
         <div className="py-12 text-center text-muted-foreground">{t.noMatch}</div>
       )}
 
@@ -555,7 +571,7 @@ export function CurrentImageContent() {
               </thead>
               <tbody>
                 {filtered.map((row, i) => {
-                  const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
+                  const displayModel = imageRowDisplayModel(row);
                   const gpuLabel = row.hardware.toUpperCase();
                   const actualLatest = getActualLatestTag(row.framework, releases);
                   const outdated = isOutdated(row.image, actualLatest);
