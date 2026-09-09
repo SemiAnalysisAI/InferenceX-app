@@ -13,6 +13,7 @@ import { useLocale } from '@/lib/use-locale';
 import { escapeHtml } from '@/lib/utils';
 import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
+import { SERVER_TIMING_COPY } from './server-timing';
 import {
   tradeoffPoints,
   tradeoffCurves,
@@ -81,8 +82,7 @@ const STRINGS = {
     limitNote:
       'Power-limit ratios use matching prelaunch/postcleanup enforced limits for the participating GPU UUIDs. Snapshots must agree; they do not prove continuous stability. TDP and later inventories are never substituted.',
     powerWindow: 'Measured power window (s)',
-    batch: 'Replica layout / actual batch size / offered arrival rate',
-    queue: 'Queue delay / server-ready timestamp / deadline attainment',
+    offered: 'Offered arrival rate / deadline attainment',
     unavailable: 'Unavailable in this result contract',
     server: 'Recorded server settings',
     fidelity: 'Recorded fidelity and policy',
@@ -164,8 +164,7 @@ const STRINGS = {
     limitNote:
       '功率占比使用参与计算 GPU 启动前与清理后记录的实际生效功率上限，并按 UUID 匹配。两次记录必须一致，但不能证明期间上限始终不变；不以规格 TDP 或事后硬件信息替代。',
     powerWindow: '功率测量窗口（秒）',
-    batch: '副本布局 / 实际批次大小 / 施加的请求到达率',
-    queue: '排队延迟 / 服务端就绪时间戳 / 时限达标情况',
+    offered: '施加的请求到达率 / 时限达标情况',
     unavailable: '此结果格式未提供',
     server: '已记录的服务端设置',
     fidelity: '已记录的保真度与判定策略',
@@ -205,7 +204,9 @@ export default function VideoTradeoff({
   onOpen: (point: TradeoffPoint) => void;
   sourceId?: string;
 }) {
-  const s = STRINGS[useLocale()];
+  const locale = useLocale();
+  const s = STRINGS[locale];
+  const t = SERVER_TIMING_COPY[locale];
   const all = useMemo(() => runs.flatMap(tradeoffPoints), [runs]);
   const [workload, setWorkload] = useState('');
   const [latencyAxis, setX] = useState<LatencyAxis | null>(null);
@@ -503,8 +504,9 @@ export default function VideoTradeoff({
                     [s.limitRatio, fmt(active.powerLimit?.percent ?? null)],
                     [s.limitWatts, fmt(active.powerLimit?.watts ?? null)],
                     [s.powerWindow, fmt(active.powerWindow)],
-                    [s.batch, s.unavailable],
-                    [s.queue, s.unavailable],
+                    [t.batch, active.timing.batchSizes?.join(', ') ?? s.unavailable],
+                    [t.replicas, active.timing.replicaIds?.join(', ') ?? s.unavailable],
+                    [s.offered, s.unavailable],
                   ].map(([name, value]) => (
                     <div key={name} className="contents">
                       <dt className="text-muted-foreground">{name}</dt>
@@ -526,6 +528,32 @@ export default function VideoTradeoff({
                   </a>
                 </div>
                 <p className="text-xs text-muted-foreground">{s.limitNote}</p>
+                <details data-testid="tradeoff-server-timing" className="space-y-3">
+                  <summary className="cursor-pointer text-xs">{t.title}</summary>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    {t.stages.map((name, index) => {
+                      const timing = active.timing.stages[index];
+                      return (
+                        <div key={name} className="contents">
+                          <dt className="text-muted-foreground">{name} · P50 / P90 / P95 (s)</dt>
+                          <dd>
+                            {fmt(timing?.p50 ?? null)} / {fmt(timing?.p90 ?? null)} /{' '}
+                            {fmt(timing?.p95 ?? null)}
+                            <br />
+                            <span className="text-muted-foreground">
+                              {t.coverage}:{' '}
+                              {timing
+                                ? `${timing.samples} / ${timing.valid} / ${timing.missing}`
+                                : s.unavailable}
+                            </span>
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                  <p className="text-xs text-muted-foreground">{t.note}</p>
+                  <p className="text-xs text-muted-foreground">{t.layoutNote}</p>
+                </details>
                 <details>
                   <summary className="cursor-pointer text-xs">{s.workload}</summary>
                   <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">

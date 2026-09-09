@@ -29,12 +29,13 @@ describe('H3 CI artifact access', () => {
           { id: 1, name: 'e2e Test - h3-8s', path: '.github/workflows/e2e-tests.yml' },
           { id: 2, name: 'Test H3 Video', path: '.github/workflows/test-h3-video.yml' },
           { id: 3, name: 'H3 Video Smoke', path: '.github/workflows/h3-video.yml' },
+          { id: 4, name: 'H3 retained-media fidelity', path: '.github/workflows/h3-fidelity.yml' },
         ],
       }),
     );
     const result = await GET(request());
     const data = await result.json();
-    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3]);
+    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4]);
     expect(result.headers.get('cache-control')).toContain('no-store');
   });
   it('refuses a private repository before reading any artifacts', async () => {

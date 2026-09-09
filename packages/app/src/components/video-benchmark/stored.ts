@@ -1,12 +1,25 @@
 import { at, type Bundle, type Json } from './bundle';
 import type { CIArtifact } from './archive';
+import { fidelityEvidence, type FidelityBundle } from './fidelity';
 
 export interface StoredSource {
   id: string;
+  kind?: 'fidelity';
   documents: [string, Json][];
   checksums: [string, string][];
   assets: [string, { url: string; downloadUrl: string }][];
   texts: [string, string][];
+}
+export function storedFidelityBundle(source: StoredSource): FidelityBundle {
+  if (source.kind !== 'fidelity') throw new Error('Not a fidelity source');
+  const documents = new Map(source.documents);
+  const checksums = new Map(source.checksums);
+  return {
+    ...fidelityEvidence(documents, checksums, source.id, new Map(source.texts)),
+    documents,
+    checksums,
+    files: new Map(source.texts.map(([path, value]) => [path, new Blob([value])])),
+  };
 }
 export interface StoredArtifact {
   storageVersion: 1;

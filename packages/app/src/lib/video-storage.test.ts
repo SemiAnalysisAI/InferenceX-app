@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { head, put } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
 import { readStoredArtifact, storeVideoArtifact } from './video-storage';
-import { storedBundle } from '@/components/video-benchmark/stored';
+import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
+import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
 vi.mock('@vercel/blob', async (original) => ({
   ...(await original<typeof BlobSdk>()),
@@ -59,6 +60,94 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('persistent H3 media', () => {
+  it('publishes native fidelity metadata while reusing already published original videos', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const fixture = await fidelityFixture();
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input);
+      const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
+      if (original) return Promise.resolve(Response.json(original));
+      for (const [id, files] of fixture.originalFiles)
+        if (url.endsWith(`/${id}/SHA256SUMS`))
+          return Promise.resolve(new Response(files.get('SHA256SUMS')));
+      throw new Error(`Unexpected synthetic URL: ${url}`);
+    });
+    const zip = new Blob([
+      zipSync(
+        Object.fromEntries(
+          await Promise.all(
+            [...fixture.files].map(async ([path, blob]) => [
+              path,
+              new Uint8Array(await blob.arrayBuffer()),
+            ]),
+          ),
+        ),
+      ).buffer,
+    ]);
+    const result = await storeVideoArtifact(
+      fixture.runId,
+      fixture.artifact,
+      zip,
+      new AbortController().signal,
+    );
+    expect(result.sources[0].kind).toBe('fidelity');
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json(result));
+    const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
+    expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
+      fixture.checksums.get('comparison.json'),
+    );
+    expect(result.sources[0].assets.filter(([path]) => path.endsWith('.mp4'))).toHaveLength(4);
+    expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
+      '/101/gpu/c1/baseline/artifacts/',
+    );
+    expect(vi.mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
+      false,
+    );
+    expect(vi.mocked(put).mock.calls.at(-1)?.[0]).toBe(
+      'h3-video-media/v1/runs/789/h3-fidelity-789-1_987.json',
+    );
+  });
+
+  it.each(['missing', 'digest', 'seal', 'media'])(
+    'does not publish fidelity with an unaccepted original source: %s',
+    async (failure) => {
+      vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+      const fixture = await fidelityFixture();
+      if (failure === 'missing') fixture.originals[0].sources = [];
+      if (failure === 'digest') fixture.originals[0].artifact.digest = `sha256:${'0'.repeat(64)}`;
+      if (failure === 'media')
+        fixture.originals[0].sources[0].assets = fixture.originals[0].sources[0].assets.filter(
+          ([path]) => !path.endsWith('.mp4'),
+        );
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = String(input);
+        const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
+        if (original) return Promise.resolve(Response.json(original));
+        for (const [id, files] of fixture.originalFiles)
+          if (url.endsWith(`/${id}/SHA256SUMS`))
+            return Promise.resolve(
+              new Response(failure === 'seal' ? 'Changed source seal' : files.get('SHA256SUMS')),
+            );
+        throw new Error(`Unexpected synthetic URL: ${url}`);
+      });
+      const zip = new Blob([
+        zipSync(
+          Object.fromEntries(
+            await Promise.all(
+              [...fixture.files].map(async ([path, blob]) => [
+                path,
+                new Uint8Array(await blob.arrayBuffer()),
+              ]),
+            ),
+          ),
+        ).buffer,
+      ]);
+      await expect(
+        storeVideoArtifact(fixture.runId, fixture.artifact, zip, new AbortController().signal),
+      ).rejects.toThrow();
+      expect(put).not.toHaveBeenCalled();
+    },
+  );
   it('reads the trusted listed index URL without a redundant HEAD request', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const indexUrl =

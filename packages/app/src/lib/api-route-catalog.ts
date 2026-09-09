@@ -76,7 +76,7 @@ export const apiRouteCatalog = [
       en: 'Hidden H3 viewer transport for live public CI runs and checksum-verified artifact ZIPs; uses the backend result contract rather than a published data API.',
       zh: '供隐藏的 H3 查看器实时读取公开 CI 运行及校验和已验证的产物 ZIP；依赖后端结果契约，不作为公开数据 API 发布。',
     },
-    sourceSha256: '73966329a42f1e3a62ca3c6215cc5e9786d9217d2d47ee512e9a81270b2ba17c',
+    sourceSha256: '33a7dec3e6d9077fe23493ed472a4ea7753254f742d676f184fd1bf41ff6b645',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',

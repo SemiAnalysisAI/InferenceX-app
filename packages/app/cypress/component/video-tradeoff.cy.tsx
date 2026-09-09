@@ -1,7 +1,7 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import VideoTradeoff from '@/components/video-benchmark/VideoTradeoff';
 import type { TradeoffRun } from '@/components/video-benchmark/tradeoff';
-import type { Json } from '@/components/video-benchmark/bundle';
+import { at, entries, rows, type Json } from '@/components/video-benchmark/bundle';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 
 const role = {
@@ -140,6 +140,59 @@ const matrix = (): TradeoffRun => ({
 });
 
 describe('Video serving matrix chart (synthetic contract fixture)', () => {
+  it('shows server coverage in point details without changing the client latency axis', () => {
+    const timed = matrix();
+    const documents = timed.bundle.documents!;
+    const runPath = 'gpu/c1/baseline/run.json';
+    const source = documents.get(runPath)!;
+    const serving = {
+      ...Object.fromEntries(entries(at(source, 'serving'))),
+      observed_batch_sizes: [1, 1, 1, 1],
+      observed_replica_ids: [0],
+      queue_delay_seconds: {
+        values: [0, 1, 2, 3],
+        sample_count: 4,
+        valid_clip_count: 4,
+        missing_count: 0,
+        p50: 1.5,
+        p90: null,
+        p95: null,
+      },
+    };
+    documents.set(runPath, { ...Object.fromEntries(entries(source)), serving });
+    const matrixDoc = documents.get('serving-smoke.json')!;
+    documents.set('serving-smoke.json', {
+      ...Object.fromEntries(entries(matrixDoc)),
+      cells: rows(at(matrixDoc, 'cells')).map((cell, index) =>
+        index
+          ? cell
+          : {
+              ...Object.fromEntries(entries(cell)),
+              metrics: { ...Object.fromEntries(entries(at(cell, 'metrics'))), serving },
+            },
+      ),
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[timed]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('dt', 'Observed batch sizes').next().should('have.text', '1');
+    cy.contains('dt', 'Observed replica IDs').next().should('have.text', '0');
+    cy.get('[data-testid="tradeoff-server-timing"]').within(() => {
+      cy.get('summary').click();
+      cy.contains('dt', 'Queue delay')
+        .next()
+        .should('contain', '1.5 / — / —')
+        .and('contain', '4 / 4 / 0');
+    });
+    cy.get('[aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'Median client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 3);
+  });
+
   it('defaults to P90 when individual serving cells have enough samples', () => {
     const formal = matrix();
     formal.bundle = {
