@@ -92,7 +92,7 @@ const STRINGS = {
     title: '视频服务延迟与效率权衡',
     subtitle: '在相同工作负载下比较硬件与运行时配置。',
     scope: '打开的运行会加入当前浏览器会话；刷新页面将清除对比集合与成本假设。',
-    workload: '匹配工作负载',
+    workload: '匹配的工作负载',
     x: '延迟轴 · 越低越好',
     y: '效率轴 · 越高越好',
     p90: 'P90 客户端就绪延迟（秒）',
@@ -100,7 +100,7 @@ const STRINGS = {
     dollar: '有效视频数 / USD',
     clipsGpu: '有效视频数 / 已分配 GPU 小时',
     secondsGpu: '生成视频秒数 / 已分配 GPU 小时',
-    energy: '有效视频数 / GPU 板卡千瓦时',
+    energy: '有效视频数 / GPU 板卡 kWh',
     latencyNote:
       '客户端就绪指从提交到媒体完整下载完成，包含轮询等待，不包含本地验证。P90 使用最近秩法，此处至少需要 10 个完整的有效请求样本；这只是显示门槛，不代表尾延迟估计具有统计可靠性。失败请求仍保留在计数中。',
     throughputNote:
@@ -130,7 +130,7 @@ const STRINGS = {
     concurrency: '客户端并发数',
     allocated: '已分配 / 参与计算的 GPU 数',
     window: '测量时段（秒）',
-    power: '参与计算板卡平均总功率（W）',
+    power: '参与计算板卡总功率均值（W）',
     energyClip: '每有效视频 GPU 板卡能耗（J）',
     powerWindow: '生成阶段功率测量窗口（秒）',
     batch: '副本布局 / 实际批次大小 / 施加的请求到达率',
