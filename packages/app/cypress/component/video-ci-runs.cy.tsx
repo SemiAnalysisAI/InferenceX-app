@@ -42,6 +42,33 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.contains('a', '#10 · completed / failure').should('be.visible');
     cy.get('video').should('not.exist');
   });
+  it('keeps the shared run selected when browsing the first catalog page', () => {
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?run=30`),
+    );
+    cy.intercept('GET', '/api/video-runs?run=30', { run: run(30, 'success'), artifacts: [] }).as(
+      'shared',
+    );
+    cy.intercept('GET', '/api/video-runs?page=1', { runs: [run(20, 'success')], nextPage: 2 }).as(
+      'browse',
+    );
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@shared');
+    cy.get('select[aria-label="CI run"]').should('have.value', '30');
+    cy.contains('button', 'Older runs').should('not.exist');
+    cy.contains('button', 'Browse CI runs').click();
+    cy.wait('@browse');
+    cy.get('select[aria-label="CI run"]')
+      .should('have.value', '30')
+      .find('option[value="20"]')
+      .should('exist');
+    cy.contains('button', 'Older runs').should('be.visible');
+    cy.location('search').should('contain', 'run=30');
+  });
   it('keeps a direct selection and its download active when an older catalog arrives', () => {
     let releaseList: (() => void) | undefined;
     cy.intercept(

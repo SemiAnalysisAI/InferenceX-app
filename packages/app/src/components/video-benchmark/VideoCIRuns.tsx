@@ -21,6 +21,7 @@ const STRINGS = {
     select: 'CI run',
     refresh: 'Refresh',
     older: 'Older runs',
+    browse: 'Browse CI runs',
     loading: 'Loading CI results…',
     source: 'Original GPU execution',
     artifact: 'Result artifact',
@@ -44,6 +45,7 @@ const STRINGS = {
     select: 'CI 运行',
     refresh: '刷新',
     older: '更早的运行',
+    browse: '浏览 CI 运行',
     loading: '正在加载 CI 结果…',
     source: '原始 GPU 运行',
     artifact: '结果产物',
@@ -207,7 +209,7 @@ export default function VideoCIRuns() {
       if (current !== request.current) return;
       setRuns((old) =>
         page === 1
-          ? data.runs
+          ? [...(run && !data.runs.some((r) => r.id === run.id) ? [run] : []), ...data.runs]
           : [...old, ...data.runs.filter((r) => !old.some((o) => o.id === r.id))],
       );
       setNextPage(data.nextPage);
@@ -296,7 +298,7 @@ export default function VideoCIRuns() {
           </Button>
           {nextPage && (
             <Button variant="outline" disabled={loading} onClick={() => void list(nextPage)}>
-              {s.older}
+              {nextPage === 1 ? s.browse : s.older}
             </Button>
           )}
         </div>
