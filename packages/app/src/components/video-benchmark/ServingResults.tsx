@@ -278,6 +278,7 @@ export default function ServingResults({
   const [gpuBasis, setGpuBasis] = useState<'participating' | 'allocated'>('participating');
   const [phase, setPhase] = useState<'measurement' | 'startup' | 'warmup'>('measurement');
   const [failedMedia, setFailedMedia] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
   const selectedId = onCellChange ? (initialCell ?? selected) : selected;
   const current = cells.find((cell) => cell.id === selectedId) ?? cells[0];
   useEffect(() => {
@@ -860,15 +861,17 @@ export default function ServingResults({
           </div>
         </details>
         {html && (
-          <details>
+          <details onToggle={(event) => setReportOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-sm">{s.report}</summary>
             <p className="my-3 text-xs text-muted-foreground">{s.reportNote}</p>
-            <iframe
-              title={s.report}
-              srcDoc={html}
-              sandbox="allow-same-origin allow-downloads"
-              className="h-[640px] w-full rounded-lg border bg-white"
-            />
+            {reportOpen && (
+              <iframe
+                title={s.report}
+                srcDoc={html}
+                sandbox="allow-same-origin allow-downloads"
+                className="h-[640px] w-full rounded-lg border bg-white"
+              />
+            )}
           </details>
         )}
         <details>

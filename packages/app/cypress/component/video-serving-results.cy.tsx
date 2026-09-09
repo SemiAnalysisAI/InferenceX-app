@@ -206,6 +206,7 @@ describe('H3 serving results (synthetic fixtures)', () => {
       mount({
         html: `<img src="${blobUrl}" alt="Synthetic blob image"><a href="${blobUrl}" download="fixture.svg">Download synthetic blob</a><script>document.body.dataset.scriptRan='yes'</script>`,
       });
+      cy.get('iframe').should('not.exist');
       cy.contains('summary', 'Original report').click();
       cy.get<HTMLIFrameElement>('iframe')
         .should('have.attr', 'sandbox', 'allow-same-origin allow-downloads')
@@ -216,6 +217,8 @@ describe('H3 serving results (synthetic fixtures)', () => {
           expect(doc?.body.dataset.scriptRan).to.equal(undefined);
         })
         .then(() => win.URL.revokeObjectURL(blobUrl));
+      cy.contains('summary', 'Original report').click();
+      cy.get('iframe').should('not.exist');
     });
   });
 
