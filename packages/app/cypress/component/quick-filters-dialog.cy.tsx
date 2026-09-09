@@ -6,7 +6,7 @@ import { Sequence } from '@/lib/data-mappings';
 import { mountWithProviders } from '../support/test-utils';
 
 const availableQuickFilters: QuickFilters = {
-  vendors: ['NVIDIA', 'AMD'],
+  vendors: ['NVIDIA', 'AMD', 'Google'],
   frameworks: ['vllm', 'sglang'],
   deployment: ['single-node', 'multi-node', 'disagg'],
   spec: ['mtp', 'stp'],
@@ -168,8 +168,11 @@ describe('QuickFiltersDialog', () => {
     cy.get('[data-testid="quick-filter-vendor-options"]')
       .should('have.attr', 'role', 'group')
       .find('button')
-      .should('have.length', 2);
+      .should('have.length', 3);
     cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="quick-filter-vendor-Google"]')
+      .should('have.attr', 'aria-pressed', 'false')
+      .and('be.enabled');
     cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
       .should('have.attr', 'aria-pressed', 'false')
       .focus()
