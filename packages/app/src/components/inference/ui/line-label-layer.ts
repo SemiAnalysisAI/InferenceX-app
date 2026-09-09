@@ -38,6 +38,11 @@ export function rectsOverlap(a: RectBounds, b: RectBounds): boolean {
   return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 }
 
+/** Like {@link rectsOverlap}, but rectangles that only share an edge do not count. */
+export function rectsStrictlyOverlap(a: RectBounds, b: RectBounds): boolean {
+  return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+}
+
 export function firstNonCollidingRect(
   candidates: readonly RectBounds[],
   placed: readonly RectBounds[],
@@ -60,9 +65,140 @@ export function horizontalShiftIntoBounds(rect: RectBounds, bounds: RectBounds):
   return 0;
 }
 
+/**
+ * Vertical shift that slides `rect` fully inside `bounds`, or `null` when it
+ * is taller than the bounds and cannot fit at any offset. Zero when it already
+ * fits; positive moves down, negative moves up.
+ */
+export function verticalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): number | null {
+  if (rect.bottom - rect.top > bounds.bottom - bounds.top) return null;
+  if (rect.top < bounds.top) return bounds.top - rect.top;
+  if (rect.bottom > bounds.bottom) return bounds.bottom - rect.bottom;
+  return 0;
+}
+
 /** Whether `rect` lies fully inside `bounds` on the vertical axis. */
 export function fitsVertically(rect: RectBounds, bounds: RectBounds): boolean {
   return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+}
+
+/**
+ * Translation that keeps a line-label pill fully inside the plot.
+ *
+ * `rect` is the pill's background box in zoom-group coordinates, i.e. its
+ * group translate plus the `.ll-bg` offset. A pill that would spill past an
+ * edge slides back until it touches that edge; a pill larger than the plot on
+ * an axis (a very narrow or very short chart) is pinned to the plot's top-left
+ * on that axis so its start stays readable rather than being clipped at an
+ * arbitrary point.
+ */
+export function pillShiftIntoBounds(rect: RectBounds, bounds: RectBounds): CartesianPoint {
+  return {
+    x: horizontalShiftIntoBounds(rect, bounds) ?? bounds.left - rect.left,
+    y: verticalShiftIntoBounds(rect, bounds) ?? bounds.top - rect.top,
+  };
+}
+
+/**
+ * The `.ll-bg` box of a rendered pill, in the pill group's own coordinates, or
+ * `null` before the sizing pass has run (or when the rect is degenerate).
+ */
+function pillLocalBox(node: SVGGElement): RectBounds | null {
+  const background = node.querySelector<SVGRectElement>('.ll-bg');
+  if (!background) return null;
+  const x = Number(background.getAttribute('x'));
+  const y = Number(background.getAttribute('y'));
+  const width = Number(background.getAttribute('width'));
+  const height = Number(background.getAttribute('height'));
+  if (![x, y, width, height].every((value) => Number.isFinite(value))) return null;
+  if (!(width > 0) || !(height > 0)) return null;
+  return { left: x, top: y, right: x + width, bottom: y + height };
+}
+
+/** A pill's local `.ll-bg` box moved to the group translate (`tx`, `ty`). */
+function pillBoxAt(local: RectBounds, tx: number, ty: number): RectBounds {
+  return {
+    left: tx + local.left,
+    right: tx + local.right,
+    top: ty + local.top,
+    bottom: ty + local.bottom,
+  };
+}
+
+/** A pill group together with the placement that anchors it this frame. */
+interface PillLayoutItem {
+  node: SVGGElement;
+  label: LineLabelPlacement;
+}
+
+/**
+ * Position every pill in `items`: anchor offset first, slid back inside
+ * `bounds`, then checked against the pills already placed this frame.
+ *
+ * `placeLineLabels` only knows anchor points and a nominal collision width,
+ * so two pills that cleared its check can still end up on top of each other
+ * once one of them is clamped to an edge (the default upward offset makes the
+ * top edge the usual culprit: a pill slid down lands on the neighbour just
+ * below it). Each pill therefore tries, in order: its default spot, the
+ * mirror image below/above its anchor, the mirror image on the other side of
+ * its anchor, and both mirrors together. Every candidate is clamped into
+ * `bounds` before the overlap test, so nothing leaves the plot. When every
+ * candidate collides the default spot is kept: an overlapped label is still
+ * better than a missing one, and the fallback matches what the anchor pass
+ * already tolerates for pinned anchors.
+ *
+ * With no bounds — a chart that clips nothing — the anchor offset is applied
+ * unchanged and the collision pass is skipped, preserving that chart's
+ * existing layout.
+ *
+ * Hidden pills get their default transform and occupy no space, so a label
+ * that later becomes visible reappears where the anchor pass put it.
+ */
+function layoutPills(
+  items: readonly PillLayoutItem[],
+  offsetX: number,
+  offsetY: number,
+  bounds: RectBounds | null,
+  obstacles: readonly RectBounds[],
+): void {
+  const placed: RectBounds[] = [...obstacles];
+
+  for (const { node, label } of items) {
+    const tx0 = label.x + offsetX;
+    const ty0 = label.y + offsetY;
+    const local = bounds ? pillLocalBox(node) : null;
+    if (!bounds || !local || !label.visible) {
+      node.setAttribute('transform', `translate(${tx0},${ty0})`);
+      continue;
+    }
+
+    // Mirror the pill's box across the anchor on each axis: the pill's far
+    // edge ends up as close to the anchor as its near edge was.
+    const mirrorX = 2 * label.x - tx0 - local.left - local.right;
+    const mirrorY = 2 * label.y - ty0 - local.top - local.bottom;
+    const candidates: [number, number][] = [
+      [tx0, ty0],
+      [tx0, mirrorY],
+      [mirrorX, ty0],
+      [mirrorX, mirrorY],
+    ];
+
+    const clamped = candidates.map(([cx, cy]) => {
+      const shift = pillShiftIntoBounds(pillBoxAt(local, cx, cy), bounds);
+      const tx = cx + shift.x;
+      const ty = cy + shift.y;
+      return { tx, ty, box: pillBoxAt(local, tx, ty) };
+    });
+    // Pills that merely share an edge are fine: the anchor pass spaces rows
+    // exactly one collision height apart, so touching is its normal output.
+    const chosen =
+      clamped.find(
+        (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
+      ) ?? clamped[0];
+
+    node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
+    placed.push(chosen.box);
+  }
 }
 
 /**
@@ -124,9 +260,10 @@ export function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
  */
 function pillObstacles(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  selector = '.line-label, .parallelism-label',
 ): RectBounds[] {
   const boxes: RectBounds[] = [];
-  zoomGroup.selectAll<SVGGElement, unknown>('.line-label, .parallelism-label').each(function () {
+  zoomGroup.selectAll<SVGGElement, unknown>(selector).each(function () {
     // A hidden pill is still in the DOM but covers nothing.
     if (this.style.opacity === '0') return;
     const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
@@ -295,11 +432,18 @@ export function renderLineLabels(
       labelGroup: d3.Selection<SVGGElement, LineLabelPlacement, null, undefined>,
       label: LineLabelPlacement,
     ) => void;
+    /**
+     * Strict bounding box, in zoom-group coordinates, every pill must lie
+     * fully inside. Defaults to the plot's clip rect ({@link plotAreaBounds});
+     * pass `null` to skip the constraint (charts that clip nothing).
+     */
+    bounds?: RectBounds | null;
   },
 ): void {
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
+  const bounds = options.bounds === undefined ? plotAreaBounds(group) : options.bounds;
   const selection = group
     .selectAll<SVGGElement, LineLabelPlacement>('.line-label')
     .data(labels, (label) => label.key)
@@ -373,17 +517,38 @@ export function renderLineLabels(
       .attr('width', (d) => d.width)
       .attr('height', (d) => d.height);
   }
+
+  // Now that every pill has its final size, slide each back inside the plot
+  // if the anchor offset pushed any part of it past an edge — a label anchored
+  // on the last point of a line otherwise pokes out past the right edge and
+  // the clip path slices the run name in half — and keep the shifted pills
+  // off one another and off the parallelism chips.
+  layoutPills(
+    measured.map(({ node, label }) => ({ node, label })),
+    offsetX,
+    offsetY,
+    bounds,
+    bounds ? pillObstacles(group, '.parallelism-label') : [],
+  );
 }
 
 export function updateRenderedLineLabels(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   labels: readonly LineLabelPlacement[],
-  options: { opacity?: number; offsetX?: number; offsetY?: number } = {},
+  options: {
+    opacity?: number;
+    offsetX?: number;
+    offsetY?: number;
+    /** See {@link renderLineLabels}. */
+    bounds?: RectBounds | null;
+  } = {},
 ): void {
   const byKey = new Map(labels.map((label) => [label.key, label]));
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
+  const bounds = options.bounds === undefined ? plotAreaBounds(group) : options.bounds;
+  const items: PillLayoutItem[] = [];
   group.selectAll<SVGGElement, unknown>('.line-label').each(function () {
     const element = d3.select(this);
     const label = byKey.get(element.attr('data-line-key'));
@@ -391,10 +556,22 @@ export function updateRenderedLineLabels(
       element.style('opacity', 0);
       return;
     }
-    element
-      .attr('transform', `translate(${label.x + offsetX},${label.y + offsetY})`)
-      .style('opacity', label.visible ? opacity : 0);
+    element.style('opacity', label.visible ? opacity : 0);
+    items.push({ node: this, label });
   });
+  // The pills keep the size they were given on render, so the zoom pass only
+  // needs to move them — inside the plot and off one another, as on render.
+  // Lay them out in the placement order the anchor pass produced (top-most
+  // series first), not DOM order, so both passes resolve ties the same way.
+  const order = new Map(labels.map((label, index) => [label.key, index]));
+  items.sort((a, b) => (order.get(a.label.key) ?? 0) - (order.get(b.label.key) ?? 0));
+  layoutPills(
+    items,
+    offsetX,
+    offsetY,
+    bounds,
+    bounds ? pillObstacles(group, '.parallelism-label') : [],
+  );
 }
 
 /**
