@@ -41,21 +41,21 @@
   content: none;
 }
 
-/* September theme for the InferenceX wordmark — Childhood Cancer Awareness Month
-   ("Go Gold"). The gold awareness ribbon's palette painted onto the brand text
-   via a clipped gradient, running from deep goldenrod through bright gold and
-   back. The darker anchors keep the clipped wordmark legible on the light
-   header, the same treatment the earlier flag themes used. Fixed colors,
-   independent of the theme tokens, so it renders the same in light, dark, and
-   minecraft modes. */
+/* September 11 memorial theme for the InferenceX wordmark, marking the 25th
+   anniversary of the 2001 attacks. Palette is drawn from the Tribute in Light
+   memorial: two pale beams rising out of a night sky, so the gradient runs
+   deep midnight navy at the edges into a soft light-blue glow at the center.
+   Dark anchors keep the clipped wordmark legible on the light header, the same
+   treatment as the earlier awareness themes. Fixed colors, independent of the
+   theme tokens, so it renders the same in light, dark, and minecraft modes. */
 .pride-wordmark {
   background-image: linear-gradient(
     90deg,
-    #9a6a00 0%,
-    #d4a017 30%,
-    #ffd700 50%,
-    #d4a017 70%,
-    #9a6a00 100%
+    #14295c 0%,
+    #2a4f96 30%,
+    #a6cdf4 50%,
+    #2a4f96 70%,
+    #14295c 100%
   );
   background-clip: text;
   -webkit-background-clip: text;
