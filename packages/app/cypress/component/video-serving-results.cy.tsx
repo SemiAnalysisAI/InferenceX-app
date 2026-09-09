@@ -63,6 +63,24 @@ const cells: ServingCell[] = [1, 2, 4].map((concurrency) => {
     job: {
       roles: {
         baseline: {
+          power_configuration_before: {
+            status: 'recorded',
+            observed_at: '2026-09-09T01:00:00Z',
+            gpus: ['GPU-test', 'GPU-test-2'].map((uuid) => ({
+              uuid,
+              configured_limit_w: 700,
+              enforced_limit_w: 700,
+            })),
+          },
+          power_configuration_after: {
+            status: 'recorded',
+            observed_at: '2026-09-09T02:00:00Z',
+            gpus: ['GPU-test', 'GPU-test-2'].map((uuid) => ({
+              uuid,
+              configured_limit_w: 700,
+              enforced_limit_w: 700,
+            })),
+          },
           telemetry_summary: {
             gpu_identity: [{ name: 'Synthetic GPU', uuid: 'GPU-test' }],
             measurement_observed_memory_peak_mib_by_gpu: { 'GPU-test': 100000 },
@@ -72,6 +90,7 @@ const cells: ServingCell[] = [1, 2, 4].map((concurrency) => {
     },
     spec: { gpu_uuids: ['GPU-test', 'GPU-test-2'], server: { ulysses_degree: 2, tp_size: 1 } },
     power: {
+      semantics: { power_unit: 'W' },
       phases: {
         measurement: {
           valid: true,
@@ -82,7 +101,10 @@ const cells: ServingCell[] = [1, 2, 4].map((concurrency) => {
             energy_j: 656721,
             joules_per_valid_clip: 164180,
           },
-          per_gpu: { 'GPU-test': { avg_power_w: 687, observed_peak_power_w: 697 } },
+          per_gpu: {
+            'GPU-test': { avg_power_w: 687, observed_peak_power_w: 697 },
+            'GPU-test-2': { avg_power_w: 687, observed_peak_power_w: 697 },
+          },
         },
         startup: {
           valid: false,
@@ -99,7 +121,7 @@ const bundle: Bundle = {
     git_commit: 'synthetic-backend-sha',
     resources: { requested: { gpus: 8 } },
   },
-  ci: { slurm_job: { AllocTRES: 'cpu=32,mem=512G,gres/gpu=2' } },
+  ci: { slurm_job: { AllocTRES: 'cpu=32,mem=512G,gres/gpu=8' } },
   result: null,
   job: null,
   report: null,
@@ -197,15 +219,24 @@ describe('H3 serving results (synthetic fixtures)', () => {
     });
   });
 
-  it('shows each concurrency without manufacturing a candidate and uses allocated GPU count', () => {
+  it('shows each concurrency without manufacturing a candidate and separates participating and allocated GPU counts', () => {
     const change = cy.stub().as('change');
     mount({ onCellChange: change });
     cy.get('[data-testid="serving-matrix"] tbody tr').should('have.length', 3);
+    cy.get('[data-testid="serving-matrix"]').within(() => {
+      cy.contains('th', 'Energy / valid clip (kJ/clip)').should('be.visible');
+      cy.contains('td', '164.18').should('be.visible');
+      cy.contains('th', 'Mean / enforced limit (%)').should('be.visible');
+      cy.contains('td', '98.14').should('be.visible');
+    });
     cy.get('[data-testid="serving-selected-metrics"]').within(() => {
       cy.contains('120 s').should('be.visible');
       cy.contains('p', '15').should('be.visible');
       cy.contains('dt', 'P90 delivery latency').next().should('have.text', 'Unavailable');
     });
+    cy.get('[aria-label="GPU normalization"]').click();
+    cy.contains('[role="option"]', 'All allocated GPUs').click();
+    cy.get('[data-testid="serving-selected-metrics"]').contains('p', '3.75').should('be.visible');
     cy.get('video')
       .should('have.attr', 'src', 'https://media.example.test/c1/measurement-r001-c001.mp4')
       .and('have.prop', 'muted', false);
@@ -241,6 +272,7 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('[role="option"]', 'Startup').click();
     cy.get('[data-testid="serving-power"]').within(() => {
       cy.contains('dt', 'Aggregate mean (W)').next().should('have.text', 'Unavailable');
+      cy.contains('dt', 'Mean / enforced limit (%)').next().should('have.text', 'Unavailable');
       cy.contains('Synthetic missing telemetry').should('be.visible');
       cy.contains('999,999').should('not.exist');
     });
@@ -264,6 +296,7 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('dt', 'Measurement verified').next().should('have.text', 'No');
     cy.get('[data-testid="serving-power"]').within(() => {
       cy.contains('dt', 'Aggregate mean (W)').next().should('have.text', 'Unavailable');
+      cy.contains('dt', 'Mean / enforced limit (%)').next().should('have.text', 'Unavailable');
     });
   });
 
@@ -272,6 +305,9 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('并发服务测试结果').should('be.visible');
     cy.contains('此请求暂无可用媒体。').should('be.visible');
     cy.get('video').should('not.exist');
+    cy.contains('p', '有效视频 / 参与计算 GPU 小时').next().should('have.text', '15');
+    cy.get('[aria-label="GPU 归一化口径"]').click();
+    cy.contains('[role="option"]', '所有已分配 GPU').click();
     cy.contains('p', '有效视频 / 已分配 GPU 小时').next().should('have.text', '无数据');
     mount({ cells: [{ ...cells[0], run: null, job: null, spec: null, power: null }] });
     cy.contains('No request records are available for this configuration.').should('be.visible');
