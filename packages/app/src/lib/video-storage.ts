@@ -7,6 +7,8 @@ import type { StoredArtifact, StoredSource } from '@/components/video-benchmark/
 const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
+const legacyTelemetry = (path: string) =>
+  /^gpu\/supervisor\/(?:baseline|candidate)\/telemetry\.jsonl$/u.test(path);
 
 export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   if (!videoStorageEnabled()) return [];
@@ -48,6 +50,12 @@ export async function readStoredArtifact(
     const result: StoredArtifact = await response.json();
     if (result.storageVersion !== 1 || result.runId !== runId || result.artifact.id !== artifact.id)
       throw new Error('Stored artifact identity mismatch');
+    // Serving cells already carry verified power and memory summaries. Older
+    // indexes embedded their full logs; keep those in downloadable assets only.
+    for (const source of result.sources)
+      source.texts = source.texts.filter(
+        ([path]) => path === 'report/index.html' || legacyTelemetry(path),
+      );
     return result;
   } catch (error) {
     if (error instanceof BlobNotFoundError) return null;
@@ -113,7 +121,7 @@ export async function storeVideoArtifact(
     }
     const texts: StoredSource['texts'] = [];
     for (const [path, body] of bundle.files) {
-      if (path === 'report/index.html' || (!bundle.result && path.endsWith('/telemetry.jsonl')))
+      if (path === 'report/index.html' || (!bundle.result && legacyTelemetry(path)))
         texts.push([path, await body.text()]);
     }
     sources.push({
