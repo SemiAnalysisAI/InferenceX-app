@@ -234,6 +234,33 @@ export function tradeoffPoints(run: TradeoffRun): TradeoffPoint[] {
   return serving.length > 0 ? serving : pairedTradeoffPoints(run);
 }
 
+export function tradeoffCurves<T extends TradeoffPoint & { x: number; y: number }>(
+  points: T[],
+): Record<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const p of points) {
+    if (!p.hardware || !p.revision) continue;
+    const key = canonical({
+      workload: p.group,
+      hardware: p.hardware,
+      revision: p.revision,
+      role: p.role,
+      allocated: p.allocated,
+      participating: p.participating,
+      server: p.server,
+    });
+    const group = groups.get(key);
+    if (group) group.push(p);
+    else groups.set(key, [p]);
+  }
+  return Object.fromEntries(
+    [...groups.values()].flatMap((group, index) => {
+      const curve = group.toSorted((a, b) => a.x - b.x);
+      return curve.length > 1 ? [[`curve-${index}`, curve]] : [];
+    }),
+  );
+}
+
 export function latencyValue(point: TradeoffPoint, axis: LatencyAxis): number | null {
   const a = point.latencies;
   // Ten samples is a display floor, not statistical or release qualification.
