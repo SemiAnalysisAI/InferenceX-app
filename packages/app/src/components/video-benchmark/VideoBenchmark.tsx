@@ -815,12 +815,7 @@ export default function VideoBenchmark({
               <Heading>{s.hardware}</Heading>
               {table([
                 [s.participating, participating > 0 ? participating : null],
-                [
-                  s.allocated,
-                  /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
-                    text(at(b.ci, 'slurm_job', 'AllocTRES')),
-                  )?.groups?.count,
-                ],
+                [s.allocated, allocatedGpus(b)],
                 ['Slurm', at(b.manifest, 'slurm_allocation', 'identity', 'JobId')],
                 [s.node, at(b.ci, 'slurm_job', 'NodeList')],
                 [s.model, at(b.manifest, 'workload_plan', 'model_id')],
