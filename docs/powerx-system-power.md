@@ -51,7 +51,10 @@ EP partitions that width. Some existing API configuration aliases contain
 per-GPU watts instead of trusting or summing those aliases. Multi-node and
 disaggregated inputs require one complete chassis per measured worker, distinct
 worker hosts, and consistent total/role watts. A role average alone cannot
-establish physical placement or evaluate each host's nonlinear model.
+establish physical placement or evaluate each host's nonlinear model. CPU-only
+frontend workers are excluded from GPU-chassis counting. Separate CPU-only
+frontend/router hosts are outside this estimate; CPU power within GPU chassis
+still uses the source's fixed 20% utilization assumption.
 
 The default measured contract is numeric `power_valid=1` and metric schema 2.
 The original validated single-node producer predates the schema marker but
@@ -154,6 +157,8 @@ PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本�
 原文章的 144 次测量全部保留。24 次 H200 测量具有完整的原始审计材料，可计算
 机箱功率及能耗估计；4-GPU 的 B200、B300、MI355X 配置不能直接按半台机箱分摊，
 GB200、GB300 也不能套用 B200、B300 模型。缺失、无效和不支持的情况保持不可用。
+纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU frontend/router 主机不在
+估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
 每次测量先独立计算，再对三次重复测量取平均。能耗使用审计记录中的实际窗口和
 成功 token 数，明确标记为估计值，不改写原有 GPU 实测指标。当前 API 快照与原文章
 冻结数据分别导出，避免混用不同时间和配置的结果。

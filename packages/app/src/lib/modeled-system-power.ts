@@ -139,6 +139,8 @@ export function modelSystemPower(row: BenchmarkRow, pue = 1.2): SystemPowerEstim
     }
     const hosts = new Set<string>();
     for (const worker of row.workers) {
+      // CPU-only frontends are outside the modeled GPU-chassis boundary.
+      if (worker.role === 'frontend' && worker.num_gpus === 0) continue;
       if (
         worker.num_gpus !== 8 ||
         !Array.isArray(worker.hosts) ||

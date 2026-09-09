@@ -220,7 +220,8 @@ const SYSTEM_POWER_STRINGS = {
     platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
     sweep: 'Fixed README inference sweep',
     topology: (chassis: number, gpus: number) => `${chassis} full eight-GPU chassis · ${gpus} GPUs`,
-    normalization: 'AC power is divided by all deployment GPUs, including prefill and decode.',
+    normalization:
+      'AC power for GPU chassis (including their CPUs) is divided by all deployment GPUs, including prefill and decode. Separate CPU-only frontend/router hosts are excluded.',
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
     reasons: {
@@ -244,7 +245,8 @@ const SYSTEM_POWER_STRINGS = {
     platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
     sweep: 'README 中的固定推理参数扫描',
     topology: (chassis: number, gpus: number) => `${chassis} 个完整八卡机箱 · ${gpus} 张 GPU`,
-    normalization: '交流功耗按整个部署的 GPU 总数分摊，包括 Prefill 与 Decode。',
+    normalization:
+      'GPU 机箱的交流功耗（含机箱内 CPU）按整个部署的 GPU 总数分摊，包括 Prefill 与 Decode。不计入独立的纯 CPU 前端或路由主机。',
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
     reasons: {

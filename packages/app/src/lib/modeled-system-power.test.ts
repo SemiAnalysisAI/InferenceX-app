@@ -314,6 +314,51 @@ describe('modeled system power admission and accounting', () => {
     expect(modelSystemPower(source)).toMatchObject({ reason: 'topology' });
   });
 
+  it('excludes only CPU-only frontend workers from the GPU-chassis accounting', () => {
+    const source = row({
+      disagg: true,
+      is_multinode: true,
+      workers: [
+        { role: 'prefill', worker_idx: 0, num_gpus: 8, hosts: ['prefill-node'], avg_power_w: 300 },
+        { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['decode-node'], avg_power_w: 700 },
+      ],
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 8000,
+        prefill_avg_power_w: 300,
+        decode_avg_power_w: 700,
+      },
+    });
+    const gpuOnly = modelSystemPower(source);
+    expect(gpuOnly).toMatchObject({
+      status: 'supported',
+      gpuCount: 16,
+      chassisCount: 2,
+      measuredTotalGpuWatts: 8000,
+    });
+    // Existing worker payloads retain a frontend entry, including generic CPU power.
+    const frontend = {
+      role: 'frontend',
+      worker_idx: 0,
+      num_gpus: 0,
+      hosts: ['frontend-node'],
+      avg_power_w: 120,
+    };
+    source.workers!.unshift(frontend);
+    expect(modelSystemPower(source)).toEqual(gpuOnly);
+    expect(source.workers).toHaveLength(3);
+
+    // A frontend with GPUs or an unknown count cannot be silently dropped.
+    for (const num_gpus of [8, 1, -1, 0.5, undefined, null, '0', NaN]) {
+      Object.assign(frontend, { num_gpus });
+      expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported' });
+    }
+    Object.assign(frontend, { role: 'other', num_gpus: 0 });
+    expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported' });
+  });
+
   it('shares official/overlay transforms without changing measured metrics or inventing modeled zeros', () => {
     const source = row();
     const entry = rowToAggDataEntry(source);

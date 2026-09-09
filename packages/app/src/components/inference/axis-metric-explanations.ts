@@ -353,8 +353,8 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredAvgPower: measuredPower('run'),
   modeledChassisPowerPerGpu: {
     description: {
-      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the deployment GPU count. Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Only fully occupied eight-GPU chassis with supported hardware and known topology are included. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
-      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以部署的 GPU 总数。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。仅纳入硬件受支持、拓扑已知且八张 GPU 全部使用的机箱。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
+      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the deployment GPU count. Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Only fully occupied eight-GPU chassis with supported hardware and known topology are included. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
+      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以部署的 GPU 总数。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。仅纳入硬件受支持、拓扑已知且八张 GPU 全部使用的机箱。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
     },
     formula: {
       en: 'W/GPU = sum of modeled chassis AC power (W) ÷ deployment GPU count; facility W = chassis AC W × PUE',
