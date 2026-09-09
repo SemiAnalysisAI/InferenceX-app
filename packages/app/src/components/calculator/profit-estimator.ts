@@ -284,8 +284,10 @@ export function isProfitEstimatorRow(
 
 /**
  * Estimate every interpolated SKU, splitting priced rows from the ones that
- * had to be skipped. Rows come back sorted by revenue descending so the chart
- * reads left to right from the largest top line.
+ * had to be skipped. Rows come back sorted by profit (P&L) descending so the
+ * chart reads left to right from the most profitable SKU, not the largest top
+ * line: a high-revenue chip with a heavier TCO can sit to the right of a
+ * cheaper one that clears more after costs.
  */
 export function estimateProfitRows(
   results: readonly Parameters<typeof estimateSkuProfit>[0][],
@@ -300,7 +302,7 @@ export function estimateProfitRows(
     if (isProfitEstimatorRow(estimate)) rows.push(estimate);
     else skipped.push(estimate);
   }
-  rows.sort((a, b) => b.revenue - a.revenue || a.resultKey.localeCompare(b.resultKey));
+  rows.sort((a, b) => b.profit - a.profit || a.resultKey.localeCompare(b.resultKey));
   return { rows, skipped };
 }
 

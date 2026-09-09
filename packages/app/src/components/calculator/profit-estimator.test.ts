@@ -247,23 +247,33 @@ describe('estimateSkuProfit', () => {
 });
 
 describe('estimateProfitRows', () => {
-  it('splits priced rows from skipped SKUs and sorts by revenue descending', () => {
+  it('splits priced rows from skipped SKUs and sorts by profit descending', () => {
     const specs: Record<string, { powerKwPerGpu: number; costPerGpuHour: number }> = {
       b200: B200,
       h200: { powerKwPerGpu: 1.37, costPerGpuHour: 1.22 },
+      // Same power as the B200 so it books less revenue per GW-year, but a
+      // fraction of the TCO, so it clears more P&L. Profit order must win.
+      cheap: { powerKwPerGpu: 1.71, costPerGpuHour: 0.4 },
       ghost: { powerKwPerGpu: 0, costPerGpuHour: 1 },
     };
     const { rows, skipped } = estimateProfitRows(
       [
         { hwKey: 'h200', resultKey: 'h200', value: 400 },
         { hwKey: 'b200', resultKey: 'b200', value: 1_000 },
+        { hwKey: 'cheap', resultKey: 'cheap', value: 600 },
         { hwKey: 'ghost', resultKey: 'ghost', value: 5_000 },
       ],
       (hwKey) => specs[hwKey]!,
       FLAT_PRICING,
       { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' },
     );
-    expect(rows.map((r) => r.resultKey)).toEqual(['b200', 'h200']);
+    expect(rows.map((r) => r.resultKey)).toEqual(['cheap', 'b200', 'h200']);
+    // Revenue alone would have put the B200 first.
+    expect(rows.toSorted((a, b) => b.revenue - a.revenue).map((r) => r.resultKey)).toEqual([
+      'b200',
+      'cheap',
+      'h200',
+    ]);
     expect(skipped).toEqual([
       { hwKey: 'ghost', resultKey: 'ghost', precision: undefined, reason: 'no-power' },
     ]);
