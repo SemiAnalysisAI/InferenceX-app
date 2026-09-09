@@ -42,7 +42,7 @@ const STRINGS = {
       'Selects the best configuration line for each chip SKU using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
     vendor: 'Vendor',
     vendorHelp:
-      'Filter by the company that makes the chip, such as NVIDIA or AMD. Select one or more vendors; leave the group empty to include all.',
+      'Filter by the company that makes the chip, such as NVIDIA, AMD, or Google (TPU). Select one or more vendors; leave the group empty to include all.',
     framework: 'Framework',
     frameworkHelp:
       'Filter by the serving engine family. Variants such as Dynamo vLLM are included with vLLM, and MoRI SGLang with SGLang.',
@@ -82,7 +82,8 @@ const STRINGS = {
     bestPerSkuHelp:
       '按当前图表指标，为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
     vendor: '厂商',
-    vendorHelp: '按芯片制造商筛选，例如 NVIDIA 或 AMD。可选择一个或多个厂商；不选则显示全部。',
+    vendorHelp:
+      '按芯片制造商筛选，例如 NVIDIA、AMD 或 Google（TPU）。可选择一个或多个厂商；不选则显示全部。',
     framework: '框架',
     frameworkHelp:
       '按推理引擎系列筛选。各系列包含其变体，例如 Dynamo vLLM 归入 vLLM，MoRI SGLang 归入 SGLang。',
@@ -111,9 +112,14 @@ const STRINGS = {
   },
 } as const;
 
+/**
+ * Vendor pills, in display order. Values must match `HW_REGISTRY` vendors so
+ * `pointVendor` can resolve them. Google covers the TPU series (TPU7x).
+ */
 const VENDORS = [
   { value: 'NVIDIA', label: 'NVIDIA' },
   { value: 'AMD', label: 'AMD' },
+  { value: 'Google', label: 'Google' },
 ] as const;
 const DEPLOYMENT_MODES: DeploymentMode[] = ['single-node', 'multi-node', 'disagg'];
 const SPEC_MODES: { value: SpecMode; label: string }[] = [

@@ -248,6 +248,9 @@ describe('QuickFiltersDialog', () => {
     cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
       .should('be.disabled')
       .and('have.attr', 'title', 'No data for the current selection');
+    cy.get('[data-testid="quick-filter-vendor-Google"]')
+      .should('be.disabled')
+      .and('have.attr', 'title', 'No data for the current selection');
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
   });

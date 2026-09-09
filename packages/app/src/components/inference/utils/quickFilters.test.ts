@@ -26,6 +26,7 @@ describe('pointVendor', () => {
   it('resolves vendor from the base GPU in the hardware key', () => {
     expect(pointVendor('h100_vllm_mtp')).toBe('NVIDIA');
     expect(pointVendor('mi300x_sglang')).toBe('AMD');
+    expect(pointVendor('tpuv7_vllm')).toBe('Google');
   });
 
   it('returns undefined for an unknown GPU base', () => {
@@ -145,6 +146,13 @@ describe('matchesQuickFilters', () => {
     const f = filters({ vendors: ['NVIDIA'] });
     expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), f)).toBe(true);
     expect(matchesQuickFilters(point({ hwKey: 'mi300x_sglang' }), f)).toBe(false);
+    expect(matchesQuickFilters(point({ hwKey: 'tpuv7_vllm' }), f)).toBe(false);
+  });
+
+  it('filters TPU points under the Google vendor', () => {
+    const f = filters({ vendors: ['Google'] });
+    expect(matchesQuickFilters(point({ hwKey: 'tpuv7_vllm' }), f)).toBe(true);
+    expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), f)).toBe(false);
   });
 
   it('treats multiple vendors as OR', () => {
