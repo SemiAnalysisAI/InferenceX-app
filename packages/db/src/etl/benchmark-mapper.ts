@@ -20,6 +20,7 @@ import {
   normalizePrecision,
   normalizeSpecMethod,
   parseBool,
+  parseOptionalBool,
   parseNum,
   parseInt2,
 } from './normalizers';
@@ -438,6 +439,25 @@ function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean):
   const tp = parseInt2(row.tp) ?? 1;
   const ep = parseInt2(row.ep) ?? 1;
   const dpAttn = parseBool(row.dp_attention);
+  let numGpus = physicalChipCount(row.num_gpus);
+  if (
+    row.num_gpus === undefined &&
+    !frameworkDisagg &&
+    String(row.scenario_type ?? '').startsWith('agentic') &&
+    row.request_metrics &&
+    typeof row.request_metrics === 'object' &&
+    !Array.isArray(row.request_metrics) &&
+    parseOptionalBool(row.is_multinode) === false &&
+    parseOptionalBool(row.disagg) === false
+  ) {
+    // Match the v3 AgentX producer's physical-device count. EP and DCP share
+    // TP devices; PP and PCP add devices. Legacy flat rows keep their fallback.
+    const physicalTp = physicalChipCount(row.tp);
+    const pp = physicalChipCount(row.pp === undefined ? 1 : row.pp);
+    const pcp = physicalChipCount(row.pcp_size === undefined ? 1 : row.pcp_size);
+    if (physicalTp && pp && pcp) numGpus = physicalChipCount(physicalTp * pp * pcp);
+  }
+  numGpus ??= tp * ep;
   return {
     prefillTp: tp,
     prefillEp: ep,
@@ -447,8 +467,8 @@ function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean):
     decodeEp: ep,
     decodeDpAttn: dpAttn,
     decodeNumWorkers: 0,
-    numPrefillGpu: physicalChipCount(row.num_gpus) ?? tp * ep,
-    numDecodeGpu: physicalChipCount(row.num_gpus) ?? tp * ep,
+    numPrefillGpu: numGpus,
+    numDecodeGpu: numGpus,
   };
 }
 
