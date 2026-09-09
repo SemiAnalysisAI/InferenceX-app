@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   pillShiftIntoBounds,
+  rectsStrictlyOverlap,
   renderLineLabels,
   updateRenderedLineLabels,
   verticalShiftIntoBounds,
   type LineLabelPlacement,
+  type RectBounds,
 } from './line-label-layer';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -77,6 +79,30 @@ function pillBox(zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   return { left: tx + x, top: ty + y, right: tx + x + width, bottom: ty + y + height, tx, ty };
 }
 
+const overlaps = (a: RectBounds, b: RectBounds) => rectsStrictlyOverlap(a, b);
+
+/** Add a parallelism chip the way the roofline layer draws one, centred on (x, y). */
+function addParallelismChip(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  x: number,
+  y: number,
+  width = 40,
+  height = 16,
+) {
+  const chip = zoomGroup
+    .append('g')
+    .attr('class', 'parallelism-label')
+    .attr('transform', `translate(${x},${y})`);
+  chip
+    .append('rect')
+    .attr('class', 'pl-bg')
+    .attr('x', -width / 2)
+    .attr('y', -height / 2)
+    .attr('width', width)
+    .attr('height', height);
+  return { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+}
+
 const expectInsidePlot = (box: ReturnType<typeof pillBox>) => {
   expect(box.left).toBeGreaterThanOrEqual(0);
   expect(box.top).toBeGreaterThanOrEqual(0);
@@ -130,6 +156,105 @@ describe('pill bounding box primitives', () => {
       x: -20,
       y: 0,
     });
+  });
+
+  it('does not count a shared edge as an overlap', () => {
+    const upper = { left: 0, right: 80, top: 0, bottom: 18 };
+    expect(rectsStrictlyOverlap(upper, { left: 0, right: 80, top: 18, bottom: 36 })).toBe(false);
+    expect(rectsStrictlyOverlap(upper, { left: 0, right: 80, top: 17, bottom: 35 })).toBe(true);
+  });
+});
+
+describe('clamped pills do not stack on their neighbours', () => {
+  it('flips a pill below its anchor when the neighbour above was slid down onto it', () => {
+    // Bugbot's case: `placeLineLabels` cleared these two anchors (they are
+    // 26px apart, more than one collision height), but the top pill has to
+    // slide 19px down to stay in the plot, which puts it on the second one.
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [placement('top', 200, 4, 'GB200 (Dynamo)'), placement('next', 210, 30, 'B300 (vLLM)')],
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    const top = pillBox(zoomGroup, 'top');
+    const next = pillBox(zoomGroup, 'next');
+    expect(top.top).toBe(0);
+    expect(overlaps(top, next)).toBe(false);
+    // The second pill kept its x and moved to the mirror slot below its anchor.
+    expect(next.tx).toBe(218);
+    expect(next.top).toBeGreaterThan(30);
+    expectInsidePlot(top);
+    expectInsidePlot(next);
+  });
+
+  it('moves a pill to the other side of its anchor when the row above and below are taken', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [
+        placement('a', 300, 4, 'GB200 (Dynamo)'),
+        placement('b', 310, 30, 'B300 (vLLM)'),
+        placement('c', 320, 56, 'MI355X (SGLang)'),
+      ],
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    const boxes = ['a', 'b', 'c'].map((key) => pillBox(zoomGroup, key));
+    for (const box of boxes) expectInsidePlot(box);
+    expect(overlaps(boxes[0], boxes[1])).toBe(false);
+    expect(overlaps(boxes[1], boxes[2])).toBe(false);
+    expect(overlaps(boxes[0], boxes[2])).toBe(false);
+  });
+
+  it('keeps pills off a parallelism chip that the clamp would slide them onto', () => {
+    const { zoomGroup } = renderChart();
+    const chip = addParallelismChip(zoomGroup, 240, 12);
+    renderLineLabels(zoomGroup, [placement('top', 200, 4, 'GB200 (Dynamo)')], {
+      seriesAttribute: 'data-hw-key',
+    });
+
+    const top = pillBox(zoomGroup, 'top');
+    expect(overlaps(top, chip)).toBe(false);
+    expectInsidePlot(top);
+  });
+
+  it('resolves the same stacking on the zoom path', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [placement('top', 200, 150, 'GB200 (Dynamo)'), placement('next', 210, 176, 'B300 (vLLM)')],
+      { seriesAttribute: 'data-hw-key' },
+    );
+    // Zoom drags both anchors to the top edge.
+    updateRenderedLineLabels(zoomGroup, [
+      placement('top', 200, 4, 'GB200 (Dynamo)'),
+      placement('next', 210, 30, 'B300 (vLLM)'),
+    ]);
+
+    const top = pillBox(zoomGroup, 'top');
+    const next = pillBox(zoomGroup, 'next');
+    expect(top.top).toBe(0);
+    expect(overlaps(top, next)).toBe(false);
+    expectInsidePlot(top);
+    expectInsidePlot(next);
+  });
+
+  it('leaves a hidden pill out of the collision pass', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [
+        placement('top', 200, 4, 'GB200 (Dynamo)', false),
+        placement('next', 210, 30, 'B300 (vLLM)'),
+      ],
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    // Nothing visible sits above it, so the second pill keeps its default slot.
+    const next = pillBox(zoomGroup, 'next');
+    expect(next.tx).toBe(218);
+    expect(next.ty).toBe(16);
   });
 });
 
