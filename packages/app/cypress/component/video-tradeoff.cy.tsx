@@ -2,6 +2,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import VideoTradeoff from '@/components/video-benchmark/VideoTradeoff';
 import type { TradeoffRun } from '@/components/video-benchmark/tradeoff';
 import type { Json } from '@/components/video-benchmark/bundle';
+import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 
 const role = {
   metrics: {
@@ -126,5 +127,64 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     cy.contains('[role="option"]', '#2').click();
     cy.contains('summary', 'Matched workload').click();
     cy.get('[data-testid="tradeoff-detail"] pre').first().should('contain', '"guidance_scale": 4');
+  });
+});
+
+const matrix = (): TradeoffRun => ({
+  exportRun: '123',
+  artifact: '456',
+  bundle: { ...servingFixture(), result: null, manifestSha256: 'synthetic-serving' },
+});
+
+describe('Video serving matrix chart (synthetic contract fixture)', () => {
+  it('shows three labeled cell medians and opens the selected concurrency result', () => {
+    const open = cy.stub().as('openCell');
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoTradeoff runs={[matrix()]} onOpen={open} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').should(
+      'contain',
+      'Median client-ready latency (s)',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.get('text.serving-point-label')
+      .should('have.length', 3)
+      .then((labels) => {
+        expect([...labels].map((label) => label.textContent)).to.deep.equal(['C1', 'C2', 'C4']);
+      });
+    cy.contains('Closed-loop smoke · serving capacity not qualified').should('be.visible');
+    cy.get('tbody tr')
+      .should('have.length', 3)
+      .each((row) => {
+        cy.wrap(row).should('contain', '4 / 4 / 4').and('contain', '15');
+      });
+    cy.get('[role="combobox"][aria-label="Latency axis · lower is better"]').click();
+    cy.contains('[role="option"]', 'P90 client-ready latency (s)').click();
+    cy.get('circle.point').should('not.exist');
+    cy.contains('No points qualify for these axes yet.').should('be.visible');
+    cy.contains('button', 'Show cell medians').click();
+    cy.get('circle.point').should('have.length', 3);
+    cy.contains('tbody button', 'Client concurrency 4').click();
+    cy.contains('button', 'Open videos and full result').click();
+    cy.get('@openCell')
+      .should('have.been.calledOnce')
+      .its('firstCall.args.0.cellId')
+      .should('equal', 'c4');
+  });
+  it('shows the Chinese serving labels with per-cell medians', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/zh/video">
+        <VideoTradeoff runs={[matrix()]} onOpen={() => undefined} />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="combobox"][aria-label="延迟轴 · 越低越好"]').should(
+      'contain',
+      '客户端就绪延迟中位数（秒）',
+    );
+    cy.get('circle.point').should('have.length', 3);
+    cy.contains('客户端并发数 2').should('be.visible');
+    cy.contains('闭环冒烟测试 · 尚未通过服务容量验证').should('be.visible');
   });
 });

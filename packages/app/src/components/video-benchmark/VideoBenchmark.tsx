@@ -9,6 +9,9 @@ import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 import ResultPower from './ResultPower';
 import VideoSelect from './VideoSelect';
+import ServingResults from './ServingResults';
+import { servingCells, type ServingCell } from './serving';
+import { renderReportHtml } from './report';
 import { storedBundle, type StoredSource } from './stored';
 import ResultSummary from './ResultSummary';
 import {
@@ -257,6 +260,7 @@ interface Loaded {
   downloads: Map<string, string>;
   power: Record<string, ReturnType<typeof sampledPower>>;
   html: string;
+  cells: ServingCell[];
 }
 const REF_RUN = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34293342829';
 const REF_ARTIFACT = `${REF_RUN}/artifacts/10082823150`;
@@ -280,11 +284,15 @@ export default function VideoBenchmark({
   published,
   onLoaded,
   onError,
+  initialCell,
+  onCellChange,
 }: {
   reader?: (path: string) => Promise<Blob>;
   published?: StoredSource;
   onLoaded?: (bundle: Bundle) => void;
   onError?: () => void;
+  initialCell?: string;
+  onCellChange?: (id: string) => void;
 }) {
   const s = STRINGS[useLocale()];
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -325,6 +333,7 @@ export default function VideoBenchmark({
     const urls = new Map<string, string>();
     try {
       const bundle = saved ? storedBundle(saved) : await loadBundle(read!());
+      const cells = servingCells(bundle);
       const power: Loaded['power'] = {};
       for (const role of ROLES) {
         const file = bundle.files.get(`gpu/supervisor/${role}/telemetry.jsonl`);
@@ -358,29 +367,7 @@ export default function VideoBenchmark({
         );
       }
       const rawHtml = await bundle.files.get('report/index.html')?.text();
-      let html = '';
-      if (rawHtml) {
-        const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
-        doc
-          .querySelectorAll('script,base,iframe,object,embed,link,meta[http-equiv],form')
-          .forEach((n) => n.remove());
-        doc.querySelectorAll('[src], [href]').forEach((n) => {
-          for (const attr of ['src', 'href']) {
-            const value = n.getAttribute(attr);
-            if (value) {
-              const url = urls.get(`report/${value}`);
-              if (url) n.setAttribute(attr, url);
-              else n.removeAttribute(attr);
-            }
-          }
-        });
-        const csp = doc.createElement('meta');
-        csp.httpEquiv = 'Content-Security-Policy';
-        csp.content =
-          "default-src 'none'; media-src blob: https:; img-src blob: data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'";
-        doc.head.prepend(csp);
-        html = doc.documentElement.outerHTML;
-      }
+      const html = rawHtml ? renderReportHtml(rawHtml, urls) : '';
       if (current !== generation.current) {
         urls.forEach(URL.revokeObjectURL);
         return;
@@ -388,6 +375,7 @@ export default function VideoBenchmark({
       activeUrls.current = [...urls.values()].filter((url) => url.startsWith('blob:'));
       setLoaded({
         bundle,
+        cells,
         urls,
         power,
         html,
@@ -558,7 +546,18 @@ export default function VideoBenchmark({
           </a>
         </Card>
       )}
-      {b && loaded && (
+      {b && loaded && loaded.cells.length > 0 && (
+        <ServingResults
+          bundle={b}
+          cells={loaded.cells}
+          urls={loaded.urls}
+          downloads={loaded.downloads}
+          html={loaded.html}
+          initialCell={initialCell}
+          onCellChange={onCellChange}
+        />
+      )}
+      {b && loaded && loaded.cells.length === 0 && (
         <>
           <div className="grid items-start gap-5 xl:grid-cols-[minmax(400px,1fr)_minmax(0,1.5fr)]">
             <ResultSummary bundle={b} stored={Boolean(published)} />
@@ -927,7 +926,7 @@ export default function VideoBenchmark({
                 <p className="my-3 text-sm text-muted-foreground">{s.reportNote}</p>
                 <iframe
                   title={s.report}
-                  sandbox="allow-same-origin"
+                  sandbox="allow-same-origin allow-downloads"
                   referrerPolicy="no-referrer"
                   className="h-[70vh] w-full rounded-lg border bg-white"
                   srcDoc={loaded.html}
