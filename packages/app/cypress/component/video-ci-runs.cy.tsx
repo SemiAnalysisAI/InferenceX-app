@@ -116,6 +116,59 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
       'Synthetic ZIP fallback',
     );
   });
+  it('keeps navigation and bundle validation errors visible on an empty tradeoff link', () => {
+    cy.window().then((win) =>
+      win.history.replaceState(
+        null,
+        '',
+        `${win.location.pathname}?run=30&artifact=40&view=tradeoff`,
+      ),
+    );
+    cy.intercept('GET', '/api/video-runs?run=30', {
+      run: run(30, 'success'),
+      artifacts: [{ id: 40, name: 'h3-results-30-1', expired: false, size_in_bytes: 100 }],
+    });
+    cy.intercept('GET', '**/api/video-runs*format=media', {
+      storageVersion: 1,
+      runId: '30',
+      artifact: { id: 40, name: 'h3-results-30-1', expired: false, size_in_bytes: 100 },
+      sources: [
+        {
+          id: '30',
+          assets: [],
+          checksums: [['manifest.json', 'synthetic']],
+          texts: [['gpu/supervisor/baseline/telemetry.jsonl', 'broken JSON']],
+          documents: [
+            ['manifest.json', { run_id: '30' }],
+            [
+              'gpu/gpu-job.json',
+              {
+                roles: {
+                  baseline: {
+                    telemetry_summary: {
+                      qualified: true,
+                      requested_interval_seconds: 1,
+                      gpu_identity: [{ uuid: 'GPU-synthetic' }],
+                    },
+                  },
+                },
+              },
+            ],
+          ],
+        },
+      ],
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('button', 'Videos & result').should('be.visible');
+    cy.contains('[role="alert"]', 'JSON').should('be.visible');
+    cy.contains('button', 'Videos & result').click();
+    cy.get('[data-testid="video-tradeoff"]').should('not.be.visible');
+    cy.contains('[role="alert"]', 'JSON').should('be.visible');
+  });
   it('keeps the shared run selected when browsing the first catalog page', () => {
     cy.window().then((win) =>
       win.history.replaceState(null, '', `${win.location.pathname}?run=30`),
