@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import VideoSelect from './VideoSelect';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/use-locale';
@@ -83,21 +84,17 @@ export default function ResultPower({ result }: { result: Json }) {
       <Card className="gap-4" data-testid="result-power">
         <Heading>{s.title}</Heading>
         <p className="text-sm text-muted-foreground">{s.note}</p>
-        <label className="text-sm">
-          {s.phase}
-          <select
-            aria-label={s.phase}
-            className="ml-3 rounded border bg-background p-2"
+        <div className="w-full max-w-xs">
+          <VideoSelect
+            label={s.phase}
             value={phase}
-            onChange={(e) => setPhase(e.target.value as typeof phase)}
-          >
-            {(['startup', 'warmup', 'measurement'] as const).map((value) => (
-              <option key={value} value={value}>
-                {s[value]}
-              </option>
-            ))}
-          </select>
-        </label>
+            onValueChange={(value) => setPhase(value as typeof phase)}
+            options={(['startup', 'warmup', 'measurement'] as const).map((value) => ({
+              value,
+              label: s[value],
+            }))}
+          />
+        </div>
         <div className="grid gap-6 lg:grid-cols-2">
           {ROLES.map((role) => {
             const power = at(result, 'roles', role, 'power');

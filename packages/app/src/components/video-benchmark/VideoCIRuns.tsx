@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
+import VideoSelect from './VideoSelect';
 import type { StoredArtifact, StoredSource } from './stored';
 import { archiveSources, type CIArtifact, type CIRun } from './archive';
 
@@ -269,7 +270,7 @@ export default function VideoCIRuns() {
   const selectedSource = sources.find((item) => item.id === sourceId);
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-ci-runs">
-      <Card className="min-w-0 gap-3 p-4">
+      <Card className="min-w-0 gap-3 p-4 md:p-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <Heading as="h1" level="section">
             {s.title}
@@ -296,57 +297,39 @@ export default function VideoCIRuns() {
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-          <label className="min-w-0 space-y-2 text-sm font-medium">
-            {s.select}
-            <select
-              aria-label={s.select}
-              className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:ring-2 focus-visible:ring-ring"
-              value={run?.id ?? ''}
-              onChange={(e) => void selectRun(e.target.value)}
-            >
-              <option value="" disabled>
-                —
-              </option>
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  #{r.id} · {r.conclusion ?? r.status}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <VideoSelect
+            label={s.select}
+            value={run ? String(run.id) : ''}
+            onValueChange={(value) => void selectRun(value)}
+            options={runs.map((r) => ({
+              value: String(r.id),
+              label: `#${r.id} · ${r.conclusion ?? r.status}`,
+            }))}
+          />
           {sources.length > 1 && (
-            <label className="min-w-0 space-y-2 text-sm font-medium">
-              {s.source}
-              <select
-                aria-label={s.source}
-                className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal focus-visible:ring-2 focus-visible:ring-ring"
-                value={sourceId}
-                onChange={(e) => {
-                  setSourceId(e.target.value);
-                  if (run && artifact) share(run.id, artifact.id, e.target.value);
-                }}
-              >
-                {sources.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    #{item.id}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <VideoSelect
+              label={s.source}
+              value={sourceId}
+              onValueChange={(value) => {
+                setSourceId(value);
+                if (run && artifact) share(run.id, artifact.id, value);
+              }}
+              options={sources.map((item) => ({ value: item.id, label: `#${item.id}` }))}
+            />
           )}
         </div>
         {run && (
           <p
-            className="min-w-0 break-words text-sm text-muted-foreground"
+            className="min-w-0 break-words text-xs text-muted-foreground"
             data-testid="selected-run-title"
           >
             {run.name}
           </p>
         )}
         {runs.length === 0 && !loading && <p>{s.empty}</p>}
-        <details>
-          <summary className="cursor-pointer text-sm text-muted-foreground">{s.advanced}</summary>
+        <details className="border-t border-border/40 pt-3 [&[open]>form]:mb-3 [&[open]>a]:mb-3 [&[open]>a]:block">
+          <summary className="cursor-pointer text-xs text-muted-foreground">{s.advanced}</summary>
           <p className="my-3 text-xs text-muted-foreground">{s.note}</p>
           <form
             className="flex flex-wrap gap-2"
@@ -380,25 +363,17 @@ export default function VideoCIRuns() {
             </a>
           )}
           {artifacts.length > 0 && (
-            <label className="text-sm">
-              {s.artifact}
-              <select
-                aria-label={s.artifact}
-                className="mt-2 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-                value={artifact?.id ?? ''}
-                onChange={(e) => run && void selectRun(String(run.id), e.target.value)}
-              >
-                <option value="" disabled>
-                  —
-                </option>
-                {artifacts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.expired ? ` · ${s.expired}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <VideoSelect
+              label={s.artifact}
+              value={artifact ? String(artifact.id) : ''}
+              onValueChange={(value) => {
+                if (run) void selectRun(String(run.id), value);
+              }}
+              options={artifacts.map((a) => ({
+                value: String(a.id),
+                label: `${a.name}${a.expired ? ` · ${s.expired}` : ''}`,
+              }))}
+            />
           )}
         </details>
         {loading && (
