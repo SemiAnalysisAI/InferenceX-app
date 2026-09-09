@@ -373,6 +373,16 @@ export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): Profit
 }
 
 /**
+ * Top of a bar's positive stack in data units. A profitable bar tops out at
+ * revenue (TCO + license fee + profit); a loss bar still draws TCO and the
+ * license fee above the axis, and that sum exceeds revenue, so the labels
+ * above the bar must clear it rather than the revenue figure.
+ */
+export function stackTopValue(row: ProfitEstimatorRow): number {
+  return Math.max(row.revenue, row.tco + row.labCut);
+}
+
+/**
  * Pixels the tallest stack needs above it: the revenue figure and margin line
  * (REVENUE_LABEL_GAP covers both), then a vendor mark `iconHeightPx` tall and its gap.
  */
@@ -396,7 +406,7 @@ export function profitYDomain(
   if (rows.length === 0) return [0, 1];
   // A loss bar stacks TCO and the license fee above the axis, and that sum can
   // exceed both revenue and TCO, so size the top to the tallest positive stack.
-  const top = Math.max(0, ...rows.map((row) => Math.max(row.revenue, row.tco + row.labCut)));
+  const top = Math.max(0, ...rows.map(stackTopValue));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   const span = top - bottom;
   const headroom =
@@ -674,7 +684,10 @@ export default function ProfitEstimatorChart({
         // sits below the bar when the stack dips under zero. The vendor's
         // full-color mark sits above the revenue figure.
         const labelData = segments.filter((d) => d.kind === 'tco');
-        const stackTopPx = (d: ProfitSegment) => yScale(Math.max(d.row.revenue, d.row.tco));
+        // Anchor to the drawn stack, not `max(revenue, tco)`: a loss bar's
+        // license-fee segment sits above both, and the revenue figure and
+        // margin line used to land inside it, on top of its in-bar label.
+        const stackTopPx = (d: ProfitSegment) => yScale(stackTopValue(d.row));
         const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
         // Same size the y domain reserved headroom for (both derive from the band width).
         const iconHeight = barMarkHeight(bandwidth);

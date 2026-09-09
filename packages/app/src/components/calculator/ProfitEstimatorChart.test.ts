@@ -26,6 +26,7 @@ import {
   stackHeadroomPx,
   rowLabel,
   segmentLabelLines,
+  stackTopValue,
 } from './ProfitEstimatorChart';
 
 function row(overrides: Partial<ProfitEstimatorRow> = {}): ProfitEstimatorRow {
@@ -88,6 +89,25 @@ describe('barMarkHeight', () => {
     expect(stackHeadroomPx(BAR_ICON_MAX_HEIGHT) - STACK_HEADROOM_PX).toBe(
       BAR_ICON_MAX_HEIGHT - BAR_ICON_MIN_HEIGHT,
     );
+  });
+});
+
+describe('stackTopValue', () => {
+  it('is revenue for a profitable bar, whose stack ends at revenue', () => {
+    expect(stackTopValue(row())).toBe(1000);
+  });
+
+  it('is TCO plus the license fee for a loss bar, so above-bar labels clear the drawn stack', () => {
+    // Kimi K3 per-GW case: $4.4B revenue against $9.5B TCO and a $1.3B license
+    // fee. Anchoring the revenue figure to max(revenue, tco) put it inside the
+    // license-fee segment, on top of that segment's own label.
+    const loss = row({ revenue: 4.4, tco: 9.5, grossMargin: -5.1, labCut: 1.3, profit: -6.4 });
+    expect(stackTopValue(loss)).toBeCloseTo(10.8);
+    expect(stackTopValue(loss)).toBeGreaterThan(Math.max(loss.revenue, loss.tco));
+  });
+
+  it('is TCO for a loss bar with no license fee', () => {
+    expect(stackTopValue(row({ revenue: 300, tco: 400, labCut: 0, profit: -100 }))).toBe(400);
   });
 });
 
