@@ -1,0 +1,35 @@
+name: 'Publish H3 media'
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Optional InferenceX CI run ID to persist'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: h3-media-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: 'Publish H3 media'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+      - name: Persist completed H3 artifacts
+        env:
+          H3_RUN_ID: ${{ inputs.run_id }}
+        run: bun packages/app/scripts/warm-video-results.ts

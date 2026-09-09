@@ -1,0 +1,78 @@
+import { createHash } from 'node:crypto';
+import { strToU8, zipSync } from 'fflate';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { put } from '@vercel/blob';
+import type * as BlobSdk from '@vercel/blob';
+import { storeVideoArtifact } from './video-storage';
+import { storedBundle } from '@/components/video-benchmark/stored';
+
+vi.mock('@vercel/blob', async (original) => ({
+  ...(await original<typeof BlobSdk>()),
+  put: vi.fn((path: string) =>
+    Promise.resolve({
+      url: `https://test.public.blob.vercel-storage.com/${path}`,
+      downloadUrl: `https://test.public.blob.vercel-storage.com/${path}?download=1`,
+    }),
+  ),
+}));
+const artifact = { id: 20, name: 'h3-video-10-1', size_in_bytes: 100, expired: false };
+const digest = (s: string) => createHash('sha256').update(s).digest('hex');
+function archive(corrupt = false) {
+  const files = {
+    'manifest.json': JSON.stringify({
+      schema_version: 1,
+      run_id: '10',
+      run_attempt: '1',
+      git_commit: 'a'.repeat(40),
+      ci: { repository: 'SemiAnalysisAI/InferenceX' },
+    }),
+    'synthetic.mp4': 'Synthetic test bytes, not a playable benchmark clip',
+  };
+  const sums = Object.entries(files)
+    .map(([path, body]) => `${digest(body)}  ${path}`)
+    .join('\n');
+  return new Blob([
+    zipSync(
+      Object.fromEntries(
+        Object.entries({
+          ...files,
+          'synthetic.mp4': corrupt ? 'changed' : files['synthetic.mp4'],
+          SHA256SUMS: sums,
+        }).map(([path, body]) => [path, strToU8(body)]),
+      ),
+    ).buffer,
+  ]);
+}
+beforeEach(() => vi.mocked(put).mockClear());
+describe('persistent H3 media', () => {
+  it('publishes verified files before the index and restores metadata without media bytes', async () => {
+    const result = await storeVideoArtifact(
+      '10',
+      artifact,
+      archive(),
+      new AbortController().signal,
+    );
+    const calls = vi.mocked(put).mock.calls;
+    expect(calls.at(-1)?.[0]).toBe('h3-video-media/v1/runs/10/h3-video-10-1_20.json');
+    const video = calls.find(([path]) => path.endsWith('/synthetic.mp4'))!;
+    expect(video[0]).toContain(digest('Synthetic test bytes, not a playable benchmark clip'));
+    expect(video[2]).toMatchObject({
+      access: 'public',
+      contentType: 'video/mp4',
+      allowOverwrite: false,
+    });
+    const source = result.sources[0];
+    expect(source.assets.find(([path]) => path === 'synthetic.mp4')?.[1].downloadUrl).toContain(
+      'download=1',
+    );
+    const bundle = storedBundle(source);
+    expect(bundle.manifestSha256).toHaveLength(64);
+    expect(bundle.files.has('synthetic.mp4')).toBe(false);
+  });
+  it('does not publish unverified bytes', async () => {
+    await expect(
+      storeVideoArtifact('10', artifact, archive(true), new AbortController().signal),
+    ).rejects.toThrow('checksum mismatch');
+    expect(put).not.toHaveBeenCalled();
+  });
+});

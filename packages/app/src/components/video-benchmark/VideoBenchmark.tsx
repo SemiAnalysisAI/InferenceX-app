@@ -8,6 +8,8 @@ import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 import ResultPower from './ResultPower';
+import { storedBundle, type StoredSource } from './stored';
+import ResultSummary from './ResultSummary';
 import {
   at,
   entries,
@@ -251,6 +253,7 @@ const STRINGS = {
 interface Loaded {
   bundle: Bundle;
   urls: Map<string, string>;
+  downloads: Map<string, string>;
   power: Record<string, ReturnType<typeof sampledPower>>;
   html: string;
 }
@@ -271,7 +274,13 @@ const field = (label: string, value: string, change: (value: string) => void, ty
   </label>
 );
 
-export default function VideoBenchmark({ reader }: { reader?: (path: string) => Promise<Blob> }) {
+export default function VideoBenchmark({
+  reader,
+  published,
+}: {
+  reader?: (path: string) => Promise<Blob>;
+  published?: StoredSource;
+}) {
   const s = STRINGS[useLocale()];
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(false);
@@ -304,13 +313,13 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
     setLoading(false);
     setSlot('');
   }
-  async function open(read: () => (path: string) => Promise<Blob>) {
+  async function open(read?: () => (path: string) => Promise<Blob>, saved?: StoredSource) {
     clear();
     const current = generation.current;
     setLoading(true);
     const urls = new Map<string, string>();
     try {
-      const bundle = await loadBundle(read());
+      const bundle = saved ? storedBundle(saved) : await loadBundle(read!());
       const power: Loaded['power'] = {};
       for (const role of ROLES) {
         const file = bundle.files.get(`gpu/supervisor/${role}/telemetry.jsonl`);
@@ -332,7 +341,8 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
             : null;
       }
       if (current !== generation.current) return;
-      for (const [path, file] of bundle.files) {
+      for (const [path, asset] of saved?.assets ?? []) urls.set(path, asset.url);
+      for (const [path, file] of saved ? [] : bundle.files) {
         urls.set(
           path,
           URL.createObjectURL(
@@ -362,7 +372,7 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
         const csp = doc.createElement('meta');
         csp.httpEquiv = 'Content-Security-Policy';
         csp.content =
-          "default-src 'none'; media-src blob:; img-src blob: data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'";
+          "default-src 'none'; media-src blob: https:; img-src blob: data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'";
         doc.head.prepend(csp);
         html = doc.documentElement.outerHTML;
       }
@@ -370,8 +380,16 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
         urls.forEach(URL.revokeObjectURL);
         return;
       }
-      activeUrls.current = [...urls.values()];
-      setLoaded({ bundle, urls, power, html });
+      activeUrls.current = [...urls.values()].filter((url) => url.startsWith('blob:'));
+      setLoaded({
+        bundle,
+        urls,
+        power,
+        html,
+        downloads: saved
+          ? new Map(saved.assets.map(([path, asset]) => [path, asset.downloadUrl]))
+          : urls,
+      });
       const first =
         rows(at(bundle.report, 'roles', 'baseline', 'observations'))[0] ??
         rows(at(bundle.report, 'roles', 'candidate', 'observations'))[0];
@@ -406,9 +424,10 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
   }, []);
 
   useEffect(() => {
-    if (reader) void open(() => reader);
+    if (published) void open(undefined, published);
+    else if (reader) void open(() => reader);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reader]);
+  }, [reader, published]);
 
   const b = loaded?.bundle;
   const participating = rows(
@@ -443,17 +462,17 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
 
   return (
     <section
-      className="ph-no-capture ph-mask mx-auto min-w-0 w-full max-w-7xl space-y-6 py-6"
+      className={`ph-no-capture ph-mask mx-auto min-w-0 w-full max-w-7xl space-y-6 ${reader || published ? '' : 'py-6'}`}
       data-testid="video-benchmark"
     >
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Heading as="h1" level="page">
-            {s.title}
-          </Heading>
-          <p className="text-muted-foreground mt-2">{s.subtitle}</p>
-        </div>
-        {!reader && (
+      {!reader && !published && (
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Heading as="h1" level="page">
+              {s.title}
+            </Heading>
+            <p className="text-muted-foreground mt-2">{s.subtitle}</p>
+          </div>
           <div className="flex gap-2">
             <Button onClick={() => input.current?.click()} disabled={loading}>
               {s.open}
@@ -464,9 +483,9 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
               </Button>
             )}
           </div>
-        )}
-      </header>
-      {!reader && (
+        </header>
+      )}
+      {!reader && !published && (
         <>
           <input
             ref={input}
@@ -531,369 +550,356 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
       )}
       {b && loaded && (
         <>
-          <Card className="gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                GitHub #{text(at(b.manifest, 'run_id'))} · {fmt(at(b.manifest, 'run_attempt'))} ·{' '}
-                {fmt(at(b.ci, 'finished_at'))}
-              </span>
-              <span className="rounded-full border px-3 py-1 text-xs">
-                {s.verified} · {b.checksums.size}
-              </span>
-            </div>
-            {at(b.report, 'same_workload') === true &&
-              at(b.report, 'same_gpu_uuid_set') === true &&
-              at(
-                b.documents.get('gpu/baseline/run.json'),
-                'configuration',
-                'configuration_sha256',
-              ) !== null &&
-              at(
-                b.documents.get('gpu/baseline/run.json'),
-                'configuration',
-                'configuration_sha256',
-              ) ===
-                at(
-                  b.documents.get('gpu/candidate/run.json'),
-                  'configuration',
-                  'configuration_sha256',
-                ) &&
-              at(b.report, 'roles', 'baseline', 'source_identity', 'source_sha256') !== null &&
-              at(b.report, 'roles', 'baseline', 'source_identity', 'source_sha256') ===
-                at(b.report, 'roles', 'candidate', 'source_identity', 'source_sha256') && (
-                <p className="text-sm font-medium">{s.aa}</p>
-              )}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[
-                [s.execution, at(b.ci, 'phase')],
-                [s.comparison, at(b.ci, 'regression_status')],
-                [s.calibration, at(b.report, 'policy', 'calibration_status')],
-                [s.qualification, at(b.ci, 'release_qualified')],
-              ].map(([label, value]) => (
-                <div key={String(label)}>
-                  <p className="text-sm text-muted-foreground">{fmt(label)}</p>
-                  <p className="mt-1 text-lg font-semibold">{fmt(value)}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {s.sameWorkload}: {fmt(at(b.report, 'same_workload'))}. {s.trust}
-            </p>
-          </Card>
-          {slots.length > 0 && (
-            <Card className="gap-4">
-              <label className="text-sm font-medium">
-                {s.slot}
-                <select
-                  className="mt-2 block w-full max-w-full rounded-md sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto border bg-background p-2"
-                  value={slot}
-                  onChange={(e) => setSlot(e.target.value)}
-                >
-                  {slots.map((o) => (
-                    <option key={text(at(o, 'slot_id'))} value={text(at(o, 'slot_id'))}>
-                      {text(at(o, 'case_id'))} ·{' '}
-                      {at(o, 'phase') === 'warmup' ? s.warmup : s.measured} ·{' '}
-                      {text(at(o, 'slot_id'))}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div>
-                <span className="text-xs text-muted-foreground">
-                  {s.prompt} · {s.seed} {fmt(at(clip, 'seed'))}
-                </span>
-                <p className="mt-2 leading-relaxed">{fmt(at(clip, 'prompt'))}</p>
-              </div>
-              <details>
-                <summary className="cursor-pointer text-sm">{s.settings}</summary>
-                <div className="mt-3">
-                  {table(entries(at(b.manifest, 'workload_plan', 'generation')))}
-                </div>
-              </details>
-            </Card>
-          )}
-          <div className="grid gap-5 lg:grid-cols-2">
-            {ROLES.map((role) => {
-              const o = selected(role);
-              const r = at(b.report, 'roles', role);
-              const summary = at(r, 'summary');
-              const mediaUrl = loaded.urls.get(`report/${text(at(o, 'artifact_path'))}`);
-              const run = b.documents.get(`gpu/${role}/run.json`);
-              const rawSummary = at(run, 'summary');
-              return (
-                <Card key={role} className="gap-4">
-                  <div className="flex justify-between">
-                    <Heading level="section">{s[role]}</Heading>
-                    <span className="text-sm text-muted-foreground">{fmt(at(o, 'status'))}</span>
-                  </div>
-                  {mediaUrl ? (
-                    <>
-                      <video
-                        key={mediaUrl + slot}
-                        data-role={role}
-                        className="aspect-video w-full rounded-lg bg-black"
-                        controls
-                        playsInline
-                        preload="auto"
-                        src={mediaUrl}
-                        aria-label={`${s[role]} ${s.slot}`}
-                        onPlay={(e) => {
-                          document
-                            .querySelectorAll<HTMLVideoElement>('[data-role]')
-                            .forEach((v) => {
-                              if (v !== e.currentTarget) v.pause();
-                            });
-                        }}
-                        onError={(e) => {
-                          const node = e.currentTarget.nextElementSibling;
-                          if (node) node.textContent = s.mediaError;
-                        }}
-                      />
-                      <p role="status" className="text-xs text-muted-foreground">
-                        {s.audio}
-                      </p>
-                      <a
-                        download={`${role}-${slot}.mp4`}
-                        className="text-sm text-primary underline"
-                        href={mediaUrl}
-                      >
-                        {s.download}
-                      </a>
-                    </>
-                  ) : (
-                    <div className="flex aspect-video items-center justify-center rounded-lg bg-muted p-6 text-muted-foreground">
-                      {s.noMedia}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">{s.statsNote}</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{s.latency}</p>
-                      <p className="text-2xl font-semibold tabular-nums">
-                        {fmt(at(summary, 'latency_median_seconds'))}{' '}
-                        <span className="text-sm">s</span>
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">{s.throughput}</p>
-                      <p className="text-2xl font-semibold tabular-nums">
-                        {fmt(at(summary, 'valid_clips_per_second'), 5)}
-                      </p>
-                    </div>
-                  </div>
-                  {table([
-                    [s.scheduled, at(summary, 'scheduled')],
-                    [s.completed, at(rawSummary, 'completed')],
-                    [s.valid, at(summary, 'valid')],
-                    [s.failed, at(rawSummary, 'failed')],
-                    [`${s.window} (s)`, at(summary, 'wall_seconds')],
-                    [
-                      s.warmup,
-                      `${fmt(at(summary, 'warmups_valid'))} / ${fmt(at(summary, 'warmups_scheduled'))}`,
-                    ],
-                  ])}
-                  <details>
-                    <summary className="cursor-pointer text-sm">{s.integrity}</summary>
-                    <div className="mt-3 space-y-3">
-                      {table([
-                        ...entries(at(o, 'media', 'video')).map(([k, v]): [string, Json] => [
-                          `video.${k}`,
-                          v,
-                        ]),
-                        ...entries(at(o, 'media', 'audio')).map(([k, v]): [string, Json] => [
-                          `audio.${k}`,
-                          v,
-                        ]),
-                      ])}
-                      {rows(
-                        at(
-                          rows(at(run, 'records')).find((record) => at(record, 'slot_id') === slot),
-                          'media',
-                          'checks',
-                        ),
-                      ).map((check, i) => (
-                        <p className="break-words text-xs" key={i}>
-                          {text(at(check, 'name'))}: <strong>{fmt(at(check, 'status'))}</strong> —{' '}
-                          {text(at(check, 'detail'))}
-                        </p>
-                      ))}
-                    </div>
-                  </details>
-                </Card>
-              );
-            })}
-          </div>
-          <p className="text-sm text-muted-foreground">{s.timing}</p>
-          {b.result ? (
-            <ResultPower result={b.result} />
-          ) : (
-            <Card className="gap-4">
-              <Heading>{s.power}</Heading>
-              <p className="text-sm text-muted-foreground">{s.powerNote}</p>
-              <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid items-start gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.8fr)]">
+            <ResultSummary bundle={b} stored={Boolean(published)} />
+            <div className="min-w-0 space-y-4">
+              <div className="grid gap-5 lg:grid-cols-2">
                 {ROLES.map((role) => {
-                  const power = loaded.power[role];
+                  const o = selected(role);
+                  const r = at(b.report, 'roles', role);
+                  const summary = at(r, 'summary');
+                  const mediaUrl = loaded.urls.get(`report/${text(at(o, 'artifact_path'))}`);
+                  const run = b.documents.get(`gpu/${role}/run.json`);
+                  const rawSummary = at(run, 'summary');
                   return (
-                    <div key={role} className="space-y-3">
-                      <Heading level="card">{s[role]}</Heading>
-                      {table([
-                        [`${s.meanPower} (W)`, power?.watts],
-                        [`${s.energy} (kJ)`, power ? power.joules / 1000 : null],
-                        [`${s.coverage} (s)`, power?.seconds],
-                        [s.samples, power?.sampleCount],
-                      ])}
-                      {power && (
-                        <p className="break-all text-xs text-muted-foreground">
-                          {power.start} → {power.end}
-                        </p>
+                    <Card key={role} className="gap-4">
+                      <div className="flex justify-between">
+                        <Heading level="section">{s[role]}</Heading>
+                        <span className="text-sm text-muted-foreground">
+                          {fmt(at(o, 'status'))}
+                        </span>
+                      </div>
+                      {mediaUrl ? (
+                        <>
+                          <video
+                            key={mediaUrl + slot}
+                            data-role={role}
+                            className="aspect-video w-full rounded-lg bg-black"
+                            controls
+                            crossOrigin="anonymous"
+                            playsInline
+                            preload="auto"
+                            src={mediaUrl}
+                            aria-label={`${s[role]} ${s.slot}`}
+                            onPlay={(e) => {
+                              document
+                                .querySelectorAll<HTMLVideoElement>('[data-role]')
+                                .forEach((v) => {
+                                  if (v !== e.currentTarget) v.pause();
+                                });
+                            }}
+                            onError={(e) => {
+                              const node = e.currentTarget.nextElementSibling;
+                              if (node) node.textContent = s.mediaError;
+                            }}
+                          />
+                          <p role="status" className="text-xs text-muted-foreground">
+                            {s.audio}
+                          </p>
+                          <a
+                            download={`${role}-${slot}.mp4`}
+                            className="text-sm text-primary underline"
+                            href={
+                              loaded.downloads.get(`report/${text(at(o, 'artifact_path'))}`) ??
+                              mediaUrl
+                            }
+                          >
+                            {s.download}
+                          </a>
+                        </>
+                      ) : (
+                        <div className="flex aspect-video items-center justify-center rounded-lg bg-muted p-6 text-muted-foreground">
+                          {s.noMedia}
+                        </div>
                       )}
-                    </div>
+                      <details>
+                        <summary className="cursor-pointer text-sm">
+                          {s.settings} · {s.integrity}
+                        </summary>
+                        <p className="my-3 text-xs text-muted-foreground">{s.statsNote}</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{s.latency}</p>
+                            <p className="text-2xl font-semibold tabular-nums">
+                              {fmt(at(summary, 'latency_median_seconds'))}{' '}
+                              <span className="text-sm">s</span>
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{s.throughput}</p>
+                            <p className="text-2xl font-semibold tabular-nums">
+                              {fmt(at(summary, 'valid_clips_per_second'), 5)}
+                            </p>
+                          </div>
+                        </div>
+                        {table([
+                          [s.scheduled, at(summary, 'scheduled')],
+                          [s.completed, at(rawSummary, 'completed')],
+                          [s.valid, at(summary, 'valid')],
+                          [s.failed, at(rawSummary, 'failed')],
+                          [`${s.window} (s)`, at(summary, 'wall_seconds')],
+                          [
+                            s.warmup,
+                            `${fmt(at(summary, 'warmups_valid'))} / ${fmt(at(summary, 'warmups_scheduled'))}`,
+                          ],
+                        ])}
+                        <details>
+                          <summary className="cursor-pointer text-sm">{s.integrity}</summary>
+                          <div className="mt-3 space-y-3">
+                            {table([
+                              ...entries(at(o, 'media', 'video')).map(([k, v]): [string, Json] => [
+                                `video.${k}`,
+                                v,
+                              ]),
+                              ...entries(at(o, 'media', 'audio')).map(([k, v]): [string, Json] => [
+                                `audio.${k}`,
+                                v,
+                              ]),
+                            ])}
+                            {rows(
+                              at(
+                                rows(at(run, 'records')).find(
+                                  (record) => at(record, 'slot_id') === slot,
+                                ),
+                                'media',
+                                'checks',
+                              ),
+                            ).map((check, i) => (
+                              <p className="break-words text-xs" key={i}>
+                                {text(at(check, 'name'))}:{' '}
+                                <strong>{fmt(at(check, 'status'))}</strong> —{' '}
+                                {text(at(check, 'detail'))}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      </details>
+                    </Card>
                   );
                 })}
               </div>
-              <Heading level="card">{s.memory}</Heading>
-              <p className="text-sm text-muted-foreground">{s.memoryNote}</p>
+              {slots.length > 0 && (
+                <Card className="gap-4">
+                  <label className="text-sm font-medium">
+                    {s.slot}
+                    <select
+                      className="mt-2 block w-full max-w-full rounded-md sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto border bg-background p-2"
+                      value={slot}
+                      onChange={(e) => setSlot(e.target.value)}
+                    >
+                      {slots.map((o) => (
+                        <option key={text(at(o, 'slot_id'))} value={text(at(o, 'slot_id'))}>
+                          {text(at(o, 'case_id'))} ·{' '}
+                          {at(o, 'phase') === 'warmup' ? s.warmup : s.measured} ·{' '}
+                          {text(at(o, 'slot_id'))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div>
+                    <span className="text-xs text-muted-foreground">
+                      {s.prompt} · {s.seed} {fmt(at(clip, 'seed'))}
+                    </span>
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-sm leading-relaxed">
+                        {text(at(clip, 'prompt')).slice(0, 150)}
+                        {text(at(clip, 'prompt')).length > 150 ? '…' : ''}
+                      </summary>
+                      <p className="mt-2 text-sm leading-relaxed">{fmt(at(clip, 'prompt'))}</p>
+                    </details>
+                  </div>
+                  <details>
+                    <summary className="cursor-pointer text-sm">{s.settings}</summary>
+                    <div className="mt-3">
+                      {table(entries(at(b.manifest, 'workload_plan', 'generation')))}
+                    </div>
+                  </details>
+                </Card>
+              )}
+            </div>
+          </div>
+          <details className="space-y-4 rounded-lg border p-5">
+            <summary className="cursor-pointer font-medium">
+              {s.power} · {s.fidelity} · {s.hardware}
+            </summary>
+            <p className="text-sm text-muted-foreground">{s.timing}</p>
+            {b.result ? (
+              <ResultPower result={b.result} />
+            ) : (
+              <Card className="gap-4">
+                <Heading>{s.power}</Heading>
+                <p className="text-sm text-muted-foreground">{s.powerNote}</p>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {ROLES.map((role) => {
+                    const power = loaded.power[role];
+                    return (
+                      <div key={role} className="space-y-3">
+                        <Heading level="card">{s[role]}</Heading>
+                        {table([
+                          [`${s.meanPower} (W)`, power?.watts],
+                          [`${s.energy} (kJ)`, power ? power.joules / 1000 : null],
+                          [`${s.coverage} (s)`, power?.seconds],
+                          [s.samples, power?.sampleCount],
+                        ])}
+                        {power && (
+                          <p className="break-all text-xs text-muted-foreground">
+                            {power.start} → {power.end}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <Heading level="card">{s.memory}</Heading>
+                <p className="text-sm text-muted-foreground">{s.memoryNote}</p>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {ROLES.map((role) => (
+                    <div key={role} className="space-y-2">
+                      <Heading level="label">{s[role]}</Heading>
+                      {entries(
+                        at(
+                          b.job,
+                          'roles',
+                          role,
+                          'telemetry_summary',
+                          'measurement_observed_memory_peak_mib_by_gpu',
+                        ),
+                      ).length > 0
+                        ? table(
+                            entries(
+                              at(
+                                b.job,
+                                'roles',
+                                role,
+                                'telemetry_summary',
+                                'measurement_observed_memory_peak_mib_by_gpu',
+                              ),
+                            ).map(([gpu, value]) => [gpu, `${fmt(value)} MiB`]),
+                          )
+                        : s.unavailable}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+            <Card className="gap-4">
+              <Heading>{s.fidelity}</Heading>
+              <p className="text-sm text-muted-foreground">{s.fidelityNote}</p>
+              {table([
+                [
+                  s.videoPsnr,
+                  at(pair, 'metrics', 'video_identical') === true
+                    ? s.identical
+                    : at(pair, 'metrics', 'video_psnr_db'),
+                ],
+                [s.videoMae, at(pair, 'metrics', 'video_mae')],
+                [s.audioSpectral, at(pair, 'metrics', 'audio_spectral_cosine')],
+                [s.audioRms, at(pair, 'metrics', 'audio_rms_ratio')],
+                [s.audioMae, at(rawPair, 'metrics', 'audio_waveform_mae')],
+                [s.videoCoverage, at(rawPair, 'metrics', 'video_sample_coverage_fraction')],
+                [s.audioCoverage, at(rawPair, 'metrics', 'audio_sample_coverage_fraction')],
+              ])}
+              <details>
+                <summary className="cursor-pointer text-sm">{s.checks}</summary>
+                {rows(at(pair, 'checks')).map((c, i) => (
+                  <p key={i} className="mt-2 break-words text-xs">
+                    {text(at(c, 'name'))} · {fmt(at(c, 'status'))} · {text(at(c, 'reason'))}
+                  </p>
+                ))}
+              </details>
+            </Card>
+            <Card className="gap-4">
+              <Heading>{s.hardware}</Heading>
+              {table([
+                [s.participating, participating > 0 ? participating : null],
+                [
+                  s.allocated,
+                  /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
+                    text(at(b.ci, 'slurm_job', 'AllocTRES')),
+                  )?.groups?.count,
+                ],
+                ['Slurm', at(b.manifest, 'slurm_allocation', 'identity', 'JobId')],
+                [s.node, at(b.ci, 'slurm_job', 'NodeList')],
+                [s.model, at(b.manifest, 'workload_plan', 'model_id')],
+                [s.modelRevision, at(b.manifest, 'workload_plan', 'model_revision')],
+              ])}
               <div className="grid gap-6 lg:grid-cols-2">
                 {ROLES.map((role) => (
-                  <div key={role} className="space-y-2">
-                    <Heading level="label">{s[role]}</Heading>
-                    {entries(
-                      at(
-                        b.job,
-                        'roles',
-                        role,
-                        'telemetry_summary',
-                        'measurement_observed_memory_peak_mib_by_gpu',
-                      ),
-                    ).length > 0
-                      ? table(
-                          entries(
-                            at(
-                              b.job,
-                              'roles',
-                              role,
-                              'telemetry_summary',
-                              'measurement_observed_memory_peak_mib_by_gpu',
-                            ),
-                          ).map(([gpu, value]) => [gpu, `${fmt(value)} MiB`]),
-                        )
-                      : s.unavailable}
+                  <div key={role} className="space-y-3">
+                    <Heading level="card">{s[role]}</Heading>
+                    {table([
+                      [
+                        s.runtimeRevision,
+                        at(b.report, 'roles', role, 'configuration', 'runtime_revision'),
+                      ],
+                      [
+                        s.sourceHash,
+                        at(b.report, 'roles', role, 'source_identity', 'source_sha256'),
+                      ],
+                      [
+                        'GPU',
+                        rows(at(b.job, 'roles', role, 'telemetry_summary', 'gpu_identity'))
+                          .map((g) => text(at(g, 'name')))
+                          .join(', '),
+                      ],
+                    ])}
+                    <details>
+                      <summary className="cursor-pointer text-sm">{s.settings}</summary>
+                      <pre className="mt-3 overflow-auto whitespace-pre-wrap break-all text-xs">
+                        {JSON.stringify(at(b.job, 'roles', role, 'launch_argv'), null, 2)}
+                      </pre>
+                    </details>
                   </div>
                 ))}
               </div>
             </Card>
-          )}
-          <Card className="gap-4">
-            <Heading>{s.fidelity}</Heading>
-            <p className="text-sm text-muted-foreground">{s.fidelityNote}</p>
-            {table([
-              [
-                s.videoPsnr,
-                at(pair, 'metrics', 'video_identical') === true
-                  ? s.identical
-                  : at(pair, 'metrics', 'video_psnr_db'),
-              ],
-              [s.videoMae, at(pair, 'metrics', 'video_mae')],
-              [s.audioSpectral, at(pair, 'metrics', 'audio_spectral_cosine')],
-              [s.audioRms, at(pair, 'metrics', 'audio_rms_ratio')],
-              [s.audioMae, at(rawPair, 'metrics', 'audio_waveform_mae')],
-              [s.videoCoverage, at(rawPair, 'metrics', 'video_sample_coverage_fraction')],
-              [s.audioCoverage, at(rawPair, 'metrics', 'audio_sample_coverage_fraction')],
-            ])}
-            <details>
-              <summary className="cursor-pointer text-sm">{s.checks}</summary>
-              {rows(at(pair, 'checks')).map((c, i) => (
-                <p key={i} className="mt-2 break-words text-xs">
-                  {text(at(c, 'name'))} · {fmt(at(c, 'status'))} · {text(at(c, 'reason'))}
-                </p>
-              ))}
-            </details>
-          </Card>
-          <Card className="gap-4">
-            <Heading>{s.hardware}</Heading>
-            {table([
-              [s.participating, participating > 0 ? participating : null],
-              [
-                s.allocated,
-                /(?:^|,)gres\/gpu=(?<count>\d+)(?:,|$)/u.exec(
-                  text(at(b.ci, 'slurm_job', 'AllocTRES')),
-                )?.groups?.count,
-              ],
-              ['Slurm', at(b.manifest, 'slurm_allocation', 'identity', 'JobId')],
-              [s.node, at(b.ci, 'slurm_job', 'NodeList')],
-              [s.model, at(b.manifest, 'workload_plan', 'model_id')],
-              [s.modelRevision, at(b.manifest, 'workload_plan', 'model_revision')],
-            ])}
-            <div className="grid gap-6 lg:grid-cols-2">
-              {ROLES.map((role) => (
-                <div key={role} className="space-y-3">
-                  <Heading level="card">{s[role]}</Heading>
-                  {table([
-                    [
-                      s.runtimeRevision,
-                      at(b.report, 'roles', role, 'configuration', 'runtime_revision'),
-                    ],
-                    [s.sourceHash, at(b.report, 'roles', role, 'source_identity', 'source_sha256')],
-                    [
-                      'GPU',
-                      rows(at(b.job, 'roles', role, 'telemetry_summary', 'gpu_identity'))
-                        .map((g) => text(at(g, 'name')))
-                        .join(', '),
-                    ],
-                  ])}
-                  <details>
-                    <summary className="cursor-pointer text-sm">{s.settings}</summary>
-                    <pre className="mt-3 overflow-auto whitespace-pre-wrap break-all text-xs">
-                      {JSON.stringify(at(b.job, 'roles', role, 'launch_argv'), null, 2)}
-                    </pre>
-                  </details>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Card className="gap-4">
-            <Heading>{s.economics}</Heading>
-            <p className="text-sm text-muted-foreground">{s.economicsNote}</p>
-            <div className="grid gap-4 md:grid-cols-3">
-              {field(s.price, price, setPrice)}
-              {field(s.cost, cost, setCost)}
-              {field(s.billed, billed, setBilled)}
-              {field(s.assumption, assumption, setAssumption, 'text')}
-              {field(s.date, date, setDate, 'date')}
-            </div>
-            <p className="text-xs text-muted-foreground">{s.needAssumptions}</p>
-            <div className="grid gap-6 lg:grid-cols-2">
-              {ROLES.map((role) => {
-                const summary = at(b.report, 'roles', role, 'summary');
-                const count = rows(
-                  at(b.job, 'roles', role, 'telemetry_summary', 'gpu_identity'),
-                ).length;
-                const e =
-                  assumption.trim() && date
-                    ? estimateEconomics(
-                        number(at(summary, 'valid_clips_per_second')),
-                        count || null,
-                        parseInput(billed),
-                        parseInput(price),
-                        parseInput(cost),
-                      )
-                    : null;
-                return (
-                  <div key={role} className="space-y-3">
-                    <Heading level="card">
-                      {s[role]} · {s.estimate} (USD)
-                    </Heading>
-                    {table([
-                      [s.revenueParticipant, e?.revenuePerParticipating],
-                      [s.revenueBilled, e?.revenuePerBilled],
-                      [s.profitParticipant, e?.profitPerParticipating],
-                      [s.profitBilled, e?.profitPerBilled],
-                    ])}
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+          </details>
+          <details className="rounded-lg border p-5">
+            <summary className="cursor-pointer font-medium">{s.economics}</summary>
+            <Card className="mt-4 gap-4">
+              <Heading>{s.economics}</Heading>
+              <p className="text-sm text-muted-foreground">{s.economicsNote}</p>
+              <div className="grid gap-4 md:grid-cols-3">
+                {field(s.price, price, setPrice)}
+                {field(s.cost, cost, setCost)}
+                {field(s.billed, billed, setBilled)}
+                {field(s.assumption, assumption, setAssumption, 'text')}
+                {field(s.date, date, setDate, 'date')}
+              </div>
+              <p className="text-xs text-muted-foreground">{s.needAssumptions}</p>
+              <div className="grid gap-6 lg:grid-cols-2">
+                {ROLES.map((role) => {
+                  const summary = at(b.report, 'roles', role, 'summary');
+                  const count = rows(
+                    at(b.job, 'roles', role, 'telemetry_summary', 'gpu_identity'),
+                  ).length;
+                  const e =
+                    assumption.trim() && date
+                      ? estimateEconomics(
+                          number(at(summary, 'valid_clips_per_second')),
+                          count || null,
+                          parseInput(billed),
+                          parseInput(price),
+                          parseInput(cost),
+                        )
+                      : null;
+                  return (
+                    <div key={role} className="space-y-3">
+                      <Heading level="card">
+                        {s[role]} · {s.estimate} (USD)
+                      </Heading>
+                      {table([
+                        [s.revenueParticipant, e?.revenuePerParticipating],
+                        [s.revenueBilled, e?.revenuePerBilled],
+                        [s.profitParticipant, e?.profitPerParticipating],
+                        [s.profitBilled, e?.profitPerBilled],
+                      ])}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </details>
           <Card className="gap-4">
             <Heading>{s.provenance}</Heading>
             {ciUrl && (
@@ -930,7 +936,7 @@ export default function VideoBenchmark({ reader }: { reader?: (path: string) => 
                   <a
                     className="break-all text-xs text-primary underline"
                     key={path}
-                    href={url}
+                    href={loaded.downloads.get(path) ?? url}
                     download={path.replaceAll('/', '__')}
                   >
                     {path}
