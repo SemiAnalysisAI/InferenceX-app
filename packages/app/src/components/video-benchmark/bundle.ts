@@ -41,6 +41,7 @@ export async function sha256(blob: Blob): Promise<string> {
 }
 export interface Bundle {
   manifest: Json;
+  result: Json;
   report: Json;
   job: Json;
   ci: Json;
@@ -109,8 +110,17 @@ export async function loadBundle(read: (path: string) => Promise<Blob>): Promise
         throw new Error(`Media identity mismatch: ${role}`);
     }
   }
+  const result = documents.get('result.json') ?? null;
+  if (
+    result &&
+    (at(result, 'schema_version') !== '1.0.0' ||
+      at(result, 'bundle_type') !== 'h3_benchmark_result' ||
+      at(result, 'execution', 'ci', 'run_id') !== at(manifest, 'run_id'))
+  )
+    throw new Error('Unsupported or mismatched H3 result contract');
   return {
     manifest,
+    result,
     report,
     job: documents.get('gpu/gpu-job.json') ?? null,
     ci: documents.get('ci.json') ?? null,
