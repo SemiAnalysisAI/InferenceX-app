@@ -19,9 +19,6 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').click();
     cy.url().should('include', '/evaluation');
 
-    cy.get('[data-testid="tab-trigger-historical"]').click();
-    cy.url().should('include', '/historical');
-
     cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').click();
     cy.url().should('include', '/profit-estimator-per-gigawatt');
 
@@ -34,6 +31,14 @@ describe('Chart Section Tabs — E2E', () => {
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.url().should('include', '/inference');
+  });
+
+  it('opens Historical Trends from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-historical"]').scrollIntoView().click();
+    cy.url().should('include', '/historical');
+    cy.get('[data-testid="historical-trends-display"]').should('exist');
   });
 
   it('opens the TCO Calculator and Fleet Lifecycle from the footer links', () => {

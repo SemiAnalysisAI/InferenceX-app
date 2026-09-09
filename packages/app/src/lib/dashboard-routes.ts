@@ -131,11 +131,14 @@ export const DASHBOARD_ROUTES = [
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'e_'],
   },
+  // Historical Trends moved to the footer as well: almost nobody opened the
+  // view, and people compare curves across dates on the inference dashboard
+  // instead. The route, canonical, /zh mirror, and sitemap entry stay.
   {
     key: 'historical',
     path: '/historical',
     canonicalPath: '/historical',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
