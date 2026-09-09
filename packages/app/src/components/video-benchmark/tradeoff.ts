@@ -2,6 +2,7 @@ import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from '
 import { servingCells } from './serving';
 import { allocatedGpus } from './allocation';
 import { powerLimitComparison } from './power-limit';
+import { serverTimingSummary } from './server-timing';
 
 export interface TradeoffRun {
   bundle: Pick<Bundle, 'manifest' | 'result' | 'manifestSha256'> &
@@ -155,6 +156,7 @@ function pairedTradeoffPoints(run: TradeoffRun) {
       participating: positive(at(result, 'hardware', 'selected_gpu_count')),
       energy,
       powerLimit,
+      timing: serverTimingSummary(null, false),
       power: at(phase, 'valid') === true ? number(at(phase, 'aggregate', 'avg_power_w')) : null,
       powerWindow: at(phase, 'valid') === true ? number(at(phase, 'duration_seconds')) : null,
       server: at(result, 'workload', 'server'),
@@ -244,6 +246,7 @@ function servingTradeoffPoints(run: TradeoffRun) {
           )
         : null,
       server,
+      timing: serverTimingSummary(item.run, complete),
       fidelity: null,
       policy: at(item.spec, 'policy'),
     };

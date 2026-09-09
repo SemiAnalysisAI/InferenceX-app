@@ -11,6 +11,7 @@ import { at, number, rows, safePath, text, type Bundle, type Json } from './bund
 import type { ServingCell } from './serving';
 import { allocatedGpus } from './allocation';
 import { powerLimitComparison } from './power-limit';
+import { requestServerTiming, serverTimingSummary, SERVER_TIMING_COPY } from './server-timing';
 
 const STRINGS = {
   en: {
@@ -105,9 +106,9 @@ const STRINGS = {
     server: 'Server configuration',
     observed: 'Observed submission rate (requests/s)',
     inFlight: 'Peak client requests in flight',
-    missing: 'Unavailable serving measurements',
+    missing: 'Serving measurement scope',
     missingNote:
-      'Server-side queue delay, server-ready latency, observed batch sizes and fixed offered arrival rate are not supplied. Closed-loop concurrency is not server batch size. Costs and prices require separate, dated assumptions.',
+      'Closed-loop tests do not fix the offered arrival rate. Missing server measurements are shown as unavailable. Costs and prices require separate, dated assumptions.',
     outcome: 'Completion accounting',
     completed: 'Completed',
     failedCount: 'Failed / invalid',
@@ -214,9 +215,9 @@ const STRINGS = {
     server: '服务端配置',
     observed: '观测提交速率（requests/s）',
     inFlight: '客户端在途请求峰值',
-    missing: '尚未提供的服务指标',
+    missing: '服务测量范围',
     missingNote:
-      '尚无服务端排队时长、服务端完成延迟、实际 batch size 或固定请求到达速率。闭环客户端并发数不等于服务端 batch size。成本与价格需要另行提供注明日期的假设。',
+      '闭环测试不固定请求到达速率。缺失的服务端指标显示为无数据。成本与价格需要另行提供注明日期的假设。',
     outcome: '请求完成情况',
     completed: '已完成',
     failedCount: '失败 / 无效',
@@ -269,7 +270,9 @@ export default function ServingResults({
   initialCell?: string;
   onCellChange?: (id: string) => void;
 }) {
-  const s = STRINGS[useLocale()];
+  const locale = useLocale();
+  const s = STRINGS[locale];
+  const t = SERVER_TIMING_COPY[locale];
   const [selected, setSelected] = useState(initialCell ?? '');
   const [slot, setSlot] = useState('');
   const [gpuBasis, setGpuBasis] = useState<'participating' | 'allocated'>('participating');
@@ -299,6 +302,8 @@ export default function ServingResults({
     records.find((row) => text(at(row, 'slot_id')) === slot) ??
     records.find((row) => at(row, 'phase') === 'measurement') ??
     records[0];
+  const serverTiming = serverTimingSummary(run, verified);
+  const requestTiming = requestServerTiming(record ?? null, verified);
   const media = at(record, 'media');
   const warmup = at(record, 'phase') === 'warmup';
   const telemetry = at(job, 'roles', 'baseline', 'telemetry_summary');
@@ -349,6 +354,7 @@ export default function ServingResults({
     current.jobPath,
     current.powerPath,
     current.specPath,
+    `gpu/${current.id}/supervisor/baseline/runtime.stdout.log`,
     'manifest.json',
     'SHA256SUMS',
   ];
@@ -516,6 +522,31 @@ export default function ServingResults({
                     ],
                   ]}
                 />
+                <details data-testid="request-server-timing">
+                  <summary className="cursor-pointer text-sm">{t.title}</summary>
+                  <div className="mt-3 space-y-3">
+                    <Data
+                      values={[
+                        [
+                          t.status,
+                          requestTiming
+                            ? requestTiming.status === 'complete'
+                              ? t.complete
+                              : t.partial
+                            : t.unavailable,
+                        ],
+                        ...t.stages.map((label, index): [string, string] => [
+                          label,
+                          `${fmt(requestTiming?.stages[index] ?? null)} s`,
+                        ]),
+                        [t.batch, fmt(requestTiming?.batchSize ?? null)],
+                        [t.replicas, fmt(requestTiming?.replicaId ?? null)],
+                        [t.identity, requestTiming?.identity ?? t.unavailable],
+                      ]}
+                    />
+                    <p className="text-xs leading-relaxed text-muted-foreground">{t.clock}</p>
+                  </div>
+                </details>
                 {warmup && (
                   <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
                     {s.warmup}
@@ -626,6 +657,57 @@ export default function ServingResults({
         />
         <p className="text-xs text-muted-foreground">{s.p90Note}</p>
         <p className="text-xs text-muted-foreground">{s.gpuNote}</p>
+      </Card>
+
+      <Card className="gap-4" data-testid="serving-server-timing">
+        <Heading>{t.title}</Heading>
+        {serverTiming.stages.some(Boolean) || serverTiming.batchSizes || serverTiming.replicaIds ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-xl text-left text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    {[t.title, 'P50 (s)', 'P90 (s)', 'P95 (s)', t.coverage].map((label) => (
+                      <th key={label} className="px-3 py-2 font-medium">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {t.stages.map((label, index) => {
+                    const timing = serverTiming.stages[index];
+                    return (
+                      <tr key={label} className="border-t border-border/40">
+                        <th className="px-3 py-2 font-medium">{label}</th>
+                        {[timing?.p50, timing?.p90, timing?.p95].map((value, i) => (
+                          <td key={i} className="px-3 py-2">
+                            {fmt(value ?? null)}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2">
+                          {timing
+                            ? `${timing.samples} / ${timing.valid} / ${timing.missing}`
+                            : t.unavailable}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Data
+              values={[
+                [t.batch, serverTiming.batchSizes?.join(', ') ?? t.unavailable],
+                [t.replicas, serverTiming.replicaIds?.join(', ') ?? t.unavailable],
+              ]}
+            />
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t.unavailable}</p>
+        )}
+        <p className="text-xs leading-relaxed text-muted-foreground">{t.note}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t.layoutNote}</p>
       </Card>
 
       <Card className="gap-4" data-testid="serving-power">

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import ServingResults from '@/components/video-benchmark/ServingResults';
 import type { ServingCell } from '@/components/video-benchmark/serving';
-import type { Bundle } from '@/components/video-benchmark/bundle';
+import { at, entries, rows, type Bundle } from '@/components/video-benchmark/bundle';
 
 // Synthetic fixtures exercise the serving contract; they are never benchmark results.
 const cells: ServingCell[] = [1, 2, 4].map((concurrency) => {
@@ -261,6 +261,86 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('Candidate').should('not.exist');
   });
 
+  it('shows server stages separately from delivery and retains partial coverage', () => {
+    const distribution = {
+      values: [1, 2, 3, 4],
+      sample_count: 4,
+      valid_clip_count: 4,
+      missing_count: 0,
+      p50: 2.5,
+      p90: null,
+      p95: null,
+    };
+    const original = cells[0];
+    const record = rows(at(original.run, 'records'))[1];
+    const timed = {
+      ...original,
+      run: {
+        ...Object.fromEntries(entries(original.run)),
+        summary: { valid: 4 },
+        serving: {
+          queue_delay_seconds: distribution,
+          server_ready_latency_seconds: {
+            ...distribution,
+            values: [120, 121],
+            sample_count: 2,
+            missing_count: 2,
+            p50: 999999,
+          },
+          observed_batch_sizes: [1, 1, 1, 1],
+          observed_replica_ids: [0],
+        },
+        records: [
+          {
+            ...Object.fromEntries(entries(record)),
+            job_id: 'synthetic-request',
+            server_timings: {
+              schema_version: '1.0.0',
+              status: 'complete',
+              request_id: 'synthetic-request',
+              instance_id: 'synthetic-instance',
+              clock_id: 'synthetic-clock',
+              clock: 'time.monotonic_ns; same Linux boot and time namespace; nanoseconds',
+              observed_batch_size: 1,
+              replica_id: 0,
+              server_ready_latency_seconds: 119,
+              prequeue_seconds: 1,
+              queue_delay_seconds: 0,
+              execution_seconds: 117,
+              postprocess_seconds: 1,
+            },
+          },
+        ],
+      },
+    };
+    mount({ cells: [timed] });
+    cy.get('[data-testid="serving-server-timing"]').within(() => {
+      cy.contains('tr', 'Queue delay').should('contain', '2.5').and('contain', '4 / 4 / 0');
+      cy.contains('tr', 'Received → media ready')
+        .should('contain', 'Unavailable')
+        .and('contain', '2 / 4 / 2')
+        .and('not.contain', '999,999');
+      cy.contains('dt', 'Observed batch sizes').next().should('have.text', '1');
+      cy.contains('dt', 'Observed replica IDs').next().should('have.text', '0');
+    });
+    cy.get('[data-testid="request-server-timing"]').within(() => {
+      cy.get('summary').click();
+      cy.contains('dt', 'Queue delay').next().should('have.text', '0 s');
+      cy.contains('dt', 'Received → media ready').next().should('have.text', '119 s');
+      cy.contains('time.monotonic_ns').should('be.visible');
+    });
+    cy.contains('dt', 'This request: submission → downloaded media')
+      .next()
+      .should('have.text', '120 s');
+    mount({ cells: [timed] }, '/zh/video');
+    cy.get('[data-testid="serving-server-timing"]').within(() => {
+      cy.contains('tr', '排队时长').should('contain', '2.5');
+      cy.contains('tr', '接收请求 → 媒体就绪')
+        .should('contain', '无数据')
+        .and('contain', '2 / 4 / 2');
+    });
+  });
+
   it('distinguishes requested and decoded duration and withholds invalid power', () => {
     mount();
     cy.contains('dt', 'Requested duration (s)').next().should('have.text', '4');
@@ -305,6 +385,7 @@ describe('H3 serving results (synthetic fixtures)', () => {
     cy.contains('并发服务测试结果').should('be.visible');
     cy.contains('此请求暂无可用媒体。').should('be.visible');
     cy.get('video').should('not.exist');
+    cy.get('[data-testid="serving-server-timing"]').should('contain', '无数据');
     cy.contains('p', '有效视频 / 参与计算 GPU 小时').next().should('have.text', '15');
     cy.get('[aria-label="GPU 归一化口径"]').click();
     cy.contains('[role="option"]', '所有已分配 GPU').click();

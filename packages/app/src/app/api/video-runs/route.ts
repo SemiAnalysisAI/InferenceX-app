@@ -14,7 +14,7 @@ const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
-const artifactName = /^h3-(?:results|video)-(?<runId>\d+)-(?<attempt>\d+)$/u;
+const artifactName = /^h3-(?:results|video|fidelity)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
 function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
@@ -147,7 +147,8 @@ export async function GET(request: NextRequest) {
         runs: runs.filter(
           (run: { name: string; display_title: string; path: string }) =>
             (run.path === '.github/workflows/e2e-tests.yml' && /\bh3\b/iu.test(run.name)) ||
-            run.path === '.github/workflows/h3-video.yml',
+            run.path === '.github/workflows/h3-video.yml' ||
+            run.path === '.github/workflows/h3-fidelity.yml',
         ),
         nextPage: runs.length === 100 ? Number(page) + 1 : null,
       },

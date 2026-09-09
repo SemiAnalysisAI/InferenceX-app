@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
+import FidelityResults from './FidelityResults';
 import VideoSelect from './VideoSelect';
 import { servingCells } from './serving';
 import VideoTradeoff from './VideoTradeoff';
@@ -108,7 +109,12 @@ export default function VideoCIRuns() {
   const [artifacts, setArtifacts] = useState<CIArtifact[]>([]);
   const [artifact, setArtifact] = useState<CIArtifact | null>(null);
   const [sources, setSources] = useState<
-    { id: string; read?: (path: string) => Promise<Blob>; stored?: StoredSource }[]
+    {
+      id: string;
+      kind?: 'fidelity';
+      read?: (path: string) => Promise<Blob>;
+      stored?: StoredSource;
+    }[]
   >([]);
   const [sourceId, setSourceId] = useState('');
   const [nextPage, setNextPage] = useState<number | null>(1);
@@ -194,7 +200,7 @@ export default function VideoCIRuns() {
             saved.sources.length === 0
           )
             throw new Error('Stored comparison identity mismatch');
-          const bundles = saved.sources.map(storedBundle);
+          const bundles = saved.sources.filter((source) => !source.kind).map(storedBundle);
           for (const bundle of bundles) servingCells(bundle);
           if (!controller.signal.aborted)
             for (const bundle of bundles) collect(bundle, runId, artifactId);
@@ -223,7 +229,12 @@ export default function VideoCIRuns() {
     setProgress(s.preparing);
     const endpoint = `/api/video-runs?run=${selectedRun.id}&artifact=${selected.id}`;
     let found:
-      | { id: string; read?: (path: string) => Promise<Blob>; stored?: StoredSource }[]
+      | {
+          id: string;
+          kind?: 'fidelity';
+          read?: (path: string) => Promise<Blob>;
+          stored?: StoredSource;
+        }[]
       | null = null;
     try {
       const response = prepared
@@ -237,7 +248,7 @@ export default function VideoCIRuns() {
           saved.artifact.id !== selected.id
         )
           throw new Error('Stored artifact identity mismatch');
-        found = saved.sources.map((item) => ({ id: item.id, stored: item }));
+        found = saved.sources.map((item) => ({ id: item.id, kind: item.kind, stored: item }));
       }
     } catch (error) {
       if (controller.signal.aborted) throw error;
@@ -269,7 +280,7 @@ export default function VideoCIRuns() {
     }
     if (current !== request.current) return;
     for (const item of found) {
-      if (item.stored)
+      if (item.stored && !item.kind)
         collect(storedBundle(item.stored), String(selectedRun.id), String(selected.id));
     }
     const chosen =
@@ -278,6 +289,7 @@ export default function VideoCIRuns() {
     if (!chosen) throw new Error(s.none);
     setSources(found);
     setSourceId(chosen.id);
+    if (chosen.kind === 'fidelity') changeView('results');
     share(selectedRun.id, selected.id, chosen.id, preferredCell);
   }
   async function selectRun(
@@ -593,18 +605,27 @@ export default function VideoCIRuns() {
       </div>
       {selectedSource && (
         <div hidden={view !== 'results'}>
-          <VideoBenchmark
-            key={`${artifact?.id}-${sourceId}`}
-            reader={selectedSource.read}
-            published={selectedSource.stored}
-            initialCell={cellId}
-            onCellChange={(id) => {
-              setCellId(id);
-              if (run && artifact) share(run.id, artifact.id, sourceId, id);
-            }}
-            onLoaded={collectLoaded}
-            onError={() => changeView('results')}
-          />
+          {selectedSource.kind === 'fidelity' ? (
+            <FidelityResults
+              key={`${artifact?.id}-${sourceId}`}
+              reader={selectedSource.read}
+              published={selectedSource.stored}
+              runId={sourceId}
+            />
+          ) : (
+            <VideoBenchmark
+              key={`${artifact?.id}-${sourceId}`}
+              reader={selectedSource.read}
+              published={selectedSource.stored}
+              initialCell={cellId}
+              onCellChange={(id) => {
+                setCellId(id);
+                if (run && artifact) share(run.id, artifact.id, sourceId, id);
+              }}
+              onLoaded={collectLoaded}
+              onError={() => changeView('results')}
+            />
+          )}
         </div>
       )}
       <details onToggle={(event) => setManual(event.currentTarget.open)}>
