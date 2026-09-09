@@ -127,8 +127,9 @@ import {
  * attribution. Keeping only the logical compute bucket prevents double
  * counting and makes the stacked breakdown sum to total prompt-token volume.
  *
+ * v17: canonical vLLM `host` hits share the existing CPU/DRAM display bucket.
  */
-export const CHART_SERIES_VERSION = 16;
+export const CHART_SERIES_VERSION = 17;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -228,6 +229,7 @@ export type MetricsMap = Record<string, RawMetric>;
 const VLLM_CACHE_SOURCE_BUCKETS: Record<string, string> = {
   device: 'cache hit (HBM)',
   cpu: 'cache hit (CPU offload)',
+  host: 'cache hit (CPU offload)',
   disk: 'cache hit (NVMe offload)',
   p2p: 'cache hit (P2P)',
   fs: 'cache hit (filesystem)',
