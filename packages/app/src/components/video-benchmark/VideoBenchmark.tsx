@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
+import ResultPower from './ResultPower';
 import {
   at,
   entries,
@@ -270,7 +271,7 @@ const field = (label: string, value: string, change: (value: string) => void, ty
   </label>
 );
 
-export default function VideoBenchmark() {
+export default function VideoBenchmark({ reader }: { reader?: (path: string) => Promise<Blob> }) {
   const s = STRINGS[useLocale()];
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(false);
@@ -404,6 +405,11 @@ export default function VideoBenchmark() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (reader) void open(() => reader);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reader]);
+
   const b = loaded?.bundle;
   const participating = rows(
     at(b?.job, 'roles', 'baseline', 'telemetry_summary', 'gpu_identity'),
@@ -447,54 +453,60 @@ export default function VideoBenchmark() {
           </Heading>
           <p className="text-muted-foreground mt-2">{s.subtitle}</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => input.current?.click()} disabled={loading}>
-            {s.open}
-          </Button>
-          {b && (
-            <Button variant="outline" onClick={clear}>
-              {s.clear}
+        {!reader && (
+          <div className="flex gap-2">
+            <Button onClick={() => input.current?.click()} disabled={loading}>
+              {s.open}
             </Button>
-          )}
-        </div>
+            {b && (
+              <Button variant="outline" onClick={clear}>
+                {s.clear}
+              </Button>
+            )}
+          </div>
+        )}
       </header>
-      <input
-        ref={input}
-        aria-label={s.open}
-        type="file"
-        multiple
-        {...{ webkitdirectory: '' }}
-        className="sr-only"
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])];
-          e.target.value = '';
-          if (files.length > 0) void open(() => folderReader(files));
-        }}
-      />
-      <details className="rounded-lg border p-4 text-sm">
-        <summary className="cursor-pointer">{s.source}</summary>
-        <form
-          className="mt-3 flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void open(() => httpReader(source));
-          }}
-        >
-          <Input
-            aria-label={s.source}
-            className="flex-1"
-            type="url"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            placeholder="https://…/manifest.json"
-            required
+      {!reader && (
+        <>
+          <input
+            ref={input}
+            aria-label={s.open}
+            type="file"
+            multiple
+            {...{ webkitdirectory: '' }}
+            className="sr-only"
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = '';
+              if (files.length > 0) void open(() => folderReader(files));
+            }}
           />
-          <Button type="submit" disabled={loading}>
-            {s.load}
-          </Button>
-        </form>
-        <p className="text-muted-foreground mt-3">{s.remote}</p>
-      </details>
+          <details className="rounded-lg border p-4 text-sm">
+            <summary className="cursor-pointer">{s.source}</summary>
+            <form
+              className="mt-3 flex flex-wrap gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void open(() => httpReader(source));
+              }}
+            >
+              <Input
+                aria-label={s.source}
+                className="flex-1"
+                type="url"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder="https://…/manifest.json"
+                required
+              />
+              <Button type="submit" disabled={loading}>
+                {s.load}
+              </Button>
+            </form>
+            <p className="text-muted-foreground mt-3">{s.remote}</p>
+          </details>
+        </>
+      )}
       {loading && <Card role="status">{s.loading}</Card>}
       {loadError && (
         <Card role="alert" className="border-destructive">
@@ -712,61 +724,65 @@ export default function VideoBenchmark() {
             })}
           </div>
           <p className="text-sm text-muted-foreground">{s.timing}</p>
-          <Card className="gap-4">
-            <Heading>{s.power}</Heading>
-            <p className="text-sm text-muted-foreground">{s.powerNote}</p>
-            <div className="grid gap-6 lg:grid-cols-2">
-              {ROLES.map((role) => {
-                const power = loaded.power[role];
-                return (
-                  <div key={role} className="space-y-3">
-                    <Heading level="card">{s[role]}</Heading>
-                    {table([
-                      [`${s.meanPower} (W)`, power?.watts],
-                      [`${s.energy} (kJ)`, power ? power.joules / 1000 : null],
-                      [`${s.coverage} (s)`, power?.seconds],
-                      [s.samples, power?.sampleCount],
-                    ])}
-                    {power && (
-                      <p className="break-all text-xs text-muted-foreground">
-                        {power.start} → {power.end}
-                      </p>
-                    )}
+          {b.result ? (
+            <ResultPower result={b.result} />
+          ) : (
+            <Card className="gap-4">
+              <Heading>{s.power}</Heading>
+              <p className="text-sm text-muted-foreground">{s.powerNote}</p>
+              <div className="grid gap-6 lg:grid-cols-2">
+                {ROLES.map((role) => {
+                  const power = loaded.power[role];
+                  return (
+                    <div key={role} className="space-y-3">
+                      <Heading level="card">{s[role]}</Heading>
+                      {table([
+                        [`${s.meanPower} (W)`, power?.watts],
+                        [`${s.energy} (kJ)`, power ? power.joules / 1000 : null],
+                        [`${s.coverage} (s)`, power?.seconds],
+                        [s.samples, power?.sampleCount],
+                      ])}
+                      {power && (
+                        <p className="break-all text-xs text-muted-foreground">
+                          {power.start} → {power.end}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <Heading level="card">{s.memory}</Heading>
+              <p className="text-sm text-muted-foreground">{s.memoryNote}</p>
+              <div className="grid gap-6 lg:grid-cols-2">
+                {ROLES.map((role) => (
+                  <div key={role} className="space-y-2">
+                    <Heading level="label">{s[role]}</Heading>
+                    {entries(
+                      at(
+                        b.job,
+                        'roles',
+                        role,
+                        'telemetry_summary',
+                        'measurement_observed_memory_peak_mib_by_gpu',
+                      ),
+                    ).length > 0
+                      ? table(
+                          entries(
+                            at(
+                              b.job,
+                              'roles',
+                              role,
+                              'telemetry_summary',
+                              'measurement_observed_memory_peak_mib_by_gpu',
+                            ),
+                          ).map(([gpu, value]) => [gpu, `${fmt(value)} MiB`]),
+                        )
+                      : s.unavailable}
                   </div>
-                );
-              })}
-            </div>
-            <Heading level="card">{s.memory}</Heading>
-            <p className="text-sm text-muted-foreground">{s.memoryNote}</p>
-            <div className="grid gap-6 lg:grid-cols-2">
-              {ROLES.map((role) => (
-                <div key={role} className="space-y-2">
-                  <Heading level="label">{s[role]}</Heading>
-                  {entries(
-                    at(
-                      b.job,
-                      'roles',
-                      role,
-                      'telemetry_summary',
-                      'measurement_observed_memory_peak_mib_by_gpu',
-                    ),
-                  ).length > 0
-                    ? table(
-                        entries(
-                          at(
-                            b.job,
-                            'roles',
-                            role,
-                            'telemetry_summary',
-                            'measurement_observed_memory_peak_mib_by_gpu',
-                          ),
-                        ).map(([gpu, value]) => [gpu, `${fmt(value)} MiB`]),
-                      )
-                    : s.unavailable}
-                </div>
-              ))}
-            </div>
-          </Card>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card className="gap-4">
             <Heading>{s.fidelity}</Heading>
             <p className="text-sm text-muted-foreground">{s.fidelityNote}</p>
@@ -925,7 +941,9 @@ export default function VideoBenchmark() {
           </Card>
           <Card className="gap-3">
             <Heading level="card">{s.missing}</Heading>
-            <p className="text-sm text-muted-foreground">{s.missingNote}</p>
+            <p className="text-sm text-muted-foreground">
+              {rows(at(b.result, 'limitations')).map(text).join('; ') || s.missingNote}
+            </p>
             {rows(at(b.report, 'acceptance_reasons')).map((reason, i) => (
               <p key={i} className="text-sm">
                 {text(reason)}

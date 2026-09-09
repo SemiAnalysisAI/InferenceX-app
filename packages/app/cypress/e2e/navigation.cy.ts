@@ -323,6 +323,9 @@ describe('TPUv7 launch banner', { testIsolation: true }, () => {
 });
 
 describe('H3 video artifact viewer', () => {
+  beforeEach(() => {
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+  });
   it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
     cy.viewport(1440, 1000);
     cy.visit('/video', {
@@ -330,7 +333,7 @@ describe('H3 video artifact viewer', () => {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
-    cy.get('[data-testid="video-benchmark"]').should('contain', 'Open a real CI result to begin');
+    cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
@@ -340,13 +343,14 @@ describe('H3 video artifact viewer', () => {
   });
   it('shows a recoverable load error and the Chinese empty state', () => {
     cy.visit('/video');
+    cy.contains('summary', 'Local artifact tools').click();
     cy.get('[data-testid="video-benchmark"]').contains('summary', 'Manifest URL').click();
     cy.get('input[aria-label="Manifest URL"]').type('https://example.com/wrong.json');
     cy.contains('button', 'Load manifest').click();
     cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
     cy.get('video[data-role]').should('not.exist');
     cy.visit('/zh/video');
-    cy.get('[data-testid="video-benchmark"]').should('contain', '打开真实 CI 结果开始查看');
+    cy.get('[data-testid="video-ci-runs"]').should('contain', '本页 GitHub 历史中没有 H3 运行');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

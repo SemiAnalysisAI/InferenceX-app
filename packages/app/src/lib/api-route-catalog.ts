@@ -68,6 +68,17 @@ export const apiRouteCatalog = [
     sourceSha256: '5ea5c034c837fda109ca3b7218db51a6ac78bca3eac545371de0f2a45880d533',
   },
   {
+    source: 'src/app/api/video-runs/route.ts',
+    path: '/api/video-runs',
+    method: 'GET',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'Hidden H3 viewer transport for live public CI runs and checksum-verified artifact ZIPs; uses the backend result contract rather than a published data API.',
+      zh: '供隐藏的 H3 查看器实时读取公开 CI 运行及校验和已验证的产物 ZIP；依赖后端结果契约，不作为公开数据 API 发布。',
+    },
+    sourceSha256: 'ef972983665a3fabb2c6552de0f5e4c31c76d5b967d23db50e76c8e78b7d9cf1',
+  },
+  {
     source: 'src/app/api/unofficial-run/route.ts',
     path: '/api/unofficial-run',
     method: 'GET',

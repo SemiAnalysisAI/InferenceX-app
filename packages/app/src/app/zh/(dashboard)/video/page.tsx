@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import VideoBenchmark from '@/components/video-benchmark/VideoBenchmark';
+import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
 import { tabMetadataZh } from '@/lib/tab-meta-zh';
 
 export const metadata: Metadata = {
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 export default function VideoPage() {
-  return <VideoBenchmark />;
+  return <VideoCIRuns />;
 }
