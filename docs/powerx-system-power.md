@@ -156,3 +156,11 @@ frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 
 实际窗口和成功 token 数，按实测 GPU 的份额计算，明确标记为估计值，不改写原有
 GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
 结果。
+
+## Measured P90 GPU power
+
+`y_measuredP90Power` shows the time-weighted P90 of synchronized fleet GPU-board
+power over the validated load window, divided by GPU count. It shares the regular
+measured-power chart path for official points and unofficial overlays. Missing or
+unvalidated P90 remains unavailable; average power is never used as a substitute.
+This metric is separate from modeled chassis AC power and individual-device P90.

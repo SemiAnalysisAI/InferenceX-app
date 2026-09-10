@@ -63,6 +63,60 @@ function examplePointBackfill(
 }
 
 describe('audited run backfills', () => {
+  it('accepts a public benchmark audit ID while still requiring an exact stable selector', () => {
+    const source = examplePointBackfill({
+      productionConfigId: undefined,
+      productionBenchmarkId: 441192,
+    });
+    expect(() => validateRunBackfills([], [source])).not.toThrow();
+    expect(() =>
+      validateRunBackfills([], [{ ...source, productionBenchmarkId: undefined }]),
+    ).toThrow(/ID is required/u);
+    expect(() => validateRunBackfills([], [{ ...source, productionBenchmarkId: 0 }])).toThrow(
+      /positive integer/u,
+    );
+    expect(() =>
+      validateRunBackfills(
+        [],
+        [source, { ...source, id: 'other-source', productionBenchmarkId: 441193 }],
+      ),
+    ).toThrow(/duplicate.*selector/u);
+  });
+
+  it('fails closed on possible purge overlap when the audit has no config ID', () => {
+    const purged = PURGED_BENCHMARK_POINTS[0];
+    const source = examplePointBackfill({
+      githubRunId: purged.githubRunId,
+      runAttempt: purged.runAttempt,
+      productionConfigId: undefined,
+      productionBenchmarkId: 441192,
+      benchmarkType: purged.benchmarkType,
+      isl: purged.isl,
+      osl: purged.osl,
+      conc: purged.conc,
+      offloadMode: purged.offloadMode,
+      recipeFingerprint: purged.recipeFingerprint,
+      set: { metricsMerge: { p90_power_w: 500 } },
+    });
+    expect(() => validateRunBackfills([], [source])).toThrow(/already being purged/u);
+  });
+
+  it('accepts zero worker counts only for aggregated configurations', () => {
+    const source = examplePointBackfill({
+      config: { ...EXAMPLE_CONFIG, disagg: false, prefillNumWorkers: 0, decodeNumWorkers: 0 },
+    });
+    expect(() => validateRunBackfills([], [source])).not.toThrow();
+    expect(() =>
+      validateRunBackfills([], [{ ...source, config: { ...source.config, disagg: true } }]),
+    ).toThrow(/positive/u);
+    expect(() =>
+      validateRunBackfills(
+        [],
+        [{ ...source, config: { ...source.config, prefillNumWorkers: -1 } }],
+      ),
+    ).toThrow(/non-negative/u);
+  });
+
   it('validates the checked-in registries', () => {
     expect(() => validateRunBackfills()).not.toThrow();
   });
@@ -79,7 +133,7 @@ describe('audited run backfills', () => {
     ]);
     for (const backfill of backfills) {
       const point = {
-        configId: backfill.productionConfigId,
+        configId: backfill.productionConfigId!,
         config: backfill.config,
         benchmarkType: 'agentic_traces',
         isl: null,

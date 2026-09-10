@@ -14,6 +14,9 @@ export const MEASURED_POWER_METRIC_KEY_LIST = [
   //                          — cluster-wide; workload-shape-fair view that
   //                          doesn't treat prompt as free.
   'avg_power_w',
+  // Time-weighted P90 of synchronized fleet draw; per-chip divides by GPU count.
+  'p90_power_w',
+  'p90_total_gpu_power_w',
   'joules_per_successful_query',
   'joules_per_output_token',
   'joules_per_total_token',

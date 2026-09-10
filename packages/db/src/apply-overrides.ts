@@ -197,9 +197,13 @@ interface BenchmarkPointBackfillTarget {
 }
 
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
+  const auditId =
+    backfill.productionConfigId === undefined
+      ? `production benchmark id ${backfill.productionBenchmarkId}`
+      : `production config id ${backfill.productionConfigId}`;
   return (
     `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
-    `config ${configCacheKey(backfill.config)} (production id ${backfill.productionConfigId}), ` +
+    `config ${configCacheKey(backfill.config)} (${auditId}), ` +
     `${backfill.benchmarkType}, isl ${backfill.isl}, osl ${backfill.osl}, ` +
     `conc ${backfill.conc}, offload ${backfill.offloadMode}, ` +
     `recipe ${backfill.recipeFingerprint ?? 'legacy'}`

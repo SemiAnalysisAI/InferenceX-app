@@ -70,6 +70,8 @@ function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
 function dirtyPowerPayload(): Record<string, any> {
   return {
     avg_power_w: 685.5,
+    p90_power_w: 710,
+    p90_total_gpu_power_w: 5680,
     joules_per_successful_query: 1542.75,
     joules_per_output_token: 8.4,
     joules_per_total_token: 0.8,

@@ -130,6 +130,7 @@ export interface AggDataEntry {
    */
   power_tier?: PowerTier;
   avg_power_w?: number;
+  p90_power_w?: number;
   /** Chassis AC estimate from validated telemetry, with explicit support/provenance. */
   modeledSystemPower?: SystemPowerEstimate;
   joules_per_successful_query?: number;
@@ -325,6 +326,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // pre-aggregate_power.py runs (and runs with monitoring disabled) won't
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
+  measuredP90Power?: { y: number; roof: boolean };
   /**
    * Summed modeled chassis AC ÷ modeled chassis GPU count (chassisCount × 8).
    * Partially allocated chassis are extrapolated; see modeled-system-power.ts chassisBasis.
