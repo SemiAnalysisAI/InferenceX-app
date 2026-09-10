@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import type { BenchmarkRow } from '../src/lib/api';
-import { modelSystemPower } from '../src/lib/modeled-system-power';
+import { AIR_COOLED_SYSTEM_PUE, modelSystemPower } from '../src/lib/modeled-system-power';
 import profileData from '../src/lib/system-power-model.profiles.json';
 
 interface PowerAudit {
@@ -119,7 +119,7 @@ function estimatedEnergy(
   };
 }
 
-export function buildComparison(input: ComparisonInput, pue = profileData.assumptions.pue) {
+export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_PUE) {
   if (!input || typeof input.cohort !== 'string' || !Array.isArray(input.rows)) {
     throw new Error(
       'Expected a cohort envelope with a rows array. See docs/powerx-system-power.md.',
@@ -321,7 +321,7 @@ async function main() {
   });
   if (!values.input || !values.output)
     throw new Error(
-      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY [--pue 1.2]',
+      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY [--pue 1.3]',
     );
   const inputBytes = await readFile(values.input);
   const result = buildComparison(

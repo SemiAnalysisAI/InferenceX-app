@@ -86,6 +86,11 @@ describe('offline modeled PowerX comparisons', () => {
     const source = input();
     const before = structuredClone(source);
     const result = buildComparison(source);
+    expect(result.metadata.pue).toBe(1.3);
+    expect(result.metadata.model.assumptions.pue).toBe(1.2);
+    expect(result.rows[0].modeled).toMatchObject({ pue: 1.3 });
+    expect(result.rows[0].assumptions).toMatchObject({ pue: 1.3 });
+    expect(buildComparison(source, 1.1).rows[0].modeled).toMatchObject({ pue: 1.1 });
     expect(result.rows[0].estimated_energy).toMatchObject({
       status: 'estimated',
       output_tokens: 9303,
@@ -124,7 +129,7 @@ describe('offline modeled PowerX comparisons', () => {
     });
     const result = buildComparison(source);
     const row = result.rows[0];
-    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8)!;
+    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8, 1.3)!;
     expect(row.modeled).toMatchObject({
       status: 'supported',
       gpuCount: 4,

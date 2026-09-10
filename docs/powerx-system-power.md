@@ -5,7 +5,7 @@ the non-agentic 8192-input/1024-output workload. The existing app transformation
 and the offline article exporter both call `modelSystemPower`; the API and
 benchmark producer continue returning their original measurements.
 
-`system-power-model.profiles.json` records the pinned Oren model revision,
+`system-power-model.profiles.json` records the pinned power model revision,
 component source hashes, hardware mapping, complete platform configuration, and
 fixed inference assumptions. Its profiles come from executing the original
 Python components. `system-power-model.ts` preserves their nonlinear fan curve,
@@ -24,7 +24,14 @@ board, fans, and PSU conversion losses. Facility power is a separate estimate:
 PUE is applied after chassis AC, including the source's rounding order.
 
 The fixed README inference sweep uses `u_cpu=0.20`, `u_ram=0.20`, `u_pcie=0.05`,
-and `u_nvme=0.0`. PUE defaults to `1.2`. Platform-specific network assumptions,
+and `u_nvme=0.0`. The pinned Python model defaults to PUE `1.2`; PowerX uses
+`1.3` for its supported air-cooled chassis profiles. Utility power = critical IT
+power × PUE (`1.3` air, `1.1` DLC).
+The factor applies after chassis AC; measured GPU power and chassis AC do not change.
+Cooling describes the modeled chassis, not verified benchmark-site cooling.
+The current profiles do not model DLC; `--pue` remains an explicit facility-factor
+override and does not convert an air-cooled chassis model into a DLC model.
+Platform-specific network assumptions,
 fan control, component counts, and chassis defaults are preserved in the
 generated profile; every JSON export includes that profile and every CSV row
 includes its applicable assumptions and profile hash. These are model inputs,
@@ -85,7 +92,7 @@ bun packages/app/scripts/export-modeled-system-power.ts \
 
 bun packages/app/scripts/export-modeled-system-power.ts \
   --input /path/to/qwen35-current.input.json \
-  --output /path/to/new-current-qwen-comparison --pue 1.2
+  --output /path/to/new-current-qwen-comparison --pue 1.3
 ```
 
 The maintained input shape is `ComparisonInput` in the script:
@@ -138,10 +145,16 @@ dropping that replicate.
 
 ## 中文说明
 
-PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的 Oren 模型估算
+PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的功耗模型估算
 8-GPU 机箱的 AC 输入功率，再单独应用 PUE 得到设施功率估计。CPU 和 DRAM 利用率
 均假设为 20%；这些是模型参数，不是实测利用率。完整平台配置、源码版本和校验和
 随导出结果保留。模型源码仍标记为待人工核验，数值一致性不代表完成了实机校准。
+
+固定版本的 Python 模型默认 PUE 为 1.2；PowerX 对当前风冷机箱模型
+采用 1.3。市电侧功率 = IT 负载功率 × PUE，风冷取 1.3，直接液冷（DLC）
+取 1.1。PUE 仅作用于机箱交流功率，不改变 GPU 实测功率或机箱交流功率。这里的
+冷却方式指建模机箱，并非已核实的测试站点配置。当前模型不支持 DLC；`--pue` 仅
+覆盖设施功率系数，不会把风冷机箱模型转换为液冷模型。
 
 仅使用部分 GPU 的机箱（单台主机上实测 1–7 张 GPU）按实测每卡功率 × 8 建模，
 与模型源码 sweep 脚本喂给各机箱模型的 `n_gpu × W/GPU` 输入一致，并假设未实测的

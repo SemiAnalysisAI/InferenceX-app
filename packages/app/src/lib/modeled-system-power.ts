@@ -2,9 +2,11 @@ import type { BenchmarkRow } from '@/lib/api';
 import {
   estimateChassisPower,
   SUPPORTED_SYSTEM_POWER_HARDWARE,
-  SYSTEM_POWER_ASSUMPTIONS,
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/system-power-model';
+
+// Application policy for the air-cooled chassis profiles; the pinned Python default stays 1.2.
+export const AIR_COOLED_SYSTEM_PUE = 1.3;
 
 /** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
 const CHASSIS_GPU_COUNT = 8;
@@ -89,7 +91,7 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
  */
 export function modelSystemPower(
   row: BenchmarkRow,
-  pue: number = SYSTEM_POWER_ASSUMPTIONS.pue,
+  pue: number = AIR_COOLED_SYSTEM_PUE,
 ): SystemPowerEstimate {
   if (row.benchmark_type !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024) {
     return unavailable('workload');
