@@ -606,7 +606,8 @@ function ProfitEstimatorInner({
   // Each model has its own operating point, price source, and license fee
   // (Kimi K3: 45 tok/s/user on OpenRouter at 30%; GLM 5.2/5.3: 100 tok/s/user
   // on the Z.ai list price at 10%; MiniMax M3: 83 tok/s/user on the MiniMax
-  // list price at 20%), so a model switch re-seeds all three. The ref keeps
+  // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
+  // price at 5%), so a model switch re-seeds all three. The ref keeps
   // this to actual switches: re-renders with the same model leave the
   // reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
