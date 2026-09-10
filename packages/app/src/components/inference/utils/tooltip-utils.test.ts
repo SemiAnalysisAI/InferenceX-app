@@ -80,10 +80,8 @@ const systemPower = {
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
-  measuredTotalGpuWatts: 8000,
   topologyBasis: 'worker-hosts',
   telemetryBasis: 'validated-v2',
-  roles: [],
 } satisfies SystemPowerEstimate;
 
 describe('modeled system-power tooltip', () => {

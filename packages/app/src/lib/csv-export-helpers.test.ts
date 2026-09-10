@@ -152,10 +152,8 @@ describe('inferenceChartToCsv', () => {
         facilityWatts: 7200,
         pue: 1.2,
         measuredGpuWattsPerGpu: 500,
-        measuredTotalGpuWatts: 4000,
         topologyBasis: 'single-node-eight-gpu',
         telemetryBasis: 'validated-unversioned-single-node',
-        roles: [],
       },
     });
     const csv = inferenceChartToCsv([point], 'deepseek-r1', '8k/1k', [point], {

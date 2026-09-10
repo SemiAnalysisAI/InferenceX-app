@@ -15,10 +15,8 @@ const supported: SystemPowerEstimate = {
   facilityWatts: 7200,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
-  measuredTotalGpuWatts: 4000,
   topologyBasis: 'single-node-eight-gpu',
   telemetryBasis: 'validated-v2',
-  roles: [],
 };
 
 describe('chipCounts', () => {

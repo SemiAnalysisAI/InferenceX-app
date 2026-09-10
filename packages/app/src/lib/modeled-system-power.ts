@@ -2,6 +2,7 @@ import type { BenchmarkRow } from '@/lib/api';
 import {
   estimateChassisPower,
   SUPPORTED_SYSTEM_POWER_HARDWARE,
+  SYSTEM_POWER_ASSUMPTIONS,
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/system-power-model';
 
@@ -15,15 +16,6 @@ export type SystemPowerUnsupportedReason =
   | 'role-power'
   | 'model-domain';
 
-export interface SystemPowerRole {
-  role: string;
-  gpuCount: number;
-  chassisCount: number;
-  measuredGpuWattsPerGpu: number;
-  chassisAcWatts: number;
-  facilityWatts: number;
-}
-
 export type SystemPowerEstimate =
   | { status: 'unsupported'; reason: SystemPowerUnsupportedReason; modelRevision: string }
   | {
@@ -34,14 +26,12 @@ export type SystemPowerEstimate =
       gpuCount: number;
       chassisCount: number;
       measuredGpuWattsPerGpu: number;
-      measuredTotalGpuWatts: number;
       chassisAcWatts: number;
       chassisAcWattsPerGpu: number;
       facilityWatts: number;
       pue: number;
       telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
       topologyBasis: 'single-node-eight-gpu' | 'worker-hosts';
-      roles: SystemPowerRole[];
     };
 
 const positive = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
@@ -62,7 +52,10 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
  * This is f(mean GPU power), not a time-integrated wall-power measurement.
  * Do not use display counts here: legacy ingest can encode TP * EP twice.
  */
-export function modelSystemPower(row: BenchmarkRow, pue = 1.2): SystemPowerEstimate {
+export function modelSystemPower(
+  row: BenchmarkRow,
+  pue: number = SYSTEM_POWER_ASSUMPTIONS.pue,
+): SystemPowerEstimate {
   if (row.benchmark_type !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024) {
     return unavailable('workload');
   }
@@ -198,26 +191,8 @@ export function modelSystemPower(row: BenchmarkRow, pue = 1.2): SystemPowerEstim
   }));
   if (results.some((r) => r.model === null)) return unavailable('model-domain');
   const first = results[0].model!;
-  const roles = new Map<string, SystemPowerRole>();
-  for (const { role, gpuWatts, model } of results) {
-    const total = roles.get(role) ?? {
-      role,
-      gpuCount: 0,
-      chassisCount: 0,
-      measuredGpuWattsPerGpu: 0,
-      chassisAcWatts: 0,
-      facilityWatts: 0,
-    };
-    total.gpuCount += 8;
-    total.chassisCount++;
-    total.measuredGpuWattsPerGpu += gpuWatts;
-    total.chassisAcWatts += model!.chassisAcWatts;
-    total.facilityWatts += model!.facilityWatts;
-    roles.set(role, total);
-  }
-  for (const role of roles.values()) role.measuredGpuWattsPerGpu /= role.gpuCount;
-  const chassisAcWatts = [...roles.values()].reduce((sum, r) => sum + r.chassisAcWatts, 0);
-  const facilityWatts = [...roles.values()].reduce((sum, r) => sum + r.facilityWatts, 0);
+  const chassisAcWatts = results.reduce((sum, r) => sum + r.model!.chassisAcWatts, 0);
+  const facilityWatts = results.reduce((sum, r) => sum + r.model!.facilityWatts, 0);
   if (!positive(chassisAcWatts) || !positive(facilityWatts)) return unavailable('model-domain');
   return {
     status: 'supported',
@@ -227,13 +202,11 @@ export function modelSystemPower(row: BenchmarkRow, pue = 1.2): SystemPowerEstim
     gpuCount,
     chassisCount: chassis.length,
     measuredGpuWattsPerGpu: m.avg_power_w,
-    measuredTotalGpuWatts: m.avg_total_gpu_power_w,
     chassisAcWatts,
     chassisAcWattsPerGpu: chassisAcWatts / gpuCount,
     facilityWatts,
     pue,
     telemetryBasis: unversionedSingleNode ? 'validated-unversioned-single-node' : 'validated-v2',
     topologyBasis,
-    roles: [...roles.values()],
   };
 }

@@ -60,7 +60,6 @@ describe('modeled system power admission and accounting', () => {
       gpuCount: 8,
       chassisCount: 1,
       measuredGpuWattsPerGpu: 349.859,
-      measuredTotalGpuWatts: 2798.868,
       chassisAcWatts: reference.chassisAcWatts,
       chassisAcWattsPerGpu: reference.chassisAcWatts / 8,
       facilityWatts: reference.facilityWatts,
@@ -194,7 +193,7 @@ describe('modeled system power admission and accounting', () => {
       throw new Error('Expected both validated single-node producers to be supported');
     }
     expect(legacy.chassisAcWatts).toBe(versioned.chassisAcWatts);
-    expect(legacy.measuredTotalGpuWatts).toBe(versioned.measuredTotalGpuWatts);
+    expect(legacy.measuredGpuWattsPerGpu).toBe(versioned.measuredGpuWattsPerGpu);
     delete source.metrics.power_valid;
     expect(modelSystemPower(source)).toMatchObject({
       status: 'unsupported',
@@ -293,10 +292,6 @@ describe('modeled system power admission and accounting', () => {
       chassisCount: 2,
       chassisAcWatts: prefill.chassisAcWatts + decode.chassisAcWatts,
       facilityWatts: prefill.facilityWatts + decode.facilityWatts,
-      roles: [
-        { role: 'prefill', gpuCount: 8, chassisAcWatts: prefill.chassisAcWatts },
-        { role: 'decode', gpuCount: 8, chassisAcWatts: decode.chassisAcWatts },
-      ],
     });
     const noPue = modelSystemPower(source, 1);
     expect(noPue.status === 'supported' && noPue.facilityWatts).toBe(
@@ -336,7 +331,7 @@ describe('modeled system power admission and accounting', () => {
       status: 'supported',
       gpuCount: 16,
       chassisCount: 2,
-      measuredTotalGpuWatts: 8000,
+      measuredGpuWattsPerGpu: 500,
     });
     // Existing worker payloads retain a frontend entry, including generic CPU power.
     const frontend = {

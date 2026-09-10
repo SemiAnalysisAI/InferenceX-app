@@ -26,10 +26,8 @@ describe('Modeled system-power table', () => {
         facilityWatts: 7200,
         pue: 1.2,
         measuredGpuWattsPerGpu: 500,
-        measuredTotalGpuWatts: 4000,
         topologyBasis: 'single-node-eight-gpu',
         telemetryBasis: 'validated-unversioned-single-node',
-        roles: [],
       },
     });
     for (const locale of ['en', 'zh'] as const) {
