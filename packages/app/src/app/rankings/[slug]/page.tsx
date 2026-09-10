@@ -84,12 +84,12 @@ function buildFaq(
             question: `What is the fastest GPU for ${model} inference?`,
             answer:
               first && typeof first.throughputPerGpu === 'number'
-                ? `As of the latest benchmark runs, ${first.hardwareLabel} leads at ${fmtThroughput(first.throughputPerGpu)} tokens/s per GPU on ${workload}, measured at a matched interactivity target of ${data.tier} tokens/s per user.`
+                ? `As of the latest benchmark runs, ${first.hardwareLabel} leads at ${fmtThroughput(first.throughputPerGpu)} tokens/s per GPU on ${workload}, measured at a minimum interactivity target of ${data.tier} tokens/s per user.`
                 : fallbackLeader,
           },
           {
             question: `How is "fastest" measured?`,
-            answer: `Every platform is read at the same interactivity tier (${data.tier} tokens/s per user) on ${workload}, then ranked by measured throughput per GPU. This is the same derivation the InferenceX overview leaderboard renders, so the ranking can never disagree with the dashboard.`,
+            answer: `Every platform must meet the same minimum interactivity target (${data.tier} tokens/s per user) on ${workload}, then ranked by frontier-derived throughput per GPU. This is the same derivation the InferenceX overview leaderboard renders, so the ranking can never disagree with the dashboard.`,
           },
         ]
       : [
@@ -97,12 +97,12 @@ function buildFaq(
             question: `What is the cheapest GPU to run ${model}?`,
             answer:
               first && typeof first.costPerMtok === 'number'
-                ? `As of the latest benchmark runs, ${first.hardwareLabel} is cheapest at ${fmtCostPerMtok(first.costPerMtok)} per million total tokens on ${workload}, at hyperscaler $/GPU/hr pricing and a matched interactivity target of ${data.tier} tokens/s per user.`
+                ? `As of the latest benchmark runs, ${first.hardwareLabel} is cheapest at ${fmtCostPerMtok(first.costPerMtok)} per million total tokens on ${workload}, at hyperscaler $/GPU/hr pricing and a minimum interactivity target of ${data.tier} tokens/s per user.`
                 : fallbackLeader,
           },
           {
             question: `How is cost per million tokens calculated?`,
-            answer: `Measured throughput per GPU at the ${data.tier} tokens/s per user tier is converted to $ per million total (input plus output) tokens using hyperscaler $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model. Slower interactivity targets or cheaper rental tiers change the absolute numbers but rarely the order.`,
+            answer: `Frontier-derived throughput per GPU meeting the minimum ${data.tier} tokens/s per user tier is converted to $ per million total (input plus output) tokens using hyperscaler $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model. Slower interactivity targets or cheaper rental tiers change the absolute numbers but rarely the order.`,
           },
         ];
   return [
@@ -163,7 +163,7 @@ export default async function RankingPage({ params }: Props) {
   const t: RankingsStrings = {
     backLabel: 'GPU rankings',
     heading,
-    scenarioNote: `Measured on ${scenarioLabel(data.scenario, 'en')} at a matched interactivity target of ${data.tier} tokens/s per user. Hardware without a measurement at this operating point is not ranked.`,
+    scenarioNote: `Measured on ${scenarioLabel(data.scenario, 'en')} at a minimum interactivity target of ${data.tier} tokens/s per user. Faster measured endpoints qualify without extrapolation; platforms that cannot meet the target are excluded.`,
     tableCaption: `${heading}: live benchmark ranking`,
     colRank: 'Rank',
     colGpu: 'GPU',
@@ -182,8 +182,8 @@ export default async function RankingPage({ params }: Props) {
         : `See the fastest GPU for ${entry.model.seoName}`,
     methodologyHeading: 'Methodology',
     methodologyBody: [
-      `Every number on this page is a measurement, not a spec-sheet estimate. The InferenceX fleet serves ${entry.model.seoName} on real hardware with community serving engines, sweeping concurrency to trace each platform's throughput-versus-interactivity frontier.`,
-      `Platforms are then read at the same operating point (${data.tier} tokens/s per user) so the comparison is iso-interactivity: a GPU cannot win by quoting throughput at an unusably slow per-user speed. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
+      `These values are derived from benchmark measurements and the stated pricing assumptions. The InferenceX fleet serves ${entry.model.seoName} on real hardware with community serving engines, sweeping concurrency to trace each platform's throughput-versus-interactivity frontier.`,
+      `Each platform must meet the minimum of ${data.tier} tokens/s per user. We interpolate within measured frontiers or use a faster measured endpoint at its observed throughput, without extrapolation. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
       `The derivation is shared with the InferenceX overview leaderboard, and results re-run continuously, so this ranking updates as new engine releases and configs land.`,
     ],
     faqHeading: 'Frequently asked questions',

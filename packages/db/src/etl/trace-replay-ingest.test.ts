@@ -45,6 +45,8 @@ function preparedFixture(): PreparedTraceReplay {
     computeMs: 20,
     cacheHitRates: null,
     fullResponseMetrics: {
+      measurement_start_unix_seconds: 1786577819,
+      measurement_end_unix_seconds: 1786581449,
       median_full_response_itl: 0.005,
       median_full_response_intvty: 200,
       median_itl: 0.005,
@@ -177,9 +179,13 @@ describe('persistPreparedTraceReplay', () => {
     ).toHaveLength(6);
     expect(linkCall?.values.some((value) => Array.isArray(value) && value.includes(41))).toBe(true);
     const metricUpdate = calls.find((call) =>
-      call.text.includes("not (metrics ? 'median_full_response_itl')"),
+      call.text.includes("case when metrics ? 'median_full_response_itl'"),
     );
     expect(metricUpdate?.values).toContainEqual(preparedFixture().fullResponseMetrics);
+    expect(metricUpdate?.values).toContainEqual({
+      measurement_start_unix_seconds: 1786577819,
+      measurement_end_unix_seconds: 1786581449,
+    });
     expect(metricUpdate?.values).not.toContain(
       JSON.stringify(preparedFixture().fullResponseMetrics),
     );

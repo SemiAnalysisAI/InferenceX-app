@@ -154,6 +154,57 @@ function platformFor(
 }
 
 describe('overview engine scope and scenario selection', () => {
+  it('prices an AgentX disaggregated observation using all-GPU throughput exactly once', () => {
+    const throughput = (3603566231 + 26257390) / 3629.862174258 / 12;
+    const summary = buildOverviewModelSummary(
+      Model.DeepSeek_V4_Pro,
+      [
+        agenticRow(50, 100, throughput, 1, {
+          model: 'dsv4',
+          hardware: 'gb300',
+          disagg: true,
+          is_multinode: true,
+          num_prefill_gpu: 4,
+          num_decode_gpu: 8,
+        }),
+      ],
+      50,
+      'community',
+      'agentx',
+    );
+    const platform = summary.platforms.find((p) => p.hardware === 'gb300')!;
+    expect(platform.read.value).toBeCloseTo(throughput, 3);
+    expect(platform.costPerMtok).toBeCloseTo((2.31 * 1e6) / (3600 * throughput), 9);
+  });
+
+  it('labels profile completion separately from the run date and logical curve snapshot', () => {
+    const metrics = {
+      median_intvty: 50,
+      tput_per_gpu: 8700,
+      measurement_start_unix_seconds: Date.parse('2026-08-12T23:36:59Z') / 1000,
+      measurement_end_unix_seconds: Date.parse('2026-08-13T00:37:29Z') / 1000,
+    };
+    const make = (values: Record<string, number>) =>
+      buildOverviewModelSummary(Model.Qwen3_5, [
+        row({ date: '2026-08-14', curve_date: '2026-08-25', metrics: values }),
+      ]).platforms.find((p) => p.hardware === 'b200')!.read;
+    expect(make(metrics)).toMatchObject({
+      evidenceDate: { from: '2026-08-13', to: '2026-08-13' },
+      evidenceDateBasis: 'measurement',
+      config: { latestDate: '2026-08-25' },
+    });
+    for (const end of [undefined, Infinity, 1e100, 1]) {
+      const values = { ...metrics };
+      if (end === undefined) delete (values as Record<string, number>).measurement_end_unix_seconds;
+      else values.measurement_end_unix_seconds = end;
+      expect(make(values)).toMatchObject({
+        evidenceDate: { from: '2026-08-14', to: '2026-08-14' },
+        evidenceDateBasis: 'run',
+        config: { latestDate: '2026-08-25' },
+      });
+    }
+  });
+
   it('accepts only supported hardware references and defaults invalid input to B200', () => {
     expect(resolveOverviewReferenceHardware('b300')).toBe('b300');
     expect(resolveOverviewReferenceHardware(['mi355x', 'b200'])).toBe('mi355x');
@@ -501,7 +552,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated total throughput by all deployed GPUs before interpolation', () => {
+  it('uses producer-normalized disaggregated total throughput without a second GPU penalty', () => {
     const summary = buildOverviewModelSummary(Model.DeepSeek_V4_Pro, [
       row({
         hardware: 'gb300',
@@ -541,7 +592,7 @@ describe('overview engine scope and scenario selection', () => {
     ]);
 
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 1224.393,
+      value: 4546.165,
       boundary: 'interpolated',
       evidenceTopologies: ['24P+8D', '16P+8D'],
     });
@@ -565,7 +616,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated rows even when they run on one node', () => {
+  it('keeps the producer denominator on single-node disaggregated rows', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([16200, 13500, 10800, 8100], {
         hardware: 'gb300',
@@ -578,7 +629,7 @@ describe('overview engine scope and scenario selection', () => {
     ]);
 
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 9000,
+      value: 13500,
       evidenceTopologies: ['4P+8D'],
     });
   });
@@ -613,7 +664,9 @@ describe('overview engine scope and scenario selection', () => {
     ]);
 
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: null,
+      value: 7200,
+      observedInteractivity: 60,
+      estimated: false,
       boundary: 'clamped_low',
       config: { latestDate: '2026-07-20' },
     });
@@ -646,10 +699,15 @@ describe('overview engine scope and scenario selection', () => {
       }),
     ]);
 
-    expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read.value).toBeNull();
+    expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
+      value: 7200,
+      boundary: 'clamped_low',
+      observedInteractivity: 60,
+      estimated: false,
+    });
   });
 
-  it('uses speculative FP4, speculative FP8, standard FP4, then standard FP8', () => {
+  it('minimizes cost across eligible precision and speculation buckets', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([8100, 6300, 4500, 2700], { hardware: 'b200', precision: Precision.FP4 }),
       ...frontier([12600, 10800, 9000, 7200], {
@@ -692,9 +750,9 @@ describe('overview engine scope and scenario selection', () => {
         value: read.value,
       })),
     ).toEqual([
-      { hardware: 'b200', precision: Precision.FP4, value: 6300 },
-      { hardware: 'mi355x', precision: Precision.FP8, value: 8100 },
-      { hardware: 'b300', precision: Precision.FP4, value: 9900 },
+      { hardware: 'b200', precision: Precision.FP4, value: 10800 },
+      { hardware: 'mi355x', precision: Precision.FP4, value: 11700 },
+      { hardware: 'b300', precision: Precision.FP8, value: 11700 },
       { hardware: 'gb200', precision: Precision.FP8, value: 9000 },
       { hardware: 'gb300', precision: Precision.FP4, value: 8100 },
     ]);
@@ -925,7 +983,7 @@ describe('assembleOverviewHistoricalPageData', () => {
 });
 
 describe('overview platform selection', () => {
-  it('keeps FP4 platform boundaries when neither side has an exact read', () => {
+  it('uses a faster measured endpoint but keeps an unreachable platform missing', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontierAt(
         [
@@ -951,8 +1009,10 @@ describe('overview platform selection', () => {
     expect(pair?.candidate.precision).toBe(Precision.FP4);
     expect(pair?.baseline.precision).toBe(Precision.FP4);
     expect(pair?.candidate.read).toMatchObject({
-      value: null,
+      value: 8100,
       boundary: 'clamped_low',
+      observedInteractivity: 60,
+      estimated: false,
       config: { hardware: 'mi355x' },
     });
     expect(pair?.baseline.read).toMatchObject({
@@ -960,7 +1020,7 @@ describe('overview platform selection', () => {
       boundary: 'unreachable',
       config: { hardware: 'b200' },
     });
-    expect(pair?.candidate.missingReason).toBe('no_exact_at_tier');
+    expect(pair?.candidate.missingReason).toBeNull();
     expect(pair?.baseline.missingReason).toBe('cannot_reach_at_tier');
   });
 
@@ -1061,9 +1121,10 @@ describe('overview platform selection', () => {
       ...frontierAt(unreachable, { hardware: 'mi355x', precision: Precision.FP4 }),
       ...frontierAt(underSwept, { hardware: 'mi355x', precision: Precision.FP8 }),
     ]);
-    expect(headlinePairOf(mixed, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
-      'no_exact_at_tier',
-    );
+    expect(headlinePairOf(mixed, 'mi355x-vs-b200')?.candidate).toMatchObject({
+      missingReason: null,
+      read: { value: 8100, observedInteractivity: 60 },
+    });
 
     const allUnreachable = buildOverviewModelSummary(Model.Qwen3_5, [
       ...baseline,
@@ -1321,8 +1382,8 @@ describe('tier-parameterized overview', () => {
     expect(at50?.baseline.read.value).toBe(9000);
 
     const at100 = headlinePairOf(page(100), 'mi355x-vs-b200');
-    expect(at100?.candidate.precision).toBe(Precision.FP4);
-    expect(at100?.candidate.read.value).toBe(3600);
+    expect(at100?.candidate.precision).toBe(Precision.FP8);
+    expect(at100?.candidate.read.value).toBe(6300);
     expect(at100?.baseline.precision).toBe(Precision.FP8);
     expect(at100?.baseline.read.value).toBe(5400);
   });
@@ -1361,7 +1422,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page.tier).toBe(50);
 
     // DeepSeek: only each series' latest-date sweep survives. B300 and MI355X
-    // therefore have no exact @50 read; GB200's independent FP8 remains visible.
+    // use measured endpoints above the minimum SLO; GB200's FP8 remains visible.
     // GB300's points are single-node and multi-node aggregate deployments, so
     // they must not be interpolated into one synthetic serving curve.
     const deepseek = page.models.find(
@@ -1373,9 +1434,13 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (8101.968 * 3600),
       6,
     );
-    expect(dsB300.candidate.read.value).toBeNull();
-    expect(dsB300.candidate.costPerMtok).toBeNull();
-    expect(dsB300.candidate.missingReason).toBe('no_exact_at_tier');
+    expect(dsB300.candidate.read).toMatchObject({
+      value: 9000,
+      boundary: 'clamped_low',
+      estimated: false,
+    });
+    expect(dsB300.candidate.costPerMtok).toBeGreaterThan(0);
+    expect(dsB300.candidate.missingReason).toBeNull();
     const dsGb200 = headlinePairOf(deepseek, 'gb200-vs-b200')!;
     expect(dsGb200.candidate.precision).toBe(Precision.FP8);
     expect(dsGb200.candidate.read.value).toBe(5100);
@@ -1383,13 +1448,12 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       (JULY_2026_HYPERSCALER_TCO.gb200 * 1e6) / (5100 * 3600),
       6,
     );
-    expect(headlinePairOf(deepseek, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
-      'no_exact_at_tier',
-    );
+    expect(headlinePairOf(deepseek, 'mi355x-vs-b200')?.candidate.missingReason).toBeNull();
     const dsGb300 = headlinePairOf(deepseek, 'gb300-vs-b200')!;
-    expect(dsGb300.candidate.read.value).toBeNull();
+    expect(dsGb300.candidate.read).toMatchObject({ boundary: 'clamped_low', estimated: false });
+    expect(dsGb300.candidate.read.value).toBeGreaterThan(0);
     expect(dsGb300.candidate.read.evidenceTopologies).toEqual([]);
-    expect(dsGb300.candidate.missingReason).toBe('no_exact_at_tier');
+    expect(dsGb300.candidate.missingReason).toBeNull();
 
     // DeepSeek's AgentX row is priced from its agentic-trace rows alone — the
     // single-turn sweeps never leak into it, so only the two benchmarked
@@ -1435,7 +1499,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     );
     expect(mmGb300.candidate.costVsReferencePct).toBeNull();
 
-    // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
+    // Qwen: MI355X and B200 choose cheaper FP8; B300 chooses FP4.
     const qwen = page.models.find(
       (m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k',
     )!;
@@ -1446,20 +1510,20 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (6688 * 3600),
       6,
     );
-    expect(qwenMi.baseline.precision).toBe(Precision.FP4);
-    expect(qwenMi.baseline.read.value).toBeCloseTo(6602.344);
+    expect(qwenMi.baseline.precision).toBe(Precision.FP8);
+    expect(qwenMi.baseline.read.value).toBeCloseTo(8100);
     expect(qwenMi.candidate.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         (6688 * 3600) /
-        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (6602.344 * 3600)) -
+        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (8100 * 3600)) -
         1,
       6,
     );
     const qwenB300 = headlinePairOf(qwen, 'b300-vs-b200')!;
     expect(qwenB300.candidate.precision).toBe(Precision.FP4);
     expect(qwenB300.candidate.read.value).toBeCloseTo(10585.75);
-    expect(qwenB300.baseline.precision).toBe(Precision.FP4);
-    expect(qwenB300.baseline.read.value).toBeCloseTo(6602.344);
+    expect(qwenB300.baseline.precision).toBe(Precision.FP8);
+    expect(qwenB300.baseline.read.value).toBeCloseTo(8100);
 
     // Standard-decode-only rows remain visible as explicitly labelled
     // fallbacks: Qwen's GB300 slice has no speculative read, so the platform

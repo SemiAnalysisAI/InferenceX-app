@@ -82,12 +82,12 @@ function buildFaqZh(
             question: `${model} 推理最快的 GPU 是哪款？`,
             answer:
               first && typeof first.throughputPerGpu === 'number'
-                ? `按最新基准测试结果，${first.hardwareLabel} 在${workload}下以单 GPU 每秒 ${fmtThroughput(first.throughputPerGpu)} token 领先，交互速度统一设定为每用户每秒 ${data.tier} token。`
+                ? `按最新基准测试结果，${first.hardwareLabel} 在${workload}下以单 GPU 每秒 ${fmtThroughput(first.throughputPerGpu)} token 领先，最低交互速度要求为每用户每秒 ${data.tier} token。`
                 : fallbackLeader,
           },
           {
             question: `“最快”是如何衡量的？`,
-            answer: `所有平台都在相同的交互速度档位（每用户每秒 ${data.tier} token）和${workload}下读取，再按实测单 GPU 吞吐排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
+            answer: `所有平台均需在${workload}下达到相同的最低交互速度要求（每用户每秒 ${data.tier} token），再按实测前沿推导的单 GPU 吞吐量排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
           },
         ]
       : [
@@ -95,12 +95,12 @@ function buildFaqZh(
             question: `运行 ${model} 最省钱的 GPU 是哪款？`,
             answer:
               first && typeof first.costPerMtok === 'number'
-                ? `按最新基准测试结果，${first.hardwareLabel} 在${workload}下成本最低，每百万 token（输入加输出）仅 ${fmtCostPerMtok(first.costPerMtok)}，按超大规模云 $/GPU/小时 价格计算，交互速度统一设定为每用户每秒 ${data.tier} token。`
+                ? `按最新基准测试结果，${first.hardwareLabel} 在${workload}下成本最低，每百万 token（输入加输出）仅 ${fmtCostPerMtok(first.costPerMtok)}，按超大规模云 $/GPU/小时 价格计算，最低交互速度要求为每用户每秒 ${data.tier} token。`
                 : fallbackLeader,
           },
           {
             question: `每百万 token 成本是如何计算的？`,
-            answer: `将每用户每秒 ${data.tier} token 档位下的实测单 GPU 吞吐，按 SemiAnalysis AI Cloud TCO 模型中的超大规模云 $/GPU/小时 价格换算为每百万 token（输入加输出）成本。更慢的交互档位或更便宜的租用价格会改变绝对数值，但很少改变排名顺序。`,
+            answer: `将满足每用户每秒至少 ${data.tier} token 要求的实测前沿吞吐量，按 SemiAnalysis AI Cloud TCO 模型中的超大规模云 $/GPU/小时 价格换算为每百万 token（输入加输出）成本。改变最低交互速度要求或 GPU 小时费率假设，可能同时改变成本和排名。`,
           },
         ];
   return [
@@ -168,7 +168,7 @@ export default async function ZhRankingPage({ params }: Props) {
   const t: RankingsStrings = {
     backLabel: 'GPU 排行榜',
     heading,
-    scenarioNote: `测试基于${scenarioLabel(data.scenario, 'zh')}，交互速度统一设定为每用户每秒 ${data.tier} token。在该工作点没有实测数据的硬件不参与排名。`,
+    scenarioNote: `测试基于${scenarioLabel(data.scenario, 'zh')}，最低交互速度要求为每用户每秒 ${data.tier} token。超过要求的实测点可直接计入，无需外推；无法达到要求的硬件不参与排名。`,
     tableCaption: `${heading}：实时基准排行`,
     colRank: '排名',
     colGpu: 'GPU',
@@ -184,8 +184,8 @@ export default async function ZhRankingPage({ params }: Props) {
         : `查看 ${entry.model.seoName} 推理最快的 GPU`,
     methodologyHeading: '测试方法',
     methodologyBody: [
-      `本页所有数字都来自实测，而非纸面规格估算。InferenceX 集群使用社区推理引擎在真实硬件上部署 ${entry.model.seoName}，通过扫描并发数绘制每个平台的吞吐与交互速度前沿曲线。`,
-      `各平台均在同一工作点（每用户每秒 ${data.tier} token）读取数据，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
+      `本页数值基于基准测试实测数据和注明的价格假设推导。InferenceX 集群使用社区推理引擎在真实硬件上部署 ${entry.model.seoName}，通过扫描并发数绘制每个平台的吞吐与交互速度前沿曲线。`,
+      `各平台均需达到每用户每秒至少 ${data.tier} token 的要求。我们在实测前沿内插值，或直接采用超过要求的实测点及其实际吞吐量，不进行外推。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
       `推导逻辑与 InferenceX 总览排行榜共用，基准测试持续重跑，新引擎版本和新配置落地后排行会自动更新。`,
     ],
     faqHeading: '常见问题',

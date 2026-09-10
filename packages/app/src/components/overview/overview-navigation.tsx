@@ -93,6 +93,12 @@ const OverviewComparisonContext = createContext<OverviewComparisonMode | null>(n
 const OverviewNavigationErrorContext = createContext(false);
 const OverviewNavigationContext = createContext<OverviewNavigationValue | null>(null);
 
+export const OVERVIEW_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
+interface CachedOverviewData {
+  data: OverviewPageData;
+  fetchedAt: number;
+}
+
 export function OverviewNavigationProvider({
   initialData,
   initialHref,
@@ -109,31 +115,47 @@ export function OverviewNavigationProvider({
   const pendingHrefRef = useRef(initialHref);
   const committedHrefRef = useRef(initialHref);
   const navigationIdRef = useRef(0);
+  const cacheEpochRef = useRef(0);
   const focusIntentRef = useRef<OverviewNavControl | null>(null);
   const dataCacheRef = useRef(
-    new Map<string, OverviewPageData>([[overviewDataKey(initialHref), initialData]]),
+    new Map<string, CachedOverviewData>([
+      [
+        overviewDataKey(initialHref),
+        {
+          data: initialData,
+          fetchedAt: Date.now(),
+        },
+      ],
+    ]),
   );
   const requestCacheRef = useRef(new Map<string, Promise<OverviewPageData>>());
 
   const load = useCallback((href: string): Promise<OverviewPageData> => {
     const key = overviewDataKey(href);
     const cached = dataCacheRef.current.get(key);
-    if (cached !== undefined) return Promise.resolve(cached);
+    if (cached !== undefined && Date.now() - cached.fetchedAt < OVERVIEW_CLIENT_CACHE_TTL_MS) {
+      return Promise.resolve(cached.data);
+    }
 
     const pending = requestCacheRef.current.get(key);
     if (pending !== undefined) return pending;
 
     const url = new URL(key, window.location.origin);
+    const cacheEpoch = cacheEpochRef.current;
     const request = fetch(`/api/v1/overview${url.search}`, {
       headers: { Accept: 'application/json' },
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Overview request failed (${response.status})`);
         const nextData = (await response.json()) as OverviewPageData;
-        dataCacheRef.current.set(key, nextData);
+        if (cacheEpoch === cacheEpochRef.current) {
+          dataCacheRef.current.set(key, { data: nextData, fetchedAt: Date.now() });
+        }
         return nextData;
       })
-      .finally(() => requestCacheRef.current.delete(key));
+      .finally(() => {
+        if (requestCacheRef.current.get(key) === request) requestCacheRef.current.delete(key);
+      });
 
     requestCacheRef.current.set(key, request);
     return request;
@@ -219,12 +241,15 @@ export function OverviewNavigationProvider({
 
   useEffect(() => {
     ++navigationIdRef.current;
+    ++cacheEpochRef.current;
+    dataCacheRef.current.clear();
+    requestCacheRef.current.clear();
     // Known params always come from the server-resolved props; only the extras
     // (utm_*, gclid, a fragment) are adopted from the address bar, so a stale
     // location can never key the cache to the wrong payload.
     const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const href = mergeOverviewControlHref(actual, initialHref, OVERVIEW_SERVER_SEARCH_KEYS);
-    dataCacheRef.current.set(overviewDataKey(href), initialData);
+    dataCacheRef.current.set(overviewDataKey(href), { data: initialData, fetchedAt: Date.now() });
     committedHrefRef.current = href;
     setCommittedHref(href);
     pendingHrefRef.current = href;
@@ -232,6 +257,41 @@ export function OverviewNavigationProvider({
     setData(initialData);
     setNavigationError(false);
   }, [initialData, initialHref]);
+
+  useEffect(() => {
+    const refreshVisibleData = () => {
+      if (document.visibilityState === 'hidden') return;
+      const href = committedHrefRef.current;
+      const key = overviewDataKey(href);
+      if (key !== overviewDataKey(pendingHrefRef.current)) return;
+      const cached = dataCacheRef.current.get(key);
+      if (cached && Date.now() - cached.fetchedAt < OVERVIEW_CLIENT_CACHE_TTL_MS) return;
+      const generation = navigationIdRef.current;
+      void load(href)
+        .then((nextData) => {
+          // A refresh must not replace a later selection, Back navigation, or a
+          // newly mounted server payload. It never writes history or steals focus.
+          if (
+            generation !== navigationIdRef.current ||
+            key !== overviewDataKey(committedHrefRef.current)
+          )
+            return;
+          setData(nextData);
+          setNavigationError(false);
+        })
+        .catch(() => {
+          if (generation === navigationIdRef.current) setNavigationError(true);
+        });
+    };
+    const interval = window.setInterval(refreshVisibleData, 30_000);
+    window.addEventListener('focus', refreshVisibleData);
+    document.addEventListener('visibilitychange', refreshVisibleData);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshVisibleData);
+      document.removeEventListener('visibilitychange', refreshVisibleData);
+    };
+  }, [load]);
 
   useEffect(() => {
     const handlePopState = () => {

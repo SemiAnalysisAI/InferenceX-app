@@ -145,6 +145,9 @@ export const METRIC_KEYS = new Set([
   'p99_full_response_intvty',
   'p99.9_full_response_intvty',
   'std_full_response_intvty',
+  // UTC wall-clock bounds of successful profiling requests, excluding warmup.
+  'measurement_start_unix_seconds',
+  'measurement_end_unix_seconds',
   // QPS — queries per second (agentic aiperf)
   'median_qps',
   'mean_qps',

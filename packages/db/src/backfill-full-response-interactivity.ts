@@ -48,7 +48,9 @@ async function main(): Promise<void> {
             join agentic_trace_replay atr on atr.id = br.trace_replay_id
             where br.benchmark_type = 'agentic_traces'
               and atr.profile_export_jsonl_gz is not null
-              and not (br.metrics ? 'median_full_response_itl')
+              and (not (br.metrics ? 'median_full_response_itl')
+                or not (br.metrics ? 'measurement_start_unix_seconds')
+                or not (br.metrics ? 'measurement_end_unix_seconds'))
             order by br.id
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `;
@@ -71,10 +73,18 @@ async function main(): Promise<void> {
         console.warn(`  id=${id}: profile has no usable request samples, skipping`);
         return 'skipped';
       }
+      const dates = Object.fromEntries(
+        Object.entries(patch).filter(
+          ([key]) =>
+            key === 'measurement_start_unix_seconds' || key === 'measurement_end_unix_seconds',
+        ),
+      );
 
       await sql`
         update benchmark_results
-        set metrics = metrics || ${jsonbParam(sql, patch)}
+        set metrics = case when not ${flags.force} and metrics ? 'median_full_response_itl'
+          then ${jsonbParam(sql, dates)} || metrics
+          else metrics || ${jsonbParam(sql, patch)} end
         where id = ${id}
       `;
       return 'ok';

@@ -104,6 +104,20 @@ function rawEvalRow(overrides: Record<string, unknown> = {}): Record<string, unk
 }
 
 describe('normalizeArtifactRows', () => {
+  it('applies the same physical-chip contract to unofficial fixed-sequence overlays', () => {
+    const [ep, pp, explicit] = normalizeArtifactRows(
+      [
+        rawRow({ tp: 8, ep: 8, pp: 1, pcp_size: 1 }),
+        rawRow({ tp: 8, ep: 1, pp: 2, pcp_size: 1 }),
+        rawRow({ tp: 8, ep: 8, num_gpus: 16 }),
+      ],
+      '2026-09-10',
+    );
+    expect([ep.num_decode_gpu, pp.num_decode_gpu, explicit.num_decode_gpu]).toEqual([8, 16, 16]);
+    expect(ep.num_prefill_gpu).toBe(8);
+    expect(ep.metrics.tput_per_gpu).toBe(100.5);
+  });
+
   it('converts raw artifact row to BenchmarkRow shape', () => {
     const rows = normalizeArtifactRows([rawRow()], '2026-03-01');
     expect(rows).toHaveLength(1);

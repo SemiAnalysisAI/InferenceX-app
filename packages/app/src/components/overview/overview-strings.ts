@@ -34,7 +34,7 @@ export const OVERVIEW_STRINGS = {
     hardwareComparisonLabel: (reference: string) => `vs ${reference}`,
     referenceSelectorAria: 'Reference hardware',
     caption:
-      'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
+      'Lowest cost per million total tokens across eligible FP4/FP8 configurations meeting the selected minimum SLO for each scenario.',
     historyCaption: (days: number) =>
       `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
     modelHeader: 'Model · Scenario',
@@ -56,7 +56,13 @@ export const OVERVIEW_STRINGS = {
     compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
       `Compare current and historical ${hardwareLabel} cost curves for ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
-      `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
+      `Open raw source dashboard. ${evidenceDate}: ${modelLabel} · ${stack}`,
+    evidenceRunDate: (date: string) => `Run-attempt date: ${date}; measurement date unavailable`,
+    evidenceMeasurementDate: (date: string) => `Measurement completed: ${date}`,
+    evidenceSnapshotDate: (date: string) => `Curve snapshot: ${date}`,
+    measuredSpeed: (speed: string) => `Measured @${speed} tok/s/user`,
+    measuredSloTooltip: (tier: number) =>
+      `This measured point exceeds the minimum SLO of ${tier} tok/s/user. Its throughput is used without extrapolation.`,
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
         ? 'Estimated from validated benchmark runs.'
@@ -71,7 +77,7 @@ export const OVERVIEW_STRINGS = {
     }),
     standardDecodeLabel: 'STP',
     methodologyNote:
-      'If a chip does not have FP4 spec decoding available, the next best available configuration is used.',
+      'Choose the lowest-cost eligible configuration. AgentX uses P90 full-response token latency; 8K/1K uses median interactivity. Costs include input and output tokens, including cached input.',
     costDeltaAria: (pct: string, cheaper: boolean, reference: string) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than ${reference}`,
     costDeltaEvenAria: (reference: string) => `About the same cost as ${reference}`,
@@ -147,7 +153,8 @@ export const OVERVIEW_STRINGS = {
     historyWindowSelectAria: '对比时间窗口',
     hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
     referenceSelectorAria: '基准硬件',
-    caption: '根据各模型标注的测试场景，采用各平台实测的最优服务包络线，计算每百万总 token 成本。',
+    caption:
+      '针对各测试场景，从满足所选最低 SLO 的有效 FP4/FP8 配置中，选取每百万总 token 成本最低的结果。',
     historyCaption: (days: number) =>
       `当前成本，以及相较于 ${days}–${days * 2} 天前该平台最近一次有效结果的变化。`,
     modelHeader: '模型 · 场景',
@@ -166,7 +173,13 @@ export const OVERVIEW_STRINGS = {
     compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
       `对比 ${modelLabel} 在 ${hardwareLabel} 上当前与历史成本曲线`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
-      `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
+      `打开原始数据仪表板。${evidenceDate}：${modelLabel} · ${stack}`,
+    evidenceRunDate: (date: string) => `运行尝试日期：${date}；缺少实测日期`,
+    evidenceMeasurementDate: (date: string) => `实测完成日期：${date}`,
+    evidenceSnapshotDate: (date: string) => `曲线快照日期：${date}`,
+    measuredSpeed: (speed: string) => `实测 @${speed} tok/s/user`,
+    measuredSloTooltip: (tier: number) =>
+      `该实测点超过 ${tier} tok/s/user 的最低 SLO，直接采用其实测吞吐量，不进行外推。`,
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
         ? '根据已验证的基准测试结果估算。'
@@ -180,7 +193,8 @@ export const OVERVIEW_STRINGS = {
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
     standardDecodeLabel: 'STP',
-    methodologyNote: '如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。',
+    methodologyNote:
+      '选取成本最低的有效配置。AgentX 采用完整响应的 P90 token 延迟，8K/1K 采用中位数交互速度。成本按输入与输出 token 总数计算，包含缓存命中的输入 token。',
     costDeltaAria: (pct: string, cheaper: boolean, reference: string) =>
       `成本比 ${reference} ${cheaper ? '低' : '高'} ${pct}`,
     costDeltaEvenAria: (reference: string) => `与 ${reference} 成本基本持平`,

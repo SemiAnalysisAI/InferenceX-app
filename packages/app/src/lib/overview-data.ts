@@ -152,6 +152,10 @@ export interface OverviewTierValue {
   evidenceDate: { from: string; to: string } | null;
   /** P/D topology labels from the frontier knot(s) backing this tier read. */
   evidenceTopologies: string[];
+  /** Observed speed when a measured endpoint exceeds the requested minimum SLO. */
+  observedInteractivity?: number;
+  /** Measurement dates require retained request timestamps for the whole series. */
+  evidenceDateBasis?: 'measurement' | 'run';
 }
 
 /** One chart-equivalent serving series. Topology and GPU-count variants may
@@ -186,11 +190,12 @@ export interface OverviewTierRead {
   evidenceDate: { from: string; to: string } | null;
   evidenceTopologies: string[];
   config: OverviewConfigView | null;
+  observedInteractivity?: number;
+  evidenceDateBasis?: 'measurement' | 'run';
 }
 
-/** Why a platform shows `∞`. `cannot_reach_at_tier` = every
- *  eligible serving series tops out below the tier; `no_exact_at_tier` = merely
- *  under-swept. */
+/** Why a platform shows `∞`. Faster measured endpoints satisfy the minimum SLO;
+ * `cannot_reach_at_tier` means every eligible series tops out below it. */
 export type OverviewMissingReason =
   | 'int4_bf16_only'
   | 'no_scenario_data'
@@ -502,6 +507,8 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
     estimated: tierValue?.estimated ?? false,
     evidenceDate: tierValue?.evidenceDate ?? null,
     evidenceTopologies: tierValue?.evidenceTopologies ?? [],
+    observedInteractivity: tierValue?.observedInteractivity,
+    evidenceDateBasis: tierValue?.evidenceDateBasis,
     config,
   };
 }
@@ -510,9 +517,9 @@ interface ConfigTierRead extends OverviewTierRead {
   config: OverviewConfigView;
 }
 
-/** In-range reads only: a clamped or unreachable read remains a coverage gap. */
-const isInRangeTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
-  read.value !== null && read.boundary === 'interpolated';
+/** A measured endpoint above the minimum SLO is usable without extrapolation. */
+const isUsableTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
+  read.value !== null && (read.boundary === 'interpolated' || read.boundary === 'clamped_low');
 
 export function overviewTierEvidenceDate(read: OverviewTierRead): string | null {
   return read.evidenceDate?.to ?? read.config?.latestDate ?? null;
@@ -524,7 +531,7 @@ function readFreshness(read: ConfigTierRead): string {
 
 function compareTierReads(a: ConfigTierRead, b: ConfigTierRead): number {
   return (
-    Number(isInRangeTierRead(b)) - Number(isInRangeTierRead(a)) ||
+    Number(isUsableTierRead(b)) - Number(isUsableTierRead(a)) ||
     (b.value ?? -1) - (a.value ?? -1) ||
     readFreshness(b).localeCompare(readFreshness(a)) ||
     b.config.latestDate.localeCompare(a.config.latestDate) ||
@@ -549,7 +556,7 @@ function nonComparableAsMissing(
   tier: number,
 ): OverviewTierRead {
   if (read === undefined) return nullTierRead(tier);
-  return isInRangeTierRead(read)
+  return isUsableTierRead(read)
     ? read
     : {
         ...read,
@@ -579,17 +586,10 @@ function selectPlatformRead(
       return { ...readConfigAtTier(config, tier), config: view };
     });
 
-  for (const priority of OVERVIEW_SLICE_PRIORITY) {
-    const exact = reads
-      .filter(
-        (read) =>
-          read.config.precision === priority.precision &&
-          isSpeculativeDecode(read.config.specMethod) === priority.speculative &&
-          isInRangeTierRead(read),
-      )
-      .toSorted(compareTierReads)[0];
-    if (exact) return exact;
-  }
+  // Every candidate on a hardware column has the same GPU-hour rate. Maximize
+  // total throughput across eligible precision/speculation buckets to minimize cost.
+  const best = reads.filter(isUsableTierRead).toSorted(compareTierReads)[0];
+  if (best) return best;
 
   const bestMissingRead = reads.toSorted(
     (a, b) =>
@@ -604,15 +604,14 @@ function missingReasonForPlatform(
   read: OverviewTierRead,
   bucketReads: readonly OverviewTierRead[],
 ): OverviewMissingReason | null {
-  if (isInRangeTierRead(read)) return null;
+  if (isUsableTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
   if (hardwareRows.length === 0) return 'no_scenario_data';
   const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
   if (supportedRows.length === 0) return 'int4_bf16_only';
   if (bucketReads.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
-  // EVERY qualified serving series tops out below the tier — one merely
-  // under-swept stack downgrades the gap to a missing exact read.
+  // EVERY qualified serving series tops out below the tier.
   return bucketReads.every((r) => r.boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
     : 'no_exact_at_tier';
@@ -682,17 +681,34 @@ function buildPlatformResults(
   }));
 }
 
-function deployedGpuFactor(row: BenchmarkRow): number {
-  const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
-  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0 && totalGpus > 0
-    ? row.num_decode_gpu / totalGpus
-    : 1;
-}
-
 function topologyEvidence(row: BenchmarkRow): string | undefined {
   return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
     ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
     : undefined;
+}
+
+function measurementDate(row: BenchmarkRow): string | null {
+  const start = row.metrics.measurement_start_unix_seconds;
+  const end = row.metrics.measurement_end_unix_seconds;
+  return Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    start > 0 &&
+    end >= start &&
+    Number.isFinite(new Date(end * 1000).getTime())
+    ? new Date(end * 1000).toISOString().slice(0, 10)
+    : null;
+}
+
+/** Use a consistently labeled date domain; unknown measurement dates remain unknown. */
+function evidenceDates(rows: readonly BenchmarkRow[]): {
+  basis: 'measurement' | 'run';
+  date: (row: BenchmarkRow) => string;
+} {
+  const measured = rows.every((row) => measurementDate(row) !== null);
+  return {
+    basis: measured ? 'measurement' : 'run',
+    date: (row) => (measured ? measurementDate(row)! : row.date),
+  };
 }
 
 interface OverviewAgenticTierPoint extends TcoTierPoint {
@@ -702,12 +718,13 @@ interface OverviewAgenticTierPoint extends TcoTierPoint {
 /** AgentX: the tier axis stays P90 interactivity (the chart's SLA contract);
  *  the throughput read at the tier is total tok/s per deployed GPU. */
 function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+  const evidence = evidenceDates(rows);
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
     const entry = rowToAggDataEntry(row);
-    const factor = deployedGpuFactor(row);
     const interactivity = entry.p90_intvty;
     const e2eLatency = entry.p90_e2el;
-    const totalThroughput = entry.tput_per_gpu * factor;
+    // Both producer schemas already divide total throughput by ALL deployed GPUs.
+    const totalThroughput = entry.tput_per_gpu;
     if (
       !Number.isFinite(interactivity) ||
       interactivity <= 0 ||
@@ -723,7 +740,7 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
         interactivity,
         e2eLatency,
         throughput: totalThroughput,
-        date: benchmarkCurveDate(row),
+        date: evidence.date(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
@@ -736,6 +753,7 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
  *  usable total-throughput metric are dropped — the overview cannot price
  *  them, so they must not shape the frontier either. */
 function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+  const evidence = evidenceDates(rows);
   const points = rows.flatMap((row): TcoTierPoint[] => {
     const interactivity = singleTurnInteractivity(row.metrics);
     const totalTput = row.metrics.tput_per_gpu;
@@ -743,8 +761,8 @@ function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] 
     return [
       {
         interactivity,
-        throughput: totalTput * deployedGpuFactor(row),
-        date: benchmarkCurveDate(row),
+        throughput: totalTput,
+        date: evidence.date(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
@@ -808,9 +826,13 @@ function buildConfigResult(
         estimated: value !== null && row.is_interpolated,
         evidenceDate: value === null ? null : row.evidence_date,
         evidenceTopologies: value === null ? [] : (row.evidence_labels ?? []),
+        observedInteractivity:
+          row.boundary === 'clamped_low' ? row.frontier_min_interactivity : undefined,
+        evidenceDateBasis: evidenceDates(rows).basis,
       };
     }),
-    latestDate: feed[0].latest_date,
+    // Logical snapshots select curves and pin drilldowns; measurement dates label evidence.
+    latestDate: rows.map(benchmarkCurveDate).toSorted().at(-1)!,
   };
 }
 

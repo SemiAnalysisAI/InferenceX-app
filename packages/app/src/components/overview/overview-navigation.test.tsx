@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
 
 import {
   OverviewNavigationProvider,
+  OVERVIEW_CLIENT_CACHE_TTL_MS,
   useOverviewData,
   useOverviewNavigationError,
   useOverviewNavigation,
@@ -68,6 +69,7 @@ function Probe() {
   return (
     <>
       <output data-testid="tier">{data.tier}</output>
+      <output data-testid="revision">{data.unchangedRowCount}</output>
       <output data-testid="reference">{reference}</output>
       <output data-testid="pending">{navigation.isPending ? 'pending' : 'settled'}</output>
       <output data-testid="error">{navigationError ? 'error' : 'ok'}</output>
@@ -120,9 +122,96 @@ afterEach(() => {
   selectHardwareRowScope = undefined;
   prefetchTier = undefined;
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('OverviewNavigationProvider', () => {
+  it('refreshes an expired visible matrix without changing history or focus', async () => {
+    vi.useFakeTimers();
+    const { stub, settlers } = deferredFetch();
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    renderProvider(pageData(50), '/overview');
+    const push = vi.spyOn(History.prototype, 'pushState');
+    const focused = document.activeElement;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OVERVIEW_CLIENT_CACHE_TTL_MS - 1);
+    });
+    expect(stub).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(stub).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      settlers[0].resolve(Response.json({ ...pageData(50), unchangedRowCount: 9 }));
+      await Promise.resolve();
+    });
+    expect(readProbe('revision')).toBe('9');
+    expect(readProbe('pending')).toBe('settled');
+    expect(push).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(focused);
+  });
+
+  it('waits while hidden, refreshes on focus, and ignores refreshes overtaken by a selector', async () => {
+    vi.useFakeTimers();
+    const { stub, settlers } = deferredFetch();
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    renderProvider(pageData(50), '/overview');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OVERVIEW_CLIENT_CACHE_TTL_MS);
+    });
+    expect(stub).not.toHaveBeenCalled();
+    visibility.mockReturnValue('visible');
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(stub).toHaveBeenCalledTimes(1);
+    act(() => selectTier?.());
+    await act(async () => {
+      settlers[1].resolve(Response.json(pageData(75)));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      settlers[0].resolve(Response.json({ ...pageData(50), unchangedRowCount: 9 }));
+      await Promise.resolve();
+    });
+    expect(readProbe('tier')).toBe('75');
+    expect(readProbe('revision')).toBe('0');
+  });
+
+  it('refetches an expired visited selection and recovers from a failed background refresh', async () => {
+    vi.useFakeTimers();
+    const { stub, settlers } = deferredFetch();
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    renderProvider(pageData(50), '/overview');
+    act(() => selectTier?.());
+    await act(async () => {
+      settlers[0].resolve(Response.json(pageData(75)));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OVERVIEW_CLIENT_CACHE_TTL_MS);
+    });
+    await act(async () => {
+      settlers[1].reject(new Error('offline'));
+      await Promise.resolve();
+    });
+    expect(readProbe('error')).toBe('error');
+    expect(readProbe('tier')).toBe('75');
+    act(() => {
+      window.history.replaceState({}, '', '/overview');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(stub).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      settlers[2].resolve(Response.json({ ...pageData(50), unchangedRowCount: 3 }));
+      await Promise.resolve();
+    });
+    expect(readProbe('revision')).toBe('3');
+    expect(readProbe('error')).toBe('ok');
+  });
+
   it('ignores an older selector response after fresh server props arrive', async () => {
     const { settlers } = deferredFetch();
 
@@ -142,6 +231,24 @@ describe('OverviewNavigationProvider', () => {
     });
 
     expect(readProbe('tier')).toBe('100');
+  });
+
+  it('does not recache a stale response after fresh server props invalidate it', async () => {
+    const { stub, settlers } = deferredFetch();
+    renderProvider(pageData(50), '/overview');
+    act(() => selectTier?.());
+    renderProvider(pageData(100), '/overview?tier=100');
+    await act(async () => {
+      settlers[0].resolve(Response.json({ ...pageData(75), unchangedRowCount: 1 }));
+      await Promise.resolve();
+    });
+    act(() => selectTier?.());
+    expect(stub).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      settlers[1].resolve(Response.json({ ...pageData(75), unchangedRowCount: 2 }));
+      await Promise.resolve();
+    });
+    expect(readProbe('revision')).toBe('2');
   });
 
   it('does not write history or route after the provider unmounts', async () => {

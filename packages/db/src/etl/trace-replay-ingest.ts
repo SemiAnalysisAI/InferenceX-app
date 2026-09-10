@@ -373,13 +373,22 @@ export async function persistPreparedTraceReplay(
       log('updated cache-hit metrics from chart series');
     }
     if (Object.keys(fullResponseMetrics).length > 0) {
+      // Existing producer timing remains authoritative; attach only missing
+      // profile dates, without mixing new percentiles into its metric family.
+      const dates = Object.fromEntries(
+        Object.entries(fullResponseMetrics).filter(
+          ([key]) =>
+            key === 'measurement_start_unix_seconds' || key === 'measurement_end_unix_seconds',
+        ),
+      );
       await tx`
         update benchmark_results
-        set metrics = metrics || ${tx.json(fullResponseMetrics)}
+        set metrics = case when metrics ? 'median_full_response_itl'
+          then ${tx.json(dates)} || metrics
+          else metrics || ${tx.json(fullResponseMetrics)} end
         where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
-          and not (metrics ? 'median_full_response_itl')
       `;
-      log('filled full-response ITL and interactivity from the AIPerf profile');
+      log('filled measurement dates and full-response timing from the AIPerf profile');
     }
     linkedCount = unlinked.length;
     await updateAtomKvCachePoolTokens(

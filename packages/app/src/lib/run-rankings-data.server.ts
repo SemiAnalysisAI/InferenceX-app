@@ -212,7 +212,7 @@ async function loadRunPageData(slug: string): Promise<RunPageData | null> {
   return buildRunPageData(entry, rows);
 }
 
-const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v2');
+const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v3');
 
 export function getRunPageData(slug: string): Promise<RunPageData | null> {
   return getCachedRunPageData(slug);
@@ -260,7 +260,7 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
   };
 }
 
-const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v2');
+const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v3');
 
 export function getRankingPageData(slug: string): Promise<RankingPageData | null> {
   return getCachedRankingPageData(slug);
