@@ -351,6 +351,16 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   jOutput: provisionedJoules('output'),
   jInput: provisionedJoules('input'),
   measuredAvgPower: measuredPower('run'),
+  measuredP90Power: {
+    description: {
+      en: 'Power stayed at or below this level for 90% of the validated load window. Device telemetry is aligned in time and summed before taking the time-weighted percentile, then divided by the GPU count. This describes fleet draw per chip, not the P90 of an individual GPU; runs without this measurement stay unavailable.',
+      zh: '在通过验证的负载测量窗口内，90% 的时间里功耗不超过此值。各 GPU 遥测按时间对齐后求和，再计算按时间加权的 P90，最后除以 GPU 数量。该指标表示整组 GPU 功耗按芯片均摊后的水平，不是单个 GPU 的 P90；缺少此测量值的运行不显示该指标。',
+    },
+    formula: {
+      en: 'P90 fleet W/chip = time-weighted P90(sum of GPU watts) ÷ GPU count',
+      zh: '整组 GPU P90 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P90 ÷ GPU 数量',
+    },
+  },
   modeledChassisPowerPerGpu: {
     description: {
       en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the modeled chassis GPU count (eight per chassis). Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Supported hardware with known eight-GPU chassis placement is included; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power, matching the source sweep. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',

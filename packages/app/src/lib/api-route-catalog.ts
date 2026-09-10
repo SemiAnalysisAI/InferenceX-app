@@ -679,10 +679,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    // Reviewed for the Neocloud cost-tier removal: only a comment describing
-    // the hyperscaler-volume cost basis changed — no parameter or
-    // OverviewPageData shape change, so the docs stand.
-    sourceSha256: '16c1cf933ebb09c4421a30417de8d7107ebc5e71dab750f6d849dc11127f989d',
+    // Reviewed for the DeepSeek V4 Pro single-turn 8k1k retirement
+    // (InferenceX#2728): OVERVIEW_MODEL_SCENARIOS drops the model's 8K/1K
+    // matrix row and overviewScenarioForModel falls back to AgentX. No
+    // parameter or OverviewPageData shape change, so the docs stand.
+    sourceSha256: '3b0a8ee4f9b9a50fd34688357dca82e55bf433c9b3a6bdcd23ef18c9bf192078',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

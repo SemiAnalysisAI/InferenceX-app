@@ -13,6 +13,19 @@ function asMetricsRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/** Reject a replayed correction when its audited source telemetry changed. */
+export function matchesExpectedBackfillMetrics(
+  value: unknown,
+  backfill: BenchmarkPointBackfill,
+): boolean {
+  if (backfill.expectedMetrics === undefined) return true;
+  const metrics = asMetricsRecord(value);
+  return (
+    metrics !== null &&
+    Object.entries(backfill.expectedMetrics).every(([key, expected]) => metrics[key] === expected)
+  );
+}
+
 function metricsPatch(backfill: BenchmarkPointBackfill): Record<string, unknown> {
   return {
     ...backfill.set.metricsMerge,
@@ -53,6 +66,9 @@ export function planBenchmarkPointBackfill(
   row: BackfillRow,
   backfill: BenchmarkPointBackfill,
 ): Record<string, unknown> | null {
+  if (!matchesExpectedBackfillMetrics(row.metrics, backfill)) {
+    throw new Error(`${backfill.id}: benchmark source metrics differ from the audited measurement`);
+  }
   if (isApplied(row, backfill)) return null;
 
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;

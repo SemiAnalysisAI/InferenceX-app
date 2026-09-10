@@ -18,6 +18,8 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
     expect(new Set(MEASURED_POWER_METRIC_KEY_LIST)).toEqual(
       new Set([
         'avg_power_w',
+        'p90_power_w',
+        'p90_total_gpu_power_w',
         'joules_per_successful_query',
         'joules_per_output_token',
         'joules_per_total_token',
@@ -32,7 +34,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'avg_mem_used_mb',
       ]),
     );
-    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(13);
+    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(15);
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
@@ -59,12 +61,12 @@ describe('POWER_METRIC_KEYS', () => {
     expect(new Set(POWER_METRIC_KEYS).size).toBe(POWER_METRIC_KEYS.length);
   });
 
-  it('contains exactly the contract discriminators plus the 13 measured keys', () => {
+  it('contains exactly the contract discriminators plus the measured keys', () => {
     // The public API documentation types every one of these keys on
     // BenchmarkRow.metrics, so membership changes are contract changes.
     expect(new Set(POWER_METRIC_KEYS)).toEqual(
       new Set(['power_valid', 'power_metric_schema_version', ...MEASURED_POWER_METRIC_KEY_LIST]),
     );
-    expect(POWER_METRIC_KEYS).toHaveLength(15);
+    expect(POWER_METRIC_KEYS).toHaveLength(17);
   });
 });

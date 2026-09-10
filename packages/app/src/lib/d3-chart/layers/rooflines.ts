@@ -8,6 +8,7 @@ export interface RooflineConfig {
   isVisible?: (key: string) => boolean;
   strokeWidth?: number;
   strokeDasharray?: string;
+  curve?: d3.CurveFactory;
 }
 
 interface RooflineEntry<T> {
@@ -31,7 +32,7 @@ export function renderRooflines<T extends { x: number; y: number }>(
     .line<T>()
     .x((d) => xScale(d.x))
     .y((d) => yScale(d.y))
-    .curve(d3.curveMonotoneX);
+    .curve(config.curve ?? d3.curveMonotoneX);
 
   const entries: RooflineEntry<T>[] = Object.entries(rooflines)
     .filter(([key, points]) => points.length >= 2 && (!isVisible || isVisible(key)))
@@ -95,12 +96,13 @@ export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
   rooflines: Record<string, T[]>,
   newXScale: ContinuousScale,
   newYScale: ContinuousScale,
+  curve: d3.CurveFactory = d3.curveMonotoneX,
 ): void {
   const lineGenerator = d3
     .line<T>()
     .x((d) => newXScale(d.x))
     .y((d) => newYScale(d.y))
-    .curve(d3.curveMonotoneX);
+    .curve(curve);
 
   Object.entries(rooflines).forEach(([key, points]) => {
     if (points.length < 2) return;

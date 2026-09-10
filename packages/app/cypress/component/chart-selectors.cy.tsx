@@ -619,6 +619,28 @@ describe('Chart Selectors', () => {
         .should('have.text', '8K / 1K (deprecated)');
     });
 
+    it('marks 8K/1K retired for DeepSeek V4 Pro while AgentX stays active', () => {
+      // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
+      // 2026-09-08 (InferenceX#2728, MODELS.md): the fixed-length option
+      // carries the deprecated status, the agentic option does not.
+      cy.mount(
+        <TooltipProvider delayDuration={0}>
+          <ScenarioSelector
+            value={Sequence.AgenticTraces}
+            onChange={() => {}}
+            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+            model={Model.DeepSeek_V4_Pro}
+            data-testid="scenario-selector"
+          />
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[data-select-option]', '8K / 1K (deprecated)').should('be.visible');
+      cy.contains('[data-select-option]', 'Agentic')
+        .should('be.visible')
+        .and('not.contain.text', 'deprecated');
+    });
+
     for (const locale of ['en', 'zh']) {
       it(`keeps retired choices selectable in one fixed-length group with inline status (${locale})`, () => {
         cy.viewport(390, 720);
@@ -634,7 +656,7 @@ describe('Chart Selectors', () => {
                     Sequence.EightK_OneK,
                     Sequence.OneK_OneK,
                   ]}
-                  model={Model.DeepSeek_V4_Pro}
+                  model={Model.Qwen3_5}
                   data-testid="scenario-selector"
                 />
               </div>
@@ -694,7 +716,7 @@ describe('Chart Selectors', () => {
             value={Sequence.AgenticTraces}
             onChange={() => {}}
             availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
-            model={Model.DeepSeek_V4_Pro}
+            model={Model.Qwen3_5}
             data-testid="scenario-selector"
           />
         </TooltipProvider>,

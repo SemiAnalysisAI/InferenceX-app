@@ -509,9 +509,14 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
  * MiniMax M3: the Single-turn 8k1k sweep was removed on 2026-08-04
  * (InferenceX#2493, per MODELS.md "Scenario and precision retirements");
  * Agentic coding is the model's only active scenario.
+ *
+ * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
+ * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
+ * including the MTP and DSpark arms, stays active and the model is not retired.
  */
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
+  [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
 };
 
 /** Whether this model retired the scenario even though it is globally active. */

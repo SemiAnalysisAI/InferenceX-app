@@ -97,12 +97,12 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { type ParetoDirection } from '@/lib/chart-utils';
 import {
-  isFrontierEligible,
-  paretoFrontForDirection,
-  type ParetoDirection,
-} from '@/lib/chart-utils';
-import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
+  chartFrontier,
+  groupOperatingCurvePoints,
+  isPowerCurveMetric,
+} from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
   ClippedInferenceData,
@@ -367,6 +367,10 @@ const SCATTER_STRINGS = {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
+    powerCurves:
+      'Lines connect concurrency measurements within the same serving configuration and run; they are power curves, not Pareto frontiers.',
+    powerOptimal:
+      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show power curves across concurrency levels.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -395,6 +399,9 @@ const SCATTER_STRINGS = {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
+    powerCurves:
+      '曲线连接同一次运行、同一推理配置在不同并发数下的测量点，表示功耗变化，不代表 Pareto 前沿。',
+    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看不同并发数下的功耗曲线。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -458,7 +465,7 @@ const ScatterGraph = React.memo(
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
-      hideNonOptimal,
+      hideNonOptimal: preferOptimalOnly,
       showPointLabels,
       highContrast,
       logScale,
@@ -466,7 +473,7 @@ const ScatterGraph = React.memo(
       isLegendExpanded,
       useAdvancedLabels,
       showConcurrencyLabels,
-      showGradientLabels,
+      showGradientLabels: preferGradientLabels,
       showLineLabels,
     } = useInferenceDisplay();
     const {
@@ -490,6 +497,16 @@ const ScatterGraph = React.memo(
       setQuickFilterSpec,
       setQuickFilterPower,
     } = useInferenceActions();
+    const paretoDirection = chartDefinition[`${selectedYAxisMetric}_roofline`] as
+      | ParetoDirection
+      | undefined;
+    const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
+    const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
+    const showOperatingCurves = isPowerAxis && !hideNonOptimal;
+    const showGradientLabels = preferGradientLabels && !showOperatingCurves;
+    const groupDisplayedPoints = showOperatingCurves
+      ? groupOperatingCurvePoints
+      : groupPointsByDate;
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
     const ephemeralUrlState = useEphemeralUrlState();
@@ -750,15 +767,13 @@ const ScatterGraph = React.memo(
       const result: Record<string, InferenceData[]> = {};
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
       const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
-      const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
           // Agentic modes intersect the selected-axis Pareto frontier with the
           // normalized north-star frontier. This keeps every drawn curve a true
           // Pareto frontier without admitting a non-canonical winner.
-          const canonicalPoints = canonicalParetoIntersection(datePoints, dir ?? 'lower_right');
-          const front = canonicalPoints ?? frontierFn(datePoints.filter(isFrontierEligible));
+          const front = chartFrontier(datePoints, dir);
           if (front.length === 0) continue;
           combined.push(...front);
         }
@@ -767,6 +782,8 @@ const ScatterGraph = React.memo(
       }
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
+
+    const displayedRooflines = showOperatingCurves ? groupedData : rooflines;
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -845,6 +862,9 @@ const ScatterGraph = React.memo(
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
     const officialOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      // Pareto continuations can cross serving configurations; they are not
+      // extensions of the configuration-local power operating curves.
+      if (showOperatingCurves) return [];
       interface Bucket {
         hw: string;
         precision: string;
@@ -888,9 +908,10 @@ const ScatterGraph = React.memo(
         );
       }
       return result;
-    }, [data, clippedData, selectedYAxisMetric, chartDefinition]);
+    }, [data, clippedData, selectedYAxisMetric, chartDefinition, showOperatingCurves]);
 
     const overlayOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      if (showOperatingCurves) return [];
       interface Bucket {
         hw: string;
         precision: string;
@@ -946,6 +967,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       runIndexByUrl,
+      showOperatingCurves,
     ]);
 
     // Warning annotations for visible series (official + unofficial overlay)
@@ -1001,7 +1023,7 @@ const ScatterGraph = React.memo(
       locale,
     ]);
 
-    const overlayRooflines = useMemo(() => {
+    const overlayGroups = useMemo(() => {
       interface Entry {
         hwKey: string;
         runIndex: number;
@@ -1020,18 +1042,33 @@ const ScatterGraph = React.memo(
         },
         {} as Record<string, Entry>,
       );
-      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
-      const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
-      const result: Record<string, Entry> = {};
-      for (const [key, group] of Object.entries(grouped)) {
-        const canonicalPoints = canonicalParetoIntersection(group.points, dir ?? 'lower_right');
-        const front = canonicalPoints ?? frontierFn(group.points.filter(isFrontierEligible));
-        front.sort((a, b) => a.x - b.x);
-        result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
-      }
-      return result;
-    }, [processedOverlayData, selectedYAxisMetric, chartDefinition, runIndexByUrl]);
+      return grouped;
+    }, [processedOverlayData, runIndexByUrl]);
+
+    const overlayRooflines = useMemo(
+      () =>
+        Object.fromEntries(
+          Object.entries(overlayGroups).map(([key, group]) => [
+            key,
+            {
+              ...group,
+              points: chartFrontier(group.points, paretoDirection).toSorted((a, b) => a.x - b.x),
+            },
+          ]),
+        ),
+      [overlayGroups, paretoDirection],
+    );
+    const displayedOverlayRooflines = useMemo(() => {
+      if (!showOperatingCurves) return overlayRooflines;
+      return Object.fromEntries(
+        Object.entries(overlayGroups).flatMap(([key, group]) =>
+          [...groupOperatingCurvePoints(group.points)].map(([segment, points]) => [
+            `${key}__${encodeURIComponent(segment)}`,
+            { ...group, points },
+          ]),
+        ),
+      );
+    }, [showOperatingCurves, overlayRooflines, overlayGroups]);
 
     // Overlay counterpart of `optimalPointKeys`: the points on any overlay
     // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
@@ -1286,6 +1323,7 @@ const ScatterGraph = React.memo(
     const metricIdentity = useMemo(
       () =>
         [
+          showOperatingCurves ? 'operating-curves' : 'pareto-curves',
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
@@ -1303,6 +1341,7 @@ const ScatterGraph = React.memo(
           .toSorted()
           .join('|'),
       [
+        showOperatingCurves,
         selectedYAxisMetric,
         useAdvancedLabels,
         showConcurrencyLabels,
@@ -1425,7 +1464,8 @@ const ScatterGraph = React.memo(
     // the curves' rendered paths at the iso-x — neither end needs to be a
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
-    const [perfRulerMode, setPerfRulerMode] = useState(false);
+    const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
+    const perfRulerMode = preferPerfRulerMode && !showOperatingCurves;
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass — lines/labels must never
@@ -2012,7 +2052,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
 
           // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
@@ -2038,7 +2078,7 @@ const ScatterGraph = React.memo(
           const entries: Entry[] = [];
           const activeGradientIds = new Set<string>();
 
-          Object.entries(rooflines).forEach(([key, pts]) => {
+          Object.entries(displayedRooflines).forEach(([key, pts]) => {
             const hw = key.split('_').slice(0, -1).join('_');
             const precision = key.split('_').pop()!;
             const visible =
@@ -2047,11 +2087,11 @@ const ScatterGraph = React.memo(
 
             // Split into per-date sub-paths so the line never crosses dates.
             // (When only one date is present the loop runs once with the full set.)
-            const byDate = groupPointsByDate(pts);
+            const byDate = groupDisplayedPoints(pts);
             const singleDate = byDate.size === 1;
 
             for (const [date, datePoints] of byDate) {
-              const entryKey = singleDate ? key : `${key}__${date}`;
+              const entryKey = singleDate ? key : `${key}__${encodeURIComponent(date)}`;
               let stroke = baseStroke;
 
               // Gradient labels only apply in the single-date case; mapping the
@@ -2111,6 +2151,7 @@ const ScatterGraph = React.memo(
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
+            .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('fill', 'none')
@@ -2205,6 +2246,7 @@ const ScatterGraph = React.memo(
               (exit) => exit.remove(),
             )
             .attr('data-seg-key', (d) => d.segKey)
+            .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
@@ -2259,7 +2301,7 @@ const ScatterGraph = React.memo(
               keepVisibleOnCollision: entry.points.length === 1,
             }));
             const overlaySeries: LineLabelSeries<InferenceData>[] = Object.entries(
-              overlayRooflines,
+              displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
               const info = unofficialRunInfos[group.runIndex];
@@ -2397,17 +2439,19 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => newXScale(d.x))
             .y((d) => newYScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
 
           // Update roofline paths — must split per-date so the zoom redraw
           // matches the per-date sub-paths created in the initial render.
-          Object.entries(rooflines).forEach(([key, pts]) => {
+          Object.entries(displayedRooflines).forEach(([key, pts]) => {
             if (pts.length < 2) return;
-            const byDate = groupPointsByDate(pts);
+            const byDate = groupDisplayedPoints(pts);
             const singleDate = byDate.size === 1;
             for (const [date, datePoints] of byDate) {
               if (datePoints.length < 2) continue;
-              const cls = singleDate ? `roofline-${key}` : `roofline-${key}__${date}`;
+              const cls = singleDate
+                ? `roofline-${key}`
+                : `roofline-${key}__${encodeURIComponent(date)}`;
               const sel = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`);
               if (!sel.empty()) sel.attr('d', lineGen(datePoints) as string);
             }
@@ -2471,7 +2515,7 @@ const ScatterGraph = React.memo(
               string,
               { key: string; seriesId: string; points: InferenceData[] }
             >();
-            for (const [key, points] of Object.entries(rooflines)) {
+            for (const [key, points] of Object.entries(displayedRooflines)) {
               const hardware = key.split('_').slice(0, -1).join('_');
               const precision = key.split('_').pop()!;
               if (
@@ -2480,10 +2524,10 @@ const ScatterGraph = React.memo(
               ) {
                 continue;
               }
-              const pointsByDate = groupPointsByDate(points);
+              const pointsByDate = groupDisplayedPoints(points);
               const singleDate = pointsByDate.size === 1;
               for (const [date, datePoints] of pointsByDate) {
-                const entryKey = singleDate ? key : `${key}__${date}`;
+                const entryKey = singleDate ? key : `${key}__${encodeURIComponent(date)}`;
                 const groupKey = multiPrecision ? entryKey : hardware;
                 const previous = bestByGroup.get(groupKey);
                 if (!previous || datePoints.length > previous.points.length) {
@@ -2504,7 +2548,7 @@ const ScatterGraph = React.memo(
               }),
             );
             const overlaySeries: LineLabelSeries<InferenceData>[] = Object.entries(
-              overlayRooflines,
+              displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) =>
               ir.activeOverlayHwTypes.has(group.hwKey)
                 ? [
@@ -2579,7 +2623,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
                 .y((d) => yScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
 
               interface OvEntry {
                 key: string;
@@ -2588,7 +2632,7 @@ const ScatterGraph = React.memo(
                 runIndex: number;
               }
               const ovEntries: OvEntry[] = [];
-              Object.entries(overlayRooflines).forEach(([key, group]) => {
+              Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 const hwCfg = overlayData.hardwareConfig[group.hwKey];
                 if (hwCfg && group.points.length > 1) {
                   ovEntries.push({
@@ -2610,6 +2654,7 @@ const ScatterGraph = React.memo(
                 .data(ovEntries, (d) => d.key)
                 .join('path')
                 .attr('class', (d) => `overlay-roofline-path overlay-roofline-${d.key}`)
+                .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
@@ -2783,11 +2828,13 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
                 .y((d) => newYScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
 
-              Object.entries(overlayRooflines).forEach(([key, group]) => {
+              Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 if (group.points.length < 2) return;
-                const sel = zoomGroup.select<SVGPathElement>(`.overlay-roofline-${key}`);
+                const sel = zoomGroup.select<SVGPathElement>(
+                  `.${CSS.escape(`overlay-roofline-${key}`)}`,
+                );
                 if (!sel.empty()) sel.attr('d', lineGen(group.points) as string);
               });
 
@@ -3010,7 +3057,9 @@ const ScatterGraph = React.memo(
       // existing DOM when it changes. Only data/structure changes recreate
       // the layers (and with them, the full chart render).
     }, [
-      rooflines,
+      displayedRooflines,
+      groupDisplayedPoints,
+      showOperatingCurves,
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
@@ -3024,7 +3073,7 @@ const ScatterGraph = React.memo(
       buildPointId,
       overlayData,
       processedOverlayData,
-      overlayRooflines,
+      displayedOverlayRooflines,
       officialOverflowContinuations,
       overlayOverflowContinuations,
       unofficialRunInfos,
@@ -3595,21 +3644,25 @@ const ScatterGraph = React.memo(
                         },
                       },
                     ]),
-                {
-                  id: 'scatter-hide-non-optimal',
-                  label: legendT.optimalOnly,
-                  checked: hideNonOptimal,
-                  onCheckedChange: (checked: boolean) => {
-                    setHideNonOptimal(checked);
-                    track('latency_hide_non_optimal_toggled', { enabled: checked });
-                  },
-                  // Every agentic axis shares the normalized north-star set.
-                  ...(selectedSequence === Sequence.AgenticTraces
-                    ? {
-                        infoTooltip: legendT.optimalInfo,
-                      }
-                    : {}),
-                },
+                ...(paretoDirection
+                  ? [
+                      {
+                        id: 'scatter-hide-non-optimal',
+                        label: legendT.optimalOnly,
+                        checked: hideNonOptimal,
+                        onCheckedChange: (checked: boolean) => {
+                          setHideNonOptimal(checked);
+                          track('latency_hide_non_optimal_toggled', { enabled: checked });
+                        },
+                        // Every agentic axis shares the normalized north-star set.
+                        ...(selectedSequence === Sequence.AgenticTraces
+                          ? {
+                              infoTooltip: legendT.optimalInfo,
+                            }
+                          : {}),
+                      },
+                    ]
+                  : []),
                 {
                   id: 'scatter-point-labels',
                   label: legendT.labels,
@@ -3641,7 +3694,7 @@ const ScatterGraph = React.memo(
                     // Parallelism labels are point labels; turning them on is
                     // pointless if labels are hidden, so auto-enable Labels.
                     if (checked && !showPointLabels) setShowPointLabels(true);
-                    if (checked && !showGradientLabels) {
+                    if (checked && !showGradientLabels && !showOperatingCurves) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
                           detail: {
@@ -3659,15 +3712,19 @@ const ScatterGraph = React.memo(
                     }
                   },
                 },
-                {
-                  id: 'scatter-gradient-labels',
-                  label: legendT.gradientLabels,
-                  checked: showGradientLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowGradientLabels(checked);
-                    track('latency_gradient_labels_toggled', { enabled: checked });
-                  },
-                },
+                ...(showOperatingCurves
+                  ? []
+                  : [
+                      {
+                        id: 'scatter-gradient-labels',
+                        label: legendT.gradientLabels,
+                        checked: showGradientLabels,
+                        onCheckedChange: (checked: boolean) => {
+                          setShowGradientLabels(checked);
+                          track('latency_gradient_labels_toggled', { enabled: checked });
+                        },
+                      },
+                    ]),
                 {
                   id: 'scatter-line-labels',
                   label: legendT.lineLabels,
@@ -3678,22 +3735,26 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                {
-                  id: 'scatter-perf-ruler',
-                  label: legendT.perfRuler,
-                  advanced: true,
-                  checked: perfRulerMode,
-                  infoTooltip: legendT.perfRulerInfo,
-                  onCheckedChange: (checked: boolean) => {
-                    setPerfRulerMode(checked);
-                    // Toggle-off clears ALL rulers in the same state batch —
-                    // the pre-paint decoration effect then removes the rulers
-                    // and the curve hit strokes before the next frame (no
-                    // lingering lines after toggle-off).
-                    if (!checked) setPerfRulerState(clearPerfRulers);
-                    track('latency_perf_ruler_toggled', { enabled: checked });
-                  },
-                },
+                ...(showOperatingCurves
+                  ? []
+                  : [
+                      {
+                        id: 'scatter-perf-ruler',
+                        label: legendT.perfRuler,
+                        advanced: true,
+                        checked: perfRulerMode,
+                        infoTooltip: legendT.perfRulerInfo,
+                        onCheckedChange: (checked: boolean) => {
+                          setPerfRulerMode(checked);
+                          // Toggle-off clears ALL rulers in the same state batch —
+                          // the pre-paint decoration effect then removes the rulers
+                          // and the curve hit strokes before the next frame (no
+                          // lingering lines after toggle-off).
+                          if (!checked) setPerfRulerState(clearPerfRulers);
+                          track('latency_perf_ruler_toggled', { enabled: checked });
+                        },
+                      },
+                    ]),
                 {
                   id: 'scatter-concurrency-labels',
                   label: legendT.concurrencyLabels,
@@ -3756,6 +3817,14 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        {isPowerAxis && (
+          <p
+            data-testid="power-curve-description"
+            className="mt-2 px-1 text-2xs text-muted-foreground"
+          >
+            {showOperatingCurves ? legendT.powerCurves : legendT.powerOptimal}
+          </p>
+        )}
         {isMeasuredEnergyAxis && (
           <MeasuredPowerSummary
             total={powerTierCounts.total}

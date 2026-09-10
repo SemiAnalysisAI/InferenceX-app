@@ -282,6 +282,14 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片实测平均功耗',
     polarity: 'lower',
   },
+  measuredP90Power: {
+    field: 'measuredP90Power.y',
+    label: 'Measured P90 Fleet Power per Chip (W)',
+    labelZh: '实测整组 GPU P90 功耗（按芯片均摊，W）',
+    title: 'Measured P90 Fleet Power per Chip',
+    titleZh: '实测整组 GPU P90 功耗（按芯片均摊）',
+    polarity: 'lower',
+  },
   modeledChassisPowerPerGpu: {
     field: 'modeledChassisPowerPerGpu.y',
     label: 'Modeled Chassis AC Power per GPU (W/GPU)',
@@ -561,6 +569,7 @@ export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredAvgPower',
+  'y_measuredP90Power',
   'y_measuredJPerInputToken',
   'y_measuredPrefillJPerInputToken',
   'y_measuredJPerOutputToken',
