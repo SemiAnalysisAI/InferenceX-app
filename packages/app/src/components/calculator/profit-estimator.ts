@@ -214,6 +214,8 @@ export function gpuHoursPerGwYear(powerKwPerGpu: number): number | null {
 }
 
 export interface ProfitEstimatorSpecs {
+  /** Explicit whole-fleet GPU-hours for capacity planning; absent keeps the provisioned baseline. */
+  gpuHours?: number;
   /** All-in kW per GPU (chip plus its share of node, network, cooling). */
   powerKwPerGpu: number;
   /** Tier $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. */
@@ -243,8 +245,12 @@ export function estimateSkuProfit(
   };
   if (result.clamped) return { ...base, reason: 'outside-measured-range' };
   // Per chip-hour the denominator is one GPU-hour, so power never enters.
-  const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
-  if (gpuHours === null) return { ...base, reason: 'no-power' };
+  const gpuHours =
+    assumptions.basis === 'chip-hour'
+      ? 1
+      : (specs.gpuHours ?? gpuHoursPerGwYear(specs.powerKwPerGpu));
+  if (gpuHours === null || !Number.isFinite(gpuHours) || gpuHours <= 0)
+    return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
 
   const revenuePerGpuHour = tokenRevenueFromRatesPerGpuHour(

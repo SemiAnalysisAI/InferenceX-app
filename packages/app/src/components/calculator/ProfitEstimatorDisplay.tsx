@@ -15,6 +15,8 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
+import MeasuredProfitComparison from './MeasuredProfitComparison';
+import { compareMeasuredProfit } from './measured-profit';
 import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
@@ -617,6 +619,7 @@ function ProfitEstimatorInner({
     true,
     'total',
     tcoBasis,
+    basis === 'gw-year',
   );
 
   // ── Compare history ───────────────────────────────────────────────────────
@@ -999,6 +1002,33 @@ function ProfitEstimatorInner({
     }),
     [fullEstimate, visibleHwKeys],
   );
+
+  const powerComparisons = useMemo(() => {
+    if (basis !== 'gw-year' || !hasData || !pricing) return [];
+    return getResults(targetValue, mode, interpolationCostProvider, visibleHwKeys).map((result) =>
+      compareMeasuredProfit(
+        result,
+        {
+          powerKwPerGpu: getGpuSpecs(result.hwKey).power,
+          costPerGpuHour: costPerGpuHourFor(result.hwKey),
+        },
+        pricing,
+        assumptions,
+        targetValue,
+      ),
+    );
+  }, [
+    basis,
+    hasData,
+    pricing,
+    getResults,
+    targetValue,
+    mode,
+    interpolationCostProvider,
+    visibleHwKeys,
+    costPerGpuHourFor,
+    assumptions,
+  ]);
 
   const handleTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTargetRaw(e.target.value);
@@ -1747,6 +1777,30 @@ function ProfitEstimatorInner({
             )
           )}
         </Card>
+      )}
+      {!loading && powerComparisons.length > 0 && (
+        <MeasuredProfitComparison
+          comparisons={powerComparisons}
+          settings={{
+            model: selectedModel,
+            sequence: selectedSequence,
+            date: selectedRunDate,
+            percentile: selectedPercentile,
+            interactivity: targetValue,
+            pricing,
+            costProvider,
+            costsPerGpuHour: Object.fromEntries(
+              powerComparisons.map((c) => [c.baseline.hwKey, costPerGpuHourFor(c.baseline.hwKey)]),
+            ),
+            ...assumptions,
+          }}
+          labelFor={(hwKey) => getDisplayLabel(hardwareConfig[hwKey])}
+          onSelectPoint={(value) => {
+            setTargetValue(value);
+            setTargetRaw(String(value));
+            track('profit_power_point_selected', { interactivity: value });
+          }}
+        />
       )}
       {tcoModelDialog}
     </div>
