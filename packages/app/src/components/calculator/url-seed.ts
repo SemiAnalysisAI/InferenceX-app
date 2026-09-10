@@ -16,6 +16,7 @@ export interface CalculatorUrlSeed {
   percentile?: Percentile;
   runDate?: string;
   runId?: string;
+  profitTarget?: number;
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -58,6 +59,9 @@ export function resolveCalculatorUrlSeed(
   if (percentileParam && (PERCENTILE_OPTIONS as readonly string[]).includes(percentileParam)) {
     seed.percentile = percentileParam as Percentile;
   }
+
+  const profitTarget = Number(pickString(sp.c_profit_target));
+  if (Number.isFinite(profitTarget) && profitTarget > 0) seed.profitTarget = profitTarget;
 
   const runDateParam = pickString(sp.g_rundate);
   if (runDateParam && /^\d{4}-\d{2}-\d{2}$/u.test(runDateParam)) {
