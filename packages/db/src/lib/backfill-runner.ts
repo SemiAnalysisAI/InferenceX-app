@@ -111,13 +111,21 @@ export async function confirmProceed(candidatesLabel: string): Promise<boolean> 
  * hundreds of MB decompressed — serial processing keeps memory bounded),
  * logging per-row progress and a final summary. `processRow` returns 'ok'
  * (counts toward the ✓ log) or 'skipped' (e.g. row vanished — the callback
- * logs its own warning); throwing marks the row failed. Sets
+ * logs its own warning); throwing marks the row failed. An optional successful-row
+ * limit scans past skipped/failed ids so they cannot starve later candidates. Sets
  * `process.exitCode = 1` when any row failed.
  */
 export async function runPerIdBackfill(
   ids: readonly number[],
   processRow: (id: number) => Promise<'ok' | 'skipped'>,
+  maxSuccessfulRows?: number,
 ): Promise<void> {
+  if (
+    maxSuccessfulRows !== undefined &&
+    (!Number.isSafeInteger(maxSuccessfulRows) || maxSuccessfulRows < 1)
+  ) {
+    throw new Error('The successful-row limit must be a positive integer');
+  }
   let ok = 0;
   let failed = 0;
   const t0 = Date.now();
@@ -129,6 +137,7 @@ export async function runPerIdBackfill(
       const elapsed = Math.round((Date.now() - start) / 1000);
       const elapsedTotal = Math.round((Date.now() - t0) / 1000);
       console.log(`  ✓ id=${id} (${elapsed}s, ${ok}/${ids.length} done, ${elapsedTotal}s total)`);
+      if (maxSuccessfulRows !== undefined && ok >= maxSuccessfulRows) break;
     } catch (error) {
       failed++;
       console.error(`  ✗ id=${id}: ${error instanceof Error ? error.message : String(error)}`);
@@ -149,6 +158,7 @@ export async function runCandidateIdBackfill(
   loadCandidateIds: () => Promise<readonly number[]>,
   processRow: (id: number) => Promise<'ok' | 'skipped'>,
   formatCandidates: (count: number) => string = (count) => `${count} candidate row(s).`,
+  maxSuccessfulRows?: number,
 ): Promise<boolean> {
   const ids = await loadCandidateIds();
   if (ids.length === 0) {
@@ -156,7 +166,7 @@ export async function runCandidateIdBackfill(
     return false;
   }
   if (!(await confirmProceed(formatCandidates(ids.length)))) return false;
-  await runPerIdBackfill(ids, processRow);
+  await runPerIdBackfill(ids, processRow, maxSuccessfulRows);
   return true;
 }
 

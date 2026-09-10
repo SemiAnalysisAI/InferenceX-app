@@ -98,7 +98,10 @@ is already committed: rerun the materialized-view refresh before verification.
 
 Separately, the existing command
 `bun run --cwd packages/db db:backfill-full-response-interactivity` fills retained
-profile dates. It prompts before writing; `--limit N` permits a small first batch.
+profile dates. It prompts before writing; `--limit N` caps rows actually updated,
+scanning past profiles with no recoverable metrics or timestamps. Such profiles
+remain eligible for a future retry if their retained content changes, but cannot
+crowd recoverable rows out of a limited batch. No placeholder dates are written.
 Do not use `--force` merely to add dates. After either repair, invalidate the
 website DB cache using the existing admin cache command, then compare the affected
 raw rows and overview values. The audit and PR preparation do not apply these

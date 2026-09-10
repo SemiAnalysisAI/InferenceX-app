@@ -7,7 +7,7 @@
  *
  * Usage:
  *   bun run --cwd packages/db db:backfill-full-response-interactivity
- *     [--limit N]   only process the first N candidate benchmark rows
+ *     [--limit N]   update at most N benchmark rows; skipped profiles do not count
  *     [--force]     recompute rows that already have the namespaced metric
  *     [--yes]       skip the confirmation prompt
  */
@@ -26,6 +26,9 @@ const flags = parseLimitForceFlags();
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
 
 async function main(): Promise<void> {
+  if (flags.limit !== null && (!Number.isSafeInteger(flags.limit) || flags.limit < 1)) {
+    throw new Error('--limit requires a positive integer');
+  }
   console.log('=== backfill-full-response-interactivity ===');
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
@@ -40,7 +43,6 @@ async function main(): Promise<void> {
             where br.benchmark_type = 'agentic_traces'
               and atr.profile_export_jsonl_gz is not null
             order by br.id
-            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `
         : await sql<{ id: number }[]>`
             select br.id
@@ -52,13 +54,15 @@ async function main(): Promise<void> {
                 or not (br.metrics ? 'measurement_start_unix_seconds')
                 or not (br.metrics ? 'measurement_end_unix_seconds'))
             order by br.id
-            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `;
       return candidates.map((candidate) => candidate.id);
     },
     async (id) => {
-      const [row] = await sql<{ profile_export_jsonl_gz: Buffer | null }[]>`
-        select atr.profile_export_jsonl_gz
+      const [row] = await sql<
+        { profile_export_jsonl_gz: Buffer | null; has_full_response: boolean }[]
+      >`
+        select atr.profile_export_jsonl_gz,
+          br.metrics ? 'median_full_response_itl' as has_full_response
         from benchmark_results br
         join agentic_trace_replay atr on atr.id = br.trace_replay_id
         where br.id = ${id}
@@ -79,17 +83,32 @@ async function main(): Promise<void> {
             key === 'measurement_start_unix_seconds' || key === 'measurement_end_unix_seconds',
         ),
       );
+      if (!flags.force && row.has_full_response && Object.keys(dates).length === 0) {
+        console.warn(`  id=${id}: profile has no measurement timestamps, skipping`);
+        return 'skipped';
+      }
 
-      await sql`
+      const changed = await sql`
         update benchmark_results
         set metrics = case when not ${flags.force} and metrics ? 'median_full_response_itl'
           then ${jsonbParam(sql, dates)} || metrics
           else metrics || ${jsonbParam(sql, patch)} end
         where id = ${id}
+          and metrics is distinct from
+            case when not ${flags.force} and metrics ? 'median_full_response_itl'
+              then ${jsonbParam(sql, dates)} || metrics
+              else metrics || ${jsonbParam(sql, patch)} end
+        returning id
       `;
+      if (changed.length === 0) {
+        console.warn(`  id=${id}: no new metrics to store, skipping`);
+        return 'skipped';
+      }
       return 'ok';
     },
-    (count) => `${count} candidate benchmark row(s).`,
+    (count) =>
+      `${count} candidate benchmark row(s).${flags.limit === null ? '' : ` Scan until ${flags.limit} row(s) are updated; skipped profiles do not count.`}`,
+    flags.limit ?? undefined,
   );
 
   if (processedCandidates && process.exitCode !== 1) await refreshLatestBenchmarks(sql);

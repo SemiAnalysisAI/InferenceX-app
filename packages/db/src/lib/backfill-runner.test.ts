@@ -151,6 +151,31 @@ describe('runPerIdBackfill', () => {
     expect(logged.at(-1)).toContain('=== backfill complete: 1 ok, 1 failed');
     expect(vi.mocked(console.error).mock.calls[0]?.[0]).toContain('✗ id=1: boom');
   });
+
+  it('limits successful updates without letting skipped or failed rows consume the batch', async () => {
+    const seen: number[] = [];
+    await runPerIdBackfill(
+      [1, 2, 3, 4, 5],
+      (id) => {
+        seen.push(id);
+        if (id === 2) return Promise.reject(new Error('unreadable profile'));
+        return Promise.resolve(id === 1 ? 'skipped' : 'ok');
+      },
+      2,
+    );
+    expect(seen).toEqual([1, 2, 3, 4]);
+    expect(process.exitCode).toBe(1);
+    expect(console.log).toHaveBeenLastCalledWith(expect.stringContaining('2 ok, 1 failed'));
+  });
+
+  it.each([0, -1, 1.5, Infinity, NaN])(
+    'rejects an invalid successful-row limit %s before processing',
+    async (limit) => {
+      const processRow = vi.fn(() => Promise.resolve('ok' as const));
+      await expect(runPerIdBackfill([1], processRow, limit)).rejects.toThrow('positive integer');
+      expect(processRow).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('runCandidateIdBackfill', () => {
