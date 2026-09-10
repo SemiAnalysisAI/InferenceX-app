@@ -470,16 +470,14 @@ export default function ProfitEstimatorDisplay({
   /** `/profit-estimator` is per chip-hour; `/profit-estimator-per-gigawatt` scales to a GW-year. */
   basis: ProfitBasis;
 }) {
+  const initialFixedScenario =
+    basis === 'gw-year' &&
+    (urlSeed?.sequence === Sequence.EightK_OneK ||
+      (!urlSeed?.sequence && urlSeed?.model === Model.Qwen3_5));
   return (
     <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={
-        basis === 'gw-year' &&
-        (urlSeed?.sequence === Sequence.EightK_OneK ||
-          (!urlSeed?.sequence && urlSeed?.model === Model.Qwen3_5))
-          ? Sequence.EightK_OneK
-          : Sequence.AgenticTraces
-      }
+      initialModel={initialFixedScenario ? Model.Qwen3_5 : urlSeed?.model}
+      initialSequence={initialFixedScenario ? Sequence.EightK_OneK : Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
@@ -609,18 +607,19 @@ function ProfitEstimatorInner({
   // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
   // price at 5%), so a model switch re-seeds all three. The ref keeps
   // this to actual switches: re-renders with the same model leave the
-  // reader's edits alone.
+  // reader's edits alone. Ignore disallowed models briefly restored by URL
+  // hydration so normalizing a fixed-workload share link preserves its target.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
   const resetLabCut = labCut.reset;
   useEffect(() => {
-    if (defaultsAppliedFor.current === selectedModel) return;
+    if (!modelAllowed || defaultsAppliedFor.current === selectedModel) return;
     defaultsAppliedFor.current = selectedModel;
     const defaults = profitModelDefaults(selectedModel);
     setTargetValue(defaults.interactivity);
     setTargetRaw(String(defaults.interactivity));
     setPriceSource(defaultPriceSource(selectedModel));
     resetLabCut(defaults.labCutPct);
-  }, [selectedModel, resetLabCut]);
+  }, [modelAllowed, selectedModel, resetLabCut]);
   const listPricing = profitModelDefaults(selectedModel).listPricing;
   // A model without a list price cannot stay on 'list' (e.g. the route seeded
   // one model and the allow-list swapped it); fall back to the catalog.
