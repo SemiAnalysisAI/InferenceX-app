@@ -23,8 +23,10 @@ describe('Current InferenceX Image localized routes', () => {
       image: 'lmsysorg/sglang:v0.5.2',
       date: today,
     },
+    // A model still sweeping 8K/1K. DeepSeek V4 Pro retired its 8k1k sweep on
+    // 2026-09-08 (InferenceX#2728), so it no longer qualifies here.
     {
-      model: 'dsv4',
+      model: 'qwen3.5',
       hardware: 'b200',
       framework: 'vllm',
       precision: 'fp4',
@@ -214,10 +216,13 @@ describe('Current InferenceX Image localized routes', () => {
   it('lists only model-scenario pairs that are still benchmarked', () => {
     cy.viewport(1440, 900);
     const retiredImage = 'lmsysorg/sglang:v0.4.9-minimax-8k1k-retired';
+    const retiredDeepSeekImage = 'vllm/vllm-openai:v0.10.0-dsv4-8k1k-retired';
     const activeMiniMaxImage = 'lmsysorg/sglang:v0.5.2-minimax-agentic';
     const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
     cy.intercept('GET', '**/api/v1/latest-images', [
       ...imageRows,
+      // DeepSeek V4 Pro retired its 8K/1K sweep on 2026-09-08 (InferenceX#2728).
+      { ...imageRows[1], model: 'dsv4', image: retiredDeepSeekImage, date: '2026-09-08' },
       // MiniMax M3 retired its 8K/1K sweep on 2026-08-04; AgentX stays active.
       {
         ...imageRows[0],
@@ -253,6 +258,7 @@ describe('Current InferenceX Image localized routes', () => {
       .should('contain.text', 'lmsysorg/sglang:v0.5.2')
       .and('contain.text', 'vllm/vllm-openai:v0.10.1')
       .and('not.contain.text', retiredImage)
+      .and('not.contain.text', retiredDeepSeekImage)
       .and('not.contain.text', deprecatedModelImage);
 
     cy.get('#image-sequence-select').click();
