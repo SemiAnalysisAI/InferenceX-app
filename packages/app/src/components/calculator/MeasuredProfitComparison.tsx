@@ -16,7 +16,7 @@ const COPY = {
       'Source observations for the current run. Measured GPU power feeds a modeled chassis estimate; it is not measured whole-system power. AgentX system-power assumptions are not established yet.',
     assumptions:
       'Supported chassis profiles use CPU 20%, DRAM 20%, air cooling and PUE 1.3. Site cooling is unverified; DLC is not modeled. Planning adds 10% electrical headroom after PUE. Only complete measured chassis can size deployments.',
-    cost: 'Both modes keep the selected bundled TCO $/GPU/hr and scale it with GPU count. No separate electricity saving is assumed; headroom is reserved capacity, not consumed energy. The chart above retains its provisioned baseline. Historical comparisons are not included below.',
+    cost: 'Both modes keep the selected bundled TCO $/GPU/hr and scale it with GPU count. No separate electricity saving is assumed; headroom is reserved capacity, not consumed energy. This detail view excludes historical comparisons. Provisioned counts here are rounded down to complete deployments; the provisioned chart retains its continuous GPU-count baseline.',
     hardware: 'Hardware',
     source: 'Measured GPU power',
     provisioned: 'Provisioned planning',
@@ -45,7 +45,7 @@ const COPY = {
       '展示本次运行的来源记录。以实测 GPU 功率估算机箱功率，不代表整机实测功率。AgentX 的系统功耗假设尚未确立。',
     assumptions:
       '支持的机箱模型采用 CPU 20%、DRAM 20%、风冷和 PUE 1.3。尚未核实测试站点的冷却方式；未对 DLC 建模。应用 PUE 后增加 10% 电力余量；部署容量仅按完整实测机箱计算。',
-    cost: '两种方式均沿用所选综合 TCO $/GPU/hr，并按 GPU 数量计算总成本。不单独计入电费节省；余量是预留容量，不是耗电量。上方图表保留原有预配功率基准，下方不包含历史对比。',
+    cost: '两种方式均沿用所选综合 TCO $/GPU/hr，并按 GPU 数量计算总成本。不单独计入电费节省；余量是预留容量，不是耗电量。此明细不包含历史对比。这里的预配容量按完整部署向下取整；预配功率图表保留原有的连续 GPU 数量基准。',
     hardware: '硬件',
     source: '实测 GPU 功率',
     provisioned: '预配功率规划',

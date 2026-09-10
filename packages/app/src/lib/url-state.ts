@@ -78,6 +78,7 @@ const URL_STATE_KEYS = [
   'r_active',
   // Calculator (fleet planner)
   'c_profit_target',
+  'c_profit_power',
   'c_mw',
   'c_costcap',
   // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
@@ -179,6 +180,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_legend: '',
   r_active: '',
   c_profit_target: '',
+  c_profit_power: 'provisioned',
   c_mw: DEFAULT_FLEET_MW,
   c_costcap: '',
   // Empty means "use the component's default", which for these two is derived

@@ -252,6 +252,7 @@ const STRINGS = {
     ofRevenue: 'of revenue',
     dismiss: 'Click anywhere to dismiss',
     runDate: 'Run date',
+    modeledYAxis: 'Revenue per utility GW-year ($ USD)',
     noData: 'No SKU can be priced for the current selection.',
   },
   zh: {
@@ -277,6 +278,7 @@ const STRINGS = {
     ofRevenue: '（占收入）',
     dismiss: '点击任意位置关闭',
     runDate: '运行日期',
+    modeledYAxis: '每 GW 市电容量的年收入（美元）',
     noData: '当前选择下没有可定价的 SKU。',
   },
 } as const;
@@ -492,6 +494,7 @@ interface ProfitEstimatorChartProps {
   assumptions: ProfitEstimatorAssumptions;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  modeledPower?: boolean;
 }
 
 export default function ProfitEstimatorChart({
@@ -501,6 +504,7 @@ export default function ProfitEstimatorChart({
   assumptions,
   legendElement,
   caption,
+  modeledPower = false,
 }: ProfitEstimatorChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
@@ -917,11 +921,16 @@ export default function ProfitEstimatorChart({
   // chart uses the short form.
   const yAxisConfig = useMemo(
     () => ({
-      label: compact ? t.yAxisCompact[basis] : t.yAxis[basis],
+      label:
+        modeledPower && basis === 'gw-year'
+          ? t.modeledYAxis
+          : compact
+            ? t.yAxisCompact[basis]
+            : t.yAxis[basis],
       tickFormat: (d: d3.AxisDomain) => formatProfitUsd(Number(d), basis, 0),
       tickCount: 8,
     }),
-    [compact, basis, t.yAxis, t.yAxisCompact],
+    [compact, basis, modeledPower, t],
   );
 
   const onRender = useMemo(

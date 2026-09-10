@@ -9,6 +9,8 @@ import {
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
 
+export type ProfitPowerBasis = 'provisioned' | 'modeled';
+
 export interface CalculatorUrlSeed {
   model?: Model;
   sequence?: Sequence;
@@ -17,6 +19,7 @@ export interface CalculatorUrlSeed {
   runDate?: string;
   runId?: string;
   profitTarget?: number;
+  profitPowerBasis?: ProfitPowerBasis;
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -62,6 +65,11 @@ export function resolveCalculatorUrlSeed(
 
   const profitTarget = Number(pickString(sp.c_profit_target));
   if (Number.isFinite(profitTarget) && profitTarget > 0) seed.profitTarget = profitTarget;
+
+  const profitPowerBasis = pickString(sp.c_profit_power);
+  if (profitPowerBasis === 'provisioned' || profitPowerBasis === 'modeled') {
+    seed.profitPowerBasis = profitPowerBasis;
+  }
 
   const runDateParam = pickString(sp.g_rundate);
   if (runDateParam && /^\d{4}-\d{2}-\d{2}$/u.test(runDateParam)) {
