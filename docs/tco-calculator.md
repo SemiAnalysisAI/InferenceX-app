@@ -55,6 +55,8 @@ When comparing FP4 vs FP8 for the same GPU, each precision needs its own Pareto 
 
 `getCostField()` maps `(provider, tokenType)` → field name, avoiding a 6-way switch in every rendering path.
 
+These two providers are the only rates the calculator knows. The Inference tab additionally draws **fixed-rate TCO variant curves** (`TCO_VARIANTS`) for chips with a single quoted $/GPU/hr — Jalapeño at $1.27/hr today. That is a chart-layer display overlay: it does not change `HW_REGISTRY` and never reaches the calculator, Fleet Lifecycle, or `/api/v1/tco-feed`, all of which continue to model the chip at its owning and retail tiers. See [Data Transforms](./data-transforms.md#fixed-rate-tco-variant-curves).
+
 ## Token Type — Most Common Bug
 
 When adding any metric or rendering path that touches throughput, cost, or power: it MUST go through `getThroughputForType()` / `getCostForType()` / `getTpPerMwForType()`. Never access `result.costh` directly.

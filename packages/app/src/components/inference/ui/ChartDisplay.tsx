@@ -53,7 +53,12 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import {
+  expandTcoVariantPoints,
+  metricChartTitle,
+  metricLabel,
+  xAxisLabel,
+} from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -85,7 +90,11 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import {
+  getHardwareConfig,
+  hardwareKeyMatchesAnyBase,
+  withTcoVariantHardwareConfig,
+} from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
 
@@ -426,8 +435,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       const capableData = pricedData.filter((point) =>
         supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
       );
+      // Overlays get the same fixed-rate TCO variant curves as the official
+      // path, and at the same point in the pipeline (after scoping and the
+      // capability filter) — otherwise a run carrying the re-priced chip would
+      // draw one line where the official series draws two, on the same axis.
+      const expandedData = expandTcoVariantPoints(capableData, selectedYAxisMetric, tcoBasis);
       const processed = processOverlayChartDataWithClipping(
-        capableData,
+        expandedData,
         chartType,
         selectedYAxisMetric,
         effectiveXMetric,
@@ -456,8 +470,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         ...overlayPoints.map((p) => String(p.hwKey)),
         ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
       ]);
+      // Variant keys are absent from the run's own hardwareConfig (they have no
+      // rows), so fill them in — otherwise the overlay points render with no
+      // legend entry.
+      const overlayHardwareConfig = withTcoVariantHardwareConfig(
+        rawData.hardwareConfig as HardwareConfig,
+        selectedModel,
+      );
       const hardwareConfigFiltered = Object.fromEntries(
-        Object.entries(rawData.hardwareConfig).filter(([k]) => keySet.has(k)),
+        Object.entries(overlayHardwareConfig).filter(([k]) => keySet.has(k)),
       ) as HardwareConfig;
 
       return {

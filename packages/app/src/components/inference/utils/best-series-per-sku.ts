@@ -1,3 +1,5 @@
+import { tcoVariantForHwKey } from '@semianalysisai/inferencex-constants';
+
 import { hermiteInterpolate, monotoneSlopes } from '@/components/calculator/interpolation';
 import type { InferenceData } from '@/components/inference/types';
 import { isFrontierEligible, paretoFrontForDirection } from '@/lib/chart-utils';
@@ -14,7 +16,13 @@ const MIN_CURVE_FRONTIER_POINTS = 2;
 /** The physical SKU portion shared by framework/speculative-decoding variants. */
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
   const rawHardware = String(point.hw || '').split('-')[0];
-  return rawHardware || String(point.hwKey).split(/[_-]/u)[0];
+  const sku = rawHardware || String(point.hwKey).split(/[_-]/u)[0];
+  // A fixed-rate TCO variant is the same physical chip at a different quoted
+  // price, so it must NOT compete with its source for the one best-per-SKU
+  // slot: being cheaper, it dominates at every x and would silently evict the
+  // modelled curve. Give it its own SKU so both lines survive.
+  const variant = tcoVariantForHwKey(String(point.hwKey));
+  return variant ? `${sku}|${variant.id}` : sku;
 }
 
 interface ScoredSeries {

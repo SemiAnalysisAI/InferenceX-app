@@ -1,3 +1,5 @@
+import { stripTcoVariantSuffix } from '@semianalysisai/inferencex-constants';
+
 import tpuv7Snapshot from './tpuv7-qwen35-snapshot.json';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api';
 
@@ -471,6 +473,9 @@ export function supportsChartTokenMetric(
   date: string,
   tokenType: TokenMetricType,
 ): boolean {
-  const [hardware, ...frameworkParts] = hwKey.split('_');
+  // A fixed-rate TCO variant is the same snapshot at a different price, so it
+  // must answer with its source's capability rather than falling through the
+  // unknown-framework default and bypassing the gate.
+  const [hardware, ...frameworkParts] = stripTcoVariantSuffix(hwKey).split('_');
   return capabilityFor(hardware, frameworkParts.join('_'), date)?.includes(tokenType) ?? true;
 }

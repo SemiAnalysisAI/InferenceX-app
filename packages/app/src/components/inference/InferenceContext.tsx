@@ -12,7 +12,12 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import {
+  DISPLAY_MODEL_TO_DB,
+  rowToSequence,
+  stripTcoVariantSuffix,
+  tcoVariantForHwKey,
+} from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import {
@@ -1164,6 +1169,29 @@ export function InferenceProvider({
     [hwFilteredPoints, extractHwKey],
   );
 
+  // Fixed-rate TCO variant curves appear only while a re-priced metric is
+  // selected. `reconcileActiveSet` intersects and never re-widens, so without
+  // this the variant would land in the legend permanently greyed out. Adopt
+  // each key exactly once — on first appearance, and only if its source curve
+  // is showing — so a deliberate deselect afterwards sticks. The ref is
+  // re-armed when the key leaves, making a metric round-trip restore it.
+  const adoptedTcoVariantKeysRef = useRef(new Set<string>());
+  useEffect(() => {
+    const adopted = adoptedTcoVariantKeysRef.current;
+    for (const key of adopted) {
+      if (!selectableHwTypes.has(key)) adopted.delete(key);
+    }
+    const toAdopt: string[] = [];
+    for (const key of selectableHwTypes) {
+      if (!tcoVariantForHwKey(key) || adopted.has(key)) continue;
+      adopted.add(key);
+      if (activeHwTypesRef.current.has(stripTcoVariantSuffix(key))) toAdopt.push(key);
+    }
+    if (toAdopt.length > 0) {
+      setActiveHwTypes(new Set([...activeHwTypesRef.current, ...toAdopt]));
+    }
+  }, [selectableHwTypes, setActiveHwTypes]);
+
   const bestHwTypes = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
@@ -1524,7 +1552,16 @@ export function InferenceProvider({
       }
       if (same) return '';
     }
-    return [...activeHwTypes].toSorted().join(',');
+    // Fixed-rate TCO variant keys are deliberately never serialized. They only
+    // exist while a re-priced metric is selected, so a link captured on one and
+    // reopened on another would restore a set of keys that no longer exist —
+    // and `reconcileActiveSet` answers an empty intersection by selecting
+    // everything. Omitting them keeps shared links stable; the adoption effect
+    // re-adds the variant on load.
+    return [...activeHwTypes]
+      .filter((key) => !tcoVariantForHwKey(key))
+      .toSorted()
+      .join(',');
   }, [activeHwTypes, selectableHwTypes, bestHwTypes, bestPerSku]);
 
   const serializedLabelState = serializeLabelState(labelScenarioKind, {

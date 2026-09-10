@@ -234,3 +234,87 @@ export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]>
   google: [{ start: 205, span: 30 }],
   unknown: [{ start: 180, span: 25 }],
 };
+
+// ---------------------------------------------------------------------------
+// Fixed-rate TCO variants
+//
+// A variant re-prices an existing chip at a single quoted $/GPU/hr instead of
+// the modelled owning tiers in HW_REGISTRY, and renders as a SECOND curve
+// beside the normal one. It exists only on the chart metrics listed in
+// `applicableMetricKeys` — it is a display overlay, not a new hardware entry,
+// and it never changes HW_REGISTRY, the calculator, or /api/v1/tco-feed.
+//
+// The variant hwKey is `${sourceHwKey}_${hwKeySuffix}` (e.g.
+// `jalapeno_teacup_tco127`), so every base-keyed consumer — getGpuSpecs,
+// getModelSortIndex, vendor colors, hardwareKeyMatchesBase — keeps resolving
+// the real chip. `hwKeySuffix` must therefore never collide with a framework
+// or spec-method token; `tco-variants.test.ts` enforces that.
+// ---------------------------------------------------------------------------
+
+export interface TcoVariant {
+  /** Stable id, also used in analytics and tests. */
+  id: string;
+  /** HW_REGISTRY key this variant re-prices. */
+  baseGpuKey: string;
+  /** Appended to the source hwKey. Lowercase, no dashes, no framework clash. */
+  hwKeySuffix: string;
+  /** Fixed $/GPU/hr replacing the hyperscaler tier for this curve. */
+  costPerHour: number;
+  /**
+   * Legend suffix fragment, appended after the framework parts. Locale
+   * invariant: it is a rate in USD units beside a chip and framework name, all
+   * of which stay English on /zh per the repo's terminology rules.
+   */
+  labelFragment: string;
+  /** y-metric config keys that materialize this variant. */
+  applicableMetricKeys: readonly string[];
+}
+
+/**
+ * Jalapeño is quoted at $1.27/GPU/hr, below the $1.47 modelled hyperscaler
+ * owning cost in HW_REGISTRY. Both economics are shown side by side on the
+ * tokens-per-$ hyperscaler metrics.
+ */
+export const TCO_VARIANTS: readonly TcoVariant[] = [
+  {
+    id: 'jalapeno-1-27',
+    baseGpuKey: 'jalapeno',
+    hwKeySuffix: 'tco127',
+    costPerHour: 1.27,
+    labelFragment: '$1.27/hr',
+    applicableMetricKeys: [
+      'y_tokensPerDollarH',
+      'y_outputTokensPerDollarH',
+      'y_inputTokensPerDollarH',
+    ],
+  },
+];
+
+/** Variant hwKey for a source key, e.g. `jalapeno_teacup` → `jalapeno_teacup_tco127`. */
+export function tcoVariantKey(sourceHwKey: string, variant: TcoVariant): string {
+  return `${sourceHwKey}_${variant.hwKeySuffix}`;
+}
+
+/**
+ * The variant a hwKey belongs to, or null. Guarded on the base GPU so a
+ * same-suffixed key on another chip cannot masquerade as this variant.
+ */
+export function tcoVariantForHwKey(hwKey: string): TcoVariant | null {
+  const base = hwKey.split('_')[0];
+  for (const variant of TCO_VARIANTS) {
+    if (base !== variant.baseGpuKey) continue;
+    if (hwKey.endsWith(`_${variant.hwKeySuffix}`)) return variant;
+  }
+  return null;
+}
+
+/** Inverse of `tcoVariantKey`; returns the key unchanged when it is not a variant. */
+export function stripTcoVariantSuffix(hwKey: string): string {
+  const variant = tcoVariantForHwKey(hwKey);
+  return variant ? hwKey.slice(0, -(variant.hwKeySuffix.length + 1)) : hwKey;
+}
+
+/** Variants that render on the given y-metric config key. */
+export function tcoVariantsForMetric(metricConfigKey: string): readonly TcoVariant[] {
+  return TCO_VARIANTS.filter((v) => v.applicableMetricKeys.includes(metricConfigKey));
+}

@@ -1,4 +1,11 @@
-import { HW_REGISTRY, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  resolveFrameworkPartLabel,
+  stripTcoVariantSuffix,
+  TCO_VARIANTS,
+  tcoVariantForHwKey,
+  tcoVariantKey,
+} from '@semianalysisai/inferencex-constants';
 
 /** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [
@@ -63,6 +70,8 @@ export interface HardwareEntry {
   framework?: string;
   /** Keep precision in curve labels even when the filter selects one precision. */
   alwaysShowPrecision?: boolean;
+  /** `TcoVariant.id` when this entry is a fixed-rate TCO variant curve. */
+  tcoVariantId?: string;
 }
 
 const UNKNOWN_HARDWARE: HardwareEntry = {
@@ -84,14 +93,23 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
   const reg = HW_REGISTRY[base];
   if (!reg) return null;
 
-  const parts = hwKey.split('_').slice(1);
+  // A fixed-rate TCO variant is the same chip and framework at a quoted
+  // $/GPU/hr, so it reuses the source key's identity and appends the rate as a
+  // final suffix fragment: "Jalapeño (Teacup, $1.27/hr)". The rate is handled
+  // here rather than through resolveFrameworkPartLabel so it stays out of the
+  // generic framework-label space shared with every other tab.
+  const variant = tcoVariantForHwKey(hwKey);
+  const identityKey = variant ? stripTcoVariantSuffix(hwKey) : hwKey;
+
+  const parts = identityKey.split('_').slice(1);
   const label = reg.label;
   const gpuName = base.toUpperCase(); // always raw uppercase for gpu string
   const isJulyRubinSnapshot = base === 'vr200' && parts[0] === 'rubin-july';
-  const partLabels =
+  const baseLabels =
     base === 'vr200' && parts[0] === 'coreweave-vera-rubin'
       ? parts.slice(1).map((p) => resolveFrameworkPartLabel(model, p))
       : parts.map((p) => resolveFrameworkPartLabel(model, p));
+  const partLabels = variant ? [...baseLabels, variant.labelFragment] : baseLabels;
 
   return {
     name: hwKey.replaceAll('_', '-'),
@@ -99,6 +117,7 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
     suffix: partLabels.length > 0 ? `(${partLabels.join(', ')})` : '',
     gpu: [getVendorPrefix(base), gpuName, ...partLabels].join(' '),
     ...(isJulyRubinSnapshot ? { alwaysShowPrecision: true } : {}),
+    ...(variant ? { tcoVariantId: variant.id } : {}),
   };
 }
 
@@ -173,4 +192,31 @@ export function getHardwareConfig(hwKey: string, model?: string): HardwareEntry 
 
   console.warn(`[getHardwareConfig] Unknown base GPU in "${hwKey}"`);
   return UNKNOWN_HARDWARE;
+}
+
+/**
+ * Adds a legend/tooltip entry for every fixed-rate TCO variant whose source
+ * config is present.
+ *
+ * Variant curves are derived at chart time and have no benchmark rows, so
+ * `transformBenchmarkRows` never registers them. Registering them here keeps
+ * the label, tooltip title, and points-table header working through the same
+ * `getHardwareConfig` path as every real series.
+ */
+export function withTcoVariantHardwareConfig(
+  config: Record<string, HardwareEntry>,
+  model?: string,
+): Record<string, HardwareEntry> {
+  let next: Record<string, HardwareEntry> | null = null;
+  for (const sourceKey of Object.keys(config)) {
+    if (tcoVariantForHwKey(sourceKey)) continue;
+    for (const variant of TCO_VARIANTS) {
+      if (!hardwareKeyMatchesBase(sourceKey, variant.baseGpuKey)) continue;
+      const key = tcoVariantKey(sourceKey, variant);
+      if (key in config) continue;
+      next ??= { ...config };
+      next[key] = { ...getHardwareConfig(key, model), name: key };
+    }
+  }
+  return next ?? config;
 }

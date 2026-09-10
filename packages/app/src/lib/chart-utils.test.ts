@@ -13,6 +13,7 @@ import {
   normalizeEvalHardwareKey,
   createChartDataPoint,
   buildDerivedChartFields,
+  expandTcoVariantPoints,
   paretoFrontUpperRight,
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
@@ -1777,5 +1778,93 @@ describe('metricChartTitle', () => {
   it('falls back to the option title when a definition has no chart title', () => {
     const bare = { ...interactivity, y_tpPerGpu_chartTitle: undefined };
     expect(metricChartTitle(bare, 'y_tpPerGpu', 'en')).toBe('Token Throughput per Chip');
+  });
+});
+
+const jalapenoPoint = (overrides: Partial<InferenceData> = {}): InferenceData =>
+  ({
+    hwKey: 'jalapeno_teacup',
+    hw: 'jalapeno',
+    framework: 'teacup',
+    precision: 'fp4',
+    date: '2026-08-22',
+    x: 50,
+    y: 0,
+    tpPerGpu: { y: 1000, roof: false },
+    outputTputPerGpu: { y: 600, roof: false },
+    inputTputPerGpu: { y: 400, roof: false },
+    tokensPerDollarH: { y: (1000 * 3600) / 1.47, roof: false },
+    ...overrides,
+  }) as unknown as InferenceData;
+
+const variantOf = (points: InferenceData[]) =>
+  points.find((p) => String(p.hwKey) === 'jalapeno_teacup_tco127');
+
+describe('expandTcoVariantPoints', () => {
+  it('returns the same array reference for metrics no variant applies to', () => {
+    const data = [jalapenoPoint()];
+    for (const metric of ['y_tokensPerDollarR', 'y_costh', 'y_costr', 'y_tpPerGpu']) {
+      expect(expandTcoVariantPoints(data, metric)).toBe(data);
+    }
+  });
+
+  it('appends one re-priced clone per Jalapeño point', () => {
+    const data = [jalapenoPoint()];
+    const expanded = expandTcoVariantPoints(data, 'y_tokensPerDollarH');
+
+    expect(expanded).toHaveLength(2);
+    expect(expanded[0]).toBe(data[0]);
+    expect(variantOf(expanded)?.tokensPerDollarH?.y).toBeCloseTo((1000 * 3600) / 1.27, 6);
+  });
+
+  it('leaves the source point priced at the modelled $1.47 tier', () => {
+    const data = [jalapenoPoint()];
+    expandTcoVariantPoints(data, 'y_tokensPerDollarH');
+    expect(data[0].tokensPerDollarH?.y).toBeCloseTo((1000 * 3600) / 1.47, 6);
+  });
+
+  it.each([
+    ['y_outputTokensPerDollarH', 'outputTokensPerDollarH', 600],
+    ['y_inputTokensPerDollarH', 'inputTokensPerDollarH', 400],
+  ] as const)('re-prices %s from the matching throughput', (metric, field, tput) => {
+    const expanded = expandTcoVariantPoints([jalapenoPoint()], metric);
+    expect(variantOf(expanded)?.[field]?.y).toBeCloseTo((tput * 3600) / 1.27, 6);
+  });
+
+  it('re-prices the whole owning-cost family so exports stay self-consistent', () => {
+    const clone = variantOf(expandTcoVariantPoints([jalapenoPoint()], 'y_tokensPerDollarH'))!;
+
+    // $/M tok on the clone must reflect $1.27, not the registry's $1.47.
+    expect(clone.costh.y).toBeCloseTo(1.27 / ((1000 * 3600) / 1_000_000), 6);
+    // The retail tier is deliberately untouched.
+    expect(clone.costr).toEqual(jalapenoPoint().costr);
+  });
+
+  it('carries the source identity so filters and grouping still apply', () => {
+    const clone = variantOf(expandTcoVariantPoints([jalapenoPoint()], 'y_tokensPerDollarH'))!;
+    expect(clone.precision).toBe('fp4');
+    expect(clone.framework).toBe('teacup');
+    expect(clone.date).toBe('2026-08-22');
+    expect(clone.tpPerGpu).toEqual({ y: 1000, roof: false });
+  });
+
+  it('never clones a clone', () => {
+    const once = expandTcoVariantPoints([jalapenoPoint()], 'y_tokensPerDollarH');
+    const twice = expandTcoVariantPoints(once, 'y_tokensPerDollarH');
+    expect(twice).toHaveLength(2);
+  });
+
+  it('ignores hardware the variant does not re-price', () => {
+    const data = [jalapenoPoint({ hwKey: 'b200_trt', hw: 'b200' } as Partial<InferenceData>)];
+    expect(expandTcoVariantPoints(data, 'y_tokensPerDollarH')).toBe(data);
+  });
+
+  it('treats an unmeasured token type exactly as the official path does', () => {
+    const data = [jalapenoPoint({ outputTputPerGpu: undefined })];
+    const clone = variantOf(expandTcoVariantPoints(data, 'y_outputTokensPerDollarH'))!;
+    // buildDerivedChartFields emits a zero here rather than omitting the field,
+    // so the clone must too — otherwise the variant would drop out of the
+    // `metricKey in d` coverage filter where its source survives.
+    expect(clone.outputTokensPerDollarH).toEqual({ y: 0, roof: false });
   });
 });

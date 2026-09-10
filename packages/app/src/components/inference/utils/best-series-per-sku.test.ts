@@ -147,3 +147,28 @@ describe('bestSeriesPerSku', () => {
     expect(selected).toEqual(new Set(['b200_overlay_sglang', 'b200_overlay_tilert_mtp']));
   });
 });
+
+describe('fixed-rate TCO variant curves', () => {
+  it('gives a variant its own SKU so it cannot evict its source curve', () => {
+    expect(baseSku(point('jalapeno', 'jalapeno_teacup', 0, 0))).toBe('jalapeno');
+    expect(baseSku(point('jalapeno', 'jalapeno_teacup_tco127', 0, 0))).toBe(
+      'jalapeno|jalapeno-1-27',
+    );
+  });
+
+  it('keeps both Jalapeño lines even though the cheaper one strictly dominates', () => {
+    // The $1.27 curve is the $1.47 curve scaled by 1.47/1.27, so it wins at
+    // every x. Sharing a SKU would silently delete the modelled line.
+    const selected = bestSeriesPerSku(
+      [
+        point('jalapeno', 'jalapeno_teacup', 10, 100),
+        point('jalapeno', 'jalapeno_teacup', 20, 80),
+        point('jalapeno', 'jalapeno_teacup_tco127', 10, 115.7),
+        point('jalapeno', 'jalapeno_teacup_tco127', 20, 92.6),
+      ],
+      'upper_right',
+    );
+
+    expect([...selected].toSorted()).toEqual(['jalapeno_teacup', 'jalapeno_teacup_tco127']);
+  });
+});

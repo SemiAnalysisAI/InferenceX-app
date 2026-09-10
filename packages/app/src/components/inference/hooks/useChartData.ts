@@ -32,6 +32,7 @@ import {
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
+  withTcoVariantHardwareConfig,
   type TcoBasis,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
@@ -42,7 +43,7 @@ import {
 } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { remapInferencePoint } from '@/lib/chart-utils';
+import { expandTcoVariantPoints, remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
 import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
@@ -433,8 +434,13 @@ export function useChartData(
     config: {} as HardwareConfig,
   });
   const hardwareConfig = useMemo(() => {
-    const hwKeys = Object.keys(rawHardwareConfig);
-    if (hwKeys.length === 0) return rawHardwareConfig;
+    // Fixed-rate TCO variants have no rows of their own, so their legend entry
+    // has to be registered alongside the source config. Adding it
+    // unconditionally is safe: the legend only renders keys that actually
+    // carry points for the selected metric.
+    const withVariants = withTcoVariantHardwareConfig(rawHardwareConfig, selectedModel);
+    const hwKeys = Object.keys(withVariants);
+    if (hwKeys.length === 0) return withVariants;
     const sortedKeys = hwKeys.toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
@@ -444,11 +450,11 @@ export function useChartData(
     }
     const config: HardwareConfig = {} as HardwareConfig;
     sortedKeys.forEach((key) => {
-      config[key] = rawHardwareConfig[key];
+      config[key] = withVariants[key];
     });
     prevHardwareConfigRef.current = { key: newKey, config };
     return config;
-  }, [rawHardwareConfig]);
+  }, [rawHardwareConfig, selectedModel]);
 
   // Quick-filter values that have data for the current model / sequence /
   // precision. Derived from the full transformed point set (BEFORE quick
@@ -664,10 +670,14 @@ export function useChartData(
         const metricData = filteredData.filter(
           (d) => metricKey in d && supportsPointTokenMetric(d, tokenType),
         );
+        // Fixed-rate TCO variants are appended last: they inherit the scoping
+        // and capability decisions already made above, so hiding the chip or
+        // its token type hides the re-priced curve with it.
+        const withVariants = expandTcoVariantPoints(metricData, selectedYAxisMetric, tcoBasis);
         const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
         const mappedData = hasMetric
-          ? metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField))
+          ? withVariants.map((d) => remapInferencePoint(d, metricKey, xAxisField))
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
@@ -713,9 +723,19 @@ export function useChartData(
   // data permanently deletes every config without telemetry for the selected
   // axis (the Measured Energy axes) the moment that axis is picked. Both chart
   // definitions are built from the same rows, so index 0 carries every hw key.
+  // Variant expansion is the one metric-dependent input here, and it is safe
+  // precisely because it only ever ADDS a key whose source is already in the
+  // set. The hazard the note above describes is narrowing — reconcileActiveSet
+  // makes a removal permanent — so a purely additive step cannot destroy a
+  // selection. On switching away the variant simply leaves the set again.
   const selectionPoints = useMemo(
-    () => applyScopeFilters(chartData[0] ?? [], selectedGPUs, quickFilters, compareGpuPair),
-    [chartData, selectedGPUs, quickFilters, compareGpuPair],
+    () =>
+      expandTcoVariantPoints(
+        applyScopeFilters(chartData[0] ?? [], selectedGPUs, quickFilters, compareGpuPair),
+        selectedYAxisMetric,
+        tcoBasis,
+      ),
+    [chartData, selectedGPUs, quickFilters, compareGpuPair, selectedYAxisMetric, tcoBasis],
   );
 
   return {

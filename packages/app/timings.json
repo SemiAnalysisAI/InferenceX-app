@@ -241,6 +241,10 @@
       "duration": 3125
     },
     {
+      "spec": "cypress/e2e/tco-variant.cy.ts",
+      "duration": 5200
+    },
+    {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
       "duration": 20924
     },

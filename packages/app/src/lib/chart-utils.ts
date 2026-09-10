@@ -4,7 +4,13 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import {
+  GOOGLE_BLUE,
+  resolveFrameworkAlias,
+  tcoVariantForHwKey,
+  tcoVariantKey,
+  tcoVariantsForMetric,
+} from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -17,7 +23,14 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  hardwareKeyMatchesBase,
+  isKnownGpu,
+  type GpuSpecs,
+  type TcoBasis,
+} from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -310,16 +323,26 @@ export function buildDerivedChartFields(
   currentHwKey: string,
   requestedMetrics: readonly DerivedMetricKey[],
   tcoBasis?: TcoBasis,
+  specOverride?: Partial<GpuSpecs>,
 ): Partial<DerivedChartFields>;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  /**
+   * Replaces individual resolved specs for this call only — used by fixed-rate
+   * TCO variants (`TCO_VARIANTS`) so the re-priced curve runs through these
+   * exact formulas instead of a second copy of them. Applied after the basis,
+   * because a quoted rate is a stated price, not another modelled owner cost.
+   */
+  specOverride?: Partial<GpuSpecs>,
 ): Partial<DerivedChartFields> {
   const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
   const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);
-  const specs = getGpuSpecs(currentHwKey, tcoBasis);
+  const specs = specOverride
+    ? { ...getGpuSpecs(currentHwKey, tcoBasis), ...specOverride }
+    : getGpuSpecs(currentHwKey, tcoBasis);
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -785,4 +808,83 @@ export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale
 /** Resolve the rendered x-axis label without mutating the canonical English label. */
 export function xAxisLabel(chartDef: ChartDefinition, locale: Locale): string {
   return locale === 'zh' && chartDef.x_labelZh ? chartDef.x_labelZh : chartDef.x_label;
+}
+
+// ---------------------------------------------------------------------------
+// Fixed-rate TCO variant curves
+// ---------------------------------------------------------------------------
+
+/**
+ * Every owning-at-large-hyperscaler-volume cost field. A variant re-prices the
+ * whole family, not just the plotted metric, so the points table and CSV export
+ * can never show a "$1.27/hr" series next to a $/M tok column derived from
+ * $1.47. The retail tier is deliberately left alone — the quoted rate replaces
+ * the owning rate only.
+ */
+const TCO_VARIANT_METRICS: readonly DerivedMetricKey[] = [
+  'costh',
+  'costhOutput',
+  'costhi',
+  'tokensPerDollarH',
+  'outputTokensPerDollarH',
+  'inputTokensPerDollarH',
+];
+
+/**
+ * Appends a re-priced clone of every point belonging to a fixed-rate TCO
+ * variant (see `TCO_VARIANTS`), so the chart draws a second curve for that
+ * chip at its quoted $/GPU/hr.
+ *
+ * Returns `data` unchanged — same reference — for any metric no variant
+ * applies to, so non-cost charts see zero extra work and no memo churn.
+ *
+ * Call this AFTER GPU/quick-filter scoping and after the metric-coverage
+ * filter: clones inherit their source's visibility and capability that way,
+ * so hiding the chip hides both curves and a snapshot that cannot report a
+ * token type never grows a variant that can.
+ */
+export function expandTcoVariantPoints(
+  data: InferenceData[],
+  metricConfigKey: string,
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
+  const variants = tcoVariantsForMetric(metricConfigKey);
+  if (variants.length === 0 || data.length === 0) return data;
+
+  const existingKeys = new Set(data.map((point) => String(point.hwKey)));
+  const clones: InferenceData[] = [];
+  for (const variant of variants) {
+    for (const point of data) {
+      const hwKey = String(point.hwKey);
+      // Never clone a clone, and only clone the chip this variant re-prices.
+      if (tcoVariantForHwKey(hwKey)) continue;
+      if (!hardwareKeyMatchesBase(hwKey, variant.baseGpuKey)) continue;
+      // Idempotent: expanding an already-expanded set must not duplicate the
+      // curve. Both the graph and selection paths run this, on arrays that can
+      // share points.
+      if (existingKeys.has(tcoVariantKey(hwKey, variant))) continue;
+
+      // Re-run the real derived-metric formulas with the quoted rate
+      // substituted for the registry's hyperscaler cost.
+      const derived = buildDerivedChartFields(
+        {
+          tput_per_gpu: point.tpPerGpu?.y ?? 0,
+          output_tput_per_gpu: point.outputTputPerGpu?.y ?? 0,
+          input_tput_per_gpu: point.inputTputPerGpu?.y ?? 0,
+        } as AggDataEntry,
+        hwKey,
+        TCO_VARIANT_METRICS,
+        tcoBasis,
+        { costh: variant.costPerHour },
+      );
+
+      clones.push({
+        ...point,
+        ...derived,
+        hwKey: tcoVariantKey(hwKey, variant),
+      });
+    }
+  }
+
+  return clones.length > 0 ? [...data, ...clones] : data;
 }

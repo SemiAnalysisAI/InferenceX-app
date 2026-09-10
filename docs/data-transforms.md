@@ -84,6 +84,26 @@ The hook runs a 5-step memoized pipeline:
 
 ---
 
+## Fixed-Rate TCO Variant Curves
+
+A chip is sometimes quoted at a single $/GPU/hr that differs from the modelled owning cost in `HW_REGISTRY`. `TCO_VARIANTS` (`packages/constants/src/gpu-keys.ts`) declares those quoted rates, and `expandTcoVariantPoints` (`lib/chart-utils.ts`) draws them as a **second curve** beside the modelled one.
+
+Today there is one entry: Jalapeño at **$1.27/hr**, against its modelled owning-at-large-hyperscaler-volume cost of $1.47/hr, on the three owning tokens-per-$ metrics (`y_tokensPerDollarH`, `y_outputTokensPerDollarH`, `y_inputTokensPerDollarH`).
+
+**It is a chart-layer display overlay only.** `HW_REGISTRY` is unchanged, so the Calculator, Historical Trends, `/compare`, `/api/v1/tco-feed`, and the MCP server never see it.
+
+Design points worth knowing before touching it:
+
+- **Key shape** — the variant hwKey is `${sourceHwKey}_${hwKeySuffix}` (`jalapeno_teacup_tco127`). Because the base still splits to `jalapeno`, every base-keyed consumer — `getGpuSpecs`, `getModelSortIndex`, `pointVendor`, vendor colors, `hardwareKeyMatchesBase`, and therefore the official-preview banner — keeps resolving the real chip with no special-casing. `hwKeySuffix` must never collide with a framework or spec-method token; `tco-variants.test.ts` enforces that.
+- **Where it is injected** — _after_ GPU/quick-filter scoping and _after_ the metric-coverage filter, in both the `graphs` and `selectionPoints` memos (`hooks/useChartData.ts`) and in the overlay's `processData` (`ui/ChartDisplay.tsx`). Injecting earlier would break it: `filterByGPU` is an exact-key/alias match, not a prefix match, so a variant key present before scoping is dropped whenever a GPU selection is active. Deriving clones from already-scoped, already-capable points also means hiding the chip hides both curves for free.
+- **One set of formulas** — the clone is priced by calling `buildDerivedChartFields` with a `specOverride` of `{ costh }`, not by rescaling the source value. The whole hyperscaler family (`costh`, `costhOutput`, `costhi`, and the three tokens-per-$ H metrics) is recomputed so the points table and CSV can never show a "$1.27/hr" series beside a $/M tok column derived from $1.47. The retail tier is deliberately untouched — the quote replaces the owning rate only.
+- **Best-per-SKU** — `baseSku` gives a variant its own SKU (`jalapeno|jalapeno-1-27`). Without that, the cheaper curve dominates at every x and silently _evicts_ the modelled curve, since `bestSeriesPerSku` keeps one series per SKU.
+- **Default visibility** — `reconcileActiveSet` intersects and never re-widens, so a newly-appearing variant key would sit in the legend permanently greyed out. `InferenceContext` adopts each variant key once, on first appearance and only when its source curve is active, re-arming when the key leaves so a metric round-trip restores it while a deliberate deselect sticks.
+- **Label is locale-invariant** — the legend reads `Jalapeño (Teacup, $1.27/hr)` on `/zh` too. Every token is a chip name, a framework name, or a USD rate, all of which stay English per the terminology rules, so switching to fullwidth punctuation would only make this row inconsistent with the `Jalapeño (Teacup)` row beside it.
+- **Share URLs** — variant keys are excluded from `i_active`. They exist only while a re-priced metric is selected, and a link captured on one and reopened on another would restore a set of keys that no longer exist — which `reconcileActiveSet` answers by selecting _everything_.
+
+---
+
 ## Hardware Key Construction
 
 This is the most complex and bug-prone part of the pipeline. A bad hardware key produces either a missing legend entry, zeroed cost/energy metrics (because `getGpuSpecs` returns zeros), or a chart point that never matches the active hardware filter.
