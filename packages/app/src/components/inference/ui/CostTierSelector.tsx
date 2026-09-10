@@ -2,6 +2,10 @@
 
 import { useMemo } from 'react';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+
 import {
   useInferenceActions,
   useInferenceDisplay,
@@ -22,6 +26,7 @@ import {
 } from '@/components/inference/metric-registry';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedTierLabel, lockedTierValue } from '@/components/ui/locked-rent-tiers';
+import { captionControlTriggerClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   LOCKED_RENT_TIERS,
@@ -29,6 +34,7 @@ import {
   useLockedTierDialog,
 } from '@/components/ui/tco-model-dialog';
 import { track } from '@/lib/analytics';
+import { getGpuSpecs } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
@@ -69,8 +75,9 @@ export function CostTierSelector({ className }: { className?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { selectedYAxisMetric } = useInferenceDisplay();
-  const { selectedModel, selectedSequence, selectedPrecisions } = useInferenceFilters();
-  const { setSelectedYAxisMetric } = useInferenceActions();
+  const { selectedModel, selectedSequence, selectedPrecisions, userCosts } = useInferenceFilters();
+  const { setSelectedYAxisMetric, setUserCosts } = useInferenceActions();
+  const { tcoBasis } = useGlobalFilterSelection();
   const { interceptLocked, dialog } = useLockedTierDialog('yaxis_cost_tier');
 
   const selectedMetricKey = selectedYAxisMetric.replace(/^y_/u, '');
@@ -104,8 +111,24 @@ export function CostTierSelector({ className }: { className?: string }) {
 
   const handleChange = (value: string) => {
     if (interceptLocked(value)) return;
-    setSelectedYAxisMetric(value);
     const tierKey = value.replace(/^y_/u, '');
+    // First visit to Custom User Values: start from the prices the caption
+    // was showing, so the reader edits the badges from there. Later visits
+    // keep whatever they typed.
+    if (
+      isMetricKey(tierKey) &&
+      metricCostTier(tierKey) === 'custom' &&
+      userCosts === null &&
+      selectedTier !== 'custom'
+    ) {
+      const field = selectedTier === 'rental' ? 'costr' : 'costh';
+      setUserCosts(
+        Object.fromEntries(
+          Object.keys(HW_REGISTRY).map((base) => [base, getGpuSpecs(base, tcoBasis)[field]]),
+        ),
+      );
+    }
+    setSelectedYAxisMetric(value);
     track('inference_cost_tier_selected', {
       metric: value,
       cost_tier: (isMetricKey(tierKey) ? metricCostTier(tierKey) : undefined) ?? 'unknown',
@@ -143,9 +166,7 @@ export function CostTierSelector({ className }: { className?: string }) {
         searchable={false}
         trackPrefix="cost_tier"
         size="sm"
-        // Compact trigger sized to the caption's text line rather than a
-        // form control: no forced height, tight padding, caption font size.
-        className="h-6 md:h-6 w-auto gap-1 rounded-sm border-transparent bg-transparent px-1 py-0 text-xs font-medium text-foreground shadow-none hover:border-input hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/60 [&_svg]:size-3"
+        className={captionControlTriggerClassName}
         contentClassName="w-80"
         groups={[{ label: '', options }]}
       />

@@ -249,55 +249,54 @@ export default function ChartControls({
   const selectedTier: CostTier | undefined = isMetricKey(selectedMetricKey)
     ? metricCostTier(selectedMetricKey)
     : undefined;
-  // Switching metric keeps the published tier the reader is on. Custom values
-  // keep their own y-axis entries, so from there other metrics open on the
-  // dashboard default tier.
-  const carriedTier: CostTier =
-    selectedTier && selectedTier !== 'custom' ? selectedTier : 'hyperscaler';
+  // Switching metric keeps the tier the reader is on, including Custom User
+  // Values: the tier is picked in the chart caption, not here.
+  const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
 
-  const groupedYAxisOptions = useMemo(
-    () =>
-      visibleGroups
-        .map((group) => {
-          const seenFamilies = new Set<CostMetricFamilyId>();
-          const options = group.metrics.flatMap((m) => {
-            if (!METRIC_TITLE_MAP.has(m)) return [];
-            const key = m.replace(/^y_/u, '') as MetricKey;
-            const family = costMetricFamily(key);
-            if (family && metricCostTier(key) !== 'custom') {
-              // Published tiers collapse into one option per metric family.
-              // The option tracks the tier in force so the selection
-              // highlight follows the metric; the Cost Tier selector in
-              // the chart caption changes the pricing basis.
-              if (seenFamilies.has(family)) return [];
-              seenFamilies.add(family);
-              const tieredKey = metricForCostTier(family, carriedTier) ?? key;
-              return [
-                {
-                  value: `y_${tieredKey}`,
-                  help: <MetricExplanation metricKey={tieredKey} />,
-                  label: metricChartTitle(key, locale),
-                },
-              ];
-            }
+  const groupedYAxisOptions = useMemo(() => {
+    // Shared across groups so a family listed under Custom User Values does
+    // not reappear after its published entry.
+    const seenFamilies = new Set<CostMetricFamilyId>();
+    return visibleGroups
+      .map((group) => {
+        const options = group.metrics.flatMap((m) => {
+          if (!METRIC_TITLE_MAP.has(m)) return [];
+          const key = m.replace(/^y_/u, '') as MetricKey;
+          const family = costMetricFamily(key);
+          if (family) {
+            // Every pricing basis of a metric, published or custom,
+            // collapses into one option per metric family. The option
+            // tracks the tier in force so the selection highlight follows
+            // the metric; the Cost Tier selector in the chart caption
+            // changes the pricing basis.
+            if (seenFamilies.has(family)) return [];
+            seenFamilies.add(family);
+            const tieredKey = metricForCostTier(family, carriedTier) ?? key;
             return [
               {
-                value: m,
-                help: <MetricExplanation metricKey={key} />,
-                label:
-                  (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
-                  METRIC_TITLE_MAP.get(m)!,
+                value: `y_${tieredKey}`,
+                help: <MetricExplanation metricKey={tieredKey} />,
+                label: metricChartTitle(key, locale),
               },
             ];
-          });
-          return {
-            groupLabel: locale === 'zh' ? group.labelZh : group.label,
-            options,
-          };
-        })
-        .filter((g) => g.options.length > 0),
-    [visibleGroups, locale, carriedTier],
-  );
+          }
+          return [
+            {
+              value: m,
+              help: <MetricExplanation metricKey={key} />,
+              label:
+                (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
+                METRIC_TITLE_MAP.get(m)!,
+            },
+          ];
+        });
+        return {
+          groupLabel: locale === 'zh' ? group.labelZh : group.label,
+          options,
+        };
+      })
+      .filter((g) => g.options.length > 0);
+  }, [visibleGroups, locale, carriedTier]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {

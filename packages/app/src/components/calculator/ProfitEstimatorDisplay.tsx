@@ -40,7 +40,6 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -50,6 +49,7 @@ import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selecto
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
@@ -57,8 +57,10 @@ import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
-import { ResultContext } from '@/components/ui/result-context';
+import { captionControlTriggerClassName, ResultContext } from '@/components/ui/result-context';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
@@ -854,6 +856,45 @@ function ProfitEstimatorInner({
   const interpolationCostProvider: CostProvider =
     costProvider === 'custom' ? CUSTOM_COST_SEED : costProvider;
 
+  // Entering the custom tier copies the published $/GPU/hr the caption was
+  // showing, so the badges keep their numbers and the reader edits from there.
+  const enterCustomCosts = useCallback(() => {
+    if (costProvider === 'custom') return;
+    const seedFrom = costProvider;
+    setCustomCosts((prev) => {
+      const next = { ...prev };
+      for (const base of customCostBases) {
+        next[base] = String(getGpuSpecs(base, tcoBasis)[seedFrom]);
+      }
+      return next;
+    });
+    setCostProvider('custom');
+  }, [costProvider, customCostBases, tcoBasis]);
+  const handleCostProviderChange = useCallback(
+    (next: string) => {
+      if (interceptLockedTier(next)) return;
+      if (next === 'custom') enterCustomCosts();
+      else setCostProvider(next as ProfitCostProvider);
+      track('profit_cost_provider_changed', { provider: next });
+    },
+    [interceptLockedTier, enterCustomCosts],
+  );
+  // Typing into a caption badge is the custom-cost entry: the first
+  // keystroke on a published tier moves the chart onto Custom $/GPU/hr.
+  const handleCustomCostChange = useCallback(
+    (base: string, raw: string) => {
+      if (costProvider !== 'custom') {
+        enterCustomCosts();
+        track('profit_cost_provider_changed', { provider: 'custom', via: 'tco_badge' });
+      }
+      setCustomCosts((prev) => ({ ...prev, [base]: raw }));
+    },
+    [costProvider, enterCustomCosts],
+  );
+  const handleCustomCostCommit = useCallback((base: string, raw: string) => {
+    track('profit_custom_cost_set', { gpu: base, value: raw });
+  }, []);
+
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -1106,6 +1147,8 @@ function ProfitEstimatorInner({
           : 'custom';
 
   // Only the SKUs the legend currently shows; hiding a bar drops its badge.
+  // On the custom tier a chip whose price is blank has no bar and no legend
+  // entry, but its badge stays so the reader can type the price back in.
   const tcoBadges = useMemo(() => {
     const bases = new Set<string>();
     for (const key of legendHwKeys) {
@@ -1113,14 +1156,68 @@ function ProfitEstimatorInner({
       const base = key.split('_')[0];
       if (base in HW_REGISTRY) bases.add(base);
     }
+    if (costProvider === 'custom') {
+      for (const key of availableHwKeys) {
+        const base = baseGpuOf(key);
+        if (base in HW_REGISTRY && parseCustomCostInput(customCosts[base]) === undefined) {
+          bases.add(base);
+        }
+      }
+    }
     return [...bases]
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map((base) => ({
         base,
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
-        cost: costPerGpuHourFor(base),
+        // Custom shows the text as typed (an empty field stays empty
+        // instead of snapping to 0); published tiers show the model rate.
+        value:
+          costProvider === 'custom' ? (customCosts[base] ?? '') : String(costPerGpuHourFor(base)),
       }));
-  }, [legendHwKeys, visibleHwKeys, costPerGpuHourFor]);
+  }, [legendHwKeys, visibleHwKeys, availableHwKeys, costPerGpuHourFor, costProvider, customCosts]);
+
+  // The cost provider is chosen in the caption's Cost Tier line, where the
+  // tier used to print as plain text. Unlocked tiers first, then Custom
+  // $/GPU/hr, then the locked rent tiers so the free-form option is never
+  // buried below rows that only open the TCO model dialog.
+  const costProviderControl = (
+    <span className="inline-flex items-center gap-0.5" data-testid="profit-cost-selector">
+      <SearchableSelect
+        triggerId="profit-cost"
+        triggerAriaLabel={t.costProviderLabel}
+        value={costProvider}
+        onValueChange={handleCostProviderChange}
+        placeholder={t.costProviderPlaceholder}
+        initialLabel={costTier}
+        searchable={false}
+        trackPrefix="profit_cost_provider"
+        size="sm"
+        className={captionControlTriggerClassName}
+        contentClassName="w-80"
+        groups={[
+          {
+            label: '',
+            options: [
+              ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                value: provider.value,
+                label: locale === 'zh' ? provider.labelZh : provider.label,
+                testId: `cost-provider-${provider.value}`,
+              })),
+              ...lockedCostProviderOptions(locale),
+            ],
+          },
+        ]}
+      />
+      <InfoHelp
+        label={t.costProviderLabel}
+        value="profit-cost"
+        analyticsEvent="selector_help_opened"
+        align="start"
+      >
+        {t.costProviderTooltip}
+      </InfoHelp>
+    </span>
+  );
 
   // Compared chips with no bar on a comparison date (or on the current date,
   // when the chip only priced earlier), named in the caption so a missing bar
@@ -1171,6 +1268,7 @@ function ProfitEstimatorInner({
         <ResultContext
           locale={locale}
           costTier={costTier}
+          costTierControl={costProviderControl}
           utilization={`${assumptions.utilizationPct}%`}
           licenseFee={`${assumptions.labCutPct}%`}
           date={selectedRunDate}
@@ -1184,17 +1282,17 @@ function ProfitEstimatorInner({
             {historyMissing.length > 0 && <> {t.historyNoData(historyMissing.join(', '))}</>}
           </p>
         )}
-        <p
-          className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-          data-testid="profit-tco-badges"
-        >
-          {t.tcoBadgesLabel}{' '}
-          {tcoBadges.map((badge) => (
-            <Badge key={badge.base} variant="outline" data-testid="profit-tco-badge">
-              {badge.label}: {badge.cost}
-            </Badge>
-          ))}
-        </p>
+        <EditableTcoBadges
+          label={t.tcoBadgesLabel}
+          items={tcoBadges}
+          onChange={handleCustomCostChange}
+          onCommit={handleCustomCostCommit}
+          inputLabel={t.customCostLabel}
+          testId="profit-tco-badges"
+          badgeTestId="profit-tco-badge"
+          inputIdPrefix="profit-custom-cost"
+          className="text-xs"
+        />
         {costProvider !== 'custom' && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-tco-source">
             <small>
@@ -1250,6 +1348,9 @@ function ProfitEstimatorInner({
     basis,
     selectedRunDate,
     tcoBadges,
+    costProviderControl,
+    handleCustomCostChange,
+    handleCustomCostCommit,
     priceSourceLabel,
     t,
     historyActive,
@@ -1356,45 +1457,6 @@ function ProfitEstimatorInner({
                   data-testid="profit-pricing-panel"
                   className="grid-cols-1 md:grid-cols-2 xl:col-span-3"
                 >
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-cost"
-                      label={t.costProviderLabel}
-                      tooltip={t.costProviderTooltip}
-                    />
-                    <div data-testid="profit-cost-selector">
-                      <MultiSelect
-                        triggerId="profit-cost"
-                        options={[
-                          // Unlocked tiers first, then Custom $/GPU/hr, then the locked
-                          // rent tiers so the free-form option is never buried below
-                          // rows that only open the TCO model dialog.
-                          ...COST_PROVIDER_OPTIONS.map((provider) => ({
-                            value: provider.value,
-                            label: locale === 'zh' ? provider.labelZh : provider.label,
-                          })),
-                          ...lockedCostProviderOptions(locale),
-                        ]}
-                        value={[costProvider]}
-                        onChange={(values) => {
-                          const next = values[0];
-                          if (!next) return;
-                          if (interceptLockedTier(next)) return;
-                          setCostProvider(next as ProfitCostProvider);
-                          track('profit_cost_provider_changed', { provider: next });
-                        }}
-                        open={openDropdown === 'costProvider'}
-                        onOpenChange={handleDropdownOpenChange('costProvider')}
-                        placeholder={t.costProviderPlaceholder}
-                        minSelections={1}
-                        maxSelections={1}
-                        showClearAll={false}
-                        searchable={false}
-                        plainSelectedText
-                        showSelectionSummary={false}
-                      />
-                    </div>
-                  </div>
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-price-source"
@@ -1557,43 +1619,6 @@ function ProfitEstimatorInner({
                         }
                       />
                       <TcoBasisToggle source="profit" className="md:h-9" />
-                    </div>
-                  )}
-
-                  {costProvider === 'custom' && customCostBases.length > 0 && (
-                    <div
-                      data-testid="profit-custom-costs"
-                      className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2 xl:grid-cols-3"
-                    >
-                      {customCostBases.map((base) => {
-                        const label = HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase();
-                        return (
-                          <div key={base} className="flex min-w-0 flex-col space-y-1.5">
-                            <Label htmlFor={`profit-custom-cost-${base}`}>
-                              {t.customCostLabel(label)}
-                            </Label>
-                            <Input
-                              id={`profit-custom-cost-${base}`}
-                              data-testid={`profit-custom-cost-${base}`}
-                              type="number"
-                              onWheel={blurOnWheel}
-                              inputMode="decimal"
-                              min={0}
-                              step={0.01}
-                              value={customCosts[base] ?? ''}
-                              onChange={(e) =>
-                                setCustomCosts((prev) => ({ ...prev, [base]: e.target.value }))
-                              }
-                              onBlur={() =>
-                                track('profit_custom_cost_set', {
-                                  gpu: base,
-                                  value: customCosts[base],
-                                })
-                              }
-                            />
-                          </div>
-                        );
-                      })}
                     </div>
                   )}
                 </ControlPanel>

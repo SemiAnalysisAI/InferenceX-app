@@ -102,9 +102,9 @@ import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
 import { CostTierSelector } from './CostTierSelector';
+import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
-import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
@@ -246,6 +246,11 @@ export function formatTokenLength(value: number): string {
  * which seed the model/scenario/metric via providers instead of user-facing
  * selectors. The run-date changelog strip and the charts themselves remain.
  */
+// Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
+function renderInferenceTcoBadges(props: { label: string; values: Record<string, number> }) {
+  return <InferenceTcoBadges label={props.label} values={props.values} />;
+}
+
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -1100,6 +1105,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
+                              renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}
                           {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
@@ -1267,13 +1273,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         </section>
       )}
 
-      {!minimalChrome &&
-        (selectedYAxisMetric === 'y_costUser' ||
-          selectedYAxisMetric === 'y_tokensPerDollarUser') && (
-          <section>
-            <CustomCosts loading={loading} />
-          </section>
-        )}
       {!minimalChrome && selectedYAxisMetric === 'y_powerUser' && (
         <section>
           <CustomPowers loading={loading} />

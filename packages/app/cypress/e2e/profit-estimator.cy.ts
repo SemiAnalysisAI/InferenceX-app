@@ -106,11 +106,13 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     bars().should('have.length.greaterThan', 0);
     // Cost tiers carry the same names as the /inference y-axis selector. The
-    // GW-year basis models a fleet owner, so it opens on the owning tier.
-    cy.get('button#profit-cost')
+    // GW-year basis models a fleet owner, so it opens on the owning tier. The
+    // selector sits in the caption's Cost Tier line, not in the pricing panel.
+    cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
+    cy.get('[data-testid="result-context-cost-tier"] button#profit-cost')
       .should('contain.text', 'Owning at Large Hyperscaler Volume')
       .click();
-    cy.get('[role="option"]').then(($opts) => {
+    cy.get('[data-select-option]').then(($opts) => {
       const labels = [...$opts].map((el) => el.textContent?.trim());
       expect(labels).to.include.members([
         'Owning at Large Hyperscaler Volume',
@@ -163,6 +165,8 @@ describe('Profit Estimator per GW', () => {
     cy.get('[role="option"]').should('have.length', 2).and('not.contain.text', 'list price');
     cy.get('body').type('{esc}');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
+    // The badges are the custom-cost entry, so each one carries an input.
+    cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
     // Each x label carries its vendor mark; the H200 curve stops short of 45
     // tok/s/user, so it is absent from the chart rather than extrapolated.
     chart().find('.tick image.vendor-mark').should('not.exist');
@@ -332,43 +336,56 @@ describe('Profit Estimator per GW', () => {
 
   it('lets a custom $/GPU/hr per chip replace the TCO tier', () => {
     cy.get('button#profit-cost').click();
-    cy.contains('[role="option"]', 'Custom $/GPU/hr').click();
+    cy.get('[data-testid="cost-provider-custom"]').click();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
-    cy.get('[data-testid="profit-custom-costs"] input').should('have.length.greaterThan', 0);
+    // There is no separate custom-cost form; the caption badges are the inputs.
+    cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
+    cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
     // A user-entered $/GPU/hr has no external source to cite.
     cy.get('[data-testid="profit-tco-source"]').should('not.exist');
     chart()
       .find('rect.bar-tco')
       .its('length')
       .then((tcoBarsBefore) => {
-        // Inputs are seeded from the hyperscaler tier, so nothing is dropped yet.
-        cy.get('[data-testid="profit-custom-costs"] input')
-          .first()
-          .invoke('val')
-          .then((seed) => expect(Number(seed)).to.be.greaterThan(0));
-        cy.get('[data-testid="profit-custom-costs"] label')
-          .first()
-          .invoke('text')
-          .then((labelText) => {
-            const chip = labelText.replace(/\s*\$\/GPU\/hr$/u, '').trim();
-            cy.get('[data-testid="profit-custom-costs"] input').first().clear().type('9').blur();
-            cy.get('[data-testid="profit-caption"]').should('contain.text', `${chip}: 9`);
-          });
+        // Inputs start from the owning tier the caption was showing, so
+        // nothing is dropped yet.
+        cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
+        cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('9').blur();
+        cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 9');
         // An empty custom cost drops that chip instead of pricing it at zero.
-        cy.get('[data-testid="profit-custom-costs"] input').first().clear().blur();
+        cy.get('[data-testid="profit-custom-cost-gb300"]').clear().blur();
         chart().find('rect.bar-tco').should('have.length.lessThan', tcoBarsBefore);
-        cy.get('[data-testid="profit-custom-costs"] input').first().type('1.5').blur();
+        cy.get('[data-testid="profit-custom-cost-gb300"]').type('1.5').blur();
         chart().find('rect.bar-tco').should('have.length', tcoBarsBefore);
       });
 
     cy.get('button#profit-cost').click();
-    cy.contains('[role="option"]', 'Owning at Large Hyperscaler Volume').click();
-    cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
+    cy.get('[data-testid="cost-provider-costh"]').click();
+    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
     cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
     );
+  });
+
+  it('switches to custom $/GPU/hr when a caption badge is edited', () => {
+    cy.get('[data-testid="result-context-cost-tier"]').should(
+      'contain.text',
+      'Owning at Large Hyperscaler Volume',
+    );
+    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'MI355X: 1.5');
+    // Typing into a badge on a published tier moves the chart onto the
+    // custom tier; the other chips keep the price they were showing.
+    cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
+    cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
+    cy.get('[data-testid="profit-tco-badges"]')
+      .should('contain.text', 'GB300: 4')
+      .and('contain.text', 'MI355X: 1.5');
+    cy.get('[data-testid="profit-tco-source"]').should('not.exist');
+    cy.get('button#profit-cost').click();
+    cy.get('[data-testid="cost-provider-costh"]').click();
+    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
   });
 
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {
@@ -949,14 +966,15 @@ describe('Profit Estimator — responsive control panels', () => {
           cy.get('#profit-price-source').click();
         });
         cy.contains('[role="option"]', 'Custom $/M tok').click();
-        cy.get('#profit-cost').click();
-        cy.contains('[role="option"]', 'Custom $/GPU/hr').click();
         cy.get('[data-testid="profit-pricing-panel"] [data-testid="profit-custom-prices"]')
           .find('input')
           .should('have.length', 3);
-        cy.get(
-          '[data-testid="profit-pricing-panel"] [data-testid="profit-custom-costs"] input',
-        ).should('have.length.greaterThan', 0);
+        // Custom $/GPU/hr is typed into the caption badges, not the panel.
+        cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
+        cy.get('[data-testid="profit-caption"] [data-testid="profit-tco-badge"] input').should(
+          'have.length.greaterThan',
+          0,
+        );
         cy.get('[data-testid="profit-controls"]').should(($controls) => {
           const benchmark = $controls
             .find('[data-testid="profit-benchmark-panel"]')[0]!

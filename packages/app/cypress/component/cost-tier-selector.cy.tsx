@@ -43,10 +43,20 @@ describe('CostTierSelector', () => {
       cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costr');
     });
 
-    it('switches to the custom axis', () => {
+    it('switches to the custom axis and seeds the per-chip $/hr from the current tier', () => {
       cy.get('[data-testid="cost-tier-selector"]').click('right');
       cy.get('[data-testid="cost-tier-custom"]').click();
       cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
+      // `userCosts` starts null, so the custom tier would otherwise draw an
+      // empty chart until every chip had been typed in.
+      cy.get('@setUserCosts').should('have.been.calledOnce');
+      cy.get('@setUserCosts').then((stub) => {
+        const seeded = (stub as unknown as { firstCall: { args: unknown[] } }).firstCall
+          .args[0] as Record<string, number>;
+        expect(seeded).to.have.property('gb300');
+        expect(seeded).to.have.property('mi355x');
+        for (const value of Object.values(seeded)) expect(value).to.be.greaterThan(0);
+      });
     });
 
     it('opens the TCO model dialog for locked rental tiers instead of changing the axis', () => {
@@ -69,6 +79,17 @@ describe('CostTierSelector', () => {
       cy.injectAxe();
       cy.checkA11y('[data-testid="cost-tier-selector"]');
     });
+  });
+
+  it('does not reseed $/hr the reader has already entered', () => {
+    mountWithProviders(<CostTierSelector />, {
+      inference: { selectedYAxisMetric: 'y_costh', userCosts: { gb300: 9 } },
+      globalFilters: {},
+    });
+    cy.get('[data-testid="cost-tier-selector"]').click('right');
+    cy.get('[data-testid="cost-tier-custom"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
+    cy.get('@setUserCosts').should('not.have.been.called');
   });
 
   it('shows the rental tier on rental-tier metrics', () => {

@@ -2,6 +2,14 @@ import type { ReactNode } from 'react';
 
 import type { Locale } from '@/lib/i18n';
 
+/**
+ * Trigger styling for a select that sits inside the caption's Cost Tier
+ * line: sized to the caption's text line rather than a form control, with a
+ * visible outline so readers can tell the tier is a control, not a label.
+ */
+export const captionControlTriggerClassName =
+  'h-6 md:h-6 w-auto gap-1 rounded-sm border-input bg-transparent px-1.5 py-0 text-xs font-medium text-foreground shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/60 [&_svg]:size-3';
+
 export interface ResultContextProps {
   locale: Locale;
   /** Omitted when the chart heading already names the model. */

@@ -170,15 +170,15 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
       const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
+      // The custom tier is one more Cost Tier option, not a second axis entry.
       expect(labels.filter((label) => label.startsWith('Total Tokens per $1 TCO'))).to.deep.equal([
         'Total Tokens per $1 TCO',
-        'Total Tokens per $1 TCO (Custom User Values)',
       ]);
       expect(
         labels.filter((label) => label.startsWith('Cost per Million Total Tokens')),
-      ).to.deep.equal([
-        'Cost per Million Total Tokens',
-        'Cost per Million Total Tokens (Custom User Values)',
+      ).to.deep.equal(['Cost per Million Total Tokens']);
+      expect(labels.filter((label) => label.includes('(Custom User Values)'))).to.deep.equal([
+        'Token Throughput per All in Utility MW (Custom User Values)',
       ]);
       expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
         false,

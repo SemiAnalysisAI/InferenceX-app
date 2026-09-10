@@ -31,6 +31,10 @@ const TOTAL_COST_METRICS = new Set([
   'y_tokensPerDollarH',
   'y_tokensPerDollarR',
 ]);
+// Priced from the reader's own $/chip/hr rather than a published tier. The
+// caption still shows the badge row (editable, see `InferenceTcoBadges`)
+// but cites no TCO model source for it.
+const CUSTOM_COST_METRICS = new Set(['y_costUser', 'y_tokensPerDollarUser']);
 const OUTPUT_COST_METRICS = new Set([
   'y_costhOutput',
   'y_costrOutput',
@@ -183,6 +187,7 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
   tcoBasis = DEFAULT_TCO_BASIS,
+  renderCostBadges,
 }: {
   selectedYAxisMetric: string;
   /**
@@ -198,6 +203,13 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
   tcoBasis?: TcoBasis;
+  /**
+   * Replaces the read-only TCO $/chip/hr badges for total-token cost metrics
+   * (published tiers and Custom User Values). `values` are the published
+   * $/chip/hr for the bases the caption shows; the renderer decides how to
+   * present or edit them.
+   */
+  renderCostBadges?: (props: { label: string; values: Record<string, number> }) => ReactNode;
 }) {
   const locale = useLocale();
   // Legend keys are `{base}` or `{base}_{framework/variant}`; badge maps are
@@ -210,7 +222,9 @@ export function MetricAssumptionNotes({
     }
     return bases;
   }, [activeHwKeys]);
-  const filterToActive = (values: Record<string, string | number>) => {
+  const filterToActive = <T extends string | number>(
+    values: Record<string, T>,
+  ): Record<string, T> => {
     if (activeBases.size === 0) return values;
     const filtered = Object.fromEntries(
       Object.entries(values).filter(([base]) => activeBases.has(base)),
@@ -222,6 +236,7 @@ export function MetricAssumptionNotes({
     ? POWER_SOURCE_METRICS.has(selectedYAxisMetric)
     : selectedYAxisMetric === 'y_tpPerMw';
   const showTotalCostSource = TOTAL_COST_METRICS.has(selectedYAxisMetric);
+  const showCustomCost = CUSTOM_COST_METRICS.has(selectedYAxisMetric);
   const showOutputCostSource = OUTPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -237,13 +252,19 @@ export function MetricAssumptionNotes({
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
-    showTotalCostSource || showOutputCostSource || showInputCostSource
+    showTotalCostSource || showOutputCostSource || showInputCostSource || showCustomCost
       ? getCostValues(selectedYAxisMetric, tcoBasis)
       : null;
 
   const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';
   const costLabel = locale === 'zh' ? 'TCO $/chip/hr：' : 'TCO $/chip/hr:';
   const sourceLabel = locale === 'zh' ? '来源：' : 'Source:';
+  // Only the total-token families have a Custom User Values member, so only
+  // their badges hand over to the editable renderer.
+  const editableCostBadges =
+    renderCostBadges && costValues && (showTotalCostSource || showCustomCost)
+      ? renderCostBadges({ label: costLabel, values: filterToActive(costValues) })
+      : null;
 
   return (
     <>
@@ -260,10 +281,14 @@ export function MetricAssumptionNotes({
       )}
       {costValues && (
         <>
-          <MetricBadges label={costLabel} values={filterToActive(costValues)} />
-          <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
-            {TCO_SOURCE_TITLE}
-          </SourceLink>
+          {editableCostBadges ?? (
+            <MetricBadges label={costLabel} values={filterToActive(costValues)} />
+          )}
+          {!showCustomCost && (
+            <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
+              {TCO_SOURCE_TITLE}
+            </SourceLink>
+          )}
         </>
       )}
       <DisaggCaveat

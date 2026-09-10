@@ -45,6 +45,13 @@ describe('ChartShareActions', () => {
   });
 });
 
+// Stand-in for the /inference editable badge row.
+const renderCostBadges = ({ label, values }: { label: string; values: Record<string, number> }) => (
+  <div data-testid="editable">
+    {label} {Object.keys(values).join(',')}
+  </div>
+);
+
 describe('MetricAssumptionNotes', () => {
   it('shows power source badges and the per-MW disaggregation caveat for inference metrics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerMw" />);
@@ -209,6 +216,42 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('H100:');
     expect(getVisibleText()).toContain('MI300X:');
+  });
+
+  it('hands the TCO badges to the caller-supplied renderer for tiered and custom cost metrics', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costh"
+        activeHwKeys={['gb300_dynamo-sglang']}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
+      'TCO $/chip/hr: gb300',
+    );
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
+
+    // The custom tier shows the same badge row (so the reader can type into
+    // it) but cites no TCO source: the numbers are theirs.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_dynamo-sglang', 'mi355x_vllm']}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
+      'TCO $/chip/hr: gb300,mi355x',
+    );
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+  });
+
+  it('falls back to read-only TCO badges without a renderer', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costUser" activeHwKeys={['gb300_x']} />);
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).toContain('GB300:');
+    expect(container.querySelector('input')).toBeNull();
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
   });
 
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {
