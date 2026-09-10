@@ -7,7 +7,6 @@ import {
   getJumpscareEligibility,
   JUMPSCARE_ACTIVATION_EVENTS,
   JUMPSCARE_DURATION_MS,
-  JUMPSCARE_STORAGE_KEY,
   pickJumpscareDelayMs,
 } from '@/lib/jumpscare';
 import { playJumpscareSound, unlockJumpscareAudio } from '@/lib/jumpscare-audio';
@@ -37,26 +36,11 @@ function isAutomatedBrowser(): boolean {
   return typeof window !== 'undefined' && 'Cypress' in window;
 }
 
-function readLastFired(): string | null {
-  try {
-    return localStorage.getItem(JUMPSCARE_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeLastFired(now: number): void {
-  try {
-    localStorage.setItem(JUMPSCARE_STORAGE_KEY, String(now));
-  } catch {
-    // Storage unavailable — the scare just isn't remembered.
-  }
-}
-
 /**
  * Halloween easter egg: within ten seconds of a visitor's first click, tap, or
  * keypress, the page goes black, a face lunges at the camera, and a synthesized
- * scream plays. Mounted once in the root layout. Scheduling rules live in
+ * scream plays. No cooldown: every page load gets one. Mounted once in the
+ * root layout. Scheduling rules live in
  * `@/lib/jumpscare` so they stay testable; this component owns the DOM.
  */
 export function Jumpscare() {
@@ -71,8 +55,6 @@ export function Jumpscare() {
       pathname: window.location.pathname,
       reducedMotion: window.matchMedia(REDUCED_MOTION_QUERY).matches,
       automated: isAutomatedBrowser(),
-      lastFired: readLastFired(),
-      now: Date.now(),
     });
     if (!eligibility.eligible) return;
 
@@ -87,10 +69,6 @@ export function Jumpscare() {
 
     const fire = () => {
       fireTimer = null;
-      // Don't waste the one scare on a background tab; they'll get it next visit.
-      if (document.visibilityState !== 'visible') return;
-      const now = Date.now();
-      writeLastFired(now);
       track('jumpscare_fired', {
         forced: eligibility.forced,
         pathname: window.location.pathname,

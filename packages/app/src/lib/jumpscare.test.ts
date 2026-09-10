@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   getJumpscareEligibility,
   isJumpscareEmbedPath,
-  isJumpscareOnCooldown,
-  JUMPSCARE_COOLDOWN_MS,
   JUMPSCARE_MAX_DELAY_MS,
   JUMPSCARE_MIN_DELAY_MS,
   pickJumpscareDelayMs,
@@ -12,16 +10,12 @@ import {
   type JumpscareEligibilityInput,
 } from './jumpscare';
 
-const NOW = 1_800_000_000_000;
-
 function input(overrides: Partial<JumpscareEligibilityInput> = {}): JumpscareEligibilityInput {
   return {
     search: '',
     pathname: '/',
     reducedMotion: false,
     automated: false,
-    lastFired: null,
-    now: NOW,
     ...overrides,
   };
 }
@@ -53,20 +47,6 @@ describe('isJumpscareEmbedPath', () => {
   });
 });
 
-describe('isJumpscareOnCooldown', () => {
-  it('is false with no record or a corrupt record', () => {
-    expect(isJumpscareOnCooldown(null, NOW, JUMPSCARE_COOLDOWN_MS)).toBe(false);
-    expect(isJumpscareOnCooldown('garbage', NOW, JUMPSCARE_COOLDOWN_MS)).toBe(false);
-  });
-
-  it('is true inside the window and false once it lapses', () => {
-    const recent = String(NOW - JUMPSCARE_COOLDOWN_MS + 1);
-    const stale = String(NOW - JUMPSCARE_COOLDOWN_MS);
-    expect(isJumpscareOnCooldown(recent, NOW, JUMPSCARE_COOLDOWN_MS)).toBe(true);
-    expect(isJumpscareOnCooldown(stale, NOW, JUMPSCARE_COOLDOWN_MS)).toBe(false);
-  });
-});
-
 describe('getJumpscareEligibility', () => {
   it('is eligible by default on a fresh browser', () => {
     expect(getJumpscareEligibility(input())).toEqual({ eligible: true, forced: false });
@@ -93,23 +73,17 @@ describe('getJumpscareEligibility', () => {
     });
   });
 
-  it('respects reduced motion and the cooldown', () => {
+  it('respects reduced motion', () => {
     expect(getJumpscareEligibility(input({ reducedMotion: true }))).toEqual({
       eligible: false,
       reason: 'reduced-motion',
     });
-    expect(getJumpscareEligibility(input({ lastFired: String(NOW - 1000) }))).toEqual({
-      eligible: false,
-      reason: 'cooldown',
-    });
   });
 
-  it('?jumpscare=1 overrides reduced motion and cooldown; ?jumpscare=0 wins over everything', () => {
-    expect(
-      getJumpscareEligibility(
-        input({ search: '?jumpscare=1', reducedMotion: true, lastFired: String(NOW - 1000) }),
-      ),
-    ).toEqual({ eligible: true, forced: true });
+  it('?jumpscare=1 overrides reduced motion; ?jumpscare=0 wins over everything', () => {
+    expect(getJumpscareEligibility(input({ search: '?jumpscare=1', reducedMotion: true }))).toEqual(
+      { eligible: true, forced: true },
+    );
     expect(getJumpscareEligibility(input({ search: '?jumpscare=0' }))).toEqual({
       eligible: false,
       reason: 'disabled-by-query',

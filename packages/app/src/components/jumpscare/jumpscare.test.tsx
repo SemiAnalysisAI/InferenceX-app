@@ -8,7 +8,6 @@ import {
   JUMPSCARE_DURATION_MS,
   JUMPSCARE_MAX_DELAY_MS,
   JUMPSCARE_MIN_DELAY_MS,
-  JUMPSCARE_STORAGE_KEY,
 } from '@/lib/jumpscare';
 
 const localeState = vi.hoisted(() => ({ pathname: '/' }));
@@ -65,7 +64,6 @@ beforeEach(() => {
   localeState.pathname = '/';
   setSearch('');
   setReducedMotion(false);
-  localStorage.clear();
   analytics.track.mockClear();
   audio.unlockJumpscareAudio.mockClear();
   audio.playJumpscareSound.mockClear();
@@ -125,10 +123,9 @@ describe('Jumpscare', () => {
       'jumpscare_fired',
       expect.objectContaining({ forced: false, pathname: '/' }),
     );
-    expect(localStorage.getItem(JUMPSCARE_STORAGE_KEY)).not.toBeNull();
   });
 
-  it('tears itself down after the animation and does not re-arm', () => {
+  it('tears itself down after the animation and does not re-arm within the same mount', () => {
     mount();
     interact();
     act(() => {
@@ -173,7 +170,6 @@ describe('Jumpscare', () => {
   });
 
   const quietCases: [string, () => void][] = [
-    ['on cooldown', () => localStorage.setItem(JUMPSCARE_STORAGE_KEY, String(Date.now()))],
     ['under reduced motion', () => setReducedMotion(true)],
     [
       'inside a partner embed',
@@ -199,8 +195,26 @@ describe('Jumpscare', () => {
     expect(audio.unlockJumpscareAudio).not.toHaveBeenCalled();
   });
 
-  it('?jumpscare=1 forces it past the cooldown and ?jumpscare=0 disables it', () => {
-    localStorage.setItem(JUMPSCARE_STORAGE_KEY, String(Date.now()));
+  function remount() {
+    act(() => root.unmount());
+    root = createRoot(container);
+  }
+
+  it('fires again on a fresh mount — there is no cooldown', () => {
+    for (let visit = 0; visit < 3; visit++) {
+      mount();
+      interact();
+      act(() => {
+        vi.advanceTimersByTime(MID_DELAY);
+      });
+      expect(overlay()).not.toBeNull();
+      remount();
+    }
+    expect(analytics.track).toHaveBeenCalledTimes(3);
+  });
+
+  it('?jumpscare=1 forces it past reduced motion and ?jumpscare=0 disables it', () => {
+    setReducedMotion(true);
     setSearch('?jumpscare=1');
     mount();
     interact();
@@ -213,9 +227,8 @@ describe('Jumpscare', () => {
       expect.objectContaining({ forced: true }),
     );
 
-    act(() => root.unmount());
-    root = createRoot(container);
-    localStorage.clear();
+    remount();
+    setReducedMotion(false);
     analytics.track.mockClear();
     setSearch('?jumpscare=0');
     mount();
@@ -225,17 +238,5 @@ describe('Jumpscare', () => {
     });
     expect(overlay()).toBeNull();
     expect(analytics.track).not.toHaveBeenCalled();
-  });
-
-  it('skips a hidden tab without spending the cooldown', () => {
-    mount();
-    interact();
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-    act(() => {
-      vi.advanceTimersByTime(MID_DELAY);
-    });
-    expect(overlay()).toBeNull();
-    expect(localStorage.getItem(JUMPSCARE_STORAGE_KEY)).toBeNull();
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   });
 });
