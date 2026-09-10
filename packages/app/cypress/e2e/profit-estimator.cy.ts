@@ -15,10 +15,11 @@
 //  - the workload is pinned to agentic traces, so there is no scenario or
 //    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3 and
 //    MiniMax M3 only, and the target interactivity is a typed number, not a slider;
-//  - the cost provider has a custom $/GPU/hr option with one input per chip;
+//  - the cost tier, utilization and license fee are edited in the caption line
+//    under the title; custom $/GPU/hr is typed into the TCO badges there;
 //  - the per-GW page opens on Owning at Large Hyperscaler Volume while the
 //    per chip-hour page opens on Rent - 3 Year Commit;
-//  - the heading reads like /inference, the subtitle names the utilization, and
+//  - the heading reads like /inference, the subtitle carries the assumptions, and
 //    the formula folds away under the chart;
 //  - /profit-estimator/<model> is the per-model route; switching models
 //    rewrites the address bar in place;
@@ -102,8 +103,18 @@ describe('Profit Estimator per GW', () => {
 
   it('opens with the documented defaults and a priced chart', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
-    cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    // Utilization and the license fee are typed into the caption, next to the
+    // Cost Tier selector; the pricing panel no longer has fields for them.
+    cy.get('[data-testid="result-context-utilization"] input#profit-utilization').should(
+      'have.value',
+      '60',
+    );
+    cy.get('[data-testid="result-context-license-fee"] input#profit-lab-cut').should(
+      'have.value',
+      '30',
+    );
+    cy.get('[data-testid="profit-pricing-panel"] #profit-utilization').should('not.exist');
+    cy.get('[data-testid="profit-pricing-panel"] #profit-lab-cut').should('not.exist');
     bars().should('have.length.greaterThan', 0);
     // Cost tiers carry the same names as the /inference y-axis selector. The
     // GW-year basis models a fleet owner, so it opens on the owning tier. The
@@ -961,10 +972,17 @@ describe('Profit Estimator — responsive control panels', () => {
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
           cy.get('legend').should('have.text', 'Pricing Config');
-          cy.get('#profit-utilization').should('have.value', '60');
-          cy.get('#profit-lab-cut').should('have.value', '30');
           cy.get('#profit-price-source').click();
         });
+        // Utilization and the license fee live in the caption with the Cost Tier.
+        cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(
+          'have.value',
+          '60',
+        );
+        cy.get('[data-testid="result-context-license-fee"] #profit-lab-cut').should(
+          'have.value',
+          '30',
+        );
         cy.contains('[role="option"]', 'Custom $/M tok').click();
         cy.get('[data-testid="profit-pricing-panel"] [data-testid="profit-custom-prices"]')
           .find('input')

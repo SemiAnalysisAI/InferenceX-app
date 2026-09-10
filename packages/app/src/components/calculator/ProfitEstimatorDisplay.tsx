@@ -59,6 +59,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
+import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
 import { captionControlTriggerClassName, ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -1219,6 +1220,50 @@ function ProfitEstimatorInner({
     </span>
   );
 
+  // Utilization and the model license fee are typed straight into the caption,
+  // next to the Cost Tier selector, so the assumptions line is where every
+  // pricing assumption gets changed.
+  const utilizationControl = (
+    <span className="inline-flex items-center gap-0.5" data-testid="profit-utilization-control">
+      <CaptionPercentInput
+        id="profit-utilization"
+        testId="profit-utilization-input"
+        ariaLabel={t.utilizationLabel}
+        value={utilization.raw}
+        onChange={utilization.onChange}
+        onBlur={utilization.onBlur}
+      />
+      <InfoHelp
+        label={t.utilizationLabel}
+        value="profit-utilization"
+        analyticsEvent="selector_help_opened"
+        align="start"
+      >
+        {t.utilizationTooltip}
+      </InfoHelp>
+    </span>
+  );
+  const labCutControl = (
+    <span className="inline-flex items-center gap-0.5" data-testid="profit-lab-cut-control">
+      <CaptionPercentInput
+        id="profit-lab-cut"
+        testId="profit-lab-cut-input"
+        ariaLabel={t.labCutLabel}
+        value={labCut.raw}
+        onChange={labCut.onChange}
+        onBlur={labCut.onBlur}
+      />
+      <InfoHelp
+        label={t.labCutLabel}
+        value="profit-lab-cut"
+        analyticsEvent="selector_help_opened"
+        align="start"
+      >
+        {t.labCutTooltip}
+      </InfoHelp>
+    </span>
+  );
+
   // Compared chips with no bar on a comparison date (or on the current date,
   // when the chip only priced earlier), named in the caption so a missing bar
   // reads as "no run that day", not as a zero.
@@ -1270,7 +1315,11 @@ function ProfitEstimatorInner({
           costTier={costTier}
           costTierControl={costProviderControl}
           utilization={`${assumptions.utilizationPct}%`}
+          utilizationControl={utilizationControl}
+          utilizationControlId="profit-utilization"
           licenseFee={`${assumptions.labCutPct}%`}
+          licenseFeeControl={labCutControl}
+          licenseFeeControlId="profit-lab-cut"
           date={selectedRunDate}
           source="SemiAnalysis InferenceX™"
         />
@@ -1498,46 +1547,6 @@ function ProfitEstimatorInner({
                         showSelectionSummary={false}
                       />
                     </div>
-                  </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-utilization"
-                      label={t.utilizationLabel}
-                      tooltip={t.utilizationTooltip}
-                    />
-                    <Input
-                      id="profit-utilization"
-                      data-testid="profit-utilization-input"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={utilization.raw}
-                      onChange={(e) => utilization.onChange(e.target.value)}
-                      onBlur={utilization.onBlur}
-                    />
-                  </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-lab-cut"
-                      label={t.labCutLabel}
-                      tooltip={t.labCutTooltip}
-                    />
-                    <Input
-                      id="profit-lab-cut"
-                      data-testid="profit-lab-cut-input"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={labCut.raw}
-                      onChange={(e) => labCut.onChange(e.target.value)}
-                      onBlur={labCut.onBlur}
-                    />
                   </div>
                   {/* Custom token prices get their own row so the main controls keep their width. */}
                   {effectivePriceSource === 'custom' && (

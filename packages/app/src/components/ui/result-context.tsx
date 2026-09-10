@@ -28,8 +28,16 @@ export interface ResultContextProps {
   costTierControl?: ReactNode;
   /** Fleet utilization the revenue figures assume (e.g. "60%"). */
   utilization?: string;
+  /** Inline editor for `utilization`; rendered like `costTierControl`. */
+  utilizationControl?: ReactNode;
+  /** Id of the input inside `utilizationControl`, so the caption label names it. */
+  utilizationControlId?: string;
   /** Share of revenue paid to the model lab (e.g. "30%"). */
   licenseFee?: string;
+  /** Inline editor for `licenseFee`; rendered like `costTierControl`. */
+  licenseFeeControl?: ReactNode;
+  /** Id of the input inside `licenseFeeControl`, so the caption label names it. */
+  licenseFeeControlId?: string;
   target?: string;
   date?: string;
   dates?: readonly string[];
@@ -37,6 +45,49 @@ export interface ResultContextProps {
   source?: string;
   costBasis?: string;
   costBasisTestId?: string;
+}
+
+/**
+ * One caption entry. With a `control`, the interactive element renders in a
+ * `.no-export` span and the plain `value` stays as an `export-only` twin, so
+ * PNG exports print the text the control stands for. `controlId` turns the
+ * term into a `<label>` for the control's input.
+ */
+function CaptionField({
+  label,
+  value,
+  control,
+  controlId,
+  testId,
+}: {
+  label: string;
+  value: string;
+  control?: ReactNode;
+  controlId?: string;
+  testId: string;
+}) {
+  if (!control) {
+    return (
+      <div>
+        <dt className="inline font-medium text-foreground">{label}:</dt>{' '}
+        <dd className="inline" data-testid={testId}>
+          {value}
+        </dd>
+      </div>
+    );
+  }
+  return (
+    <div className="inline-flex flex-wrap items-center gap-x-1">
+      {/* The space keeps textContent identical to the plain-text variant. */}
+      <dt className="font-medium text-foreground">
+        {controlId ? <label htmlFor={controlId}>{label}:</label> : <>{label}:</>}
+      </dt>{' '}
+      <dd className="inline-flex items-center" data-testid={testId}>
+        <span className="no-export inline-flex items-center">{control}</span>
+        <span className="export-only hidden">{value}</span>
+      </dd>
+    </div>
+  );
 }
 
 /** Compact, reusable context for the values shown in a result chart. */
@@ -49,7 +100,11 @@ export function ResultContext({
   costTier,
   costTierControl,
   utilization,
+  utilizationControl,
+  utilizationControlId,
   licenseFee,
+  licenseFeeControl,
+  licenseFeeControlId,
   target,
   date,
   dates,
@@ -128,39 +183,31 @@ export function ResultContext({
           <dd className="inline">{metric}</dd>
         </div>
       )}
-      {costTier &&
-        (costTierControl ? (
-          <div className="inline-flex flex-wrap items-center gap-x-1">
-            {/* The space keeps textContent identical to the plain-text variant. */}
-            <dt className="font-medium text-foreground">{labels.costTier}:</dt>{' '}
-            <dd className="inline-flex items-center" data-testid="result-context-cost-tier">
-              <span className="no-export inline-flex items-center">{costTierControl}</span>
-              <span className="export-only hidden">{costTier}</span>
-            </dd>
-          </div>
-        ) : (
-          <div>
-            <dt className="inline font-medium text-foreground">{labels.costTier}:</dt>{' '}
-            <dd className="inline" data-testid="result-context-cost-tier">
-              {costTier}
-            </dd>
-          </div>
-        ))}
+      {costTier && (
+        <CaptionField
+          label={labels.costTier}
+          value={costTier}
+          control={costTierControl}
+          testId="result-context-cost-tier"
+        />
+      )}
       {utilization && (
-        <div>
-          <dt className="inline font-medium text-foreground">{labels.utilization}:</dt>{' '}
-          <dd className="inline" data-testid="result-context-utilization">
-            {utilization}
-          </dd>
-        </div>
+        <CaptionField
+          label={labels.utilization}
+          value={utilization}
+          control={utilizationControl}
+          controlId={utilizationControlId}
+          testId="result-context-utilization"
+        />
       )}
       {licenseFee && (
-        <div>
-          <dt className="inline font-medium text-foreground">{labels.licenseFee}:</dt>{' '}
-          <dd className="inline" data-testid="result-context-license-fee">
-            {licenseFee}
-          </dd>
-        </div>
+        <CaptionField
+          label={labels.licenseFee}
+          value={licenseFee}
+          control={licenseFeeControl}
+          controlId={licenseFeeControlId}
+          testId="result-context-license-fee"
+        />
       )}
       {target && (
         <div>
