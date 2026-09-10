@@ -374,6 +374,9 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],
   [Model.Qwen3_8_Flash_Next]: ['agentx'],
+  // V4.1 Flash entered the fleet on AgentX only (first sweep 2026-09-10,
+  // InferenceX#2961, GB300 agentic traces); no 8K/1K sweep exists yet.
+  [Model.DeepSeek_V4_1_Flash]: ['agentx'],
 };
 
 /** The scenarios this model gets a row for. Unlisted models keep the single

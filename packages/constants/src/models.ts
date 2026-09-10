@@ -27,6 +27,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   'glm5.1': 'GLM-5',
   'glm5.2': 'GLM-5.2',
   dsv4: 'DeepSeek-V4-Pro',
+  // V4.1-Flash is a separate CED/CSA2 architecture (552B backbone, 8B prefill /
+  // 16B decode active), not a V4-Pro point release, so it gets its own bucket.
+  dsv41flash: 'DeepSeek-V4.1-Flash',
 };
 
 /**
@@ -127,6 +130,11 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // license. The 2026-06-01 launch shipped API access only; the arXiv report
   // followed on 2026-06-11. sweep: 2026-06-12.
   'MiniMax-M3': '2026-06-07',
+  // DeepSeek-V4.1-Flash — MIT weights published at deepseek-ai/DeepSeek-V4.1-Flash
+  // on 2026-09-10 UTC (HF repo initial commit 02:17Z, tech report 05:34Z). The
+  // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but
+  // that is the image build date, not the weights date. sweep: 2026-09-10 — day zero.
+  'DeepSeek-V4.1-Flash': '2026-09-10',
   // V4 Preview — V4-Pro (1.6T total / 49B active) and V4-Flash (284B/13B)
   // published together under MIT on Hugging Face, the API and chat.deepseek.com.
   // V4-Pro-0813 went GA on 2026-08-13, but the Hugging Face repo still hosts the
