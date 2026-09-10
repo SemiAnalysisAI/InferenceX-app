@@ -42,17 +42,28 @@ not measured CPU/DRAM utilization.
 
 All listed profiles describe a complete eight-GPU chassis. GB200 and GB300 have
 no matching model and are unsupported. Their rack topology is not substituted
-with B200 or B300. Partial allocations, missing or invalid telemetry, inconsistent
-counts, missing host placement, and model-domain overflow remain unavailable.
+with B200 or B300.
+
+A partially allocated chassis (one to seven measured GPUs on one host) is
+modeled at measured per-GPU power × 8. That is the same `n_gpu × W/GPU` input
+the source sweep scripts feed each chassis model, and it assumes the unmeasured
+GPUs run the same workload. The estimate is labeled `chassisBasis:
+'extrapolated'`: per-GPU values divide by the modeled chassis GPU count
+(`modeledGpuCount`), while `deploymentAcWatts` / `deploymentFacilityWatts` keep
+only the measured GPUs' share of each chassis. This is not a proportional share
+of a chassis evaluated at partial load; fixed components, the fan curve, and PSU
+efficiency are all evaluated at full-chassis load. Missing or invalid telemetry,
+inconsistent counts, missing host placement, more than one chassis per host, and
+model-domain overflow remain unavailable.
 
 For a single-node deployment, the producer's physical width is `TP * PP * PCP`.
 EP partitions that width. Some existing API configuration aliases contain
 `TP * EP`; the model cross-checks the physical width against measured total and
 per-GPU watts instead of trusting or summing those aliases. Multi-node and
-disaggregated inputs require one complete chassis per measured worker, distinct
-worker hosts, and consistent total/role watts. A role average alone cannot
-establish physical placement or evaluate each host's nonlinear model. CPU-only
-frontend workers are excluded from GPU-chassis counting. Separate CPU-only
+disaggregated inputs require one chassis (one to eight GPUs) per measured
+worker, distinct worker hosts, and consistent total/role watts. A role average
+alone cannot establish physical placement or evaluate each host's nonlinear
+model. CPU-only frontend workers are excluded from GPU-chassis counting. Separate CPU-only
 frontend/router hosts are outside this estimate; CPU power within GPU chassis
 still uses the source's fixed 20% utilization assumption.
 
@@ -114,8 +125,8 @@ identify any local changes during development.
 
 Modeled energy is available only when a matching valid audit sidecar supplies an
 exact telemetry duration, physical GPU count, and successful request/token
-denominators. It is modeled average power multiplied by that duration, not a
-time integral of measured wall power. Actual output-token counts are used;
+denominators. It is modeled deployment power (the measured GPUs' share of each
+chassis) multiplied by that duration, not a time integral of measured wall power. Actual output-token counts are used;
 nominal `1024` tokens per query never replace recorded counts. No kernel-level
 prefill/decode energy is inferred. API snapshots without these sidecars receive
 power estimates only.
@@ -125,40 +136,23 @@ replicate outputs; it does not evaluate the model at mean watts. If any replicat
 is unavailable, the corresponding mean remains unavailable rather than silently
 dropping that replicate.
 
-## First-article evidence package
-
-The delivered package keeps three distinct complete cohorts:
-
-1. Original Qwen3.5 campaign: 48 cells and 144 replicates across six hardware
-   configurations. All 24 H200 replicates have recovered original telemetry,
-   audit receipts, exact timing/token counts, and verified producer checkout
-   `bf4461db65ac7d8351d720b302aadac4f0de8f78`. B200, B300, and MI355X used
-   four-GPU allocations and remain unsupported for chassis attribution; GB200
-   and GB300 lack matching models. Original measured inputs remain intact.
-2. Current published Qwen snapshot: every scoped row, separately identified by
-   the saved API response, retrieval time, and checksum.
-3. Current DeepSeek-V4 snapshot: separate integration coverage, not a replacement
-   for the original article's Qwen measurements.
-
-The saved package includes `prepare-comparison-inputs.ts`, its original source
-responses/receipts, and the three normalized input envelopes. Run that preparation
-script from the selected app checkout, then run the exporter for each envelope.
-The script uses the existing ETL normalizer and checks all original measurement
-fields against the frozen source. No new GPU experiments or article rewrite are
-part of this integration.
-
 ## 中文说明
 
-PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的 Oren 模型估算完整
+PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的 Oren 模型估算
 8-GPU 机箱的 AC 输入功率，再单独应用 PUE 得到设施功率估计。CPU 和 DRAM 利用率
 均假设为 20%；这些是模型参数，不是实测利用率。完整平台配置、源码版本和校验和
 随导出结果保留。模型源码仍标记为待人工核验，数值一致性不代表完成了实机校准。
 
-原文章的 144 次测量全部保留。24 次 H200 测量具有完整的原始审计材料，可计算
-机箱功率及能耗估计；4-GPU 的 B200、B300、MI355X 配置不能直接按半台机箱分摊，
-GB200、GB300 也不能套用 B200、B300 模型。缺失、无效和不支持的情况保持不可用。
-纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU frontend/router 主机不在
-估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
-每次测量先独立计算，再对三次重复测量取平均。能耗使用审计记录中的实际窗口和
-成功 token 数，明确标记为估计值，不改写原有 GPU 实测指标。当前 API 快照与原文章
-冻结数据分别导出，避免混用不同时间和配置的结果。
+仅使用部分 GPU 的机箱（单台主机上实测 1–7 张 GPU）按实测每卡功率 × 8 建模，
+与模型源码 sweep 脚本喂给各机箱模型的 `n_gpu × W/GPU` 输入一致，并假设未实测的
+GPU 运行相同负载。结果标记为 `chassisBasis: 'extrapolated'`：每卡数值按建模机箱
+的 GPU 总数分摊，`deploymentAcWatts` 只保留实测 GPU 在各机箱中的份额。这不是把
+半台机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
+GB200、GB300 没有匹配模型，也不能套用 B200、B300 模型。缺失、无效和不支持的
+情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
+frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
+
+导出时每次测量先独立计算，再对同一 cell 的重复测量取平均。能耗使用审计记录中的
+实际窗口和成功 token 数，按实测 GPU 的份额计算，明确标记为估计值，不改写原有
+GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
+结果。

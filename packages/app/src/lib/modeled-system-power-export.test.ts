@@ -5,6 +5,7 @@ import {
   csv,
   type ComparisonInput,
 } from '../../scripts/export-modeled-system-power';
+import { estimateChassisPower } from '@/lib/system-power-model';
 
 // Original H200 c1, run 31672765610, artifact 9171086754; schema marker was absent.
 function input(): ComparisonInput {
@@ -94,6 +95,49 @@ describe('offline modeled PowerX comparisons', () => {
     expect(result.rows[0].measured_inputs?.gpu_j_per_output_token).toBe(12.736929);
     expect(result.rows[0].benchmark.metrics).not.toHaveProperty('power_metric_schema_version');
     expect(source).toEqual(before);
+  });
+
+  it('attributes extrapolated partial-chassis energy to the measured GPUs only', () => {
+    const source = input();
+    const entry = source.rows[0];
+    const audit = entry.audit!;
+    const perGpu = audit.metrics.avg_power_w;
+    const total = perGpu * 4;
+    const energy = total * audit.benchmark_window.integration_duration_s;
+    const w = audit.benchmark_window;
+    audit.expected_gpu_count = 4;
+    audit.observed_gpu_count = 4;
+    audit.metrics = {
+      avg_power_w: perGpu,
+      avg_total_gpu_power_w: total,
+      total_gpu_energy_j: energy,
+    };
+    entry.benchmark.prefill_tp = 4;
+    entry.benchmark.decode_tp = 4;
+    Object.assign(entry.benchmark.metrics, {
+      avg_total_gpu_power_w: Math.round(total * 1000) / 1000,
+      total_gpu_energy_j: Math.round(energy * 1000) / 1000,
+      joules_per_output_token: energy / w.total_output_tokens,
+      joules_per_input_token: energy / w.total_input_tokens,
+      joules_per_total_token: energy / (w.total_input_tokens + w.total_output_tokens),
+      joules_per_successful_query: energy / w.completed,
+    });
+    const row = buildComparison(source).rows[0];
+    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8)!;
+    expect(row.modeled).toMatchObject({
+      status: 'supported',
+      gpuCount: 4,
+      modeledGpuCount: 8,
+      chassisBasis: 'extrapolated',
+      chassisAcWatts: reference.chassisAcWatts,
+      deploymentAcWatts: reference.chassisAcWatts / 2,
+    });
+    expect(row.estimated_energy).toMatchObject({
+      status: 'estimated',
+      chassis_ac_j: (reference.chassisAcWatts / 2) * w.integration_duration_s,
+      chassis_ac_j_per_output_token:
+        ((reference.chassisAcWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
+    });
   });
 
   it.each([0, -1, Infinity, NaN, 1.5])(

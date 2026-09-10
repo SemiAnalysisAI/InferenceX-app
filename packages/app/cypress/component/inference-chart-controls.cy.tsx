@@ -26,7 +26,11 @@ describe('Modeled system-power table', () => {
         facilityWatts: 7200,
         pue: 1.2,
         measuredGpuWattsPerGpu: 500,
-        topologyBasis: 'single-node-eight-gpu',
+        modeledGpuCount: 8,
+        deploymentAcWatts: 6000,
+        deploymentFacilityWatts: 7200,
+        topologyBasis: 'single-node',
+        chassisBasis: 'full',
         telemetryBasis: 'validated-unversioned-single-node',
       },
     });
@@ -144,7 +148,7 @@ describe('Inference ChartControls', () => {
       });
     cy.get('[data-testid="option-help-content-y_modeledChassisPowerPerGpu"]')
       .should('contain.text', 'validated measured GPU power')
-      .and('contain.text', 'fully occupied eight-GPU chassis')
+      .and('contain.text', 'extrapolated to a full chassis')
       .and('contain.text', 'PUE after chassis AC');
     cy.get('body').type('{esc}');
     cy.contains('[data-slot="select-item"]', 'Modeled Chassis AC Power per GPU (8k1k)')

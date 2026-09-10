@@ -129,14 +129,14 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     systemPowerAssumptions:
-      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Fully occupied eight-GPU chassis only. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
+      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Eight-GPU chassis models; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     noSystemPowerData:
-      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known full eight-GPU chassis. Measured GPU power remains available separately where telemetry exists.',
+      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -157,12 +157,12 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     systemPowerAssumptions:
-      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 仅纳入八张 GPU 全部使用的机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
+      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 采用八卡机箱模型；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     noSystemPowerData:
-      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱拓扑已知且完整占用的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
+      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },

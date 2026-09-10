@@ -95,14 +95,16 @@ function estimatedEnergy(
     )
   )
     return { status: 'unavailable', reason: 'audit-does-not-match-measured-input' };
-  const chassis = modeled.chassisAcWatts * w.integration_duration_s;
-  const facility = modeled.facilityWatts * w.integration_duration_s;
+  // Energy belongs to the measured GPUs: an extrapolated chassis contributes
+  // only their share at the modeled per-GPU rate.
+  const chassis = modeled.deploymentAcWatts * w.integration_duration_s;
+  const facility = modeled.deploymentFacilityWatts * w.integration_duration_s;
   if (!finite(chassis) || !finite(facility))
     return { status: 'unavailable', reason: 'non-finite-modeled-energy' };
   return {
     status: 'estimated',
     basis:
-      'Modeled power at mean GPU input multiplied by the exact recorded telemetry window; not integrated wall-power telemetry.',
+      'Modeled deployment power at mean GPU input multiplied by the exact recorded telemetry window; not integrated wall-power telemetry.',
     integration_seconds: w.integration_duration_s,
     completed_queries: w.completed,
     input_tokens: w.total_input_tokens,
@@ -221,6 +223,13 @@ export function buildComparison(input: ComparisonInput, pue = profileData.assump
           ),
         ),
       ],
+      chassis_bases: [
+        ...new Set(
+          replicates.flatMap((row) =>
+            row.modeled.status === 'supported' ? [row.modeled.chassisBasis] : [],
+          ),
+        ),
+      ],
       measured_gpu_w_per_gpu_mean: mean(
         replicates.map((row) => row.measured_inputs?.avg_gpu_w ?? null),
       ),
@@ -233,6 +242,16 @@ export function buildComparison(input: ComparisonInput, pue = profileData.assump
       modeled_chassis_ac_w_mean: mean(
         replicates.map((row) =>
           row.modeled.status === 'supported' ? row.modeled.chassisAcWatts : null,
+        ),
+      ),
+      modeled_chassis_ac_w_per_gpu_mean: mean(
+        replicates.map((row) =>
+          row.modeled.status === 'supported' ? row.modeled.chassisAcWattsPerGpu : null,
+        ),
+      ),
+      modeled_deployment_ac_w_mean: mean(
+        replicates.map((row) =>
+          row.modeled.status === 'supported' ? row.modeled.deploymentAcWatts : null,
         ),
       ),
       modeled_facility_w_mean: mean(
@@ -260,6 +279,8 @@ export function buildComparison(input: ComparisonInput, pue = profileData.assump
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
         'Measured GPU-board inputs; modeled GPU-chassis AC includes their CPU/DRAM, other model components, and PSU loss. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after GPU-chassis AC.',
+      extrapolation:
+        'A partially allocated chassis is modeled at measured per-GPU power × 8 (the source sweep input), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
       energy_caveat:
         'Energy from modeled average power is an estimate. Nonlinear fan/PSU behavior is not integrated over time. Energy requires an exact matching audit window and successful token counts.',
       model: profileData,
@@ -354,14 +375,23 @@ async function main() {
     modeled_status: row.modeled.status,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
     modeled_chassis_ac_w: row.modeled.status === 'supported' ? row.modeled.chassisAcWatts : null,
+    modeled_chassis_ac_w_per_gpu:
+      row.modeled.status === 'supported' ? row.modeled.chassisAcWattsPerGpu : null,
     modeled_facility_w: row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,
+    modeled_deployment_ac_w:
+      row.modeled.status === 'supported' ? row.modeled.deploymentAcWatts : null,
+    modeled_deployment_facility_w:
+      row.modeled.status === 'supported' ? row.modeled.deploymentFacilityWatts : null,
     physical_gpu_count: row.modeled.status === 'supported' ? row.modeled.gpuCount : null,
+    modeled_gpu_count: row.modeled.status === 'supported' ? row.modeled.modeledGpuCount : null,
     chassis_count: row.modeled.status === 'supported' ? row.modeled.chassisCount : null,
+    chassis_basis: row.modeled.status === 'supported' ? row.modeled.chassisBasis : null,
     telemetry_basis: row.modeled.status === 'supported' ? row.modeled.telemetryBasis : null,
     topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
     model_revision: row.modeled.modelRevision,
     model_status: profileData.status,
     calculation_boundary: metadata.boundary,
+    extrapolation_note: metadata.extrapolation,
     energy_caveat: metadata.energy_caveat,
     model_path: row.model_path,
     pue: metadata.pue,

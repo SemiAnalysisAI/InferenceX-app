@@ -6,12 +6,14 @@ import {
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/system-power-model';
 
+/** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
+const CHASSIS_GPU_COUNT = 8;
+
 export type SystemPowerUnsupportedReason =
   | 'workload'
   | 'hardware'
   | 'telemetry'
   | 'gpu-count'
-  | 'partial-chassis'
   | 'topology'
   | 'role-power'
   | 'model-domain';
@@ -23,19 +25,53 @@ export type SystemPowerEstimate =
       hardware: string;
       modelRevision: string;
       modelPath: string;
+      /** Physical GPUs covered by the validated telemetry. */
       gpuCount: number;
       chassisCount: number;
+      /** GPUs the chassis models were evaluated for: chassisCount × 8. Exceeds gpuCount when extrapolated. */
+      modeledGpuCount: number;
       measuredGpuWattsPerGpu: number;
+      /** Modeled AC for every full chassis, summed. */
       chassisAcWatts: number;
+      /** chassisAcWatts ÷ modeledGpuCount: the plotted metric. */
       chassisAcWattsPerGpu: number;
       facilityWatts: number;
+      /** Share of the modeled chassis attributable to the measured GPUs; equals the totals for full chassis. */
+      deploymentAcWatts: number;
+      deploymentFacilityWatts: number;
       pue: number;
       telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
-      topologyBasis: 'single-node-eight-gpu' | 'worker-hosts';
+      topologyBasis: 'single-node' | 'worker-hosts';
+      /**
+       * 'full': every chassis had all eight GPUs measured. 'extrapolated': at least
+       * one chassis was partially allocated; its model input is the measured per-GPU
+       * power × 8, assuming the unmeasured GPUs run the same workload. This is the
+       * source README sweep's own n_gpu × W/GPU input, not a proportional share of a
+       * chassis evaluated at partial load.
+       */
+      chassisBasis: 'full' | 'extrapolated';
     };
+
+interface MeasuredChassis {
+  role: string;
+  /** GPUs on this chassis covered by telemetry (1–8). */
+  measuredGpus: number;
+  /** Full-chassis GPU watts handed to the source model. */
+  modelInputWatts: number;
+}
+
+interface MeasuredWorker {
+  role: string;
+  gpus: number;
+  watts: number;
+}
+
+const sumGpus = (items: MeasuredWorker[]) => items.reduce((sum, c) => sum + c.gpus, 0);
+const sumWatts = (items: MeasuredWorker[]) => items.reduce((sum, c) => sum + c.watts, 0);
 
 const positive = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
 const count = (n: unknown): n is number => positive(n) && Number.isSafeInteger(n);
+const chassisShare = (n: unknown): n is number => count(n) && n <= CHASSIS_GPU_COUNT;
 
 // The schema-v2 producer rounds each watts field to 0.001 W. This bound
 // accounts for both the aggregate rounding and every multiplied mean.
@@ -48,7 +84,7 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
 }
 
 /**
- * Model the mean GPU telemetry on known, fully occupied eight-GPU chassis.
+ * Model the mean GPU telemetry on known eight-GPU chassis.
  * This is f(mean GPU power), not a time-integrated wall-power measurement.
  * Do not use display counts here: legacy ingest can encode TP * EP twice.
  */
@@ -94,12 +130,12 @@ export function modelSystemPower(
   ) {
     return unavailable('gpu-count');
   }
-  if (gpuCount % 8 !== 0) return unavailable('partial-chassis');
 
-  const chassis: { role: string; gpuWatts: number }[] = [];
-  let topologyBasis: 'single-node-eight-gpu' | 'worker-hosts';
+  const chassis: MeasuredChassis[] = [];
+  let topologyBasis: 'single-node' | 'worker-hosts';
   if (row.disagg === false && row.is_multinode === false) {
-    if (gpuCount !== 8) return unavailable('topology');
+    // One host cannot hold more than one chassis.
+    if (gpuCount > CHASSIS_GPU_COUNT) return unavailable('topology');
     // The producer's physical width is TP * PP * PCP; EP partitions that
     // width. Check the populated aggregate side, not summed role aliases.
     const tp = row.decode_tp > 0 ? row.decode_tp : row.prefill_tp;
@@ -121,21 +157,31 @@ export function modelSystemPower(
     if (!count(tp) || !count(pp) || !count(pcp) || tp * pp * pcp !== gpuCount) {
       return unavailable('gpu-count');
     }
-    topologyBasis = 'single-node-eight-gpu';
-    chassis.push({ role: 'aggregate', gpuWatts: m.avg_total_gpu_power_w });
+    topologyBasis = 'single-node';
+    chassis.push({
+      role: 'aggregate',
+      measuredGpus: gpuCount,
+      // A full chassis keeps the producer's exact total; a partial one is
+      // extrapolated from the per-GPU mean.
+      modelInputWatts:
+        gpuCount === CHASSIS_GPU_COUNT
+          ? m.avg_total_gpu_power_w
+          : m.avg_power_w * CHASSIS_GPU_COUNT,
+    });
   } else {
     // A role average across several hosts is insufficient for nonlinear
-    // fan/PSU evaluation. Require one whole chassis per measured worker and
-    // a distinct host for every worker. No proportional partial allocation.
+    // fan/PSU evaluation. Require one chassis per measured worker and a
+    // distinct host for every worker.
     if (!Array.isArray(row.workers) || row.workers.length === 0) {
       return unavailable('topology');
     }
     const hosts = new Set<string>();
+    const measured: MeasuredWorker[] = [];
     for (const worker of row.workers) {
       // CPU-only frontends are outside the modeled GPU-chassis boundary.
       if (worker.role === 'frontend' && worker.num_gpus === 0) continue;
       if (
-        worker.num_gpus !== 8 ||
+        !chassisShare(worker.num_gpus) ||
         !Array.isArray(worker.hosts) ||
         worker.hosts.length !== 1 ||
         typeof worker.hosts[0] !== 'string' ||
@@ -153,30 +199,28 @@ export function modelSystemPower(
         return unavailable('role-power');
       }
       hosts.add(worker.hosts[0]);
+      const role = row.disagg ? worker.role : 'aggregate';
+      measured.push({ role, gpus: worker.num_gpus, watts: worker.avg_power_w * worker.num_gpus });
       chassis.push({
-        role: row.disagg ? worker.role : 'aggregate',
-        gpuWatts: worker.avg_power_w * 8,
+        role,
+        measuredGpus: worker.num_gpus,
+        modelInputWatts: worker.avg_power_w * CHASSIS_GPU_COUNT,
       });
     }
-    if (chassis.length * 8 !== gpuCount) return unavailable('gpu-count');
-    const workerWatts = chassis.reduce((sum, c) => sum + c.gpuWatts, 0);
-    if (!matchingWatts(workerWatts, m.avg_total_gpu_power_w, gpuCount)) {
+    if (sumGpus(measured) !== gpuCount) return unavailable('gpu-count');
+    if (!matchingWatts(sumWatts(measured), m.avg_total_gpu_power_w, gpuCount)) {
       return unavailable('role-power');
     }
     if (row.disagg) {
       for (const role of ['prefill', 'decode'] as const) {
-        const roleChassis = chassis.filter((c) => c.role === role);
-        const roleCount = roleChassis.length * 8;
+        const roleWorkers = measured.filter((c) => c.role === role);
+        const roleCount = sumGpus(roleWorkers);
         const roleAverage = m[`${role}_avg_power_w`];
         if (
           roleCount === 0 ||
           row[`num_${role}_gpu`] !== roleCount ||
           !positive(roleAverage) ||
-          !matchingWatts(
-            roleChassis.reduce((sum, c) => sum + c.gpuWatts, 0),
-            roleAverage * roleCount,
-            roleCount * 2,
-          )
+          !matchingWatts(sumWatts(roleWorkers), roleAverage * roleCount, roleCount * 2)
         ) {
           return unavailable('role-power');
         }
@@ -187,12 +231,21 @@ export function modelSystemPower(
 
   const results = chassis.map((c) => ({
     ...c,
-    model: estimateChassisPower(hardware, c.gpuWatts, pue),
+    model: estimateChassisPower(hardware, c.modelInputWatts, pue),
   }));
   if (results.some((r) => r.model === null)) return unavailable('model-domain');
   const first = results[0].model!;
+  const modeledGpuCount = chassis.length * CHASSIS_GPU_COUNT;
+  const extrapolated = chassis.some((c) => c.measuredGpus !== CHASSIS_GPU_COUNT);
   const chassisAcWatts = results.reduce((sum, r) => sum + r.model!.chassisAcWatts, 0);
   const facilityWatts = results.reduce((sum, r) => sum + r.model!.facilityWatts, 0);
+  // Attribute each chassis to its measured GPUs at the modeled per-GPU rate.
+  const share = (watts: (r: (typeof results)[number]) => number) =>
+    results.reduce((sum, r) => sum + (watts(r) * r.measuredGpus) / CHASSIS_GPU_COUNT, 0);
+  const deploymentAcWatts = extrapolated ? share((r) => r.model!.chassisAcWatts) : chassisAcWatts;
+  const deploymentFacilityWatts = extrapolated
+    ? share((r) => r.model!.facilityWatts)
+    : facilityWatts;
   if (!positive(chassisAcWatts) || !positive(facilityWatts)) return unavailable('model-domain');
   return {
     status: 'supported',
@@ -201,12 +254,16 @@ export function modelSystemPower(
     modelPath: first.modelPath,
     gpuCount,
     chassisCount: chassis.length,
+    modeledGpuCount,
     measuredGpuWattsPerGpu: m.avg_power_w,
     chassisAcWatts,
-    chassisAcWattsPerGpu: chassisAcWatts / gpuCount,
+    chassisAcWattsPerGpu: chassisAcWatts / modeledGpuCount,
     facilityWatts,
+    deploymentAcWatts,
+    deploymentFacilityWatts,
     pue,
     telemetryBasis: unversionedSingleNode ? 'validated-unversioned-single-node' : 'validated-v2',
     topologyBasis,
+    chassisBasis: extrapolated ? 'extrapolated' : 'full',
   };
 }

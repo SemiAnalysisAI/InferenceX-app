@@ -63,7 +63,11 @@ describe('modeled system power admission and accounting', () => {
       chassisAcWatts: reference.chassisAcWatts,
       chassisAcWattsPerGpu: reference.chassisAcWatts / 8,
       facilityWatts: reference.facilityWatts,
-      topologyBasis: 'single-node-eight-gpu',
+      modeledGpuCount: 8,
+      deploymentAcWatts: reference.chassisAcWatts,
+      deploymentFacilityWatts: reference.facilityWatts,
+      topologyBasis: 'single-node',
+      chassisBasis: 'full',
     });
     expect(source.metrics.joules_per_output_token).toBe(12.937902);
   });
@@ -109,16 +113,97 @@ describe('modeled system power admission and accounting', () => {
     expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported', reason: 'telemetry' });
   });
 
-  it('rejects partial chassis, inconsistent telemetry and missing topology', () => {
-    const partial = row();
-    partial.metrics.avg_total_gpu_power_w = partial.metrics.avg_power_w * 4;
-    expect(modelSystemPower(partial)).toMatchObject({ reason: 'partial-chassis' });
+  it('rejects inconsistent telemetry, missing topology, and more than one chassis per host', () => {
     const inconsistent = row();
     inconsistent.metrics.avg_total_gpu_power_w = 2700;
     expect(modelSystemPower(inconsistent)).toMatchObject({ reason: 'gpu-count' });
     expect(modelSystemPower(row({ is_multinode: true }))).toMatchObject({ reason: 'topology' });
     expect(modelSystemPower(row({ decode_tp: 4 }))).toMatchObject({ reason: 'gpu-count' });
+    const twoHosts = row({ prefill_tp: 16, decode_tp: 16 });
+    twoHosts.metrics.avg_total_gpu_power_w = twoHosts.metrics.avg_power_w * 16;
+    expect(modelSystemPower(twoHosts)).toMatchObject({ reason: 'topology' });
     expect(modelSystemPower(row(), 0.9)).toMatchObject({ reason: 'model-domain' });
+  });
+
+  it('extrapolates a partially allocated single-node chassis at the measured per-GPU power', () => {
+    const partial = row({ prefill_tp: 4, decode_tp: 4, num_prefill_gpu: 4, num_decode_gpu: 4 });
+    partial.metrics.avg_total_gpu_power_w = 1399.436; // 4 × 349.859
+    const result = modelSystemPower(partial);
+    expect(result.status).toBe('supported');
+    if (result.status !== 'supported') throw new Error(result.reason);
+    // The source sweep's input for the whole chassis: n_gpu × W/GPU.
+    const reference = estimateChassisPower('b200', 349.859 * 8)!;
+    expect(result).toMatchObject({
+      gpuCount: 4,
+      chassisCount: 1,
+      modeledGpuCount: 8,
+      measuredGpuWattsPerGpu: 349.859,
+      chassisAcWatts: reference.chassisAcWatts,
+      chassisAcWattsPerGpu: reference.chassisAcWatts / 8,
+      facilityWatts: reference.facilityWatts,
+      deploymentAcWatts: reference.chassisAcWatts / 2,
+      deploymentFacilityWatts: reference.facilityWatts / 2,
+      topologyBasis: 'single-node',
+      chassisBasis: 'extrapolated',
+    });
+    // The same per-GPU telemetry on a full chassis plots the same per-GPU value.
+    const full = row();
+    full.metrics.avg_total_gpu_power_w = 349.859 * 8;
+    const fullResult = modelSystemPower(full);
+    expect(fullResult).toMatchObject({
+      chassisBasis: 'full',
+      deploymentAcWatts: reference.chassisAcWatts,
+    });
+    expect(fullResult.status === 'supported' && fullResult.chassisAcWattsPerGpu).toBe(
+      result.chassisAcWattsPerGpu,
+    );
+    // Four measured GPUs cannot establish a TP8 width.
+    partial.prefill_tp = 8;
+    partial.decode_tp = 8;
+    expect(modelSystemPower(partial)).toMatchObject({ reason: 'gpu-count' });
+  });
+
+  it('extrapolates partially allocated worker chassis and attributes only their measured share', () => {
+    const source = row({
+      disagg: true,
+      is_multinode: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 8,
+      workers: [
+        { role: 'prefill', worker_idx: 0, num_gpus: 4, hosts: ['prefill-node'], avg_power_w: 300 },
+        { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['decode-node'], avg_power_w: 700 },
+      ],
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: (300 * 4 + 700 * 8) / 12,
+        avg_total_gpu_power_w: 300 * 4 + 700 * 8,
+        prefill_avg_power_w: 300,
+        decode_avg_power_w: 700,
+      },
+    });
+    const prefill = estimateChassisPower('b200', 2400)!;
+    const decode = estimateChassisPower('b200', 5600)!;
+    expect(modelSystemPower(source)).toMatchObject({
+      status: 'supported',
+      gpuCount: 12,
+      chassisCount: 2,
+      modeledGpuCount: 16,
+      chassisAcWatts: prefill.chassisAcWatts + decode.chassisAcWatts,
+      chassisAcWattsPerGpu: (prefill.chassisAcWatts + decode.chassisAcWatts) / 16,
+      deploymentAcWatts: prefill.chassisAcWatts / 2 + decode.chassisAcWatts,
+      deploymentFacilityWatts: prefill.facilityWatts / 2 + decode.facilityWatts,
+      topologyBasis: 'worker-hosts',
+      chassisBasis: 'extrapolated',
+    });
+    // A worker cannot span hosts or occupy nothing; only 1–8 GPUs fit one chassis.
+    for (const num_gpus of [0, 9, 16, 0.5, undefined]) {
+      Object.assign(source.workers![0], { num_gpus });
+      expect(modelSystemPower(source)).toMatchObject({ reason: 'topology' });
+    }
+    source.workers![0].num_gpus = 4;
+    source.num_prefill_gpu = 8;
+    expect(modelSystemPower(source)).toMatchObject({ reason: 'role-power' });
   });
 
   it('preserves meaningful aggregate PP and PCP aliases before checking physical width', () => {

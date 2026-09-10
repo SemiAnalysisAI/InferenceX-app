@@ -353,12 +353,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredAvgPower: measuredPower('run'),
   modeledChassisPowerPerGpu: {
     description: {
-      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the deployment GPU count. Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Only fully occupied eight-GPU chassis with supported hardware and known topology are included. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
-      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以部署的 GPU 总数。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。仅纳入硬件受支持、拓扑已知且八张 GPU 全部使用的机箱。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
+      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the deployment GPU count. Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Supported hardware with known eight-GPU chassis placement is included; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power, matching the source sweep. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
+      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以部署的 GPU 总数。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。纳入硬件受支持、八卡机箱位置已知的运行；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱，与模型源码的扫描口径一致。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
     },
     formula: {
-      en: 'W/GPU = sum of modeled chassis AC power (W) ÷ deployment GPU count; facility W = chassis AC W × PUE',
-      zh: 'W/GPU = 各机箱交流功耗估算之和（W）÷ 部署的 GPU 总数；数据中心 W = 机箱交流 W × PUE',
+      en: 'W/GPU = sum of modeled chassis AC power (W) ÷ modeled chassis GPU count (8 per chassis); facility W = chassis AC W × PUE',
+      zh: 'W/GPU = 各机箱交流功耗估算之和（W）÷ 建模机箱的 GPU 总数（每机箱 8 张）；数据中心 W = 机箱交流 W × PUE',
     },
   },
   measuredPrefillAvgPower: measuredPower('prefill'),

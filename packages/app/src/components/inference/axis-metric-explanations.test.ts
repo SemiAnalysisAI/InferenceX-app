@@ -41,7 +41,9 @@ describe('METRIC_EXPLANATIONS completeness', () => {
   it('limits system power to GPU chassis while retaining their CPU and DRAM assumptions', () => {
     const { description } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
     expect(description.en).toContain('CPU and DRAM utilization set to 20%');
-    expect(description.en).toContain('Only fully occupied eight-GPU chassis');
+    expect(description.en).toContain(
+      'extrapolated to a full chassis at the measured per-GPU power',
+    );
     expect(description.en).toContain('Separate CPU-only frontend/router hosts are excluded.');
     expect(description.zh).toContain('CPU 与 DRAM 利用率均设为 20%');
     expect(description.zh).toContain('不计入独立的纯 CPU 前端或路由主机。');

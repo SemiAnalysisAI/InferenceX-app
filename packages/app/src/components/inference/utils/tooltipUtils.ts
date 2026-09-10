@@ -219,8 +219,13 @@ const SYSTEM_POWER_STRINGS = {
     assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
     platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
     sweep: 'Fixed README inference sweep',
-    topology: (chassis: number, gpus: number) => `${chassis} full eight-GPU chassis · ${gpus} GPUs`,
-    normalization: 'AC power is divided by all deployment GPUs, including prefill and decode.',
+    topology: (chassis: number, measured: number, modeled: number) =>
+      measured === modeled
+        ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
+        : `${chassis} eight-GPU chassis · ${measured} of ${modeled} GPUs measured, extrapolated to full chassis`,
+    extrapolation:
+      'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
+    normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
     boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
@@ -229,8 +234,7 @@ const SYSTEM_POWER_STRINGS = {
       hardware: 'No matching chassis model is available for this hardware.',
       telemetry: 'Validated measured GPU power is required.',
       'gpu-count': 'A valid deployment GPU count is required.',
-      'partial-chassis': 'A partial GPU allocation cannot be assigned proportional chassis power.',
-      topology: 'The available topology does not establish full chassis occupancy.',
+      topology: 'The available topology does not establish chassis placement.',
       'role-power': 'Valid measured power and topology are required for every GPU worker role.',
       'model-domain': 'The measured input is outside the source model’s supported range.',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
@@ -244,8 +248,13 @@ const SYSTEM_POWER_STRINGS = {
     assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
     platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
     sweep: 'README 中的固定推理参数扫描',
-    topology: (chassis: number, gpus: number) => `${chassis} 个完整八卡机箱 · ${gpus} 张 GPU`,
-    normalization: '交流功耗按整个部署的 GPU 总数分摊，包括 Prefill 与 Decode。',
+    topology: (chassis: number, measured: number, modeled: number) =>
+      measured === modeled
+        ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
+        : `${chassis} 个八卡机箱 · 实测 ${measured}/${modeled} 张 GPU，按满机箱外推`,
+    extrapolation:
+      '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
+    normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
     boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
@@ -254,8 +263,7 @@ const SYSTEM_POWER_STRINGS = {
       hardware: '该硬件没有匹配的机箱功耗模型。',
       telemetry: '需要通过验证的 GPU 实测功耗。',
       'gpu-count': '需要有效的部署 GPU 数量。',
-      'partial-chassis': '仅使用部分 GPU 时，不能按比例分摊机箱功耗。',
-      topology: '现有拓扑信息无法确认机箱内的 GPU 是否全部使用。',
+      topology: '现有拓扑信息无法确认 GPU 所在的机箱。',
       'role-power': '每个 GPU worker 角色都需要有效的实测功耗和拓扑信息。',
       'model-domain': '实测输入超出功耗模型的支持范围。',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
@@ -290,9 +298,9 @@ const modeledSystemPowerHTML = (
     ${
       isPinned
         ? `
-      ${tooltipLine(t.deploymentAc, `${fmt(estimate.chassisAcWatts)} W`)}
-      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.facilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount)}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
+      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
+      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
       <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
     `

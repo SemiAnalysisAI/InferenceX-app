@@ -80,7 +80,11 @@ const systemPower = {
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
+  modeledGpuCount: 16,
+  deploymentAcWatts: 12000,
+  deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
+  chassisBasis: 'full',
   telemetryBasis: 'validated-v2',
 } satisfies SystemPowerEstimate;
 
@@ -107,6 +111,38 @@ describe('modeled system-power tooltip', () => {
     );
     expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
     expect(html).not.toContain('12,000 W/GPU');
+    expect(html).not.toContain('Unmeasured chassis GPUs');
+  });
+
+  it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
+    const html = generateTooltipContent(
+      config({
+        data: pt({
+          physicalChips: 4,
+          modeledSystemPower: {
+            ...systemPower,
+            gpuCount: 4,
+            chassisCount: 1,
+            modeledGpuCount: 8,
+            chassisAcWatts: 6000,
+            facilityWatts: 7200,
+            deploymentAcWatts: 3000,
+            deploymentFacilityWatts: 3600,
+            topologyBasis: 'single-node',
+            chassisBasis: 'extrapolated',
+          },
+        }),
+      }),
+    );
+    expect(html).toContain(
+      '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
+    );
+    expect(html).toContain('Unmeasured chassis GPUs are assumed to run the same workload');
+    expect(html).toContain('3000 W');
+    expect(html).toContain('3600 W');
+    expect(html).not.toContain('6000 W');
+    expect(html).not.toContain('7200 W');
+    expect(html).toContain('<strong>Total Chips:</strong> 4');
   });
 
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
@@ -168,7 +204,7 @@ describe('modeled system-power tooltip', () => {
       const html = generateTooltipContent(config({ locale }));
       const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
       expect(match?.groups?.normalization).toContain(
-        locale === 'en' ? 'all deployment GPUs' : 'GPU 总数',
+        locale === 'en' ? 'all modeled chassis GPUs' : '建模机箱的 GPU 总数',
       );
       expect(match?.groups?.boundary).toContain(
         locale === 'en' ? 'frontend/router hosts' : '前端或路由主机',
@@ -185,7 +221,10 @@ describe('modeled system-power tooltip', () => {
         ...systemPower,
         gpuCount: 8,
         chassisCount: 1,
-        topologyBasis: 'single-node-eight-gpu',
+        modeledGpuCount: 8,
+        chassisAcWatts: 6000,
+        deploymentAcWatts: 6000,
+        topologyBasis: 'single-node',
         telemetryBasis: 'validated-unversioned-single-node',
       },
     });
