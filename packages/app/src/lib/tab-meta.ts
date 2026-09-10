@@ -135,7 +135,7 @@ export const MODEL_TAB_META: Record<
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} Inference Profit Estimator per GigaWatt`,
     description: (seoName) =>
-      `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.`,
+      `Estimate what one gigawatt-year of ${seoName} inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.`,
   },
 };
 

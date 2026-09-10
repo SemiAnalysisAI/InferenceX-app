@@ -33,6 +33,8 @@
 
 import {
   interceptProfitData,
+  profitAvailabilityRows,
+  profitBenchmarkRows,
   PROFIT_CHANGELOG_NOTES,
   PROFIT_DATE,
   PROFIT_HISTORY_DATE,
@@ -1123,4 +1125,122 @@ describe('Profit Estimator — responsive control panels', () => {
       });
     }
   }
+});
+
+describe('Fixed 8k/1k power planning', () => {
+  beforeEach(() => {
+    stubOpenRouter();
+    // Reuse the numerical B200 model fixture with a synthetic fixed token mix.
+    const source = profitBenchmarkRows('qwen3.5').find((row) => row.hardware === 'b200')!;
+    const fixed = {
+      ...source,
+      id: 441192,
+      precision: 'fp8',
+      benchmark_type: 'single_turn',
+      isl: 8192,
+      osl: 1024,
+      prefill_ep: 1,
+      decode_ep: 1,
+      offload_mode: 'off',
+      metrics: {
+        tput_per_gpu: 1000,
+        median_intvty: 100,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 349.859,
+        avg_total_gpu_power_w: 2798.868,
+        pp: 1,
+        pcp_size: 1,
+      },
+    };
+    cy.intercept('GET', '/api/v1/availability*', {
+      body: [...profitAvailabilityRows(), fixed],
+    });
+    cy.intercept('GET', '/api/v1/benchmarks?*', (req) => {
+      if (String(req.query.model).includes('Qwen')) req.reply({ body: [fixed] });
+    });
+    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
+      data: [
+        ...OPENROUTER_MODELS.data,
+        { id: 'qwen/qwen3.5-397b-a17b', pricing: { prompt: '0.000001', completion: '0.000001' } },
+      ],
+    });
+  });
+
+  it('prices the exact fixed point, exports modeled capacity, and switches back to AgentX', () => {
+    cy.visit('/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=100', {
+      onBeforeLoad: suppressNudges,
+    });
+    cy.get('#profit-scenario')
+      .invoke('text')
+      .should('match', /8K\s*\/\s*1K/u);
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-caption"]').should('contain.text', 'Median 100');
+    cy.get('[data-testid="profit-history-panel"]').should('not.exist');
+    cy.get('[data-testid="profit-fixed-workload-note"]').should(
+      'contain.text',
+      'synthetic workload',
+    );
+    cy.get('a[download="InferenceX_power_planning.json"]')
+      .invoke('attr', 'href')
+      .then((href) => {
+        const payload = JSON.parse(decodeURIComponent(href!.split(',').slice(1).join(',')));
+        expect(payload.settings.sequence).to.equal('8k/1k');
+        expect(payload.settings.interactivity).to.equal(100);
+        const comparison = payload.comparisons.find(
+          (entry: { baseline: { hwKey: string } }) => entry.baseline.hwKey === 'b200_sglang',
+        );
+        expect(comparison, 'exact B200 comparison').to.not.equal(undefined);
+        expect(comparison.status, comparison.reason).to.equal('supported');
+        expect(comparison.capacity.facilityWattsPerDeployment).to.equal(6288.4);
+        expect(comparison.capacity.planningWattsPerDeployment).to.be.closeTo(6917.24, 1e-8);
+        expect(comparison.capacity.modeledDeployments).to.equal(Math.floor(1e9 / 6917.24));
+        expect(comparison.measured.revenue).to.be.greaterThan(0);
+      });
+    cy.get('#profit-scenario').click();
+    cy.get('[data-value="agentic-traces"]').click();
+    cy.get('#profit-model').should('contain.text', 'Kimi K3');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-history-panel"]').should('exist');
+    cy.get('[data-testid="profit-fixed-workload-note"]').should('not.exist');
+  });
+
+  for (const path of [
+    '/profit-estimator-per-gigawatt',
+    '/profit-estimator-per-gigawatt/kimi-k3',
+    '/profit-estimator-per-gigawatt?g_model=DeepSeek-V4-Pro',
+  ]) {
+    it(`preserves the shared fixed target when ${path} needs the Qwen model`, () => {
+      const separator = path.includes('?') ? '&' : '?';
+      cy.visit(`${path}${separator}i_seq=8k%2F1k&c_profit_target=100`, {
+        onBeforeLoad: suppressNudges,
+      });
+      cy.get('#profit-model').should('contain.text', 'Qwen3.5');
+      cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+      cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+      cy.location('pathname').should('equal', '/profit-estimator-per-gigawatt/qwen-3-5');
+      cy.location('search').should('contain', 'c_profit_target=100');
+      cy.get('a[download="InferenceX_power_planning.json"]')
+        .invoke('attr', 'href')
+        .then((href) => {
+          const payload = JSON.parse(decodeURIComponent(href!.split(',').slice(1).join(',')));
+          expect(payload.settings.interactivity).to.equal(100);
+          expect(
+            payload.comparisons.some((entry: { status: string }) => entry.status === 'supported'),
+          ).to.equal(true);
+        });
+    });
+  }
+
+  it('preserves the fixed scenario on the Chinese route', () => {
+    cy.visit('/zh/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=100', {
+      onBeforeLoad: suppressNudges,
+    });
+    cy.get('#profit-scenario')
+      .invoke('text')
+      .should('match', /8K\s*\/\s*1K/u);
+    cy.get('[data-testid="profit-caption"]').should('contain.text', '中位数');
+    cy.get('[data-testid="profit-fixed-workload-note"]').should('contain.text', '合成工作负载');
+    cy.get('[data-testid="power-planning-comparison"]').should('contain.text', '年收入');
+  });
 });

@@ -4,6 +4,15 @@ import { resolveCalculatorUrlSeed } from './url-seed';
 import { Model, Percentile, Precision, Sequence } from '@/lib/data-mappings';
 
 describe('resolveCalculatorUrlSeed', () => {
+  it('preserves an exact profit target and rejects invalid targets', () => {
+    expect(resolveCalculatorUrlSeed({ c_profit_target: '32.123353678124' })).toEqual({
+      profitTarget: 32.123353678124,
+    });
+    for (const value of ['0', '-1', '', 'NaN', 'Infinity', '100bad']) {
+      expect(resolveCalculatorUrlSeed({ c_profit_target: value })).toEqual({});
+    }
+  });
+
   it('returns the model when g_model is a known enum value', () => {
     expect(resolveCalculatorUrlSeed({ g_model: 'DeepSeek-V4-Pro' })).toEqual({
       model: Model.DeepSeek_V4_Pro,

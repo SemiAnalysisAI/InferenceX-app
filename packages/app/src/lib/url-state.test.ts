@@ -541,6 +541,17 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
+  it('shares an exact fixed-workload profit point with its model and scenario', async () => {
+    setupWindow('', '/profit-estimator-per-gigawatt/qwen-3-5');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    writeUrlParams({ i_seq: '8k/1k', c_profit_target: '222.68672965491135' });
+    await vi.advanceTimersByTimeAsync(200);
+    const url = new URL(buildShareUrl());
+    expect(url.pathname).toBe('/profit-estimator-per-gigawatt/qwen-3-5');
+    expect(url.searchParams.get('i_seq')).toBe('8k/1k');
+    expect(url.searchParams.get('c_profit_target')).toBe('222.68672965491135');
+  });
+
   it('defaults to inference tab prefixes when on root path', async () => {
     setupWindow('', '/');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
