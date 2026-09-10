@@ -1,10 +1,3 @@
-const selectCustomCostMetric = () => {
-  cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-  cy.get('[data-slot="select-item"]')
-    .contains('Cost per Million Total Tokens (Custom User Values)')
-    .click({ force: true });
-};
-
 const selectCustomPowerMetric = () => {
   cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
   cy.get('[data-slot="select-item"]')
@@ -22,52 +15,57 @@ describe('Custom User Values', () => {
   });
 
   describe('Custom Chip Costs', () => {
-    it('renders the custom costs input section when custom cost metric is selected', () => {
-      selectCustomCostMetric();
-      cy.get('[data-testid="custom-costs-section"]').scrollIntoView().should('be.visible');
-      cy.get('[data-testid="custom-costs-section"]').should('contain.text', 'Custom Chip Costs');
+    // The custom tier has no y-axis entry of its own: it is picked from the
+    // caption's Cost Tier selector, so the dropdown lists one option per
+    // cost metric family and the "Custom User Values" group only holds power.
+    it('does not list custom cost metrics on the y-axis selector', () => {
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
+      cy.get('[data-slot="select-item"]').should('have.length.greaterThan', 0);
+      cy.get('[data-slot="select-item"]')
+        .contains('Cost per Million Total Tokens (Custom User Values)')
+        .should('not.exist');
+      cy.get('[data-slot="select-item"]')
+        .contains('Total Tokens per $1 TCO (Custom User Values)')
+        .should('not.exist');
+      cy.get('[data-slot="select-item"]')
+        .contains('Token Throughput per All in Utility MW (Custom User Values)')
+        .should('exist');
+      cy.get('body').type('{esc}');
     });
 
-    it('shows input fields pre-filled with default cost values', () => {
-      // Custom cost metric still selected from previous test
-      cy.get('[data-testid="custom-costs-section"] input[id^="cost-input-"]')
+    it('opens the custom tier from the caption selector with badges seeded from the tier', () => {
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-custom"]').click();
+      cy.get('[data-testid="cost-tier-selector"]')
+        .first()
+        .should('contain.text', 'Custom User Values');
+      // There is no separate Custom Chip Costs card; the caption badges are the inputs.
+      cy.get('[data-testid="custom-costs-section"]').should('not.exist');
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
         .first()
         .should(($input) => {
           const val = parseFloat($input.val() as string);
           expect(val).to.be.greaterThan(0);
         });
-    });
-
-    // Regression test for stale closure bug: Calculate button must use the newly typed
-    // values, not the original defaults captured when the callback was first created.
-    it('Calculate button applies the newly entered cost values (regression: stale closure)', () => {
-      // Apply defaults first — userCosts starts null so chart has no data until Calculate is clicked
-      cy.get('[data-testid="custom-costs-calculate"]').click();
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')
         .should('have.length.greaterThan', 0);
+    });
 
-      // Capture the D3 bound y value of the first scatter point
+    it('re-prices the chart as a badge is edited', () => {
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')
         .first()
         .should(($el) => {
-          // Ensure D3 data is bound
           expect(($el[0] as any).__data__).to.not.equal(undefined);
         })
         .then(($el) => {
           const initialY = ($el[0] as any).__data__.y;
-
-          // Set ALL GPU costs to a very high value to force chart rescaling
-          cy.get('[data-testid="custom-costs-section"] input[id^="cost-input-"]').each(($input) => {
+          cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]').each(($input) => {
             cy.wrap($input).clear().type('9999');
           });
-
-          cy.get('[data-testid="custom-costs-calculate"]').click();
-
-          // All points should have different y values since all costs changed
           cy.get('[data-testid="scatter-graph"]')
             .first()
             .find('svg .dot-group')
@@ -79,19 +77,45 @@ describe('Custom User Values', () => {
         });
     });
 
-    it('Reset button restores default values', () => {
-      cy.get('[data-testid="custom-costs-section"] input[id^="cost-input-"]')
+    it('re-opening the custom tier quotes the reseeded prices, not the earlier typing', () => {
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-custom"]').click();
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
         .first()
-        .invoke('val')
-        .then((defaultVal) => {
-          cy.get(
-            '[data-testid="custom-costs-section"] button[aria-label="Reset to defaults"]',
-          ).click();
-
-          cy.get('[data-testid="custom-costs-section"] input[id^="cost-input-"]')
-            .first()
-            .should('have.value', defaultVal);
+        .clear()
+        .type('9');
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .should('have.value', '9');
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-hyperscaler"]').click();
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-custom"]').click();
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .should(($input) => {
+          const val = parseFloat($input.val() as string);
+          expect(val).to.be.greaterThan(0);
+          expect(val).to.not.equal(9);
         });
+    });
+
+    it('editing a badge on a published tier switches to the custom tier', () => {
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-hyperscaler"]').click();
+      cy.get('[data-testid="cost-tier-selector"]')
+        .first()
+        .should('contain.text', 'Owning at Large Hyperscaler Volume');
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .clear()
+        .type('7');
+      cy.get('[data-testid="cost-tier-selector"]')
+        .first()
+        .should('contain.text', 'Custom User Values');
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .should('have.value', '7');
     });
   });
 

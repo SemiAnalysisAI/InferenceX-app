@@ -481,6 +481,15 @@ export function costTierLabel(tier: CostTier, locale: 'en' | 'zh'): string {
   return locale === 'zh' ? COST_TIER_LABELS[tier].labelZh : COST_TIER_LABELS[tier].label;
 }
 
+/**
+ * The copy the caption's Cost Tier selector uses for `tier`, both in its
+ * option list and on its trigger. The caption's export twin prints the same
+ * string so a PNG export matches the control on screen.
+ */
+export function costTierOptionLabel(tier: CostTier, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option;
+}
+
 /** Chart-heading title: the metric without its cost tier. */
 export function metricChartTitle(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   const metric: MetricDefinition = METRIC_REGISTRY[metricKey];

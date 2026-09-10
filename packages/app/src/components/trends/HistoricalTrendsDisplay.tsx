@@ -14,6 +14,7 @@ import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
+import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -50,7 +51,7 @@ import {
 } from '@/components/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
 import {
-  costTierLabel,
+  costTierOptionLabel,
   metricCostTier,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -442,8 +443,12 @@ export default function HistoricalTrendsDisplay() {
                         const tier = metricCostTier(
                           selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                         );
-                        return tier ? costTierLabel(tier, locale) : undefined;
+                        // Same copy as the selector so a PNG export matches it.
+                        return tier ? costTierOptionLabel(tier, locale) : undefined;
                       })()}
+                      // The trend chart prices every point from the published
+                      // tiers, so Custom User Values is not offered here.
+                      costTierControl={<CostTierSelector allowCustom={false} />}
                       target={`${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined

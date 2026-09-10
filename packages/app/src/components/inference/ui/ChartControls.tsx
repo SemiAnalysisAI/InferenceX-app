@@ -38,11 +38,9 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
-  COST_TIER_LABELS,
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
   costMetricFamily,
-  costTiersForFamily,
   isMetricKey,
   metricChartTitle,
   metricCostTier,
@@ -52,12 +50,6 @@ import {
   type CostTier,
   type MetricKey,
 } from '@/components/inference/metric-registry';
-import { lockedTierLabel, lockedTierValue } from '@/components/ui/locked-rent-tiers';
-import {
-  LOCKED_RENT_TIERS,
-  LockedTierBadge,
-  useLockedTierDialog,
-} from '@/components/ui/tco-model-dialog';
 import {
   cachedInputPricePerMillion,
   formatTokenPrice,
@@ -82,9 +74,6 @@ const STRINGS = {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
       "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
-    costTier: 'Cost Tier',
-    costTierTooltip:
-      'The $/chip/hr pricing basis behind cost and tokens-per-dollar metrics. InferenceX publishes Owning at Large Hyperscaler Volume and Rent - 3 Year Commit; the shorter rental terms are priced in the SemiAnalysis AI Cloud TCO Model.',
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -127,9 +116,6 @@ const STRINGS = {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
       '图表 Y 轴显示的性能指标，包括吞吐量、每 GPU 小时 token 收入、每百万 token 成本、每 1 美元 TCO 对应的 token 数以及自定义值。',
-    costTier: '成本层级',
-    costTierTooltip:
-      '成本类和每美元 token 数指标所依据的 $/芯片/小时 价格口径。InferenceX 公开自有（超大规模云大批量）与租赁 - 3 年承诺两档；更短租期的价格收录在 SemiAnalysis AI Cloud TCO 模型中。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -167,8 +153,9 @@ const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
 // Full option titles carry the cost tier ("… (Owning at Large Hyperscaler
 // Volume)"). The y-axis selector collapses the published tiers of a metric
-// into one option and hands the tier to the Cost Tier selector, so these maps
-// serve analytics labels and the Custom User Values entries.
+// into one option and hands the tier to the Cost Tier selector in the chart
+// caption, so these maps serve analytics labels and the Custom User Values
+// entries.
 const METRIC_TITLE_MAP = new Map(
   (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
     `y_${key}`,
@@ -258,88 +245,58 @@ export default function ChartControls({
       ),
     [visibleGroups],
   );
-  // Locked rental tiers open the TCO model dialog instead of changing the axis.
-  const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
-    useLockedTierDialog('yaxis_cost_tier');
-
   const selectedMetricKey = selectedYAxisMetric.replace(/^y_/u, '');
-  const selectedFamily: CostMetricFamilyId | undefined = isMetricKey(selectedMetricKey)
-    ? costMetricFamily(selectedMetricKey)
-    : undefined;
   const selectedTier: CostTier | undefined = isMetricKey(selectedMetricKey)
     ? metricCostTier(selectedMetricKey)
     : undefined;
-  // Switching metric keeps the published tier the reader is on. Custom values
-  // keep their own y-axis entries, so from there other metrics open on the
-  // dashboard default tier.
-  const carriedTier: CostTier =
-    selectedTier && selectedTier !== 'custom' ? selectedTier : 'hyperscaler';
+  // Switching metric keeps the tier the reader is on, including Custom User
+  // Values: the tier is picked in the chart caption, not here.
+  const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
 
-  const groupedYAxisOptions = useMemo(
-    () =>
-      visibleGroups
-        .map((group) => {
-          const seenFamilies = new Set<CostMetricFamilyId>();
-          const options = group.metrics.flatMap((m) => {
-            if (!METRIC_TITLE_MAP.has(m)) return [];
-            const key = m.replace(/^y_/u, '') as MetricKey;
-            const family = costMetricFamily(key);
-            if (family && metricCostTier(key) !== 'custom') {
-              // Published tiers collapse into one option per metric family.
-              // The option tracks the tier in force so the selection
-              // highlight follows the metric; the Cost Tier selector
-              // beside this one changes the pricing basis.
-              if (seenFamilies.has(family)) return [];
-              seenFamilies.add(family);
-              const tieredKey = metricForCostTier(family, carriedTier) ?? key;
-              return [
-                {
-                  value: `y_${tieredKey}`,
-                  help: <MetricExplanation metricKey={tieredKey} />,
-                  label: metricChartTitle(key, locale),
-                },
-              ];
-            }
+  const groupedYAxisOptions = useMemo(() => {
+    // Shared across groups so a family listed under Custom User Values does
+    // not reappear after its published entry.
+    const seenFamilies = new Set<CostMetricFamilyId>();
+    return visibleGroups
+      .map((group) => {
+        const options = group.metrics.flatMap((m) => {
+          if (!METRIC_TITLE_MAP.has(m)) return [];
+          const key = m.replace(/^y_/u, '') as MetricKey;
+          const family = costMetricFamily(key);
+          if (family) {
+            // Every pricing basis of a metric, published or custom,
+            // collapses into one option per metric family. The option
+            // tracks the tier in force so the selection highlight follows
+            // the metric; the Cost Tier selector in the chart caption
+            // changes the pricing basis.
+            if (seenFamilies.has(family)) return [];
+            seenFamilies.add(family);
+            const tieredKey = metricForCostTier(family, carriedTier) ?? key;
             return [
               {
-                value: m,
-                help: <MetricExplanation metricKey={key} />,
-                label:
-                  (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
-                  METRIC_TITLE_MAP.get(m)!,
+                value: `y_${tieredKey}`,
+                help: <MetricExplanation metricKey={tieredKey} />,
+                label: metricChartTitle(key, locale),
               },
             ];
-          });
-          return {
-            groupLabel: locale === 'zh' ? group.labelZh : group.label,
-            options,
-          };
-        })
-        .filter((g) => g.options.length > 0),
-    [visibleGroups, locale, carriedTier],
-  );
-
-  // Cost Tier options for the selected metric family: the published tiers
-  // first, in registry order, then the shorter rental terms locked behind the
-  // TCO model dialog.
-  const costTierOptions = useMemo(() => {
-    if (!selectedFamily) return [];
-    const published = costTiersForFamily(selectedFamily).map((tier) => ({
-      value: `y_${metricForCostTier(selectedFamily, tier)!}`,
-      label: locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option,
-      testId: `cost-tier-${tier}`,
-    }));
-    const rentalMetric = metricForCostTier(selectedFamily, 'rental');
-    const locked = rentalMetric
-      ? LOCKED_RENT_TIERS.map((tier) => ({
-          value: lockedTierValue(tier.id, rentalMetric),
-          label: lockedTierLabel(tier, locale),
-          badge: <LockedTierBadge className="mt-0.5" />,
-          testId: `cost-tier-locked-${tier.id}`,
-        }))
-      : [];
-    return [...published, ...locked];
-  }, [selectedFamily, locale]);
+          }
+          return [
+            {
+              value: m,
+              help: <MetricExplanation metricKey={key} />,
+              label:
+                (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
+                METRIC_TITLE_MAP.get(m)!,
+            },
+          ];
+        });
+        return {
+          groupLabel: locale === 'zh' ? group.labelZh : group.label,
+          options,
+        };
+      })
+      .filter((g) => g.options.length > 0);
+  }, [visibleGroups, locale, carriedTier]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -389,26 +346,11 @@ export default function ChartControls({
   };
 
   const handleYAxisMetricChange = (value: string) => {
-    if (interceptLockedTier(value)) return;
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
       metric: value,
       metric_label: METRIC_TITLE_MAP.get(value) ?? value,
       metric_group: metricGroupMap.get(value) ?? 'Unknown',
-    });
-    setTimeout(trackCombinedFilters, 0);
-  };
-
-  const costTierVisible = mounted && selectedFamily !== undefined;
-
-  const handleCostTierChange = (value: string) => {
-    if (interceptLockedTier(value)) return;
-    setSelectedYAxisMetric(value);
-    const tierKey = value.replace(/^y_/u, '');
-    track('inference_cost_tier_selected', {
-      metric: value,
-      cost_tier: (isMetricKey(tierKey) ? metricCostTier(tierKey) : undefined) ?? 'unknown',
-      metric_label: METRIC_TITLE_MAP.get(value) ?? value,
     });
     setTimeout(trackCombinedFilters, 0);
   };
@@ -563,34 +505,6 @@ export default function ChartControls({
                 <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
                   <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
                   <TcoBasisToggle source={tcoSource} className="md:h-9" />
-                </div>
-              )}
-
-              {/* Cost Tier swaps the selected metric between its pricing
-                bases. It sits under the y-axis selector, in its column, so it
-                reads as part of the metric choice. It only appears for tiered
-                metrics, so it waits for mount like the Token Price Source
-                block: the selected metric resolves client-side from the URL
-                and persisted state. */}
-              {costTierVisible && (
-                <div
-                  className={`flex min-w-0 max-w-sm flex-col space-y-1.5 ${showXAxisMode ? 'sm:col-start-2' : 'sm:col-span-2'}`}
-                >
-                  <LabelWithTooltip
-                    htmlFor="cost-tier-select"
-                    label={t.costTier}
-                    tooltip={t.costTierTooltip}
-                  />
-                  <SearchableSelect
-                    triggerId="cost-tier-select"
-                    triggerTestId="cost-tier-selector"
-                    value={selectedYAxisMetric}
-                    onValueChange={handleCostTierChange}
-                    placeholder={t.costTier}
-                    searchable={false}
-                    trackPrefix="cost_tier"
-                    groups={[{ label: '', options: costTierOptions }]}
-                  />
                 </div>
               )}
 
@@ -760,7 +674,6 @@ export default function ChartControls({
           )}
         </MobileControlSection>
       </div>
-      {tcoModelDialog}
     </TooltipProvider>
   );
 }
