@@ -47,8 +47,16 @@ describe('ChartShareActions', () => {
 });
 
 // Stand-in for the /inference editable badge row.
-const renderCostBadges = ({ label, values }: { label: string; values: Record<string, number> }) => (
-  <div data-testid="editable">
+const renderCostBadges = ({
+  label,
+  values,
+  blankedBases,
+}: {
+  label: string;
+  values: Record<string, number>;
+  blankedBases?: string[];
+}) => (
+  <div data-testid="editable" data-blanked={(blankedBases ?? []).join(',')}>
     {label} {Object.keys(values).join(',')}
   </div>
 );
@@ -267,12 +275,18 @@ describe('MetricAssumptionNotes', () => {
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
         activeHwKeys={['gb300_x']}
-        userCosts={{ gb300: undefined, mi355x: 0.75, b200: 1.5 }}
+        userCosts={{ gb300: undefined, mi355x: 0.75, b200: undefined }}
         renderCostBadges={renderCostBadges}
       />,
     );
     expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
       'TCO $/chip/hr:',
+    );
+    // Every blanked chip is named so the renderer can keep its badge. A
+    // blanked chip has no point and so leaves the active selection, which is
+    // why the list is not narrowed to `activeHwKeys`.
+    expect(container.querySelector<HTMLElement>('[data-testid="editable"]')?.dataset.blanked).toBe(
+      'gb300,b200',
     );
 
     // Nothing entered yet: show the seed the custom costs will start from.

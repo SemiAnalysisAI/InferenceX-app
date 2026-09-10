@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -47,16 +47,24 @@ export function parseInferenceCustomCost(raw: string): number | undefined {
  *
  * `values` are the $/chip/hr for the bases the caption should show, already
  * narrowed to the active selection: the published price on a published tier,
- * the reader's own price on Custom User Values.
+ * the reader's own price on Custom User Values. `blankedBases` are the
+ * selected chips whose custom price was cleared; they come from the shared
+ * `userCosts`, so both /inference figures keep the badge, not only the one
+ * the reader typed into.
  */
 export function InferenceTcoBadges({
   label,
   values,
+  blankedBases,
 }: {
   label: string;
   values: Record<string, number>;
+  blankedBases?: string[];
 }) {
   const locale = useLocale();
+  // /inference mounts one set of badges per figure; the input ids (and the
+  // labels' htmlFor) must not collide between them.
+  const inputIdPrefix = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { userCosts } = useInferenceFilters();
   const { setUserCosts, setSelectedYAxisMetric } = useInferenceActions();
@@ -118,13 +126,12 @@ export function InferenceTcoBadges({
     track('inference_custom_cost_set', { gpu: base, value: raw });
   }, []);
 
-  // A chip whose price was blanked has no point on the plot, so it leaves
-  // the active selection `values` is narrowed to; keep its badge so the
-  // reader can type the price back in.
+  // A chip whose price was blanked has no value in `values`; keep its badge
+  // so the reader can type the price back in.
   const bases = Object.keys(values);
   if (isCustom) {
-    for (const [base, raw] of Object.entries(drafts)) {
-      if (!bases.includes(base) && parseInferenceCustomCost(raw) === undefined) bases.push(base);
+    for (const base of blankedBases ?? []) {
+      if (!bases.includes(base)) bases.push(base);
     }
   }
   const items = bases.map((base) => {
@@ -148,7 +155,8 @@ export function InferenceTcoBadges({
       inputLabel={(name) => (locale === 'zh' ? `${name} $/芯片/小时` : `${name} $/chip/hr`)}
       testId="inference-tco-badges"
       badgeTestId="inference-tco-badge"
-      inputIdPrefix="cost-input"
+      inputIdPrefix={`cost-input-${inputIdPrefix}`}
+      inputTestIdPrefix="cost-input"
     />
   );
 }

@@ -51,7 +51,7 @@ import {
 } from '@/components/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
 import {
-  costTierLabel,
+  costTierOptionLabel,
   metricCostTier,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -443,7 +443,8 @@ export default function HistoricalTrendsDisplay() {
                         const tier = metricCostTier(
                           selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                         );
-                        return tier ? costTierLabel(tier, locale) : undefined;
+                        // Same copy as the selector so a PNG export matches it.
+                        return tier ? costTierOptionLabel(tier, locale) : undefined;
                       })()}
                       // The trend chart prices every point from the published
                       // tiers, so Custom User Values is not offered here.

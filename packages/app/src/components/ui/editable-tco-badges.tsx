@@ -30,6 +30,7 @@ export function EditableTcoBadges({
   testId,
   badgeTestId,
   inputIdPrefix,
+  inputTestIdPrefix = inputIdPrefix,
   className,
 }: {
   label: string;
@@ -42,6 +43,12 @@ export function EditableTcoBadges({
   testId: string;
   badgeTestId: string;
   inputIdPrefix: string;
+  /**
+   * Prefix for each input's `data-testid`; defaults to `inputIdPrefix`. Pass
+   * it when the id prefix is per instance (`useId()`) but tests address the
+   * inputs by a stable name.
+   */
+  inputTestIdPrefix?: string;
   className?: string;
 }) {
   return (
@@ -64,7 +71,7 @@ export function EditableTcoBadges({
             </label>{' '}
             <input
               id={id}
-              data-testid={`${inputIdPrefix}-${base}`}
+              data-testid={`${inputTestIdPrefix}-${base}`}
               type="number"
               inputMode="decimal"
               min={0}

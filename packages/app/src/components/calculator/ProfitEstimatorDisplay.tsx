@@ -28,11 +28,7 @@ import {
   useGlobalFilterSelection,
 } from '@/components/GlobalFilterContext';
 import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
-import {
-  COST_TIER_LABELS,
-  costTierLabel,
-  type CostTier,
-} from '@/components/inference/metric-registry';
+import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import ComparisonChangelog from '@/components/inference/ui/ComparisonChangelog';
 import {
@@ -147,6 +143,12 @@ const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh
   })),
   { value: 'custom', label: 'Custom $/GPU/hr', labelZh: '自定义 $/GPU/hr' },
 ];
+
+function costProviderOptionLabel(provider: ProfitCostProvider, locale: 'en' | 'zh'): string {
+  const option = COST_PROVIDER_OPTIONS.find((entry) => entry.value === provider);
+  if (!option) return provider;
+  return locale === 'zh' ? option.labelZh : option.label;
+}
 
 /** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
 const CUSTOM_COST_SEED: CostProvider = 'costh';
@@ -1137,7 +1139,9 @@ function ProfitEstimatorInner({
     return null;
   }, [effectivePriceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
-  const costTier = costTierLabel(COST_PROVIDER_TIER[costProvider], locale);
+  // The caption prints the selector's own option copy (also in the PNG export
+  // twin), so the trigger reads the same before and after hydration.
+  const costTier = costProviderOptionLabel(costProvider, locale);
   const priceSourceLabel =
     pricing?.source === 'openrouter'
       ? 'OpenRouter'

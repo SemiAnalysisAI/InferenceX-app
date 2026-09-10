@@ -73,4 +73,45 @@ describe('InferenceTcoBadges', () => {
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: 3, mi355x: 1.5 });
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
   });
+
+  it('keeps an empty badge for a chip blanked from the other figure', () => {
+    // The blanked chip comes from the shared userCosts, not from this
+    // figure's own typing, so the sibling /inference figure shows it too.
+    mountWithProviders(
+      <InferenceTcoBadges
+        label="TCO $/chip/hr:"
+        values={{ mi355x: 1.5 }}
+        blankedBases={['gb300']}
+      />,
+      {
+        inference: {
+          selectedYAxisMetric: 'y_costUser',
+          userCosts: { gb300: undefined, mi355x: 1.5 },
+        },
+        globalFilters: {},
+      },
+    );
+    cy.get('[data-testid="cost-input-gb300"]').should('have.value', '');
+    cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.5');
+    cy.get('[data-testid="cost-input-gb300"]').type('3');
+    cy.get('@setUserCosts').should('have.been.calledWith', { gb300: 3, mi355x: 1.5 });
+  });
+
+  it('gives each mounted set of badges its own input ids', () => {
+    mountWithProviders(
+      <>
+        <InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />
+        <InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />
+      </>,
+      { inference: { selectedYAxisMetric: 'y_costh' }, globalFilters: {} },
+    );
+    cy.get('[data-testid="cost-input-gb300"]').should('have.length', 2);
+    cy.get('[data-testid="cost-input-gb300"]').then(($inputs) => {
+      const ids = $inputs.toArray().map((el) => el.id);
+      expect(ids[0]).to.not.equal(ids[1]);
+      for (const id of ids) {
+        cy.get(`label[for="${id}"]`).should('have.length', 1);
+      }
+    });
+  });
 });

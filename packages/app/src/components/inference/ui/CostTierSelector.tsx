@@ -10,9 +10,9 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import {
-  COST_TIER_LABELS,
   METRIC_CONTROL_GROUPS,
   costMetricFamily,
+  costTierOptionLabel,
   costTiersForFamily,
   isMetricKey,
   metricCostTier,
@@ -56,11 +56,6 @@ const STRINGS = {
 export function selectedCostTier(selectedYAxisMetric: string): CostTier | undefined {
   const key = selectedYAxisMetric.replace(/^y_/u, '');
   return isMetricKey(key) ? metricCostTier(key) : undefined;
-}
-
-/** The label the selector's option list uses for `tier`. */
-function costTierOptionLabel(tier: CostTier, locale: 'en' | 'zh'): string {
-  return locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option;
 }
 
 /**

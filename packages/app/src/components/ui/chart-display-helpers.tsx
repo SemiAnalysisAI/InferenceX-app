@@ -221,11 +221,17 @@ export function MetricAssumptionNotes({
   userCosts?: Record<string, number | undefined> | null;
   /**
    * Replaces the read-only TCO $/chip/hr badges for total-token cost metrics
-   * (published tiers and Custom User Values). `values` are the published
-   * $/chip/hr for the bases the caption shows; the renderer decides how to
-   * present or edit them.
+   * (published tiers and Custom User Values). `values` are the $/chip/hr for
+   * the bases the caption shows; the renderer decides how to present or edit
+   * them. `blankedBases` lists the selected chips whose custom price the
+   * reader cleared: they have no value and no point on the plot, but the
+   * renderer keeps a badge for them so the price can be typed back in.
    */
-  renderCostBadges?: (props: { label: string; values: Record<string, number> }) => ReactNode;
+  renderCostBadges?: (props: {
+    label: string;
+    values: Record<string, number>;
+    blankedBases?: string[];
+  }) => ReactNode;
 }) {
   const locale = useLocale();
   // Legend keys are `{base}` or `{base}_{framework/variant}`; badge maps are
@@ -287,6 +293,15 @@ export function MetricAssumptionNotes({
       ? renderCostBadges({
           label: costLabel,
           values: filterToActive(costValues, { keepEmpty: showCustomCost }),
+          // A blanked chip has no point on the plot, so it also drops out of
+          // the active selection; it is named here from `userCosts` alone so
+          // its badge survives on every figure.
+          blankedBases:
+            showCustomCost && userCosts
+              ? Object.entries(userCosts)
+                  .filter(([, value]) => value === undefined)
+                  .map(([base]) => base)
+              : undefined,
         })
       : null;
 

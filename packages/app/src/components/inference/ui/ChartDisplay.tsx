@@ -6,6 +6,7 @@ import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
   costTierLabel,
+  costTierOptionLabel,
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
   metricCostTier,
@@ -247,8 +248,18 @@ export function formatTokenLength(value: number): string {
  * selectors. The run-date changelog strip and the charts themselves remain.
  */
 // Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
-function renderInferenceTcoBadges(props: { label: string; values: Record<string, number> }) {
-  return <InferenceTcoBadges label={props.label} values={props.values} />;
+function renderInferenceTcoBadges(props: {
+  label: string;
+  values: Record<string, number>;
+  blankedBases?: string[];
+}) {
+  return (
+    <InferenceTcoBadges
+      label={props.label}
+      values={props.values}
+      blankedBases={props.blankedBases}
+    />
+  );
 }
 
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
@@ -1057,7 +1068,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               const tier = metricCostTier(
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                               );
-                              return tier ? costTierLabel(tier, locale) : undefined;
+                              if (!tier) return undefined;
+                              // With the selector in the caption, the export twin
+                              // prints the selector's own copy so a PNG export
+                              // matches the control; plain-text captions keep
+                              // the caption label.
+                              return embedded || minimalChrome
+                                ? costTierLabel(tier, locale)
+                                : costTierOptionLabel(tier, locale);
                             })()}
                             // The dashboard picks the pricing basis right here in the
                             // caption; embedded model pages render no controls and
