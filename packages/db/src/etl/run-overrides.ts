@@ -31,6 +31,8 @@
  */
 
 import { type ConfigParams, configCacheKey } from './config-cache';
+import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
+import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
@@ -286,7 +288,9 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   githubRunId: number;
   runAttempt: number;
   /** Production ID retained for audit logs only. Never use it to match another DB branch. */
-  productionConfigId: number;
+  productionConfigId?: number;
+  /** Public benchmark row ID when its production config ID is not exposed. Audit only. */
+  productionBenchmarkId?: number;
   /** Stable configuration dimensions shared by production, staging, and rebuilt databases. */
   config: ConfigParams;
   benchmarkType: string;
@@ -296,6 +300,8 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   offloadMode: string;
   /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
+  /** Source-bound corrections require an exact run attempt and these unchanged metrics. */
+  expectedMetrics?: Readonly<Record<string, number>>;
   /** Previously applied patch accepted when extending an identity-changing backfill. */
   previousSet?: BenchmarkPointBackfill['set'];
   set: {
@@ -461,6 +467,7 @@ const GB300_CACHE_HIT_RATE_REASON =
   'The GB300 dynamo-vllm recipe scraped only the Dynamo frontend, so AIPerf reported no prefix-cache hit rate; borrow the nearest-concurrency GB200 dynamo-vllm measurement so cache-aware pricing does not bill cached input at full price.';
 
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
+  ...QWEN35_P90_POWER_BACKFILLS,
   // The source recipes in run 31633154542 attach MooncakeStoreConnector to
   // every disaggregated worker and allocate a 180 GB Mooncake segment per
   // node. The master matrix omitted the corresponding offload annotation.
@@ -1162,12 +1169,14 @@ function backfillPointIdentity(
 
 function backfillProductionPointIdentity(
   backfill: BenchmarkPointBackfill,
-  offloadMode: string = backfill.offloadMode,
+  offloadMode: string,
+  purgedConfigId: number,
 ): string {
   return pointIdentity({
     githubRunId: backfill.githubRunId,
     runAttempt: backfill.runAttempt,
-    configId: backfill.productionConfigId,
+    // Without a config ID, conservatively reject a possible purge overlap.
+    configId: backfill.productionConfigId ?? purgedConfigId,
     benchmarkType: backfill.benchmarkType,
     isl: backfill.isl,
     osl: backfill.osl,
@@ -1196,14 +1205,22 @@ function validateBackfillConfig(config: ConfigParams, id: string): void {
   for (const [label, value] of Object.entries({
     prefillTp: config.prefillTp,
     prefillEp: config.prefillEp,
-    prefillNumWorkers: config.prefillNumWorkers,
     decodeTp: config.decodeTp,
     decodeEp: config.decodeEp,
-    decodeNumWorkers: config.decodeNumWorkers,
     numPrefillGpu: config.numPrefillGpu,
     numDecodeGpu: config.numDecodeGpu,
   })) {
     validatePositiveInteger(value, `config.${label}`, id);
+  }
+  for (const [label, value] of Object.entries({
+    prefillNumWorkers: config.prefillNumWorkers,
+    decodeNumWorkers: config.decodeNumWorkers,
+  })) {
+    if (!Number.isInteger(value) || value < (config.disagg ? 1 : 0)) {
+      throw new Error(
+        `${id}: config.${label} must be ${config.disagg ? 'positive' : 'non-negative'}`,
+      );
+    }
   }
 }
 
@@ -1264,7 +1281,24 @@ export function validateRunBackfills(
   }
 
   for (const backfill of points) {
-    validatePositiveInteger(backfill.productionConfigId, 'productionConfigId', backfill.id);
+    if (backfill.productionConfigId === undefined && backfill.productionBenchmarkId === undefined) {
+      throw new Error(`${backfill.id}: a production config or benchmark ID is required for audit`);
+    }
+    if (backfill.productionConfigId !== undefined) {
+      validatePositiveInteger(backfill.productionConfigId, 'productionConfigId', backfill.id);
+    }
+    if (backfill.productionBenchmarkId !== undefined) {
+      validatePositiveInteger(backfill.productionBenchmarkId, 'productionBenchmarkId', backfill.id);
+    }
+    if (
+      backfill.expectedMetrics !== undefined &&
+      (Object.keys(backfill.expectedMetrics).length === 0 ||
+        Object.entries(backfill.expectedMetrics).some(
+          ([key, value]) => key.length === 0 || !Number.isFinite(value),
+        ))
+    ) {
+      throw new Error(`${backfill.id}: expectedMetrics must contain finite source metrics`);
+    }
     validateBackfillConfig(backfill.config, backfill.id);
     validatePositiveInteger(backfill.conc, 'conc', backfill.id);
     if (backfill.benchmarkType.length === 0 || backfill.offloadMode.length === 0) {
@@ -1322,8 +1356,10 @@ export function validateRunBackfills(
       PURGED_BENCHMARK_POINTS.some((purged) => {
         const purgedIdentity = pointIdentity(purged);
         return (
-          purgedIdentity === backfillProductionPointIdentity(backfill) ||
-          purgedIdentity === backfillProductionPointIdentity(backfill, desiredOffloadMode)
+          purgedIdentity ===
+            backfillProductionPointIdentity(backfill, backfill.offloadMode, purged.configId) ||
+          purgedIdentity ===
+            backfillProductionPointIdentity(backfill, desiredOffloadMode, purged.configId)
         );
       })
     ) {
@@ -1454,7 +1490,9 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   const matches = BENCHMARK_POINT_BACKFILLS.filter(
     (backfill) =>
       backfill.githubRunId === githubRunId &&
-      (runAttempt === null || runAttempt === undefined || backfill.runAttempt === runAttempt) &&
+      (backfill.expectedMetrics === undefined
+        ? runAttempt === null || runAttempt === undefined || backfill.runAttempt === runAttempt
+        : backfill.runAttempt === runAttempt) &&
       matchesBenchmarkPoint(point, backfill),
   );
   if (matches.length > 1) {
@@ -1463,7 +1501,7 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
     );
   }
   const [backfill] = matches;
-  if (!backfill) {
+  if (!backfill || !matchesExpectedBackfillMetrics(point.metrics, backfill)) {
     return { point, backfillId: null, sourceIdentity, desiredIdentity: sourceIdentity };
   }
 

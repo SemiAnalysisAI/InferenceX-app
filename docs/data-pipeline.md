@@ -443,3 +443,17 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 - **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
 The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
+
+Backfill audit provenance may identify the production config or an exact public
+benchmark row (`productionBenchmarkId`); at least one positive ID is required.
+Both are audit references only. Selection still uses all stable config dimensions
+and the complete run/attempt/point key so staging and rebuilt databases remain
+safe. Without a known config ID, the registry conservatively rejects any purge
+with the same remaining point identity. The P90 power backfill records original
+artifact hashes and windows in `docs/data/power-p90-backfill.json`.
+
+Corrections with `expectedMetrics` are bound to their original telemetry: ingest
+requires a known, matching run attempt and leaves the row unchanged if those
+source values differ. Database recovery rejects the mismatch before writing.
+P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
+original average power, including when checking an already-applied correction.
