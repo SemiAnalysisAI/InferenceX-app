@@ -5,10 +5,14 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import { chipCounts } from '@/lib/chip-counts';
 import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isModeledSystemPowerConfigKey,
+} from '@/components/inference/metric-registry';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -174,17 +178,13 @@ const TOOLTIP_STRINGS = {
 
 const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   const t = TOOLTIP_STRINGS[locale];
-  const configured = d.physicalChips ?? d.tp;
-  const modeled =
-    selectedYAxisMetric === 'y_modeledChassisPowerPerGpu' &&
-    d.modeledSystemPower?.status === 'supported'
-      ? d.modeledSystemPower.gpuCount
-      : undefined;
+  const { physical, configured } = chipCounts(
+    d,
+    isModeledSystemPowerConfigKey(selectedYAxisMetric),
+  );
   return (
-    tooltipLine(t.totalChips, modeled ?? configured) +
-    (modeled !== undefined && modeled !== configured
-      ? tooltipLine(t.configuredChips, configured)
-      : '')
+    tooltipLine(t.totalChips, physical) +
+    (physical === configured ? '' : tooltipLine(t.configuredChips, configured))
   );
 };
 
@@ -272,7 +272,7 @@ const modeledSystemPowerHTML = (
   if (
     !estimate ||
     (!isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-      selectedYAxisMetric !== 'y_modeledChassisPowerPerGpu')
+      !isModeledSystemPowerConfigKey(selectedYAxisMetric))
   ) {
     return '';
   }

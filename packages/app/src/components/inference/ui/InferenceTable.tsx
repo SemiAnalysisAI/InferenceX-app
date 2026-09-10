@@ -4,8 +4,10 @@ import { useMemo } from 'react';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { chipCounts } from '@/lib/chip-counts';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
@@ -54,7 +56,7 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
-  const showModeledPower = selectedYAxisMetric === 'y_modeledChassisPowerPerGpu';
+  const showModeledPower = isModeledSystemPowerConfigKey(selectedYAxisMetric);
   const headers = useMemo(
     () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
     [chartDefinition, selectedYAxisMetric, locale],
@@ -93,14 +95,8 @@ export default function InferenceTable({
       {
         header: headers.physicalChips,
         align: 'right',
-        cell: (row) =>
-          showModeledPower && row.modeledSystemPower?.status === 'supported'
-            ? row.modeledSystemPower.gpuCount
-            : (row.physicalChips ?? row.tp),
-        sortValue: (row) =>
-          showModeledPower && row.modeledSystemPower?.status === 'supported'
-            ? row.modeledSystemPower.gpuCount
-            : (row.physicalChips ?? row.tp),
+        cell: (row) => chipCounts(row, showModeledPower).physical,
+        sortValue: (row) => chipCounts(row, showModeledPower).physical,
         importance: 'secondary',
       },
       ...(showModeledPower
@@ -108,8 +104,8 @@ export default function InferenceTable({
             {
               header: headers.configuredChips,
               align: 'right' as const,
-              cell: (row: InferenceData) => row.physicalChips ?? row.tp,
-              sortValue: (row: InferenceData) => row.physicalChips ?? row.tp,
+              cell: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
+              sortValue: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
               importance: 'secondary' as const,
             },
           ]

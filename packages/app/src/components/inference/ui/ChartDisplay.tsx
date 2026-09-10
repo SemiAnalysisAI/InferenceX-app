@@ -7,6 +7,7 @@ import { BarChart3, Table2 } from 'lucide-react';
 import chartDefinitions, {
   costTierLabel,
   isMeasuredEnergyConfigKey,
+  isModeledSystemPowerConfigKey,
   metricCostTier,
   tokenMetricTypeForConfigKey,
   type MetricKey,
@@ -802,7 +803,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               className="flex min-h-[320px] items-center justify-center"
             >
               <p className="max-w-md text-center text-sm text-muted-foreground">
-                {selectedYAxisMetric === 'y_modeledChassisPowerPerGpu'
+                {isModeledSystemPowerConfigKey(selectedYAxisMetric)
                   ? t.noSystemPowerData
                   : t.noChartData}
               </p>
@@ -1094,7 +1095,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               activeHwKeys={captionHwKeys}
                             />
                           )}
-                          {selectedYAxisMetric === 'y_modeledChassisPowerPerGpu' && (
+                          {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
                             <p
                               className="mb-2 text-xs text-muted-foreground"
                               data-testid="modeled-system-power-assumptions"
