@@ -6,6 +6,7 @@ export interface CIArtifact {
   expired: boolean;
   size_in_bytes: number;
   digest?: string;
+  workflow_run?: { id: number; head_sha: string };
   stored?: boolean;
   indexUrl?: string;
 }
@@ -57,13 +58,36 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
       throw new Error('Archive checksum mismatch');
     verified.add(match.groups!.path);
   }
-  if (!verified.has(files['index.json'] ? 'index.json' : 'manifest.json'))
+  const fidelity = artifact.name.startsWith('h3-fidelity-');
+  if (
+    !verified.has(
+      fidelity ? 'comparison.json' : files['index.json'] ? 'index.json' : 'manifest.json',
+    )
+  )
     throw new Error('Missing verified archive entry point');
   const index: Json = files['index.json'] ? JSON.parse(await read('index.json').text()) : null;
-  const identity = /^h3-(?:video|results)-(?<run>\d+)-(?<attempt>\d+)$/u.exec(
+  const identity = /^h3-(?:video|results|fidelity)-(?<run>\d+)-(?<attempt>\d+)$/u.exec(
     artifact.name,
   )?.groups;
   if (!identity) throw new Error('Invalid H3 artifact identity');
+  if (fidelity) {
+    const comparison: Json = JSON.parse(await read('comparison.json').text());
+    if (
+      at(comparison, 'producer', 'run_id') !== identity.run ||
+      at(comparison, 'producer', 'run_attempt') !== identity.attempt ||
+      (artifact.workflow_run !== undefined &&
+        (String(artifact.workflow_run.id) !== identity.run ||
+          artifact.workflow_run.head_sha !== at(comparison, 'producer', 'git_commit')))
+    )
+      throw new Error('Comparison and GitHub artifact identify different runs');
+    return [
+      {
+        id: identity.run,
+        kind: 'fidelity' as const,
+        read: (path: string) => Promise.resolve(read(path)),
+      },
+    ];
+  }
   if (
     index &&
     (at(index, 'producer', 'ci', 'run_id') !== identity.run ||

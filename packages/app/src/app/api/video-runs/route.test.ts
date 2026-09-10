@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
-import { readStoredArtifact, storedArtifacts, videoStorageEnabled } from '@/lib/video-storage';
+import {
+  readStoredArtifact,
+  storedArtifacts,
+  storeVideoArtifact,
+  videoStorageEnabled,
+} from '@/lib/video-storage';
 
 vi.mock('@/lib/video-storage', () => ({
   videoStorageEnabled: vi.fn(() => false),
@@ -18,6 +23,8 @@ afterEach(() => {
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
   vi.mocked(readStoredArtifact).mockReset();
+  vi.mocked(storeVideoArtifact).mockClear();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -29,12 +36,13 @@ describe('H3 CI artifact access', () => {
           { id: 1, name: 'e2e Test - h3-8s', path: '.github/workflows/e2e-tests.yml' },
           { id: 2, name: 'Test H3 Video', path: '.github/workflows/test-h3-video.yml' },
           { id: 3, name: 'H3 Video Smoke', path: '.github/workflows/h3-video.yml' },
+          { id: 4, name: 'H3 retained-media fidelity', path: '.github/workflows/h3-fidelity.yml' },
         ],
       }),
     );
     const result = await GET(request());
     const data = await result.json();
-    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3]);
+    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4]);
     expect(result.headers.get('cache-control')).toContain('no-store');
   });
   it('refuses a private repository before reading any artifacts', async () => {
@@ -61,6 +69,7 @@ describe('H3 CI artifact access', () => {
     expect(result3.status).toBe(410);
   });
   it('streams the verified run artifact with a deadline longer than metadata requests', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
     const deadline = new AbortController().signal;
     const timeout = vi
       .spyOn(AbortSignal, 'timeout')
@@ -116,6 +125,7 @@ describe('H3 CI artifact access', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('serves a persisted result without fetching an expired GitHub artifact', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     const artifact = {
       id: 20,
@@ -172,5 +182,109 @@ describe('H3 CI artifact access', () => {
     const result6 = await GET(request('?artifact=123'));
     expect(result6.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('H3 published results in development', () => {
+  const saved = {
+    storageVersion: 1,
+    runId: '10',
+    artifact: { id: 20, name: 'h3-fidelity-10-1', stored: true },
+    sources: [
+      {
+        id: '10',
+        kind: 'fidelity',
+        assets: [['clip.mp4', { url: 'https://cdn.example/clip.mp4' }]],
+      },
+    ],
+  };
+
+  it('reuses the published result without a ZIP download or forwarded credentials', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    fetchMock.mockResolvedValueOnce(response(saved));
+    const result = await GET(
+      new NextRequest(
+        'http://localhost/api/video-runs?run=10&artifact=20&format=media&origin=https://evil.example',
+        { headers: { authorization: 'Bearer local-only', cookie: 'session=local-only' } },
+      ),
+    );
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual(saved);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe(
+      'https://inferencex.semianalysis.com/api/video-runs?run=10&artifact=20&format=published',
+    );
+    expect(options).toMatchObject({ credentials: 'omit', redirect: 'error', cache: 'no-store' });
+    expect(options?.headers).toBeUndefined();
+    expect(options?.signal).toBeInstanceOf(AbortSignal);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['?run=10', { run: { id: 10 }, artifacts: [saved.artifact] }, '?run=10'],
+    ['?page=2', { runs: [{ id: 10 }], nextPage: 3 }, '?page=2'],
+  ])(
+    'reuses published discovery for %s, including retained artifacts',
+    async (query, data, upstream) => {
+      vi.stubEnv('NODE_ENV', 'development');
+      fetchMock.mockResolvedValueOnce(response(data));
+      const result = await GET(request(query));
+      expect(await result.json()).toEqual(data);
+      expect(String(fetchMock.mock.calls[0][0])).toBe(
+        `https://inferencex.semianalysis.com/api/video-runs${upstream}`,
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('keeps cache misses available for the existing local ZIP fallback', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(result.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...saved, runId: '11' },
+    { ...saved, artifact: { id: 21 } },
+    { ...saved, sources: [] },
+  ])('rejects a mismatched or incomplete published result', async (data) => {
+    vi.stubEnv('NODE_ENV', 'development');
+    fetchMock.mockResolvedValueOnce(response(data));
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(result.status).toBe(502);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
+  it('refuses an old deployment ZIP response instead of consuming it as stored media', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const zip = new Response('not JSON', { headers: { 'Content-Type': 'application/zip' } });
+    const cancel = vi.spyOn(zip.body!, 'cancel');
+    fetchMock.mockResolvedValueOnce(zip);
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(result.status).toBe(502);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the production visibility failure without trying an archive', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    fetchMock.mockResolvedValueOnce(response({ error: 'Public H3 repository unavailable' }, 503));
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(result.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never publishes an uncached artifact through the production published-only mode', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?run=10&artifact=20&format=published'));
+    expect(result.status).toBe(204);
+    expect(storedArtifacts).toHaveBeenCalledWith('10');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
   });
 });

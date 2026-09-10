@@ -1,5 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import {
+  GITHUB_API_BASE,
+  GITHUB_OWNER,
+  GITHUB_REPO,
+  SITE_URL,
+} from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github-artifacts';
 import {
   readStoredArtifact,
@@ -14,7 +19,7 @@ const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
-const artifactName = /^h3-(?:results|video)-(?<runId>\d+)-(?<attempt>\d+)$/u;
+const artifactName = /^h3-(?:results|video|fidelity)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
 function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
@@ -33,6 +38,8 @@ export async function GET(request: NextRequest) {
   const runId = query.get('run');
   const artifactId = query.get('artifact');
   const page = query.get('page') ?? '1';
+  const publishedOnly = query.get('format') === 'published';
+  const media = query.get('format') === 'media' || publishedOnly;
   if ((runId && !id(runId)) || (artifactId && (!runId || !id(artifactId))) || !id(page))
     return NextResponse.json(
       { error: 'Invalid CI run, artifact or page' },
@@ -40,6 +47,50 @@ export async function GET(request: NextRequest) {
     );
   const deadline = AbortSignal.timeout(270000);
   try {
+    if (
+      process.env.NODE_ENV === 'development' &&
+      !videoStorageEnabled() &&
+      (!artifactId || media)
+    ) {
+      // Production checks repository visibility; local reads must never publish on a cache miss.
+      const url = new URL('/api/video-runs', SITE_URL);
+      if (runId) url.searchParams.set('run', runId);
+      if (artifactId) {
+        url.searchParams.set('artifact', artifactId);
+        url.searchParams.set('format', 'published');
+      } else if (!runId) url.searchParams.set('page', page);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'error',
+        signal: AbortSignal.timeout(30000),
+      });
+      if (response.status === 204) return new Response(null, { status: 204, headers });
+      if (!response.headers.get('content-type')?.includes('application/json')) {
+        await response.body?.cancel();
+        throw new Error('Published result unavailable');
+      }
+      const data = await response.json();
+      if (response.ok) {
+        if (artifactId) {
+          if (
+            data.storageVersion !== 1 ||
+            data.runId !== runId ||
+            data.artifact?.id !== Number(artifactId) ||
+            !Array.isArray(data.sources) ||
+            data.sources.length === 0
+          )
+            throw new Error('Published artifact identity mismatch');
+        } else if (
+          runId
+            ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
+            : !Array.isArray(data.runs)
+        ) {
+          throw new Error('Published run identity mismatch');
+        }
+      }
+      return NextResponse.json(data, { status: response.status, headers });
+    }
     // This public viewer must never expose artifacts from a repository that becomes private.
     const repository = await github('');
     const repo = repository.ok ? await repository.json() : null;
@@ -49,7 +100,6 @@ export async function GET(request: NextRequest) {
         { status: 503, headers },
       );
     if (artifactId) {
-      const media = query.get('format') === 'media';
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
         const saved = await storedArtifacts(runId!);
@@ -58,6 +108,7 @@ export async function GET(request: NextRequest) {
           const result = await readStoredArtifact(runId!, stored);
           if (result) return NextResponse.json(result, { headers });
         }
+        if (publishedOnly) return new Response(null, { status: 204, headers });
       }
       const metaResponse = await github(`/actions/artifacts/${artifactId}`);
       if (!metaResponse.ok)
@@ -147,7 +198,8 @@ export async function GET(request: NextRequest) {
         runs: runs.filter(
           (run: { name: string; display_title: string; path: string }) =>
             (run.path === '.github/workflows/e2e-tests.yml' && /\bh3\b/iu.test(run.name)) ||
-            run.path === '.github/workflows/h3-video.yml',
+            run.path === '.github/workflows/h3-video.yml' ||
+            run.path === '.github/workflows/h3-fidelity.yml',
         ),
         nextPage: runs.length === 100 ? Number(page) + 1 : null,
       },

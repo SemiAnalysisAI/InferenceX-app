@@ -33,6 +33,7 @@ const STRINGS = {
     telemetry: 'Telemetry',
     articles: 'Articles',
     apiReference: 'API Reference',
+    historicalTrends: 'Historical Trends',
     tcoCalculator: 'TCO Calculator',
     fleetLifecycle: 'Fleet Lifecycle',
     gpuReliability: 'Chip Reliability',
@@ -66,6 +67,7 @@ const STRINGS = {
     agentx: 'AgentX',
     telemetry: '遥测数据',
     articles: '技术文章',
+    historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
     fleetLifecycle: '集群生命周期',
     gpuReliability: '芯片可靠性',
@@ -263,6 +265,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.apiReference}
+                </Link>
+                <Link
+                  data-testid="footer-link-historical"
+                  href={`${prefix}/historical`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_historical_clicked')}
+                >
+                  {t.historicalTrends}
                 </Link>
                 <Link
                   data-testid="footer-link-calculator"

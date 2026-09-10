@@ -10,6 +10,8 @@ import VideoSelect from './VideoSelect';
 import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
 import type { ServingCell } from './serving';
 import { allocatedGpus } from './allocation';
+import { powerLimitComparison } from './power-limit';
+import { requestServerTiming, serverTimingSummary, SERVER_TIMING_COPY } from './server-timing';
 
 const STRINGS = {
   en: {
@@ -21,8 +23,13 @@ const STRINGS = {
     valid: 'Valid / scheduled',
     median: 'Median delivery latency',
     hour: 'Valid clips / deployment-hour',
-    gpuHour: 'Valid clips / allocated GPU-hour',
-    secondsHour: 'Video seconds / allocated GPU-hour',
+    gpuHour: 'Valid clips / participating GPU-hour',
+    allocatedGpuHour: 'Valid clips / allocated GPU-hour',
+    gpuBasis: 'GPU normalization',
+    allocatedBasis: 'All allocated GPUs',
+    participatingBasis: 'Participating GPUs',
+    secondsHour: 'Video seconds / participating GPU-hour',
+    allocatedSecondsHour: 'Video seconds / allocated GPU-hour',
     wall: 'Delivery measurement window',
     rate: 'Valid clips / second',
     samples: 'Valid latency samples',
@@ -75,6 +82,12 @@ const STRINGS = {
     energy: 'Integrated energy (kJ)',
     perClip: 'Energy / valid clip (kJ/clip)',
     powerWindow: 'Power window duration (s)',
+    limitRatio: 'Mean / enforced limit (%)',
+    limitWatts: 'Total enforced power limit (W)',
+    limitNote:
+      'Power-limit ratios require matching participating GPU UUIDs and unchanged prelaunch/postcleanup enforced limits. These snapshots do not prove continuous stability; TDP and later inventories are never substituted.',
+    gpuNote:
+      'Participating GPUs measure hardware efficiency. The allocated view includes idle allocations; full deployment costs must include all billed resources.',
     powerNote:
       'Generation power covers first submission → last observed provider completion. Intervening idle time, downloads and validation are included; overlapping requests are integrated once. Startup and warmup are separate. Time-weighted board measurements exclude the host and facility; sampled peaks are not instantaneous electrical peaks.',
     gpu: 'GPU',
@@ -93,9 +106,9 @@ const STRINGS = {
     server: 'Server configuration',
     observed: 'Observed submission rate (requests/s)',
     inFlight: 'Peak client requests in flight',
-    missing: 'Unavailable serving measurements',
+    missing: 'Serving measurement scope',
     missingNote:
-      'Server-side queue delay, server-ready latency, observed batch sizes and fixed offered arrival rate are not supplied. Closed-loop concurrency is not server batch size. Costs and prices require separate, dated assumptions.',
+      'Closed-loop tests do not fix the offered arrival rate. Missing server measurements are shown as unavailable. Costs and prices require separate, dated assumptions.',
     outcome: 'Completion accounting',
     completed: 'Completed',
     failedCount: 'Failed / invalid',
@@ -120,8 +133,13 @@ const STRINGS = {
     valid: '有效 / 计划请求',
     median: '交付延迟中位数',
     hour: '有效视频 / 部署小时',
-    gpuHour: '有效视频 / 已分配 GPU 小时',
-    secondsHour: '视频秒数 / 已分配 GPU 小时',
+    gpuHour: '有效视频 / 参与计算 GPU 小时',
+    allocatedGpuHour: '有效视频 / 已分配 GPU 小时',
+    gpuBasis: 'GPU 归一化口径',
+    allocatedBasis: '所有已分配 GPU',
+    participatingBasis: '参与计算的 GPU',
+    secondsHour: '视频秒数 / 参与计算 GPU 小时',
+    allocatedSecondsHour: '视频秒数 / 已分配 GPU 小时',
     wall: '交付测量时段',
     rate: '有效视频 / 秒',
     samples: '有效延迟样本数',
@@ -173,6 +191,12 @@ const STRINGS = {
     energy: '积分能耗（kJ）',
     perClip: '每有效视频能耗（kJ/clip）',
     powerWindow: '功率统计时段时长（s）',
+    limitRatio: '平均功率 / 实际生效上限（%）',
+    limitWatts: '实际生效功率上限合计（W）',
+    limitNote:
+      '功率占比要求参与计算 GPU 的 UUID 匹配，且启动前与清理后记录的实际生效上限一致。这不能证明期间上限始终不变；不以规格 TDP 或事后硬件信息替代。',
+    gpuNote:
+      '按参与计算 GPU 数衡量硬件效率；按已分配 GPU 数统计时包含空闲分配。完整部署成本须包含所有计费资源。',
     powerNote:
       '生成阶段功率覆盖首次提交到最后一次观测到服务端完成为止，包含期间的空闲、下载与校验时间；并发请求重叠时段只积分一次。启动与 warmup 单独统计。板卡功率按时间加权，不含主机与设施能耗；采样峰值不是瞬时电气峰值。',
     gpu: 'GPU',
@@ -183,7 +207,7 @@ const STRINGS = {
       '客户端工作负载期间的设备已用显存，包含 warmup。MiB = 2²⁰ 字节；采样可能遗漏峰值，也不等同于框架分配器统计的峰值。',
     hardware: '硬件与执行配置',
     allocated: '已分配 GPU 数',
-    participating: '参与测试 GPU 数',
+    participating: '参与计算 GPU 数',
     model: '模型',
     modelRevision: '模型版本',
     runtimeRevision: '运行时版本',
@@ -191,9 +215,9 @@ const STRINGS = {
     server: '服务端配置',
     observed: '观测提交速率（requests/s）',
     inFlight: '客户端在途请求峰值',
-    missing: '尚未提供的服务指标',
+    missing: '服务测量范围',
     missingNote:
-      '尚无服务端排队时长、服务端完成延迟、实际 batch size 或固定请求到达速率。闭环客户端并发数不等于服务端 batch size。成本与价格需要另行提供注明日期的假设。',
+      '闭环测试不固定请求到达速率。缺失的服务端指标显示为无数据。成本与价格需要另行提供注明日期的假设。',
     outcome: '请求完成情况',
     completed: '已完成',
     failedCount: '失败 / 无效',
@@ -246,11 +270,15 @@ export default function ServingResults({
   initialCell?: string;
   onCellChange?: (id: string) => void;
 }) {
-  const s = STRINGS[useLocale()];
+  const locale = useLocale();
+  const s = STRINGS[locale];
+  const t = SERVER_TIMING_COPY[locale];
   const [selected, setSelected] = useState(initialCell ?? '');
   const [slot, setSlot] = useState('');
+  const [gpuBasis, setGpuBasis] = useState<'participating' | 'allocated'>('participating');
   const [phase, setPhase] = useState<'measurement' | 'startup' | 'warmup'>('measurement');
   const [failedMedia, setFailedMedia] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
   const selectedId = onCellChange ? (initialCell ?? selected) : selected;
   const current = cells.find((cell) => cell.id === selectedId) ?? cells[0];
   useEffect(() => {
@@ -275,14 +303,31 @@ export default function ServingResults({
     records.find((row) => text(at(row, 'slot_id')) === slot) ??
     records.find((row) => at(row, 'phase') === 'measurement') ??
     records[0];
+  const serverTiming = serverTimingSummary(run, verified);
+  const requestTiming = requestServerTiming(record ?? null, verified);
   const media = at(record, 'media');
   const warmup = at(record, 'phase') === 'warmup';
   const telemetry = at(job, 'roles', 'baseline', 'telemetry_summary');
   const devices = rows(at(telemetry, 'gpu_identity'));
   const allocated = allocatedGpus(bundle);
+  const gpuUuids = rows(at(spec, 'gpu_uuids')).map(text);
+  const participating =
+    gpuUuids.length > 0 && gpuUuids.every(Boolean) && new Set(gpuUuids).size === gpuUuids.length
+      ? gpuUuids.length
+      : null;
+  const gpuCount = gpuBasis === 'participating' ? participating : allocated;
   const gpuRate = (value: Json) =>
-    allocated !== null && allocated > 0 ? multiply(value, 3600 / allocated) : null;
+    gpuCount !== null && gpuCount > 0 ? multiply(value, 3600 / gpuCount) : null;
   const powerData = at(power, 'phases', phase);
+  const limitComparison = verified
+    ? powerLimitComparison(
+        powerData,
+        at(job, 'roles', 'baseline', 'power_configuration_before'),
+        at(job, 'roles', 'baseline', 'power_configuration_after'),
+        at(spec, 'gpu_uuids'),
+        at(power, 'semantics', 'power_unit'),
+      )
+    : null;
   const powerValue = (...keys: string[]) =>
     verified && at(powerData, 'valid') === true ? at(powerData, ...keys) : null;
   let mediaPath = '';
@@ -310,6 +355,7 @@ export default function ServingResults({
     current.jobPath,
     current.powerPath,
     current.specPath,
+    `gpu/${current.id}/supervisor/baseline/runtime.stdout.log`,
     'manifest.json',
     'SHA256SUMS',
   ];
@@ -327,10 +373,18 @@ export default function ServingResults({
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm" data-testid="serving-matrix">
+          <table className="w-full min-w-3xl text-left text-sm" data-testid="serving-matrix">
             <thead className="text-xs text-muted-foreground">
               <tr>
-                {[s.concurrency, s.valid, `${s.median} (s)`, s.hour].map((label) => (
+                {[
+                  s.concurrency,
+                  s.valid,
+                  `${s.median} (s)`,
+                  s.hour,
+                  s.mean,
+                  s.perClip,
+                  s.limitRatio,
+                ].map((label) => (
                   <th key={label} className="px-3 py-2 font-medium">
                     {label}
                   </th>
@@ -338,44 +392,69 @@ export default function ServingResults({
               </tr>
             </thead>
             <tbody className="tabular-nums">
-              {cells.map((item) => (
-                <tr
-                  key={item.id}
-                  className={item.id === current.id ? 'bg-primary/10' : 'border-t border-border/40'}
-                >
-                  <td className="px-3 py-2">
-                    <Button
-                      size="sm"
-                      variant={item.id === current.id ? 'default' : 'outline'}
-                      aria-pressed={item.id === current.id}
-                      onClick={() => chooseCell(item.id)}
-                    >
-                      C{item.concurrency}
-                    </Button>
-                  </td>
-                  <td className="px-3 py-2">
-                    {fmt(at(item.cell, 'completion', 'valid'))} /{' '}
-                    {fmt(at(item.cell, 'completion', 'scheduled'))}
-                  </td>
-                  <td className="px-3 py-2">
-                    {fmt(
-                      at(item.cell, 'verified') === true
-                        ? at(item.cell, 'metrics', 'client_ready_p50_seconds')
-                        : null,
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {fmt(
-                      multiply(
+              {cells.map((item) => {
+                const measuredPower =
+                  at(item.cell, 'verified') === true &&
+                  at(item.power, 'phases', 'measurement', 'valid') === true
+                    ? at(item.power, 'phases', 'measurement')
+                    : null;
+                const limits = powerLimitComparison(
+                  measuredPower,
+                  at(item.job, 'roles', 'baseline', 'power_configuration_before'),
+                  at(item.job, 'roles', 'baseline', 'power_configuration_after'),
+                  at(item.spec, 'gpu_uuids'),
+                  at(item.power, 'semantics', 'power_unit'),
+                );
+                return (
+                  <tr
+                    key={item.id}
+                    className={
+                      item.id === current.id ? 'bg-primary/10' : 'border-t border-border/40'
+                    }
+                  >
+                    <td className="px-3 py-2">
+                      <Button
+                        size="sm"
+                        variant={item.id === current.id ? 'default' : 'outline'}
+                        aria-pressed={item.id === current.id}
+                        onClick={() => chooseCell(item.id)}
+                      >
+                        C{item.concurrency}
+                      </Button>
+                    </td>
+                    <td className="px-3 py-2">
+                      {fmt(at(item.cell, 'completion', 'valid'))} /{' '}
+                      {fmt(at(item.cell, 'completion', 'scheduled'))}
+                    </td>
+                    <td className="px-3 py-2">
+                      {fmt(
                         at(item.cell, 'verified') === true
-                          ? at(item.cell, 'metrics', 'valid_clips_per_second')
+                          ? at(item.cell, 'metrics', 'client_ready_p50_seconds')
                           : null,
-                        3600,
-                      ),
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {fmt(
+                        multiply(
+                          at(item.cell, 'verified') === true
+                            ? at(item.cell, 'metrics', 'valid_clips_per_second')
+                            : null,
+                          3600,
+                        ),
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {fmt(at(measuredPower, 'aggregate', 'avg_power_w'))}
+                    </td>
+                    <td className="px-3 py-2">
+                      {fmt(
+                        multiply(at(measuredPower, 'aggregate', 'joules_per_valid_clip'), 0.001),
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{fmt(limits?.percent ?? null)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -444,6 +523,31 @@ export default function ServingResults({
                     ],
                   ]}
                 />
+                <details data-testid="request-server-timing">
+                  <summary className="cursor-pointer text-sm">{t.title}</summary>
+                  <div className="mt-3 space-y-3">
+                    <Data
+                      values={[
+                        [
+                          t.status,
+                          requestTiming
+                            ? requestTiming.status === 'complete'
+                              ? t.complete
+                              : t.partial
+                            : t.unavailable,
+                        ],
+                        ...t.stages.map((label, index): [string, string] => [
+                          label,
+                          `${fmt(requestTiming?.stages[index] ?? null)} s`,
+                        ]),
+                        [t.batch, fmt(requestTiming?.batchSize ?? null)],
+                        [t.replicas, fmt(requestTiming?.replicaId ?? null)],
+                        [t.identity, requestTiming?.identity ?? t.unavailable],
+                      ]}
+                    />
+                    <p className="text-xs leading-relaxed text-muted-foreground">{t.clock}</p>
+                  </div>
+                </details>
                 {warmup && (
                   <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
                     {s.warmup}
@@ -503,13 +607,27 @@ export default function ServingResults({
       </Card>
 
       <Card className="gap-4" data-testid="serving-selected-metrics">
+        <div className="w-full max-w-sm">
+          <VideoSelect
+            label={s.gpuBasis}
+            value={gpuBasis}
+            onValueChange={(value) => setGpuBasis(value as typeof gpuBasis)}
+            options={[
+              { value: 'participating', label: s.participatingBasis },
+              { value: 'allocated', label: s.allocatedBasis },
+            ]}
+          />
+        </div>
         <Heading level="card">
           C{current.concurrency} · {s.closedLoop}
         </Heading>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             [s.median, `${fmt(at(metrics, 'client_ready_p50_seconds'))} s`],
-            [s.gpuHour, fmt(gpuRate(at(metrics, 'valid_clips_per_second')))],
+            [
+              gpuBasis === 'participating' ? s.gpuHour : s.allocatedGpuHour,
+              fmt(gpuRate(at(metrics, 'valid_clips_per_second'))),
+            ],
             [s.valid, `${fmt(at(completion, 'valid'))} / ${fmt(at(completion, 'scheduled'))}`],
             [s.wall, `${fmt(at(metrics, 'measurement', 'wall_seconds'))} s`],
           ].map(([label, value]) => (
@@ -524,7 +642,10 @@ export default function ServingResults({
             [s.status, at(cell, 'status') === 'complete' ? s.complete : s.incomplete],
             [s.verified, verified ? s.yes : s.no],
             [s.rate, fmt(at(metrics, 'valid_clips_per_second'), 6)],
-            [s.secondsHour, fmt(gpuRate(at(serving, 'valid_video_seconds_per_second')))],
+            [
+              gpuBasis === 'participating' ? s.secondsHour : s.allocatedSecondsHour,
+              fmt(gpuRate(at(serving, 'valid_video_seconds_per_second'))),
+            ],
             [
               s.p90,
               p90 !== null && p90 >= 10
@@ -536,6 +657,58 @@ export default function ServingResults({
           ]}
         />
         <p className="text-xs text-muted-foreground">{s.p90Note}</p>
+        <p className="text-xs text-muted-foreground">{s.gpuNote}</p>
+      </Card>
+
+      <Card className="gap-4" data-testid="serving-server-timing">
+        <Heading>{t.title}</Heading>
+        {serverTiming.stages.some(Boolean) || serverTiming.batchSizes || serverTiming.replicaIds ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-xl text-left text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    {[t.title, 'P50 (s)', 'P90 (s)', 'P95 (s)', t.coverage].map((label) => (
+                      <th key={label} className="px-3 py-2 font-medium">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {t.stages.map((label, index) => {
+                    const timing = serverTiming.stages[index];
+                    return (
+                      <tr key={label} className="border-t border-border/40">
+                        <th className="px-3 py-2 font-medium">{label}</th>
+                        {[timing?.p50, timing?.p90, timing?.p95].map((value, i) => (
+                          <td key={i} className="px-3 py-2">
+                            {fmt(value ?? null)}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2">
+                          {timing
+                            ? `${timing.samples} / ${timing.valid} / ${timing.missing}`
+                            : t.unavailable}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Data
+              values={[
+                [t.batch, serverTiming.batchSizes?.join(', ') ?? t.unavailable],
+                [t.replicas, serverTiming.replicaIds?.join(', ') ?? t.unavailable],
+              ]}
+            />
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t.unavailable}</p>
+        )}
+        <p className="text-xs leading-relaxed text-muted-foreground">{t.note}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t.layoutNote}</p>
       </Card>
 
       <Card className="gap-4" data-testid="serving-power">
@@ -561,6 +734,8 @@ export default function ServingResults({
             [s.energy, fmt(multiply(powerValue('aggregate', 'energy_j'), 0.001))],
             [s.perClip, fmt(multiply(powerValue('aggregate', 'joules_per_valid_clip'), 0.001))],
             [s.powerWindow, fmt(powerValue('duration_seconds'))],
+            [s.limitRatio, fmt(limitComparison?.percent ?? null)],
+            [s.limitWatts, fmt(limitComparison?.watts ?? null)],
           ]}
         />
         {at(powerData, 'valid') !== true && (
@@ -569,6 +744,7 @@ export default function ServingResults({
           </p>
         )}
         <p className="text-xs leading-relaxed text-muted-foreground">{s.powerNote}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{s.limitNote}</p>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -616,12 +792,7 @@ export default function ServingResults({
             [s.runtimeRevision, scalar(at(run, 'configuration', 'runtime_revision'))],
             [s.sourceHash, scalar(at(spec, 'baseline', 'source_sha256'))],
             [s.allocated, fmt(allocated)],
-            [
-              s.participating,
-              rows(at(spec, 'gpu_uuids')).length > 0
-                ? fmt(rows(at(spec, 'gpu_uuids')).length)
-                : s.unavailable,
-            ],
+            [s.participating, fmt(participating)],
             [s.observed, fmt(at(serving, 'observed_submission_rate_per_second'), 6)],
           ]}
         />
@@ -690,15 +861,17 @@ export default function ServingResults({
           </div>
         </details>
         {html && (
-          <details>
+          <details onToggle={(event) => setReportOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-sm">{s.report}</summary>
             <p className="my-3 text-xs text-muted-foreground">{s.reportNote}</p>
-            <iframe
-              title={s.report}
-              srcDoc={html}
-              sandbox="allow-same-origin allow-downloads"
-              className="h-[640px] w-full rounded-lg border bg-white"
-            />
+            {reportOpen && (
+              <iframe
+                title={s.report}
+                srcDoc={html}
+                sandbox="allow-same-origin allow-downloads"
+                className="h-[640px] w-full rounded-lg border bg-white"
+              />
+            )}
           </details>
         )}
         <details>

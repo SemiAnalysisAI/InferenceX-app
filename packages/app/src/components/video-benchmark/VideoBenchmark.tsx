@@ -306,6 +306,7 @@ export default function VideoBenchmark({
   const [billed, setBilled] = useState('');
   const [assumption, setAssumption] = useState('');
   const [date, setDate] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
   const generation = useRef(0);
   const input = useRef<HTMLInputElement>(null);
   const activeUrls = useRef<string[]>([]);
@@ -326,6 +327,7 @@ export default function VideoBenchmark({
     setError('');
     setLoading(false);
     setSlot('');
+    setReportOpen(false);
   }
   async function open(read?: () => (path: string) => Promise<Blob>, saved?: StoredSource) {
     clear();
@@ -915,16 +917,18 @@ export default function VideoBenchmark({
             </a>
             {table([[s.manifest, b.manifestSha256]])}
             {loaded.html && (
-              <details>
+              <details onToggle={(event) => setReportOpen(event.currentTarget.open)}>
                 <summary className="cursor-pointer">{s.report}</summary>
                 <p className="my-3 text-sm text-muted-foreground">{s.reportNote}</p>
-                <iframe
-                  title={s.report}
-                  sandbox="allow-same-origin allow-downloads"
-                  referrerPolicy="no-referrer"
-                  className="h-[70vh] w-full rounded-lg border bg-white"
-                  srcDoc={loaded.html}
-                />
+                {reportOpen && (
+                  <iframe
+                    title={s.report}
+                    sandbox="allow-same-origin allow-downloads"
+                    referrerPolicy="no-referrer"
+                    className="h-[70vh] w-full rounded-lg border bg-white"
+                    srcDoc={loaded.html}
+                  />
+                )}
               </details>
             )}
             <details>

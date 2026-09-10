@@ -233,7 +233,7 @@ const entryOrder = (a: string, b: string): number => {
 
 /**
  * Order bars for the comparison view: chips in the order they already hold
- * (revenue descending, from `estimateProfitRows`), and within a chip its
+ * (profit descending, from `estimateProfitRows`), and within a chip its
  * entries oldest → newest (same-day runs in run order, as `/inference` sorts
  * them) so the current bar sits at the right of its group. Rows with no entry
  * are today's and sort last within their chip.

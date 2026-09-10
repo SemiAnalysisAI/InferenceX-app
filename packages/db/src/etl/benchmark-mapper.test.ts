@@ -1172,6 +1172,41 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
 }
 
 describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
+  it.each<[Record<string, unknown>, number]>([
+    [{}, 4],
+    [{ tp: 8, ep: 8, pp: 2, dcp_size: 8 }, 16],
+    [{ pcp_size: 2 }, 8],
+    [{ tp: '4', ep: '4', pp: '1', pcp_size: '1' }, 4],
+    [{ num_gpus: 8 }, 8],
+    [{ num_gpus: true }, 16],
+    [{ is_multinode: undefined }, 16],
+    [{ disagg: true }, 16],
+    [{ framework: 'mori-sglang' }, 16],
+    [{ pp: true }, 16],
+    [{ pp: null }, 16],
+    [{ request_metrics: undefined }, 16],
+  ])('counts physical GPUs for the AgentX producer shape %j', (overrides, expected) => {
+    // Qwen3.8 H200 run 33038487711 uses TP4/EP4 on four GPUs, not sixteen.
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({
+        infmax_model_prefix: 'qwen3.8next',
+        hw: 'cluster:h200-dgxc',
+        framework: 'sglang',
+        precision: 'fp8',
+        tp: 4,
+        ep: 4,
+        pp: 1,
+        pcp_size: 1,
+        ...overrides,
+      }),
+      createSkipTracker(),
+    );
+
+    expect(result!.config.numPrefillGpu).toBe(expected);
+    expect(result!.config.numDecodeGpu).toBe(expected);
+    expect(result!.config.prefillEp).toBe(Number(overrides.ep ?? 4));
+  });
+
   it('maps identity/routing and flattens the nested containers', () => {
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);

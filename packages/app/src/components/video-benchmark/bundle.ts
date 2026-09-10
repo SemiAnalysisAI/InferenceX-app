@@ -51,7 +51,10 @@ export interface Bundle {
   checksums: Map<string, string>;
   manifestSha256: string;
 }
-export async function loadBundle(read: (path: string) => Promise<Blob>): Promise<Bundle> {
+export async function readVerifiedFiles(
+  read: (path: string) => Promise<Blob>,
+  entryPoint: 'manifest.json' | 'comparison.json',
+) {
   const sums = await read('SHA256SUMS');
   if (sums.size > 1024 * 1024) throw new Error('Checksum inventory exceeds 1 MiB');
   const checksums = new Map<string, string>();
@@ -62,8 +65,8 @@ export async function loadBundle(read: (path: string) => Promise<Blob>): Promise
       throw new Error('Malformed or duplicate SHA256SUMS entry');
     checksums.set(safePath(match.groups!.path), match.groups!.hash);
   }
-  if (!checksums.has('manifest.json') || checksums.size > 2000)
-    throw new Error('Missing manifest or oversized inventory');
+  if (!checksums.has(entryPoint) || checksums.size > 2000)
+    throw new Error('Missing artifact entry point or oversized inventory');
   const files = new Map<string, Blob>([['SHA256SUMS', sums]]);
   const documents = new Map<string, Json>();
   let total = 0;
@@ -80,6 +83,11 @@ export async function loadBundle(read: (path: string) => Promise<Blob>): Promise
     if (path.endsWith('.json') && !path.endsWith('.stdout.json'))
       documents.set(path, JSON.parse(await blob.text()));
   }
+  return { files, documents, checksums };
+}
+
+export async function loadBundle(read: (path: string) => Promise<Blob>): Promise<Bundle> {
+  const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json');
   const manifest = documents.get('manifest.json') ?? null;
   if (
     at(manifest, 'schema_version') !== 1 ||

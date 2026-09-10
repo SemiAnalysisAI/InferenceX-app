@@ -160,26 +160,40 @@ describe('Inference ChartControls', () => {
     );
   });
 
-  it('lists locked rental tiers under each cost group and opens the TCO model dialog', () => {
+  it('hides the Cost Tier selector for metrics without a pricing basis', () => {
+    // Default mock: selectedYAxisMetric = y_tpPerGpu
+    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+    cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
+  });
+
+  it('lists each tiered metric once in the Y-axis selector, without the tier suffix', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('Cost per Million Total Tokens')
-      .closest('[role="rowgroup"]')
-      .within(() => {
-        cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
-        cy.get('[data-testid="yaxis-locked-rent_1_year-costr"]')
-          .should('contain.text', 'Cost per Million Total Tokens (Rent - 1 Year Commit)')
-          .scrollIntoView()
-          .click();
-      });
-    cy.get('[data-testid="tco-model-dialog"]')
-      .should('be.visible')
-      .and('contain.text', 'Rent - 1 Year Commit');
-    cy.get('[data-testid="tco-model-dialog-link"]')
-      .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
-      .and('have.attr', 'target', '_blank');
-    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
-    cy.contains('button', 'Not now').click();
-    cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
+    cy.get('[data-slot="select-item"]').then(($items) => {
+      const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
+      expect(labels.filter((label) => label.startsWith('Total Tokens per $1 TCO'))).to.deep.equal([
+        'Total Tokens per $1 TCO',
+        'Total Tokens per $1 TCO (Custom User Values)',
+      ]);
+      expect(
+        labels.filter((label) => label.startsWith('Cost per Million Total Tokens')),
+      ).to.deep.equal([
+        'Cost per Million Total Tokens',
+        'Cost per Million Total Tokens (Custom User Values)',
+      ]);
+      expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
+        false,
+      );
+      expect(labels.some((label) => label.includes('Rent - 3 Year Commit'))).to.equal(false);
+    });
+    cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
+  });
+
+  it('opens tiered metrics on the hyperscaler tier from an untiered metric', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-slot="select-item"]', /^Cost per Million Total Tokens$/u)
+      .scrollIntoView()
+      .click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
   });
 
   it('hides the GPU comparison section when no GPUs are selected', () => {
@@ -425,32 +439,68 @@ describe('Inference ChartControls cost metrics', () => {
 
   it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
-    ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Output Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    ).should('exist');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Input Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    ).should('exist');
+    for (const label of [
+      /^Cost per Million Total Tokens$/u,
+      /^Total Tokens per \$1 TCO$/u,
+      /^Output Tokens per \$1 TCO$/u,
+      /^Input Tokens per \$1 TCO$/u,
+    ]) {
+      cy.contains('[data-slot="select-item"]', label).should('exist');
+    }
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
-  it('selects tokens per dollar through the Y-axis metric control', () => {
+  it('selects tokens per dollar through the Y-axis metric control on the active tier', () => {
+    // y_costh is selected, so other tiered metrics open on the hyperscaler tier.
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains(
-      '[data-slot="select-item"]',
-      'Total Tokens per $1 TCO (Rent - 3 Year Commit)',
-    ).click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarR');
+    cy.contains('[data-slot="select-item"]', /^Total Tokens per \$1 TCO$/u).click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
+  });
+
+  it('shows the Cost Tier selector with published tiers, custom values and locked rental terms', () => {
+    cy.get('[data-testid="cost-tier-selector"]')
+      .should('be.visible')
+      .and('contain.text', 'Owning at Large Hyperscaler Volume')
+      .click('right');
+    cy.get('[data-slot="select-item"]').then(($items) => {
+      const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
+      expect(labels).to.deep.equal([
+        'Owning at Large Hyperscaler Volume',
+        'Rent - 3 Year Commit',
+        'Custom User Values',
+        // The lock badge carries a screen-reader "Locked" label.
+        'Rent - On DemandLocked',
+        'Rent - 1 Month CommitLocked',
+        'Rent - 6 Month CommitLocked',
+        'Rent - 1 Year CommitLocked',
+        'Rent - 2 Year CommitLocked',
+      ]);
+    });
+    cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
+    cy.get('[data-testid="cost-tier-rental"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costr');
+  });
+
+  it('switches to the custom axis from the Cost Tier selector', () => {
+    cy.get('[data-testid="cost-tier-selector"]').click('right');
+    cy.get('[data-testid="cost-tier-custom"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
+  });
+
+  it('opens the TCO model dialog for locked rental tiers instead of changing the axis', () => {
+    cy.get('[data-testid="cost-tier-selector"]').click('right');
+    cy.get('[data-testid="cost-tier-locked-rent_1_year"]')
+      .should('contain.text', 'Rent - 1 Year Commit')
+      .click();
+    cy.get('[data-testid="tco-model-dialog"]')
+      .should('be.visible')
+      .and('contain.text', 'Rent - 1 Year Commit');
+    cy.get('[data-testid="tco-model-dialog-link"]')
+      .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
+      .and('have.attr', 'target', '_blank');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.contains('button', 'Not now').click();
+    cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
   });
 });
 
@@ -460,6 +510,15 @@ describe('Inference ChartControls infrastructure tokens per dollar', () => {
       inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },
       globalFilters: {},
     });
+  });
+
+  it('keeps the rental tier when switching between tiered metrics', () => {
+    cy.get('[data-testid="cost-tier-selector"]').should('contain.text', 'Rent - 3 Year Commit');
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-slot="select-item"]', /^Cost per Million Output Tokens$/u)
+      .scrollIntoView()
+      .click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costrOutput');
   });
 
   it('does not show the token sale-price source control', () => {
@@ -634,30 +693,30 @@ describe('Axis option help', () => {
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('Rent - 3 Year Commit');
+    cy.get('input[aria-label="Search options"]').type('Total Tokens per $1 TCO');
     cy.clock();
-    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').trigger('pointerover', {
+    cy.get('[data-testid="option-help-y_tokensPerDollarH"]').trigger('pointerover', {
       pointerType: 'mouse',
     });
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').should('be.visible');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]').should('be.visible');
     cy.get('input[aria-label="Search options"]').should('have.focus');
-    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').trigger('pointerout', {
+    cy.get('[data-testid="option-help-y_tokensPerDollarH"]').trigger('pointerout', {
       pointerType: 'mouse',
     });
     cy.tick(100);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').trigger('pointerover', {
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]').trigger('pointerover', {
       pointerType: 'mouse',
     });
     cy.tick(300);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]')
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]')
       .should('be.visible')
       .and('contain.text', 'infrastructure spend')
       .trigger('pointerout', { pointerType: 'mouse' });
     cy.tick(300);
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').should('not.exist');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]').should('not.exist');
     cy.get('input[aria-label="Search options"]')
       .should('have.focus')
-      .and('have.value', 'Rent - 3 Year Commit');
+      .and('have.value', 'Total Tokens per $1 TCO');
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
   });
@@ -724,20 +783,20 @@ describe('Axis option help', () => {
 
   it('opens descriptions and formulas without selecting an option or losing the search', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('Rent - 3 Year Commit');
-    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').click();
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]')
+    cy.get('input[aria-label="Search options"]').type('Total Tokens per $1 TCO');
+    cy.get('[data-testid="option-help-y_tokensPerDollarH"]').click();
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]')
       .should('be.visible')
       .and('contain.text', 'infrastructure spend')
       .find('code')
       .should('have.text', 'tok/$ = (total tok/s/chip × 3,600) ÷ all-in cost per chip-hour ($)');
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarR"]').type('{esc}');
-    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').should('have.focus');
-    cy.get('input[aria-label="Search options"]').should('have.value', 'Rent - 3 Year Commit');
-    cy.get('[data-select-option][data-value="y_tokensPerDollarR"]').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarR');
+    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]').type('{esc}');
+    cy.get('[data-testid="option-help-y_tokensPerDollarH"]').should('have.focus');
+    cy.get('input[aria-label="Search options"]').should('have.value', 'Total Tokens per $1 TCO');
+    cy.get('[data-select-option][data-value="y_tokensPerDollarH"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_tokensPerDollarH');
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'false');
   });
 
@@ -779,10 +838,10 @@ describe('Axis option help', () => {
 
   it('exposes separate accessible selection and help actions', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('[data-testid="option-help-y_tokensPerDollarR"]').click();
+    cy.get('[data-testid="option-help-y_tokensPerDollarH"]').click();
     cy.injectAxe();
     cy.checkA11y(
-      '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarR"]',
+      '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarH"]',
       {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
       },

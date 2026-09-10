@@ -13,6 +13,7 @@ import { useLocale } from '@/lib/use-locale';
 import { escapeHtml } from '@/lib/utils';
 import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
+import { SERVER_TIMING_COPY } from './server-timing';
 import {
   tradeoffPoints,
   tradeoffCurves,
@@ -37,13 +38,15 @@ const STRINGS = {
     p90: 'P90 client-ready latency (s)',
     median: 'Median client-ready latency (s)',
     dollar: 'Valid clips / USD',
-    clipsGpu: 'Valid clips / allocated GPU-hour',
-    secondsGpu: 'Video seconds / allocated GPU-hour',
+    clipsGpu: 'Valid clips / participating GPU-hour',
+    clipsAllocatedGpu: 'Valid clips / allocated GPU-hour',
+    secondsGpu: 'Video seconds / participating GPU-hour',
+    secondsAllocatedGpu: 'Video seconds / allocated GPU-hour',
     energy: 'Valid clips / GPU-board kWh',
     latencyNote:
       'Client-ready = submission to fully downloaded media, including polling; local validation is excluded from latency. P90 uses nearest rank and requires at least 10 complete valid-request samples here. This display floor does not establish tail-latency reliability. Failed requests stay visible in the counts.',
     throughputNote:
-      'Throughput uses the recorded measurement wall window, including failed attempts and client overhead. Serial runs are diagnostics, not demonstrated serving capacity. GPU-hour views charge every reserved GPU, including idle allocations.',
+      'Throughput uses the recorded measurement wall window, including failed attempts and client overhead. Serial runs are diagnostics, not demonstrated serving capacity.',
     qualityNote:
       'Matching fixes the model revision, generation settings and prompt/seed/input workload. Precision, caching and runtime changes still require fidelity review. Technical validity does not establish perceptual quality; uncalibrated points are not qualified winners.',
     energyNote:
@@ -70,10 +73,16 @@ const STRINGS = {
     allocated: 'Allocated / participating GPUs',
     window: 'Measurement window (s)',
     power: 'Mean total participating-board power (W)',
-    energyClip: 'GPU-board energy / valid clip (J)',
+    energyClip: 'GPU-board energy / valid clip (kJ)',
+    meanPower: 'Total mean board power (W)',
+    gpuNote:
+      'Participating-GPU views measure hardware efficiency; allocated-GPU views include idle allocations. Deployment costs include all billed resources.',
+    limitRatio: 'Mean / enforced limit (%)',
+    limitWatts: 'Total enforced power limit (W)',
+    limitNote:
+      'Power-limit ratios use matching prelaunch/postcleanup enforced limits for the participating GPU UUIDs. Snapshots must agree; they do not prove continuous stability. TDP and later inventories are never substituted.',
     powerWindow: 'Measured power window (s)',
-    batch: 'Replica layout / actual batch size / offered arrival rate',
-    queue: 'Queue delay / server-ready timestamp / deadline attainment',
+    offered: 'Offered arrival rate / deadline attainment',
     unavailable: 'Unavailable in this result contract',
     server: 'Recorded server settings',
     fidelity: 'Recorded fidelity and policy',
@@ -111,13 +120,15 @@ const STRINGS = {
     p90: 'P90 客户端就绪延迟（秒）',
     median: '客户端就绪延迟中位数（秒）',
     dollar: '有效视频数 / USD',
-    clipsGpu: '有效视频数 / 已分配 GPU 小时',
-    secondsGpu: '生成视频秒数 / 已分配 GPU 小时',
+    clipsGpu: '有效视频数 / 参与计算 GPU 小时',
+    clipsAllocatedGpu: '有效视频数 / 已分配 GPU 小时',
+    secondsGpu: '生成视频秒数 / 参与计算 GPU 小时',
+    secondsAllocatedGpu: '生成视频秒数 / 已分配 GPU 小时',
     energy: '有效视频数 / GPU 板卡 kWh',
     latencyNote:
       '客户端就绪指从提交到媒体完整下载完成，包含轮询等待，不包含本地验证。P90 使用最近秩法，此处至少需要 10 个完整的有效请求样本；这只是显示门槛，不代表尾延迟估计具有统计可靠性。失败请求仍保留在计数中。',
     throughputNote:
-      '吞吐量使用记录的测量墙钟时间窗口，包含失败尝试与客户端开销。串行运行仅用于诊断，不能证明服务容量。GPU 小时指标计入所有预留 GPU，包括空闲的已分配资源。',
+      '吞吐量使用记录的测量墙钟时间窗口，包含失败尝试与客户端开销。串行运行仅用于诊断，不能证明服务容量。',
     qualityNote:
       '工作负载匹配固定了模型版本、生成设置以及 prompt、seed 和输入工作负载。精度、缓存和运行时变更仍需审查保真度。技术有效性不代表感知质量；未校准的点不能作为合格的性能优胜结果。',
     energyNote:
@@ -144,10 +155,16 @@ const STRINGS = {
     allocated: '已分配 / 参与计算的 GPU 数',
     window: '测量时段（秒）',
     power: '参与计算板卡总功率均值（W）',
-    energyClip: '每有效视频 GPU 板卡能耗（J）',
+    energyClip: '每有效视频 GPU 板卡能耗（kJ）',
+    meanPower: '板卡总功率均值（W）',
+    gpuNote:
+      '按参与计算 GPU 数衡量硬件效率；按已分配 GPU 数统计时包含空闲分配。完整部署成本须包含所有计费资源。',
+    limitRatio: '平均功率 / 实际生效上限（%）',
+    limitWatts: '实际生效功率上限合计（W）',
+    limitNote:
+      '功率占比使用参与计算 GPU 启动前与清理后记录的实际生效功率上限，并按 UUID 匹配。两次记录必须一致，但不能证明期间上限始终不变；不以规格 TDP 或事后硬件信息替代。',
     powerWindow: '功率测量窗口（秒）',
-    batch: '副本布局 / 实际批次大小 / 施加的请求到达率',
-    queue: '排队延迟 / 服务端就绪时间戳 / 时限达标情况',
+    offered: '施加的请求到达率 / 时限达标情况',
     unavailable: '此结果格式未提供',
     server: '已记录的服务端设置',
     fidelity: '已记录的保真度与判定策略',
@@ -187,7 +204,9 @@ export default function VideoTradeoff({
   onOpen: (point: TradeoffPoint) => void;
   sourceId?: string;
 }) {
-  const s = STRINGS[useLocale()];
+  const locale = useLocale();
+  const s = STRINGS[locale];
+  const t = SERVER_TIMING_COPY[locale];
   const all = useMemo(() => runs.flatMap(tradeoffPoints), [runs]);
   const [workload, setWorkload] = useState('');
   const [latencyAxis, setX] = useState<LatencyAxis | null>(null);
@@ -282,7 +301,16 @@ export default function VideoTradeoff({
               label={s.y}
               value={yAxis}
               onValueChange={(value) => setY(value as EfficiencyAxis)}
-              options={(['dollar', 'clipsGpu', 'secondsGpu', 'energy'] as const).map((value) => ({
+              options={(
+                [
+                  'clipsGpu',
+                  'secondsGpu',
+                  'clipsAllocatedGpu',
+                  'secondsAllocatedGpu',
+                  'energy',
+                  'dollar',
+                ] as const
+              ).map((value) => ({
                 value,
                 label: s[value],
               }))}
@@ -403,6 +431,7 @@ export default function VideoTradeoff({
             <summary className="cursor-pointer font-medium">{s.methods}</summary>
             <p>{s.latencyNote}</p>
             <p>{isServing ? s.servingNote : s.throughputNote}</p>
+            <p>{s.gpuNote}</p>
             <p>{s.qualityNote}</p>
             {yAxis === 'energy' && <p>{s.energyNote}</p>}
           </details>
@@ -416,6 +445,9 @@ export default function VideoTradeoff({
                   <th className="p-2">{s.failed}</th>
                   <th className="p-2">{s[xAxis]}</th>
                   <th className="p-2">{s[yAxis]}</th>
+                  <th className="p-2">{s.meanPower}</th>
+                  <th className="p-2">{s.energyClip}</th>
+                  <th className="p-2">{s.limitRatio}</th>
                   <th className="p-2">{s.status}</th>
                 </tr>
               </thead>
@@ -438,6 +470,9 @@ export default function VideoTradeoff({
                     <td className="p-2">{fmt(p.failed)}</td>
                     <td className="p-2">{fmt(latencyValue(p, xAxis))}</td>
                     <td className="p-2">{fmt(efficiencyValue(p, yAxis, costs[p.id]))}</td>
+                    <td className="p-2">{fmt(p.power)}</td>
+                    <td className="p-2">{fmt(p.energy === null ? null : p.energy / 1000)}</td>
+                    <td className="p-2">{fmt(p.powerLimit?.percent ?? null)}</td>
                     <td className="p-2 text-xs">
                       {plotted.some((q) => q.id === p.id) ? s.plotted : s.missing}
                     </td>
@@ -465,10 +500,13 @@ export default function VideoTradeoff({
                       : []),
                     [s.window, fmt(active.wall)],
                     [s.power, fmt(active.power)],
-                    [s.energyClip, fmt(active.energy)],
+                    [s.energyClip, fmt(active.energy === null ? null : active.energy / 1000)],
+                    [s.limitRatio, fmt(active.powerLimit?.percent ?? null)],
+                    [s.limitWatts, fmt(active.powerLimit?.watts ?? null)],
                     [s.powerWindow, fmt(active.powerWindow)],
-                    [s.batch, s.unavailable],
-                    [s.queue, s.unavailable],
+                    [t.batch, active.timing.batchSizes?.join(', ') ?? s.unavailable],
+                    [t.replicas, active.timing.replicaIds?.join(', ') ?? s.unavailable],
+                    [s.offered, s.unavailable],
                   ].map(([name, value]) => (
                     <div key={name} className="contents">
                       <dt className="text-muted-foreground">{name}</dt>
@@ -489,6 +527,33 @@ export default function VideoTradeoff({
                     {s.ci}
                   </a>
                 </div>
+                <p className="text-xs text-muted-foreground">{s.limitNote}</p>
+                <details data-testid="tradeoff-server-timing" className="space-y-3">
+                  <summary className="cursor-pointer text-xs">{t.title}</summary>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    {t.stages.map((name, index) => {
+                      const timing = active.timing.stages[index];
+                      return (
+                        <div key={name} className="contents">
+                          <dt className="text-muted-foreground">{name} · P50 / P90 / P95 (s)</dt>
+                          <dd>
+                            {fmt(timing?.p50 ?? null)} / {fmt(timing?.p90 ?? null)} /{' '}
+                            {fmt(timing?.p95 ?? null)}
+                            <br />
+                            <span className="text-muted-foreground">
+                              {t.coverage}:{' '}
+                              {timing
+                                ? `${timing.samples} / ${timing.valid} / ${timing.missing}`
+                                : s.unavailable}
+                            </span>
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                  <p className="text-xs text-muted-foreground">{t.note}</p>
+                  <p className="text-xs text-muted-foreground">{t.layoutNote}</p>
+                </details>
                 <details>
                   <summary className="cursor-pointer text-xs">{s.workload}</summary>
                   <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">

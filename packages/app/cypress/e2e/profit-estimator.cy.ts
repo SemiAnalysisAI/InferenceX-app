@@ -245,8 +245,9 @@ describe('Profit Estimator per GW', () => {
       .first()
       .invoke('text')
       .should((text) => {
-        // Bars re-sort by revenue, but halving utilization halves every bar, so
-        // the tallest bar is still the tallest and its label halves.
+        // Bars re-sort by P&L, but the fixture SKUs keep their profit order at
+        // 30% utilization, so the first bar is the same chip and its revenue
+        // label halves along with every other bar's.
         expect(parseCompactUsd(text)).to.be.closeTo(revenueAt60 / 2, revenueAt60 * 0.02);
       });
     // Y domain rescales, so compare TCO in data terms via the tooltip-free

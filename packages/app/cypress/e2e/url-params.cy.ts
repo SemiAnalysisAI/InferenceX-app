@@ -114,10 +114,9 @@ describe('URL Parameter Persistence', () => {
         .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
           cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-          cy.contains(
-            '[data-select-option]',
-            'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
-          ).click({ force: true });
+          cy.contains('[data-select-option]', /^Cost per Million Total Tokens$/u).click({
+            force: true,
+          });
 
           cy.get('[data-testid="scatter-quick-filters"]').click();
           cy.get('[data-testid="quick-filter-best-per-sku"]').should(
@@ -175,7 +174,11 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
+        'Cost per Million Total Tokens',
+      );
+      cy.get('[data-testid="cost-tier-selector"]').should(
+        'contain.text',
+        'Owning at Large Hyperscaler Volume',
       );
 
       cy.get('[data-testid="scatter-graph"]')
@@ -195,10 +198,7 @@ describe('URL Parameter Persistence', () => {
         .should('contain.text', 'Total Tokens per $1 TCO');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.contains(
-        '[data-select-option]',
-        'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
-      ).click({
+      cy.contains('[data-select-option]', /^Cost per Million Total Tokens$/u).click({
         force: true,
       });
 
@@ -213,7 +213,11 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+        'Total Tokens per $1 TCO',
+      );
+      cy.get('[data-testid="cost-tier-selector"]').should(
+        'contain.text',
+        'Owning at Large Hyperscaler Volume',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
