@@ -100,7 +100,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { type ParetoDirection } from '@/lib/chart-utils';
 import {
   chartFrontier,
-  groupOperatingCurvePoints,
+  upperPowerEnvelope,
   isPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
@@ -368,9 +368,9 @@ const SCATTER_STRINGS = {
     optimalOnly: 'Optimal Only',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerCurves:
-      'Lines connect concurrency measurements within the same serving configuration and run; they are power curves, not Pareto frontiers.',
+      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
     powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show power curves across concurrency levels.',
+      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -400,8 +400,8 @@ const SCATTER_STRINGS = {
     optimalOnly: '仅最优',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerCurves:
-      '曲线连接同一次运行、同一推理配置在不同并发数下的测量点，表示功耗变化，不代表 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看不同并发数下的功耗曲线。',
+      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
+    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -502,11 +502,20 @@ const ScatterGraph = React.memo(
       | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const showOperatingCurves = isPowerAxis && !hideNonOptimal;
-    const showGradientLabels = preferGradientLabels && !showOperatingCurves;
-    const groupDisplayedPoints = showOperatingCurves
-      ? groupOperatingCurvePoints
-      : groupPointsByDate;
+    const showPowerEnvelope = isPowerAxis && !hideNonOptimal;
+    const showGradientLabels = preferGradientLabels && !showPowerEnvelope;
+    const groupDisplayedPoints = useCallback(
+      (points: InferenceData[]) => {
+        const groups = groupPointsByDate(points);
+        if (showPowerEnvelope) {
+          for (const [date, samples] of groups) {
+            groups.set(date, upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e'));
+          }
+        }
+        return groups;
+      },
+      [showPowerEnvelope, chartDefinition.chartType],
+    );
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
     const ephemeralUrlState = useEphemeralUrlState();
@@ -783,7 +792,7 @@ const ScatterGraph = React.memo(
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
-    const displayedRooflines = showOperatingCurves ? groupedData : rooflines;
+    const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -863,8 +872,8 @@ const ScatterGraph = React.memo(
 
     const officialOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
       // Pareto continuations can cross serving configurations; they are not
-      // extensions of the configuration-local power operating curves.
-      if (showOperatingCurves) return [];
+      // extensions of the measured power envelope.
+      if (showPowerEnvelope) return [];
       interface Bucket {
         hw: string;
         precision: string;
@@ -908,10 +917,10 @@ const ScatterGraph = React.memo(
         );
       }
       return result;
-    }, [data, clippedData, selectedYAxisMetric, chartDefinition, showOperatingCurves]);
+    }, [data, clippedData, selectedYAxisMetric, chartDefinition, showPowerEnvelope]);
 
     const overlayOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
-      if (showOperatingCurves) return [];
+      if (showPowerEnvelope) return [];
       interface Bucket {
         hw: string;
         precision: string;
@@ -967,7 +976,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       runIndexByUrl,
-      showOperatingCurves,
+      showPowerEnvelope,
     ]);
 
     // Warning annotations for visible series (official + unofficial overlay)
@@ -1059,16 +1068,16 @@ const ScatterGraph = React.memo(
       [overlayGroups, paretoDirection],
     );
     const displayedOverlayRooflines = useMemo(() => {
-      if (!showOperatingCurves) return overlayRooflines;
+      if (!showPowerEnvelope) return overlayRooflines;
       return Object.fromEntries(
         Object.entries(overlayGroups).flatMap(([key, group]) =>
-          [...groupOperatingCurvePoints(group.points)].map(([segment, points]) => [
+          [...groupDisplayedPoints(group.points)].map(([segment, points]) => [
             `${key}__${encodeURIComponent(segment)}`,
             { ...group, points },
           ]),
         ),
       );
-    }, [showOperatingCurves, overlayRooflines, overlayGroups]);
+    }, [showPowerEnvelope, overlayRooflines, overlayGroups, groupDisplayedPoints]);
 
     // Overlay counterpart of `optimalPointKeys`: the points on any overlay
     // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
@@ -1323,7 +1332,7 @@ const ScatterGraph = React.memo(
     const metricIdentity = useMemo(
       () =>
         [
-          showOperatingCurves ? 'operating-curves' : 'pareto-curves',
+          showPowerEnvelope ? 'power-envelopes' : 'pareto-curves',
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
@@ -1341,7 +1350,7 @@ const ScatterGraph = React.memo(
           .toSorted()
           .join('|'),
       [
-        showOperatingCurves,
+        showPowerEnvelope,
         selectedYAxisMetric,
         useAdvancedLabels,
         showConcurrencyLabels,
@@ -1465,7 +1474,7 @@ const ScatterGraph = React.memo(
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
     const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = preferPerfRulerMode && !showOperatingCurves;
+    const perfRulerMode = preferPerfRulerMode && !showPowerEnvelope;
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass — lines/labels must never
@@ -2052,7 +2061,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y))
-            .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
+            .curve(d3.curveMonotoneX);
 
           // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
@@ -2151,7 +2160,7 @@ const ScatterGraph = React.memo(
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
-            .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
+            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('fill', 'none')
@@ -2246,7 +2255,7 @@ const ScatterGraph = React.memo(
               (exit) => exit.remove(),
             )
             .attr('data-seg-key', (d) => d.segKey)
-            .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
+            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
@@ -2439,7 +2448,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => newXScale(d.x))
             .y((d) => newYScale(d.y))
-            .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
+            .curve(d3.curveMonotoneX);
 
           // Update roofline paths — must split per-date so the zoom redraw
           // matches the per-date sub-paths created in the initial render.
@@ -2623,7 +2632,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
                 .y((d) => yScale(d.y))
-                .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
+                .curve(d3.curveMonotoneX);
 
               interface OvEntry {
                 key: string;
@@ -2654,7 +2663,7 @@ const ScatterGraph = React.memo(
                 .data(ovEntries, (d) => d.key)
                 .join('path')
                 .attr('class', (d) => `overlay-roofline-path overlay-roofline-${d.key}`)
-                .attr('data-curve-kind', showOperatingCurves ? 'operating' : 'pareto')
+                .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
@@ -2828,7 +2837,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
                 .y((d) => newYScale(d.y))
-                .curve(showOperatingCurves ? d3.curveLinear : d3.curveMonotoneX);
+                .curve(d3.curveMonotoneX);
 
               Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 if (group.points.length < 2) return;
@@ -3059,7 +3068,7 @@ const ScatterGraph = React.memo(
     }, [
       displayedRooflines,
       groupDisplayedPoints,
-      showOperatingCurves,
+      showPowerEnvelope,
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
@@ -3501,7 +3510,21 @@ const ScatterGraph = React.memo(
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"
           grabCursor={true}
-          caption={caption}
+          caption={
+            isPowerAxis ? (
+              <>
+                {caption}
+                <p
+                  data-testid="power-curve-description"
+                  className="mt-2 text-2xs text-muted-foreground"
+                >
+                  {showPowerEnvelope ? legendT.powerCurves : legendT.powerOptimal}
+                </p>
+              </>
+            ) : (
+              caption
+            )
+          }
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}
@@ -3694,7 +3717,7 @@ const ScatterGraph = React.memo(
                     // Parallelism labels are point labels; turning them on is
                     // pointless if labels are hidden, so auto-enable Labels.
                     if (checked && !showPointLabels) setShowPointLabels(true);
-                    if (checked && !showGradientLabels && !showOperatingCurves) {
+                    if (checked && !showGradientLabels && !showPowerEnvelope) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
                           detail: {
@@ -3712,7 +3735,7 @@ const ScatterGraph = React.memo(
                     }
                   },
                 },
-                ...(showOperatingCurves
+                ...(showPowerEnvelope
                   ? []
                   : [
                       {
@@ -3735,7 +3758,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showOperatingCurves
+                ...(showPowerEnvelope
                   ? []
                   : [
                       {
@@ -3817,14 +3840,6 @@ const ScatterGraph = React.memo(
             />
           }
         />
-        {isPowerAxis && (
-          <p
-            data-testid="power-curve-description"
-            className="mt-2 px-1 text-2xs text-muted-foreground"
-          >
-            {showOperatingCurves ? legendT.powerCurves : legendT.powerOptimal}
-          </p>
-        )}
         {isMeasuredEnergyAxis && (
           <MeasuredPowerSummary
             total={powerTierCounts.total}

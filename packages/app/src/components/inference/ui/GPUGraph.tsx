@@ -44,7 +44,7 @@ import {
 import type { ParetoDirection } from '@/lib/chart-utils';
 import {
   chartFrontier,
-  groupOperatingCurvePoints,
+  upperPowerEnvelope,
   isPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
@@ -148,9 +148,9 @@ const GPU_STRINGS = {
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
     powerCurves:
-      'Lines connect concurrency measurements within the same serving configuration and run; they are power curves, not Pareto frontiers.',
+      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
     powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show power curves across concurrency levels.',
+      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
@@ -171,8 +171,8 @@ const GPU_STRINGS = {
     highContrast: '高对比度',
     optimalOnly: '仅最优',
     powerCurves:
-      '曲线连接同一次运行、同一推理配置在不同并发数下的测量点，表示功耗变化，不代表 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看不同并发数下的功耗曲线。',
+      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
+    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
@@ -250,7 +250,7 @@ const GPUGraph = React.memo(
     ] as ParetoDirection | undefined;
     const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
     const powerCurveMetric = isPowerCurveMetric(selectedYAxisMetric);
-    const operatingCurves = powerCurveMetric && !hideNonOptimal;
+    const powerEnvelopeMode = powerCurveMetric && !hideNonOptimal;
     const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
@@ -427,16 +427,13 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      if (!operatingCurves) return paretoRooflines;
+      if (!powerEnvelopeMode) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
-        let index = 0;
-        for (const segment of groupOperatingCurvePoints(points).values()) {
-          result[`${key}__operating${index++}`] = segment;
-        }
+        result[key] = upperPowerEnvelope(points, chartDefinition.chartType !== 'e2e');
       }
       return result;
-    }, [operatingCurves, groupedData, paretoRooflines]);
+    }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -601,7 +598,7 @@ const GPUGraph = React.memo(
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
-          operatingCurves ? 'operating-curves' : 'pareto-curves',
+          powerEnvelopeMode ? 'power-envelope' : 'pareto-curves',
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
           ...filteredData.map(
@@ -612,7 +609,7 @@ const GPUGraph = React.memo(
           .join('|'),
       [
         selectedYAxisMetric,
-        operatingCurves,
+        powerEnvelopeMode,
         useAdvancedLabels,
         showConcurrencyLabels,
         xExtent,
@@ -753,7 +750,7 @@ const GPUGraph = React.memo(
     // chip configs on the same date, or a mix — which is the point of this
     // view: quantify the multiple between comparison series at a glance.
     const [savedPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = savedPerfRulerMode && !operatingCurves;
+    const perfRulerMode = savedPerfRulerMode && !powerEnvelopeMode;
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass (no lingering frame).
@@ -1245,7 +1242,7 @@ const GPUGraph = React.memo(
               )}
               {powerCurveMetric && (
                 <p data-testid="power-curve-description" className="text-muted-foreground text-sm">
-                  {operatingCurves ? legendT.powerCurves : legendT.powerOptimal}
+                  {powerEnvelopeMode ? legendT.powerCurves : legendT.powerOptimal}
                 </p>
               )}
             </>
@@ -1273,7 +1270,7 @@ const GPUGraph = React.memo(
             config: {
               getColor: getRooflineColor,
               isVisible: isRooflineVisible,
-              curve: operatingCurves ? d3.curveLinear : d3.curveMonotoneX,
+              curve: d3.curveMonotoneX,
             },
           },
           {
@@ -1574,7 +1571,7 @@ const GPUGraph = React.memo(
                   if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
-              ...(operatingCurves
+              ...(powerEnvelopeMode
                 ? []
                 : [
                     {
