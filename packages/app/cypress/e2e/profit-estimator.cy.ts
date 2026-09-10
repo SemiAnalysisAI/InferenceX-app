@@ -6,8 +6,8 @@
 //    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
-//  - DeepSeek V4 Pro opens on 24 tok/s/user and the DeepSeek peak list price
-//    ($1.32 / $0.044 cached / $3.96);
+//  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
+//    ($1.32 / $0.044 cached / $3.96), and a 5% license fee;
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
@@ -854,8 +854,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '30%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '5%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
@@ -911,15 +911,18 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
       .should('contain.text', 'DeepSeek V4 Pro')
       .and('contain.text', '24 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
       .and('contain.text', '(DeepSeek list price)');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    // Leaving a per-model path rewrites to the target model's slug; only a
+    // fresh visit canonicalizes the default model to the bare path.
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
       .and('contain.text', '(OpenRouter)');

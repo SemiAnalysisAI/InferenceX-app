@@ -1134,12 +1134,12 @@ and the two can be collapsed into one once both are on master.
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
   H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
-  MiniMax M3 also opens on a 20% model license fee; every other model opens on
-  the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user, the
-  speed DeepSeek's own API serves at, and DeepSeek's peak-hour list price for
+  GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on 20%; Kimi K3
+  opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user,
+  the speed DeepSeek's own API serves at, DeepSeek's peak-hour list price for
   `deepseek-v4-pro-0813` ($1.32 input / $0.044 cached / $3.96 output per M tok;
-  the off-peak rate is half that, and the OpenRouter aggregate sits below both).
-  At 24 tok/s/user the B200, B300, and MI355X agentic curves are priced; the
+  the off-peak rate is half that, and the OpenRouter aggregate sits below both),
+  and a 5% model license fee. At 24 tok/s/user the B200, B300, and MI355X agentic curves are priced; the
   GB200, GB300, and H200 curves bottom out above it (their lowest measured
   points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
   a lower-interactivity run lands. A

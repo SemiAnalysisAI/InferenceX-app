@@ -381,10 +381,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 30% license fee', () => {
+  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 5% license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
     expect(defaults.interactivity).toBe(24);
-    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
+    expect(defaults.labCutPct).toBe(5);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
       inputPerMillion: 1.32,
