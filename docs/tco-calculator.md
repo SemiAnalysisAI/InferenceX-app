@@ -1052,8 +1052,10 @@ tabs differ only in the denominator (`ProfitBasis`):
 
 In the nav both sit between Inference Performance and Accuracy Evals. TCO
 Calculator and Fleet Lifecycle moved out of the tab bar into the footer's "More" column
-(`navGroup: 'footer-only'`, `footer-link-calculator` / `footer-link-fleet`); their
-pages, `/zh` mirrors and sitemap entries are unchanged.
+(`navGroup: 'footer-only'`, `footer-link-calculator` / `footer-link-fleet`), and
+Historical Trends followed (`footer-link-historical`) since the compare-by-date
+flow on the inference dashboard covers the same question; their pages, `/zh`
+mirrors and sitemap entries are unchanged.
 
 ### The arithmetic
 

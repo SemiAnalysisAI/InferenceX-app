@@ -58,7 +58,7 @@ describe('CSV Export', () => {
   });
 
   it('historical trends chart has CSV export option', () => {
-    cy.get('[data-testid="tab-trigger-historical"]').click();
+    cy.get('[data-testid="footer-link-historical"]').scrollIntoView().click();
     cy.get('[data-testid="historical-trend-figure"]').should('exist');
 
     cy.get('[data-testid="export-button"]').first().click();

@@ -42,6 +42,13 @@ describe('dashboard route registry', () => {
     expect(getDashboardRoute('fleet').indexable).toBe(true);
   });
 
+  it('moves Historical Trends to the footer but keeps it indexed and locale-mirrored', () => {
+    expect(getDashboardRoute('historical').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('historical').indexable).toBe(true);
+    expect(getDashboardRoute('historical').localeMirrored).toBe(true);
+    expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
+  });
+
   it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
@@ -54,6 +61,7 @@ describe('dashboard route registry', () => {
     ]);
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');
+    expect(primary).not.toContain('historical');
     expect(dashboardRouteForPathname('/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
       'profit-estimator-per-gigawatt',
     );

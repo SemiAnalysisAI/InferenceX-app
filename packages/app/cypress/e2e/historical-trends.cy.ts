@@ -41,8 +41,11 @@ describe('Historical Trends Tab', () => {
     cy.get('[data-testid="historical-trends-display"]').find('svg').should('exist');
   });
 
-  it('tab trigger is visible in desktop navigation', () => {
-    cy.get('[data-testid="tab-trigger-historical"]').should('contain.text', 'Historical Trends');
+  it('is reachable from the footer, not the tab bar', () => {
+    cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
+    cy.get('[data-testid="footer-link-historical"]')
+      .should('have.attr', 'href', '/historical')
+      .and('contain.text', 'Historical Trends');
   });
 });
 
