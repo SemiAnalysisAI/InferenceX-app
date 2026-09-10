@@ -77,6 +77,29 @@ describe('Custom User Values', () => {
         });
     });
 
+    it('re-opening the custom tier quotes the reseeded prices, not the earlier typing', () => {
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-custom"]').click();
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .clear()
+        .type('9');
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .should('have.value', '9');
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-hyperscaler"]').click();
+      cy.get('[data-testid="cost-tier-selector"]').first().click();
+      cy.get('[data-testid="cost-tier-custom"]').click();
+      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
+        .first()
+        .should(($input) => {
+          const val = parseFloat($input.val() as string);
+          expect(val).to.be.greaterThan(0);
+          expect(val).to.not.equal(9);
+        });
+    });
+
     it('editing a badge on a published tier switches to the custom tier', () => {
       cy.get('[data-testid="cost-tier-selector"]').first().click();
       cy.get('[data-testid="cost-tier-hyperscaler"]').click();

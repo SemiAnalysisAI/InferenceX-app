@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -79,6 +79,16 @@ export function InferenceTcoBadges({
   // Text as typed, so a half-entered "2." or an emptied field survives the
   // re-render; the parsed number lives in `userCosts`.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // The `userCosts` object this figure last wrote. When the context holds a
+  // different one (a tier change reseeded it, the other /inference figure
+  // edited a chip, or the reader left the custom tier), the drafts describe
+  // prices the plot no longer uses, so they are dropped during render.
+  const ownedCostsRef = useRef<typeof userCosts>(null);
+  const [seenCosts, setSeenCosts] = useState(userCosts);
+  if (userCosts !== seenCosts) {
+    setSeenCosts(userCosts);
+    if (userCosts !== ownedCostsRef.current) setDrafts({});
+  }
 
   // A deep link onto the custom metric arrives with no custom costs yet;
   // seed every registry chip from the published prices so the chart is not
@@ -91,8 +101,10 @@ export function InferenceTcoBadges({
     (base: string, raw: string) => {
       const parsed = parseInferenceCustomCost(raw);
       if (isCustom) {
+        const next = { ...(userCosts ?? values), [base]: parsed };
+        ownedCostsRef.current = next;
         setDrafts((prev) => ({ ...prev, [base]: raw }));
-        setUserCosts({ ...(userCosts ?? values), [base]: parsed });
+        setUserCosts(next);
         return;
       }
       if (!customMetric || !publishedTier) return;
@@ -102,8 +114,10 @@ export function InferenceTcoBadges({
       const seeded = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, String(value)]),
       );
+      const next = { ...publishedCostsForTier(publishedTier, tcoBasis), [base]: parsed };
+      ownedCostsRef.current = next;
       setDrafts({ ...seeded, [base]: raw });
-      setUserCosts({ ...publishedCostsForTier(publishedTier, tcoBasis), [base]: parsed });
+      setUserCosts(next);
       setSelectedYAxisMetric(`y_${customMetric}`);
       track('inference_cost_tier_selected', {
         metric: `y_${customMetric}`,

@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
 import { getGpuSpecs } from '@/lib/constants';
+import { createMockInferenceContextValues } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
 const VALUES = { gb300: 2.31, mi355x: 1.5 };
 const REGISTRY_BASES = Object.keys(HW_REGISTRY);
+const GB300_INPUT = '[data-testid="cost-input-gb300"]';
 
 // The /inference caption's TCO badges double as the custom $/chip/hr inputs,
 // so there is no Custom Chip Costs card; the badges are exercised on their own.
@@ -95,6 +99,46 @@ describe('InferenceTcoBadges', () => {
     cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.5');
     cy.get('[data-testid="cost-input-gb300"]').type('3');
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: 3, mi355x: 1.5 });
+  });
+
+  it('drops a typed draft once the shared costs are reseeded or edited elsewhere', () => {
+    // Two figures share one userCosts, as on /inference. The provider here
+    // holds real state so the second figure and a tier reseed reach the first.
+    const base = createMockInferenceContextValues({ selectedYAxisMetric: 'y_costUser' });
+    function Harness() {
+      const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>({
+        gb300: 2.31,
+        mi355x: 1.5,
+      });
+      const value = { ...base, userCosts, setUserCosts };
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div data-testid="figure-a">
+            <InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />
+          </div>
+          <div data-testid="figure-b">
+            <InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />
+          </div>
+          <button type="button" onClick={() => setUserCosts({ gb300: 2.31, mi355x: 1.5 })}>
+            reseed
+          </button>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(<Harness />, { globalFilters: {} });
+    const a = () => cy.get(`[data-testid="figure-a"] ${GB300_INPUT}`);
+    const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
+    a().clear().type('2.50');
+    a().should('have.value', '2.50');
+    b().should('have.value', '2.5');
+    // The other figure edits the chip: figure A's "2.50" text is stale and goes.
+    b().clear().type('3');
+    a().should('have.value', '3');
+    b().should('have.value', '3');
+    // A tier change reseeds the shared costs: both figures quote the seed.
+    cy.contains('button', 'reseed').click();
+    a().should('have.value', '2.31');
+    b().should('have.value', '2.31');
   });
 
   it('gives each mounted set of badges its own input ids', () => {
