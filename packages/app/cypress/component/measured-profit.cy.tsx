@@ -125,8 +125,8 @@ describe('Measured-power profit comparison', () => {
       .then((href) => {
         const payload = JSON.parse(decodeURIComponent(href!.split(',').slice(1).join(',')));
         expect(payload.settings.targetInteractivity).to.equal(POINT.interactivity);
-        expect(payload.modelAssumptions.pue).to.equal(1.3);
         const comparison = payload.comparisons[0];
+        expect(comparison.modelAssumptions.pue).to.equal(1.3);
         expect(comparison.status).to.equal('unavailable');
         expect(comparison.reason).to.equal('workload');
         expect(comparison.sourcePoints[0]).to.include({
