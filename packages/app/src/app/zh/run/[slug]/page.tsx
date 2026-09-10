@@ -45,7 +45,7 @@ function statLedDescriptionZh(entry: RunPageEntry, data: RunPageData): string {
       ? ''
       : `，按超大规模云价格每百万 token 成本 ${fmtCostPerMtok(read.costPerMtok)}`;
   const chipLabel = entry.chip.label;
-  return `实测数据：运行 ${entry.model.seoName} 时，${chipLabel} 在每用户每秒 ${data.primaryTier} token 的交互速度下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
+  return `实测数据：运行 ${entry.model.seoName} 时，${chipLabel} 在每用户每秒至少 ${data.primaryTier} token 的要求下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -90,17 +90,17 @@ function buildFaqZh(
     data.bestThroughputPerGpu === null ? '暂无' : fmtThroughput(data.bestThroughputPerGpu);
   const throughputAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `在${workload}下运行 ${model}，目标交互速度为每用户每秒 ${data.primaryTier} token 时，${chipLabel} 的单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度为 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值总吞吐量为单 GPU ${peak} token/s。`
+      ? `在${workload}下运行 ${model}，交互速度至少达到每用户每秒 ${data.primaryTier} token 时，${chipLabel} 的单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度为 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值总吞吐量为单 GPU ${peak} token/s。`
       : `InferenceX 集群已为该组合完成 ${data.configCount} 组实测配置，各交互档位的实测结果见上方阶梯表。`;
 
   const costAnswer =
     typeof read?.costPerMtok === 'number'
-      ? `按超大规模云大批量自有 $/GPU/小时 价格、每用户每秒 ${data.primaryTier} token 档位计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。零售租用价格见上方表格；更慢的交互档位成本更低。`
+      ? `按超大规模云大批量自有 $/GPU/小时 价格、每用户每秒至少 ${data.primaryTier} token 的要求计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。零售租用价格见上方表格；降低最低交互速度要求可能进一步降低成本。`
       : `每百万 token 成本由实测吞吐和 SemiAnalysis AI Cloud TCO 模型的 $/GPU/小时 价格换算得出，待该组合达到主交互档位后即会显示。`;
 
   const servingAnswer = `本页数据来自 ${data.frameworks.join('、')}，精度覆盖 ${data.precisions.map((p) => p.toUpperCase()).join('、')}${data.hasDisagg ? '，包含 prefill 分离部署' : ''}${data.hasMultinode ? '，并包含多节点部署' : ''}。推理引擎持续重新构建并重跑基准，最优配置可能随时变化。`;
 
-  const methodologyAnswer = `所有数字均由 InferenceX 集群在真实 ${chipLabel} 硬件上实测，通过在${workload}下扫描并发数绘制吞吐与交互速度前沿曲线${data.newest ? `；最新一次运行落在 ${data.newest}` : ''}。推导方式与 InferenceX 总览排行榜完全一致。`;
+  const methodologyAnswer = `结果基于 InferenceX 集群在真实 ${chipLabel} 硬件上的实测数据推导，通过在${workload}下扫描并发数绘制吞吐与交互速度前沿曲线${data.newest ? `；最新一次运行落在 ${data.newest}` : ''}。推导方式与 InferenceX 总览排行榜完全一致。`;
 
   return [
     { question: questions.throughput, answer: throughputAnswer },
@@ -169,7 +169,7 @@ export default async function ZhRunPage({ params }: Props) {
     : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `运行 ${model} 时，${chipLabel} 在每用户每秒 ${data.primaryTier} token 的交互速度下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`
+      ? `运行 ${model} 时，${chipLabel} 在每用户每秒至少 ${data.primaryTier} token 的要求下，单 GPU 总吞吐量（输入加输出）可持续达到 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`
       : `${model} 可在 ${chipLabel} 上运行：目前已有 ${data.configCount} 组实测配置，各档位实测结果见下方阶梯表。`;
 
   const t: RunStrings = {
@@ -183,14 +183,14 @@ export default async function ZhRunPage({ params }: Props) {
     statPrecisions: '精度',
     statFreshness: '运行日期',
     ladderHeading: '各交互档位下的吞吐表现',
-    ladderIntro: `推理部署是一种权衡：单 GPU 上并发用户越多，每个用户收到 token 的速度就越慢。下表在${scenarioLabel(data.scenario, 'zh')}下按每个单用户速度目标读取实测前沿，取该工作点上最优的引擎与精度。`,
-    colTier: '单用户速度目标',
+    ladderIntro: `推理部署是一种权衡：单 GPU 上并发用户越多，每个用户收到 token 的速度就越慢。下表在${scenarioLabel(data.scenario, 'zh')}下，按最低单用户速度要求选取有效引擎与精度中的最优结果。超过要求的实测点按其实际吞吐量计入；插值仅在实测前沿范围内进行。`,
+    colTier: '最低单用户速度',
     colThroughput: '单 GPU 每秒 token 数',
     colCost: '每百万 token 成本',
     colEngine: '推理引擎',
     colPrecision: '精度',
     costHeading: '实际部署成本',
-    costIntro: `将每用户每秒 ${data.primaryTier} token 工作点的实测吞吐，按 SemiAnalysis AI Cloud TCO 模型的各档租用价格换算为每百万 token（输入加输出）成本。`,
+    costIntro: `将满足每用户每秒至少 ${data.primaryTier} token 要求的实测前沿吞吐量，按 SemiAnalysis AI Cloud TCO 模型的各档租用价格换算为每百万 token（输入加输出）成本。`,
     colPriceTier: '价格档位',
     colGpuHour: '$/GPU/小时',
     colCostPerMtok: '每百万 token 成本',

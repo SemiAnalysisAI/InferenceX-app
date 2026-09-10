@@ -785,13 +785,13 @@ describe('Overview page', () => {
         .as('b200HistoryDelta')
         .should('have.attr', 'data-history-status', 'comparable')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
-        .and('contain.text', '-17%');
+        .and('contain.text', '-32%');
       cy.get('@b200HistoryDelta')
         .should(($badge) => {
           expect($badge).not.to.have.attr('aria-label');
         })
         .find('.sr-only')
-        .should('have.text', '17% cheaper than this platform’s Jun 10 result');
+        .should('have.text', '32% cheaper than this platform’s Jun 10 result');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.attr', 'data-history-status', 'comparable')
@@ -1062,7 +1062,7 @@ describe('Overview page', () => {
     });
   });
 
-  it('prefers speculative decode and falls back to labelled standard-decode reads', () => {
+  it('chooses the cheapest eligible stack and labels measured SLO endpoints', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
@@ -1092,24 +1092,25 @@ describe('Overview page', () => {
           .should(
             'have.attr',
             'title',
-            'Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
+            'Estimated from validated benchmark runs. Open raw source dashboard. Run-attempt date: Jul 18; measurement date unavailable. Curve snapshot: Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
           )
           .and(
             'have.attr',
             'aria-label',
-            'Approximately $0.059. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
+            'Approximately $0.059. Estimated from validated benchmark runs. Open raw source dashboard. Run-attempt date: Jul 18; measurement date unavailable. Curve snapshot: Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
           );
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
       // GB300's two points are a single-node and a multi-node aggregate
       // deployment. They are separate serving series, so neither interpolates
-      // to the tier and the cell stays empty instead of blending them.
+      // to the tier; use the qualifying endpoint without blending them.
       platform('gb300').within(() => {
-        cy.get('[data-testid="overview-pair-value"]').should('not.exist');
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'contain.text',
-          'no exact @50 result',
-        );
+        cy.get('[data-testid="overview-cost-evidence-link"]').should('have.text', '$0.095');
+        cy.get('[data-testid="overview-measured-speed"]')
+          .should('have.text', 'Measured @60 tok/s/user')
+          .and('have.attr', 'title')
+          .and('include', 'without extrapolation');
+        cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
     });
     desktopModel('MiniMax-M3', AGENTX).within(() => {
@@ -1119,9 +1120,9 @@ describe('Overview page', () => {
         .and('not.contain.text', 'STP');
     });
     cy.contains(
-      'If a chip does not have FP4 spec decoding available, the next best available configuration is used.',
+      'Choose the lowest-cost eligible configuration. AgentX uses P90 full-response token latency; 8K/1K uses median interactivity. Costs include input and output tokens, including cached input.',
     ).should('exist');
-    cy.get('body').should('not.contain.text', 'P90');
+    cy.get('body').should('contain.text', 'P90 full-response token latency');
   });
 
   it('color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞', () => {
@@ -1132,14 +1133,14 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '-14%')
-        .and('have.attr', 'data-cost-polarity', 'cheaper')
+        .should('contain.text', '+5%')
+        .and('have.attr', 'data-cost-polarity', 'pricier')
         .then(($badge) => {
           // The shade lives on the cell now, never on the badge itself.
           expect($badge.attr('style') ?? '').not.to.contain('background');
         });
-      // Cheaper than B200: the whole cell carries the green wash.
-      expectCellTint('mi355x', 'rgba(16, 185, 129,');
+      // The cheaper B200 FP8 baseline changes this cell to a red wash.
+      expectCellTint('mi355x', 'rgba(239, 68, 68,');
     });
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
@@ -1150,13 +1151,9 @@ describe('Overview page', () => {
       // +71% saturates the alpha ramp; read the computed value so the
       // assertion survives the browser normalizing `0.40` to `0.4`.
       expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
-      // No read at the tier means nothing to grade — the cell stays untinted.
-      platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
-      platform('gb300').then(([cell]) => {
-        expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
-          /rgba\(0, 0, 0, 0\)|transparent/,
-        );
-      });
+      // A measured endpoint satisfying the SLO also participates in cost comparison.
+      platform('gb300').find('[data-testid="overview-cost-delta"]').should('contain.text', '+60%');
+      expectCellTint('gb300', 'rgba(239, 68, 68, 0.4)');
     });
 
     // The B200 reference column is never washed: its null delta means "no
@@ -1200,7 +1197,7 @@ describe('Overview page', () => {
 
     cy.contains('h1', PAGE_TITLE).should('exist');
     cy.contains(
-      'Cost per million total tokens from each platform’s best observed serving envelope',
+      'Lowest cost per million total tokens across eligible FP4/FP8 configurations meeting the selected minimum SLO for each scenario.',
     ).should('exist');
     cy.get('[data-testid="overview-scope"]')
       .should('have.text', SCOPE_LINE)
@@ -1370,12 +1367,12 @@ describe('Overview page', () => {
           .and(
             'have.attr',
             'title',
-            'Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
+            'Open raw source dashboard. Run-attempt date: Jul 18; measurement date unavailable. Curve snapshot: Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .and(
             'have.attr',
             'aria-label',
-            '$0.062. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
+            '$0.062. Open raw source dashboard. Run-attempt date: Jul 18; measurement date unavailable. Curve snapshot: Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
           .and('include', '/inference?')
@@ -1388,17 +1385,17 @@ describe('Overview page', () => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         )
-          .should('contain.text', '$0.073')
+          .should('contain.text', '$0.059')
           .should('have.attr', 'href')
-          .and('include', 'i_prec=fp4')
+          .and('include', 'i_prec=fp8')
           .and('include', 'i_gpus=b200_sglang_mtp');
       });
     });
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
-      // A cell without a read at the tier carries no evidence link either.
+      // A measured endpoint has the same source evidence link as an interpolated read.
       platform('gb300').within(() => {
-        cy.get('[data-testid="overview-cost-evidence-link"]').should('not.exist');
+        cy.get('[data-testid="overview-cost-evidence-link"]').should('have.text', '$0.095');
       });
     });
     expectNoVisibleDatesOrSnapshot();
@@ -1409,17 +1406,15 @@ describe('Overview page', () => {
     cy.visit('/overview');
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
-      platform('mi355x').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
-          .should('contain.text', '—')
-          .and('not.contain.text', '∞')
-          .and('contain.text', 'no exact @50 result');
-      });
-      platform('gb300').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
-          .should('contain.text', '—')
-          .and('contain.text', 'no exact @50 result');
-      });
+      for (const hardware of ['mi355x', 'gb300']) {
+        platform(hardware).within(() => {
+          cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+          cy.get('[data-testid="overview-measured-speed"]').should(
+            'have.text',
+            'Measured @60 tok/s/user',
+          );
+        });
+      }
       platform('b200')
         .find('[data-testid="overview-cost-evidence-link"]')
         .should('have.attr', 'title')
@@ -1522,17 +1517,14 @@ describe('Overview page', () => {
 
     cy.visit('/overview?tier=30');
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
-      platform('b300').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
-          .should('contain.text', '—')
-          .and('contain.text', 'no exact @30 result');
-      });
+      platform('b300')
+        .find('[data-testid="overview-measured-speed"]')
+        .should('have.text', 'Measured @70 tok/s/user');
       platform('b200')
-        .find('[data-testid="overview-pair-missing"]')
-        .should('contain.text', '—')
-        .and('contain.text', 'no exact @30 result');
+        .find('[data-testid="overview-measured-speed"]')
+        .should('have.text', 'Measured @40 tok/s/user');
     });
-    // Exact @30 read priced without a B200 baseline: cost plus the ∞ badge.
+    // B200 now has a measured point above the minimum SLO, so comparison is available.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
@@ -1540,8 +1532,8 @@ describe('Overview page', () => {
           '$0.049',
         );
         cy.get('[data-testid="overview-cost-delta"][data-hardware="b300"]')
-          .should('contain.text', '∞')
-          .and('have.attr', 'data-cost-polarity', 'no-baseline');
+          .should('contain.text', '-18%')
+          .and('have.attr', 'data-cost-polarity', 'cheaper');
       });
     });
     cy.get('body')
@@ -1585,10 +1577,9 @@ describe('Overview page', () => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.059');
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'contain.text',
-          'no exact @50 result',
-        );
+        platform('gb300')
+          .find('[data-testid="overview-measured-speed"]')
+          .should('have.text', 'Measured @60 tok/s/user');
       });
       expectNoVisibleDatesOrSnapshot();
       expectNoHorizontalOverflow();
@@ -1611,7 +1602,13 @@ describe('Overview page', () => {
             for (let index = 1; index < rects.length; index += 1) {
               expect(rects[index - 1].bottom).to.be.at.most(rects[index].top + 1);
             }
-            expect(rows.every((row) => row.getBoundingClientRect().height <= 88)).to.equal(true);
+            for (const row of rows) {
+              // A qualifying measured endpoint adds one metadata line.
+              const maxHeight = row.querySelector('[data-testid="overview-measured-speed"]')
+                ? 104
+                : 88;
+              expect(row.getBoundingClientRect().height).to.be.at.most(maxHeight);
+            }
           });
 
         cy.get('[data-testid="overview-mobile-hardware"]').then(($labels) => {
@@ -1776,7 +1773,7 @@ describe('Overview page', () => {
       .and('contain.text', '总览');
     cy.contains('h1', PAGE_TITLE_ZH).should('exist');
     cy.contains(
-      '根据各模型标注的测试场景，采用各平台实测的最优服务包络线，计算每百万总 token 成本',
+      '针对各测试场景，从满足所选最低 SLO 的有效 FP4/FP8 配置中，选取每百万总 token 成本最低的结果。',
     ).should('exist');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
     cy.get('[data-testid="overview-source-link"]')
@@ -1800,7 +1797,10 @@ describe('Overview page', () => {
       .as('estimatedB200')
       .invoke('attr', 'title')
       .should('include', '根据已验证的基准测试结果估算。')
-      .and('include', '原始数据仪表板：DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP');
+      .and(
+        'include',
+        '曲线快照日期：7月18日：DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
+      );
     cy.get('@estimatedB200')
       .invoke('attr', 'aria-label')
       .should('include', '约 $0.059。根据已验证的基准测试结果估算。');
@@ -1810,9 +1810,10 @@ describe('Overview page', () => {
       .and('include', '/zh/inference?')
       .and('include', 'g_model=DeepSeek-V4-Pro');
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
-      .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
-      .should('contain.text', '—')
-      .and('contain.text', '无精确 @50 结果');
+      .find(
+        '[data-testid="overview-platform"][data-hardware="gb300"] [data-testid="overview-measured-speed"]',
+      )
+      .should('have.text', '实测 @60 tok/s/user');
     cy.get('body')
       .invoke('text')
       .should('not.match', /回退/);
@@ -1848,7 +1849,9 @@ describe('Overview page', () => {
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.064');
     });
-    cy.contains('如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。').should('exist');
+    cy.contains(
+      '选取成本最低的有效配置。AgentX 采用完整响应的 P90 token 延迟，8K/1K 采用中位数交互速度。成本按输入与输出 token 总数计算，包含缓存命中的输入 token。',
+    ).should('exist');
 
     cy.visit('/zh/overview?tier=100');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);

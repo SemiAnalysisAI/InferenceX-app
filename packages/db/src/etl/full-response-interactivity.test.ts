@@ -54,6 +54,47 @@ describe('fullResponseItlSample', () => {
 });
 
 describe('fullResponseMetricsFromProfile', () => {
+  it('dates the successful profiling window, including one-token requests, across UTC midnight', () => {
+    const start = Date.parse('2026-08-12T23:59:00Z') / 1000;
+    const record = (offset: number, phase = 'profiling', error?: string) =>
+      profileRecord({
+        metadata: {
+          benchmark_phase: phase,
+          request_start_ns: (start + offset) * 1e9,
+          request_end_ns: (start + offset + 120) * 1e9,
+        },
+        metrics: { output_sequence_length: { value: 1 } },
+        error,
+      });
+    const result = fullResponseMetricsFromProfile(
+      [
+        record(-1000, 'warmup'),
+        record(0),
+        record(30),
+        record(1000, 'profiling', 'failed'),
+        'null',
+        '{bad',
+      ].join('\n'),
+    );
+    expect(result).toEqual({
+      measurement_start_unix_seconds: start,
+      measurement_end_unix_seconds: start + 150,
+    });
+    expect(new Date(result.measurement_end_unix_seconds * 1000).toISOString()).toBe(
+      '2026-08-13T00:01:30.000Z',
+    );
+  });
+
+  it('does not invent measurement dates for missing or reversed timestamps', () => {
+    const result = fullResponseMetricsFromProfile(
+      profileRecord({
+        metadata: { benchmark_phase: 'profiling', request_start_ns: 2e9, request_end_ns: 1e9 },
+      }),
+    );
+    expect(result).not.toHaveProperty('measurement_end_unix_seconds');
+    expect(fullResponseMetricsFromProfile('null\n{}\n{bad')).toEqual({});
+  });
+
   it('skips warmup, failed, malformed, and one-token records', () => {
     const valid = profileRecord({
       metrics: {

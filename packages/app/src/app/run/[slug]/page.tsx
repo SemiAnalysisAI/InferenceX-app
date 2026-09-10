@@ -46,7 +46,7 @@ function statLedDescription(entry: RunPageEntry, data: RunPageData): string {
     read.costPerMtok === null
       ? ''
       : `, ${fmtCostPerMtok(read.costPerMtok)} per million tokens at hyperscaler pricing`;
-  return `Measured: ${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at ${data.primaryTier} tokens/s per user${cost}. Live data from ${data.configCount} benchmarked configs.`;
+  return `Measured: ${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at a minimum of ${data.primaryTier} tokens/s per user${cost}. Live data from ${data.configCount} benchmarked configs.`;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -87,17 +87,17 @@ function buildFaq(entry: RunPageEntry, data: RunPageData): { question: string; a
     data.bestThroughputPerGpu === null ? 'n/a' : fmtThroughput(data.bestThroughputPerGpu);
   const throughputAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `At an interactivity target of ${data.primaryTier} tokens/s per user on ${workload}, ${chip} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU serving ${model}${read.framework ? ` with ${read.framework}` : ''}${read.precision ? ` in ${read.precision.toUpperCase()}` : ''}. Peak measured throughput across all configs is ${peak} tokens/s per GPU.`
+      ? `With a minimum interactivity target of ${data.primaryTier} tokens/s per user on ${workload}, ${chip} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU serving ${model}${read.framework ? ` with ${read.framework}` : ''}${read.precision ? ` in ${read.precision.toUpperCase()}` : ''}. Peak measured throughput across all configs is ${peak} tokens/s per GPU.`
       : `The InferenceX fleet has ${data.configCount} benchmarked configs for this pairing; see the interactivity ladder above for the operating points reached so far.`;
 
   const costAnswer =
     typeof read?.costPerMtok === 'number'
-      ? `${fmtCostPerMtok(read.costPerMtok)} per million total tokens at large-hyperscaler-volume ownership $/GPU/hr pricing, at ${data.primaryTier} tokens/s per user. The retail rental tier is tabulated above; slower interactivity targets lower the cost further.`
+      ? `${fmtCostPerMtok(read.costPerMtok)} per million total tokens at large-hyperscaler-volume ownership $/GPU/hr pricing, at a minimum of ${data.primaryTier} tokens/s per user. The retail rental tier is tabulated above; a lower minimum target may allow a lower cost.`
       : `Cost per million tokens is derived from measured throughput and $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model; it appears once this pairing reaches the primary interactivity tier.`;
 
   const servingAnswer = `The runs behind this page used ${data.frameworks.join(', ')} in ${data.precisions.map((p) => p.toUpperCase()).join(', ')}${data.hasDisagg ? ', including disaggregated prefill' : ''}${data.hasMultinode ? ' and multi-node serving' : ''}. Engines are rebuilt and re-benchmarked continuously, so the best config can change between visits.`;
 
-  const methodologyAnswer = `Every number is measured on real ${chip} hardware by the InferenceX fleet, sweeping concurrency on ${workload} to trace the throughput-versus-interactivity frontier${data.newest ? `; the newest run landed on ${data.newest}` : ''}. The same derivation powers the InferenceX overview leaderboard.`;
+  const methodologyAnswer = `Results are derived from measurements on real ${chip} hardware by the InferenceX fleet, sweeping concurrency on ${workload} to trace the throughput-versus-interactivity frontier${data.newest ? `; the newest run landed on ${data.newest}` : ''}. The same derivation powers the InferenceX overview leaderboard.`;
 
   return [
     { question: questions.throughput, answer: throughputAnswer },
@@ -161,7 +161,7 @@ export default async function RunPage({ params }: Props) {
     : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at ${data.primaryTier} tokens/s per user${quickAnswerCost}${read.framework ? `, served by ${read.framework}` : ''}.${quickAnswerLatency}`
+      ? `${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at a minimum of ${data.primaryTier} tokens/s per user${quickAnswerCost}${read.framework ? `, served by ${read.framework}` : ''}.${quickAnswerLatency}`
       : `${entry.model.seoName} runs on ${entry.chip.label}: ${data.configCount} benchmarked configs so far. See the interactivity ladder below for measured operating points.`;
 
   const t: RunStrings = {
@@ -175,14 +175,14 @@ export default async function RunPage({ params }: Props) {
     statPrecisions: 'Precisions',
     statFreshness: 'Run dates',
     ladderHeading: 'Throughput at every interactivity target',
-    ladderIntro: `Serving is a trade-off: push more concurrent users through a GPU and each user's tokens arrive slower. The ladder below reads the measured frontier at each per-user speed target on ${scenarioLabel(data.scenario, 'en')}, using the best engine and precision at that point.`,
-    colTier: 'Per-user target',
+    ladderIntro: `Serving is a trade-off: push more concurrent users through a GPU and each user's tokens arrive slower. The ladder below reads the measured frontier for each minimum per-user speed target on ${scenarioLabel(data.scenario, 'en')}, using the best eligible engine and precision. Faster measured endpoints qualify at their observed throughput; interpolation stays inside the measured frontier.`,
+    colTier: 'Minimum per-user target',
     colThroughput: 'Tokens/s per GPU',
     colCost: '$ / 1M tokens',
     colEngine: 'Engine',
     colPrecision: 'Precision',
     costHeading: 'What serving actually costs',
-    costIntro: `Converting the ${data.primaryTier} tokens/s per user operating point to $ per million total tokens across rental pricing tiers from the SemiAnalysis AI Cloud TCO model.`,
+    costIntro: `Converting frontier throughput meeting the minimum of ${data.primaryTier} tokens/s per user to $ per million total tokens across pricing tiers from the SemiAnalysis AI Cloud TCO model.`,
     colPriceTier: 'Pricing tier',
     colGpuHour: '$ / GPU / hr',
     colCostPerMtok: '$ / 1M tokens',

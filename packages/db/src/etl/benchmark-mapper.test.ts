@@ -91,6 +91,28 @@ function dirtyPowerPayload(): Record<string, any> {
 
 describe('mapBenchmarkRow', () => {
   describe('v1 schema', () => {
+    it.each([
+      { tp: 8, ep: 8, pp: 1, pcp_size: 1, expected: 8 },
+      { tp: 8, ep: 1, pp: 2, pcp_size: 1, expected: 16 },
+      { tp: 8, ep: 1, pp: 1, pcp_size: 2, expected: 16 },
+    ])('matches the fixed-sequence producer physical GPU count: %j', ({ expected, ...shape }) => {
+      const mapped = mapBenchmarkRow(
+        makeV1Row({ ...shape, is_multinode: false, disagg: false }),
+        createSkipTracker(),
+      )!;
+      expect(mapped.config.numPrefillGpu).toBe(expected);
+      expect(mapped.config.numDecodeGpu).toBe(expected);
+      expect(mapped.metrics.tput_per_gpu).toBe(1234.5);
+    });
+
+    it('retains an explicit physical GPU count', () => {
+      const mapped = mapBenchmarkRow(
+        makeV1Row({ tp: 8, ep: 8, num_gpus: 16, is_multinode: false, disagg: false }),
+        createSkipTracker(),
+      )!;
+      expect(mapped.config.numDecodeGpu).toBe(16);
+    });
+
     it('maps a valid v1 row to BenchmarkParams', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(makeV1Row(), tracker);
@@ -1184,7 +1206,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     [{ framework: 'mori-sglang' }, 16],
     [{ pp: true }, 16],
     [{ pp: null }, 16],
-    [{ request_metrics: undefined }, 16],
+    [{ request_metrics: undefined }, 4],
   ])('counts physical GPUs for the AgentX producer shape %j', (overrides, expected) => {
     // Qwen3.8 H200 run 33038487711 uses TP4/EP4 on four GPUs, not sixteen.
     const result = mapBenchmarkRow(

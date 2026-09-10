@@ -44,7 +44,9 @@ describe('OVERVIEW_STRINGS.zh', () => {
     expect(zh.scopeAria).toContain('hyperscaler');
     expect(zh.caption).toContain('token');
     expect(zh.scenarioLabels.agentx).toContain('AgentX');
-    expect(zh.methodologyNote).toContain('FP4');
+    expect(zh.caption).toContain('FP4/FP8');
+    expect(zh.methodologyNote).toContain('P90');
+    expect(zh.methodologyNote).toContain('缓存命中');
     expect(zh.historyCaption(7)).toContain('7–14');
     expect(zh.costDeltaAria('20%', true, 'B200')).toEqual(
       expect.stringMatching(/B200.*20%|20%.*B200/),

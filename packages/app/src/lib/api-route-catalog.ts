@@ -679,10 +679,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    // Reviewed for the Neocloud cost-tier removal: only a comment describing
-    // the hyperscaler-volume cost basis changed — no parameter or
-    // OverviewPageData shape change, so the docs stand.
-    sourceSha256: '16c1cf933ebb09c4421a30417de8d7107ebc5e71dab750f6d849dc11127f989d',
+    // Reviewed: total-throughput denominator, minimum-SLO/lowest-cost selection,
+    // optional observedInteractivity/evidenceDateBasis and evidence-date semantics.
+    // The page-owned contract is documented in docs/overview-data-integrity.md;
+    // public throughput and profile timestamps are in api-documentation.ts.
+    sourceSha256: '30102cfc99ff66f914a1f32da20130acf588e88002b4b4d261ff9a4a53f81cf2',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

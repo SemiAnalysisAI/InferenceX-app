@@ -93,17 +93,19 @@ describe('Agentic point coach mark', () => {
     // highlight ring sits exactly on the anchor (the pointer line deliberately
     // stops short so its arrowhead doesn't cover the dot).
     cy.get('[data-testid="agentic-point-coach-mark-pointer"]').should('exist');
-    cy.get('[data-testid="agentic-point-coach-mark-target"]').then(($ring) => {
+    // D3 transitions and the coach mark's animation-frame callback can still
+    // be moving. Retry a single, same-frame measurement of both coordinates;
+    // separate `.then()` commands compare positions from different frames.
+    cy.get('[data-testid="agentic-point-coach-mark-target"]').should(($ring) => {
       const tipX = Number($ring.attr('cx'));
       const tipY = Number($ring.attr('cy'));
 
-      cy.get(AGENTIC_MARKERS).then(($points) => {
-        const hit = [...$points].some((point) => {
-          const { x, y } = centreOf(point);
-          return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
-        });
-        expect(hit, 'pointer ends on an agentic point').to.eq(true);
+      const points = $ring[0].ownerDocument.querySelectorAll(AGENTIC_MARKERS);
+      const hit = [...points].some((point) => {
+        const { x, y } = centreOf(point);
+        return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
       });
+      expect(hit, 'pointer ends on an agentic point').to.eq(true);
     });
   });
 
@@ -247,7 +249,7 @@ describe('Agentic point coach mark', () => {
     );
 
     cy.get(COACH_MARK).should('be.visible');
-    cy.get('[data-testid="agentic-point-coach-mark-target"]').then(($ring) => {
+    cy.get('[data-testid="agentic-point-coach-mark-target"]').should(($ring) => {
       const tipX = Number($ring.attr('cx'));
       const tipY = Number($ring.attr('cy'));
       const onPoint = (element: Element) => {
@@ -255,12 +257,11 @@ describe('Agentic point coach mark', () => {
         return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
       };
 
-      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').then(($overlay) => {
-        expect([...$overlay].some(onPoint), 'pointer avoids overlay markers').to.eq(false);
-      });
-      cy.get(AGENTIC_MARKERS).then(($official) => {
-        expect([...$official].some(onPoint), 'pointer lands on an official point').to.eq(true);
-      });
+      const doc = $ring[0].ownerDocument;
+      const overlay = doc.querySelectorAll('[data-testid="scatter-graph"] .unofficial-overlay-pt');
+      const official = doc.querySelectorAll(AGENTIC_MARKERS);
+      expect([...overlay].some(onPoint), 'pointer avoids overlay markers').to.eq(false);
+      expect([...official].some(onPoint), 'pointer lands on an official point').to.eq(true);
     });
   });
 

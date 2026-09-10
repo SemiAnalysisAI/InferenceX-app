@@ -26,6 +26,7 @@ import {
 } from './normalizers';
 import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
+import { isColocatedResult, PHYSICAL_TP_FRAMEWORKS } from '../lib/benchmark-topology';
 
 export { flattenAgenticAggRow };
 
@@ -253,10 +254,26 @@ export function mapBenchmarkRow(
   // deployments such as one distributed vLLM server. A non-zero decode worker
   // pool, however, is structural proof of disaggregation and preserves older
   // Dynamo artifacts that incorrectly emitted disagg=false.
-  const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
+  let disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
   let metrics = captureNumericMetrics(row);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
+  if (
+    isColocatedResult(
+      {
+        hardware: gpuKey,
+        framework,
+        model: modelKey,
+        precision,
+        specMethod,
+        disagg,
+        isMultinode,
+        ...parallelism,
+      },
+      metrics,
+    )
+  )
+    disagg = false;
   if (!disagg) {
     const usePrefill =
       parallelism.decodeTp <= 0 ||
@@ -443,15 +460,16 @@ function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean):
   if (
     row.num_gpus === undefined &&
     !frameworkDisagg &&
-    String(row.scenario_type ?? '').startsWith('agentic') &&
-    row.request_metrics &&
-    typeof row.request_metrics === 'object' &&
-    !Array.isArray(row.request_metrics) &&
+    hwToGpuKey(String(row.hw ?? '')) !== 'tpuv7' &&
+    PHYSICAL_TP_FRAMEWORKS.has(
+      normalizeFramework(String(row.framework ?? ''), row.disagg).framework,
+    ) &&
     parseOptionalBool(row.is_multinode) === false &&
     parseOptionalBool(row.disagg) === false
   ) {
-    // Match the v3 AgentX producer's physical-device count. EP and DCP share
-    // TP devices; PP and PCP add devices. Legacy flat rows keep their fallback.
+    // Both fixed-sequence and AgentX producers use this physical-device count.
+    // EP and DCP share TP devices; PP and PCP add devices. Unidentified legacy
+    // rows keep their fallback and explicit num_gpus remains authoritative.
     const physicalTp = physicalChipCount(row.tp);
     const pp = physicalChipCount(row.pp === undefined ? 1 : row.pp);
     const pcp = physicalChipCount(row.pcp_size === undefined ? 1 : row.pcp_size);

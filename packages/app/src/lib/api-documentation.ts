@@ -226,13 +226,25 @@ const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
   additionalProperties: numberSchema,
   description:
-    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
-  properties: Object.fromEntries(
-    POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
-      key,
-      { type: 'number', description: powerMetricDescriptions[key] },
-    ]),
-  ),
+    'Scalar metric map. Latency metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. tput_per_gpu is total input plus output throughput divided by all physical deployment chips; do not apply an additional disaggregation factor. Fixed-sequence disaggregated input/output throughput uses the respective role chip count (zero decode workers uses the total count); AgentX throughput uses all chips for all token types. Optional measurement_*_unix_seconds fields date successful profiling requests, independently of workflow or curve snapshot dates. Keys evolve independently.',
+  properties: {
+    ...Object.fromEntries(
+      POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
+        key,
+        { type: 'number', description: powerMetricDescriptions[key] },
+      ]),
+    ),
+    measurement_start_unix_seconds: {
+      type: 'number',
+      description:
+        'Earliest successful profiling request start, Unix seconds UTC; excludes warmup. Absent when unknown.',
+    },
+    measurement_end_unix_seconds: {
+      type: 'number',
+      description:
+        'Latest successful profiling request completion, Unix seconds UTC; excludes warmup. Absent when unknown.',
+    },
+  },
 };
 const powerAuditSchema: ApiSchema = {
   type: 'object',
@@ -2696,6 +2708,19 @@ const overview = {
     },
   ],
   schemaNotes: [
+    {
+      id: 'throughput-and-measurement-dates',
+      title: text('Throughput denominators and measurement dates', '吞吐量分母与测量日期'),
+      description: text(
+        'tput_per_gpu already divides input plus output throughput by every physical chip in the deployment, including prefill and decode chips. Do not normalize it again. Fixed-sequence disaggregated input_tput_per_gpu and output_tput_per_gpu use the prefill and decode chip counts respectively; with no separate decode workers, output uses the total count. AgentX uses the total physical chip count for all three throughput fields. Optional measurement_start_unix_seconds and measurement_end_unix_seconds bound successful profiling requests in UTC, excluding warmup and errors. The completion date can precede the workflow-run date or logical curve snapshot because artifacts can be reused. Missing timestamps mean the measurement date is unknown.',
+        'tput_per_gpu 已将输入与输出吞吐量之和除以整个部署的物理芯片总数，其中包括 prefill 和 decode 芯片，不应再次归一化。固定序列长度的分离式基准测试中，input_tput_per_gpu 和 output_tput_per_gpu 分别使用 prefill 和 decode 芯片数；没有独立 decode worker 时，输出吞吐量使用总芯片数。AgentX 的这三个吞吐量字段均使用物理芯片总数。可选字段 measurement_start_unix_seconds 和 measurement_end_unix_seconds 记录成功 profiling 请求的起止时间，以 UTC Unix 秒表示，不含 warmup 和失败请求。由于产物可能被复用，测量完成日期可能早于工作流运行日期或曲线快照日期。时间戳缺失表示测量日期未知。',
+      ),
+      shape: 'BenchmarkRows',
+      example: {
+        measurement_start_unix_seconds: 1786577819.732095,
+        measurement_end_unix_seconds: 1786581449.59427,
+      },
+    },
     {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),

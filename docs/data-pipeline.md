@@ -1,5 +1,8 @@
 # Data Pipeline Design
 
+For the overview denominator, minimum-SLO selection, measurement dates, and GPU
+count repair procedure, see [Overview data integrity](./overview-data-integrity.md).
+
 ## DB Schema Decisions
 
 ### Why Metrics Stay in JSONB

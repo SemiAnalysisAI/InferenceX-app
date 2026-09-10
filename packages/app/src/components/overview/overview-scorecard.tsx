@@ -370,6 +370,14 @@ function CellValue({
         ].join(' · ');
   const evidenceDateLabel =
     evidenceDate === null ? '' : formatEvidenceDate(formatters, evidenceDate);
+  const evidenceDescription = [
+    member.read.evidenceDateBasis === 'measurement'
+      ? strings.evidenceMeasurementDate(evidenceDateLabel)
+      : strings.evidenceRunDate(evidenceDateLabel),
+    config === null ? '' : strings.evidenceSnapshotDate(formatters.shortDate(config.latestDate)),
+  ]
+    .filter(Boolean)
+    .join('. ');
   const formattedValue = formatters.cost.format(member.costPerMtok);
   const estimateExplanation = member.read.estimated
     ? strings.estimatedTooltip(evidenceTopologies)
@@ -379,7 +387,7 @@ function CellValue({
   const evidenceAria =
     config === null || stack === null
       ? null
-      : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
+      : strings.rawDashboardAria(evidenceDescription, model.modelLabel, stack);
   const costText = formattedValue;
   const comparison = displayedComparison(member, comparisonMode, referenceHardware, referenceCost);
   const historicalConfig =
@@ -445,6 +453,19 @@ function CellValue({
           />
         )}
       </div>
+      {member.read.observedInteractivity === undefined ? null : (
+        <div
+          data-testid="overview-measured-speed"
+          className="text-2xs leading-tight text-muted-foreground"
+          title={strings.measuredSloTooltip(member.read.tier)}
+        >
+          {strings.measuredSpeed(
+            member.read.observedInteractivity.toLocaleString(locale, {
+              maximumFractionDigits: 2,
+            }),
+          )}
+        </div>
+      )}
       {member.precision === null ? null : (
         <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-foreground/80">
           {config === null ? (

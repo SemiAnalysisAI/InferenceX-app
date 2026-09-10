@@ -121,19 +121,42 @@ export function fullResponseItlSample(record: ProfileRecord): number | undefined
  */
 export function fullResponseMetricsFromProfile(jsonl: string): Record<string, number> {
   const samples: number[] = [];
+  let startSeconds = Infinity;
+  let endSeconds = -Infinity;
   for (const line of jsonl.split('\n')) {
     if (!line.trim()) continue;
     try {
-      const sample = fullResponseItlSample(JSON.parse(line) as ProfileRecord);
+      const record = JSON.parse(line) as ProfileRecord;
+      const sample = fullResponseItlSample(record);
       if (sample !== undefined && Number.isFinite(sample) && sample > 0) samples.push(sample);
+      // Match the producer's successful profiling window, including one-token
+      // requests that cannot contribute an ITL sample. Never date from warmup.
+      const start = Number(record.metadata?.request_start_ns) / 1e9;
+      const end = Number(record.metadata?.request_end_ns) / 1e9;
+      if (
+        !record.error &&
+        record.metadata?.benchmark_phase === 'profiling' &&
+        Number.isFinite(start) &&
+        start > 0 &&
+        Number.isFinite(end) &&
+        end >= start &&
+        Number.isFinite(new Date(end * 1000).getTime())
+      ) {
+        startSeconds = Math.min(startSeconds, start);
+        endSeconds = Math.max(endSeconds, end);
+      }
     } catch {
       // A malformed record does not invalidate the remaining profile.
     }
   }
-  if (samples.length === 0) return {};
+  const patch: Record<string, number> = {};
+  if (Number.isFinite(startSeconds) && Number.isFinite(endSeconds)) {
+    patch.measurement_start_unix_seconds = startSeconds;
+    patch.measurement_end_unix_seconds = endSeconds;
+  }
+  if (samples.length === 0) return patch;
 
   const stats = percentileStats(samples);
-  const patch: Record<string, number> = {};
   for (const stat of FULL_RESPONSE_STAT_KEYS) {
     const itl = stats[stat];
     patch[`${stat}_full_response_itl`] = itl;

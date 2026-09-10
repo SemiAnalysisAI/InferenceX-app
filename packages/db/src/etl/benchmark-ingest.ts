@@ -113,11 +113,14 @@ export async function bulkIngestBenchmarkRows(
     )
     do update set
       -- Replace metrics with the fresh artifact values, but carry over
-      -- kv_cache_pool_tokens: it is derived from the server log at
-      -- insertServerLog time (not present in any artifact JSON), so a later
-      -- upsert from the aggregated results_bmk artifact would silently wipe it.
+      -- fields derived from the attached server log / trace profile. A later
+      -- upsert from an aggregate artifact must not wipe that evidence.
       metrics = excluded.metrics || jsonb_strip_nulls(
-        jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
+        jsonb_build_object(
+          'kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens',
+          'measurement_start_unix_seconds', benchmark_results.metrics->'measurement_start_unix_seconds',
+          'measurement_end_unix_seconds', benchmark_results.metrics->'measurement_end_unix_seconds'
+        )
       ),
       image = excluded.image,
       workers = excluded.workers

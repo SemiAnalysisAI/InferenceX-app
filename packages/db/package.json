@@ -33,7 +33,8 @@
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",
-    "test:unit:coverage": "vitest run --coverage"
+    "test:unit:coverage": "vitest run --coverage",
+    "db:backfill-benchmark-topology": "bun --env-file=../../.env src/backfill-benchmark-topology.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
