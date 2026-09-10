@@ -261,6 +261,20 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleText()).toContain('MI355X: 0.75');
     expect(getVisibleText()).not.toContain('B200:');
 
+    // Every selected chip blanked: hand the renderer an empty list rather
+    // than every other registry chip the reader never selected.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x']}
+        userCosts={{ gb300: undefined, mi355x: 0.75, b200: 1.5 }}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
+      'TCO $/chip/hr:',
+    );
+
     // Nothing entered yet: show the seed the custom costs will start from.
     renderUi(
       <MetricAssumptionNotes

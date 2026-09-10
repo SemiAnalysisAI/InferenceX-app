@@ -240,12 +240,17 @@ export function MetricAssumptionNotes({
   }, [activeHwKeys]);
   const filterToActive = <T extends string | number>(
     values: Record<string, T>,
+    { keepEmpty = false }: { keepEmpty?: boolean } = {},
   ): Record<string, T> => {
     if (activeBases.size === 0) return values;
     const filtered = Object.fromEntries(
       Object.entries(values).filter(([base]) => activeBases.has(base)),
     );
-    // Defensive: never render a badge row with an empty value list.
+    // Defensive: never render a badge row with an empty value list, except
+    // on the custom tier, where an empty list means the reader blanked every
+    // selected chip; falling back to the full map would list every registry
+    // chip they never selected. The editable badges keep the blanked chips.
+    if (keepEmpty) return filtered;
     return Object.keys(filtered).length > 0 ? filtered : values;
   };
   const showPowerSource = includeAllPowerThroughputMetrics
@@ -279,7 +284,10 @@ export function MetricAssumptionNotes({
   // their badges hand over to the editable renderer.
   const editableCostBadges =
     renderCostBadges && costValues && (showTotalCostSource || showCustomCost)
-      ? renderCostBadges({ label: costLabel, values: filterToActive(costValues) })
+      ? renderCostBadges({
+          label: costLabel,
+          values: filterToActive(costValues, { keepEmpty: showCustomCost }),
+        })
       : null;
 
   return (
@@ -298,7 +306,10 @@ export function MetricAssumptionNotes({
       {costValues && (
         <>
           {editableCostBadges ?? (
-            <MetricBadges label={costLabel} values={filterToActive(costValues)} />
+            <MetricBadges
+              label={costLabel}
+              values={filterToActive(costValues, { keepEmpty: showCustomCost })}
+            />
           )}
           {!showCustomCost && (
             <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
