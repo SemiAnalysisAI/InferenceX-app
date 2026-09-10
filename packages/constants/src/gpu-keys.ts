@@ -144,8 +144,8 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 10,
     tdp: 700,
     power: 1.125,
-    costh: 1.47,
-    costr: 1.79,
+    costh: 1.27,
+    costr: 1.27,
   },
   tpuv7: {
     vendor: 'Google',

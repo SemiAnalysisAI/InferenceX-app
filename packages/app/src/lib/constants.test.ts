@@ -149,8 +149,8 @@ describe('getHardwareConfig', () => {
     expect(getGpuSpecs('jalapeno_teacup')).toEqual({
       tdp: 700,
       power: 1.125,
-      costh: 1.47,
-      costr: 1.79,
+      costh: 1.27,
+      costr: 1.27,
     });
     expect(getGpuSpecs('vr200_coreweave-vera-rubin')).toEqual({
       tdp: 1800,
