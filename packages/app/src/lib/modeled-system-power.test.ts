@@ -50,12 +50,28 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('modeled system power admission and accounting', () => {
+  it('defaults air-cooled chassis to PUE 1.3 and preserves explicit facility overrides', () => {
+    // Pinned Python b200_chassis_power, fixed README utilization inputs.
+    expect(modelSystemPower(row())).toMatchObject({
+      pue: 1.3,
+      chassisAcWatts: 4837.2,
+      facilityWatts: 6288.4,
+      measuredGpuWattsPerGpu: 349.859,
+    });
+    expect(modelSystemPower(row(), 1.1)).toMatchObject({
+      pue: 1.1,
+      chassisAcWatts: 4837.2,
+      facilityWatts: 5320.9,
+      measuredGpuWattsPerGpu: 349.859,
+    });
+  });
+
   it('uses the validated physical count without summing aggregate aliases or multiplying by EP', () => {
     const source = row({ num_prefill_gpu: 64, num_decode_gpu: 64, prefill_ep: 8, decode_ep: 8 });
     const result = modelSystemPower(source);
     expect(result.status).toBe('supported');
     if (result.status !== 'supported') throw new Error(result.reason);
-    const reference = estimateChassisPower('b200', 2798.868)!;
+    const reference = estimateChassisPower('b200', 2798.868, 1.3)!;
     expect(result).toMatchObject({
       gpuCount: 8,
       chassisCount: 1,
@@ -132,7 +148,7 @@ describe('modeled system power admission and accounting', () => {
     expect(result.status).toBe('supported');
     if (result.status !== 'supported') throw new Error(result.reason);
     // The source sweep's input for the whole chassis: n_gpu × W/GPU.
-    const reference = estimateChassisPower('b200', 349.859 * 8)!;
+    const reference = estimateChassisPower('b200', 349.859 * 8, 1.3)!;
     expect(result).toMatchObject({
       gpuCount: 4,
       chassisCount: 1,
@@ -182,8 +198,8 @@ describe('modeled system power admission and accounting', () => {
         decode_avg_power_w: 700,
       },
     });
-    const prefill = estimateChassisPower('b200', 2400)!;
-    const decode = estimateChassisPower('b200', 5600)!;
+    const prefill = estimateChassisPower('b200', 2400, 1.3)!;
+    const decode = estimateChassisPower('b200', 5600, 1.3)!;
     expect(modelSystemPower(source)).toMatchObject({
       status: 'supported',
       gpuCount: 12,
@@ -369,8 +385,8 @@ describe('modeled system power admission and accounting', () => {
       },
     });
     const result = modelSystemPower(source);
-    const prefill = estimateChassisPower('b200', 2400)!;
-    const decode = estimateChassisPower('b200', 5600)!;
+    const prefill = estimateChassisPower('b200', 2400, 1.3)!;
+    const decode = estimateChassisPower('b200', 5600, 1.3)!;
     expect(result).toMatchObject({
       status: 'supported',
       gpuCount: 16,
