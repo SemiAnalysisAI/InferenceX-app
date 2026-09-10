@@ -104,7 +104,10 @@ export const HARDWARE_CONFIG = {
   b200: { name: 'B200', label: 'B200', gpu: 'B200' },
 };
 
-const CHART_DEFINITION = { chartType: 'interactivity' } as unknown as ChartDefinition;
+const CHART_DEFINITION = {
+  chartType: 'interactivity',
+  y_roofline: 'lower_right',
+} as unknown as ChartDefinition;
 export const noop = () => {};
 
 export function baseInferenceState() {

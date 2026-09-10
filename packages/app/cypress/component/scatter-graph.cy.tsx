@@ -2145,3 +2145,202 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('#chart-0 svg .unofficial-overlay-pt').should('not.exist');
   });
 });
+
+// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, so the true
+// Pareto frontier is one point, but show-all must draw the measured load curve.
+describe('Power operating curves', () => {
+  for (const optimal of [false, true]) {
+    it(`${optimal ? 'preserves Pareto' : 'suppresses cross-configuration'} clipping continuations with Optimal Only ${optimal ? 'on' : 'off'}`, () => {
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
+      const visible = createMockInferenceData({
+        hwKey: 'b200_trt',
+        tp: 4,
+        conc: 1,
+        x: 100,
+        y: 600,
+        run_url: runUrl,
+      });
+      const clipped = { ...visible, tp: 8, conc: 8, x: 1500, y: 300 };
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="power-clipped"
+            modelLabel="Qwen3.5 397B"
+            data={[visible]}
+            clippedData={[{ point: clipped, reasons: ['latency'] }]}
+            xLabel="TTFT"
+            yLabel="Power"
+            chartDefinition={createMockChartDefinition({
+              y_measuredAvgPower_roofline: 'lower_left',
+              y_latency_limit: 1000,
+            })}
+            overlayData={{
+              data: [visible],
+              clippedData: [{ point: clipped, reasons: ['latency'] }],
+              hardwareConfig: hwConfig,
+              label: 'Power replay',
+              runUrl,
+            }}
+            transitionDuration={0}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric: 'y_measuredAvgPower',
+            hideNonOptimal: optimal,
+            selectedPrecisions: [Precision.FP4],
+            hardwareConfig: hwConfig,
+            activeHwTypes: new Set(['b200_trt']),
+            hwTypesWithData: new Set(['b200_trt']),
+          },
+          unofficial: {
+            activeOverlayHwTypes: new Set(['b200_trt']),
+            allOverlayHwTypes: new Set(['b200_trt']),
+            runIndexByUrl: { [runUrl]: 0, '102': 0 },
+          },
+        },
+      );
+      cy.get('#power-clipped .dot-group').should('have.length', 1);
+      if (optimal) {
+        cy.get('#power-clipped .official-overflow-continuation').should('have.length', 1);
+        cy.get('#power-clipped .overlay-overflow-continuation').should('have.length', 1);
+      } else {
+        cy.get('#power-clipped .overflow-continuation').should('not.exist');
+      }
+    });
+  }
+
+  function PowerHarness() {
+    const [optimal, setOptimal] = useState(true);
+    const [metric, setMetric] = useState('y_measuredAvgPower');
+    const power = metric !== 'y_measuredJPerOutputToken';
+    const rows = [1, 8, 32].map((conc, i) =>
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        conc,
+        x: 100 - i * 30,
+        y: power ? 400 + i * 200 : 4 - i,
+        measuredAvgPower: { y: 400 + i * 200, roof: false },
+        measuredPowerPercentTdp: { y: 40 + i * 20, roof: false },
+        measuredJPerOutputToken: { y: 4 - i, roof: false },
+        run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
+        power_tier: 'certified',
+      }),
+    );
+    const value = createMockInferenceContextValues({
+      selectedYAxisMetric: metric,
+      hideNonOptimal: optimal,
+      setHideNonOptimal: setOptimal,
+      selectedPrecisions: [Precision.FP4],
+      hardwareConfig: hwConfig,
+      activeHwTypes: new Set(['b200_trt']),
+      hwTypesWithData: new Set(['b200_trt']),
+    });
+    const definition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_measuredAvgPower_roofline: 'lower_right',
+      y_measuredJPerOutputToken_roofline: 'lower_right',
+    });
+    return (
+      <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+        <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
+        <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="power-sweep"
+            modelLabel="Qwen3.5 397B"
+            data={rows}
+            xLabel="Interactivity"
+            yLabel="Power"
+            chartDefinition={definition}
+            transitionDuration={0}
+          />
+        </div>
+      </InferenceContextsProvider>
+    );
+  }
+
+  it('draws the full power sweep when Optimal Only is off and preserves energy frontiers', () => {
+    mountWithProviders(<PowerHarness />, { unofficial: {} });
+    cy.get('#power-sweep .roofline-path').should('not.exist');
+    cy.get('[data-testid="power-curve-description"]').should('contain', 'single point');
+    cy.get('#scatter-hide-non-optimal').click({ force: true });
+    cy.get('#power-sweep .roofline-path[data-curve-kind="operating"]')
+      .should('have.length', 1)
+      .invoke('attr', 'd')
+      .should('match', /^M[^C]+L/u);
+    cy.get('#power-sweep .dot-group')
+      .should('have.length', 3)
+      .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+    cy.get('#scatter-hide-non-optimal').click({ force: true });
+    cy.get('#power-sweep .roofline-path').should('not.exist');
+    cy.contains('button', 'Percent TDP').click();
+    cy.get('#scatter-hide-non-optimal').should('not.exist');
+    cy.get('#power-sweep .roofline-path[data-curve-kind="operating"]').should('have.length', 1);
+    cy.get('#power-sweep .dot-group').each(($point) =>
+      cy.wrap($point).should('have.css', 'opacity', '1'),
+    );
+    cy.contains('button', 'Energy').click();
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
+    cy.get('[data-testid="power-curve-description"]').should('not.exist');
+  });
+
+  it('keeps official and unofficial serving configurations on separate operating curves', () => {
+    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
+    const rows = [4, 8].flatMap((tp) =>
+      [1, 8, 32].map((conc, i) =>
+        createMockInferenceData({
+          hwKey: 'b200_trt',
+          tp,
+          conc,
+          x: 100 - i * 30,
+          y: 400 + i * 200 + tp,
+          measuredAvgPower: { y: 400 + i * 200 + tp, roof: false },
+          run_url: runUrl,
+        }),
+      ),
+    );
+    mountWithProviders(
+      <div style={{ width: 1000, height: 600 }}>
+        <ScatterGraph
+          chartId="power-overlay"
+          modelLabel="Qwen3.5 397B"
+          data={rows}
+          xLabel="Interactivity"
+          yLabel="Power"
+          chartDefinition={createMockChartDefinition({
+            chartType: 'interactivity',
+            y_measuredAvgPower_roofline: 'lower_right',
+          })}
+          overlayData={{ data: rows, hardwareConfig: hwConfig, label: 'Power replay', runUrl }}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: {
+          selectedYAxisMetric: 'y_measuredAvgPower',
+          hideNonOptimal: false,
+          selectedPrecisions: [Precision.FP4],
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_trt']),
+          allOverlayHwTypes: new Set(['b200_trt']),
+          runIndexByUrl: { [runUrl]: 0, '101': 0 },
+        },
+      },
+    );
+    cy.get('#power-overlay .roofline-path[data-curve-kind="operating"]').should('have.length', 2);
+    cy.get('#power-overlay .overlay-roofline-path[data-curve-kind="operating"]')
+      .should('have.length', 2)
+      .each(($path) =>
+        cy
+          .wrap($path)
+          .invoke('attr', 'd')
+          .should('match', /^M[^C]+L/u),
+      );
+  });
+});
