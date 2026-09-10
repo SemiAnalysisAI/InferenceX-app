@@ -4,6 +4,7 @@ import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmar
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
+import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 
 export type { WorkerPower };
@@ -129,6 +130,8 @@ export interface AggDataEntry {
    */
   power_tier?: PowerTier;
   avg_power_w?: number;
+  /** Chassis AC estimate from validated telemetry, with explicit support/provenance. */
+  modeledSystemPower?: SystemPowerEstimate;
   joules_per_successful_query?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
@@ -322,6 +325,11 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // pre-aggregate_power.py runs (and runs with monitoring disabled) won't
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
+  /**
+   * Summed modeled chassis AC ÷ modeled chassis GPU count (chassisCount × 8).
+   * Partially allocated chassis are extrapolated; see modeled-system-power.ts chassisBasis.
+   */
+  modeledChassisPowerPerGpu?: { y: number; roof: boolean };
   measuredPrefillAvgPower?: { y: number; roof: boolean };
   measuredDecodeAvgPower?: { y: number; roof: boolean };
   measuredJPerOutputToken?: { y: number; roof: boolean };

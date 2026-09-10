@@ -5,9 +5,14 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import { chipCounts } from '@/lib/chip-counts';
+import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isModeledSystemPowerConfigKey,
+} from '@/components/inference/metric-registry';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -142,6 +147,7 @@ const TOOLTIP_STRINGS = {
     branch: 'Branch',
     chipConfig: 'Chip Config',
     totalChips: 'Total Chips',
+    configuredChips: 'Configured Chip Count',
     concurrency: 'Concurrency',
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
@@ -159,6 +165,7 @@ const TOOLTIP_STRINGS = {
     branch: '分支',
     chipConfig: '芯片配置',
     totalChips: '芯片总数',
+    configuredChips: '配置中的芯片数',
     concurrency: '并发数',
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
@@ -168,6 +175,18 @@ const TOOLTIP_STRINGS = {
     powerLegacy: '历史测量（尚未按当前方法验证）',
   },
 } as const;
+
+const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
+  const t = TOOLTIP_STRINGS[locale];
+  const { physical, configured } = chipCounts(
+    d,
+    isModeledSystemPowerConfigKey(selectedYAxisMetric),
+  );
+  return (
+    tooltipLine(t.totalChips, physical) +
+    (physical === configured ? '' : tooltipLine(t.configuredChips, configured))
+  );
+};
 
 /**
  * Measured-power certification tier line. Rendered only while a Measured
@@ -189,6 +208,106 @@ const escapeHtml = (s: string): string =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+const SYSTEM_POWER_STRINGS = {
+  en: {
+    heading: 'Draft System-Power Model · 8k1k',
+    measuredGpu: 'Measured GPU power',
+    normalizedAc: 'Modeled chassis AC per GPU',
+    deploymentAc: 'Modeled deployment chassis AC',
+    facility: 'Modeled facility power',
+    assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
+    platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
+    sweep: 'Fixed README inference sweep',
+    topology: (chassis: number, measured: number, modeled: number) =>
+      measured === modeled
+        ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
+        : `${chassis} eight-GPU chassis · ${measured} of ${modeled} GPUs measured, extrapolated to full chassis`,
+    extrapolation:
+      'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
+    normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
+    boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+    model: 'Power model source',
+    unavailable: 'System-power estimate unavailable',
+    reasons: {
+      workload: 'Only non-agentic 8k1k workloads are supported.',
+      hardware: 'No matching chassis model is available for this hardware.',
+      telemetry: 'Validated measured GPU power is required.',
+      'gpu-count': 'A valid deployment GPU count is required.',
+      topology: 'The available topology does not establish chassis placement.',
+      'role-power': 'Valid measured power and topology are required for every GPU worker role.',
+      'model-domain': 'The measured input is outside the source model’s supported range.',
+    } satisfies Record<SystemPowerUnsupportedReason, string>,
+  },
+  zh: {
+    heading: '系统功耗模型（草案）· 8k1k',
+    measuredGpu: 'GPU 实测功耗',
+    normalizedAc: '每 GPU 分摊的机箱交流功耗估算',
+    deploymentAc: '整个部署的机箱交流功耗估算',
+    facility: '数据中心功耗估算',
+    assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
+    platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
+    sweep: 'README 中的固定推理参数扫描',
+    topology: (chassis: number, measured: number, modeled: number) =>
+      measured === modeled
+        ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
+        : `${chassis} 个八卡机箱 · 实测 ${measured}/${modeled} 张 GPU，按满机箱外推`,
+    extrapolation:
+      '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
+    normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
+    boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
+    model: '功耗模型来源',
+    unavailable: '无法估算系统功耗',
+    reasons: {
+      workload: '仅支持非智能体 8k1k 工作负载。',
+      hardware: '该硬件没有匹配的机箱功耗模型。',
+      telemetry: '需要通过验证的 GPU 实测功耗。',
+      'gpu-count': '需要有效的部署 GPU 数量。',
+      topology: '现有拓扑信息无法确认 GPU 所在的机箱。',
+      'role-power': '每个 GPU worker 角色都需要有效的实测功耗和拓扑信息。',
+      'model-domain': '实测输入超出功耗模型的支持范围。',
+    } satisfies Record<SystemPowerUnsupportedReason, string>,
+  },
+} as const;
+
+const modeledSystemPowerHTML = (
+  d: InferenceData,
+  selectedYAxisMetric: string,
+  isPinned: boolean,
+  locale: Locale,
+): string => {
+  const estimate = d.modeledSystemPower;
+  if (
+    !estimate ||
+    (!isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
+      !isModeledSystemPowerConfigKey(selectedYAxisMetric))
+  ) {
+    return '';
+  }
+  const t = SYSTEM_POWER_STRINGS[locale];
+  if (estimate.status === 'unsupported') {
+    if (!isPinned || estimate.reason === 'workload') return '';
+    return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
+  }
+  const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
+  const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
+  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
+    <strong>${t.heading}</strong>
+    ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.normalizedAc, `${fmt(estimate.chassisAcWattsPerGpu)} W/GPU`)}
+    ${
+      isPinned
+        ? `
+      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
+      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
+      <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
+    `
+        : ''
+    }
+  </div>`;
+};
 
 const WORKER_POWER_STRINGS = {
   en: {
@@ -572,7 +691,8 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
+      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
+      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -614,7 +734,8 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
+      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
+      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -673,7 +794,8 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
+      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
+      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}

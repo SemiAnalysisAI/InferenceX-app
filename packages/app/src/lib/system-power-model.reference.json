@@ -1,0 +1,3913 @@
+{
+  "modelRevision": "ca4403aa527069857351ad8047dbb726844b3382",
+  "source": "https://github.com/SemiAnalysisAI/inferencex_power_model",
+  "status": "DRAFT / pending human verification",
+  "cases": [
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1710.8,
+        "fanWatts": 32.1,
+        "dcWatts": 1742.9,
+        "psuEfficiency": 0.9116,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1911.9,
+        "facilityWatts": 1911.9
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1710.8,
+        "fanWatts": 32.1,
+        "dcWatts": 1742.9,
+        "psuEfficiency": 0.9116,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1911.9,
+        "facilityWatts": 2294.3
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1711.9,
+        "fanWatts": 32.2,
+        "dcWatts": 1744.1,
+        "psuEfficiency": 0.9117,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1913.1,
+        "facilityWatts": 1913.1
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1711.9,
+        "fanWatts": 32.2,
+        "dcWatts": 1744.1,
+        "psuEfficiency": 0.9117,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1913.1,
+        "facilityWatts": 2295.7
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.55,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.3,
+        "fanWatts": 36.5,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.0,
+        "facilityWatts": 2152.0
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.55,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.3,
+        "fanWatts": 36.5,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.0,
+        "facilityWatts": 2582.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.5,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.2,
+        "facilityWatts": 2152.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.5,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.2,
+        "facilityWatts": 2582.6
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.6,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.3,
+        "facilityWatts": 2152.3
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 232.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.6,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.3,
+        "facilityWatts": 2582.8
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2710.9,
+        "fanWatts": 53.9,
+        "dcWatts": 2764.8,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.7,
+        "chassisAcWatts": 2979.5,
+        "facilityWatts": 2979.5
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2710.9,
+        "fanWatts": 53.9,
+        "dcWatts": 2764.8,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.7,
+        "chassisAcWatts": 2979.5,
+        "facilityWatts": 3575.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2711.5,
+        "fanWatts": 53.9,
+        "dcWatts": 2765.4,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.8,
+        "chassisAcWatts": 2980.2,
+        "facilityWatts": 2980.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2711.5,
+        "fanWatts": 53.9,
+        "dcWatts": 2765.4,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.8,
+        "chassisAcWatts": 2980.2,
+        "facilityWatts": 3576.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2157.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3868.6,
+        "fanWatts": 91.1,
+        "dcWatts": 3959.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.5,
+        "facilityWatts": 4212.5
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2157.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3868.6,
+        "fanWatts": 91.1,
+        "dcWatts": 3959.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.5,
+        "facilityWatts": 5055.0
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2158.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3868.9,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.8,
+        "facilityWatts": 4212.8
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2158.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3868.9,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.8,
+        "facilityWatts": 5055.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2158.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3869.0,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.9,
+        "facilityWatts": 4212.9
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2158.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3869.0,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.9,
+        "facilityWatts": 5055.5
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 4110.7,
+        "fanWatts": 100.8,
+        "dcWatts": 4211.5,
+        "psuEfficiency": 0.9408,
+        "psuLossWatts": 264.8,
+        "chassisAcWatts": 4476.3,
+        "facilityWatts": 4476.3
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 4110.7,
+        "fanWatts": 100.8,
+        "dcWatts": 4211.5,
+        "psuEfficiency": 0.9408,
+        "psuLossWatts": 264.8,
+        "chassisAcWatts": 4476.3,
+        "facilityWatts": 5371.6
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5710.7,
+        "fanWatts": 184.4,
+        "dcWatts": 5895.1,
+        "psuEfficiency": 0.9465,
+        "psuLossWatts": 333.1,
+        "chassisAcWatts": 6228.2,
+        "facilityWatts": 6228.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5710.7,
+        "fanWatts": 184.4,
+        "dcWatts": 5895.1,
+        "psuEfficiency": 0.9465,
+        "psuLossWatts": 333.1,
+        "chassisAcWatts": 6228.2,
+        "facilityWatts": 7473.8
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7310.7,
+        "fanWatts": 308.8,
+        "dcWatts": 7619.5,
+        "psuEfficiency": 0.9523,
+        "psuLossWatts": 381.5,
+        "chassisAcWatts": 8001.0,
+        "facilityWatts": 8001.0
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7310.7,
+        "fanWatts": 308.8,
+        "dcWatts": 7619.5,
+        "psuEfficiency": 0.9523,
+        "psuLossWatts": 381.5,
+        "chassisAcWatts": 8001.0,
+        "facilityWatts": 9601.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7645.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9356.6,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.2,
+        "facilityWatts": 10312.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7645.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9356.6,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.2,
+        "facilityWatts": 12374.6
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7646.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9356.8,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.4,
+        "facilityWatts": 10312.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7646.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9356.8,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.4,
+        "facilityWatts": 12374.9
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7646.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9357.1,
+        "fanWatts": 543.2,
+        "dcWatts": 9900.3,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.8,
+        "facilityWatts": 10312.8
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7646.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9357.1,
+        "fanWatts": 543.2,
+        "dcWatts": 9900.3,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.8,
+        "facilityWatts": 12375.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.1,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9499.8,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.0,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.2,
+        "facilityWatts": 10483.2
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.1,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9499.8,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.0,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.2,
+        "facilityWatts": 12579.8
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.3,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9500.0,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.2,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.4,
+        "facilityWatts": 10483.4
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.3,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9500.0,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.2,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.4,
+        "facilityWatts": 12580.1
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9500.2,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.4,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.6,
+        "facilityWatts": 10483.6
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 7789.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9500.2,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.4,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.6,
+        "facilityWatts": 12580.3
+      }
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 13200.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=15473.9 exceeds redundant PSU capacity 13200.0 W (4+2)"
+    },
+    {
+      "hardware": "h100",
+      "measuredGpuWatts": 13200.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=15473.9 exceeds redundant PSU capacity 13200.0 W (4+2)"
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1710.8,
+        "fanWatts": 32.1,
+        "dcWatts": 1742.9,
+        "psuEfficiency": 0.9116,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1911.9,
+        "facilityWatts": 1911.9
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1710.8,
+        "fanWatts": 32.1,
+        "dcWatts": 1742.9,
+        "psuEfficiency": 0.9116,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1911.9,
+        "facilityWatts": 2294.3
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1711.9,
+        "fanWatts": 32.2,
+        "dcWatts": 1744.1,
+        "psuEfficiency": 0.9117,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1913.1,
+        "facilityWatts": 1913.1
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1711.9,
+        "fanWatts": 32.2,
+        "dcWatts": 1744.1,
+        "psuEfficiency": 0.9117,
+        "psuLossWatts": 169.0,
+        "chassisAcWatts": 1913.1,
+        "facilityWatts": 2295.7
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.55,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.3,
+        "fanWatts": 36.5,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.0,
+        "facilityWatts": 2152.0
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.55,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.3,
+        "fanWatts": 36.5,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.0,
+        "facilityWatts": 2582.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.5,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.2,
+        "facilityWatts": 2152.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.5,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.2,
+        "facilityWatts": 2582.6
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1943.6,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.3,
+        "facilityWatts": 2152.3
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 232.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1943.6,
+        "fanWatts": 36.5,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 172.2,
+        "chassisAcWatts": 2152.3,
+        "facilityWatts": 2582.8
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2710.9,
+        "fanWatts": 53.9,
+        "dcWatts": 2764.8,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.7,
+        "chassisAcWatts": 2979.5,
+        "facilityWatts": 2979.5
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2710.9,
+        "fanWatts": 53.9,
+        "dcWatts": 2764.8,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.7,
+        "chassisAcWatts": 2979.5,
+        "facilityWatts": 3575.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2711.5,
+        "fanWatts": 53.9,
+        "dcWatts": 2765.4,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.8,
+        "chassisAcWatts": 2980.2,
+        "facilityWatts": 2980.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2711.5,
+        "fanWatts": 53.9,
+        "dcWatts": 2765.4,
+        "psuEfficiency": 0.9279,
+        "psuLossWatts": 214.8,
+        "chassisAcWatts": 2980.2,
+        "facilityWatts": 3576.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2157.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3868.6,
+        "fanWatts": 91.1,
+        "dcWatts": 3959.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.5,
+        "facilityWatts": 4212.5
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2157.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3868.6,
+        "fanWatts": 91.1,
+        "dcWatts": 3959.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.5,
+        "facilityWatts": 5055.0
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2158.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3868.9,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.8,
+        "facilityWatts": 4212.8
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2158.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3868.9,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.8,
+        "facilityWatts": 5055.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2158.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3869.0,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.9,
+        "facilityWatts": 4212.9
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2158.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3869.0,
+        "fanWatts": 91.1,
+        "dcWatts": 3960.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 252.8,
+        "chassisAcWatts": 4212.9,
+        "facilityWatts": 5055.5
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 4110.7,
+        "fanWatts": 100.8,
+        "dcWatts": 4211.5,
+        "psuEfficiency": 0.9408,
+        "psuLossWatts": 264.8,
+        "chassisAcWatts": 4476.3,
+        "facilityWatts": 4476.3
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 4110.7,
+        "fanWatts": 100.8,
+        "dcWatts": 4211.5,
+        "psuEfficiency": 0.9408,
+        "psuLossWatts": 264.8,
+        "chassisAcWatts": 4476.3,
+        "facilityWatts": 5371.6
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5710.7,
+        "fanWatts": 184.4,
+        "dcWatts": 5895.1,
+        "psuEfficiency": 0.9465,
+        "psuLossWatts": 333.1,
+        "chassisAcWatts": 6228.2,
+        "facilityWatts": 6228.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5710.7,
+        "fanWatts": 184.4,
+        "dcWatts": 5895.1,
+        "psuEfficiency": 0.9465,
+        "psuLossWatts": 333.1,
+        "chassisAcWatts": 6228.2,
+        "facilityWatts": 7473.8
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7310.7,
+        "fanWatts": 308.8,
+        "dcWatts": 7619.5,
+        "psuEfficiency": 0.9523,
+        "psuLossWatts": 381.5,
+        "chassisAcWatts": 8001.0,
+        "facilityWatts": 8001.0
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7310.7,
+        "fanWatts": 308.8,
+        "dcWatts": 7619.5,
+        "psuEfficiency": 0.9523,
+        "psuLossWatts": 381.5,
+        "chassisAcWatts": 8001.0,
+        "facilityWatts": 9601.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7645.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9356.6,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.2,
+        "facilityWatts": 10312.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7645.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9356.6,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.2,
+        "facilityWatts": 12374.6
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7646.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9356.8,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.4,
+        "facilityWatts": 10312.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7646.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9356.8,
+        "fanWatts": 543.1,
+        "dcWatts": 9899.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.4,
+        "facilityWatts": 12374.9
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7646.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9357.1,
+        "fanWatts": 543.2,
+        "dcWatts": 9900.3,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.8,
+        "facilityWatts": 10312.8
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7646.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9357.1,
+        "fanWatts": 543.2,
+        "dcWatts": 9900.3,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 412.5,
+        "chassisAcWatts": 10312.8,
+        "facilityWatts": 12375.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.1,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9499.8,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.0,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.2,
+        "facilityWatts": 10483.2
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.1,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9499.8,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.0,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.2,
+        "facilityWatts": 12579.8
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.3,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9500.0,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.2,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.4,
+        "facilityWatts": 10483.4
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.3,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9500.0,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.2,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.4,
+        "facilityWatts": 12580.1
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 9500.2,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.4,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.6,
+        "facilityWatts": 10483.6
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 7789.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 9500.2,
+        "fanWatts": 563.2,
+        "dcWatts": 10063.4,
+        "psuEfficiency": 0.9599,
+        "psuLossWatts": 420.2,
+        "chassisAcWatts": 10483.6,
+        "facilityWatts": 12580.3
+      }
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 13200.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=15473.9 exceeds redundant PSU capacity 13200.0 W (4+2)"
+    },
+    {
+      "hardware": "h200",
+      "measuredGpuWatts": 13200.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=15473.9 exceeds redundant PSU capacity 13200.0 W (4+2)"
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1659.4,
+        "fanWatts": 53.6,
+        "dcWatts": 1713.0,
+        "psuEfficiency": 0.9256,
+        "psuLossWatts": 137.6,
+        "chassisAcWatts": 1850.6,
+        "facilityWatts": 1850.6
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1659.4,
+        "fanWatts": 53.6,
+        "dcWatts": 1713.0,
+        "psuEfficiency": 0.9256,
+        "psuLossWatts": 137.6,
+        "chassisAcWatts": 1850.6,
+        "facilityWatts": 2220.7
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1660.5,
+        "fanWatts": 53.6,
+        "dcWatts": 1714.1,
+        "psuEfficiency": 0.9257,
+        "psuLossWatts": 137.7,
+        "chassisAcWatts": 1851.8,
+        "facilityWatts": 1851.8
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1660.5,
+        "fanWatts": 53.6,
+        "dcWatts": 1714.1,
+        "psuEfficiency": 0.9257,
+        "psuLossWatts": 137.7,
+        "chassisAcWatts": 1851.8,
+        "facilityWatts": 2222.2
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2659.5,
+        "fanWatts": 77.1,
+        "dcWatts": 2736.6,
+        "psuEfficiency": 0.9393,
+        "psuLossWatts": 176.9,
+        "chassisAcWatts": 2913.5,
+        "facilityWatts": 2913.5
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2659.5,
+        "fanWatts": 77.1,
+        "dcWatts": 2736.6,
+        "psuEfficiency": 0.9393,
+        "psuLossWatts": 176.9,
+        "chassisAcWatts": 2913.5,
+        "facilityWatts": 3496.2
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2660.1,
+        "fanWatts": 77.2,
+        "dcWatts": 2737.3,
+        "psuEfficiency": 0.9393,
+        "psuLossWatts": 176.9,
+        "chassisAcWatts": 2914.2,
+        "facilityWatts": 2914.2
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2660.1,
+        "fanWatts": 77.2,
+        "dcWatts": 2737.3,
+        "psuEfficiency": 0.9393,
+        "psuLossWatts": 176.9,
+        "chassisAcWatts": 2914.2,
+        "facilityWatts": 3497.0
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1401.65,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3061.0,
+        "fanWatts": 88.8,
+        "dcWatts": 3149.8,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3333.8,
+        "facilityWatts": 3333.8
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1401.65,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3061.0,
+        "fanWatts": 88.8,
+        "dcWatts": 3149.8,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3333.8,
+        "facilityWatts": 4000.6
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1401.85,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3061.1,
+        "fanWatts": 88.8,
+        "dcWatts": 3149.9,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3333.9,
+        "facilityWatts": 3333.9
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1401.85,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3061.1,
+        "fanWatts": 88.8,
+        "dcWatts": 3149.9,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3333.9,
+        "facilityWatts": 4000.7
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1402.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3061.3,
+        "fanWatts": 88.8,
+        "dcWatts": 3150.1,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3334.1,
+        "facilityWatts": 3334.1
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 1402.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3061.3,
+        "fanWatts": 88.8,
+        "dcWatts": 3150.1,
+        "psuEfficiency": 0.9448,
+        "psuLossWatts": 184.0,
+        "chassisAcWatts": 3334.1,
+        "facilityWatts": 4000.9
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 4059.3,
+        "fanWatts": 123.8,
+        "dcWatts": 4183.1,
+        "psuEfficiency": 0.949,
+        "psuLossWatts": 224.8,
+        "chassisAcWatts": 4407.9,
+        "facilityWatts": 4407.9
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 4059.3,
+        "fanWatts": 123.8,
+        "dcWatts": 4183.1,
+        "psuEfficiency": 0.949,
+        "psuLossWatts": 224.8,
+        "chassisAcWatts": 4407.9,
+        "facilityWatts": 5289.5
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5659.3,
+        "fanWatts": 201.5,
+        "dcWatts": 5860.8,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 270.9,
+        "chassisAcWatts": 6131.7,
+        "facilityWatts": 6131.7
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5659.3,
+        "fanWatts": 201.5,
+        "dcWatts": 5860.8,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 270.9,
+        "chassisAcWatts": 6131.7,
+        "facilityWatts": 7358.0
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7259.3,
+        "fanWatts": 311.5,
+        "dcWatts": 7570.8,
+        "psuEfficiency": 0.9628,
+        "psuLossWatts": 292.8,
+        "chassisAcWatts": 7863.6,
+        "facilityWatts": 7863.6
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7259.3,
+        "fanWatts": 311.5,
+        "dcWatts": 7570.8,
+        "psuEfficiency": 0.9628,
+        "psuLossWatts": 292.8,
+        "chassisAcWatts": 7863.6,
+        "facilityWatts": 9436.3
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5880.65,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7539.9,
+        "fanWatts": 334.7,
+        "dcWatts": 7874.6,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8168.7,
+        "facilityWatts": 8168.7
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5880.65,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7539.9,
+        "fanWatts": 334.7,
+        "dcWatts": 7874.6,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8168.7,
+        "facilityWatts": 9802.4
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5880.85,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7540.2,
+        "fanWatts": 334.8,
+        "dcWatts": 7875.0,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8169.1,
+        "facilityWatts": 8169.1
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5880.85,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7540.2,
+        "fanWatts": 334.8,
+        "dcWatts": 7875.0,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8169.1,
+        "facilityWatts": 9802.9
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5881.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7540.4,
+        "fanWatts": 334.8,
+        "dcWatts": 7875.2,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8169.3,
+        "facilityWatts": 8169.3
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 5881.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7540.4,
+        "fanWatts": 334.8,
+        "dcWatts": 7875.2,
+        "psuEfficiency": 0.964,
+        "psuLossWatts": 294.1,
+        "chassisAcWatts": 8169.3,
+        "facilityWatts": 9803.2
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.4,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.6,
+        "chassisAcWatts": 13458.0,
+        "facilityWatts": 13458.0
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.4,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.6,
+        "chassisAcWatts": 13458.0,
+        "facilityWatts": 16149.6
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.7,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.6,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.7,
+        "chassisAcWatts": 13458.3,
+        "facilityWatts": 13458.3
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.7,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.6,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.7,
+        "chassisAcWatts": 13458.3,
+        "facilityWatts": 16150.0
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.9,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.8,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.7,
+        "chassisAcWatts": 13458.5,
+        "facilityWatts": 13458.5
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 10340.9,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 901.6,
+        "dcWatts": 12901.8,
+        "psuEfficiency": 0.9586,
+        "psuLossWatts": 556.7,
+        "chassisAcWatts": 13458.5,
+        "facilityWatts": 16150.2
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13188.85,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 14848.2,
+        "fanWatts": 901.6,
+        "dcWatts": 15749.8,
+        "psuEfficiency": 0.9556,
+        "psuLossWatts": 731.8,
+        "chassisAcWatts": 16481.6,
+        "facilityWatts": 16481.6
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13188.85,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 14848.2,
+        "fanWatts": 901.6,
+        "dcWatts": 15749.8,
+        "psuEfficiency": 0.9556,
+        "psuLossWatts": 731.8,
+        "chassisAcWatts": 16481.6,
+        "facilityWatts": 19777.9
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13189.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 14848.3,
+        "fanWatts": 901.6,
+        "dcWatts": 15749.9,
+        "psuEfficiency": 0.9556,
+        "psuLossWatts": 731.8,
+        "chassisAcWatts": 16481.7,
+        "facilityWatts": 16481.7
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13189.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 14848.3,
+        "fanWatts": 901.6,
+        "dcWatts": 15749.9,
+        "psuEfficiency": 0.9556,
+        "psuLossWatts": 731.8,
+        "chassisAcWatts": 16481.7,
+        "facilityWatts": 19778.0
+      }
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13189.25,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=15750.1 exceeds active PSU capacity 15750.0 W (3x active)"
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 13189.25,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=15750.1 exceeds active PSU capacity 15750.0 W (3x active)"
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 15750.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=18310.9 exceeds active PSU capacity 15750.0 W (3x active)"
+    },
+    {
+      "hardware": "b200",
+      "measuredGpuWatts": 15750.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=18310.9 exceeds active PSU capacity 15750.0 W (3x active)"
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1874.8,
+        "fanWatts": 56.7,
+        "dcWatts": 1931.5,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 251.0,
+        "chassisAcWatts": 2182.5,
+        "facilityWatts": 2182.5
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1874.8,
+        "fanWatts": 56.7,
+        "dcWatts": 1931.5,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 251.0,
+        "chassisAcWatts": 2182.5,
+        "facilityWatts": 2619.0
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1875.9,
+        "fanWatts": 56.7,
+        "dcWatts": 1932.6,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 251.1,
+        "chassisAcWatts": 2183.7,
+        "facilityWatts": 2183.7
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1875.9,
+        "fanWatts": 56.7,
+        "dcWatts": 1932.6,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 251.1,
+        "chassisAcWatts": 2183.7,
+        "facilityWatts": 2620.4
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1921.7,
+        "fanWatts": 57.9,
+        "dcWatts": 1979.6,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.2,
+        "chassisAcWatts": 2236.8,
+        "facilityWatts": 2236.8
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1921.7,
+        "fanWatts": 57.9,
+        "dcWatts": 1979.6,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.2,
+        "chassisAcWatts": 2236.8,
+        "facilityWatts": 2684.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1921.9,
+        "fanWatts": 58.0,
+        "dcWatts": 1979.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.2,
+        "facilityWatts": 2237.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1921.9,
+        "fanWatts": 58.0,
+        "dcWatts": 1979.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.2,
+        "facilityWatts": 2684.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.45,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1922.2,
+        "fanWatts": 58.0,
+        "dcWatts": 1980.2,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.5,
+        "facilityWatts": 2237.5
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 47.45,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1922.2,
+        "fanWatts": 58.0,
+        "dcWatts": 1980.2,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.5,
+        "facilityWatts": 2685.0
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2874.9,
+        "fanWatts": 89.2,
+        "dcWatts": 2964.1,
+        "psuEfficiency": 0.9024,
+        "psuLossWatts": 320.6,
+        "chassisAcWatts": 3284.7,
+        "facilityWatts": 3284.7
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2874.9,
+        "fanWatts": 89.2,
+        "dcWatts": 2964.1,
+        "psuEfficiency": 0.9024,
+        "psuLossWatts": 320.6,
+        "chassisAcWatts": 3284.7,
+        "facilityWatts": 3941.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2875.5,
+        "fanWatts": 89.2,
+        "dcWatts": 2964.7,
+        "psuEfficiency": 0.9024,
+        "psuLossWatts": 320.6,
+        "chassisAcWatts": 3285.3,
+        "facilityWatts": 3285.3
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2875.5,
+        "fanWatts": 89.2,
+        "dcWatts": 2964.7,
+        "psuEfficiency": 0.9024,
+        "psuLossWatts": 320.6,
+        "chassisAcWatts": 3285.3,
+        "facilityWatts": 3942.4
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1953.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3828.5,
+        "fanWatts": 131.3,
+        "dcWatts": 3959.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.1,
+        "facilityWatts": 4304.1
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1953.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3828.5,
+        "fanWatts": 131.3,
+        "dcWatts": 3959.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.1,
+        "facilityWatts": 5164.9
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1953.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3828.7,
+        "fanWatts": 131.3,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.3,
+        "facilityWatts": 4304.3
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1953.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3828.7,
+        "fanWatts": 131.3,
+        "dcWatts": 3960.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.3,
+        "facilityWatts": 5165.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1954.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3828.9,
+        "fanWatts": 131.4,
+        "dcWatts": 3960.3,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.4,
+        "chassisAcWatts": 4304.7,
+        "facilityWatts": 4304.7
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 1954.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3828.9,
+        "fanWatts": 131.4,
+        "dcWatts": 3960.3,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.4,
+        "chassisAcWatts": 4304.7,
+        "facilityWatts": 5165.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 4274.7,
+        "fanWatts": 155.3,
+        "dcWatts": 4430.0,
+        "psuEfficiency": 0.9224,
+        "psuLossWatts": 372.8,
+        "chassisAcWatts": 4802.8,
+        "facilityWatts": 4802.8
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 4274.7,
+        "fanWatts": 155.3,
+        "dcWatts": 4430.0,
+        "psuEfficiency": 0.9224,
+        "psuLossWatts": 372.8,
+        "chassisAcWatts": 4802.8,
+        "facilityWatts": 5763.4
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5874.7,
+        "fanWatts": 267.3,
+        "dcWatts": 6142.0,
+        "psuEfficiency": 0.931,
+        "psuLossWatts": 455.1,
+        "chassisAcWatts": 6597.1,
+        "facilityWatts": 6597.1
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5874.7,
+        "fanWatts": 267.3,
+        "dcWatts": 6142.0,
+        "psuEfficiency": 0.931,
+        "psuLossWatts": 455.1,
+        "chassisAcWatts": 6597.1,
+        "facilityWatts": 7916.5
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7474.7,
+        "fanWatts": 427.3,
+        "dcWatts": 7902.0,
+        "psuEfficiency": 0.9399,
+        "psuLossWatts": 505.2,
+        "chassisAcWatts": 8407.2,
+        "facilityWatts": 8407.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7474.7,
+        "fanWatts": 427.3,
+        "dcWatts": 7902.0,
+        "psuEfficiency": 0.9399,
+        "psuLossWatts": 505.2,
+        "chassisAcWatts": 8407.2,
+        "facilityWatts": 10088.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5615.85,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7490.6,
+        "fanWatts": 429.2,
+        "dcWatts": 7919.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.3,
+        "facilityWatts": 8425.3
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5615.85,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7490.6,
+        "fanWatts": 429.2,
+        "dcWatts": 7919.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.3,
+        "facilityWatts": 10110.4
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5616.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7490.8,
+        "fanWatts": 429.2,
+        "dcWatts": 7920.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.5,
+        "facilityWatts": 8425.5
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5616.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7490.8,
+        "fanWatts": 429.2,
+        "dcWatts": 7920.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.5,
+        "facilityWatts": 10110.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5616.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7490.9,
+        "fanWatts": 429.2,
+        "dcWatts": 7920.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.6,
+        "facilityWatts": 8425.6
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 5616.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7490.9,
+        "fanWatts": 429.2,
+        "dcWatts": 7920.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.6,
+        "facilityWatts": 10110.7
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.1,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.0,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13939.8,
+        "facilityWatts": 13939.8
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.1,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.0,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13939.8,
+        "facilityWatts": 16727.8
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.3,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.2,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13940.0,
+        "facilityWatts": 13940.0
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.3,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.2,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13940.0,
+        "facilityWatts": 16728.0
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.4,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13940.2,
+        "facilityWatts": 13940.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 10125.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 1228.2,
+        "dcWatts": 13228.4,
+        "psuEfficiency": 0.9489,
+        "psuLossWatts": 711.8,
+        "chassisAcWatts": 13940.2,
+        "facilityWatts": 16728.2
+      }
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 15000.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=18102.9 exceeds modeled B300 power capacity 15000.0 W"
+    },
+    {
+      "hardware": "b300",
+      "measuredGpuWatts": 15000.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=18102.9 exceeds modeled B300 power capacity 15000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1199.6,
+        "fanWatts": 45.0,
+        "dcWatts": 1244.6,
+        "psuEfficiency": 0.8984,
+        "psuLossWatts": 140.8,
+        "chassisAcWatts": 1385.4,
+        "facilityWatts": 1385.4
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1199.6,
+        "fanWatts": 45.0,
+        "dcWatts": 1244.6,
+        "psuEfficiency": 0.8984,
+        "psuLossWatts": 140.8,
+        "chassisAcWatts": 1385.4,
+        "facilityWatts": 1662.5
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1200.7,
+        "fanWatts": 45.0,
+        "dcWatts": 1245.7,
+        "psuEfficiency": 0.8984,
+        "psuLossWatts": 140.8,
+        "chassisAcWatts": 1386.5,
+        "facilityWatts": 1386.5
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1200.7,
+        "fanWatts": 45.0,
+        "dcWatts": 1245.7,
+        "psuEfficiency": 0.8984,
+        "psuLossWatts": 140.8,
+        "chassisAcWatts": 1386.5,
+        "facilityWatts": 1663.8
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 536.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1736.3,
+        "fanWatts": 63.5,
+        "dcWatts": 1799.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.3,
+        "facilityWatts": 1956.3
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 536.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1736.3,
+        "fanWatts": 63.5,
+        "dcWatts": 1799.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.3,
+        "facilityWatts": 2347.6
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 536.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1736.5,
+        "fanWatts": 63.5,
+        "dcWatts": 1800.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.5,
+        "facilityWatts": 1956.5
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 536.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1736.5,
+        "fanWatts": 63.5,
+        "dcWatts": 1800.0,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.5,
+        "facilityWatts": 2347.8
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 537.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1736.6,
+        "fanWatts": 63.5,
+        "dcWatts": 1800.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.6,
+        "facilityWatts": 1956.6
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 537.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1736.6,
+        "fanWatts": 63.5,
+        "dcWatts": 1800.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 156.5,
+        "chassisAcWatts": 1956.6,
+        "facilityWatts": 2347.9
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2199.7,
+        "fanWatts": 83.5,
+        "dcWatts": 2283.2,
+        "psuEfficiency": 0.9254,
+        "psuLossWatts": 184.1,
+        "chassisAcWatts": 2467.3,
+        "facilityWatts": 2467.3
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2199.7,
+        "fanWatts": 83.5,
+        "dcWatts": 2283.2,
+        "psuEfficiency": 0.9254,
+        "psuLossWatts": 184.1,
+        "chassisAcWatts": 2467.3,
+        "facilityWatts": 2960.8
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2200.3,
+        "fanWatts": 83.6,
+        "dcWatts": 2283.9,
+        "psuEfficiency": 0.9254,
+        "psuLossWatts": 184.2,
+        "chassisAcWatts": 2468.1,
+        "facilityWatts": 2468.1
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2200.3,
+        "fanWatts": 83.6,
+        "dcWatts": 2283.9,
+        "psuEfficiency": 0.9254,
+        "psuLossWatts": 184.2,
+        "chassisAcWatts": 2468.1,
+        "facilityWatts": 2961.7
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2240.65,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3440.2,
+        "fanWatts": 159.6,
+        "dcWatts": 3599.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3829.6,
+        "facilityWatts": 3829.6
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2240.65,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3440.2,
+        "fanWatts": 159.6,
+        "dcWatts": 3599.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3829.6,
+        "facilityWatts": 4595.5
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2240.85,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3440.3,
+        "fanWatts": 159.6,
+        "dcWatts": 3599.9,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3829.7,
+        "facilityWatts": 3829.7
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2240.85,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3440.3,
+        "fanWatts": 159.6,
+        "dcWatts": 3599.9,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3829.7,
+        "facilityWatts": 4595.6
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2241.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3440.6,
+        "fanWatts": 159.6,
+        "dcWatts": 3600.2,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3830.0,
+        "facilityWatts": 3830.0
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2241.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3440.6,
+        "fanWatts": 159.6,
+        "dcWatts": 3600.2,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 229.8,
+        "chassisAcWatts": 3830.0,
+        "facilityWatts": 4596.0
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3599.5,
+        "fanWatts": 172.0,
+        "dcWatts": 3771.5,
+        "psuEfficiency": 0.9406,
+        "psuLossWatts": 238.0,
+        "chassisAcWatts": 4009.5,
+        "facilityWatts": 4009.5
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3599.5,
+        "fanWatts": 172.0,
+        "dcWatts": 3771.5,
+        "psuEfficiency": 0.9406,
+        "psuLossWatts": 238.0,
+        "chassisAcWatts": 4009.5,
+        "facilityWatts": 4811.4
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5199.5,
+        "fanWatts": 338.4,
+        "dcWatts": 5537.9,
+        "psuEfficiency": 0.9472,
+        "psuLossWatts": 308.8,
+        "chassisAcWatts": 5846.7,
+        "facilityWatts": 5846.7
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5199.5,
+        "fanWatts": 338.4,
+        "dcWatts": 5537.9,
+        "psuEfficiency": 0.9472,
+        "psuLossWatts": 308.8,
+        "chassisAcWatts": 5846.7,
+        "facilityWatts": 7016.0
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 6799.5,
+        "fanWatts": 595.1,
+        "dcWatts": 7394.6,
+        "psuEfficiency": 0.9541,
+        "psuLossWatts": 356.1,
+        "chassisAcWatts": 7750.7,
+        "facilityWatts": 7750.7
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 6799.5,
+        "fanWatts": 595.1,
+        "dcWatts": 7394.6,
+        "psuEfficiency": 0.9541,
+        "psuLossWatts": 356.1,
+        "chassisAcWatts": 7750.7,
+        "facilityWatts": 9300.8
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.45,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 8110.9,
+        "fanWatts": 888.8,
+        "dcWatts": 8999.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 375.0,
+        "chassisAcWatts": 9374.7,
+        "facilityWatts": 9374.7
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.45,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 8110.9,
+        "fanWatts": 888.8,
+        "dcWatts": 8999.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 375.0,
+        "chassisAcWatts": 9374.7,
+        "facilityWatts": 11249.6
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.65,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 8111.1,
+        "fanWatts": 888.8,
+        "dcWatts": 8999.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 375.0,
+        "chassisAcWatts": 9374.9,
+        "facilityWatts": 9374.9
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.65,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 8111.1,
+        "fanWatts": 888.8,
+        "dcWatts": 8999.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 375.0,
+        "chassisAcWatts": 9374.9,
+        "facilityWatts": 11249.9
+      }
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.85,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=9000.3 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 6911.85,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=9000.3 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.3,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.2 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.3,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.2 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.5,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.5 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.5,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.5 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.7,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.7 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 7300.7,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=9492.7 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 9000.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=11192.0 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi300x",
+      "measuredGpuWatts": 9000.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=11192.0 exceeds modeled MI300X 8U chassis PSU bank capacity 9000.0 W"
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1307.8,
+        "fanWatts": 70.9,
+        "dcWatts": 1378.7,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 179.2,
+        "chassisAcWatts": 1557.9,
+        "facilityWatts": 1557.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1307.8,
+        "fanWatts": 70.9,
+        "dcWatts": 1378.7,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 179.2,
+        "chassisAcWatts": 1557.9,
+        "facilityWatts": 1869.5
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1308.9,
+        "fanWatts": 71.0,
+        "dcWatts": 1379.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 179.3,
+        "chassisAcWatts": 1559.2,
+        "facilityWatts": 1559.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1308.9,
+        "fanWatts": 71.0,
+        "dcWatts": 1379.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 179.3,
+        "chassisAcWatts": 1559.2,
+        "facilityWatts": 1871.0
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1496.9,
+        "fanWatts": 77.8,
+        "dcWatts": 1574.7,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.6,
+        "chassisAcWatts": 1779.3,
+        "facilityWatts": 1779.3
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1496.9,
+        "fanWatts": 77.8,
+        "dcWatts": 1574.7,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.6,
+        "chassisAcWatts": 1779.3,
+        "facilityWatts": 2135.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.45,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1497.1,
+        "fanWatts": 77.8,
+        "dcWatts": 1574.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.6,
+        "chassisAcWatts": 1779.5,
+        "facilityWatts": 1779.5
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.45,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1497.1,
+        "fanWatts": 77.8,
+        "dcWatts": 1574.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.6,
+        "chassisAcWatts": 1779.5,
+        "facilityWatts": 2135.4
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.65,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1497.4,
+        "fanWatts": 77.8,
+        "dcWatts": 1575.2,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.7,
+        "chassisAcWatts": 1779.9,
+        "facilityWatts": 1779.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 189.65,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1497.4,
+        "fanWatts": 77.8,
+        "dcWatts": 1575.2,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 204.7,
+        "chassisAcWatts": 1779.9,
+        "facilityWatts": 2135.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2307.9,
+        "fanWatts": 112.9,
+        "dcWatts": 2420.8,
+        "psuEfficiency": 0.9038,
+        "psuLossWatts": 257.7,
+        "chassisAcWatts": 2678.5,
+        "facilityWatts": 2678.5
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2307.9,
+        "fanWatts": 112.9,
+        "dcWatts": 2420.8,
+        "psuEfficiency": 0.9038,
+        "psuLossWatts": 257.7,
+        "chassisAcWatts": 2678.5,
+        "facilityWatts": 3214.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2308.5,
+        "fanWatts": 112.9,
+        "dcWatts": 2421.4,
+        "psuEfficiency": 0.9038,
+        "psuLossWatts": 257.7,
+        "chassisAcWatts": 2679.1,
+        "facilityWatts": 2679.1
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2308.5,
+        "fanWatts": 112.9,
+        "dcWatts": 2421.4,
+        "psuEfficiency": 0.9038,
+        "psuLossWatts": 257.7,
+        "chassisAcWatts": 2679.1,
+        "facilityWatts": 3214.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2998.9,
+        "fanWatts": 150.9,
+        "dcWatts": 3149.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3423.7,
+        "facilityWatts": 3423.7
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2998.9,
+        "fanWatts": 150.9,
+        "dcWatts": 3149.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3423.7,
+        "facilityWatts": 4108.4
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2999.0,
+        "fanWatts": 150.9,
+        "dcWatts": 3149.9,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3423.8,
+        "facilityWatts": 3423.8
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2999.0,
+        "fanWatts": 150.9,
+        "dcWatts": 3149.9,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3423.8,
+        "facilityWatts": 4108.6
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.55,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2999.2,
+        "fanWatts": 150.9,
+        "dcWatts": 3150.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3424.0,
+        "facilityWatts": 3424.0
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 1691.55,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2999.2,
+        "fanWatts": 150.9,
+        "dcWatts": 3150.1,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 273.9,
+        "chassisAcWatts": 3424.0,
+        "facilityWatts": 4108.8
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3707.7,
+        "fanWatts": 198.6,
+        "dcWatts": 3906.3,
+        "psuEfficiency": 0.9248,
+        "psuLossWatts": 317.6,
+        "chassisAcWatts": 4223.9,
+        "facilityWatts": 4223.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3707.7,
+        "fanWatts": 198.6,
+        "dcWatts": 3906.3,
+        "psuEfficiency": 0.9248,
+        "psuLossWatts": 317.6,
+        "chassisAcWatts": 4223.9,
+        "facilityWatts": 5068.7
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5307.7,
+        "fanWatts": 344.0,
+        "dcWatts": 5651.7,
+        "psuEfficiency": 0.9359,
+        "psuLossWatts": 387.2,
+        "chassisAcWatts": 6038.9,
+        "facilityWatts": 6038.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5307.7,
+        "fanWatts": 344.0,
+        "dcWatts": 5651.7,
+        "psuEfficiency": 0.9359,
+        "psuLossWatts": 387.2,
+        "chassisAcWatts": 6038.9,
+        "facilityWatts": 7246.7
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.55,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5888.3,
+        "fanWatts": 411.5,
+        "dcWatts": 6299.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6701.9,
+        "facilityWatts": 6701.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.55,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5888.3,
+        "fanWatts": 411.5,
+        "dcWatts": 6299.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6701.9,
+        "facilityWatts": 8042.3
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5888.5,
+        "fanWatts": 411.5,
+        "dcWatts": 6300.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6702.1,
+        "facilityWatts": 6702.1
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5888.5,
+        "fanWatts": 411.5,
+        "dcWatts": 6300.0,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6702.1,
+        "facilityWatts": 8042.5
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5888.6,
+        "fanWatts": 411.5,
+        "dcWatts": 6300.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6702.2,
+        "facilityWatts": 6702.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 4580.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5888.6,
+        "fanWatts": 411.5,
+        "dcWatts": 6300.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 402.1,
+        "chassisAcWatts": 6702.2,
+        "facilityWatts": 8042.6
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 6907.7,
+        "fanWatts": 551.6,
+        "dcWatts": 7459.3,
+        "psuEfficiency": 0.9425,
+        "psuLossWatts": 455.5,
+        "chassisAcWatts": 7914.8,
+        "facilityWatts": 7914.8
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 6907.7,
+        "fanWatts": 551.6,
+        "dcWatts": 7459.3,
+        "psuEfficiency": 0.9425,
+        "psuLossWatts": 455.5,
+        "chassisAcWatts": 7914.8,
+        "facilityWatts": 9497.8
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.1,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 1771.8,
+        "dcWatts": 13771.6,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.3,
+        "facilityWatts": 14408.3
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.1,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 11999.8,
+        "fanWatts": 1771.8,
+        "dcWatts": 13771.6,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.3,
+        "facilityWatts": 17290.0
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.3,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 1771.8,
+        "dcWatts": 13771.8,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.5,
+        "facilityWatts": 14408.5
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.3,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.0,
+        "fanWatts": 1771.8,
+        "dcWatts": 13771.8,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.5,
+        "facilityWatts": 17290.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 1771.8,
+        "dcWatts": 13772.0,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.7,
+        "facilityWatts": 14408.7
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 10692.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 12000.2,
+        "fanWatts": 1771.8,
+        "dcWatts": 13772.0,
+        "psuEfficiency": 0.9558,
+        "psuLossWatts": 636.7,
+        "chassisAcWatts": 14408.7,
+        "facilityWatts": 17290.4
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 13977.9,
+        "fanWatts": 1771.8,
+        "dcWatts": 15749.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 656.2,
+        "chassisAcWatts": 16405.9,
+        "facilityWatts": 16405.9
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 13977.9,
+        "fanWatts": 1771.8,
+        "dcWatts": 15749.7,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 656.2,
+        "chassisAcWatts": 16405.9,
+        "facilityWatts": 19687.1
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.45,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 13978.2,
+        "fanWatts": 1771.8,
+        "dcWatts": 15750.0,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 656.2,
+        "chassisAcWatts": 16406.2,
+        "facilityWatts": 16406.2
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.45,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 13978.2,
+        "fanWatts": 1771.8,
+        "dcWatts": 15750.0,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 656.2,
+        "chassisAcWatts": 16406.2,
+        "facilityWatts": 19687.4
+      }
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.65,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=15750.1 exceeds modeled MI325X 8U chassis PSU bank capacity 15750.0 W"
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 12670.65,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=15750.1 exceeds modeled MI325X 8U chassis PSU bank capacity 15750.0 W"
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 15750.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=18829.5 exceeds modeled MI325X 8U chassis PSU bank capacity 15750.0 W"
+    },
+    {
+      "hardware": "mi325x",
+      "measuredGpuWatts": 15750.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=18829.5 exceeds modeled MI325X 8U chassis PSU bank capacity 15750.0 W"
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1356.6,
+        "fanWatts": 100.3,
+        "dcWatts": 1456.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 189.3,
+        "chassisAcWatts": 1646.2,
+        "facilityWatts": 1646.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 0.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1356.6,
+        "fanWatts": 100.3,
+        "dcWatts": 1456.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 189.3,
+        "chassisAcWatts": 1646.2,
+        "facilityWatts": 1975.4
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1357.7,
+        "fanWatts": 100.4,
+        "dcWatts": 1458.1,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 189.5,
+        "chassisAcWatts": 1647.6,
+        "facilityWatts": 1647.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1357.7,
+        "fanWatts": 100.4,
+        "dcWatts": 1458.1,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 189.5,
+        "chassisAcWatts": 1647.6,
+        "facilityWatts": 1977.1
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.05,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1857.6,
+        "fanWatts": 122.2,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.1,
+        "facilityWatts": 2237.1
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.05,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1857.6,
+        "fanWatts": 122.2,
+        "dcWatts": 1979.8,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.1,
+        "facilityWatts": 2684.5
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1857.7,
+        "fanWatts": 122.2,
+        "dcWatts": 1979.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.2,
+        "facilityWatts": 2237.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1857.7,
+        "fanWatts": 122.2,
+        "dcWatts": 1979.9,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.2,
+        "facilityWatts": 2684.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.45,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 1857.9,
+        "fanWatts": 122.2,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.4,
+        "facilityWatts": 2237.4
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 501.45,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 1857.9,
+        "fanWatts": 122.2,
+        "dcWatts": 1980.1,
+        "psuEfficiency": 0.885,
+        "psuLossWatts": 257.3,
+        "chassisAcWatts": 2237.4,
+        "facilityWatts": 2684.9
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2356.7,
+        "fanWatts": 147.2,
+        "dcWatts": 2503.9,
+        "psuEfficiency": 0.8943,
+        "psuLossWatts": 296.1,
+        "chassisAcWatts": 2800.0,
+        "facilityWatts": 2800.0
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1000.25,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2356.7,
+        "fanWatts": 147.2,
+        "dcWatts": 2503.9,
+        "psuEfficiency": 0.8943,
+        "psuLossWatts": 296.1,
+        "chassisAcWatts": 2800.0,
+        "facilityWatts": 3360.0
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 2357.3,
+        "fanWatts": 147.2,
+        "dcWatts": 2504.5,
+        "psuEfficiency": 0.8943,
+        "psuLossWatts": 296.1,
+        "chassisAcWatts": 2800.6,
+        "facilityWatts": 2800.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 1000.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 2357.3,
+        "fanWatts": 147.2,
+        "dcWatts": 2504.5,
+        "psuEfficiency": 0.8943,
+        "psuLossWatts": 296.1,
+        "chassisAcWatts": 2800.6,
+        "facilityWatts": 3360.7
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3725.7,
+        "fanWatts": 234.1,
+        "dcWatts": 3959.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.1,
+        "facilityWatts": 4304.1
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3725.7,
+        "fanWatts": 234.1,
+        "dcWatts": 3959.8,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.1,
+        "facilityWatts": 5164.9
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3725.8,
+        "fanWatts": 234.1,
+        "dcWatts": 3959.9,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.2,
+        "facilityWatts": 4304.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3725.8,
+        "fanWatts": 234.1,
+        "dcWatts": 3959.9,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.3,
+        "chassisAcWatts": 4304.2,
+        "facilityWatts": 5165.0
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.55,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3726.1,
+        "fanWatts": 234.1,
+        "dcWatts": 3960.2,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.4,
+        "chassisAcWatts": 4304.6,
+        "facilityWatts": 4304.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2369.55,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3726.1,
+        "fanWatts": 234.1,
+        "dcWatts": 3960.2,
+        "psuEfficiency": 0.92,
+        "psuLossWatts": 344.4,
+        "chassisAcWatts": 4304.6,
+        "facilityWatts": 5165.5
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 3756.5,
+        "fanWatts": 236.4,
+        "dcWatts": 3992.9,
+        "psuEfficiency": 0.9202,
+        "psuLossWatts": 346.4,
+        "chassisAcWatts": 4339.3,
+        "facilityWatts": 4339.3
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 2400.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 3756.5,
+        "fanWatts": 236.4,
+        "dcWatts": 3992.9,
+        "psuEfficiency": 0.9202,
+        "psuLossWatts": 346.4,
+        "chassisAcWatts": 4339.3,
+        "facilityWatts": 5207.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 5356.5,
+        "fanWatts": 378.3,
+        "dcWatts": 5734.8,
+        "psuEfficiency": 0.929,
+        "psuLossWatts": 438.5,
+        "chassisAcWatts": 6173.3,
+        "facilityWatts": 6173.3
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 4000.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 5356.5,
+        "fanWatts": 378.3,
+        "dcWatts": 5734.8,
+        "psuEfficiency": 0.929,
+        "psuLossWatts": 438.5,
+        "chassisAcWatts": 6173.3,
+        "facilityWatts": 7408.0
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 6956.5,
+        "fanWatts": 570.7,
+        "dcWatts": 7527.2,
+        "psuEfficiency": 0.938,
+        "psuLossWatts": 497.4,
+        "chassisAcWatts": 8024.6,
+        "facilityWatts": 8024.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5600.0,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 6956.5,
+        "fanWatts": 570.7,
+        "dcWatts": 7527.2,
+        "psuEfficiency": 0.938,
+        "psuLossWatts": 497.4,
+        "chassisAcWatts": 8024.6,
+        "facilityWatts": 9629.5
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5943.75,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7300.3,
+        "fanWatts": 619.4,
+        "dcWatts": 7919.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.2,
+        "facilityWatts": 8425.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5943.75,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7300.3,
+        "fanWatts": 619.4,
+        "dcWatts": 7919.7,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.2,
+        "facilityWatts": 10110.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5943.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7300.4,
+        "fanWatts": 619.4,
+        "dcWatts": 7919.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.3,
+        "facilityWatts": 8425.3
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5943.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7300.4,
+        "fanWatts": 619.4,
+        "dcWatts": 7919.8,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.3,
+        "facilityWatts": 10110.4
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5944.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 7300.6,
+        "fanWatts": 619.5,
+        "dcWatts": 7920.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.6,
+        "facilityWatts": 8425.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 5944.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 7300.6,
+        "fanWatts": 619.5,
+        "dcWatts": 7920.1,
+        "psuEfficiency": 0.94,
+        "psuLossWatts": 505.5,
+        "chassisAcWatts": 8425.6,
+        "facilityWatts": 10110.7
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.3,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 15499.8,
+        "fanWatts": 2803.2,
+        "dcWatts": 18303.0,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19115.8,
+        "facilityWatts": 19115.8
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.3,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 15499.8,
+        "fanWatts": 2803.2,
+        "dcWatts": 18303.0,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19115.8,
+        "facilityWatts": 22939.0
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.5,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 15500.0,
+        "fanWatts": 2803.3,
+        "dcWatts": 18303.3,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19116.1,
+        "facilityWatts": 19116.1
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.5,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 15500.0,
+        "fanWatts": 2803.3,
+        "dcWatts": 18303.3,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19116.1,
+        "facilityWatts": 22939.3
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.7,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 15500.2,
+        "fanWatts": 2803.3,
+        "dcWatts": 18303.5,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19116.3,
+        "facilityWatts": 19116.3
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 14143.7,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 15500.2,
+        "fanWatts": 2803.3,
+        "dcWatts": 18303.5,
+        "psuEfficiency": 0.9575,
+        "psuLossWatts": 812.8,
+        "chassisAcWatts": 19116.3,
+        "facilityWatts": 22939.6
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15639.95,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 16996.5,
+        "fanWatts": 2803.3,
+        "dcWatts": 19799.8,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20624.8,
+        "facilityWatts": 20624.8
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15639.95,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 16996.5,
+        "fanWatts": 2803.3,
+        "dcWatts": 19799.8,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20624.8,
+        "facilityWatts": 24749.8
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15640.15,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 16996.6,
+        "fanWatts": 2803.3,
+        "dcWatts": 19799.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20624.9,
+        "facilityWatts": 20624.9
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15640.15,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 16996.6,
+        "fanWatts": 2803.3,
+        "dcWatts": 19799.9,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20624.9,
+        "facilityWatts": 24749.9
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15640.35,
+      "pue": 1.0,
+      "expected": {
+        "preFanDcWatts": 16996.9,
+        "fanWatts": 2803.3,
+        "dcWatts": 19800.2,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20625.2,
+        "facilityWatts": 20625.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 15640.35,
+      "pue": 1.2,
+      "expected": {
+        "preFanDcWatts": 16996.9,
+        "fanWatts": 2803.3,
+        "dcWatts": 19800.2,
+        "psuEfficiency": 0.96,
+        "psuLossWatts": 825.0,
+        "chassisAcWatts": 20625.2,
+        "facilityWatts": 24750.2
+      }
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 26400.0,
+      "pue": 1.0,
+      "expected": null,
+      "referenceError": "dc_load_w=30559.8 exceeds modeled MI355X 10U chassis PSU bank capacity 26400.0 W"
+    },
+    {
+      "hardware": "mi355x",
+      "measuredGpuWatts": 26400.0,
+      "pue": 1.2,
+      "expected": null,
+      "referenceError": "dc_load_w=30559.8 exceeds modeled MI355X 10U chassis PSU bank capacity 26400.0 W"
+    }
+  ]
+}

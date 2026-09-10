@@ -9,6 +9,7 @@ import {
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
+  isModeledSystemPowerConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
@@ -218,6 +219,21 @@ describe('metric registry', () => {
     expect(isMeasuredEnergyConfigKey('y_tpPerGpu')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y_jTotal')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y')).toBe(false);
+    expect(isMeasuredEnergyConfigKey('y_modeledChassisPowerPerGpu')).toBe(false);
+    expect(isModeledSystemPowerConfigKey('y_modeledChassisPowerPerGpu')).toBe(true);
+    expect(isModeledSystemPowerConfigKey('y_measuredAvgPower')).toBe(false);
+    expect(isModeledSystemPowerConfigKey('modeledChassisPowerPerGpu.y')).toBe(false);
+  });
+
+  it('keeps modeled chassis AC separate from measured and provisioned power', () => {
+    const group = METRIC_CONTROL_GROUPS.find((item) => item.label === 'Modeled System Power');
+    expect(group?.metrics).toEqual(['y_modeledChassisPowerPerGpu']);
+    expect(resolveMetricConfigKey('y_modeledChassisPowerPerGpu')).toBe(
+      'y_modeledChassisPowerPerGpu',
+    );
+    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu).toBe('modeledChassisPowerPerGpu.y');
+    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu_roofline).toBe('lower_right');
+    expect(chartDefinitions[1].y_modeledChassisPowerPerGpu_roofline).toBe('lower_left');
   });
 });
 

@@ -7,7 +7,9 @@
  * plotted x/y axes.
  */
 
+import { METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
+import { chipCounts } from '@/lib/chip-counts';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -53,6 +55,8 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
+  const showModeledPower =
+    displayedMetrics?.yPath === METRIC_REGISTRY.modeledChassisPowerPerGpu.field;
   const headers = [
     'Model',
     'ISL',
@@ -106,6 +110,7 @@ export function inferenceChartToCsv(
     'Run URL',
     'Physical Chips',
     'DP',
+    ...(showModeledPower ? ['Configured Chip Count'] : []),
   ];
 
   const displayedColumns = displayedMetrics
@@ -126,6 +131,7 @@ export function inferenceChartToCsv(
   const rows = [...data, ...overlayData]
     .filter((d) => !d.hidden)
     .map((d) => {
+      const chips = chipCounts(d, showModeledPower);
       const row = [
         model,
         islOsl?.isl ?? '',
@@ -168,8 +174,9 @@ export function inferenceChartToCsv(
         d.dp_attention ?? '',
         d.is_multinode ?? '',
         d.run_url ?? '',
-        d.physicalChips ?? d.tp,
+        chips.physical,
         d.dp ?? '',
+        ...(showModeledPower ? [chips.configured] : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;

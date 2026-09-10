@@ -4,8 +4,10 @@ import { useMemo } from 'react';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { chipCounts } from '@/lib/chip-counts';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
@@ -39,6 +41,7 @@ export function inferenceTableHeaderLabels(
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
     physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
+    configuredChips: locale === 'zh' ? '配置中的芯片数' : 'Configured Chip Count',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
@@ -53,6 +56,7 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
+  const showModeledPower = isModeledSystemPowerConfigKey(selectedYAxisMetric);
   const headers = useMemo(
     () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
     [chartDefinition, selectedYAxisMetric, locale],
@@ -91,10 +95,21 @@ export default function InferenceTable({
       {
         header: headers.physicalChips,
         align: 'right',
-        cell: (row) => row.physicalChips ?? row.tp,
-        sortValue: (row) => row.physicalChips ?? row.tp,
+        cell: (row) => chipCounts(row, showModeledPower).physical,
+        sortValue: (row) => chipCounts(row, showModeledPower).physical,
         importance: 'secondary',
       },
+      ...(showModeledPower
+        ? [
+            {
+              header: headers.configuredChips,
+              align: 'right' as const,
+              cell: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
+              sortValue: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
+              importance: 'secondary' as const,
+            },
+          ]
+        : []),
       {
         header: 'DP',
         align: 'right',
@@ -135,7 +150,7 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers],
+    [yPath, headers, showModeledPower],
   );
 
   return (

@@ -38,6 +38,24 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     }
   });
 
+  it('limits system power to GPU chassis while retaining their CPU and DRAM assumptions', () => {
+    const { description, formula } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
+    expect(description.en).toContain(
+      'divided by the modeled chassis GPU count (eight per chassis)',
+    );
+    expect(description.en).not.toContain('deployment GPU count');
+    expect(formula.en).toContain('÷ modeled chassis GPU count (8 per chassis)');
+    expect(description.zh).toContain('再除以建模机箱的 GPU 总数（每机箱 8 张）');
+    expect(formula.zh).toContain('÷ 建模机箱的 GPU 总数（每机箱 8 张）');
+    expect(description.en).toContain('CPU and DRAM utilization set to 20%');
+    expect(description.en).toContain(
+      'extrapolated to a full chassis at the measured per-GPU power',
+    );
+    expect(description.en).toContain('Separate CPU-only frontend/router hosts are excluded.');
+    expect(description.zh).toContain('CPU 与 DRAM 利用率均设为 20%');
+    expect(description.zh).toContain('不计入独立的纯 CPU 前端或路由主机。');
+  });
+
   it('cost metrics show the $/Mtok formula', () => {
     for (const key of [
       'costh',

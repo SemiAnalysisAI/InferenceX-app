@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import {
   getPointLabel,
   generateTooltipContent,
@@ -66,6 +67,181 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
     ...overrides,
   };
 }
+
+const systemPower = {
+  status: 'supported',
+  hardware: 'h100',
+  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
+  modelPath: 'chassis/H100.py',
+  gpuCount: 16,
+  chassisCount: 2,
+  chassisAcWatts: 12000,
+  chassisAcWattsPerGpu: 750,
+  facilityWatts: 14400,
+  pue: 1.2,
+  measuredGpuWattsPerGpu: 500,
+  modeledGpuCount: 16,
+  deploymentAcWatts: 12000,
+  deploymentFacilityWatts: 14400,
+  topologyBasis: 'worker-hosts',
+  chassisBasis: 'full',
+  telemetryBasis: 'validated-v2',
+} satisfies SystemPowerEstimate;
+
+describe('modeled system-power tooltip', () => {
+  const config = (overrides: Partial<TooltipConfig> = {}) =>
+    tooltipConfig({
+      data: pt({ modeledSystemPower: systemPower }),
+      selectedYAxisMetric: 'y_modeledChassisPowerPerGpu',
+      isPinned: true,
+      ...overrides,
+    });
+
+  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+    const html = generateTooltipContent(config());
+    expect(html).toContain('500 W/GPU');
+    expect(html).toContain('750 W/GPU');
+    expect(html).toContain('12,000 W');
+    expect(html).toContain('14,400 W');
+    expect(html).toContain('PUE 1.2');
+    expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
+    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain(
+      'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+    );
+    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).not.toContain('12,000 W/GPU');
+    expect(html).not.toContain('Unmeasured chassis GPUs');
+  });
+
+  it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
+    const data = pt({
+      physicalChips: 4,
+      modeledSystemPower: {
+        ...systemPower,
+        gpuCount: 4,
+        chassisCount: 1,
+        modeledGpuCount: 8,
+        chassisAcWatts: 6000,
+        facilityWatts: 7200,
+        deploymentAcWatts: 3000,
+        deploymentFacilityWatts: 3600,
+        topologyBasis: 'single-node',
+        chassisBasis: 'extrapolated',
+      },
+    });
+    const html = generateTooltipContent(config({ data }));
+    expect(html).toContain(
+      '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
+    );
+    expect(html).toContain('Unmeasured chassis GPUs are assumed to run the same workload');
+    expect(html).toContain('3000 W');
+    expect(html).toContain('3600 W');
+    expect(html).not.toContain('6000 W');
+    expect(html).not.toContain('7200 W');
+    expect(html).toContain('<strong>Total Chips:</strong> 4');
+
+    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
+    expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
+    expect(zh).toContain('3000 W');
+    expect(zh).not.toContain('6000 W');
+  });
+
+  it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
+    const official = config();
+    const overlay = generateOverlayTooltipContent({
+      ...official,
+      overlayData: {
+        label: 'PowerX comparison',
+        hardwareConfig: mockHardwareConfig,
+      } as OverlayTooltipConfig['overlayData'],
+    });
+    for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
+      expect(html).toContain('500 W/GPU');
+      expect(html).toContain('750 W/GPU');
+      expect(html).toContain(systemPower.modelRevision);
+    }
+  });
+
+  it('explains unsupported hardware on the measured baseline without substituting zero', () => {
+    const html = generateTooltipContent(
+      config({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({
+          modeledSystemPower: {
+            status: 'unsupported',
+            reason: 'hardware',
+            modelRevision: systemPower.modelRevision,
+          },
+        }),
+      }),
+    );
+    expect(html).toContain('No matching chassis model is available');
+    expect(html).not.toContain('tooltip-modeled-system-power');
+    expect(html).not.toContain('0 W/GPU');
+  });
+
+  it('keeps hover compact and leaves unrelated metrics unchanged', () => {
+    const hover = generateTooltipContent(config({ isPinned: false }));
+    expect(hover).toContain('500 W/GPU');
+    expect(hover).not.toContain('PUE 1.2');
+    expect(generateTooltipContent(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
+      'tooltip-modeled-system-power',
+    );
+  });
+
+  it('localizes the measurement boundary and occupancy assumptions', () => {
+    const html = generateTooltipContent(config({ locale: 'zh' }));
+    expect(html).toContain('GPU 实测功耗');
+    expect(html).toContain('整个部署的机箱交流功耗估算');
+    expect(html).toContain('数据中心功耗估算');
+    expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
+    expect(html).toContain('CPU/DRAM 利用率：20%');
+    expect(html).toContain('计入 GPU 机箱内的 CPU');
+    expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
+  });
+
+  it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      const html = generateTooltipContent(config({ locale }));
+      const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
+      expect(match?.groups?.normalization).toContain(
+        locale === 'en' ? 'all modeled chassis GPUs' : '建模机箱的 GPU 总数',
+      );
+      expect(match?.groups?.boundary).toContain(
+        locale === 'en' ? 'frontend/router hosts' : '前端或路由主机',
+      );
+      expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
+      expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
+    }
+  });
+
+  it('uses validated model topology while preserving legacy configuration counts separately', () => {
+    const data = pt({
+      physicalChips: 64,
+      modeledSystemPower: {
+        ...systemPower,
+        gpuCount: 8,
+        chassisCount: 1,
+        modeledGpuCount: 8,
+        chassisAcWatts: 6000,
+        deploymentAcWatts: 6000,
+        topologyBasis: 'single-node',
+        telemetryBasis: 'validated-unversioned-single-node',
+      },
+    });
+    const html = generateTooltipContent(config({ data }));
+    expect(html).toContain('<strong>Total Chips:</strong> 8');
+    expect(html).toContain('<strong>Configured Chip Count:</strong> 64');
+    expect(html).toContain('1 full eight-GPU chassis · 8 GPUs');
+    const measured = generateTooltipContent(
+      config({ data, selectedYAxisMetric: 'y_measuredAvgPower' }),
+    );
+    expect(measured).toContain('<strong>Total Chips:</strong> 64');
+    expect(measured).not.toContain('Configured Chip Count');
+  });
+});
 
 // ===========================================================================
 // getPointLabel
