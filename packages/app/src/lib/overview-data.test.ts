@@ -177,7 +177,7 @@ describe('overview engine scope and scenario selection', () => {
   it('assigns each active model to its configured scenario', () => {
     expect(overviewScenarioForModel(Model.Kimi_K3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.GLM_5_2)).toBe('agentx');
-    expect(overviewScenarioForModel(Model.DeepSeek_V4_Pro)).toBe('single_turn_8k1k');
+    expect(overviewScenarioForModel(Model.DeepSeek_V4_Pro)).toBe('agentx');
     expect(overviewScenarioForModel(Model.Kimi_K2_5)).toBe('single_turn_8k1k');
     expect(overviewScenarioForModel(Model.MiniMax_M3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.Qwen3_5)).toBe('single_turn_8k1k');
@@ -1336,16 +1336,16 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    // Curated scenarios: DeepSeek and Qwen3.5 each get both rows, Kimi K3 and
-    // GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are not
-    // default models, and the matrix is built from DEFAULT_MODELS.
+    // Curated scenarios: Qwen3.5 gets both rows; Kimi K3 and GLM are
+    // AgentX-only. Kimi K2.5 is absent — deprecated models are not default
+    // models, and the matrix is built from DEFAULT_MODELS.
     // Qwen3.8-Flash-Next is curated AgentX-only, like Kimi K3 and GLM: the
     // model is benchmarked on agentic traces, so it must not claim a
-    // fixed-sequence row it will never fill. MiniMax M3 is AgentX-only too,
-    // but by retirement: its single-turn 8k1k sweep stopped on 2026-08-04
-    // (InferenceX#2493), so the matrix must not keep a row that never
-    // refreshes. AgentX rows group above the 8K/1K rows, each group in
-    // MODEL_CONFIG declaration order.
+    // fixed-sequence row it will never fill. MiniMax M3 and DeepSeek V4 Pro
+    // are AgentX-only by retirement: their single-turn 8k1k sweeps stopped on
+    // 2026-08-04 (InferenceX#2493) and after 2026-09-08 (InferenceX#2728), so
+    // the matrix must not keep rows that never refresh. AgentX rows group
+    // above the 8K/1K row, each group in MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.Kimi_K3}/agentx`,
@@ -1353,19 +1353,19 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
-      `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
       `${Model.Qwen3_5}/single_turn_8k1k`,
     ]);
     expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
     expect(page).not.toHaveProperty('datasetThroughDate');
     expect(page.tier).toBe(50);
 
-    // DeepSeek: only each series' latest-date sweep survives. B300 and MI355X
-    // therefore have no exact @50 read; GB200's independent FP8 remains visible.
-    // GB300's points are single-node and multi-node aggregate deployments, so
-    // they must not be interpolated into one synthetic serving curve.
+    // DeepSeek (AgentX): only each series' latest-date sweep survives. B300
+    // and MI355X therefore have no exact @50 read; GB200's independent FP8
+    // remains visible. GB300's points are single-node and multi-node
+    // aggregate deployments, so they must not be interpolated into one
+    // synthetic serving curve.
     const deepseek = page.models.find(
-      (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'single_turn_8k1k',
+      (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'agentx',
     )!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
     expect(dsB300.baseline.read.value).toBeCloseTo(8101.968);
@@ -1391,35 +1391,13 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(dsGb300.candidate.read.evidenceTopologies).toEqual([]);
     expect(dsGb300.candidate.missingReason).toBe('no_exact_at_tier');
 
-    // DeepSeek's AgentX row is priced from its agentic-trace rows alone — the
-    // single-turn sweeps never leak into it, so only the two benchmarked
-    // platforms carry a read.
-    const deepseekAgentx = page.models.find(
-      (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'agentx',
-    )!;
-    const dsxB200 = deepseekAgentx.platforms.find((p) => p.hardware === 'b200')!;
-    expect(dsxB200.read.value).toBe(7500);
-    expect(dsxB200.costPerMtok).toBeCloseTo(
-      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7500 * 3600),
-      6,
-    );
-    // Distinct from this model's single-turn B200 read (8101.968), so a
-    // regression that fed single-turn rows into this row would land there.
-    expect(dsxB200.read.value).not.toBeCloseTo(8101.968, 3);
-    const dsxMi355x = deepseekAgentx.platforms.find((p) => p.hardware === 'mi355x')!;
-    expect(dsxMi355x.read.value).toBe(6000);
-    expect(dsxMi355x.costVsReferencePct).toBeCloseTo(
-      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
-        6000 /
-        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / 7500) -
-        1,
-      6,
-    );
+    // DeepSeek's retired single-turn 8k1k scenario gets no matrix row even
+    // though historical 8K/1K rows would still be queryable.
     expect(
-      deepseekAgentx.platforms
-        .filter((p) => ['b300', 'gb200', 'gb300'].includes(p.hardware))
-        .map((p) => p.missingReason),
-    ).toEqual(['no_scenario_data', 'no_scenario_data', 'no_scenario_data']);
+      page.models.some(
+        (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'single_turn_8k1k',
+      ),
+    ).toBe(false);
 
     // MiniMax: the platform result remains visible when B200 has no AgentX
     // data — priced, but with no percentage baseline (the UI's ∞ badge state).

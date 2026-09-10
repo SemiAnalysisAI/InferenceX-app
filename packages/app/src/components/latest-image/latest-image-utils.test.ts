@@ -235,16 +235,17 @@ describe('imageRowSequence', () => {
 
 describe('isActiveImageRow', () => {
   it('keeps active models on scenarios they still sweep', () => {
-    expect(isActiveImageRow(imageRow('dsv4', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(true);
     // Maintenance is not deprecation: DeepSeek R1 stays listed on 8K/1K.
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
-  it('drops the per-model retired MiniMax M3 8K/1K sweep while keeping 8K/1K elsewhere', () => {
+  it('drops the per-model retired MiniMax M3 and DeepSeek V4 Pro 8K/1K sweeps while keeping 8K/1K elsewhere', () => {
     expect(isActiveImageRow(imageRow('minimaxm3', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('dsv4', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
   });
 

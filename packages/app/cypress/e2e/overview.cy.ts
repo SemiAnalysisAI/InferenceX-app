@@ -22,11 +22,11 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Six models: two with both a single-turn and an AgentX row (DeepSeek,
- *  Qwen3.5), and four curated AgentX-only (Kimi K3, GLM 5.2,
- *  Qwen3.8-Flash-Next, and MiniMax M3, whose 8k1k sweep was retired on
- *  2026-08-04 in InferenceX#2493). */
-const MATRIX_ROWS = 8;
+/** Six models: one with both a single-turn and an AgentX row (Qwen3.5),
+ *  three curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next), and two
+ *  AgentX-only by retirement: MiniMax M3's 8k1k sweep stopped on 2026-08-04
+ *  (InferenceX#2493) and DeepSeek V4 Pro's on 2026-09-08 (InferenceX#2728). */
+const MATRIX_ROWS = 7;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -487,7 +487,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-R1-0528')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'maintenance');
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
+    desktopModel('DeepSeek-V4-Pro', AGENTX)
       .find('[data-testid="overview-model-category-badge"]')
       .should('not.exist');
     cy.get('[data-testid="overview-desktop-model"]').then(([...rows]) => {
@@ -834,9 +834,8 @@ describe('Overview page', () => {
       platform('b200')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.attr', 'data-history-status', 'comparable');
-      platform('mi355x')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('have.attr', 'data-history-status', 'comparable');
+      // MI355X has a baseline but no exact @50 read today: nothing to compare.
+      platform('mi355x').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
 
     cy.contains(
@@ -1074,7 +1073,7 @@ describe('Overview page', () => {
       platform('mi355x').should('not.contain.text', 'STP');
     });
 
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       // Speculative decode is the expected case and goes unlabelled; the stack
       // badge stops at framework and precision.
       cy.contains('SGLang · FP4').should('exist');
@@ -1142,7 +1141,7 @@ describe('Overview page', () => {
       expectCellTint('mi355x', 'rgba(16, 185, 129,');
     });
 
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('gb200')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+71%')
@@ -1249,8 +1248,8 @@ describe('Overview page', () => {
             expect(getComputedStyle(header).fontSize).to.equal('14px');
           }
         });
-        // One row per curated (model, scenario) pair: six models, two of
-        // which (DeepSeek, Qwen3.5) carry a second single-turn row.
+        // One row per curated (model, scenario) pair: six models, one of
+        // which (Qwen3.5) carries a second single-turn row.
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
@@ -1266,43 +1265,35 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['Kimi-K3', 'GLM-5.2', 'MiniMax-M3']) {
+    for (const model of ['DeepSeek-V4-Pro', 'Kimi-K3', 'GLM-5.2', 'MiniMax-M3']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });
     }
-    for (const model of ['DeepSeek-V4-Pro', 'Qwen-3.5-397B-A17B']) {
-      desktopModel(model, SINGLE_TURN)
-        .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', '8K/1K');
-    }
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
+      .find('[data-testid="overview-model-scenario"]')
+      .should('have.text', '8K/1K');
   });
 
   it('gives a model benchmarked on both scenarios one row each, priced independently', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').should(
+    cy.get('[data-testid="overview-desktop-model"][data-model="Qwen-3.5-397B-A17B"]').should(
       'have.length',
       2,
     );
     // The AgentX row sits in the leading AgentX group; the single-turn row
     // follows in the 8K/1K group below it, both under the same label.
-    cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').then(($rows) => {
-      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([AGENTX, SINGLE_TURN]);
-    });
+    cy.get('[data-testid="overview-desktop-model"][data-model="Qwen-3.5-397B-A17B"]').then(
+      ($rows) => {
+        expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([AGENTX, SINGLE_TURN]);
+      },
+    );
 
-    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', AGENTX).within(() => {
       expectAgentxScenario(AGENTX_LABEL);
-      cy.contains('DeepSeek V4 Pro 0813 1.6T').should('exist');
-      // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
-      cy.get(
-        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.064');
-      cy.get(
-        '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.069');
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 3);
+      cy.contains('Qwen3.5 397B').should('exist');
       // Its detail link points at the agentic-traces workload, not 8K→1K.
       cy.contains('a', 'View details')
         .should('have.attr', 'href')
@@ -1312,15 +1303,34 @@ describe('Overview page', () => {
       cy.contains('a', 'View details').should(
         'have.attr',
         'aria-label',
-        `View details: DeepSeek V4 Pro 0813 1.6T · ${AGENTX_LABEL}`,
+        `View details: Qwen3.5 397B · ${AGENTX_LABEL}`,
       );
     });
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       cy.contains('a', 'View details').should(
         'have.attr',
         'aria-label',
-        'View details: DeepSeek V4 Pro 0813 1.6T · 8K/1K',
+        'View details: Qwen3.5 397B · 8K/1K',
       );
+    });
+
+    // DeepSeek V4 Pro retired its single-turn 8k1k sweep on 2026-09-08
+    // (InferenceX#2728): only the AgentX row remains, and it is priced from
+    // the agentic-trace rows — no stale 8K/1K row lingers below it.
+    cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').should(
+      'have.length',
+      1,
+    );
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
+      expectAgentxScenario(AGENTX_LABEL);
+      cy.contains('DeepSeek V4 Pro 0813 1.6T').should('exist');
+      cy.get(
+        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
+      ).should('have.text', '$0.059');
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 3);
+      cy.contains('a', 'View details')
+        .should('have.attr', 'href')
+        .and('include', 'i_seq=agentic-traces');
     });
   });
 
@@ -1395,7 +1405,7 @@ describe('Overview page', () => {
       });
     });
 
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       // A cell without a read at the tier carries no evidence link either.
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-cost-evidence-link"]').should('not.exist');
@@ -1408,7 +1418,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
           .should('contain.text', '—')
@@ -1521,7 +1531,7 @@ describe('Overview page', () => {
     });
 
     cy.visit('/overview?tier=30');
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
@@ -1581,7 +1591,7 @@ describe('Overview page', () => {
           ).should('have.text', '$0.062');
         });
       });
-      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.059');
@@ -1602,7 +1612,7 @@ describe('Overview page', () => {
       cy.viewport(width, 844);
       cy.visit('/overview');
 
-      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]')
           .should('have.length', 5)
           .then(($rows) => {
@@ -1631,7 +1641,7 @@ describe('Overview page', () => {
       cy.viewport(width, 900);
       cy.visit('/overview');
 
-      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
           const rows = [...$rows];
           expect(rows).to.have.length(5);
@@ -1793,7 +1803,7 @@ describe('Overview page', () => {
       .and('not.match', /不会外推/);
     cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
+    desktopModel('DeepSeek-V4-Pro', AGENTX)
       .find(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       )
@@ -1809,7 +1819,7 @@ describe('Overview page', () => {
       .should('have.attr', 'href')
       .and('include', '/zh/inference?')
       .and('include', 'g_model=DeepSeek-V4-Pro');
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
+    desktopModel('DeepSeek-V4-Pro', AGENTX)
       .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
       .should('contain.text', '—')
       .and('contain.text', '无精确 @50 结果');
@@ -1825,7 +1835,7 @@ describe('Overview page', () => {
       platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
-    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
     desktopModel('MiniMax-M3', AGENTX).within(() => {
@@ -1846,7 +1856,7 @@ describe('Overview page', () => {
       expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.064');
+      ).should('have.text', '$0.059');
     });
     cy.contains('如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。').should('exist');
 

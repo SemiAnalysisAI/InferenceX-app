@@ -238,11 +238,16 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
     expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.MiniMax_M3)).toBe('deprecated');
   });
 
-  it('keeps 8K/1K default for models still sweeping it', () => {
-    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+  it('marks 8K/1K deprecated for DeepSeek V4 Pro (last sweep 2026-09-08, InferenceX#2728)', () => {
+    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(true);
     expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_V4_Pro)).toBe(
-      'default',
+      'deprecated',
     );
+  });
+
+  it('keeps 8K/1K default for models still sweeping it', () => {
+    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
   });
 
   it('does not un-deprecate globally deprecated sequences', () => {
@@ -260,6 +265,13 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   it('leaves MiniMax M3 agentic traces active', () => {
     expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.AgenticTraces)).toBe(false);
     expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.MiniMax_M3)).toBe('default');
+  });
+
+  it('leaves DeepSeek V4 Pro agentic traces active', () => {
+    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.DeepSeek_V4_Pro)).toBe(
+      'default',
+    );
   });
 });
 
