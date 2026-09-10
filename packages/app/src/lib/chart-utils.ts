@@ -509,6 +509,7 @@ type MeasuredPowerChartFields = Partial<
   Pick<
     InferenceData,
     | 'measuredAvgPower'
+    | 'measuredP75Power'
     | 'measuredP90Power'
     | 'measuredPrefillAvgPower'
     | 'measuredDecodeAvgPower'
@@ -531,6 +532,9 @@ function buildMeasuredPowerChartFields(
   return {
     ...(typeof entry.avg_power_w === 'number'
       ? { measuredAvgPower: chartMetric(entry.avg_power_w) }
+      : {}),
+    ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
+      ? { measuredP75Power: chartMetric(entry.p75_power_w) }
       : {}),
     ...(typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w)
       ? { measuredP90Power: chartMetric(entry.p90_power_w) }

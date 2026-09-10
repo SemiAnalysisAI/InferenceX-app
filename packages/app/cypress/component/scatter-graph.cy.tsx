@@ -2289,136 +2289,138 @@ describe('Power envelopes', () => {
     cy.get('[data-testid="power-curve-description"]').should('not.exist');
   });
 
-  it('smooths nonmonotonic measurements across configurations and preserves overlay runs through zoom', () => {
-    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
-    const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
-    // The H100 Qwen3.5 8k/1k measurements that produced loops when joined
-    // in concurrency order. EP1 and EP8 contribute to the same upper boundary.
-    const rows = [
-      [16, 62.737, 399.728, 8],
-      [32, 55.742, 448.775, 8],
-      [64, 20.506, 344.948, 8],
-      [128, 25.686, 502.536, 8],
-      [256, 4.645, 372.904, 8],
-      [1, 172.488, 252.217, 1],
-      [2, 149.322, 291.378, 1],
-      [4, 121.477, 318.845, 1],
-      [8, 65.346, 283.477, 1],
-    ].map(([conc, x, y, ep]) =>
-      createMockInferenceData({
-        hwKey: 'h100',
-        model: Model.Qwen3_5,
-        precision: Precision.FP8,
-        date: '2026-07-05',
-        ep,
-        conc,
-        x,
-        y,
-        measuredAvgPower: { y, roof: false },
-        run_url: runUrl,
-      }),
-    );
-    const secondRunRows = [1, 8, 32].map((conc, i) =>
-      createMockInferenceData({
-        hwKey: 'h100',
-        model: Model.Qwen3_5,
-        precision: Precision.FP8,
-        date: '2026-07-05',
-        conc,
-        x: 100 - i * 30,
-        y: 400 + i * 200,
-        measuredAvgPower: { y: 400 + i * 200, roof: false },
-        run_url: secondRunUrl,
-      }),
-    );
-    mountWithProviders(
-      <div style={{ width: 1000, height: 600 }}>
-        <ScatterGraph
-          chartId="power-overlay"
-          modelLabel="Qwen3.5 397B"
-          data={rows}
-          xLabel="Interactivity"
-          yLabel="Power"
-          chartDefinition={createMockChartDefinition({
-            chartType: 'interactivity',
-            y_measuredAvgPower_roofline: 'lower_right',
-          })}
-          overlayData={{
-            data: [...rows, ...secondRunRows],
+  for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
+    it(`smooths ${metric} across configurations and preserves overlay runs through zoom`, () => {
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
+      const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
+      // The H100 Qwen3.5 8k/1k measurements that produced loops when joined
+      // in concurrency order. EP1 and EP8 contribute to the same upper boundary.
+      const rows = [
+        [16, 62.737, 399.728, 8],
+        [32, 55.742, 448.775, 8],
+        [64, 20.506, 344.948, 8],
+        [128, 25.686, 502.536, 8],
+        [256, 4.645, 372.904, 8],
+        [1, 172.488, 252.217, 1],
+        [2, 149.322, 291.378, 1],
+        [4, 121.477, 318.845, 1],
+        [8, 65.346, 283.477, 1],
+      ].map(([conc, x, y, ep]) =>
+        createMockInferenceData({
+          hwKey: 'h100',
+          model: Model.Qwen3_5,
+          precision: Precision.FP8,
+          date: '2026-07-05',
+          ep,
+          conc,
+          x,
+          y,
+          [metric]: { y, roof: false },
+          run_url: runUrl,
+        }),
+      );
+      const secondRunRows = [1, 8, 32].map((conc, i) =>
+        createMockInferenceData({
+          hwKey: 'h100',
+          model: Model.Qwen3_5,
+          precision: Precision.FP8,
+          date: '2026-07-05',
+          conc,
+          x: 100 - i * 30,
+          y: 400 + i * 200,
+          [metric]: { y: 400 + i * 200, roof: false },
+          run_url: secondRunUrl,
+        }),
+      );
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="power-overlay"
+            modelLabel="Qwen3.5 397B"
+            data={rows}
+            xLabel="Interactivity"
+            yLabel="Power"
+            chartDefinition={createMockChartDefinition({
+              chartType: 'interactivity',
+              [`y_${metric}_roofline`]: 'lower_right',
+            })}
+            overlayData={{
+              data: [...rows, ...secondRunRows],
+              hardwareConfig: hwConfig,
+              label: 'Power replay',
+              runUrl,
+            }}
+            transitionDuration={0}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric: `y_${metric}`,
+            hideNonOptimal: false,
+            selectedModel: Model.Qwen3_5,
+            selectedSequence: Sequence.EightK_OneK,
+            selectedPrecisions: [Precision.FP8],
             hardwareConfig: hwConfig,
-            label: 'Power replay',
-            runUrl,
-          }}
-          transitionDuration={0}
-        />
-      </div>,
-      {
-        inference: {
-          selectedYAxisMetric: 'y_measuredAvgPower',
-          hideNonOptimal: false,
-          selectedModel: Model.Qwen3_5,
-          selectedSequence: Sequence.EightK_OneK,
-          selectedPrecisions: [Precision.FP8],
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['h100']),
-          hwTypesWithData: new Set(['h100']),
+            activeHwTypes: new Set(['h100']),
+            hwTypesWithData: new Set(['h100']),
+          },
+          unofficial: {
+            activeOverlayHwTypes: new Set(['h100']),
+            allOverlayHwTypes: new Set(['h100']),
+            runIndexByUrl: { [runUrl]: 0, '101': 0, [secondRunUrl]: 1, '102': 1 },
+          },
         },
-        unofficial: {
-          activeOverlayHwTypes: new Set(['h100']),
-          allOverlayHwTypes: new Set(['h100']),
-          runIndexByUrl: { [runUrl]: 0, '101': 0, [secondRunUrl]: 1, '102': 1 },
-        },
-      },
-    );
-    const officialSelector = '#power-overlay .roofline-path[data-curve-kind="power-envelope"]';
-    const overlaySelector =
-      '#power-overlay .overlay-roofline-path[data-curve-kind="power-envelope"]';
-    function assertEnvelopes() {
-      cy.get<SVGPathElement>(`${officialSelector}, ${overlaySelector}`)
-        .should('have.length', 3)
-        .should(($paths) => {
-          const segmentCounts = [...$paths].map((path) => {
-            const segments = path.getAttribute('d')!.match(/C/gu) ?? [];
-            const length = path.getTotalLength();
-            let previous = path.getPointAtLength(0);
-            for (let step = 1; step <= 20; step++) {
-              const point = path.getPointAtLength((length * step) / 20);
-              expect(point.x, 'interactivity never reverses').to.be.at.least(previous.x);
-              expect(point.y, 'upper boundary never turns back').to.be.at.least(previous.y);
-              previous = point;
-            }
-            return segments.length;
+      );
+      const officialSelector = '#power-overlay .roofline-path[data-curve-kind="power-envelope"]';
+      const overlaySelector =
+        '#power-overlay .overlay-roofline-path[data-curve-kind="power-envelope"]';
+      function assertEnvelopes() {
+        cy.get<SVGPathElement>(`${officialSelector}, ${overlaySelector}`)
+          .should('have.length', 3)
+          .should(($paths) => {
+            const segmentCounts = [...$paths].map((path) => {
+              const segments = path.getAttribute('d')!.match(/C/gu) ?? [];
+              const length = path.getTotalLength();
+              let previous = path.getPointAtLength(0);
+              for (let step = 1; step <= 20; step++) {
+                const point = path.getPointAtLength((length * step) / 20);
+                expect(point.x, 'interactivity never reverses').to.be.at.least(previous.x);
+                expect(point.y, 'upper boundary never turns back').to.be.at.least(previous.y);
+                previous = point;
+              }
+              return segments.length;
+            });
+            expect(segmentCounts).to.have.members([5, 5, 2]);
           });
-          expect(segmentCounts).to.have.members([5, 5, 2]);
+      }
+      cy.get(officialSelector).should('have.length', 1);
+      cy.get(overlaySelector).should('have.length', 2);
+      cy.get('#power-overlay .dot-group').should('have.length', 9);
+      cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
+      cy.get('#power-overlay .dot-group, #power-overlay .unofficial-overlay-pt').each(($point) =>
+        cy.wrap($point).should('have.css', 'opacity', '1'),
+      );
+      assertEnvelopes();
+      cy.get(officialSelector)
+        .invoke('attr', 'd')
+        .then((beforeZoom) => {
+          cy.get('#power-overlay svg').then(($svg) => {
+            const svg = $svg[0];
+            const bounds = svg.getBoundingClientRect();
+            svg.dispatchEvent(
+              new WheelEvent('wheel', {
+                deltaY: -240,
+                clientX: bounds.x + bounds.width / 2,
+                clientY: bounds.y + bounds.height / 2,
+                shiftKey: true,
+                bubbles: true,
+                cancelable: true,
+              }),
+            );
+          });
+          cy.get(officialSelector).invoke('attr', 'd').should('not.equal', beforeZoom);
         });
-    }
-    cy.get(officialSelector).should('have.length', 1);
-    cy.get(overlaySelector).should('have.length', 2);
-    cy.get('#power-overlay .dot-group').should('have.length', 9);
-    cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
-    cy.get('#power-overlay .dot-group, #power-overlay .unofficial-overlay-pt').each(($point) =>
-      cy.wrap($point).should('have.css', 'opacity', '1'),
-    );
-    assertEnvelopes();
-    cy.get(officialSelector)
-      .invoke('attr', 'd')
-      .then((beforeZoom) => {
-        cy.get('#power-overlay svg').then(($svg) => {
-          const svg = $svg[0];
-          const bounds = svg.getBoundingClientRect();
-          svg.dispatchEvent(
-            new WheelEvent('wheel', {
-              deltaY: -240,
-              clientX: bounds.x + bounds.width / 2,
-              clientY: bounds.y + bounds.height / 2,
-              shiftKey: true,
-              bubbles: true,
-              cancelable: true,
-            }),
-          );
-        });
-        cy.get(officialSelector).invoke('attr', 'd').should('not.equal', beforeZoom);
-      });
-    assertEnvelopes();
-  });
+      assertEnvelopes();
+    });
+  }
 });

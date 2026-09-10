@@ -989,14 +989,15 @@ describe('createChartDataPoint energy fields', () => {
 // createChartDataPoint — measured power / energy fields (from runner telemetry)
 // ===========================================================================
 describe('createChartDataPoint measured power fields', () => {
-  it('uses measured P90 independently from average power and omits it when absent', () => {
+  it('uses measured percentiles independently from average power and omits them when absent', () => {
     const point = createChartDataPoint(
       '2025-01-01',
-      entry({ avg_power_w: 500, p90_power_w: 620 }),
+      entry({ avg_power_w: 500, p75_power_w: 575, p90_power_w: 620 }),
       'median_e2el',
       'tput_per_gpu',
       'h100',
     );
+    expect(point.measuredP75Power?.y).toBe(575);
     expect(point.measuredP90Power?.y).toBe(620);
     const missing = createChartDataPoint(
       '2025-01-01',
@@ -1005,6 +1006,7 @@ describe('createChartDataPoint measured power fields', () => {
       'tput_per_gpu',
       'h100',
     );
+    expect(missing.measuredP75Power).toBeUndefined();
     expect(missing.measuredP90Power).toBeUndefined();
   });
   it('emits measuredAvgPower when avg_power_w is present on the entry', () => {

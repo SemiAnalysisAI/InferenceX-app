@@ -123,6 +123,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
   // Tier derivation must see exactly the measured values the chart can render.
   const avgPowerW = measuredPowerValid ? m.avg_power_w : undefined;
+  const p75PowerW =
+    m.power_valid === 1 && m.power_metric_schema_version === 2 ? m.p75_power_w : undefined;
   const p90PowerW =
     m.power_valid === 1 && m.power_metric_schema_version === 2 ? m.p90_power_w : undefined;
   const prefillAvgPowerW = measuredPowerValid ? m.prefill_avg_power_w : undefined;
@@ -139,6 +141,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     measuredPowerValid && hasWholeDeploymentEnergySemantics ? m.joules_per_input_token : undefined;
   const hasMeasuredTelemetry = [
     avgPowerW,
+    p75PowerW,
     p90PowerW,
     prefillAvgPowerW,
     decodeAvgPowerW,
@@ -230,6 +233,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
       hasMeasuredTelemetry,
     }),
     avg_power_w: avgPowerW,
+    p75_power_w: p75PowerW,
     p90_power_w: p90PowerW,
     joules_per_successful_query: joulesPerSuccessfulQuery,
     joules_per_output_token: joulesPerOutputToken,

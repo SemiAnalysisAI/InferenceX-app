@@ -351,6 +351,16 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   jOutput: provisionedJoules('output'),
   jInput: provisionedJoules('input'),
   measuredAvgPower: measuredPower('run'),
+  measuredP75Power: {
+    description: {
+      en: 'Power stayed at or below this level for 75% of the validated load window. Device telemetry is aligned in time and summed before taking the time-weighted percentile, then divided by the GPU count. This describes fleet draw per chip, not the P75 of an individual GPU; runs without this measurement stay unavailable.',
+      zh: '在通过验证的负载测量窗口内，75% 的时间里功耗不超过此值。各 GPU 遥测按时间对齐后求和，再计算按时间加权的 P75，最后除以 GPU 数量。该指标表示整组 GPU 功耗按芯片均摊后的水平，不是单个 GPU 的 P75；缺少此测量值的运行不显示该指标。',
+    },
+    formula: {
+      en: 'P75 fleet W/chip = time-weighted P75(sum of GPU watts) ÷ GPU count',
+      zh: '整组 GPU P75 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P75 ÷ GPU 数量',
+    },
+  },
   measuredP90Power: {
     description: {
       en: 'Power stayed at or below this level for 90% of the validated load window. Device telemetry is aligned in time and summed before taking the time-weighted percentile, then divided by the GPU count. This describes fleet draw per chip, not the P90 of an individual GPU; runs without this measurement stay unavailable.',

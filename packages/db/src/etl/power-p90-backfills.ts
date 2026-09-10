@@ -4,7 +4,7 @@ import type { BenchmarkPointBackfill } from './run-overrides';
 type P90BackfillGroup = Pick<
   BenchmarkPointBackfill,
   'githubRunId' | 'runAttempt' | 'config' | 'recipeFingerprint' | 'productionConfigId'
-> & { points: readonly [number, number, number, number, number][] };
+> & { points: readonly [number, number, number, number, number, number, number][] };
 
 const GROUPS: readonly P90BackfillGroup[] = [
   {
@@ -31,9 +31,9 @@ const GROUPS: readonly P90BackfillGroup[] = [
     },
     recipeFingerprint: '4a9cbfa6f11448e88c93ab17612b518fb1c4d1bf6bbf39b8b275fee5d2609511',
     points: [
-      [441192, 1, 373.49, 2987.919, 349.859],
-      [441190, 2, 418.298, 3346.384, 385.32],
-      [441191, 4, 483.38, 3867.038, 448.935],
+      [441192, 1, 373.49, 2987.919, 349.859, 359.847, 2878.779],
+      [441190, 2, 418.298, 3346.384, 385.32, 404.674, 3237.39],
+      [441191, 4, 483.38, 3867.038, 448.935, 466.18, 3729.443],
     ],
     productionConfigId: 618,
   },
@@ -61,13 +61,13 @@ const GROUPS: readonly P90BackfillGroup[] = [
     },
     recipeFingerprint: '104c82d1267efd3dd69625e36ed2c99152d1ee0955f544fd86c115f89175e1d5',
     points: [
-      [440673, 4, 633.299, 2533.195, 530.522],
-      [440670, 8, 682.256, 2729.025, 604.356],
-      [440666, 16, 763.678, 3054.712, 676.407],
-      [440665, 32, 902.246, 3608.985, 788.324],
-      [440664, 64, 935.737, 3742.947, 855.613],
-      [440667, 128, 937.461, 3749.842, 881.125],
-      [440663, 256, 956.986, 3827.946, 933.904],
+      [440673, 4, 633.299, 2533.195, 530.522, 529.736, 2118.944],
+      [440670, 8, 682.256, 2729.025, 604.356, 616.518, 2466.071],
+      [440666, 16, 763.678, 3054.712, 676.407, 690.605, 2762.419],
+      [440665, 32, 902.246, 3608.985, 788.324, 812.822, 3251.289],
+      [440664, 64, 935.737, 3742.947, 855.613, 897.608, 3590.431],
+      [440667, 128, 937.461, 3749.842, 881.125, 914.603, 3658.413],
+      [440663, 256, 956.986, 3827.946, 933.904, 948.939, 3795.756],
     ],
     productionConfigId: 714,
   },
@@ -95,13 +95,13 @@ const GROUPS: readonly P90BackfillGroup[] = [
     },
     recipeFingerprint: 'd181ca508cdb14681fdecf2ce5042153552856609923c3654bac7b09240b3156',
     points: [
-      [440662, 4, 674.282, 2697.127, 603.85],
-      [440674, 8, 808.705, 3234.82, 713.159],
-      [440672, 16, 844.259, 3377.034, 772.813],
-      [440668, 32, 929.698, 3718.793, 849.075],
-      [440671, 64, 940.618, 3762.472, 891.973],
-      [440669, 128, 945.02, 3780.079, 929.576],
-      [440661, 256, 969.339, 3877.355, 924.685],
+      [440662, 4, 674.282, 2697.127, 603.85, 608.201, 2432.803],
+      [440674, 8, 808.705, 3234.82, 713.159, 736.111, 2944.445],
+      [440672, 16, 844.259, 3377.034, 772.813, 790.917, 3163.669],
+      [440668, 32, 929.698, 3718.793, 849.075, 884.675, 3538.7],
+      [440671, 64, 940.618, 3762.472, 891.973, 919.752, 3679.01],
+      [440669, 128, 945.02, 3780.079, 929.576, 938.978, 3755.913],
+      [440661, 256, 969.339, 3877.355, 924.685, 951.969, 3807.875],
     ],
     productionConfigId: 752,
   },
@@ -129,19 +129,19 @@ const GROUPS: readonly P90BackfillGroup[] = [
     },
     recipeFingerprint: '4ae01c876b98d044a80be5209d4e508111dafbd5c0854cbb3f775a3bd18ee81a',
     points: [
-      [441193, 2, 481.99, 1927.959, 441.509],
-      [441194, 4, 577.885, 2311.539, 533.037],
-      [441187, 8, 662.439, 2649.756, 589.622],
-      [441184, 16, 797.334, 3189.337, 734.122],
-      [441183, 32, 886.059, 3544.236, 823.878],
-      [441181, 64, 942.803, 3771.211, 905.525],
-      [441185, 128, 939.209, 3756.837, 898.515],
-      [441182, 256, 984.544, 3938.177, 974.028],
-      [441188, 320, 989.621, 3958.482, 978.869],
-      [441186, 384, 991.034, 3964.135, 977.24],
-      [441195, 448, 969.97, 3879.881, 956.871],
-      [441180, 512, 990.597, 3962.39, 978.151],
-      [441189, 640, 989.385, 3957.539, 977.582],
+      [441193, 2, 481.99, 1927.959, 441.509, 465.683, 1862.733],
+      [441194, 4, 577.885, 2311.539, 533.037, 555.056, 2220.223],
+      [441187, 8, 662.439, 2649.756, 589.622, 626.244, 2504.975],
+      [441184, 16, 797.334, 3189.337, 734.122, 775.768, 3103.074],
+      [441183, 32, 886.059, 3544.236, 823.878, 861.873, 3447.493],
+      [441181, 64, 942.803, 3771.211, 905.525, 932.553, 3730.212],
+      [441185, 128, 939.209, 3756.837, 898.515, 924.187, 3696.747],
+      [441182, 256, 984.544, 3938.177, 974.028, 980.279, 3921.116],
+      [441188, 320, 989.621, 3958.482, 978.869, 984.932, 3939.73],
+      [441186, 384, 991.034, 3964.135, 977.24, 984.826, 3939.304],
+      [441195, 448, 969.97, 3879.881, 956.871, 964.223, 3856.891],
+      [441180, 512, 990.597, 3962.39, 978.151, 984.484, 3937.937],
+      [441189, 640, 989.385, 3957.539, 977.582, 983.357, 3933.429],
     ],
   },
   {
@@ -168,21 +168,21 @@ const GROUPS: readonly P90BackfillGroup[] = [
     },
     recipeFingerprint: '8d2c2664c301f07ee87a1b98535a1d388acd110ad5596a731e871924a1770240',
     points: [
-      [441446, 4, 393.987, 3151.899, 363.704],
-      [441449, 8, 452.354, 3618.834, 421.743],
-      [441448, 16, 486.854, 3894.834, 467.813],
-      [441447, 32, 513.258, 4106.065, 498.285],
+      [441446, 4, 393.987, 3151.899, 363.704, 380.376, 3043.005],
+      [441449, 8, 452.354, 3618.834, 421.743, 439.783, 3518.262],
+      [441448, 16, 486.854, 3894.834, 467.813, 481.521, 3852.168],
+      [441447, 32, 513.258, 4106.065, 498.285, 509.604, 4076.834],
     ],
   },
 ];
 
 export const QWEN35_P90_POWER_BACKFILLS: readonly BenchmarkPointBackfill[] = GROUPS.flatMap(
   ({ points, ...group }) =>
-    points.map(([productionBenchmarkId, conc, perChip, total, average]) => ({
+    points.map(([productionBenchmarkId, conc, perChip, total, average, p75PerChip, p75Total]) => ({
       ...group,
       id: `run-${group.githubRunId}-row-${productionBenchmarkId}-measured-p90-power`,
       reason:
-        'Recompute P90 from the original validated raw power trace and exact benchmark window; existing average power reproduced within 0.001 W. See docs/data/power-p90-backfill.json for artifact names, hashes, and windows.',
+        'Recompute P75 and P90 from the original validated raw power trace and exact benchmark window; existing average power reproduced within 0.001 W. See docs/data/power-p90-backfill.json for artifact names, hashes, and windows.',
       productionBenchmarkId,
       expectedMetrics: { power_valid: 1, power_metric_schema_version: 2, avg_power_w: average },
       benchmarkType: 'single_turn',
@@ -190,6 +190,13 @@ export const QWEN35_P90_POWER_BACKFILLS: readonly BenchmarkPointBackfill[] = GRO
       osl: 1024,
       conc,
       offloadMode: 'off',
-      set: { metricsMerge: { p90_power_w: perChip, p90_total_gpu_power_w: total } },
+      set: {
+        metricsMerge: {
+          p75_power_w: p75PerChip,
+          p75_total_gpu_power_w: p75Total,
+          p90_power_w: perChip,
+          p90_total_gpu_power_w: total,
+        },
+      },
     })),
 );
