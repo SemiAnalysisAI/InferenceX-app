@@ -186,11 +186,14 @@ describe('modelRoutesForTab', () => {
   it('serves Kimi K3, GLM 5.2/5.3 and MiniMax M3 on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
-      expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
-        Model.Kimi_K3,
-        Model.MiniMax_M3,
-        Model.GLM_5_2,
-      ]);
+      expect(
+        modelRoutesForTab(tab)
+          .map((route) => route.model)
+          .filter((model) => model !== Model.Qwen3_5),
+      ).toEqual([Model.Kimi_K3, Model.MiniMax_M3, Model.GLM_5_2]);
+      expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(
+        tab === 'profit-estimator-per-gigawatt',
+      );
       expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
       expect(modelRouteAvailableForTab(tab, Model.MiniMax_M3)).toBe(true);
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.MiniMax_M3)?.slug).toBe(

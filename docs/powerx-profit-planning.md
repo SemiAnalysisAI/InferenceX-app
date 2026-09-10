@@ -9,10 +9,14 @@ Each throughput point retains its source observation. The comparison accepts
 only an exact measured operating point; it never pairs interpolated throughput
 with another point's GPU watts. JSON and CSV exports include observation IDs,
 run URLs, model revision, power inputs, settings, assumptions, and unavailable
-reasons. The section excludes historical comparisons.
+reasons. The section excludes historical comparisons. The fixed scenario also hides the
+AgentX history controls. Share links preserve the model, `i_seq=8k/1k`, and the
+exact operating point in `c_profit_target`.
 
 The shared system model still supports only the fixed 8192-input/1024-output
-workload. The profit estimator currently serves AgentX: its system estimates
+workload. The per-GW scenario selector retains AgentX as its default and also exposes
+Qwen3.5 fixed 8k/1k planning. Its fixed token mix is synthetic and carries no
+cached-input discount; it is not an AgentX fleet forecast. AgentX system estimates
 remain unavailable until appropriate workload assumptions are established.
 The low CPU/DRAM utilization model is not enabled for AgentX by this change. Missing telemetry
 also remains unavailable, independently of model support.
@@ -54,8 +58,11 @@ those figures can differ slightly from the chart.
 运行点的 GPU 功率拼接。JSON 和 CSV 包含记录 ID、运行链接、模型版本、功率输入、
 参数、假设及不可用原因。此区域不包含历史对比。
 
-共用系统模型仍仅支持 8192 输入、1024 输出的固定长度工作负载。利润估算器目前
-使用 AgentX；在确立适用假设之前，系统功耗估算保持不可用。本次改动不会为 AgentX
+共用系统模型仍仅支持 8192 输入、1024 输出的固定长度工作负载。每吉瓦视图默认
+使用 AgentX，也可选择 Qwen3.5 的固定 8k/1k 规划；后者采用合成 token 比例，不计
+缓存输入折扣，不代表 AgentX 集群预测。固定场景隐藏 AgentX 历史对比控件。分享链接
+保留模型、`i_seq=8k/1k` 和 `c_profit_target` 指定的实际运行点。在确立适用假设之前，
+AgentX 系统功耗估算保持不可用。本次改动不会为 AgentX
 启用低 CPU/DRAM 利用率模型；缺少遥测也会独立导致结果不可用。
 
 容量规划只采用完整实测机箱和完整部署。PowerX 其他视图采用的部分机箱外推不足以

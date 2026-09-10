@@ -344,10 +344,9 @@ export function formatProfitUsd(value: number, basis: ProfitBasis, digits?: numb
 
 /**
  * Models that have AgentX (agentic-trace) rows in the availability table, in
- * the order of `models`. The estimator only prices agentic workloads: fixed
- * ISL/OSL scenarios have no cache-hit telemetry and their token mix is
- * synthetic, so a $/GW-year figure built on them would not describe a real
- * serving fleet. `dbKeysFor` maps a display model to its DB model keys.
+ * the order of `models`. The AgentX view uses measured token/cache mixes;
+ * the separate fixed-workload planning view explicitly labels its synthetic
+ * mix. `dbKeysFor` maps a display model to its DB model keys.
  */
 export function modelsWithAgenticData<M extends string>(
   models: readonly M[],
