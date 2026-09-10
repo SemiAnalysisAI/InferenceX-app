@@ -9,12 +9,14 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 
+import { isMetricKey, metricCostTier } from '@/components/inference/metric-registry';
+import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -158,23 +160,30 @@ function DisaggCaveat({
   );
 }
 
-function getCostValues(selectedYAxisMetric: string, tcoBasis: TcoBasis) {
-  return Object.fromEntries(
-    Object.keys(HW_REGISTRY).map((base) => {
-      const specs = getGpuSpecs(base, tcoBasis);
-      return [
-        base,
-        selectedYAxisMetric === 'y_costh' ||
-        selectedYAxisMetric === 'y_costhOutput' ||
-        selectedYAxisMetric === 'y_costhi' ||
-        selectedYAxisMetric === 'y_tokensPerDollarH' ||
-        selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
-        selectedYAxisMetric === 'y_inputTokensPerDollarH'
-          ? specs.costh
-          : specs.costr,
-      ];
-    }),
-  );
+/**
+ * The $/chip/hr the caption's TCO badges quote for `selectedYAxisMetric`.
+ *
+ * Published tiers read the tier's price for every registry GPU. Custom User
+ * Values quotes the reader's own `userCosts` (the prices the plot is using),
+ * skipping chips whose price was blanked; before the reader has any, it
+ * shows the Owning at Large Hyperscaler Volume price, which is what the
+ * badges seed the custom costs from on a deep link.
+ */
+function getCostValues(
+  selectedYAxisMetric: string,
+  tcoBasis: TcoBasis,
+  userCosts: Record<string, number | undefined> | null | undefined,
+): Record<string, number> {
+  const key = selectedYAxisMetric.replace(/^y_/u, '');
+  const tier = isMetricKey(key) ? metricCostTier(key) : undefined;
+  if (tier === 'custom' && userCosts) {
+    return Object.fromEntries(
+      Object.entries(userCosts).filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number',
+      ),
+    );
+  }
+  return publishedCostsForTier(tier ?? 'rental', tcoBasis);
 }
 
 export function ChartShareActions() {
@@ -187,6 +196,7 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
   tcoBasis = DEFAULT_TCO_BASIS,
+  userCosts,
   renderCostBadges,
 }: {
   selectedYAxisMetric: string;
@@ -203,6 +213,12 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
   tcoBasis?: TcoBasis;
+  /**
+   * The reader's own $/chip/hr, which the Custom User Values metrics plot
+   * from. The badges quote these on that tier so the caption matches the
+   * points. `null`/omitted: nothing entered yet.
+   */
+  userCosts?: Record<string, number | undefined> | null;
   /**
    * Replaces the read-only TCO $/chip/hr badges for total-token cost metrics
    * (published tiers and Custom User Values). `values` are the published
@@ -253,7 +269,7 @@ export function MetricAssumptionNotes({
 
   const costValues =
     showTotalCostSource || showOutputCostSource || showInputCostSource || showCustomCost
-      ? getCostValues(selectedYAxisMetric, tcoBasis)
+      ? getCostValues(selectedYAxisMetric, tcoBasis, userCosts)
       : null;
 
   const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';

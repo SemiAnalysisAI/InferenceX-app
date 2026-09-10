@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { getGpuSpecs } from '@/lib/constants';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -244,6 +245,41 @@ describe('MetricAssumptionNotes', () => {
       'TCO $/chip/hr: gb300,mi355x',
     );
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+  });
+
+  it("quotes the reader's own prices on the custom tier and the hyperscaler price before any exist", () => {
+    // The plot prices Custom User Values from `userCosts`, so the badges
+    // must quote those, not a published tier; a blanked chip has no badge.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x', 'mi355x_x', 'b200_x']}
+        userCosts={{ gb300: 9.5, mi355x: 0.75, b200: undefined }}
+      />,
+    );
+    expect(getVisibleText()).toContain('GB300: 9.5');
+    expect(getVisibleText()).toContain('MI355X: 0.75');
+    expect(getVisibleText()).not.toContain('B200:');
+
+    // Nothing entered yet: show the seed the custom costs will start from.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x']}
+        userCosts={null}
+      />,
+    );
+    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costh}`);
+
+    // Published tiers ignore `userCosts`.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costr"
+        activeHwKeys={['gb300_x']}
+        userCosts={{ gb300: 9.5 }}
+      />,
+    );
+    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costr}`);
   });
 
   it('falls back to read-only TCO badges without a renderer', () => {

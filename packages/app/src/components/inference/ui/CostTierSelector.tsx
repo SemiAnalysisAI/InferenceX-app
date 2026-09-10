@@ -1,8 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
-
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { useId, useMemo } from 'react';
 
 import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 
@@ -15,7 +13,6 @@ import {
   COST_TIER_LABELS,
   METRIC_CONTROL_GROUPS,
   costMetricFamily,
-  costTierLabel,
   costTiersForFamily,
   isMetricKey,
   metricCostTier,
@@ -24,6 +21,7 @@ import {
   type CostMetricFamilyId,
   type CostTier,
 } from '@/components/inference/metric-registry';
+import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedTierLabel, lockedTierValue } from '@/components/ui/locked-rent-tiers';
 import { captionControlTriggerClassName } from '@/components/ui/result-context';
@@ -34,7 +32,6 @@ import {
   useLockedTierDialog,
 } from '@/components/ui/tco-model-dialog';
 import { track } from '@/lib/analytics';
-import { getGpuSpecs } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +58,11 @@ export function selectedCostTier(selectedYAxisMetric: string): CostTier | undefi
   return isMetricKey(key) ? metricCostTier(key) : undefined;
 }
 
+/** The label the selector's option list uses for `tier`. */
+function costTierOptionLabel(tier: CostTier, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option;
+}
+
 /**
  * Inline Cost Tier selector for the chart caption. It swaps the selected
  * y-axis metric between its pricing bases: the two published tiers, Custom
@@ -70,10 +72,22 @@ export function selectedCostTier(selectedYAxisMetric: string): CostTier | undefi
  * pricing basis reads as part of the result the chart shows. The trigger is
  * `no-export`; PNG exports keep the plain-text label via the caption's
  * `export-only` twin.
+ *
+ * `allowCustom={false}` leaves Custom User Values out of the list for charts
+ * that price every point from the published tiers and have nowhere to enter
+ * a custom $/chip/hr (the /historical trend chart).
  */
-export function CostTierSelector({ className }: { className?: string }) {
+export function CostTierSelector({
+  className,
+  allowCustom = true,
+}: {
+  className?: string;
+  allowCustom?: boolean;
+}) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // One selector per figure on /inference, so the trigger id is per instance.
+  const triggerId = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { selectedModel, selectedSequence, selectedPrecisions, userCosts } = useInferenceFilters();
   const { setSelectedYAxisMetric, setUserCosts } = useInferenceActions();
@@ -90,11 +104,13 @@ export function CostTierSelector({ className }: { className?: string }) {
   // the shorter rental terms locked behind the TCO model dialog.
   const options = useMemo(() => {
     if (!selectedFamily) return [];
-    const published = costTiersForFamily(selectedFamily).map((tier) => ({
-      value: `y_${metricForCostTier(selectedFamily, tier)!}`,
-      label: locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option,
-      testId: `cost-tier-${tier}`,
-    }));
+    const published = costTiersForFamily(selectedFamily)
+      .filter((tier) => allowCustom || tier !== 'custom')
+      .map((tier) => ({
+        value: `y_${metricForCostTier(selectedFamily, tier)!}`,
+        label: costTierOptionLabel(tier, locale),
+        testId: `cost-tier-${tier}`,
+      }));
     const rentalMetric = metricForCostTier(selectedFamily, 'rental');
     const locked = rentalMetric
       ? LOCKED_RENT_TIERS.map((tier) => ({
@@ -105,7 +121,7 @@ export function CostTierSelector({ className }: { className?: string }) {
         }))
       : [];
     return [...published, ...locked];
-  }, [selectedFamily, locale]);
+  }, [selectedFamily, locale, allowCustom]);
 
   if (!selectedFamily || !selectedTier) return null;
 
@@ -121,12 +137,7 @@ export function CostTierSelector({ className }: { className?: string }) {
       userCosts === null &&
       selectedTier !== 'custom'
     ) {
-      const field = selectedTier === 'rental' ? 'costr' : 'costh';
-      setUserCosts(
-        Object.fromEntries(
-          Object.keys(HW_REGISTRY).map((base) => [base, getGpuSpecs(base, tcoBasis)[field]]),
-        ),
-      );
+      setUserCosts(publishedCostsForTier(selectedTier, tcoBasis));
     }
     setSelectedYAxisMetric(value);
     track('inference_cost_tier_selected', {
@@ -152,7 +163,7 @@ export function CostTierSelector({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-0.5', className)}>
       <SearchableSelect
-        triggerId="cost-tier-select"
+        triggerId={triggerId}
         triggerTestId="cost-tier-selector"
         // The caption's <dt> is not a <label>, so name the combobox directly.
         triggerAriaLabel={t.costTier}
@@ -162,7 +173,9 @@ export function CostTierSelector({ className }: { className?: string }) {
         // The tier resolves client-side from the URL, but the caption's
         // server render already knows the default metric's tier, so the
         // trigger can show it before hydration instead of the placeholder.
-        initialLabel={costTierLabel(selectedTier, locale)}
+        // Same copy as the option list, so the label does not change once
+        // the select hydrates.
+        initialLabel={costTierOptionLabel(selectedTier, locale)}
         searchable={false}
         trackPrefix="cost_tier"
         size="sm"

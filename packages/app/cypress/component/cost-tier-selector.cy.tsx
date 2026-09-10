@@ -92,6 +92,18 @@ describe('CostTierSelector', () => {
     cy.get('@setUserCosts').should('not.have.been.called');
   });
 
+  it('leaves Custom User Values out when the chart has no custom pricing path', () => {
+    mountWithProviders(<CostTierSelector allowCustom={false} />, {
+      inference: { selectedYAxisMetric: 'y_costh' },
+      globalFilters: {},
+    });
+    cy.get('[data-testid="cost-tier-selector"]').click('right');
+    cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
+    cy.get('[data-testid="cost-tier-rental"]').should('exist');
+    cy.get('[data-testid="cost-tier-custom"]').should('not.exist');
+    cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
+  });
+
   it('shows the rental tier on rental-tier metrics', () => {
     mountWithProviders(<CostTierSelector />, {
       inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },

@@ -269,6 +269,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     compareGpuPair,
     quickFilters,
     minimalChrome,
+    userCosts,
   } = useInferenceFilters();
   const {
     selectedYAxisMetric,
@@ -1105,6 +1106,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
+                              userCosts={userCosts}
                               renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}

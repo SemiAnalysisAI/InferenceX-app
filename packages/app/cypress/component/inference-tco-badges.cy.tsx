@@ -1,7 +1,11 @@
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
+import { getGpuSpecs } from '@/lib/constants';
 import { mountWithProviders } from '../support/test-utils';
 
 const VALUES = { gb300: 2.31, mi355x: 1.5 };
+const REGISTRY_BASES = Object.keys(HW_REGISTRY);
 
 // The /inference caption's TCO badges double as the custom $/chip/hr inputs,
 // so there is no Custom Chip Costs card; the badges are exercised on their own.
@@ -27,15 +31,32 @@ describe('InferenceTcoBadges', () => {
     // quotes 2.31 and the keystroke appends to it.
     cy.get('[data-testid="cost-input-gb300"]').type('4');
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
-    cy.get('@setUserCosts').should('have.been.calledOnceWith', { gb300: 2.314, mi355x: 1.5 });
+    // Every registry chip is seeded from the tier being left, not only the
+    // two the caption shows, so a chip that joins the selection later is
+    // priced too.
+    cy.get('@setUserCosts').should('have.been.calledOnce');
+    cy.get('@setUserCosts').then((stub) => {
+      const seeded = (stub as unknown as { firstCall: { args: unknown[] } }).firstCall
+        .args[0] as Record<string, number>;
+      expect(Object.keys(seeded).sort()).to.deep.equal([...REGISTRY_BASES].sort());
+      expect(seeded.gb300).to.equal(2.314);
+      expect(seeded.mi355x).to.equal(getGpuSpecs('mi355x').costh);
+      expect(seeded.b200).to.equal(getGpuSpecs('b200').costh);
+    });
   });
 
-  it('seeds custom costs from the published prices on a deep link to the custom metric', () => {
+  it('seeds every chip from the hyperscaler prices on a deep link to the custom metric', () => {
     mountWithProviders(<InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />, {
       inference: { selectedYAxisMetric: 'y_costUser', userCosts: null },
       globalFilters: {},
     });
-    cy.get('@setUserCosts').should('have.been.calledWith', VALUES);
+    cy.get('@setUserCosts').should('have.been.calledOnce');
+    cy.get('@setUserCosts').then((stub) => {
+      const seeded = (stub as unknown as { firstCall: { args: unknown[] } }).firstCall
+        .args[0] as Record<string, number>;
+      expect(Object.keys(seeded).sort()).to.deep.equal([...REGISTRY_BASES].sort());
+      for (const base of REGISTRY_BASES) expect(seeded[base]).to.equal(getGpuSpecs(base).costh);
+    });
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
   });
 

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+
 import {
   useInferenceActions,
   useInferenceDisplay,
@@ -12,8 +14,10 @@ import {
 import {
   costMetricFamily,
   isMetricKey,
+  metricCostTier,
   metricForCostTier,
 } from '@/components/inference/metric-registry';
+import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -41,8 +45,9 @@ export function parseInferenceCustomCost(raw: string): number | undefined {
  * moves the y-axis onto the metric's Custom User Values member, so the
  * badges are the only place custom $/chip/hr are entered.
  *
- * `values` are the published $/chip/hr for the bases the caption should
- * show, already narrowed to the active selection.
+ * `values` are the $/chip/hr for the bases the caption should show, already
+ * narrowed to the active selection: the published price on a published tier,
+ * the reader's own price on Custom User Values.
  */
 export function InferenceTcoBadges({
   label,
@@ -55,21 +60,24 @@ export function InferenceTcoBadges({
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { userCosts } = useInferenceFilters();
   const { setUserCosts, setSelectedYAxisMetric } = useInferenceActions();
+  const { tcoBasis } = useGlobalFilterSelection();
 
   const metricKey = metricKeyOf(selectedYAxisMetric);
   const family = metricKey ? costMetricFamily(metricKey) : undefined;
   const customMetric = family ? metricForCostTier(family, 'custom') : undefined;
   const isCustom = metricKey !== undefined && metricKey === customMetric;
+  const publishedTier = metricKey ? metricCostTier(metricKey) : undefined;
 
   // Text as typed, so a half-entered "2." or an emptied field survives the
   // re-render; the parsed number lives in `userCosts`.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   // A deep link onto the custom metric arrives with no custom costs yet;
-  // seed them from the published prices so the chart is not blank.
+  // seed every registry chip from the published prices so the chart is not
+  // blank and chips outside the current selection are priced too.
   useEffect(() => {
-    if (isCustom && userCosts === null) setUserCosts({ ...values });
-  }, [isCustom, userCosts, values, setUserCosts]);
+    if (isCustom && userCosts === null) setUserCosts(publishedCostsForTier('custom', tcoBasis));
+  }, [isCustom, userCosts, tcoBasis, setUserCosts]);
 
   const handleChange = useCallback(
     (base: string, raw: string) => {
@@ -79,14 +87,15 @@ export function InferenceTcoBadges({
         setUserCosts({ ...(userCosts ?? values), [base]: parsed });
         return;
       }
-      if (!customMetric) return;
-      // Leaving a published tier: every chip keeps the price it was showing
-      // and only the edited one changes.
+      if (!customMetric || !publishedTier) return;
+      // Leaving a published tier: every registry chip keeps that tier's
+      // price (not only the chips the caption shows, so a chip that joins
+      // the selection later is priced too) and only the edited one changes.
       const seeded = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, String(value)]),
       );
       setDrafts({ ...seeded, [base]: raw });
-      setUserCosts({ ...values, [base]: parsed });
+      setUserCosts({ ...publishedCostsForTier(publishedTier, tcoBasis), [base]: parsed });
       setSelectedYAxisMetric(`y_${customMetric}`);
       track('inference_cost_tier_selected', {
         metric: `y_${customMetric}`,
@@ -94,7 +103,16 @@ export function InferenceTcoBadges({
         via: 'tco_badge',
       });
     },
-    [isCustom, customMetric, values, userCosts, setUserCosts, setSelectedYAxisMetric],
+    [
+      isCustom,
+      customMetric,
+      publishedTier,
+      tcoBasis,
+      values,
+      userCosts,
+      setUserCosts,
+      setSelectedYAxisMetric,
+    ],
   );
   const handleCommit = useCallback((base: string, raw: string) => {
     track('inference_custom_cost_set', { gpu: base, value: raw });
@@ -127,7 +145,7 @@ export function InferenceTcoBadges({
       items={items}
       onChange={handleChange}
       onCommit={handleCommit}
-      inputLabel={(chip) => (locale === 'zh' ? `${chip} $/芯片/小时` : `${chip} $/chip/hr`)}
+      inputLabel={(name) => (locale === 'zh' ? `${name} $/芯片/小时` : `${name} $/chip/hr`)}
       testId="inference-tco-badges"
       badgeTestId="inference-tco-badge"
       inputIdPrefix="cost-input"

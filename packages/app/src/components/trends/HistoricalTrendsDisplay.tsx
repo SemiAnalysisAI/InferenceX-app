@@ -445,7 +445,9 @@ export default function HistoricalTrendsDisplay() {
                         );
                         return tier ? costTierLabel(tier, locale) : undefined;
                       })()}
-                      costTierControl={<CostTierSelector />}
+                      // The trend chart prices every point from the published
+                      // tiers, so Custom User Values is not offered here.
+                      costTierControl={<CostTierSelector allowCustom={false} />}
                       target={`${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
