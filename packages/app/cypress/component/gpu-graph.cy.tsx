@@ -490,26 +490,30 @@ describe('GPUGraph', () => {
   });
 });
 
-describe('GPU comparison power curves', () => {
-  function PowerComparison() {
+describe('GPU comparison power envelopes', () => {
+  function PowerComparison({ latency = false }: { latency?: boolean }) {
     const [optimal, setOptimal] = useState(true);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
     const rows = ['2026-09-09', '2026-09-10'].flatMap((date) =>
       [4, 8].flatMap((tp) =>
-        [1, 8, 32].map((conc, index) =>
-          createMockInferenceData({
+        [1, 8, 32].map((conc, index) => {
+          const interactivity =
+            metric === 'y_measuredJPerOutputToken' || tp === 8
+              ? 200 - index * 70
+              : [200, 120, 130][index];
+          return createMockInferenceData({
             hwKey: 'h100',
             precision: Precision.FP8,
             date,
             tp,
             conc,
-            x: 200 - index * 70,
+            x: latency ? 1000 / interactivity : interactivity,
             y: metric === 'y_measuredJPerOutputToken' ? 4 - index : 350 + index * 200 + tp,
             run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date}`,
             power_tier: 'certified',
-          }),
-        ),
+          });
+        }),
       ),
     );
     const value = createMockInferenceContextValues({
@@ -536,12 +540,12 @@ describe('GPU comparison power curves', () => {
             chartId="gpu-power-curves"
             modelLabel="Qwen3.5 397B"
             data={rows}
-            xLabel="Interactivity"
+            xLabel={latency ? 'Latency' : 'Interactivity'}
             yLabel="Power"
             chartDefinition={createMockChartDefinition({
-              chartType: 'interactivity',
-              y_measuredAvgPower_roofline: 'lower_right',
-              y_measuredJPerOutputToken_roofline: 'lower_right',
+              chartType: latency ? 'e2e' : 'interactivity',
+              y_measuredAvgPower_roofline: latency ? 'lower_left' : 'lower_right',
+              y_measuredJPerOutputToken_roofline: latency ? 'lower_left' : 'lower_right',
             })}
           />
         </div>
@@ -549,25 +553,38 @@ describe('GPU comparison power curves', () => {
     );
   }
 
-  it('shows isolated power sweeps when Optimal Only is off and respects date visibility', () => {
+  it('shows one smooth power envelope per date while preserving all configurations and date visibility', () => {
     mountWithProviders(<PowerComparison />);
     cy.get('#gpu-power-curves .roofline-path').should('not.exist');
     cy.get('[data-testid="power-curve-description"]').should('contain', 'single point');
     cy.get('#gpu-hide-non-optimal').click({ force: true });
     cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
     cy.get('#gpu-power-curves .roofline-path')
-      .should('have.length', 4)
+      .should('have.length', 2)
       .each(($path) => {
-        expect($path.attr('d')).to.match(/^M[^C]+L/u);
+        expect($path.attr('d')).to.contain('C');
         expect($path.attr('stroke')).not.to.equal('#6b7280');
       });
     cy.get('#gpu-power-curves .line-label').should('have.length', 2);
     cy.get('[data-testid="legend-advanced-toggle"]').click();
     cy.get('#gpu-perf-ruler').should('not.exist');
     cy.contains('button', 'Hide older date').click();
-    cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+    cy.get('#gpu-power-curves .roofline-path').should('have.length', 1);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     cy.get('#gpu-power-curves .line-label').should('have.length', 1);
+  });
+
+  it('draws the smooth upper boundary toward lower latency and keeps all measured dots', () => {
+    mountWithProviders(<PowerComparison latency />);
+    cy.get('#gpu-power-curves .roofline-path').should('not.exist');
+    cy.get('#gpu-hide-non-optimal').click({ force: true });
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+    cy.get('#gpu-power-curves .roofline-path')
+      .should('have.length', 2)
+      .each(($path) => expect($path.attr('d')).to.contain('C'));
+    cy.get('#gpu-power-curves [data-testid="power-curve-description"]')
+      .should('contain.text', 'upper power boundary')
+      .and('contain.text', 'not efficiency frontiers');
   });
 
   it('bypasses %TDP filtering without changing the saved Optimal Only preference for energy', () => {
@@ -579,8 +596,8 @@ describe('GPU comparison power curves', () => {
     cy.contains('button', 'Percent TDP').click();
     cy.get('#gpu-hide-non-optimal').should('not.exist');
     cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
-    cy.get('#gpu-power-curves .roofline-path').should('have.length', 4);
-    cy.get('[data-testid="power-curve-description"]').should('contain', '不代表 Pareto 前沿');
+    cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+    cy.get('[data-testid="power-curve-description"]').should('contain', '不代表能效 Pareto 前沿');
     cy.contains('button', 'Energy').click();
     cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#gpu-power-curves .roofline-path')
