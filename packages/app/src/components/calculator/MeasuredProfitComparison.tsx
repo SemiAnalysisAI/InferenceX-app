@@ -193,7 +193,7 @@ export default function MeasuredProfitComparison({
                   <td className="p-2">
                     {source.length === 0 && t.missing}
                     {source.map((p) => (
-                      <div key={p.id} className="mb-2">
+                      <div key={`${p.id}-${p.concurrency}-${p.interactivity}`} className="mb-2">
                         <div>
                           {p.measuredGpuWattsPerGpu === null
                             ? t.missingPower

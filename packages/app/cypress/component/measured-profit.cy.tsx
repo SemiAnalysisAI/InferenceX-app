@@ -99,6 +99,42 @@ function mountComparison(pathname = '/profit-estimator-per-gigawatt') {
 }
 
 describe('Measured-power profit comparison', () => {
+  it('keeps supplemental observations distinct when they share a placeholder source id', () => {
+    const consoleError = cy.spy(console, 'error');
+    const source = COMPARISON.sourcePoints[0];
+    const onSelectPoint = cy.stub().as('selectSupplementalPoint');
+    cy.mount(
+      <PathnameContext.Provider value="/profit-estimator-per-gigawatt">
+        <MeasuredProfitComparison
+          comparisons={[
+            {
+              ...COMPARISON,
+              sourcePoints: [
+                { ...source, id: 0, concurrency: 64, interactivity: 30 },
+                { ...source, id: 0, concurrency: 32, interactivity: 40 },
+              ],
+            },
+          ]}
+          settings={{}}
+          labelFor={() => 'TPU7x'}
+          onSelectPoint={onSelectPoint}
+        />
+      </PathnameContext.Provider>,
+    );
+    cy.get('tbody tr').within(() => {
+      cy.contains('#0 · C64').should('be.visible');
+      cy.contains('#0 · C32').should('be.visible');
+      cy.contains('button', 'Use point: 30.00 tok/s/user').click();
+      cy.contains('button', 'Use point: 40.00 tok/s/user').click();
+    });
+    cy.get('@selectSupplementalPoint')
+      .should('have.been.calledWithExactly', 30)
+      .and('have.been.calledWithExactly', 40);
+    cy.then(() => {
+      expect(consoleError).not.to.have.been.calledWithMatch(/same key/u);
+    });
+  });
+
   it('preserves the provisioned baseline and selects the exact observed point without inventing power', () => {
     mountComparison();
     cy.get('tbody tr').within(() => {
