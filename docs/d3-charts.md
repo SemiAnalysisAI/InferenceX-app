@@ -73,6 +73,14 @@ Different metrics need different "optimal" directions:
 
 The metric registry declares whether higher or lower values are preferable. Chart definitions derive the concrete corner from that polarity and the chart's x-axis direction, which keeps the choice in data rather than rendering code.
 
+## Power curves and optimal filtering
+
+Power axes use the same Pareto directions as other metrics while **Optimal Only** is on. A frontier can legitimately contain one point: the fastest measured configuration can also draw the least power. Turning the switch off connects the concurrency measurements for each serving configuration, date, and run with straight segments. These operating curves do not represent a Pareto frontier and must never connect unrelated configurations or runs.
+
+Measured power as a percentage of TDP has no preferred direction, so it always shows all measurements and operating curves; its optimal switch is hidden. Charts preserve the saved optimal preference when switching to another metric. Energy per token retains its existing Pareto behavior.
+
+Operating curves use linear interpolation, including after zoom, and disable gradient strategy labels and the performance ruler. Repeated conflicting measurements at the same concurrency break a curve rather than choosing a winner or bridging the conflict. The same grouping applies to unofficial-run overlays.
+
 ## Gradient Roofline Labels
 
 Parallelism strategy labels (TP4, TEP8, DPAEP4) are rendered as gradient stops along roofline paths, not as individual text labels. The reasoning:
