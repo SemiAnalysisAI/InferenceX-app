@@ -201,9 +201,12 @@ describe('Inference Chart', () => {
     );
     cy.wait('@unofficialRun');
 
-    cy.get('[data-testid="yaxis-metric-selector"]').should(
+    cy.get('[data-testid="yaxis-metric-selector"]')
+      .should('contain.text', 'Total Tokens per $1 TCO')
+      .and('not.contain.text', '(Owning');
+    cy.get('[data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Owning at Large Hyperscaler Volume',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
@@ -301,10 +304,10 @@ describe('Inference Chart', () => {
     );
     cy.wait('@unofficialRun');
 
-    cy.get('[data-testid="yaxis-metric-selector"]').should(
-      'contain.text',
-      '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模云大批量）',
-    );
+    cy.get('[data-testid="yaxis-metric-selector"]')
+      .should('contain.text', '每 1 美元 TCO 对应的总 token 数')
+      .and('not.contain.text', '（自有');
+    cy.get('[data-testid="cost-tier-selector"]').should('contain.text', '自有 - 超大规模云大批量');
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]')
       .first()

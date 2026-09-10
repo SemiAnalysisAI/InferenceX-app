@@ -4,32 +4,37 @@
  * Catches bugs where custom-value metrics (costUser, powerUser) require clicking
  * "Calculate" before data appears.
  */
+const exact = (label: string) =>
+  new RegExp(`^${label.replaceAll(/[$()]/gu, (char) => `\\${char}`)}$`, 'u');
+
 describe('Y-Axis Metrics All Render Data', () => {
-  const metrics = [
-    'Token Throughput per Chip',
-    'Input Token Throughput per Chip',
-    'Output Token Throughput per Chip',
-    'Token Throughput per All in Utility MW',
-    'Input Token Throughput per All in Utility MW',
-    'Output Token Throughput per All in Utility MW',
-    'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume)',
-    'Cost per Million Total Tokens (Rent - 3 Year Commit)',
-    'Cost per Million Output Tokens (Owning at Large Hyperscaler Volume)',
-    'Cost per Million Output Tokens (Rent - 3 Year Commit)',
-    'Cost per Million Input Tokens (Owning at Large Hyperscaler Volume)',
-    'Cost per Million Input Tokens (Rent - 3 Year Commit)',
-    'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    'Total Tokens per $1 TCO (Rent - 3 Year Commit)',
-    'Output Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    'Output Tokens per $1 TCO (Rent - 3 Year Commit)',
-    'Input Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
-    'Input Tokens per $1 TCO (Rent - 3 Year Commit)',
-    'Cost per Million Total Tokens (Custom User Values)',
-    'Total Tokens per $1 TCO (Custom User Values)',
-    'Token Throughput per All in Utility MW (Custom User Values)',
-    'All-in Provisioned Joules per Total Token',
-    'All-in Provisioned Joules per Output Token',
-    'All-in Provisioned Joules per Input Token',
+  // Tiered metrics are one Y-axis option each; the Cost Tier selector picks
+  // the pricing basis, so those entries name the tier option to click.
+  const metrics: { label: string; tier?: 'hyperscaler' | 'rental' }[] = [
+    { label: 'Token Throughput per Chip' },
+    { label: 'Input Token Throughput per Chip' },
+    { label: 'Output Token Throughput per Chip' },
+    { label: 'Token Throughput per All in Utility MW' },
+    { label: 'Input Token Throughput per All in Utility MW' },
+    { label: 'Output Token Throughput per All in Utility MW' },
+    { label: 'Cost per Million Total Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Total Tokens', tier: 'rental' },
+    { label: 'Cost per Million Output Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Output Tokens', tier: 'rental' },
+    { label: 'Cost per Million Input Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Input Tokens', tier: 'rental' },
+    { label: 'Total Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Total Tokens per $1 TCO', tier: 'rental' },
+    { label: 'Output Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Output Tokens per $1 TCO', tier: 'rental' },
+    { label: 'Input Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Input Tokens per $1 TCO', tier: 'rental' },
+    { label: 'Cost per Million Total Tokens (Custom User Values)' },
+    { label: 'Total Tokens per $1 TCO (Custom User Values)' },
+    { label: 'Token Throughput per All in Utility MW (Custom User Values)' },
+    { label: 'All-in Provisioned Joules per Total Token' },
+    { label: 'All-in Provisioned Joules per Output Token' },
+    { label: 'All-in Provisioned Joules per Input Token' },
   ];
 
   before(() => {
@@ -43,10 +48,15 @@ describe('Y-Axis Metrics All Render Data', () => {
       .should('have.length.greaterThan', 0);
   });
 
-  metrics.forEach((label) => {
-    it(`"${label}" renders scatter points without extra interaction`, () => {
+  metrics.forEach(({ label, tier }) => {
+    const name = tier ? `${label} [${tier}]` : label;
+    it(`"${name}" renders scatter points without extra interaction`, () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.get('[data-slot="select-item"]').contains(label).click({ force: true });
+      cy.get('[data-slot="select-item"]').contains(exact(label)).click({ force: true });
+      if (tier) {
+        cy.get('[data-testid="cost-tier-selector"]').click('right', { force: true });
+        cy.get(`[data-testid="cost-tier-${tier}"]`).click({ force: true });
+      }
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')

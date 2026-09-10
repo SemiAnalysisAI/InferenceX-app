@@ -6,8 +6,9 @@ export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'l
 /**
  * Pricing basis behind a cost or purchasing-power metric. The chart heading
  * shows only the metric (`title`); the tier is spelled out separately in the
- * caption's "Cost Tier" line and appended to the y-axis option label so the
- * two variants stay distinguishable in the selector.
+ * caption's "Cost Tier" line and in the Cost Tier selector that sits beside
+ * the y-axis selector. `metricOptionTitle` still appends it for surfaces that
+ * name a single metric out of context (explanations, share text).
  */
 export type CostTier = 'hyperscaler' | 'rental' | 'custom';
 
@@ -400,6 +401,65 @@ export function metricCostTier(metricKey: MetricKey): CostTier | undefined {
   return metric.costTier;
 }
 
+/**
+ * Metrics that price the same quantity at different cost tiers. The y-axis
+ * selector lists one option per family and the Cost Tier selector swaps
+ * between its members, so the tier is not repeated in every option label.
+ * Tiers are listed in selector order.
+ */
+export const COST_METRIC_FAMILIES = {
+  tokensPerDollar: {
+    hyperscaler: 'tokensPerDollarH',
+    rental: 'tokensPerDollarR',
+    custom: 'tokensPerDollarUser',
+  },
+  outputTokensPerDollar: {
+    hyperscaler: 'outputTokensPerDollarH',
+    rental: 'outputTokensPerDollarR',
+  },
+  inputTokensPerDollar: {
+    hyperscaler: 'inputTokensPerDollarH',
+    rental: 'inputTokensPerDollarR',
+  },
+  cost: { hyperscaler: 'costh', rental: 'costr', custom: 'costUser' },
+  costOutput: { hyperscaler: 'costhOutput', rental: 'costrOutput' },
+  costInput: { hyperscaler: 'costhi', rental: 'costri' },
+} as const satisfies Record<string, Partial<Record<CostTier, MetricKey>>>;
+
+export type CostMetricFamilyId = keyof typeof COST_METRIC_FAMILIES;
+
+export const COST_TIER_ORDER: readonly CostTier[] = ['hyperscaler', 'rental', 'custom'];
+
+const COST_METRIC_FAMILY_BY_METRIC: ReadonlyMap<MetricKey, CostMetricFamilyId> = new Map(
+  (
+    Object.entries(COST_METRIC_FAMILIES) as [
+      CostMetricFamilyId,
+      Partial<Record<CostTier, MetricKey>>,
+    ][]
+  ).flatMap(([family, members]) =>
+    Object.values(members).map((metricKey) => [metricKey, family] as const),
+  ),
+);
+
+/** Family a tiered metric belongs to, or `undefined` for untiered metrics. */
+export function costMetricFamily(metricKey: MetricKey): CostMetricFamilyId | undefined {
+  return COST_METRIC_FAMILY_BY_METRIC.get(metricKey);
+}
+
+/** The family member priced at `tier`, or `undefined` when it publishes none. */
+export function metricForCostTier(
+  family: CostMetricFamilyId,
+  tier: CostTier,
+): MetricKey | undefined {
+  const members: Partial<Record<CostTier, MetricKey>> = COST_METRIC_FAMILIES[family];
+  return members[tier];
+}
+
+/** Tiers a family publishes, in selector order. */
+export function costTiersForFamily(family: CostMetricFamilyId): CostTier[] {
+  return COST_TIER_ORDER.filter((tier) => metricForCostTier(family, tier) !== undefined);
+}
+
 /** Caption "Cost Tier" value for a tier. */
 export function costTierLabel(tier: CostTier, locale: 'en' | 'zh'): string {
   return locale === 'zh' ? COST_TIER_LABELS[tier].labelZh : COST_TIER_LABELS[tier].label;
@@ -540,35 +600,25 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     labelZh: '每 GPU 小时 token 收入',
     metrics: ['y_tokenRevenuePerGpuHour'],
   },
+  // Tiered metrics list both published tiers here so every registry key stays
+  // reachable from the controls; the y-axis selector shows one option per
+  // metric family and the Cost Tier selector picks the tier.
   {
-    label: 'Total Tokens per $1 TCO',
-    labelZh: '每 1 美元 TCO 对应的总 token 数',
-    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarR'],
+    label: 'Tokens per $1 TCO',
+    labelZh: '每 1 美元 TCO 对应的 token 数',
+    metrics: [
+      'y_tokensPerDollarH',
+      'y_tokensPerDollarR',
+      'y_outputTokensPerDollarH',
+      'y_outputTokensPerDollarR',
+      'y_inputTokensPerDollarH',
+      'y_inputTokensPerDollarR',
+    ],
   },
   {
-    label: 'Output Tokens per $1 TCO',
-    labelZh: '每 1 美元 TCO 对应的输出 token 数',
-    metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarR'],
-  },
-  {
-    label: 'Input Tokens per $1 TCO',
-    labelZh: '每 1 美元 TCO 对应的输入 token 数',
-    metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarR'],
-  },
-  {
-    label: 'Cost per Million Total Tokens',
-    labelZh: '每百万总 token 成本',
-    metrics: ['y_costh', 'y_costr'],
-  },
-  {
-    label: 'Cost per Million Output Tokens',
-    labelZh: '每百万输出 token 成本',
-    metrics: ['y_costhOutput', 'y_costrOutput'],
-  },
-  {
-    label: 'Cost per Million Input Tokens',
-    labelZh: '每百万输入 token 成本',
-    metrics: ['y_costhi', 'y_costri'],
+    label: 'Cost per Million Tokens',
+    labelZh: '每百万 token 成本',
+    metrics: ['y_costh', 'y_costr', 'y_costhOutput', 'y_costrOutput', 'y_costhi', 'y_costri'],
   },
   {
     label: 'All-in Provisioned Energy per Token',
