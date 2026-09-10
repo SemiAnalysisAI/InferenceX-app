@@ -53,7 +53,6 @@ export type SystemPowerEstimate =
     };
 
 interface MeasuredChassis {
-  role: string;
   /** GPUs on this chassis covered by telemetry (1–8). */
   measuredGpus: number;
   /** Full-chassis GPU watts handed to the source model. */
@@ -159,10 +158,9 @@ export function modelSystemPower(
     }
     topologyBasis = 'single-node';
     chassis.push({
-      role: 'aggregate',
       measuredGpus: gpuCount,
-      // A full chassis keeps the producer's exact total; a partial one is
-      // extrapolated from the per-GPU mean.
+      // The producer's exact total avoids re-rounding a full chassis through
+      // the per-GPU mean.
       modelInputWatts:
         gpuCount === CHASSIS_GPU_COUNT
           ? m.avg_total_gpu_power_w
@@ -202,7 +200,6 @@ export function modelSystemPower(
       const role = row.disagg ? worker.role : 'aggregate';
       measured.push({ role, gpus: worker.num_gpus, watts: worker.avg_power_w * worker.num_gpus });
       chassis.push({
-        role,
         measuredGpus: worker.num_gpus,
         modelInputWatts: worker.avg_power_w * CHASSIS_GPU_COUNT,
       });
@@ -239,7 +236,6 @@ export function modelSystemPower(
   const extrapolated = chassis.some((c) => c.measuredGpus !== CHASSIS_GPU_COUNT);
   const chassisAcWatts = results.reduce((sum, r) => sum + r.model!.chassisAcWatts, 0);
   const facilityWatts = results.reduce((sum, r) => sum + r.model!.facilityWatts, 0);
-  // Attribute each chassis to its measured GPUs at the modeled per-GPU rate.
   const share = (watts: (r: (typeof results)[number]) => number) =>
     results.reduce((sum, r) => sum + (watts(r) * r.measuredGpus) / CHASSIS_GPU_COUNT, 0);
   const deploymentAcWatts = extrapolated ? share((r) => r.model!.chassisAcWatts) : chassisAcWatts;

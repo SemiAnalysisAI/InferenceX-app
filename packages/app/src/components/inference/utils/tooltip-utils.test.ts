@@ -115,25 +115,22 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
-    const html = generateTooltipContent(
-      config({
-        data: pt({
-          physicalChips: 4,
-          modeledSystemPower: {
-            ...systemPower,
-            gpuCount: 4,
-            chassisCount: 1,
-            modeledGpuCount: 8,
-            chassisAcWatts: 6000,
-            facilityWatts: 7200,
-            deploymentAcWatts: 3000,
-            deploymentFacilityWatts: 3600,
-            topologyBasis: 'single-node',
-            chassisBasis: 'extrapolated',
-          },
-        }),
-      }),
-    );
+    const data = pt({
+      physicalChips: 4,
+      modeledSystemPower: {
+        ...systemPower,
+        gpuCount: 4,
+        chassisCount: 1,
+        modeledGpuCount: 8,
+        chassisAcWatts: 6000,
+        facilityWatts: 7200,
+        deploymentAcWatts: 3000,
+        deploymentFacilityWatts: 3600,
+        topologyBasis: 'single-node',
+        chassisBasis: 'extrapolated',
+      },
+    });
+    const html = generateTooltipContent(config({ data }));
     expect(html).toContain(
       '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
     );
@@ -143,6 +140,12 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
     expect(html).toContain('<strong>Total Chips:</strong> 4');
+
+    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
+    expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
+    expect(zh).toContain('3000 W');
+    expect(zh).not.toContain('6000 W');
   });
 
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {

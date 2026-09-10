@@ -39,7 +39,14 @@ describe('METRIC_EXPLANATIONS completeness', () => {
   });
 
   it('limits system power to GPU chassis while retaining their CPU and DRAM assumptions', () => {
-    const { description } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
+    const { description, formula } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
+    expect(description.en).toContain(
+      'divided by the modeled chassis GPU count (eight per chassis)',
+    );
+    expect(description.en).not.toContain('deployment GPU count');
+    expect(formula.en).toContain('÷ modeled chassis GPU count (8 per chassis)');
+    expect(description.zh).toContain('再除以建模机箱的 GPU 总数（每机箱 8 张）');
+    expect(formula.zh).toContain('÷ 建模机箱的 GPU 总数（每机箱 8 张）');
     expect(description.en).toContain('CPU and DRAM utilization set to 20%');
     expect(description.en).toContain(
       'extrapolated to a full chassis at the measured per-GPU power',

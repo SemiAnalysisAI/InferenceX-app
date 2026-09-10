@@ -254,6 +254,11 @@ export function buildComparison(input: ComparisonInput, pue = profileData.assump
           row.modeled.status === 'supported' ? row.modeled.deploymentAcWatts : null,
         ),
       ),
+      modeled_deployment_facility_w_mean: mean(
+        replicates.map((row) =>
+          row.modeled.status === 'supported' ? row.modeled.deploymentFacilityWatts : null,
+        ),
+      ),
       modeled_facility_w_mean: mean(
         replicates.map((row) =>
           row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,

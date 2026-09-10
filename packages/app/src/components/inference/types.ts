@@ -325,7 +325,10 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // pre-aggregate_power.py runs (and runs with monitoring disabled) won't
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
-  /** Whole-deployment chassis AC normalized over GPUs in fully occupied chassis. */
+  /**
+   * Summed modeled chassis AC ÷ modeled chassis GPU count (chassisCount × 8).
+   * Partially allocated chassis are extrapolated; see modeled-system-power.ts chassisBasis.
+   */
   modeledChassisPowerPerGpu?: { y: number; roof: boolean };
   measuredPrefillAvgPower?: { y: number; roof: boolean };
   measuredDecodeAvgPower?: { y: number; roof: boolean };

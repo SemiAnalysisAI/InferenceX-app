@@ -147,7 +147,7 @@ PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本�
 与模型源码 sweep 脚本喂给各机箱模型的 `n_gpu × W/GPU` 输入一致，并假设未实测的
 GPU 运行相同负载。结果标记为 `chassisBasis: 'extrapolated'`：每卡数值按建模机箱
 的 GPU 总数分摊，`deploymentAcWatts` 只保留实测 GPU 在各机箱中的份额。这不是把
-半台机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
+部分分配的机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
 GB200、GB300 没有匹配模型，也不能套用 B200、B300 模型。缺失、无效和不支持的
 情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
 frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。

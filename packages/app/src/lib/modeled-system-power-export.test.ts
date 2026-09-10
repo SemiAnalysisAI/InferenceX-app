@@ -122,7 +122,8 @@ describe('offline modeled PowerX comparisons', () => {
       joules_per_total_token: energy / (w.total_input_tokens + w.total_output_tokens),
       joules_per_successful_query: energy / w.completed,
     });
-    const row = buildComparison(source).rows[0];
+    const result = buildComparison(source);
+    const row = result.rows[0];
     const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8)!;
     expect(row.modeled).toMatchObject({
       status: 'supported',
@@ -137,6 +138,13 @@ describe('offline modeled PowerX comparisons', () => {
       chassis_ac_j: (reference.chassisAcWatts / 2) * w.integration_duration_s,
       chassis_ac_j_per_output_token:
         ((reference.chassisAcWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
+    });
+    expect(result.cells[0]).toMatchObject({
+      modeled_chassis_ac_w_mean: reference.chassisAcWatts,
+      modeled_chassis_ac_w_per_gpu_mean: reference.chassisAcWatts / 8,
+      modeled_deployment_ac_w_mean: reference.chassisAcWatts / 2,
+      modeled_deployment_facility_w_mean: reference.facilityWatts / 2,
+      modeled_facility_w_mean: reference.facilityWatts,
     });
   });
 
