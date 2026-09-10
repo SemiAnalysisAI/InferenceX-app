@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chartDefinitions,
+  COST_METRIC_FAMILIES,
+  costMetricFamily,
   costTierLabel,
+  costTiersForFamily,
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
@@ -13,6 +16,7 @@ import {
   METRIC_REGISTRY,
   metricChartTitle,
   metricCostTier,
+  metricForCostTier,
   metricOptionTitle,
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
@@ -102,7 +106,7 @@ describe('metric registry', () => {
           metricKeys.includes(metric.slice(2) as (typeof metricKeys)[number]),
       ),
     );
-    expect(tcoGroups).toHaveLength(3);
+    expect(tcoGroups).toHaveLength(1);
     for (const group of tcoGroups) {
       expect(group.label).toContain(' TCO');
       expect(group.labelZh).toContain(' TCO ');
@@ -154,6 +158,44 @@ describe('metric registry', () => {
     expect(interactivity.y_tokensPerDollarH_chartTitle).toBe('Total Tokens per $1 TCO');
     expect(interactivity.y_tokensPerDollarH_costTier).toBe('hyperscaler');
     expect(interactivity.y_tpPerGpu_costTier).toBeUndefined();
+  });
+
+  it('groups tiered metrics into families the Cost Tier selector can swap between', () => {
+    // Every family member carries the tier it is filed under, and every tiered
+    // registry metric belongs to exactly one family.
+    const familyMembers = new Set<string>();
+    for (const [family, members] of Object.entries(COST_METRIC_FAMILIES)) {
+      for (const [tier, metricKey] of Object.entries(members)) {
+        expect(metricCostTier(metricKey), `${family}.${tier}`).toBe(tier);
+        expect(costMetricFamily(metricKey), metricKey).toBe(family);
+        expect(familyMembers.has(metricKey), `${metricKey} listed twice`).toBe(false);
+        familyMembers.add(metricKey);
+      }
+    }
+    for (const metricKey of Object.keys(METRIC_REGISTRY)) {
+      const tiered = metricCostTier(metricKey as keyof typeof METRIC_REGISTRY) !== undefined;
+      expect(familyMembers.has(metricKey), metricKey).toBe(tiered);
+    }
+
+    expect(costMetricFamily('tpPerGpu')).toBeUndefined();
+    expect(costMetricFamily('costUser')).toBe('cost');
+
+    // Selector order: published tiers first, custom last; families without a
+    // custom axis stop at rental.
+    expect(costTiersForFamily('tokensPerDollar')).toEqual(['hyperscaler', 'rental', 'custom']);
+    expect(costTiersForFamily('costOutput')).toEqual(['hyperscaler', 'rental']);
+    expect(metricForCostTier('cost', 'rental')).toBe('costr');
+    expect(metricForCostTier('costInput', 'custom')).toBeUndefined();
+
+    // Family members share a chart title, so the y-axis option can drop the tier.
+    for (const members of Object.values(COST_METRIC_FAMILIES)) {
+      const titles = new Set(
+        Object.entries(members)
+          .filter(([tier]) => tier !== 'custom')
+          .map(([, metricKey]) => metricChartTitle(metricKey, 'en')),
+      );
+      expect(titles.size).toBe(1);
+    }
   });
 
   it('keeps the Measured Energy key list in lockstep with the registry', () => {
