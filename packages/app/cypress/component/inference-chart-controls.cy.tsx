@@ -160,7 +160,7 @@ describe('Inference ChartControls', () => {
     );
   });
 
-  it('hides the Cost Tier selector for metrics without a pricing basis', () => {
+  it('does not render the Cost Tier selector; it lives in the chart caption', () => {
     // Default mock: selectedYAxisMetric = y_tpPerGpu
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
@@ -456,52 +456,6 @@ describe('Inference ChartControls cost metrics', () => {
     cy.contains('[data-slot="select-item"]', /^Total Tokens per \$1 TCO$/u).click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
   });
-
-  it('shows the Cost Tier selector with published tiers, custom values and locked rental terms', () => {
-    cy.get('[data-testid="cost-tier-selector"]')
-      .should('be.visible')
-      .and('contain.text', 'Owning at Large Hyperscaler Volume')
-      .click('right');
-    cy.get('[data-slot="select-item"]').then(($items) => {
-      const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
-      expect(labels).to.deep.equal([
-        'Owning at Large Hyperscaler Volume',
-        'Rent - 3 Year Commit',
-        'Custom User Values',
-        // The lock badge carries a screen-reader "Locked" label.
-        'Rent - On DemandLocked',
-        'Rent - 1 Month CommitLocked',
-        'Rent - 6 Month CommitLocked',
-        'Rent - 1 Year CommitLocked',
-        'Rent - 2 Year CommitLocked',
-      ]);
-    });
-    cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
-    cy.get('[data-testid="cost-tier-rental"]').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costr');
-  });
-
-  it('switches to the custom axis from the Cost Tier selector', () => {
-    cy.get('[data-testid="cost-tier-selector"]').click('right');
-    cy.get('[data-testid="cost-tier-custom"]').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
-  });
-
-  it('opens the TCO model dialog for locked rental tiers instead of changing the axis', () => {
-    cy.get('[data-testid="cost-tier-selector"]').click('right');
-    cy.get('[data-testid="cost-tier-locked-rent_1_year"]')
-      .should('contain.text', 'Rent - 1 Year Commit')
-      .click();
-    cy.get('[data-testid="tco-model-dialog"]')
-      .should('be.visible')
-      .and('contain.text', 'Rent - 1 Year Commit');
-    cy.get('[data-testid="tco-model-dialog-link"]')
-      .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
-      .and('have.attr', 'target', '_blank');
-    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
-    cy.contains('button', 'Not now').click();
-    cy.get('[data-testid="tco-model-dialog"]').should('not.exist');
-  });
 });
 
 describe('Inference ChartControls infrastructure tokens per dollar', () => {
@@ -513,7 +467,7 @@ describe('Inference ChartControls infrastructure tokens per dollar', () => {
   });
 
   it('keeps the rental tier when switching between tiered metrics', () => {
-    cy.get('[data-testid="cost-tier-selector"]').should('contain.text', 'Rent - 3 Year Commit');
+    cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', /^Cost per Million Output Tokens$/u)
       .scrollIntoView()

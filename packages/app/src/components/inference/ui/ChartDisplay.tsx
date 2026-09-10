@@ -101,6 +101,7 @@ import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
+import { CostTierSelector } from './CostTierSelector';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
@@ -1052,6 +1053,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               );
                               return tier ? costTierLabel(tier, locale) : undefined;
                             })()}
+                            // The dashboard picks the pricing basis right here in the
+                            // caption; embedded model pages render no controls and
+                            // keep the plain-text tier.
+                            costTierControl={
+                              embedded || minimalChrome ? undefined : <CostTierSelector />
+                            }
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={

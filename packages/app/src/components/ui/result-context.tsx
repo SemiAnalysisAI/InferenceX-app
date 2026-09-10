@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { Locale } from '@/lib/i18n';
 
 export interface ResultContextProps {
@@ -9,6 +11,13 @@ export interface ResultContextProps {
   metric?: string;
   /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning at Large Hyperscaler Volume"). */
   costTier?: string;
+  /**
+   * Interactive replacement for the `costTier` text, e.g. the inline Cost
+   * Tier selector on the inference dashboard. The plain `costTier` label is
+   * still rendered as an `export-only` twin so PNG exports keep the text
+   * while the control itself stays `no-export`.
+   */
+  costTierControl?: ReactNode;
   /** Fleet utilization the revenue figures assume (e.g. "60%"). */
   utilization?: string;
   /** Share of revenue paid to the model lab (e.g. "30%"). */
@@ -30,6 +39,7 @@ export function ResultContext({
   precision,
   metric,
   costTier,
+  costTierControl,
   utilization,
   licenseFee,
   target,
@@ -84,7 +94,7 @@ export function ResultContext({
   return (
     <dl
       data-testid="result-context"
-      className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+      className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
       {model && (
         <div>
@@ -110,14 +120,24 @@ export function ResultContext({
           <dd className="inline">{metric}</dd>
         </div>
       )}
-      {costTier && (
-        <div>
-          <dt className="inline font-medium text-foreground">{labels.costTier}:</dt>{' '}
-          <dd className="inline" data-testid="result-context-cost-tier">
-            {costTier}
-          </dd>
-        </div>
-      )}
+      {costTier &&
+        (costTierControl ? (
+          <div className="inline-flex flex-wrap items-center gap-x-1">
+            {/* The space keeps textContent identical to the plain-text variant. */}
+            <dt className="font-medium text-foreground">{labels.costTier}:</dt>{' '}
+            <dd className="inline-flex items-center" data-testid="result-context-cost-tier">
+              <span className="no-export inline-flex items-center">{costTierControl}</span>
+              <span className="export-only hidden">{costTier}</span>
+            </dd>
+          </div>
+        ) : (
+          <div>
+            <dt className="inline font-medium text-foreground">{labels.costTier}:</dt>{' '}
+            <dd className="inline" data-testid="result-context-cost-tier">
+              {costTier}
+            </dd>
+          </div>
+        ))}
       {utilization && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.utilization}:</dt>{' '}

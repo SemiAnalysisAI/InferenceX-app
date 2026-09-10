@@ -14,6 +14,7 @@ import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
+import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -444,6 +445,7 @@ export default function HistoricalTrendsDisplay() {
                         );
                         return tier ? costTierLabel(tier, locale) : undefined;
                       })()}
+                      costTierControl={<CostTierSelector />}
                       target={`${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined

@@ -71,6 +71,26 @@ describe('ResultContext', () => {
     );
   });
 
+  it('hosts an inline Cost Tier control and keeps a plain-text twin for PNG export', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          costTier="Rent - 3 Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          date="2026-09-01"
+        />,
+      );
+    });
+    const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
+    expect(container.textContent).toContain('Cost Tier:');
+    expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
+    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
+    expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
+    expect(container.textContent).toContain('Updated: 2026-09-01');
+  });
+
   it('shows utilization and the model license fee when given, in both locales', () => {
     const en = document.createElement('div');
     act(() => {

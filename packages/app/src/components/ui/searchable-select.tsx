@@ -60,6 +60,11 @@ interface SearchableSelectProps {
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
+  /**
+   * Accessible name for the trigger when no visible <label htmlFor> points at
+   * it, e.g. when the select sits inline in a caption next to a <dt>.
+   */
+  triggerAriaLabel?: string;
   size?: 'sm' | 'default';
   disabled?: boolean;
   open?: boolean;
@@ -82,6 +87,7 @@ export function SearchableSelect({
   className,
   contentClassName,
   triggerId,
+  triggerAriaLabel,
   triggerTestId,
   size = 'default',
   disabled = false,
@@ -223,11 +229,12 @@ export function SearchableSelect({
             aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}
             aria-controls={listboxId}
             aria-label={
-              hasOptionHelp
+              triggerAriaLabel ??
+              (hasOptionHelp
                 ? triggerLabel === placeholder
                   ? placeholder
                   : `${placeholder}: ${triggerLabel}`
-                : undefined
+                : undefined)
             }
             disabled={disabled}
             className={cn(

@@ -54,7 +54,7 @@ describe('Y-Axis Metrics All Render Data', () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.get('[data-slot="select-item"]').contains(exact(label)).click({ force: true });
       if (tier) {
-        cy.get('[data-testid="cost-tier-selector"]').click('right', { force: true });
+        cy.get('[data-testid="cost-tier-selector"]').first().click('right', { force: true });
         cy.get(`[data-testid="cost-tier-${tier}"]`).click({ force: true });
       }
       cy.get('[data-testid="scatter-graph"]')
