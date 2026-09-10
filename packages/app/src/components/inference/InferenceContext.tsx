@@ -15,7 +15,6 @@ import {
 import {
   DISPLAY_MODEL_TO_DB,
   rowToSequence,
-  stripTcoVariantSuffix,
   tcoVariantForHwKey,
 } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api';
@@ -110,6 +109,7 @@ import {
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
+import { planTcoVariantAdoption } from './utils/tcoVariantAdoption';
 
 const InferenceDataContext = createContext<InferenceDataContextType | undefined>(undefined);
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
@@ -1178,19 +1178,28 @@ export function InferenceProvider({
   const adoptedTcoVariantKeysRef = useRef(new Set<string>());
   useEffect(() => {
     const adopted = adoptedTcoVariantKeysRef.current;
+    // Re-arm when a variant leaves, so switching metrics away and back
+    // restores it while a deliberate deselect on the same metric sticks.
     for (const key of adopted) {
       if (!selectableHwTypes.has(key)) adopted.delete(key);
     }
-    const toAdopt: string[] = [];
-    for (const key of selectableHwTypes) {
-      if (!tcoVariantForHwKey(key) || adopted.has(key)) continue;
-      adopted.add(key);
-      if (activeHwTypesRef.current.has(stripTcoVariantSuffix(key))) toAdopt.push(key);
-    }
-    if (toAdopt.length > 0) {
-      setActiveHwTypes(new Set([...activeHwTypesRef.current, ...toAdopt]));
-    }
-  }, [selectableHwTypes, setActiveHwTypes]);
+    const candidates = [...selectableHwTypes].filter(
+      (key) => tcoVariantForHwKey(key) && !adopted.has(key),
+    );
+    if (candidates.length === 0) return;
+    // The decision happens inside the updater, against the live set: this
+    // effect can run in the same commit as useChartDataFilter's reconcile and
+    // the `i_active` restore, and a value read from a ref outside would
+    // overwrite whichever of those landed first. `activeHwTypes` is a dep so
+    // an undecidable pass (selection not restored yet) retries instead of
+    // marking the variant adopted and never looking again.
+    setActiveHwTypesDispatch((prev) => {
+      const { add, adopt } = planTcoVariantAdoption(prev, candidates);
+      for (const key of adopt) adopted.add(key);
+      if (add.length === 0) return prev;
+      return resolveHwSelection(new Set([...prev, ...add]), prev).result;
+    });
+  }, [selectableHwTypes, activeHwTypes, setActiveHwTypesDispatch, resolveHwSelection]);
 
   const bestHwTypes = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
