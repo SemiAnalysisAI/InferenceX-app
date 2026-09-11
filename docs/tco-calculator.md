@@ -1141,7 +1141,8 @@ and the two can be collapsed into one once both are on master.
   the speed DeepSeek's own API serves at, DeepSeek's peak-hour list price for
   `deepseek-v4-pro-0813` ($1.32 input / $0.044 cached / $3.96 output per M tok;
   the off-peak rate is half that, and the OpenRouter aggregate sits below both),
-  and a 5% model license fee. At 24 tok/s/user the B200, B300, and MI355X agentic curves are priced; the
+  and a 0% model license fee, since the weights ship under the MIT license. At 24
+  tok/s/user the B200, B300, and MI355X agentic curves are priced; the
   GB200, GB300, and H200 curves bottom out above it (their lowest measured
   points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
   a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,

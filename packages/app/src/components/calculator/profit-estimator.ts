@@ -75,22 +75,22 @@ export interface ProfitModelDefaults {
  * 20%, instead of the 30% the other models assume. DeepSeek V4 Pro opens on
  * DeepSeek's peak-hour list price ($1.32 / $0.044 cached / $3.96 per M tok;
  * off-peak is half that) because third-party hosts undercut it on OpenRouter,
- * on 24 tok/s/user, the speed DeepSeek's own API serves at, and on a 5% model
- * license fee. The B200, B300, and MI355X agentic curves reach that point; the
+ * on 24 tok/s/user, the speed DeepSeek's own API serves at, and on a 0% model
+ * license fee: the weights ship under the MIT license, so there is no lab cut
+ * to model. The B200, B300, and MI355X agentic curves reach that point; the
  * GB200, GB300, and H200 curves bottom out above it and list as not priced
  * until a lower-interactivity run lands. DeepSeek V4.1 Flash opens on the
  * `deepseek-flash` peak-hour list price ($0.30 / $0.006 cached / $1.20 per M
  * tok; off-peak is half that) from the same pricing page, on 125 tok/s/user,
- * the speed DeepSeek's own API serves the Flash tier at, and on a 0% model
- * license fee: the weights ship under the MIT license, so there is no lab cut
- * to model. It entered the fleet on AgentX only, so the
+ * the speed DeepSeek's own API serves the Flash tier at, and on the same 0%
+ * MIT license fee. It entered the fleet on AgentX only, so the
  * estimator serves it from day zero; SKUs whose curves stop short of 125
  * tok/s/user list as not priced rather than extrapolated.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 24,
-    labCutPct: 5,
+    labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
       inputPerMillion: 1.32,
