@@ -682,7 +682,7 @@ export const apiContractSourceDigests = [
     // Reviewed for the DeepSeek-V4.1-Flash addition (InferenceX#2961): the
     // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
     // data, no parameter or OverviewPageData shape change, so the docs stand.
-    sourceSha256: 'PLACEHOLDER_OVERVIEW',
+    sourceSha256: '18ffcb420cc933479c67025415848966294a8ebd28c084471cd58474ce96133f',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
