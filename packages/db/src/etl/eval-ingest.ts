@@ -4,7 +4,7 @@
 
 import type postgres from 'postgres';
 
-type Sql = ReturnType<typeof postgres>;
+type Sql = postgres.Sql;
 
 export interface EvalPersistenceInput {
   task: string;
@@ -19,6 +19,8 @@ export interface EvalPersistenceInput {
  * Insert a single `eval_results` row for an already resolved config id.
  * On conflict `(workflow_run_id, config_id, task, isl, osl, conc)` the metrics
  * are overwritten with the latest values.
+ * Nullable identities reuse the existing row under a per-run transaction lock,
+ * since PostgreSQL's ordinary UNIQUE constraint treats NULL values as distinct.
  *
  * @param sql - Active `postgres` connection.
  * @param configId - Resolved `configs.id` for this result.
@@ -28,8 +30,40 @@ export interface EvalPersistenceInput {
  * @returns Outcome (`'new'` or `'dup'`) and the inserted/updated row's `id`,
  *   so the caller can attach related data (e.g. `eval_samples`) to it.
  */
-export async function ingestEvalRow(
+export function ingestEvalRow(
   sql: Sql,
+  configId: number,
+  p: EvalPersistenceInput,
+  workflowRunId: number,
+  date: string,
+): Promise<{ outcome: 'new' | 'dup'; id: number }> {
+  if (p.isl !== null && p.osl !== null && p.conc !== null) {
+    return insertEvalRow(sql, configId, p, workflowRunId, date);
+  }
+
+  return sql.begin(async (tx) => {
+    // Serialize nullable-key writers for this run without changing historical rows.
+    await tx`select id from workflow_runs where id = ${workflowRunId} for update`;
+    const [existing] = await tx<{ id: number }[]>`
+      update eval_results set metrics = ${tx.json(p.metrics)}
+      where id = (
+        select id from eval_results
+        where workflow_run_id = ${workflowRunId} and config_id = ${configId}
+          and task = ${p.task}
+          and isl is not distinct from ${p.isl}
+          and osl is not distinct from ${p.osl}
+          and conc is not distinct from ${p.conc}
+        order by id limit 1
+      )
+      returning id
+    `;
+    if (existing) return { outcome: 'dup' as const, id: existing.id };
+    return insertEvalRow(tx, configId, p, workflowRunId, date);
+  });
+}
+
+async function insertEvalRow(
+  sql: Sql | postgres.TransactionSql,
   configId: number,
   p: EvalPersistenceInput,
   workflowRunId: number,

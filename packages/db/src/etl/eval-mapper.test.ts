@@ -172,6 +172,27 @@ describe('mapEvalRow', () => {
     expect(result[0].conc).toBeNull();
   });
 
+  it('maps AgentX zero-length sentinels to the aggregate eval identity', () => {
+    const [individual] = mapEvalRow(
+      makeMeta({ isl: '0', osl: 0 }),
+      makeResults(),
+      createSkipTracker(),
+    );
+    const aggregate = mapAggEvalRow(
+      makeAggRow({ source: 'eval_dsr1_agentic/results.json', conc: 64 }),
+      createSkipTracker(),
+    )!;
+
+    expect([individual.isl, individual.osl]).toEqual([null, null]);
+    expect([individual.task, individual.isl, individual.osl, individual.conc]).toEqual([
+      aggregate.task,
+      aggregate.isl,
+      aggregate.osl,
+      aggregate.conc,
+    ]);
+    expect(configCacheKey(individual.config)).toBe(configCacheKey(aggregate.config));
+  });
+
   it('returns null lmEvalVersion when missing from results', () => {
     const tracker = createSkipTracker();
     const results = makeResults();
