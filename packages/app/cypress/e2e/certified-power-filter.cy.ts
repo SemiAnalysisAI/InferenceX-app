@@ -86,6 +86,8 @@ function visitCertifiedPowerChart(extraParams = '') {
   cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
+      win.localStorage.setItem('inferencex-feature-gate', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);

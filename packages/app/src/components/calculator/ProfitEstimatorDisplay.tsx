@@ -1879,7 +1879,9 @@ function ProfitEstimatorInner({
           {t.fixedWorkloadNote}
         </p>
       )}
-      {!loading && powerComparisons.length > 0 && (
+      {/* Power planning stays behind the ↑↑↓↓ gate while the measured-power
+          inputs and the chassis model that consumes them are still WIP. */}
+      {!loading && featureGateUnlocked && powerComparisons.length > 0 && (
         <MeasuredProfitComparison
           comparisons={powerComparisons}
           settings={{

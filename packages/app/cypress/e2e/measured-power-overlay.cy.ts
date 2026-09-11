@@ -8,6 +8,8 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.visit('/inference?unofficialrun=26312107787', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
+        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
     cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');

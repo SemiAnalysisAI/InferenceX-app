@@ -84,6 +84,15 @@ function suppressNudges(win: Cypress.AUTWindow): void {
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
 }
 
+/**
+ * The Power planning comparison card sits behind the ↑↑↓↓ feature gate while
+ * measured power is WIP; specs that assert on it unlock the gate up front.
+ */
+function unlockPowerPlanning(win: Cypress.AUTWindow): void {
+  suppressNudges(win);
+  win.localStorage.setItem('inferencex-feature-gate', '1');
+}
+
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 /** The plot SVG itself, not the icon SVGs inside the export button. */
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
@@ -1311,7 +1320,7 @@ describe('Fixed 8k/1k power planning', () => {
 
   it('prices the exact fixed point, exports modeled capacity, and switches back to AgentX', () => {
     cy.visit('/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=100', {
-      onBeforeLoad: suppressNudges,
+      onBeforeLoad: unlockPowerPlanning,
     });
     cy.get('#profit-scenario')
       .invoke('text')
@@ -1355,7 +1364,7 @@ describe('Fixed 8k/1k power planning', () => {
     it(`preserves the shared fixed target when ${path} needs the Qwen model`, () => {
       const separator = path.includes('?') ? '&' : '?';
       cy.visit(`${path}${separator}i_seq=8k%2F1k&c_profit_target=100`, {
-        onBeforeLoad: suppressNudges,
+        onBeforeLoad: unlockPowerPlanning,
       });
       cy.get('#profit-model').should('contain.text', 'Qwen3.5');
       cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
@@ -1376,7 +1385,7 @@ describe('Fixed 8k/1k power planning', () => {
 
   it('preserves the fixed scenario on the Chinese route', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=100', {
-      onBeforeLoad: suppressNudges,
+      onBeforeLoad: unlockPowerPlanning,
     });
     cy.get('#profit-scenario')
       .invoke('text')
