@@ -51,10 +51,11 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'TPUv7 Inference Performance')
       .and('contain.text', 'Compare TPUv7 versus Blackwell & Blackwell Ultra')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the six AgentX hero ledger rows — the
-    // shared pill must render at the same fixed size everywhere it appears.
+    // Banner + header-nav badges, plus the four still-new AgentX hero ledger
+    // rows (AGENTX_NEW_MODEL_SLUGS) — the shared pill must render at the same
+    // fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 8)
+      .should('have.length', 6)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();

@@ -171,7 +171,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     description:
       'First benchmarks of MiniMax M3 across every available chip. New configurations appear here as they come online.',
     descriptionZh: '涵盖所有可用芯片的 MiniMax M3 首批基准测试结果。新配置上线后将在此同步更新。',
-    tags: ['MiniMax', 'M3', 'New'],
+    tags: ['MiniMax', 'M3'],
     category: 'comparison',
     wide: true,
     hidden: true,
@@ -191,7 +191,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     title: 'DeepSeek V4 Pro — First Look',
     description:
       'First benchmarks of DeepSeek V4 Pro across every available chip. New configurations appear here as they come online.',
-    tags: ['DeepSeek', 'V4-Pro', 'New'],
+    tags: ['DeepSeek', 'V4-Pro'],
     category: 'comparison',
     wide: true,
     hidden: true,
@@ -210,7 +210,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     title: 'DeepSeek V4 Pro — NVIDIA First Look',
     description:
       'First benchmarks of DeepSeek V4 Pro on NVIDIA chips. New configurations appear here as they come online.',
-    tags: ['DeepSeek', 'V4-Pro', 'NVIDIA', 'New'],
+    tags: ['DeepSeek', 'V4-Pro', 'NVIDIA'],
     category: 'comparison',
     wide: true,
     hidden: true,
