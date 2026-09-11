@@ -115,6 +115,11 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // InferenceX benchmark — recorded so the "cannot predate its own weights"
   // invariant above is checkable by eye at review time.
   //
+  // DeepSeek-V4.1-Flash — MIT weights published at deepseek-ai/DeepSeek-V4.1-Flash
+  // on 2026-09-10 UTC (HF repo initial commit 02:17Z, tech report 05:34Z). The
+  // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but
+  // that is the image build date, not the weights date. sweep: 2026-09-10 — day zero.
+  'DeepSeek-V4.1-Flash': '2026-09-10',
   // Weights published on Hugging Face 2026-07-27 under the Kimi K3 License,
   // eleven days after the 2026-07-16 product launch; the gap was to let vLLM,
   // NVIDIA and AMD prepare day-zero support. sweep: 2026-07-27 — day zero.
@@ -130,11 +135,6 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // license. The 2026-06-01 launch shipped API access only; the arXiv report
   // followed on 2026-06-11. sweep: 2026-06-12.
   'MiniMax-M3': '2026-06-07',
-  // DeepSeek-V4.1-Flash — MIT weights published at deepseek-ai/DeepSeek-V4.1-Flash
-  // on 2026-09-10 UTC (HF repo initial commit 02:17Z, tech report 05:34Z). The
-  // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but
-  // that is the image build date, not the weights date. sweep: 2026-09-10 — day zero.
-  'DeepSeek-V4.1-Flash': '2026-09-10',
   // V4 Preview — V4-Pro (1.6T total / 49B active) and V4-Flash (284B/13B)
   // published together under MIT on Hugging Face, the API and chat.deepseek.com.
   // V4-Pro-0813 went GA on 2026-08-13, but the Hugging Face repo still hosts the

@@ -12,7 +12,30 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
   'qwen-3-8-flash-next',
 ] as const;
 
-const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
+/**
+ * AgentX-only models that are NOT part of the editorial featured set above.
+ *
+ * The featured list is an editorial ordering — it drives the compare hero
+ * ledger and the NEW badge in the /inference model selector. Which workload a
+ * model actually has data for is a separate, factual question, and the two
+ * stopped coinciding with DeepSeek V4.1 Flash: it entered the fleet on AgentX
+ * only (InferenceX#2961), so defaulting it to 8K/1K renders an empty compare
+ * page, but promoting it into the hero is a product decision this list
+ * deliberately does not make.
+ *
+ * Keep this in sync with OVERVIEW_MODEL_SCENARIOS in `overview-data.ts` — that
+ * map is the same fact for the overview matrix. `compare-agentx.test.ts` pins
+ * the agreement rather than importing the overview module here, which would
+ * pull the matrix builder into the client bundle through ChartControls.
+ */
+const AGENTX_ONLY_MODEL_SLUGS = ['deepseek-v41-flash'] as const;
+
+/** Every model whose default compare workload is AgentX: the editorial
+ *  featured set plus the AgentX-only models kept out of it. */
+const AGENTX_SCENARIO_MODEL_SET = new Set<string>([
+  ...FEATURED_AGENTX_MODEL_SLUGS,
+  ...AGENTX_ONLY_MODEL_SLUGS,
+]);
 
 export interface ComparisonScenario {
   label: 'AgentX' | '8K/1K';
@@ -58,7 +81,7 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
 }
 
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {
-  return FEATURED_AGENTX_MODEL_SET.has(model.slug)
+  return AGENTX_SCENARIO_MODEL_SET.has(model.slug)
     ? { label: 'AgentX', sequence: 'agentic-traces' }
     : { label: '8K/1K', sequence: '8k/1k' };
 }
