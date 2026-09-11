@@ -18,6 +18,8 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
     expect(new Set(MEASURED_POWER_METRIC_KEY_LIST)).toEqual(
       new Set([
         'avg_power_w',
+        'avg_total_gpu_power_w',
+        'total_gpu_energy_j',
         'p75_power_w',
         'p75_total_gpu_power_w',
         'p90_power_w',
@@ -36,7 +38,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'avg_mem_used_mb',
       ]),
     );
-    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(17);
+    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(19);
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
@@ -69,6 +71,6 @@ describe('POWER_METRIC_KEYS', () => {
     expect(new Set(POWER_METRIC_KEYS)).toEqual(
       new Set(['power_valid', 'power_metric_schema_version', ...MEASURED_POWER_METRIC_KEY_LIST]),
     );
-    expect(POWER_METRIC_KEYS).toHaveLength(19);
+    expect(POWER_METRIC_KEYS).toHaveLength(21);
   });
 });

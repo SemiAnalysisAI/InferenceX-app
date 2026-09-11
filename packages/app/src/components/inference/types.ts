@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
@@ -120,6 +120,8 @@ export interface AggDataEntry {
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
   power_valid?: number;
+  power_invalid_reasons?: string[];
+  power_audit?: PowerAudit;
   power_metric_schema_version?: number;
   /**
    * Certification tier for the measured power telemetry, derived by
@@ -593,6 +595,8 @@ export interface InferenceDataContextType {
   hwTypesWithData: Set<string>;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
+  /** Missing metrics must remain countable after chart filtering hides their points. */
+  selectionPoints: InferenceData[];
   loading: boolean;
   /** True while `graphs` shows previous-key data (placeholder) or a background
    *  refetch is in flight — i.e. content is visible but about to update. */

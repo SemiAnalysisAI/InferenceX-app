@@ -193,6 +193,40 @@ describe('normalizeArtifactRows', () => {
     },
   );
 
+  it('carries power audit provenance on overlay rows', () => {
+    const audit = {
+      window_start_unix: 1756174800,
+      window_end_unix: 1756175400,
+      expected_gpu_count: 8,
+      observed_gpu_count: 8,
+      sample_count: 4800,
+      max_sample_gap_s: 1.013,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    };
+    const [row] = normalizeArtifactRows(
+      [
+        rawRow({
+          power_valid: 0,
+          power_invalid_reasons: ['sampling_gap_exceeded'],
+          power_audit: audit,
+        }),
+      ],
+      '2026-03-01',
+    );
+
+    expect(row.power_invalid_reasons).toEqual(['sampling_gap_exceeded']);
+    expect(row.power_audit).toEqual(audit);
+    expect(row.metrics).not.toHaveProperty('power_invalid_reasons');
+    expect(row.metrics).not.toHaveProperty('power_audit');
+  });
+
+  it('leaves provenance keys undefined for rows without the contract fields', () => {
+    const [row] = normalizeArtifactRows([rawRow()], '2026-03-01');
+    expect(row.power_invalid_reasons).toBeUndefined();
+    expect(row.power_audit).toBeUndefined();
+  });
+
   it('preserves recipe identity for unofficial overlays', () => {
     const rows = normalizeArtifactRows(
       [
@@ -936,4 +970,28 @@ describe('GET /api/unofficial-run', () => {
     const body = await res.json();
     expect(body.error).toContain('999');
   });
+});
+
+// Retained outputs of the real producer CLI, with synthetic input traces.
+import validProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/valid-power.json';
+import missingProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/missing-power.json';
+import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+
+it('carries the actual processor audit and power through API mapping into measured chart fields', () => {
+  const rows = normalizeArtifactRows([validProcessorPower, missingProcessorPower], '2026-09-11');
+  expect(rows[0].power_audit).toMatchObject({
+    source: 'power_validation_benchmark_result.json',
+    observed_gpu_ids: ['0', '1'],
+    sample_count: 34,
+  });
+  expect(rows[1].power_invalid_reasons).toEqual(['telemetry_file_missing']);
+  expect(rows[1].metrics).not.toHaveProperty('avg_power_w');
+  const points = transformBenchmarkRows(rows).chartData[0];
+  expect(points[0].measuredAvgPower?.y).toBe(500);
+  expect(points[0].measuredP75Power?.y).toBe(500);
+  expect(points[0].measuredP90Power?.y).toBe(500);
+  expect(points[0].measuredWhPerSuccessfulQuery?.y).toBeCloseTo(100 / 3600);
+  expect(points[0].measuredPrefillAvgPower).toBeUndefined();
+  expect(points[1].measuredAvgPower).toBeUndefined();
+  expect(points[1].power_audit?.observed_gpu_count).toBe(0);
 });

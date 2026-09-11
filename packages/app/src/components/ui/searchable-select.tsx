@@ -223,7 +223,7 @@ export function SearchableSelect({
             data-testid={triggerTestId}
             data-slot="select-trigger"
             data-size={size}
-            data-value={value}
+            data-value={mounted ? value : undefined}
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}

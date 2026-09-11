@@ -6,6 +6,7 @@ import {
   UnofficialRunContext,
 } from '@/components/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import { chartDefinitions } from '@/components/inference/metric-registry';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
@@ -2255,6 +2256,7 @@ describe('Power envelopes', () => {
       chartType: 'interactivity',
       y_measuredAvgPower_roofline: 'lower_right',
       y_measuredJPerOutputToken_roofline: 'lower_right',
+      y_measuredPowerPercentTdp_roofline: chartDefinitions[0].y_measuredPowerPercentTdp_roofline,
     });
     return (
       <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
@@ -2319,7 +2321,10 @@ describe('Power envelopes', () => {
     cy.get('#power-sweep .roofline-path').should('not.exist');
     cy.get('#scatter-show-all-measurements').should('not.exist');
     cy.contains('button', 'Percent TDP').click();
-    cy.get('#scatter-hide-non-optimal').should('not.exist');
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#power-sweep .roofline-path').should('not.exist');
+    cy.get('[data-testid="power-curve-description"]').should('contain', 'single point');
+    cy.get('#scatter-hide-non-optimal').click({ force: true });
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
       .should('have.length', 1)
       .invoke('attr', 'd')
@@ -2327,6 +2332,12 @@ describe('Power envelopes', () => {
     cy.get('#power-sweep .dot-group')
       .filter((_, element) => element.style.opacity !== '0')
       .should('have.length', 3);
+    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-show-all-measurements').click({ force: true });
+    cy.get('#power-sweep .dot-group')
+      .should('have.length', 4)
+      .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+    cy.get('#scatter-hide-non-optimal').click({ force: true });
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);

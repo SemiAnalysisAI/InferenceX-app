@@ -58,6 +58,7 @@ import {
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
+import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -508,6 +509,12 @@ export default function ChartControls({
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
+                {mounted && (
+                  <PowerMetricAvailability
+                    metric={selectedYAxisMetric}
+                    onSelect={handleYAxisMetricChange}
+                  />
+                )}
               </div>
 
               {tcoVisible && (

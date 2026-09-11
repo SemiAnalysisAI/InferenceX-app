@@ -79,7 +79,9 @@ Power axes use the same Pareto directions as other metrics while **Optimal Only*
 
 Power-boundary views show only the measurements forming that boundary by default. **Show all measurements** reveals the remaining dots without changing the curves, axis domains or zoom. This display preference is independent of **Optimal Only**, defaults off, and is shared through `i_allpoints=1`. Historical rings remain attached to visible historical points; tables and data exports retain their existing selection rules.
 
-Measured power as a percentage of TDP has no preferred direction, so it always uses the upper boundary; its optimal switch is hidden. Charts preserve both display preferences when switching metrics. Energy per token retains its existing Pareto behavior. Power boundaries disable gradient strategy labels and the performance ruler.
+Measured power as a percentage of TDP uses the same lower-is-better power-demand direction as watts. Dividing watts by one hardware's positive, constant TDP preserves its Pareto membership. Optimal Only therefore works on both metrics and retains the saved preference when switching between them. A lower percentage across different chips is not, by itself, an energy-efficiency comparison. Energy per token retains its existing Pareto behavior.
+
+Upper boundaries use monotone interpolation between unique-X vertices, including after zoom, and disable gradient strategy labels and the performance ruler. The same grouping applies to unofficial-run overlays; unrelated dates and runs never share a curve.
 
 ## Gradient Roofline Labels
 

@@ -490,3 +490,28 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should('have.length', 6);
   });
 });
+
+it('hydrates a direct PowerX metric link and shows availability for the selected workload', () => {
+  cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      unlockAgenticGate(win);
+      cy.spy(win.console, 'error').as('powerLinkConsoleErrors');
+    },
+  });
+  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Percent of TDP');
+  cy.get('[data-testid="power-metric-availability"]').should(
+    'contain',
+    'Current workload and hardware selection',
+  );
+  cy.contains('summary', 'Availability of all measured metrics').click();
+  cy.get('[data-testid="power-metric-availability"]').within(() => {
+    cy.contains('button', 'Measured P75 Fleet Power per Chip').should('contain', '/');
+    cy.contains('button', 'Measured Joules per Output Token').click();
+  });
+  cy.get('[data-testid="yaxis-metric-selector"]').should(
+    'contain',
+    'Measured Joules per Output Token',
+  );
+  cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
+});
