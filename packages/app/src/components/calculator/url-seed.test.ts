@@ -4,6 +4,23 @@ import { resolveCalculatorUrlSeed } from './url-seed';
 import { Model, Percentile, Precision, Sequence } from '@/lib/data-mappings';
 
 describe('resolveCalculatorUrlSeed', () => {
+  it.each(['provisioned', 'modeled'])('accepts the %s profit power basis', (profitPowerBasis) => {
+    expect(resolveCalculatorUrlSeed({ c_profit_power: profitPowerBasis })).toEqual({
+      profitPowerBasis,
+    });
+  });
+
+  it.each(['', 'measured', 'unknown'])('ignores invalid profit power basis %j', (value) => {
+    expect(resolveCalculatorUrlSeed({ c_profit_power: value })).toEqual({});
+  });
+
+  it('uses the first repeated power basis, including when that value is invalid', () => {
+    expect(resolveCalculatorUrlSeed({ c_profit_power: ['modeled', 'provisioned'] })).toEqual({
+      profitPowerBasis: 'modeled',
+    });
+    expect(resolveCalculatorUrlSeed({ c_profit_power: ['unknown', 'modeled'] })).toEqual({});
+  });
+
   it('preserves an exact profit target and rejects invalid targets', () => {
     expect(resolveCalculatorUrlSeed({ c_profit_target: '32.123353678124' })).toEqual({
       profitTarget: 32.123353678124,

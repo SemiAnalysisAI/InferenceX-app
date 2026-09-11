@@ -14,8 +14,9 @@
 //  - a loss is drawn below the zero line as a hatched segment, not as a new colour;
 //  - the OpenRouter catalog is the default price source and a custom triple
 //    (input, cached input, output) can replace it;
-//  - the workload is pinned to agentic traces, so there is no scenario or
-//    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3,
+//  - the default workload is agentic traces; fixed 8k/1k on the per-GW page
+//    offers measured-power-based planning, while the agentic model selector offers
+//    Kimi K3, GLM 5.2/5.3,
 //    MiniMax M3 and DeepSeek V4 Pro only, and the target interactivity is a
 //    typed number, not a slider;
 //  - the cost tier, utilization and license fee are edited in the caption line
@@ -30,6 +31,8 @@
 //    a date range, kept in `i_gpus`/`i_dstart`/`i_dend`; with a range set the
 //    chart draws only the compared chips, today's bar plus one per range
 //    endpoint priced from that date's run, labelled with the date.
+
+import { csvParse } from 'd3';
 
 import {
   interceptProfitData,
@@ -88,6 +91,14 @@ const openFormulaNotes = () =>
     if ($btn.attr('aria-expanded') === 'false') cy.wrap($btn).click();
   });
 const revenueLabels = () => chart().find('text.revenue-label tspan.revenue-amount');
+const openPowerDetails = () =>
+  cy.get('[data-testid="profit-power-details"]').then(($details) => {
+    if ($details.attr('open') === undefined) cy.wrap($details).find('> summary').click();
+  });
+const selectPowerBasis = (label: string) => {
+  cy.get('[data-testid="profit-power-basis"]').click();
+  cy.contains('[role="option"]', label).click();
+};
 
 function parseCompactUsd(text: string): number {
   const match = /^(?<sign>-?)\$(?<digits>[\d.]+)(?<unit>[kMB]?)$/.exec(text.trim());
@@ -172,6 +183,7 @@ describe('Profit Estimator per GW', () => {
       .and('not.contain.text', 'moonshotai');
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
+    cy.get('[data-testid="profit-power-basis"]').should('contain.text', 'Provisioned power');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
     cy.get('[role="option"]')
       .should('have.length', 4)
@@ -1009,6 +1021,7 @@ describe('Profit Estimator (per chip-hour)', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-utilization-input"]').should('have.value', '60');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-power-basis"]').should('not.exist');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity',
@@ -1184,6 +1197,8 @@ describe('Fixed 8k/1k power planning', () => {
       'contain.text',
       'synthetic workload',
     );
+    cy.get('[data-testid="profit-power-details"]').should('not.have.attr', 'open');
+    openPowerDetails();
     cy.get('a[download="InferenceX_power_planning.json"]')
       .invoke('attr', 'href')
       .then((href) => {
@@ -1208,6 +1223,97 @@ describe('Fixed 8k/1k power planning', () => {
     cy.get('[data-testid="profit-fixed-workload-note"]').should('not.exist');
   });
 
+  it('changes the main chart and CSV to whole-deployment modeled capacity', () => {
+    let capturedCsv: Blob | undefined;
+    cy.visit('/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=100', {
+      onBeforeLoad(win) {
+        suppressNudges(win);
+        cy.stub(win.URL, 'createObjectURL').callsFake((object: Blob | MediaSource) => {
+          if (object instanceof win.Blob) capturedCsv = object;
+          return 'blob:profit-power-csv';
+        });
+        cy.stub(win.HTMLAnchorElement.prototype, 'click');
+      },
+    });
+
+    const provisionedGpuHours = (1_000_000 / 1.71) * 8760;
+    const modeledGpuHours = Math.floor(1_000_000_000 / 6917.24) * 8 * 8760;
+    // tput_per_gpu is total tokens: 1,000 tok/s/GPU at $1/M for both token types.
+    const revenuePerGpuHour = ((1000 * 3600) / 1_000_000) * 0.6;
+    const assertRevenue = (gpuHours: number) =>
+      revenueLabels()
+        .should('have.length', 1)
+        .invoke('text')
+        .should((label) => {
+          const revenue = revenuePerGpuHour * gpuHours;
+          expect(parseCompactUsd(label)).to.be.closeTo(revenue, revenue * 0.01);
+        });
+    const assertCsv = (gpuHours: number, powerBasis: string) => {
+      cy.get('[data-testid="profit-figure"] [data-testid="export-button"]').click();
+      cy.get('[data-testid="export-csv-button"]').click();
+      cy.then(() => {
+        expect(capturedCsv, 'chart CSV download').to.not.equal(undefined);
+        return capturedCsv!.text();
+      }).then((csv) => {
+        const rows = csvParse(
+          csv
+            .split('\n')
+            .filter((line) => !line.startsWith('#'))
+            .join('\n'),
+        );
+        expect(rows, 'one B200 row').to.have.length(1);
+        expect(Number(rows[0]!['GPU-hours per GW-year'])).to.equal(Math.round(gpuHours));
+        expect(Number(rows[0]!['Revenue ($/GW/yr)'])).to.equal(
+          Math.round(revenuePerGpuHour * gpuHours),
+        );
+        expect(rows[0]!['Power basis']).to.equal(powerBasis);
+      });
+    };
+
+    // The page also includes supplemental TPU curves; compare this measured SKU.
+    cy.get('[data-testid="profit-legend"] li').contains('B200').click();
+    assertRevenue(provisionedGpuHours);
+    assertCsv(provisionedGpuHours, 'Provisioned power');
+    selectPowerBasis('Modeled system power + 10%');
+    assertRevenue(modeledGpuHours);
+    cy.get('[data-testid="profit-caption"]').should('contain.text', 'Modeled system power');
+    assertCsv(modeledGpuHours, 'Modeled system power + 10%');
+    cy.get('[data-testid="profit-power-details"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should('include', 'c_profit_power=modeled')
+      .and('include', 'c_profit_target=100');
+    cy.get('body').type('{esc}');
+    selectPowerBasis('Provisioned power');
+    assertRevenue(provisionedGpuHours);
+  });
+
+  it('leaves non-measured targets and AgentX unavailable until the power basis changes', () => {
+    cy.visit(
+      '/profit-estimator-per-gigawatt/qwen-3-5?i_seq=8k%2F1k&c_profit_target=99&c_profit_power=modeled',
+      { onBeforeLoad: suppressNudges },
+    );
+    cy.get('[data-testid="profit-power-basis"]').should('contain.text', 'Modeled system power');
+    cy.get('[data-testid="profit-modeled-unavailable"]').should('be.visible');
+    chart().should('not.exist');
+    openPowerDetails();
+    cy.get('[data-testid="power-planning-comparison"]')
+      .should('contain.text', 'Select an exact benchmark point')
+      .contains('button', 'Use point: 100')
+      .click();
+    revenueLabels().should('have.length', 1);
+    cy.get('#profit-scenario').click();
+    cy.get('[data-value="agentic-traces"]').click();
+    cy.get('#profit-model').should('contain.text', 'Kimi K3');
+    cy.get('[data-testid="profit-modeled-unavailable"]').should('contain.text', 'AgentX');
+    chart().should('not.exist');
+    cy.get('[data-testid="profit-history-panel"]').should('not.exist');
+    selectPowerBasis('Provisioned power');
+    chart().find('rect.bar-tco').should('have.length', 4);
+    cy.get('[data-testid="profit-history-panel"]').should('exist');
+  });
+
   for (const path of [
     '/profit-estimator-per-gigawatt',
     '/profit-estimator-per-gigawatt/kimi-k3',
@@ -1215,7 +1321,7 @@ describe('Fixed 8k/1k power planning', () => {
   ]) {
     it(`preserves the shared fixed target when ${path} needs the Qwen model`, () => {
       const separator = path.includes('?') ? '&' : '?';
-      cy.visit(`${path}${separator}i_seq=8k%2F1k&c_profit_target=100`, {
+      cy.visit(`${path}${separator}i_seq=8k%2F1k&c_profit_target=100&c_profit_power=modeled`, {
         onBeforeLoad: suppressNudges,
       });
       cy.get('#profit-model').should('contain.text', 'Qwen3.5');
@@ -1223,6 +1329,9 @@ describe('Fixed 8k/1k power planning', () => {
       cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
       cy.location('pathname').should('equal', '/profit-estimator-per-gigawatt/qwen-3-5');
       cy.location('search').should('contain', 'c_profit_target=100');
+      cy.location('search').should('contain', 'c_profit_power=modeled');
+      cy.get('[data-testid="profit-power-basis"]').should('contain.text', 'Modeled system power');
+      openPowerDetails();
       cy.get('a[download="InferenceX_power_planning.json"]')
         .invoke('attr', 'href')
         .then((href) => {
@@ -1244,6 +1353,10 @@ describe('Fixed 8k/1k power planning', () => {
       .should('match', /8K\s*\/\s*1K/u);
     cy.get('[data-testid="profit-caption"]').should('contain.text', '中位数');
     cy.get('[data-testid="profit-fixed-workload-note"]').should('contain.text', '合成工作负载');
+    selectPowerBasis('系统建模功率 + 10%');
+    cy.get('[data-testid="profit-power-caption"]').should('contain.text', '系统建模功率 + 10%');
+    revenueLabels().should('have.length', 1);
+    openPowerDetails();
     cy.get('[data-testid="power-planning-comparison"]').should('contain.text', '年收入');
   });
 });

@@ -541,15 +541,35 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
-  it('shares an exact fixed-workload profit point with its model and scenario', async () => {
-    setupWindow('', '/profit-estimator-per-gigawatt/qwen-3-5');
+  it.each(['', '/zh'])(
+    'shares modeled power and an exact fixed-workload point for %s',
+    async (locale) => {
+      setupWindow('', `${locale}/profit-estimator-per-gigawatt/qwen-3-5`);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      writeUrlParams({
+        i_seq: '8k/1k',
+        c_profit_target: '222.68672965491135',
+        c_profit_power: 'modeled',
+      });
+      await vi.advanceTimersByTimeAsync(200);
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(`${locale}/profit-estimator-per-gigawatt/qwen-3-5`);
+      expect(url.searchParams.get('i_seq')).toBe('8k/1k');
+      expect(url.searchParams.get('c_profit_target')).toBe('222.68672965491135');
+      expect(url.searchParams.get('c_profit_power')).toBe('modeled');
+      const { resolveCalculatorUrlSeed } = await import('@/components/calculator/url-seed');
+      expect(resolveCalculatorUrlSeed(Object.fromEntries(url.searchParams))).toMatchObject({
+        profitTarget: 222.68672965491135,
+        profitPowerBasis: 'modeled',
+      });
+    },
+  );
+
+  it('omits the default provisioned power basis after switching back from modeled', async () => {
+    setupWindow('?c_profit_power=modeled', '/profit-estimator-per-gigawatt/qwen-3-5');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
-    writeUrlParams({ i_seq: '8k/1k', c_profit_target: '222.68672965491135' });
-    await vi.advanceTimersByTimeAsync(200);
-    const url = new URL(buildShareUrl());
-    expect(url.pathname).toBe('/profit-estimator-per-gigawatt/qwen-3-5');
-    expect(url.searchParams.get('i_seq')).toBe('8k/1k');
-    expect(url.searchParams.get('c_profit_target')).toBe('222.68672965491135');
+    writeUrlParams({ c_profit_power: 'provisioned' });
+    expect(new URL(buildShareUrl()).searchParams.has('c_profit_power')).toBe(false);
   });
 
   it('defaults to inference tab prefixes when on root path', async () => {
