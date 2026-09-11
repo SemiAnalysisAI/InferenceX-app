@@ -7,7 +7,7 @@
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
 //  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
-//    ($1.32 / $0.044 cached / $3.96), and a 5% license fee;
+//    ($1.32 / $0.044 cached / $3.96), and a 0% license fee (MIT weights);
 //  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
 //    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
 //  - utilization scales revenue only, so the revenue label moves and the
@@ -894,8 +894,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '5%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
@@ -951,7 +951,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
       .should('contain.text', 'DeepSeek V4 Pro')
       .and('contain.text', '24 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
       .and('contain.text', '(DeepSeek list price)');
@@ -1038,7 +1038,7 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.visit('/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
 
     // Both DeepSeek models share a vendor label, so the switch must land on the
     // Flash triple, not keep V4 Pro's.
