@@ -81,8 +81,9 @@ export interface ProfitModelDefaults {
  * until a lower-interactivity run lands. DeepSeek V4.1 Flash opens on the
  * `deepseek-flash` peak-hour list price ($0.30 / $0.006 cached / $1.20 per M
  * tok; off-peak is half that) from the same pricing page, on 125 tok/s/user,
- * the speed DeepSeek's own API serves the Flash tier at, and on the same 5%
- * model license fee as V4 Pro. It entered the fleet on AgentX only, so the
+ * the speed DeepSeek's own API serves the Flash tier at, and on a 0% model
+ * license fee: the weights ship under the MIT license, so there is no lab cut
+ * to model. It entered the fleet on AgentX only, so the
  * estimator serves it from day zero; SKUs whose curves stop short of 125
  * tok/s/user list as not priced rather than extrapolated.
  */
@@ -100,7 +101,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   },
   [Model.DeepSeek_V4_1_Flash]: {
     interactivity: 125,
-    labCutPct: 5,
+    labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
       inputPerMillion: 0.3,

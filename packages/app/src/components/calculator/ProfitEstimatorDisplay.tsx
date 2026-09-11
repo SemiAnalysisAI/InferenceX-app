@@ -611,7 +611,7 @@ function ProfitEstimatorInner({
   // on the Z.ai list price at 10%; MiniMax M3: 83 tok/s/user on the MiniMax
   // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
   // price at 5%; DeepSeek V4.1 Flash: 125 tok/s/user on the DeepSeek Flash
-  // list price at 5%), so a model switch re-seeds all three. The ref keeps
+  // list price at 0%, MIT-licensed), so a model switch re-seeds all three. The ref keeps
   // this to actual switches: re-renders with the same model leave the
   // reader's edits alone. Ignore disallowed models briefly restored by URL
   // hydration so normalizing a fixed-workload share link preserves its target.

@@ -400,10 +400,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4.1 Flash on 125 tok/s/user, the DeepSeek Flash peak list price, and a 5% license fee', () => {
+  it('opens DeepSeek V4.1 Flash on 125 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_1_Flash);
     expect(defaults.interactivity).toBe(125);
-    expect(defaults.labCutPct).toBe(5);
+    expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
       inputPerMillion: 0.3,

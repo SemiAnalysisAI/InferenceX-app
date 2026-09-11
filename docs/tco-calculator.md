@@ -1147,8 +1147,8 @@ and the two can be collapsed into one once both are on master.
   a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,
   the speed DeepSeek's own API serves the Flash tier at, DeepSeek's peak-hour
   list price for `deepseek-flash` ($0.30 input / $0.006 cached / $1.20 output
-  per M tok; off-peak is half that), and the same 5% model license fee as V4
-  Pro. It entered the fleet on AgentX only (InferenceX#2961), so the page is
+  per M tok; off-peak is half that), and a 0% model license fee, since the
+  weights ship under the MIT license. It entered the fleet on AgentX only (InferenceX#2961), so the page is
   wired ahead of the first published rows; SKUs whose agentic curves stop short
   of 125 tok/s/user list as not priced rather than extrapolated. A
   model with a list price gets a third Token Price option, `<vendor> list

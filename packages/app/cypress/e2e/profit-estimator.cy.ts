@@ -9,7 +9,7 @@
 //  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
 //    ($1.32 / $0.044 cached / $3.96), and a 5% license fee;
 //  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
-//    price ($0.30 / $0.006 cached / $1.20), and a 5% license fee;
+//    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
@@ -990,8 +990,8 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v41-flash');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '125');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '5%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'DeepSeek V4.1 Flash 552B Agentic Revenue & Profit Estimates per Chip per Hour at P90 125 tok/s/user Interactivity',
@@ -1049,7 +1049,7 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
       .should('contain.text', 'DeepSeek V4.1 Flash')
       .and('contain.text', '125 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '125');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.3')
       .and('contain.text', 'Output: $1.2')
