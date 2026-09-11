@@ -210,9 +210,9 @@ export const MODEL_TAB_META_ZH: Record<
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} 每吉瓦推理利润估算器`,
     description: (seoName) =>
-      `估算每款芯片一个吉瓦年运行 ${seoName} 推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
+      `估算每款芯片一个吉瓦年运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
     intro: (seoName) =>
-      `本页面按芯片估算一个全电源配置吉瓦年运行 ${seoName} 推理的收入、算力支出（TCO）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
+      `本页面按芯片估算一个全电源配置吉瓦年运行 ${seoName} 智能体推理的收入、算力支出（TCO）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
   },
 };
 
