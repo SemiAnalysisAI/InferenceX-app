@@ -1107,7 +1107,7 @@ and the two can be collapsed into one once both are on master.
   no scenario selector and no precision selector (precision stays in auto mode, the
   densest measured run set). The interactivity target is a typed number in the same
   row as utilization and the license fee.
-- **Kimi K3, GLM 5.2/5.3, MiniMax M3, and DeepSeek V4 Pro.** The model selector offers the tab's route allow-list
+- **Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro, and DeepSeek V4.1 Flash.** The model selector offers the tab's route allow-list
   (`MODEL_ROUTE_TAB_MODELS['profit-estimator']` and
   `['profit-estimator-per-gigawatt']` in `model-routes.ts`) intersected with the
   models that have an agentic run. Each bare path opens on Kimi K3
@@ -1116,7 +1116,9 @@ and the two can be collapsed into one once both are on master.
   GLM 5.2/5.3 page (one data bucket, one slug, as on the rest of the site),
   `/minimax-m3` is the MiniMax M3 page, `/deepseek-v4` is the DeepSeek V4 Pro
   page (the app-wide default elsewhere, but a slugged page here since the bare
-  path is Kimi K3), aliases 308 to the canonical slug, and any model outside the
+  path is Kimi K3), `/deepseek-v41-flash` is the DeepSeek V4.1 Flash page (its
+  own slug and `dsv41flash` bucket: a different architecture, not a V4 Pro point
+  release), aliases 308 to the canonical slug, and any model outside the
   allow-list 404s. Widening
   the pages to more models is one list edit, a `profitModelDefaults` entry, and
   fixture rows.
@@ -1142,7 +1144,13 @@ and the two can be collapsed into one once both are on master.
   and a 5% model license fee. At 24 tok/s/user the B200, B300, and MI355X agentic curves are priced; the
   GB200, GB300, and H200 curves bottom out above it (their lowest measured
   points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
-  a lower-interactivity run lands. A
+  a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,
+  the speed DeepSeek's own API serves the Flash tier at, DeepSeek's peak-hour
+  list price for `deepseek-flash` ($0.30 input / $0.006 cached / $1.20 output
+  per M tok; off-peak is half that), and a 0% model license fee, since the
+  weights ship under the MIT license. It entered the fleet on AgentX only (InferenceX#2961), so the page is
+  wired ahead of the first published rows; SKUs whose agentic curves stop short
+  of 125 tok/s/user list as not priced rather than extrapolated. A
   model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom

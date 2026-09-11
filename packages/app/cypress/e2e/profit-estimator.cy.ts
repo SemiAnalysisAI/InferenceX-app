@@ -8,6 +8,8 @@
 //    ($0.30 / $0.06 cached / $1.20);
 //  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
 //    ($1.32 / $0.044 cached / $3.96), and a 5% license fee;
+//  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
+//    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
 //  - utilization scales revenue only, so the revenue label moves and the
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
@@ -16,8 +18,8 @@
 //    (input, cached input, output) can replace it;
 //  - the workload is pinned to agentic traces, so there is no scenario or
 //    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3,
-//    MiniMax M3 and DeepSeek V4 Pro only, and the target interactivity is a
-//    typed number, not a slider;
+//    MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash only, and the target
+//    interactivity is a typed number, not a slider;
 //  - the cost tier, utilization and license fee are edited in the caption line
 //    under the title; custom $/GPU/hr is typed into the TCO badges there;
 //  - the per-GW page opens on Owning at Large Hyperscaler Volume while the
@@ -63,6 +65,10 @@ const OPENROUTER_MODELS = {
     {
       id: 'deepseek/deepseek-v4-pro-0813',
       pricing: { prompt: '0.00000066', completion: '0.00000198', input_cache_read: '0.000000022' },
+    },
+    {
+      id: 'deepseek/deepseek-v4.1-flash',
+      pricing: { prompt: '0.00000015', completion: '0.0000006', input_cache_read: '0.000000003' },
     },
   ],
 };
@@ -174,11 +180,12 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
     cy.get('[role="option"]')
-      .should('have.length', 4)
+      .should('have.length', 5)
       .and('contain.text', 'Kimi K3')
       .and('contain.text', 'GLM5.2/GLM5.3')
       .and('contain.text', 'MiniMax M3')
-      .and('contain.text', 'DeepSeek V4 Pro');
+      .and('contain.text', 'DeepSeek V4 Pro')
+      .and('contain.text', 'DeepSeek V4.1 Flash');
     cy.get('body').type('{esc}');
     // Kimi K3 has no list price, so the selector offers the catalog and custom only.
     cy.get('button#profit-price-source').click();
@@ -967,6 +974,105 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', '输入：$1.32')
+      .and('contain.text', 'DeepSeek 官方定价');
+    cy.get('button#profit-price-source').should('contain.text', 'DeepSeek 官方定价');
+  });
+});
+
+describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
+  beforeEach(() => {
+    stubOpenRouter();
+    cy.viewport(1280, 1000);
+  });
+
+  it('opens /profit-estimator/deepseek-v41-flash on 125 tok/s/user and the DeepSeek Flash list price', () => {
+    cy.visit('/profit-estimator/deepseek-v41-flash', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.location('pathname').should('eq', '/profit-estimator/deepseek-v41-flash');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '125');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
+    cy.get('[data-testid="profit-caption"] h2').should(
+      'contain.text',
+      'DeepSeek V4.1 Flash 552B Agentic Revenue & Profit Estimates per Chip per Hour at P90 125 tok/s/user Interactivity',
+    );
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.3')
+      .and('contain.text', 'Cached Input: $0.006')
+      .and('contain.text', 'Output: $1.2')
+      .and('contain.text', '(DeepSeek list price)');
+    cy.get('[data-testid="profit-list-price-source"]')
+      .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
+      .and('contain.text', 'DeepSeek');
+    // 125 tok/s/user sits inside the wide curve (top 130) but past the H200
+    // curve's 38 tok/s/user top, so H200 lists as not priced.
+    chart().find('image.bar-vendor-mark').should('have.length', 4);
+    chart().should('not.contain.text', 'H200');
+    cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
+
+    // The catalog stays one click away and reads the Flash row, not V4 Pro's.
+    cy.get('button#profit-price-source').click();
+    cy.get('[role="option"]')
+      .should('have.length', 3)
+      .and('contain.text', 'OpenRouter')
+      .and('contain.text', 'DeepSeek list price')
+      .and('contain.text', 'Custom $/M tok');
+    cy.contains('[role="option"]', 'OpenRouter').click();
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.15')
+      .and('contain.text', 'Output: $0.6')
+      .and('contain.text', '(OpenRouter)');
+    cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
+
+    // Custom seeds from the price in force, here the list price.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'DeepSeek list price').click();
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'Custom $/M tok').click();
+    cy.get('[data-testid="profit-input-price"]').should('have.value', '0.3');
+    cy.get('[data-testid="profit-cached-price"]').should('have.value', '0.006');
+    cy.get('[data-testid="profit-output-price"]').should('have.value', '1.2');
+  });
+
+  it('re-seeds the operating point and price source when switching from DeepSeek V4 Pro', () => {
+    cy.visit('/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '5');
+
+    // Both DeepSeek models share a vendor label, so the switch must land on the
+    // Flash triple, not keep V4 Pro's.
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'DeepSeek V4.1 Flash').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v41-flash');
+    cy.get('[data-testid="profit-caption"] h2')
+      .should('contain.text', 'DeepSeek V4.1 Flash')
+      .and('contain.text', '125 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '125');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.3')
+      .and('contain.text', 'Output: $1.2')
+      .and('contain.text', '(DeepSeek list price)');
+
+    cy.get('[data-testid="profit-model-selector"]').click();
+    cy.contains('[role="option"]', 'Kimi K3').click();
+    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.6')
+      .and('contain.text', '(OpenRouter)');
+  });
+
+  it('serves the Chinese mirror with the list price named in Chinese', () => {
+    cy.visit('/zh/profit-estimator-per-gigawatt/deepseek-v41-flash', {
+      onBeforeLoad: suppressNudges,
+    });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '125');
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', '输入：$0.3')
       .and('contain.text', 'DeepSeek 官方定价');
     cy.get('button#profit-price-source').should('contain.text', 'DeepSeek 官方定价');
   });

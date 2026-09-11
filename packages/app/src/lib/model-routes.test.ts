@@ -183,14 +183,20 @@ describe('modelRoutePathnameRewrite', () => {
 });
 
 describe('modelRoutesForTab', () => {
-  it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3 and DeepSeek V4 Pro on the profit estimators and every model elsewhere', () => {
+  it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
       expect(
         modelRoutesForTab(tab)
           .map((route) => route.model)
           .filter((model) => model !== Model.Qwen3_5),
-      ).toEqual([Model.DeepSeek_V4_Pro, Model.Kimi_K3, Model.MiniMax_M3, Model.GLM_5_2]);
+      ).toEqual([
+        Model.DeepSeek_V4_Pro,
+        Model.DeepSeek_V4_1_Flash,
+        Model.Kimi_K3,
+        Model.MiniMax_M3,
+        Model.GLM_5_2,
+      ]);
       expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(
         tab === 'profit-estimator-per-gigawatt',
       );
@@ -203,6 +209,12 @@ describe('modelRoutesForTab', () => {
       expect(
         modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_Pro)?.slug,
       ).toBe('deepseek-v4');
+      // V4.1 Flash is its own architecture and DB bucket, so it gets its own
+      // slug rather than joining the V4 Pro page.
+      expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_1_Flash)).toBe(true);
+      expect(
+        modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_1_Flash)?.slug,
+      ).toBe('deepseek-v41-flash');
       // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
       // release, as on the rest of the site, and `glm-5-2` 308s to it.
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
