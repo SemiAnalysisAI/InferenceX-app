@@ -60,8 +60,10 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. Kimi K3 opens on 45 tok/s/user and OpenRouter, where
- * Moonshot's price holds across hosts. GLM 5.2/5.3 opens on Z.ai's list price
+ * Per-model defaults. Kimi K3 opens on 45 tok/s/user and Moonshot's list
+ * price ($3.00 / $0.30 cached / $15.00 per M tok, flat at any context length)
+ * because third-party hosts undercut it on OpenRouter, where the catalog
+ * aggregate sits near $1.80 / $9.00. GLM 5.2/5.3 opens on Z.ai's list price
  * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
  * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
  * no priced SKU has a measured point that low yet, so the nearest round
@@ -112,8 +114,14 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   },
   [Model.Kimi_K3]: {
     interactivity: DEFAULT_PROFIT_INTERACTIVITY,
-    listPricing: null,
     labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: {
+      vendor: 'Moonshot',
+      inputPerMillion: 3,
+      cachedInputPerMillion: 0.3,
+      outputPerMillion: 15,
+      sourceUrl: 'https://platform.kimi.ai/docs/pricing/chat-k3',
+    },
   },
   [Model.GLM_5_2]: {
     interactivity: 100,
