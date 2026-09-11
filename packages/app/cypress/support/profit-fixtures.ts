@@ -1,7 +1,7 @@
 /**
  * Synthetic agentic rows for the `/profit-estimator` e2e spec, one identical
  * SKU set per model the estimator serves (Kimi K3, GLM 5.2/5.3, MiniMax M3,
- * DeepSeek V4 Pro).
+ * DeepSeek V4 Pro, DeepSeek V4.1 Flash).
  *
  * The captured API fixtures carry no `agentic_traces` rows, and the estimator
  * is pinned to that workload, so the spec intercepts availability and
@@ -14,7 +14,9 @@
  * wide curve reaches 130 tok/s/user so GLM's 100 and MiniMax M3's 83 tok/s/user
  * defaults are reads, not clamps, on every other SKU. Both curves start below
  * DeepSeek V4 Pro's 24 tok/s/user default, so every SKU, H200 included, is
- * priced there.
+ * priced there. DeepSeek V4.1 Flash's 125 tok/s/user default sits just inside
+ * the wide curve's 130 tok/s/user top, so the four wide-curve SKUs are priced
+ * and H200 is not, as on the Kimi, GLM, and MiniMax defaults.
  */
 import { metricsFor } from './overlay-fixtures';
 
@@ -22,12 +24,14 @@ export const PROFIT_MODEL_DB_KEY = 'kimik3';
 export const PROFIT_GLM_DB_KEY = 'glm5.2';
 export const PROFIT_MINIMAX_DB_KEY = 'minimaxm3';
 export const PROFIT_DEEPSEEK_DB_KEY = 'dsv4';
+export const PROFIT_DEEPSEEK_FLASH_DB_KEY = 'dsv41flash';
 /** `?model=` display key the benchmarks request carries → DB key of its rows. */
 const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
   'Kimi-K3': PROFIT_MODEL_DB_KEY,
   'GLM-5.2': PROFIT_GLM_DB_KEY,
   'MiniMax-M3': PROFIT_MINIMAX_DB_KEY,
   'DeepSeek-V4-Pro': PROFIT_DEEPSEEK_DB_KEY,
+  'DeepSeek-V4.1-Flash': PROFIT_DEEPSEEK_FLASH_DB_KEY,
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
