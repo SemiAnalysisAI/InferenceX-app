@@ -69,23 +69,27 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
-  it('only exposes measured P90 from validated schema-2 rows, including overlays without DB IDs', () => {
-    for (const id of [1, undefined]) {
-      const row = makeRow({
-        id,
-        metrics: { power_valid: 1, power_metric_schema_version: 2, p90_power_w: 620 },
-      });
-      expect(rowToAggDataEntry(row).p90_power_w).toBe(620);
-      const unavailableMetrics: Record<string, number>[] = [
-        { power_valid: 0, power_metric_schema_version: 2, p90_power_w: 620 },
-        { power_valid: 1, p90_power_w: 620 },
-        { avg_power_w: 500 },
-      ];
-      for (const metrics of unavailableMetrics) {
-        expect(rowToAggDataEntry(makeRow({ id, metrics })).p90_power_w).toBeUndefined();
+  it.each(['p75_power_w', 'p90_power_w'] as const)(
+    'only exposes %s from validated schema-2 rows, including overlays without DB IDs',
+    (metric) => {
+      for (const id of [1, undefined]) {
+        const row = makeRow({
+          id,
+          metrics: { power_valid: 1, power_metric_schema_version: 2, [metric]: 620 },
+        });
+        expect(rowToAggDataEntry(row)[metric]).toBe(620);
+        const unavailableMetrics: Record<string, number>[] = [
+          { power_valid: 0, power_metric_schema_version: 2, [metric]: 620 },
+          { power_valid: 1, [metric]: 620 },
+          { power_valid: 1, power_metric_schema_version: 3, [metric]: 620 },
+          { avg_power_w: 500 },
+        ];
+        for (const metrics of unavailableMetrics) {
+          expect(rowToAggDataEntry(makeRow({ id, metrics }))[metric]).toBeUndefined();
+        }
       }
-    }
-  });
+    },
+  );
   it('preserves DCP and PCP metrics for point tooltips', () => {
     const entry = rowToAggDataEntry(
       makeRow({

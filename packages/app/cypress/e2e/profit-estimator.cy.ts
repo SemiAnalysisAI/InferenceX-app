@@ -146,6 +146,9 @@ describe('Profit Estimator per GW', () => {
       expect(Math.min(...lockedIdx)).to.be.greaterThan(customIdx);
     });
     cy.get('body').type('{esc}');
+    // Escape restores focus asynchronously; wait before opening another menu
+    // so the cost selector cannot steal focus and close the model dropdown.
+    cy.get('button#profit-cost').should('have.attr', 'aria-expanded', 'false').and('be.focused');
     // Segments are labelled in place; there is no separate key under the title.
     cy.get('[data-testid="profit-segment-key"]').should('not.exist');
     chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');

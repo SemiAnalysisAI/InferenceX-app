@@ -26,6 +26,7 @@ function point(conc: number, x: number, y: number, overrides: Partial<InferenceD
 describe('power chart semantics', () => {
   it('selects power gauges without changing energy chart semantics', () => {
     expect(isPowerCurveMetric('y_measuredAvgPower')).toBe(true);
+    expect(isPowerCurveMetric('y_measuredP75Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredP90Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredPowerPercentTdp')).toBe(true);
     expect(isPowerCurveMetric('y_modeledChassisPowerPerGpu')).toBe(true);

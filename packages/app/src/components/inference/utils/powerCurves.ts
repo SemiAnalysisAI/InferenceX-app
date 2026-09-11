@@ -9,6 +9,7 @@ import { canonicalParetoIntersection } from './canonicalFrontier';
 
 const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredAvgPower',
+  'y_measuredP75Power',
   'y_measuredP90Power',
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',

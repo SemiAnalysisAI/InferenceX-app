@@ -23,7 +23,7 @@ function sourcePoint(backfill = QWEN35_P90_POWER_BACKFILLS[0]) {
   };
 }
 
-describe('Qwen3.5 measured P90 backfills', () => {
+describe('Qwen3.5 measured P75 and P90 backfills', () => {
   it('ties all 34 exact selectors and values to their raw audit evidence', () => {
     expect(QWEN35_P90_POWER_BACKFILLS).toHaveLength(34);
     for (const backfill of QWEN35_P90_POWER_BACKFILLS) {
@@ -43,10 +43,14 @@ describe('Qwen3.5 measured P90 backfills', () => {
         avg_power_w: record.source_avg_power_w,
       });
       expect(backfill.set.metricsMerge).toEqual({
+        p75_power_w: record.p75_power_w,
+        p75_total_gpu_power_w: record.p75_total_gpu_power_w,
         p90_power_w: record.p90_power_w,
         p90_total_gpu_power_w: record.p90_total_gpu_power_w,
       });
       expect(Math.abs(record.average_power_parity_w)).toBeLessThan(0.001);
+      expect(record.p75_power_w).toBeLessThanOrEqual(record.p90_power_w);
+      expect(record.p75_total_gpu_power_w / record.gpu_count).toBeCloseTo(record.p75_power_w, 2);
       expect(record.p90_total_gpu_power_w / record.gpu_count).toBeCloseTo(record.p90_power_w, 2);
       expect(record.window.end_time_unix).toBeGreaterThan(record.window.start_time_unix);
       for (const hash of Object.values(record.source_sha256))
