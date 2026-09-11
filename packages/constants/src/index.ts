@@ -1,3 +1,4 @@
+export * from './benchmark-curve';
 export * from './framework-aliases';
 export * from './github';
 export * from './gpu-keys';

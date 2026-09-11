@@ -30,10 +30,11 @@ there are no duplicated metric-specific columns on `benchmark_results` or
 ### Why a Materialized View (latest_benchmarks)
 
 Computing the newest logical curve from the full result table is expensive. The
-materialized view pre-computes the newest successful snapshot for each config,
-scenario, sequence, offload mode, recipe fingerprint, and concurrency, including
-the same-image append-only history when applicable. API routes use the view when no
-date filter is specified; date-filtered requests hit the base table.
+materialized view pre-computes the newest logical curve snapshot, including
+same-image append-only history when applicable. Point identity within that snapshot
+remains config, scenario, sequence, offload mode, recipe fingerprint, and concurrency.
+API routes use the view when no date filter is specified; date-filtered requests
+use the same `benchmark_curve_runs` view and `benchmark_curve_scope` function.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest — acceptable since data changes at most daily.
 
@@ -47,6 +48,39 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 
 The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
 concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
+
+### AgentX Curve Replacement Scope
+
+For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
+and workload (benchmark type and sequence lengths). AGG/disagg, parallelism,
+speculative decoding, offload mode, and recipe fingerprint describe individual
+points within that curve; they do not start independently replaceable curves.
+A new normal sweep owns the complete curve, including which variants are absent.
+If one sweep contains both AGG and disagg points, both remain visible.
+Fixed-sequence workloads retain their existing separate spec-method, disagg, and
+offload scopes. Models, hardware, frameworks and precisions always stay separate.
+
+For example, producer PR #2939 replaced GLM-5.2 / GB300 / Dynamo TensorRT-LLM / FP4
+with six disagg points in run `34413290524`. The old AGG TP8 concurrency-1 point
+from run `33219706372` belongs to the earlier snapshot and is no longer in latest.
+It remains accessible through history, the earlier date, and the earlier exact run.
+No benchmark rows, logs, trace sidecars, or recipe attributes are removed.
+The client uses the same replacement scope when selecting official runs. An
+unofficial overlay remains a separate comparison; it does not replace official data.
+
+Migration `014_agentic_curve_snapshots.sql` adds the shared SQL scope/view and
+rebuilds `latest_benchmarks`. Apply it before deploying the new readers. The existing
+application can read the rebuilt materialized view; the new readers require the
+migration. Deployment must invalidate the shared data cache (including derived
+pages); benchmark API cache keys are versioned in this change. No re-ingest is needed.
+
+Eligibility is unchanged: successful benchmark rows from the latest stored run
+attempt. Overall workflow status is not a completeness signal: accepted benchmarks
+can come from workflows whose later upload or evaluation failed. Detecting an
+incomplete sweep requires an explicit producer completion manifest and publication
+contract; this change does not infer completion from a missing config or workflow
+conclusion. A normal partial sweep still replaces its curve, so intentional deltas
+must use the append-only contract below.
 
 ### Append-Only Curve Extensions
 

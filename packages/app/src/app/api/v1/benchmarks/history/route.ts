@@ -22,7 +22,7 @@ const getCachedBenchmarkHistory = cachedQuery(
 const getCachedAgenticBenchmarkHistory = cachedQuery(
   (modelKeys: string[]) =>
     getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces'),
-  'benchmark-history-agentic',
+  'benchmark-history-agentic-curve-scope-v2',
   { blobOnly: true },
 );
 

@@ -182,11 +182,10 @@ interface DedupeRow {
   run_started_at?: string | null;
 }
 
-// offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
-// lineKey — agentic offload=on and offload=off are distinct series.
+// AgentX replacement scope matches benchmark_curve_scope in the SQL layer.
 /**
- * Keep only the newest workflow run for each chart series. Agentic series omit
- * point-level spec decoding from their curve identity; fixed-sequence series do not.
+ * Keep only the newest workflow run for each chart series. AgentX treats topology,
+ * speculative decoding and offload as point properties within a complete curve.
  */
 export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
   return dedupeLatestBenchmarkSeries(rows);
@@ -381,8 +380,8 @@ export function useChartData(
     );
 
     // Keep only each series' latest-date rows (drops stale config_ids left behind
-    // when parallelism settings change between runs). Keyed per offload variant so
-    // an offload=on sweep can't hide a differently-dated offload=off series.
+    // when parallelism settings change between runs). AgentX replaces the complete
+    // curve; fixed-sequence workloads keep separate offload variants.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
     const mainRows = deduped.map((r) => ({

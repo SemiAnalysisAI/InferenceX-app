@@ -119,7 +119,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: '7b251598bf9e4e181834311a554aa8ef7a9bc39d605eed243364ce5c3f5cc43e',
+    sourceSha256: 'ce70784354b0d541899cfa90c3615ca294863fda67c489ea90e034b6996d52d3',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -127,7 +127,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: '42ba4d72298084ffe079ffcee7b6309ef3fb94d1df4769be4485d95097aa8cbe',
+    sourceSha256: '882c7c2515568c6ee89eb9f506d626289df807369aded6de300dadb7fa81320f',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -741,7 +741,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '486e34d55275170c7e0544af24c151199752eb5628191d38606b1ecec289dfdf',
+    sourceSha256: '96fb2be476ce05ee0384b55bbacf00b0e5e35af28f7080dbf003b578800b5b01',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
