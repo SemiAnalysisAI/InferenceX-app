@@ -1163,6 +1163,15 @@ describe('Profit Estimator (per chip-hour)', () => {
       .invoke('text')
       .should('match', /^\$\d+\.\d{2}/u)
       .and('not.match', /[BMk]/u);
+    // At Moonshot's list price the rental TCO is a few percent of revenue, so
+    // the thin Compute Expense segment is drawn but drops its name by design;
+    // the license-fee segment is tall enough to keep its label.
+    chart().find('rect.bar-tco').should('have.length', 4);
+    chart().should('contain.text', 'Model License Fee');
+    // The catalog price is a fraction of the list price, so the Compute
+    // Expense segment grows tall enough to carry its name.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'OpenRouter').click();
     chart().should('contain.text', 'Compute Expense').and('contain.text', 'Model License Fee');
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     cy.get('[data-testid="tab-trigger-profit-estimator"]')
