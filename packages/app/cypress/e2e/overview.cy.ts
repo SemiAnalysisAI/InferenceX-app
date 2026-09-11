@@ -5,6 +5,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 // rows follow.
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 0813 1.6T',
+  'DeepSeek V4.1 Flash 552B',
   'Kimi K3 2.8T',
   'MiniMax M3 428B',
   'GLM5.2/GLM5.3',
@@ -22,11 +23,13 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Six models: one with both a single-turn and an AgentX row (Qwen3.5),
- *  three curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next), and two
- *  AgentX-only by retirement: MiniMax M3's 8k1k sweep stopped on 2026-08-04
- *  (InferenceX#2493) and DeepSeek V4 Pro's on 2026-09-08 (InferenceX#2728). */
-const MATRIX_ROWS = 7;
+/** Seven models: one with both a single-turn and an AgentX row (Qwen3.5),
+ *  four curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next, and
+ *  DeepSeek V4.1 Flash, which entered the fleet on AgentX only in
+ *  InferenceX#2961), and two AgentX-only by retirement: MiniMax M3's 8k1k
+ *  sweep stopped on 2026-08-04 (InferenceX#2493) and DeepSeek V4 Pro's on
+ *  2026-09-08 (InferenceX#2728). */
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -1265,7 +1268,13 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['DeepSeek-V4-Pro', 'Kimi-K3', 'GLM-5.2', 'MiniMax-M3']) {
+    for (const model of [
+      'DeepSeek-V4-Pro',
+      'DeepSeek-V4.1-Flash',
+      'Kimi-K3',
+      'GLM-5.2',
+      'MiniMax-M3',
+    ]) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });

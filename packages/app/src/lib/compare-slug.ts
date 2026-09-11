@@ -54,6 +54,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'DeepSeek V4 Pro',
   },
   {
+    slug: 'deepseek-v41-flash',
+    displayName: 'DeepSeek-V4.1-Flash',
+    // Causal Encoder-Decoder + CSA2 architecture, not a V4-Pro point release,
+    // so it gets its own slug and DB bucket rather than joining deepseek-v4.
+    dbKeys: ['dsv41flash'],
+    label: 'DeepSeek V4.1 Flash 552B',
+    seoName: 'DeepSeek V4.1 Flash',
+  },
+  {
     slug: 'deepseek-r1',
     displayName: 'DeepSeek-R1-0528',
     dbKeys: ['dsr1'],

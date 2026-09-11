@@ -265,6 +265,7 @@ describe('compareModelSeoName', () => {
   // slashes, no param-count suffix, no fully-qualified checkpoint id.
   const EXPECTED: Record<string, string> = {
     'deepseek-v4': 'DeepSeek V4 Pro',
+    'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
     'deepseek-r1': 'DeepSeek R1',
     'kimi-k3': 'Kimi K3',
     'kimi-k26': 'Kimi K2.6',

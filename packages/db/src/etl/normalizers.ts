@@ -119,6 +119,8 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'zai-org/GLM-5.2-FP8': 'glm5.2',
   // DeepSeek-V4-Pro
   'deepseek-ai/DeepSeek-V4-Pro': 'dsv4',
+  // DeepSeek-V4.1-Flash
+  'deepseek-ai/DeepSeek-V4.1-Flash': 'dsv41flash',
 };
 
 /**
