@@ -133,31 +133,14 @@ interface RecursiveBenchmarkPlan {
 function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
   return sqlPiece`
     run_lines AS (
-      SELECT
-        c.model, c.hardware, c.framework, c.precision, c.disagg,
-        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END AS line_spec_method,
-        br.benchmark_type, br.isl, br.osl, br.offload_mode,
-        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id,
-        wr.append_only, min(br.image) AS image,
-        count(DISTINCT br.image) AS image_count,
-        bool_and(br.image IS NOT NULL) AS images_complete
-      FROM benchmark_results br
-      JOIN configs c ON c.id = br.config_id
-      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      WHERE c.model = ANY(${modelKeys})
+      SELECT *
+      FROM benchmark_curve_runs
+      WHERE model = ANY(${modelKeys})
         ${runLineFilter}
-        AND br.error IS NULL
-      GROUP BY
-        c.model, c.hardware, c.framework, c.precision, c.disagg,
-        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END,
-        br.benchmark_type, br.isl, br.osl, br.offload_mode,
-        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id, wr.append_only
     ), ranked_runs AS (
       SELECT run_lines.*,
         row_number() OVER (
-          PARTITION BY
-            model, hardware, framework, precision, disagg, line_spec_method,
-            benchmark_type, isl, osl, offload_mode
+          PARTITION BY curve_scope
           ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
         ) AS run_rank
       FROM run_lines
@@ -174,16 +157,7 @@ const CURVE_RECURSION = sqlPiece`
     current.snapshot_workflow_run_id
   FROM curve_runs current
   JOIN ranked_runs older
-    ON older.model = current.model
-    AND older.hardware = current.hardware
-    AND older.framework = current.framework
-    AND older.precision = current.precision
-    AND older.disagg = current.disagg
-    AND older.line_spec_method = current.line_spec_method
-    AND older.benchmark_type = current.benchmark_type
-    AND older.isl IS NOT DISTINCT FROM current.isl
-    AND older.osl IS NOT DISTINCT FROM current.osl
-    AND older.offload_mode = current.offload_mode
+    ON older.curve_scope = current.curve_scope
     AND older.run_rank = current.run_rank + 1
   WHERE current.append_only
     AND current.image_count = 1
@@ -194,20 +168,13 @@ const CURVE_RECURSION = sqlPiece`
 
 const CURVE_POINT_SOURCE = sqlPiece`
   FROM curve_runs cr
-  JOIN benchmark_results br
-    ON br.workflow_run_id = cr.workflow_run_id
-    AND br.benchmark_type = cr.benchmark_type
-    AND br.isl IS NOT DISTINCT FROM cr.isl
-    AND br.osl IS NOT DISTINCT FROM cr.osl
-    AND br.offload_mode = cr.offload_mode
+  JOIN benchmark_results br ON br.workflow_run_id = cr.workflow_run_id
   JOIN configs point_c
     ON point_c.id = br.config_id
-    AND point_c.model = cr.model
-    AND point_c.hardware = cr.hardware
-    AND point_c.framework = cr.framework
-    AND point_c.precision = cr.precision
-    AND point_c.disagg = cr.disagg
-    AND CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE point_c.spec_method END = cr.line_spec_method
+    AND benchmark_curve_scope(
+      point_c.model, point_c.hardware, point_c.framework, point_c.precision,
+      br.benchmark_type, br.isl, br.osl, point_c.spec_method, point_c.disagg, br.offload_mode
+    ) = cr.curve_scope
   WHERE br.error IS NULL`;
 
 function executeRecursiveBenchmarkQuery(
@@ -302,17 +269,13 @@ function queryRecursiveBenchmarks(
           : sqlPiece``;
       const seed = sqlPiece`
         seed_runs AS (
-          SELECT DISTINCT ON (
-            r.model, r.hardware, r.framework, r.precision, r.disagg,
-            r.line_spec_method, r.benchmark_type, r.isl, r.osl, r.offload_mode
-          )
+          SELECT DISTINCT ON (r.curve_scope)
             r.*
           FROM ranked_runs r
           WHERE ${datePredicate}
             ${asOfPredicate}
           ORDER BY
-            r.model, r.hardware, r.framework, r.precision, r.disagg,
-            r.line_spec_method, r.benchmark_type, r.isl, r.osl, r.offload_mode,
+            r.curve_scope,
             r.date DESC, r.run_started_at DESC NULLS LAST, r.workflow_run_id DESC
         ), curve_runs AS (
           SELECT
@@ -352,8 +315,8 @@ function queryRecursiveBenchmarks(
     case 'history': {
       const runLineFilter =
         variant.benchmarkType === 'agentic_traces'
-          ? sqlPiece`AND br.benchmark_type = 'agentic_traces'`
-          : sqlPiece`AND br.isl = ${variant.isl} AND br.osl = ${variant.osl}`;
+          ? sqlPiece`AND benchmark_type = 'agentic_traces'`
+          : sqlPiece`AND isl = ${variant.isl} AND osl = ${variant.osl}`;
       const seed = sqlPiece`
         curve_runs AS (
           SELECT

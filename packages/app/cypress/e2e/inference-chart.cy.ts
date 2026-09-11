@@ -1,5 +1,10 @@
-import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
-import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
+import {
+  expectNoPageOverflow,
+  unlockAgenticGate,
+  interceptDerivedAgenticMetrics,
+  selectXAxisMode,
+} from '../support/e2e';
+import { interceptOverlayRun, OVERLAY_RUN_ID, b300Rows } from '../support/overlay-fixtures';
 
 function openYAxisHelp(metric: string) {
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
@@ -391,5 +396,97 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
       .and('match', /^\/zh\/model\//u);
     cy.contains('button', '变更日志').should('be.visible').click();
     cy.contains('说明').should('be.visible');
+  });
+});
+
+describe('AgentX replaces a complete curve while preserving an unofficial comparison', () => {
+  it('shows only the six new disagg points and keeps the overlay independently dismissible', () => {
+    const runId = '34413290524';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
+    const date = '2026-09-11';
+    const current = b300Rows(runUrl, 'gb300', [
+      [1, 130, 2600, 25],
+      [20, 100, 5000, 30],
+      [30, 80, 7500, 40],
+      [60, 60, 10000, 50],
+      [227, 30, 15000, 80],
+      [260, 20, 18000, 100],
+    ]).map((row, i) => ({
+      ...row,
+      id: 441595 + i,
+      model: 'glm5.2',
+      framework: 'dynamo-trt',
+      disagg: true,
+      spec_method: 'mtp',
+      prefill_tp: 4,
+      num_prefill_gpu: 4,
+      date,
+      workflow_run_id: 2437,
+      run_started_at: `${date}T17:00:36Z`,
+    }));
+    const old = {
+      ...current[0],
+      id: 440948,
+      disagg: false,
+      prefill_tp: 8,
+      num_prefill_gpu: 8,
+      offload_mode: 'off',
+      date: '2026-09-01',
+      workflow_run_id: 2396,
+      run_started_at: '2026-09-01T21:32:27Z',
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219706372/attempts/2',
+    };
+    // Include the stale row deliberately to exercise client replacement as well
+    // as the SQL regression covered by benchmark-snapshots.test.ts.
+    cy.intercept('GET', '/api/v1/availability', { body: current.slice(0, 1) });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: [old, ...current] });
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: { runs: [], changelogs: [], configs: [] },
+    });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: runId,
+            name: 'disagg-replacement',
+            branch: 'disagg-replacement',
+            sha: 'abc000',
+            createdAt: `${date}T17:00:36Z`,
+            url: runUrl,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: current.map((row) => ({ ...row, id: 0 })),
+        evaluations: [],
+      },
+    }).as('replacementOverlay');
+    interceptDerivedAgenticMetrics();
+    cy.viewport(1440, 900);
+    cy.visit(
+      `/inference?g_model=GLM-5.2&unofficialrun=${runId}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.wait('@replacementOverlay');
+    selectXAxisMode('interactivity');
+    cy.get('#scatter-hide-non-optimal').then(($toggle) => {
+      if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
+    });
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should('have.length', 6);
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length',
+      6,
+    );
+    cy.get('[aria-label="Dismiss disagg-replacement"]').click();
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'not.exist',
+    );
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should('have.length', 6);
   });
 });

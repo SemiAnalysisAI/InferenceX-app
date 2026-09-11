@@ -2,7 +2,7 @@
  * Transforms raw BenchmarkRow[] from the API into InferenceData[] for charts.
  */
 
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import { benchmarkCurveScope, DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions from '@/components/inference/metric-registry';
 import type {
@@ -342,7 +342,7 @@ export function withPercentile(key: string, percentile: string): string {
   return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
 }
 
-// Replacement granularity for single-run scoping is an exact generated topology.
+// Fixed-sequence replacement granularity is an exact generated topology.
 // An append-only run may touch one TP/EP search-space row while the displayed
 // curve also contains sibling topologies from the preceding snapshot.
 const runScopeKey = (r: BenchmarkRow): string =>
@@ -375,24 +375,23 @@ const runScopeKey = (r: BenchmarkRow): string =>
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
  *
- * When the user picks a specific workflow run (to disambiguate two same-day
- * sweeps of the same config), only the configs that run actually produced
- * should be pinned to it — every other config must keep its normal
- * carry-forward rows. Scoping the whole chart to the run (the old behavior)
- * silently hid complementary configs that happened to land on the same date,
- * e.g. selecting one of two same-day vLLM runs made the day's SGLang curve
- * vanish because it lived in a different workflow run.
- *
- * Run rows win for every exact generated topology they cover; base rows fill
- * in sibling topologies and unrelated series.
+ * A selected AgentX run owns every point in its curve scope. Other engines,
+ * hardware, precisions and workloads retain their normal carry-forward rows.
+ * Fixed-sequence rows retain exact generated-topology replacement. This also
+ * keeps a same-day run selection from hiding unrelated curves.
  */
 export function mergeRunScopedRows(
   runRows: BenchmarkRow[],
   baseRows: BenchmarkRow[],
 ): BenchmarkRow[] {
   if (runRows.length === 0) return baseRows;
-  const claimed = new Set(runRows.map(runScopeKey));
-  return [...runRows, ...baseRows.filter((r) => !claimed.has(runScopeKey(r)))];
+  // AgentX run reads already reconstruct the complete logical snapshot, including
+  // explicit append-only ancestors. Filling from the current base would reinsert
+  // removed topologies or points from a later run into a historical selection.
+  const key = (row: BenchmarkRow) =>
+    row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
+  const claimed = new Set(runRows.map(key));
+  return [...runRows, ...baseRows.filter((row) => !claimed.has(key(row)))];
 }
 
 /**
