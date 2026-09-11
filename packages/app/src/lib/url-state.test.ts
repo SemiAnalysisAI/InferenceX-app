@@ -445,6 +445,33 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     expect(readUrlParams().g_model).toBeUndefined();
   });
+
+  it('preserves all-measurement visibility across metric changes and shared links', async () => {
+    const { location } = setupWindow('?i_optimal=0', '/inference');
+    const { readUrlParams, writeUrlParams, buildShareUrl, refreshUrlParams } =
+      await import('@/lib/url-state');
+
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+
+    writeUrlParams({ i_allpoints: '1', i_metric: 'y_measuredAvgPower' });
+    const powerUrl = new URL(buildShareUrl());
+    expect(powerUrl.searchParams.get('i_allpoints')).toBe('1');
+    expect(powerUrl.searchParams.get('i_optimal')).toBe('0');
+
+    writeUrlParams({ i_metric: 'y_tpPerGpu' });
+    location.search = new URL(buildShareUrl()).search;
+    expect(refreshUrlParams()).toMatchObject({
+      i_allpoints: '1',
+      i_metric: 'y_tpPerGpu',
+      i_optimal: '0',
+    });
+
+    writeUrlParams({ i_allpoints: '' });
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(readUrlParams().i_optimal).toBe('0');
+  });
 });
 
 describe('SSR safety', () => {

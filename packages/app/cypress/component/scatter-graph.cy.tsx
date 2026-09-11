@@ -2212,6 +2212,7 @@ describe('Power envelopes', () => {
 
   function PowerHarness() {
     const [optimal, setOptimal] = useState(true);
+    const [showAllMeasurements, setShowAllMeasurements] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const power = metric !== 'y_measuredJPerOutputToken';
     const rows = [1, 8, 32].map((conc, i) =>
@@ -2224,13 +2225,27 @@ describe('Power envelopes', () => {
         measuredPowerPercentTdp: { y: 40 + i * 20, roof: false },
         measuredJPerOutputToken: { y: 4 - i, roof: false },
         run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
-        power_tier: 'certified',
+        power_tier: i === 1 ? 'legacy' : 'certified',
+      }),
+    );
+    rows.push(
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        conc: 16,
+        x: 60,
+        y: power ? 500 : 3.5,
+        measuredAvgPower: { y: 500, roof: false },
+        measuredPowerPercentTdp: { y: 50, roof: false },
+        measuredJPerOutputToken: { y: 3.5, roof: false },
+        power_tier: 'legacy',
       }),
     );
     const value = createMockInferenceContextValues({
       selectedYAxisMetric: metric,
       hideNonOptimal: optimal,
       setHideNonOptimal: setOptimal,
+      showAllMeasurements,
+      setShowAllMeasurements,
       selectedPrecisions: [Precision.FP4],
       hardwareConfig: hwConfig,
       activeHwTypes: new Set(['b200_trt']),
@@ -2270,23 +2285,53 @@ describe('Power envelopes', () => {
       .invoke('attr', 'd')
       .should('match', /^M[^C]+C/u);
     cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
       .should('have.length', 3)
       .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 3 of 4 measured points')
+      .and('contain.text', '1/2 historical');
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .find('.legacy-power-ring')
+      .should('have.length', 1);
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity === '0')
+      .should('have.css', 'pointer-events', 'none');
+    cy.get('#power-sweep .roofline-path')
+      .invoke('attr', 'd')
+      .then((boundary) => {
+        cy.get('#scatter-show-all-measurements').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .should('have.length', 4)
+          .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('[data-testid="measured-power-summary"]').should(
+          'contain.text',
+          'Showing 4 of 4 measured points',
+        );
+        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
+        cy.get('#scatter-show-all-measurements').click({ force: true });
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+      });
     cy.get('#scatter-hide-non-optimal').click({ force: true });
     cy.get('#power-sweep .roofline-path').should('not.exist');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
     cy.contains('button', 'Percent TDP').click();
     cy.get('#scatter-hide-non-optimal').should('not.exist');
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
       .should('have.length', 1)
       .invoke('attr', 'd')
       .should('match', /^M[^C]+C/u);
-    cy.get('#power-sweep .dot-group').each(($point) =>
-      cy.wrap($point).should('have.css', 'opacity', '1'),
-    );
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
     cy.get('[data-testid="power-curve-description"]').should('not.exist');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 
   for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
@@ -2397,9 +2442,12 @@ describe('Power envelopes', () => {
       cy.get(overlaySelector).should('have.length', 2);
       cy.get('#power-overlay .dot-group').should('have.length', 9);
       cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
-      cy.get('#power-overlay .dot-group, #power-overlay .unofficial-overlay-pt').each(($point) =>
-        cy.wrap($point).should('have.css', 'opacity', '1'),
-      );
+      cy.get('#power-overlay .dot-group')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 6);
+      cy.get('#power-overlay .unofficial-overlay-pt')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 9);
       assertEnvelopes();
       cy.get(officialSelector)
         .invoke('attr', 'd')

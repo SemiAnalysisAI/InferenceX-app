@@ -95,6 +95,9 @@ function visitCertifiedPowerChart(extraParams = '') {
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
+const visiblePowerPoints = () =>
+  cy.get<SVGGElement>('.dot-group').filter((_, element) => element.style.opacity !== '0');
+
 describe('Validated vs historical measured power', () => {
   beforeEach(() => {
     // Firefox can defer resize notifications while the Radix metric menu
@@ -179,5 +182,27 @@ describe('Validated vs historical measured power', () => {
       'true',
     );
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+  });
+
+  it('defaults to boundary measurements and restores the independent show-all preference', () => {
+    const powerView = '&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0';
+    visitCertifiedPowerChart(powerView);
+    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
+    visiblePowerPoints().should('have.length', 2);
+    cy.get('[data-testid="measured-power-summary"]').should(
+      'contain.text',
+      'Showing 2 of 6 measured points',
+    );
+
+    cy.get('#scatter-show-all-measurements').click();
+    visiblePowerPoints().should('have.length', 6);
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+
+    visitCertifiedPowerChart(`${powerView}&i_allpoints=1`);
+    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'checked');
+    visiblePowerPoints().should('have.length', 6);
+    cy.get('#scatter-show-all-measurements').click();
+    visiblePowerPoints().should('have.length', 2);
+    visiblePowerPoints().find('.legacy-power-ring').should('have.length', 1);
   });
 });
