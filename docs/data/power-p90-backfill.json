@@ -54,7 +54,9 @@
       "production_config_id": 618,
       "source_avg_power_w": 349.859,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 359.847,
+      "p75_total_gpu_power_w": 2878.779
     },
     {
       "row_id": "441190",
@@ -105,7 +107,9 @@
       "production_config_id": 618,
       "source_avg_power_w": 385.32,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 404.674,
+      "p75_total_gpu_power_w": 3237.39
     },
     {
       "row_id": "441191",
@@ -156,7 +160,9 @@
       "production_config_id": 618,
       "source_avg_power_w": 448.935,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 466.18,
+      "p75_total_gpu_power_w": 3729.443
     },
     {
       "row_id": "440673",
@@ -210,7 +216,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 530.522,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 529.736,
+      "p75_total_gpu_power_w": 2118.944
     },
     {
       "row_id": "440670",
@@ -264,7 +272,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 604.356,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 616.518,
+      "p75_total_gpu_power_w": 2466.071
     },
     {
       "row_id": "440666",
@@ -318,7 +328,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 676.407,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 690.605,
+      "p75_total_gpu_power_w": 2762.419
     },
     {
       "row_id": "440665",
@@ -372,7 +384,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 788.324,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 812.822,
+      "p75_total_gpu_power_w": 3251.289
     },
     {
       "row_id": "440664",
@@ -426,7 +440,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 855.613,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 897.608,
+      "p75_total_gpu_power_w": 3590.431
     },
     {
       "row_id": "440667",
@@ -480,7 +496,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 881.125,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 914.603,
+      "p75_total_gpu_power_w": 3658.413
     },
     {
       "row_id": "440663",
@@ -534,7 +552,9 @@
       "production_config_id": 714,
       "source_avg_power_w": 933.904,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 948.939,
+      "p75_total_gpu_power_w": 3795.756
     },
     {
       "row_id": "440662",
@@ -588,7 +608,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 603.85,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 608.201,
+      "p75_total_gpu_power_w": 2432.803
     },
     {
       "row_id": "440674",
@@ -642,7 +664,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 713.159,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 736.111,
+      "p75_total_gpu_power_w": 2944.445
     },
     {
       "row_id": "440672",
@@ -696,7 +720,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 772.813,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 790.917,
+      "p75_total_gpu_power_w": 3163.669
     },
     {
       "row_id": "440668",
@@ -750,7 +776,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 849.075,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 884.675,
+      "p75_total_gpu_power_w": 3538.7
     },
     {
       "row_id": "440671",
@@ -804,7 +832,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 891.973,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 919.752,
+      "p75_total_gpu_power_w": 3679.01
     },
     {
       "row_id": "440669",
@@ -858,7 +888,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 929.576,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 938.978,
+      "p75_total_gpu_power_w": 3755.913
     },
     {
       "row_id": "440661",
@@ -912,7 +944,9 @@
       "production_config_id": 752,
       "source_avg_power_w": 924.685,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 951.969,
+      "p75_total_gpu_power_w": 3807.875
     },
     {
       "row_id": "441193",
@@ -962,7 +996,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 441.509,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 465.683,
+      "p75_total_gpu_power_w": 1862.733
     },
     {
       "row_id": "441194",
@@ -1012,7 +1048,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 533.037,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 555.056,
+      "p75_total_gpu_power_w": 2220.223
     },
     {
       "row_id": "441187",
@@ -1062,7 +1100,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 589.622,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 626.244,
+      "p75_total_gpu_power_w": 2504.975
     },
     {
       "row_id": "441184",
@@ -1112,7 +1152,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 734.122,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 775.768,
+      "p75_total_gpu_power_w": 3103.074
     },
     {
       "row_id": "441183",
@@ -1162,7 +1204,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 823.878,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 861.873,
+      "p75_total_gpu_power_w": 3447.493
     },
     {
       "row_id": "441181",
@@ -1212,7 +1256,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 905.525,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 932.553,
+      "p75_total_gpu_power_w": 3730.212
     },
     {
       "row_id": "441185",
@@ -1262,7 +1308,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 898.515,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 924.187,
+      "p75_total_gpu_power_w": 3696.747
     },
     {
       "row_id": "441182",
@@ -1312,7 +1360,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 974.028,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 980.279,
+      "p75_total_gpu_power_w": 3921.116
     },
     {
       "row_id": "441188",
@@ -1362,7 +1412,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 978.869,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 984.932,
+      "p75_total_gpu_power_w": 3939.73
     },
     {
       "row_id": "441186",
@@ -1412,7 +1464,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 977.24,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 984.826,
+      "p75_total_gpu_power_w": 3939.304
     },
     {
       "row_id": "441195",
@@ -1462,7 +1516,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 956.871,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 964.223,
+      "p75_total_gpu_power_w": 3856.891
     },
     {
       "row_id": "441180",
@@ -1512,7 +1568,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 978.151,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 984.484,
+      "p75_total_gpu_power_w": 3937.937
     },
     {
       "row_id": "441189",
@@ -1562,7 +1620,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 977.582,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 983.357,
+      "p75_total_gpu_power_w": 3933.429
     },
     {
       "row_id": "441446",
@@ -1612,7 +1672,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 363.704,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 380.376,
+      "p75_total_gpu_power_w": 3043.005
     },
     {
       "row_id": "441449",
@@ -1662,7 +1724,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 421.743,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 439.783,
+      "p75_total_gpu_power_w": 3518.262
     },
     {
       "row_id": "441448",
@@ -1712,7 +1776,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 467.813,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 481.521,
+      "p75_total_gpu_power_w": 3852.168
     },
     {
       "row_id": "441447",
@@ -1762,7 +1828,9 @@
       "run_attempt": 1,
       "source_avg_power_w": 498.285,
       "source_power_valid": 1,
-      "source_power_metric_schema_version": 2
+      "source_power_metric_schema_version": 2,
+      "p75_power_w": 509.604,
+      "p75_total_gpu_power_w": 4076.834
     }
   ],
   "producer_source": "https://github.com/SemiAnalysisAI/InferenceX/blob/f387fe099/infx/results/power/common.py"

@@ -222,6 +222,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 | ---------------------- | ----- | ----------- | ----------------------------------- | ---------------------------------- |
 | DeepSeek-R1-0528       | 671B  | 37B         | `deepseek-ai/DeepSeek-R1-0528`      | HF model card                      |
 | DeepSeek-V4-Pro        | 1.6T  | 49B         | `deepseek-ai/DeepSeek-V4-Pro`       | HF model card                      |
+| DeepSeek-V4.1-Flash    | 552B  | 8B / 16B    | `deepseek-ai/DeepSeek-V4.1-Flash`   | HF model card                      |
 | Kimi-K2.5              | 1T    | 32B         | `moonshotai/Kimi-K2.5`              | HF model card                      |
 | Kimi-K2.6              | 1T    | 32B         | `moonshotai/Kimi-K2.6`              | HF model card                      |
 | Kimi-K2.7-Code         | 1T    | 32B         | `moonshotai/Kimi-K2.7-Code`         | HF model card                      |
@@ -236,6 +237,15 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 **Common mislabel traps** (have all bitten this repo at least once — do not repeat):
 
+- **DeepSeek-V4.1-Flash is 552B, and its active count is two numbers.** The
+  Causal Encoder-Decoder split means 8B activates during prefill and 16B during
+  decode — quoting a single "active" figure loses that. The 196B Engram
+  conditional-memory table is excluded from the 552B backbone total: it is
+  sparsely accessed by token lookup, not resident per-token compute, so it is
+  treated like a separate MTP head rather than like Qwen3.8's n-gram embedding
+  table (which IS counted). Hugging Face safetensors metadata says 485B, which
+  matches neither figure. Do not fold it into the `dsv4` bucket — V4.1-Flash is
+  a different architecture (CED + CSA2), not a V4-Pro point release.
 - **Qwen3.8-Flash-Next is 176B, not 125B.** The model card leads with "125B with 6B activated", but that is the main model only; the 51B n-gram embedding table brings the total to 176B. The separate 4B MTP head sits outside both figures. It is a Qwen4-architecture preview (GatedDeltaNet + Qwen Sparse Attention, 512 experts, 10 routed + 1 shared), not a Qwen3.5 point release, so it gets its own DB bucket.
 - **GLM-5 ≠ 355B.** 355B is GLM-4.5. GLM-5 jumped to 744B / 40B active (256-expert MoE with DSA).
 - **MiniMax-M2.5/M2.7 ≠ 456B.** 456B is the older MiniMax-Text-01 / M1 (32 large experts). The M2 series is a different architecture: 230B / 10B active, 256 small experts.

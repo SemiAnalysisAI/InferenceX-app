@@ -6,6 +6,7 @@ import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
   costTierLabel,
+  costTierOptionLabel,
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
   metricCostTier,
@@ -101,9 +102,10 @@ import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
+import { CostTierSelector } from './CostTierSelector';
+import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
-import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
@@ -245,6 +247,21 @@ export function formatTokenLength(value: number): string {
  * which seed the model/scenario/metric via providers instead of user-facing
  * selectors. The run-date changelog strip and the charts themselves remain.
  */
+// Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
+function renderInferenceTcoBadges(props: {
+  label: string;
+  values: Record<string, number>;
+  blankedBases?: string[];
+}) {
+  return (
+    <InferenceTcoBadges
+      label={props.label}
+      values={props.values}
+      blankedBases={props.blankedBases}
+    />
+  );
+}
+
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -263,6 +280,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     compareGpuPair,
     quickFilters,
     minimalChrome,
+    userCosts,
   } = useInferenceFilters();
   const {
     selectedYAxisMetric,
@@ -1050,8 +1068,21 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               const tier = metricCostTier(
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                               );
-                              return tier ? costTierLabel(tier, locale) : undefined;
+                              if (!tier) return undefined;
+                              // With the selector in the caption, the export twin
+                              // prints the selector's own copy so a PNG export
+                              // matches the control; plain-text captions keep
+                              // the caption label.
+                              return embedded || minimalChrome
+                                ? costTierLabel(tier, locale)
+                                : costTierOptionLabel(tier, locale);
                             })()}
+                            // The dashboard picks the pricing basis right here in the
+                            // caption; embedded model pages render no controls and
+                            // keep the plain-text tier.
+                            costTierControl={
+                              embedded || minimalChrome ? undefined : <CostTierSelector />
+                            }
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={
@@ -1093,6 +1124,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
+                              userCosts={userCosts}
+                              renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}
                           {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
@@ -1260,13 +1293,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         </section>
       )}
 
-      {!minimalChrome &&
-        (selectedYAxisMetric === 'y_costUser' ||
-          selectedYAxisMetric === 'y_tokensPerDollarUser') && (
-          <section>
-            <CustomCosts loading={loading} />
-          </section>
-        )}
       {!minimalChrome && selectedYAxisMetric === 'y_powerUser' && (
         <section>
           <CustomPowers loading={loading} />

@@ -10,7 +10,7 @@ const exact = (label: string) =>
 describe('Y-Axis Metrics All Render Data', () => {
   // Tiered metrics are one Y-axis option each; the Cost Tier selector picks
   // the pricing basis, so those entries name the tier option to click.
-  const metrics: { label: string; tier?: 'hyperscaler' | 'rental' }[] = [
+  const metrics: { label: string; tier?: 'hyperscaler' | 'rental' | 'custom' }[] = [
     { label: 'Token Throughput per Chip' },
     { label: 'Input Token Throughput per Chip' },
     { label: 'Output Token Throughput per Chip' },
@@ -29,8 +29,10 @@ describe('Y-Axis Metrics All Render Data', () => {
     { label: 'Output Tokens per $1 TCO', tier: 'rental' },
     { label: 'Input Tokens per $1 TCO', tier: 'hyperscaler' },
     { label: 'Input Tokens per $1 TCO', tier: 'rental' },
-    { label: 'Cost per Million Total Tokens (Custom User Values)' },
-    { label: 'Total Tokens per $1 TCO (Custom User Values)' },
+    // The custom tier is picked from the caption selector, which seeds the
+    // per-chip $/hr from the tier it replaces, so points render at once.
+    { label: 'Cost per Million Total Tokens', tier: 'custom' },
+    { label: 'Total Tokens per $1 TCO', tier: 'custom' },
     { label: 'Token Throughput per All in Utility MW (Custom User Values)' },
     { label: 'All-in Provisioned Joules per Total Token' },
     { label: 'All-in Provisioned Joules per Output Token' },
@@ -54,7 +56,7 @@ describe('Y-Axis Metrics All Render Data', () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
       cy.get('[data-slot="select-item"]').contains(exact(label)).click({ force: true });
       if (tier) {
-        cy.get('[data-testid="cost-tier-selector"]').click('right', { force: true });
+        cy.get('[data-testid="cost-tier-selector"]').first().click('right', { force: true });
         cy.get(`[data-testid="cost-tier-${tier}"]`).click({ force: true });
       }
       cy.get('[data-testid="scatter-graph"]')

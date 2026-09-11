@@ -14,10 +14,12 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
     }
   });
 
-  it('contains exactly the 13 measured power / energy / telemetry keys', () => {
+  it('contains the published measured power / energy / telemetry keys', () => {
     expect(new Set(MEASURED_POWER_METRIC_KEY_LIST)).toEqual(
       new Set([
         'avg_power_w',
+        'p75_power_w',
+        'p75_total_gpu_power_w',
         'p90_power_w',
         'p90_total_gpu_power_w',
         'joules_per_successful_query',
@@ -34,7 +36,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'avg_mem_used_mb',
       ]),
     );
-    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(15);
+    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(17);
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
@@ -67,6 +69,6 @@ describe('POWER_METRIC_KEYS', () => {
     expect(new Set(POWER_METRIC_KEYS)).toEqual(
       new Set(['power_valid', 'power_metric_schema_version', ...MEASURED_POWER_METRIC_KEY_LIST]),
     );
-    expect(POWER_METRIC_KEYS).toHaveLength(17);
+    expect(POWER_METRIC_KEYS).toHaveLength(19);
   });
 });

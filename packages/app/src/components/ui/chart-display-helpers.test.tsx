@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { getGpuSpecs } from '@/lib/constants';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -44,6 +45,21 @@ describe('ChartShareActions', () => {
     expect(trigger?.textContent).toContain('Share');
   });
 });
+
+// Stand-in for the /inference editable badge row.
+const renderCostBadges = ({
+  label,
+  values,
+  blankedBases,
+}: {
+  label: string;
+  values: Record<string, number>;
+  blankedBases?: string[];
+}) => (
+  <div data-testid="editable" data-blanked={(blankedBases ?? []).join(',')}>
+    {label} {Object.keys(values).join(',')}
+  </div>
+);
 
 describe('MetricAssumptionNotes', () => {
   it('shows power source badges and the per-MW disaggregation caveat for inference metrics', () => {
@@ -209,6 +225,97 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('H100:');
     expect(getVisibleText()).toContain('MI300X:');
+  });
+
+  it('hands the TCO badges to the caller-supplied renderer for tiered and custom cost metrics', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costh"
+        activeHwKeys={['gb300_dynamo-sglang']}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
+      'TCO $/chip/hr: gb300',
+    );
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
+
+    // The custom tier shows the same badge row (so the reader can type into
+    // it) but cites no TCO source: the numbers are theirs.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_dynamo-sglang', 'mi355x_vllm']}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
+      'TCO $/chip/hr: gb300,mi355x',
+    );
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+  });
+
+  it("quotes the reader's own prices on the custom tier and the hyperscaler price before any exist", () => {
+    // The plot prices Custom User Values from `userCosts`, so the badges
+    // must quote those, not a published tier; a blanked chip has no badge.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x', 'mi355x_x', 'b200_x']}
+        userCosts={{ gb300: 9.5, mi355x: 0.75, b200: undefined }}
+      />,
+    );
+    expect(getVisibleText()).toContain('GB300: 9.5');
+    expect(getVisibleText()).toContain('MI355X: 0.75');
+    expect(getVisibleText()).not.toContain('B200:');
+
+    // Every selected chip blanked: hand the renderer an empty list rather
+    // than every other registry chip the reader never selected.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x']}
+        userCosts={{ gb300: undefined, mi355x: 0.75, b200: undefined }}
+        renderCostBadges={renderCostBadges}
+      />,
+    );
+    expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
+      'TCO $/chip/hr:',
+    );
+    // Every blanked chip is named so the renderer can keep its badge. A
+    // blanked chip has no point and so leaves the active selection, which is
+    // why the list is not narrowed to `activeHwKeys`.
+    expect(container.querySelector<HTMLElement>('[data-testid="editable"]')?.dataset.blanked).toBe(
+      'gb300,b200',
+    );
+
+    // Nothing entered yet: show the seed the custom costs will start from.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costUser"
+        activeHwKeys={['gb300_x']}
+        userCosts={null}
+      />,
+    );
+    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costh}`);
+
+    // Published tiers ignore `userCosts`.
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costr"
+        activeHwKeys={['gb300_x']}
+        userCosts={{ gb300: 9.5 }}
+      />,
+    );
+    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costr}`);
+  });
+
+  it('falls back to read-only TCO badges without a renderer', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costUser" activeHwKeys={['gb300_x']} />);
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).toContain('GB300:');
+    expect(container.querySelector('input')).toBeNull();
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
   });
 
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {

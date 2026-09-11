@@ -406,6 +406,11 @@ export function useChartExport({
       for (const el of clone.querySelectorAll('.no-export')) {
         (el as HTMLElement).style.display = 'none';
       }
+      // Reveal export-only twins: plain-text stand-ins for interactive
+      // controls in the caption (e.g. the Cost Tier selector's label).
+      for (const el of clone.querySelectorAll('.export-only')) {
+        (el as HTMLElement).style.display = 'inline';
+      }
       for (const el of clone.querySelectorAll('[id$="-export"]')) {
         (el as HTMLElement).parentElement!.style.display = 'none';
       }

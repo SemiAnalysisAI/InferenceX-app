@@ -9,12 +9,14 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 
+import { isMetricKey, metricCostTier } from '@/components/inference/metric-registry';
+import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -31,6 +33,10 @@ const TOTAL_COST_METRICS = new Set([
   'y_tokensPerDollarH',
   'y_tokensPerDollarR',
 ]);
+// Priced from the reader's own $/chip/hr rather than a published tier. The
+// caption still shows the badge row (editable, see `InferenceTcoBadges`)
+// but cites no TCO model source for it.
+const CUSTOM_COST_METRICS = new Set(['y_costUser', 'y_tokensPerDollarUser']);
 const OUTPUT_COST_METRICS = new Set([
   'y_costhOutput',
   'y_costrOutput',
@@ -154,23 +160,30 @@ function DisaggCaveat({
   );
 }
 
-function getCostValues(selectedYAxisMetric: string, tcoBasis: TcoBasis) {
-  return Object.fromEntries(
-    Object.keys(HW_REGISTRY).map((base) => {
-      const specs = getGpuSpecs(base, tcoBasis);
-      return [
-        base,
-        selectedYAxisMetric === 'y_costh' ||
-        selectedYAxisMetric === 'y_costhOutput' ||
-        selectedYAxisMetric === 'y_costhi' ||
-        selectedYAxisMetric === 'y_tokensPerDollarH' ||
-        selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
-        selectedYAxisMetric === 'y_inputTokensPerDollarH'
-          ? specs.costh
-          : specs.costr,
-      ];
-    }),
-  );
+/**
+ * The $/chip/hr the caption's TCO badges quote for `selectedYAxisMetric`.
+ *
+ * Published tiers read the tier's price for every registry GPU. Custom User
+ * Values quotes the reader's own `userCosts` (the prices the plot is using),
+ * skipping chips whose price was blanked; before the reader has any, it
+ * shows the Owning at Large Hyperscaler Volume price, which is what the
+ * badges seed the custom costs from on a deep link.
+ */
+function getCostValues(
+  selectedYAxisMetric: string,
+  tcoBasis: TcoBasis,
+  userCosts: Record<string, number | undefined> | null | undefined,
+): Record<string, number> {
+  const key = selectedYAxisMetric.replace(/^y_/u, '');
+  const tier = isMetricKey(key) ? metricCostTier(key) : undefined;
+  if (tier === 'custom' && userCosts) {
+    return Object.fromEntries(
+      Object.entries(userCosts).filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number',
+      ),
+    );
+  }
+  return publishedCostsForTier(tier ?? 'rental', tcoBasis);
 }
 
 export function ChartShareActions() {
@@ -183,6 +196,8 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
   tcoBasis = DEFAULT_TCO_BASIS,
+  userCosts,
+  renderCostBadges,
 }: {
   selectedYAxisMetric: string;
   /**
@@ -198,6 +213,25 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
   tcoBasis?: TcoBasis;
+  /**
+   * The reader's own $/chip/hr, which the Custom User Values metrics plot
+   * from. The badges quote these on that tier so the caption matches the
+   * points. `null`/omitted: nothing entered yet.
+   */
+  userCosts?: Record<string, number | undefined> | null;
+  /**
+   * Replaces the read-only TCO $/chip/hr badges for total-token cost metrics
+   * (published tiers and Custom User Values). `values` are the $/chip/hr for
+   * the bases the caption shows; the renderer decides how to present or edit
+   * them. `blankedBases` lists the selected chips whose custom price the
+   * reader cleared: they have no value and no point on the plot, but the
+   * renderer keeps a badge for them so the price can be typed back in.
+   */
+  renderCostBadges?: (props: {
+    label: string;
+    values: Record<string, number>;
+    blankedBases?: string[];
+  }) => ReactNode;
 }) {
   const locale = useLocale();
   // Legend keys are `{base}` or `{base}_{framework/variant}`; badge maps are
@@ -210,18 +244,26 @@ export function MetricAssumptionNotes({
     }
     return bases;
   }, [activeHwKeys]);
-  const filterToActive = (values: Record<string, string | number>) => {
+  const filterToActive = <T extends string | number>(
+    values: Record<string, T>,
+    { keepEmpty = false }: { keepEmpty?: boolean } = {},
+  ): Record<string, T> => {
     if (activeBases.size === 0) return values;
     const filtered = Object.fromEntries(
       Object.entries(values).filter(([base]) => activeBases.has(base)),
     );
-    // Defensive: never render a badge row with an empty value list.
+    // Defensive: never render a badge row with an empty value list, except
+    // on the custom tier, where an empty list means the reader blanked every
+    // selected chip; falling back to the full map would list every registry
+    // chip they never selected. The editable badges keep the blanked chips.
+    if (keepEmpty) return filtered;
     return Object.keys(filtered).length > 0 ? filtered : values;
   };
   const showPowerSource = includeAllPowerThroughputMetrics
     ? POWER_SOURCE_METRICS.has(selectedYAxisMetric)
     : selectedYAxisMetric === 'y_tpPerMw';
   const showTotalCostSource = TOTAL_COST_METRICS.has(selectedYAxisMetric);
+  const showCustomCost = CUSTOM_COST_METRICS.has(selectedYAxisMetric);
   const showOutputCostSource = OUTPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -237,13 +279,31 @@ export function MetricAssumptionNotes({
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
-    showTotalCostSource || showOutputCostSource || showInputCostSource
-      ? getCostValues(selectedYAxisMetric, tcoBasis)
+    showTotalCostSource || showOutputCostSource || showInputCostSource || showCustomCost
+      ? getCostValues(selectedYAxisMetric, tcoBasis, userCosts)
       : null;
 
   const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';
   const costLabel = locale === 'zh' ? 'TCO $/chip/hr：' : 'TCO $/chip/hr:';
   const sourceLabel = locale === 'zh' ? '来源：' : 'Source:';
+  // Only the total-token families have a Custom User Values member, so only
+  // their badges hand over to the editable renderer.
+  const editableCostBadges =
+    renderCostBadges && costValues && (showTotalCostSource || showCustomCost)
+      ? renderCostBadges({
+          label: costLabel,
+          values: filterToActive(costValues, { keepEmpty: showCustomCost }),
+          // A blanked chip has no point on the plot, so it also drops out of
+          // the active selection; it is named here from `userCosts` alone so
+          // its badge survives on every figure.
+          blankedBases:
+            showCustomCost && userCosts
+              ? Object.entries(userCosts)
+                  .filter(([, value]) => value === undefined)
+                  .map(([base]) => base)
+              : undefined,
+        })
+      : null;
 
   return (
     <>
@@ -260,10 +320,17 @@ export function MetricAssumptionNotes({
       )}
       {costValues && (
         <>
-          <MetricBadges label={costLabel} values={filterToActive(costValues)} />
-          <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
-            {TCO_SOURCE_TITLE}
-          </SourceLink>
+          {editableCostBadges ?? (
+            <MetricBadges
+              label={costLabel}
+              values={filterToActive(costValues, { keepEmpty: showCustomCost })}
+            />
+          )}
+          {!showCustomCost && (
+            <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
+              {TCO_SOURCE_TITLE}
+            </SourceLink>
+          )}
         </>
       )}
       <DisaggCaveat

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { chartFrontier, groupOperatingCurvePoints, isPowerCurveMetric } from './powerCurves';
+import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
 
 function point(conc: number, x: number, y: number, overrides: Partial<InferenceData> = {}) {
   return {
@@ -23,67 +23,10 @@ function point(conc: number, x: number, y: number, overrides: Partial<InferenceD
   } satisfies InferenceData;
 }
 
-describe('power operating curves', () => {
-  it('connects the power sweep while retaining the single true Pareto winner', () => {
-    const fast = point(1, 200, 350);
-    const medium = point(8, 100, 700);
-    const slow = point(32, 50, 950);
-    const input = Object.freeze([slow, fast, medium]);
-    const segments = [...groupOperatingCurvePoints(input).values()];
-
-    expect(segments).toEqual([[fast, medium, slow]]);
-    expect(segments[0][0]).toBe(fast);
-    expect(input).toEqual([slow, fast, medium]);
-    expect(chartFrontier([...input], 'lower_right')).toEqual([fast]);
-    expect(chartFrontier([...input], undefined)).toEqual([]);
-  });
-
-  it('keeps concurrency order when measured interactivity is non-monotonic', () => {
-    const points = [point(1, 200, 350), point(8, 80, 700), point(32, 90, 950)];
-    expect([...groupOperatingCurvePoints(points).values()]).toEqual([points]);
-  });
-
-  it.each<Partial<InferenceData>>([
-    { tp: 4 },
-    { precision: 'fp4' },
-    { hwKey: 'b200_sglang_mtp' },
-    { date: '2026-09-09' },
-    { run_url: 'https://github.com/o/r/actions/runs/2' },
-    { decode_ep: 8 },
-    { prefill_tp: 4 },
-    { prefill_ep: 4 },
-    { disagg: true, num_prefill_gpu: 4, num_decode_gpu: 8 },
-    { physicalChips: 16 },
-    { dp: 2 },
-    { offload_mode: 'on' },
-    { recipe_fingerprint: 'another-recipe' },
-    { benchmark_type: 'agentic_traces', spec_decoding: 'mtp' },
-  ])('never joins different configuration/date/run identities: %j', (overrides) => {
-    const base = [point(1, 200, 350), point(8, 100, 700)];
-    const different = [point(1, 210, 400, overrides), point(8, 110, 750, overrides)];
-    expect([...groupOperatingCurvePoints([...base, ...different]).values()]).toEqual([
-      base,
-      different,
-    ]);
-  });
-
-  it('deduplicates identical vertices but breaks curves at ambiguous repeated concurrency', () => {
-    const first = point(1, 200, 350);
-    const ambiguous = [point(8, 100, 700), point(8, 110, 710)];
-    const tail = [point(16, 80, 800), point(32, 50, 950)];
-    expect([
-      ...groupOperatingCurvePoints([first, { ...first }, ...ambiguous, ...tail]).values(),
-    ]).toEqual([[first], [ambiguous[0]], [ambiguous[1]], tail]);
-  });
-
-  it('excludes unusable coordinates and concurrency from line vertices', () => {
-    const valid = [point(1, 200, 350), point(8, 100, 700)];
-    const invalid = [point(16, 0, 800), point(32, 50, NaN), point(NaN, 50, 950)];
-    expect([...groupOperatingCurvePoints([...valid, ...invalid]).values()]).toEqual([valid]);
-  });
-
+describe('power chart semantics', () => {
   it('selects power gauges without changing energy chart semantics', () => {
     expect(isPowerCurveMetric('y_measuredAvgPower')).toBe(true);
+    expect(isPowerCurveMetric('y_measuredP75Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredP90Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredPowerPercentTdp')).toBe(true);
     expect(isPowerCurveMetric('y_modeledChassisPowerPerGpu')).toBe(true);
@@ -97,5 +40,54 @@ describe('power operating curves', () => {
     const canonical = point(8, 100, 1, { isOnNormalizedInteractivityFrontier: true });
     const nonCanonical = point(1, 200, 4, { isOnNormalizedInteractivityFrontier: false });
     expect(chartFrontier([canonical, nonCanonical], 'lower_right')).toEqual([canonical]);
+  });
+});
+
+describe('upper power envelope', () => {
+  it('removes concurrency backtracking across configurations without changing measurements', () => {
+    // H100-style sweep: more concurrency can move both left and right on X.
+    const fast = point(1, 172.49, 252.22, { tp: 8 });
+    const middle = point(2, 149.32, 291.38);
+    const peak = point(128, 25.69, 502.54, { decode_ep: 8 });
+    const dominated = point(64, 20.51, 344.95, { decode_ep: 8 });
+    const slower = point(256, 4.65, 372.9, { decode_ep: 8 });
+    const input = Object.freeze([fast, middle, dominated, peak, slower]);
+    expect(upperPowerEnvelope(input, true)).toEqual([peak, middle, fast]);
+    expect(input).toEqual([fast, middle, dominated, peak, slower]);
+    expect(chartFrontier([...input], 'lower_right')).toEqual([fast]);
+  });
+
+  it('mirrors the boundary for latency and resolves tied coordinates deterministically', () => {
+    const fast = point(1, 1, 350);
+    const middle = point(8, 2, 700);
+    const slow = point(32, 4, 950);
+    const samples = [slow, point(16, 3, 700), point(4, 2, 500), middle, { ...middle }, fast];
+    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, slow]);
+    expect(
+      upperPowerEnvelope(
+        samples.map((p) => ({ ...p, x: 1000 / p.x })),
+        true,
+      ).map((p) => p.y),
+    ).toEqual([950, 700, 350]);
+  });
+
+  it('uses only finite positive coordinates and preserves singleton boundaries', () => {
+    const valid = point(1, 200, 350);
+    expect(upperPowerEnvelope([], true)).toEqual([]);
+    expect(
+      upperPowerEnvelope(
+        [
+          point(1, 0, 900),
+          point(1, NaN, 900),
+          point(1, Infinity, 900),
+          point(1, 10, Infinity),
+          point(1, 10, NaN),
+          point(1, 10, 0),
+          point(1, 10, -1),
+          valid,
+        ],
+        true,
+      ),
+    ).toEqual([valid]);
   });
 });

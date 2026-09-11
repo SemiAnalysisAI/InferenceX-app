@@ -56,6 +56,7 @@ export const KNOWN_MODELS = new Set([
   'GLM-5',
   'GLM-5.2',
   'DeepSeek-V4-Pro',
+  'DeepSeek-V4.1-Flash',
 ]);
 export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);

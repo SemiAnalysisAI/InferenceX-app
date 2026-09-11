@@ -6,10 +6,10 @@ import {
 } from '@/lib/chart-utils';
 
 import { canonicalParetoIntersection } from './canonicalFrontier';
-import { scatterPointConfigId } from './point-identity';
 
 const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredAvgPower',
+  'y_measuredP75Power',
   'y_measuredP90Power',
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
@@ -34,62 +34,22 @@ export function chartFrontier(
 }
 
 /**
- * Connect concurrency sweeps only within one dated serving configuration/run.
- * These are operating curves, not optimality claims. Input points are unchanged.
- * Conflicting measurements at one concurrency break a curve rather than invent
- * an ordering between repeated observations; exact duplicate vertices collapse.
+ * Higher-power outer boundary across tested configurations, not an efficiency
+ * frontier. Unique X vertices avoid concurrency backtracking during smoothing.
+ * Callers scope the samples by hardware, precision, date and overlay run.
  */
-export function groupOperatingCurvePoints(
+export function upperPowerEnvelope(
   points: readonly InferenceData[],
-): Map<string, InferenceData[]> {
-  const groups = new Map<string, InferenceData[]>();
-  for (const point of points) {
-    if (
-      !isFrontierEligible(point) ||
-      !Number.isFinite(point.y) ||
-      !Number.isFinite(point.conc) ||
-      point.conc <= 0
-    ) {
-      continue;
-    }
-    const key = JSON.stringify([
-      point.date,
-      point.run_url ?? null,
-      scatterPointConfigId({ ...point, conc: 0 }),
-    ]);
-    const group = groups.get(key) ?? [];
-    group.push(point);
-    groups.set(key, group);
-  }
-
-  const segments = new Map<string, InferenceData[]>();
-  for (const [key, group] of groups) {
-    const sorted = group.toSorted((a, b) => a.conc - b.conc || a.x - b.x || a.y - b.y);
-    let segment: InferenceData[] = [];
-    let segmentIndex = 0;
-    const flush = () => {
-      if (segment.length > 0) segments.set(`${key}:${segmentIndex++}`, segment);
-      segment = [];
-    };
-    for (let i = 0; i < sorted.length;) {
-      const sameConcurrency: InferenceData[] = [];
-      const concurrency = sorted[i].conc;
-      while (i < sorted.length && sorted[i].conc === concurrency) {
-        const point = sorted[i++];
-        if (!sameConcurrency.some((other) => other.x === point.x && other.y === point.y)) {
-          sameConcurrency.push(point);
-        }
-      }
-      if (sameConcurrency.length === 1) {
-        segment.push(sameConcurrency[0]);
-      } else {
-        flush();
-        for (const point of sameConcurrency) {
-          segments.set(`${key}:${segmentIndex++}`, [point]);
-        }
-      }
-    }
-    flush();
-  }
-  return segments;
+  maximizeX: boolean,
+): InferenceData[] {
+  const sorted = points
+    .filter((point) => isFrontierEligible(point) && Number.isFinite(point.y) && point.y > 0)
+    .sort((a, b) => (maximizeX ? b.x - a.x : a.x - b.x) || b.y - a.y);
+  let maxY = -Infinity;
+  const envelope = sorted.filter((point) => {
+    if (point.y <= maxY) return false;
+    maxY = point.y;
+    return true;
+  });
+  return maximizeX ? envelope.toReversed() : envelope;
 }

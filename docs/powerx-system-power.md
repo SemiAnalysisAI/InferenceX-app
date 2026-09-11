@@ -170,10 +170,20 @@ frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 
 GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
 结果。
 
-## Measured P90 GPU power
+## Measured P75 and P90 GPU power
 
-`y_measuredP90Power` shows the time-weighted P90 of synchronized fleet GPU-board
-power over the validated load window, divided by GPU count. It shares the regular
-measured-power chart path for official points and unofficial overlays. Missing or
-unvalidated P90 remains unavailable; average power is never used as a substitute.
-This metric is separate from modeled chassis AC power and individual-device P90.
+`y_measuredP75Power` and `y_measuredP90Power` show the time-weighted P75 and P90 of
+synchronized fleet GPU-board power over the validated load window, divided by GPU
+count. They share the regular measured-power chart path for official points and
+unofficial overlays. Missing or unvalidated percentile data remains unavailable;
+average power is never used as a substitute. These metrics are separate from modeled
+chassis AC power and individual-device percentiles.
+
+P75 and P90 backfills use the same 34 original validated traces and exact windows
+recorded in `docs/data/power-p90-backfill.json`.
+
+`y_measuredP75Power` 和 `y_measuredP90Power` 分别显示已验证负载窗口内整组 GPU
+功耗按时间加权的 P75 和 P90，再按参与测量的 GPU 数量均摊。正式数据与非正式
+运行叠加层使用同一计算和绘图路径。缺少测量值或未通过验证时保持不可用，
+不会用平均功耗替代。该指标与机箱交流功耗估算、单个设备的功耗分位数不同。
+两个分位数均由审计记录中的同一批 34 份原始遥测及其测量窗口重新计算。

@@ -14,6 +14,7 @@ export enum Model {
   GLM_5 = 'GLM-5',
   GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
+  DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
 }
 
 export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
@@ -141,6 +142,18 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
     logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
+  },
+  [Model.DeepSeek_V4_1_Flash]: {
+    // Separate architecture from V4-Pro (Causal Encoder-Decoder + CSA2), not a
+    // point release, so it keeps its own DB bucket and dropdown entry. Label
+    // carries the 552B backbone total; the 196B Engram conditional-memory table
+    // is sparsely accessed via token lookup and is excluded, matching how the
+    // separate MTP head is excluded elsewhere.
+    label: 'DeepSeek V4.1 Flash 552B',
+    prefix: 'dsv41flash',
+    category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4.1-flash',
+    logo: 'deepseek-color.svg',
   },
   [Model.Kimi_K3]: {
     // K3 is a separate 2.8T KDA/MLA-hybrid architecture, not a K2 point release,

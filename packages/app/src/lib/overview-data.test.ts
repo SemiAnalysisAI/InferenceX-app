@@ -1348,6 +1348,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     // above the 8K/1K row, each group in MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.DeepSeek_V4_Pro}/agentx`,
+      `${Model.DeepSeek_V4_1_Flash}/agentx`,
       `${Model.Kimi_K3}/agentx`,
       `${Model.MiniMax_M3}/agentx`,
       `${Model.GLM_5_2}/agentx`,

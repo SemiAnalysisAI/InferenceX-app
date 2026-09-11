@@ -679,11 +679,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    // Reviewed for the DeepSeek V4 Pro single-turn 8k1k retirement
-    // (InferenceX#2728): OVERVIEW_MODEL_SCENARIOS drops the model's 8K/1K
-    // matrix row and overviewScenarioForModel falls back to AgentX. No
-    // parameter or OverviewPageData shape change, so the docs stand.
-    sourceSha256: '3b0a8ee4f9b9a50fd34688357dca82e55bf433c9b3a6bdcd23ef18c9bf192078',
+    // Reviewed for the DeepSeek-V4.1-Flash addition (InferenceX#2961): the
+    // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
+    // data, no parameter or OverviewPageData shape change, so the docs stand.
+    sourceSha256: '18ffcb420cc933479c67025415848966294a8ebd28c084471cd58474ce96133f',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -702,7 +701,7 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: '9faf1ed1ed1712ee04741b6aa2291d42b2c202c2dadbb1a2681b5391da555e6c',
+    sourceSha256: 'bb58d43160c2b83ce61e7c34326a6d316fd751e435c6819f1991ed69e4f1b45c',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
