@@ -1,6 +1,7 @@
 // /profit-estimator: one stacked bar per SKU, US$ per all-in GW per year.
 // Behaviours worth locking down:
-//  - defaults are Kimi K3, 45 tok/s/user, 60% utilization, 30% model license fee;
+//  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
+//    ($3.00 / $0.30 cached / $15.00), 60% utilization, 30% model license fee;
 //  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
 //    ($1.40 / $0.26 cached / $4.40), and a 10% license fee; a model switch
 //    re-seeds all three;
@@ -14,8 +15,8 @@
 //    TCO segment does not;
 //  - the SKU legend is the filter for which bars are drawn;
 //  - a loss is drawn below the zero line as a hatched segment, not as a new colour;
-//  - the OpenRouter catalog is the default price source and a custom triple
-//    (input, cached input, output) can replace it;
+//  - the OpenRouter catalog is one click away from the list price and a
+//    custom triple (input, cached input, output) can replace either;
 //  - the workload is pinned to agentic traces, so there is no scenario or
 //    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3,
 //    MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash only, and the target
@@ -45,9 +46,9 @@ import {
 } from '../support/profit-fixtures';
 
 // Kimi K3 is the page default; the DeepSeek row proves the page prices the
-// routed model, not the first catalog entry. The GLM, MiniMax, and DeepSeek
-// rows sit below their labs' list prices, as the real aggregates do, so the
-// spec can tell the two sources apart.
+// routed model, not the first catalog entry. Every row sits below its lab's
+// list price, as the real aggregates do, so the spec can tell the two sources
+// apart.
 const OPENROUTER_MODELS = {
   data: [
     {
@@ -171,11 +172,14 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-caption"]').should('contain.text', 'TCO $/chip/hr');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', 'Cached Input: $0.1')
-      .and('contain.text', 'Output: $2.5')
-      .and('contain.text', '(OpenRouter)')
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', 'Cached Input: $0.3')
+      .and('contain.text', 'Output: $15')
+      .and('contain.text', '(Moonshot list price)')
       .and('not.contain.text', 'moonshotai');
+    cy.get('[data-testid="profit-list-price-source"]')
+      .should('have.attr', 'href', 'https://platform.kimi.ai/docs/pricing/chat-k3')
+      .and('contain.text', 'Moonshot');
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
@@ -187,9 +191,13 @@ describe('Profit Estimator per GW', () => {
       .and('contain.text', 'DeepSeek V4 Pro')
       .and('contain.text', 'DeepSeek V4.1 Flash');
     cy.get('body').type('{esc}');
-    // Kimi K3 has no list price, so the selector offers the catalog and custom only.
+    // Kimi K3 opens on the Moonshot list price; the catalog and custom stay one click away.
     cy.get('button#profit-price-source').click();
-    cy.get('[role="option"]').should('have.length', 2).and('not.contain.text', 'list price');
+    cy.get('[role="option"]')
+      .should('have.length', 3)
+      .and('contain.text', 'OpenRouter')
+      .and('contain.text', 'Moonshot list price')
+      .and('contain.text', 'Custom $/M tok');
     cy.get('body').type('{esc}');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     // The badges are the custom-cost entry, so each one carries an input.
@@ -343,7 +351,18 @@ describe('Profit Estimator per GW', () => {
       });
   });
 
-  it('lets a custom price pair replace the OpenRouter catalog', () => {
+  it('lets the OpenRouter catalog or a custom price pair replace the list price', () => {
+    // The catalog reads the Kimi row, which sits below Moonshot's list price.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'OpenRouter').click();
+    cy.get('[data-testid="profit-selling-prices"]')
+      .should('contain.text', 'Input: $0.6')
+      .and('contain.text', 'Cached Input: $0.1')
+      .and('contain.text', 'Output: $2.5')
+      .and('contain.text', '(OpenRouter)');
+    cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
+
+    // Custom seeds from the price in force, here the catalog.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'Custom $/M tok').click();
     cy.get('[data-testid="profit-custom-prices"]').should('exist');
@@ -355,10 +374,10 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-selling-prices"]').should('contain.text', '(custom)');
 
     cy.get('button#profit-price-source').click();
-    cy.contains('[role="option"]', 'OpenRouter').click();
+    cy.contains('[role="option"]', 'Moonshot list price').click();
     cy.get('[data-testid="profit-input-price"]').should('not.exist');
     cy.get('[data-testid="profit-cached-price"]').should('not.exist');
-    cy.get('[data-testid="profit-selling-prices"]').should('contain.text', 'Output: $2.5');
+    cy.get('[data-testid="profit-selling-prices"]').should('contain.text', 'Output: $15');
   });
 
   it('lets a custom $/GPU/hr per chip replace the TCO tier', () => {
@@ -419,6 +438,11 @@ describe('Profit Estimator per GW', () => {
     interceptProfitData();
     cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] }).as('openrouter-empty');
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
+    // The list price does not depend on the catalog, so the page opens priced.
+    chart().should('exist');
+    cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'OpenRouter').click();
     cy.get('[data-testid="profit-pricing-notice"]').should(
       'contain.text',
       'OpenRouter has no price',
@@ -765,8 +789,8 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
       .and('contain.text', '45 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
@@ -868,8 +892,8 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
@@ -964,8 +988,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
@@ -1061,8 +1085,8 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
@@ -1139,6 +1163,15 @@ describe('Profit Estimator (per chip-hour)', () => {
       .invoke('text')
       .should('match', /^\$\d+\.\d{2}/u)
       .and('not.match', /[BMk]/u);
+    // At Moonshot's list price the rental TCO is a few percent of revenue, so
+    // the thin Compute Expense segment is drawn but drops its name by design;
+    // the license-fee segment is tall enough to keep its label.
+    chart().find('rect.bar-tco').should('have.length', 4);
+    chart().should('contain.text', 'Model License Fee');
+    // The catalog price is a fraction of the list price, so the Compute
+    // Expense segment grows tall enough to carry its name.
+    cy.get('button#profit-price-source').click();
+    cy.contains('[role="option"]', 'OpenRouter').click();
     chart().should('contain.text', 'Compute Expense').and('contain.text', 'Model License Fee');
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     cy.get('[data-testid="tab-trigger-profit-estimator"]')
