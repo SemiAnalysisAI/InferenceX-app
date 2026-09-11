@@ -156,7 +156,7 @@ describe('getHardwareConfig', () => {
       tdp: 1800,
       power: 3.3,
       costh: 3.61,
-      costr: 3.61,
+      costr: 8.5,
     });
   });
 

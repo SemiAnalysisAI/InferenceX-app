@@ -30,7 +30,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1800,
     power: 3.3,
     costh: 3.61,
-    costr: 3.61,
+    costr: 8.5,
   },
   h100: {
     vendor: 'NVIDIA',
