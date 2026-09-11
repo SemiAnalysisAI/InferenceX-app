@@ -232,11 +232,20 @@ export default function ChartControls({
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
-  // Gated groups appear only after the feature gate unlocks.
+  // Gated groups appear only after the feature gate unlocks. A gated metric
+  // that arrived through a shared URL keeps its own group visible while the
+  // gate is locked so the selector never shows an option it cannot name;
+  // this mirrors how tab-nav keeps a gated route's tab for the current page.
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
-    () => METRIC_GROUPS.filter((g) => !g.gated || featureGateUnlocked),
-    [featureGateUnlocked],
+    () =>
+      METRIC_GROUPS.filter(
+        (g) =>
+          !g.gated ||
+          featureGateUnlocked ||
+          (g.metrics as readonly string[]).includes(selectedYAxisMetric),
+      ),
+    [featureGateUnlocked, selectedYAxisMetric],
   );
   const metricGroupMap = useMemo(
     () =>
