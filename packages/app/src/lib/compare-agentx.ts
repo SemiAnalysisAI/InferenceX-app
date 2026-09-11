@@ -2,8 +2,16 @@ import { scenarioSegmentForSequence } from '@/lib/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/inference-model-slug';
 
+/**
+ * Editorial ordering of the AgentX hero ledger on `/compare` and the landing
+ * page. Every model here has AgentX data and a registered `/inference/<slug>`
+ * page; the order is a product call, not alphabetical or by launch date.
+ */
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
+  // V4.1 Flash sits directly under Kimi K3, ahead of the V4 Pro flagship it
+  // post-dates (InferenceX#2961).
+  'deepseek-v41-flash',
   'deepseek-v4',
   'glm-5-3',
   'minimax-m3',
@@ -13,22 +21,36 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 ] as const;
 
 /**
+ * Featured models that still carry the NEW pill — in the hero ledger and in
+ * the /inference model selector. Presence in the ledger and the NEW badge are
+ * separate editorial decisions: a model stays featured for as long as its
+ * AgentX results matter, while the pill retires once the launch is old news.
+ * DeepSeek V4 Pro, MiniMax M3, and Qwen 3.5 keep their rows without the pill.
+ */
+const AGENTX_NEW_MODEL_SLUGS = [
+  'kimi-k3',
+  'deepseek-v41-flash',
+  'glm-5-3',
+  'qwen-3-8-flash-next',
+] as const satisfies readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][];
+
+/**
  * AgentX-only models that are NOT part of the editorial featured set above.
  *
  * The featured list is an editorial ordering — it drives the compare hero
- * ledger and the NEW badge in the /inference model selector. Which workload a
- * model actually has data for is a separate, factual question, and the two
- * stopped coinciding with DeepSeek V4.1 Flash: it entered the fleet on AgentX
- * only (InferenceX#2961), so defaulting it to 8K/1K renders an empty compare
- * page, but promoting it into the hero is a product decision this list
- * deliberately does not make.
+ * ledger. Which workload a model actually has data for is a separate, factual
+ * question, and the two can diverge: a model that enters the fleet on AgentX
+ * only would render an empty compare page if it defaulted to 8K/1K, but
+ * promoting it into the hero is a product decision this list deliberately
+ * does not make. The list is empty today (DeepSeek V4.1 Flash was promoted
+ * into the featured set); the mechanism stays for the next day-zero model.
  *
  * Keep this in sync with OVERVIEW_MODEL_SCENARIOS in `overview-data.ts` — that
  * map is the same fact for the overview matrix. `compare-agentx.test.ts` pins
  * the agreement rather than importing the overview module here, which would
  * pull the matrix builder into the client bundle through ChartControls.
  */
-const AGENTX_ONLY_MODEL_SLUGS = ['deepseek-v41-flash'] as const;
+const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = [];
 
 /** Every model whose default compare workload is AgentX: the editorial
  *  featured set plus the AgentX-only models kept out of it. */
@@ -50,14 +72,21 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
   },
 );
 
+const AGENTX_NEW_MODEL_SLUG_SET: ReadonlySet<string> = new Set(AGENTX_NEW_MODEL_SLUGS);
+
+/** Whether a featured ledger row carries the NEW pill. */
+export function isNewAgentxModel(model: CompareModelSlug): boolean {
+  return AGENTX_NEW_MODEL_SLUG_SET.has(model.slug);
+}
+
 /**
- * `Model` enum values (the dashboard's model identifiers) for the featured
- * AgentX set. The landing/compare hero ledger and the /inference model
- * selector both mark these models with a NEW badge, so the badge follows the
- * single featured list instead of maintaining a second one.
+ * `Model` enum values (the dashboard's model identifiers) for the models that
+ * carry the NEW badge. The landing/compare hero ledger and the /inference
+ * model selector both read from this one list, so the pill retires (or
+ * arrives) everywhere in a single edit.
  */
 export const AGENTX_NEW_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
-  FEATURED_AGENTX_MODELS.map((model) => model.displayName),
+  FEATURED_AGENTX_MODELS.filter(isNewAgentxModel).map((model) => model.displayName),
 );
 
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {

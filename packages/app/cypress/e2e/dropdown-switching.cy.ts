@@ -53,16 +53,45 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-slot="select-content"]').should('not.exist');
   });
 
-  it('marks the featured AgentX models with a NEW pill in the dropdown', () => {
+  it('marks only the still-new AgentX models with a NEW pill in the dropdown', () => {
+    // The availability fixture predates DeepSeek V4.1 Flash, so splice one
+    // agentic row in: the dropdown only lists models with availability rows.
+    cy.fixture('api/availability.json').then((rows: Record<string, unknown>[]) => {
+      cy.intercept('GET', '/api/v1/availability', {
+        body: [
+          ...rows,
+          {
+            model: 'dsv41flash',
+            isl: null,
+            osl: null,
+            precision: 'fp4',
+            hardware: 'gb300',
+            framework: 'vllm',
+            spec_method: 'mtp',
+            disagg: false,
+            date: '2026-09-10',
+          },
+        ],
+      }).as('availability');
+    });
+    cy.visit('/inference');
+    cy.wait('@availability');
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('[data-testid="model-selector"]').click();
 
-    // A featured AgentX model carries the pill… (MiniMax M3 rather than the
-    // Kimi K3 default because the availability fixtures don't ship kimik3 rows)
-    cy.contains('[role="option"]', 'MiniMax M3 428B')
+    // A NEW AgentX model carries the pill…
+    cy.contains('[role="option"]', 'DeepSeek V4.1 Flash 552B')
       .find('[data-new-badge="model-option"]')
       .should('be.visible')
       .and('have.text', 'NEW');
-    // …while non-featured models render without one.
+    // …featured models whose launch pill has retired render without one…
+    cy.contains('[role="option"]', 'MiniMax M3 428B')
+      .find('[data-new-badge="model-option"]')
+      .should('not.exist');
+    cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T')
+      .find('[data-new-badge="model-option"]')
+      .should('not.exist');
+    // …as do models that were never featured.
     cy.contains('[role="option"]', 'DeepSeek R1 0528 671B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
