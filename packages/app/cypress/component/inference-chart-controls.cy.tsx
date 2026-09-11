@@ -67,9 +67,35 @@ describe('Modeled system-power table', () => {
   });
 });
 
+/**
+ * Measured Energy and Modeled System Power sit behind the ↑↑↓↓ feature gate
+ * while power telemetry is WIP. Unlock it and remount so the gated groups are
+ * listed; the gate hook reads localStorage on mount.
+ */
+function mountWithPowerGroupsUnlocked() {
+  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+  mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+}
+
 describe('Inference ChartControls', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+  });
+
+  afterEach(() => {
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+  });
+
+  it('hides the Measured Energy and Modeled System Power groups while the gate is locked', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('[data-slot="select-content"]').should('exist');
+    cy.contains('Throughput').should('exist');
+    cy.contains('Measured Energy').should('not.exist');
+    cy.contains('Modeled System Power').should('not.exist');
+    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').should('not.exist');
+    cy.contains('[data-slot="select-item"]', 'Modeled Chassis AC Power per GPU (8k1k)').should(
+      'not.exist',
+    );
   });
 
   it('renders the model selector with the current model', () => {
@@ -109,6 +135,7 @@ describe('Inference ChartControls', () => {
   });
 
   it('lists and selects the schema-v2 derived axes in the Measured Energy group', () => {
+    mountWithPowerGroupsUnlocked();
     const options = [
       {
         key: 'y_measuredJPerSuccessfulQuery',
@@ -139,6 +166,7 @@ describe('Inference ChartControls', () => {
   });
 
   it('offers modeled chassis power separately and explains its measurement boundary', () => {
+    mountWithPowerGroupsUnlocked();
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('input[aria-label="Search options"]').type('Modeled Chassis');
     cy.contains('Modeled System Power')
