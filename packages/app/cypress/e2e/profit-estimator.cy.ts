@@ -892,8 +892,8 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
@@ -988,8 +988,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
@@ -1085,8 +1085,8 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
-      .should('contain.text', 'Input: $0.6')
-      .and('contain.text', '(OpenRouter)');
+      .should('contain.text', 'Input: $3')
+      .and('contain.text', '(Moonshot list price)');
   });
 
   it('serves the Chinese mirror with the list price named in Chinese', () => {
