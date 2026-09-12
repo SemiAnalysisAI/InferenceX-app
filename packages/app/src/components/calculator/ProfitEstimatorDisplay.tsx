@@ -209,7 +209,7 @@ const STRINGS = {
     powerOptions: {
       provisioned: 'Provisioned power',
       modeled: 'Measured + modeled power',
-      compare: 'Compare both (apples-to-apples)',
+      compare: 'Compare both',
     },
     powerBarLabels: { provisioned: 'Provisioned', modeled: 'Measured + modeled' },
     powerPreview:
@@ -324,7 +324,7 @@ const STRINGS = {
     powerOptions: {
       provisioned: '预配功耗',
       modeled: '实测 GPU + 系统功耗估算',
-      compare: '同口径对比两种估算方式',
+      compare: '对比两种估算方式',
     },
     powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算' },
     powerPreview:
