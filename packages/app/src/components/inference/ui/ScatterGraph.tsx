@@ -83,6 +83,7 @@ import {
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
+import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -1507,13 +1508,23 @@ const ScatterGraph = React.memo(
     // Curve-to-curve ISO-X semantics: each measurement is two CURVES
     // (rendered roofline path class tokens) plus a freely chosen iso-x
     // stored in DATA space (xScale.invert of the click), so measurements
-    // survive zoom and metric changes. BOTH ruler ends are interpolated on
+    // survive zoom (axis-metric changes clear them; see
+    // usePerfRulerAxisReset). BOTH ruler ends are interpolated on
     // the curves' rendered paths at the iso-x — neither end needs to be a
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
     const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
     const perfRulerMode = preferPerfRulerMode && !showPowerEnvelope;
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Changing the x- or y-axis metric (including the x percentile, which
+    // `x_scale_field` encodes) clears every ruler: the curves are redrawn
+    // in different units, so a ruler that persisted would measure a ratio
+    // the user never placed. Runs before the draw pass so no stale ruler
+    // ever paints over the new curves.
+    usePerfRulerAxisReset(
+      perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
+      setPerfRulerState,
+    );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass — lines/labels must never
     // linger a frame after the switch flips (Bugbot report on PR #853).

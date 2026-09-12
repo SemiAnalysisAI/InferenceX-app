@@ -24,6 +24,7 @@ import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/
 import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -757,13 +758,22 @@ const GPUGraph = React.memo(
     // Same curve-to-curve ISO-X semantics as ScatterGraph, applied to the
     // date/chip comparison view: each measurement is two rendered roofline
     // paths (class tokens `roofline-<date>_<hwKey>_<precision>`) plus an
-    // iso-x stored in DATA space so it survives zoom and metric changes.
+    // iso-x stored in DATA space so it survives zoom (axis-metric changes
+    // clear rulers; see usePerfRulerAxisReset).
     // Any two curves may be paired — two dates of the same chip config, two
     // chip configs on the same date, or a mix — which is the point of this
     // view: quantify the multiple between comparison series at a glance.
     const [savedPerfRulerMode, setPerfRulerMode] = useState(false);
     const perfRulerMode = savedPerfRulerMode && !powerEnvelopeMode;
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Changing the x- or y-axis metric clears every ruler: the curves are
+    // redrawn in different units, so a ruler that persisted would measure a
+    // ratio the user never placed. Runs before the draw pass so no stale
+    // ruler ever paints over the new curves.
+    usePerfRulerAxisReset(
+      perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
+      setPerfRulerState,
+    );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass (no lingering frame).
     const perfRulerModeRef = useRef(perfRulerMode);
