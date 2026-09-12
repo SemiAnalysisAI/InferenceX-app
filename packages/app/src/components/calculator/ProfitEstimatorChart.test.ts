@@ -11,11 +11,14 @@ import {
   contrastingTextColor,
   generateProfitTooltipHTML,
   estimateTextWidth,
+  lossLabelStyle,
+  lossLabelText,
   slantedMargins,
   splitAxisLabel,
   splitHistoryLabel,
   xLabelLayout,
   operatorMarginLabel,
+  LOSS_FOOTROOM_PX,
   profitYDomain,
   BAR_ICON_MAX_HEIGHT,
   BAR_ICON_MIN_HEIGHT,
@@ -137,6 +140,24 @@ describe('profitYDomain', () => {
     const [, roomy] = profitYDomain([row()], 500, stackHeadroomPx(BAR_ICON_MAX_HEIGHT));
     expect(roomy).toBeGreaterThan(top);
     expect((roomy - 1000) * (500 / roomy)).toBeCloseTo(stackHeadroomPx(BAR_ICON_MAX_HEIGHT), 5);
+  });
+
+  it('reserves pixel footroom under the deepest loss once the plot height is known', () => {
+    const losing = row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 0, profit: -100 });
+    const [bottom, top] = profitYDomain([losing], 500);
+    const pxPerUnit = 500 / (top - bottom);
+    // The loss figure hangs LOSS_FOOTROOM_PX below the hatch, so the floor sits that far under it.
+    expect((-100 - bottom) * pxPerUnit).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
+    // The headroom above the stack is unchanged by the footroom.
+    expect((top - 400) * pxPerUnit).toBeCloseTo(STACK_HEADROOM_PX, 5);
+    // A loss that fills nearly the whole plot still keeps its figure clear of the axis.
+    const deep = row({ revenue: 100, tco: 2000, grossMargin: -1900, labCut: 0, profit: -1900 });
+    const [deepBottom, deepTop] = profitYDomain([deep], 300);
+    expect((-1900 - deepBottom) * (300 / (deepTop - deepBottom))).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
+  });
+
+  it('reserves no footroom when nothing loses money', () => {
+    expect(profitYDomain([row()], 500)[0]).toBe(0);
   });
 
   it('extends below zero when any SKU loses money, and covers TCO when it exceeds revenue', () => {
@@ -464,6 +485,90 @@ describe('revenueLabelStyle', () => {
     const style = revenueLabelStyle(rows, 'chip-hour', boldWidth('$3.96', CHART_TYPE.annotation));
     expect(style.fontPx).toBe(CHART_TYPE.annotation);
     expect(formatProfitUsd(3.96, 'chip-hour', style.digits)).toBe('$3.96');
+  });
+});
+
+describe('lossLabelStyle', () => {
+  // The DeepSeek V4.1 Flash chart on a phone: two of five bars lose money,
+  // one by $561.2M and the last by $4.9B, and "Loss -$561.2M" ran across
+  // both neighbouring bands.
+  const flashRows = [
+    row({ revenue: 14e9, profit: 5.14e9 }),
+    row({ revenue: 11.9e9, profit: 1.46e9 }),
+    row({ revenue: 9.7e9, profit: 1.01e9 }),
+    row({ revenue: 9e9, profit: -561.2e6 }),
+    row({ revenue: 2.9e9, profit: -4.9e9 }),
+  ];
+  const phoneSlot = barLabelSlotPx(38.2, 54.6);
+
+  it('keeps the word and the decimal when every loss figure fits its slot', () => {
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year')).toEqual({ word: true, digits: 1 });
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year', barLabelSlotPx(100, 143))).toEqual({
+      word: true,
+      digits: 1,
+    });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year')).toBe('Loss -$561.2M');
+  });
+
+  it('narrows every loss figure until the widest fits a phone-width slot', () => {
+    const style = lossLabelStyle(flashRows, 'Loss', 'gw-year', phoneSlot);
+    expect(style).not.toEqual({ word: true, digits: 1 });
+    for (const losing of flashRows.filter((r) => r.profit < 0)) {
+      const text = lossLabelText(losing.profit, 'Loss', 'gw-year', style, phoneSlot);
+      expect(boldWidth(text, CHART_TYPE.annotation)).toBeLessThanOrEqual(phoneSlot);
+      // The sign and the compact unit survive every rung.
+      expect(text).toMatch(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
+    }
+  });
+
+  it('lets a bar keep its decimal when only a wider neighbour had to lose it', () => {
+    const style = lossLabelStyle(flashRows, 'Loss', 'gw-year', phoneSlot);
+    expect(style).toEqual({ word: false, digits: 0 });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$561M');
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$4.9B');
+    // Without a slot to test against, the style is applied as given.
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', { word: true, digits: 0 })).toBe('Loss -$5B');
+  });
+
+  it('drops the decimal before the word, and the word before the last decimal', () => {
+    const rows = [row({ profit: -561.2e6 })];
+    const width = (style: { word: boolean; digits: number }) => {
+      const amount = formatProfitUsd(-561.2e6, 'gw-year', style.digits);
+      return boldWidth(style.word ? `Loss ${amount}` : amount, CHART_TYPE.annotation);
+    };
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: true, digits: 0 }))).toEqual({
+      word: true,
+      digits: 0,
+    });
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 1 }))).toEqual({
+      word: false,
+      digits: 1,
+    });
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 0 }))).toEqual({
+      word: false,
+      digits: 0,
+    });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', { word: false, digits: 0 })).toBe('-$561M');
+  });
+
+  it('ignores profitable rows and falls back to the smallest style when nothing fits', () => {
+    expect(lossLabelStyle([row({ profit: 420 })], 'Loss', 'gw-year', 1)).toEqual({
+      word: true,
+      digits: 1,
+    });
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year', 1)).toEqual({ word: false, digits: 0 });
+  });
+
+  it('only drops the word per chip-hour, where the formatter keeps its two decimals', () => {
+    const rows = [row({ profit: -0.57 })];
+    const style = lossLabelStyle(
+      rows,
+      'Loss',
+      'chip-hour',
+      boldWidth('-$0.57', CHART_TYPE.annotation),
+    );
+    expect(style.word).toBe(false);
+    expect(lossLabelText(-0.57, 'Loss', 'chip-hour', style)).toBe('-$0.57');
   });
 });
 
