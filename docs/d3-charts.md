@@ -75,11 +75,11 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 ## Power curves and optimal filtering
 
-Power axes use the same Pareto directions as other metrics while **Optimal Only** is on. A frontier can legitimately contain one point: the fastest measured configuration can also draw the least power. Turning the switch off connects the concurrency measurements for each serving configuration, date, and run with straight segments. These operating curves do not represent a Pareto frontier and must never connect unrelated configurations or runs.
+Power axes use the same Pareto directions as other metrics while **Optimal Only** is on. A frontier can legitimately contain one point: the fastest measured configuration can also draw the least power. Turning the switch off draws a smooth upper power boundary across tested configurations, grouped by hardware, precision and date (and by run for unofficial overlays). This boundary does not represent an efficiency frontier.
 
-Measured power as a percentage of TDP has no preferred direction, so it always shows all measurements and operating curves; its optimal switch is hidden. Charts preserve the saved optimal preference when switching to another metric. Energy per token retains its existing Pareto behavior.
+Power-boundary views show only the measurements forming that boundary by default. **Show all measurements** reveals the remaining dots without changing the curves, axis domains or zoom. This display preference is independent of **Optimal Only**, defaults off, and is shared through `i_allpoints=1`. Historical rings remain attached to visible historical points; tables and data exports retain their existing selection rules.
 
-Operating curves use linear interpolation, including after zoom, and disable gradient strategy labels and the performance ruler. Repeated conflicting measurements at the same concurrency break a curve rather than choosing a winner or bridging the conflict. The same grouping applies to unofficial-run overlays.
+Measured power as a percentage of TDP has no preferred direction, so it always uses the upper boundary; its optimal switch is hidden. Charts preserve both display preferences when switching metrics. Energy per token retains its existing Pareto behavior. Power boundaries disable gradient strategy labels and the performance ruler.
 
 ## Gradient Roofline Labels
 

@@ -38,6 +38,7 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
+  'i_allpoints',
   'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
@@ -148,6 +149,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
+  i_allpoints: '',
   i_best: '',
   i_label: '',
   i_nolabel: '',

@@ -545,6 +545,9 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
+  const [showAllMeasurements, setShowAllMeasurements] = useState(
+    () => getUrlParam('i_allpoints') === '1',
+  );
   // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
   // mode follows the model + scenario default, so charts that open with every
   // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
@@ -1543,6 +1546,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
+      i_allpoints: showAllMeasurements ? '1' : '',
       i_best:
         bestPerSkuChoice === null || bestPerSkuChoice === bestPerSkuDefault
           ? ''
@@ -1579,6 +1583,7 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
+      showAllMeasurements,
       bestPerSkuChoice,
       bestPerSkuDefault,
       showPointLabels,
@@ -1810,6 +1815,7 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1832,6 +1838,7 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1868,6 +1875,7 @@ export function InferenceProvider({
     setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
+    setShowAllMeasurements,
     setShowPointLabels,
     setHighContrast,
     setLogScale,
