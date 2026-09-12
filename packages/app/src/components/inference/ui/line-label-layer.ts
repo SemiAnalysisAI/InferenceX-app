@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
 export interface CartesianPoint {
   x: number;
@@ -321,7 +322,7 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     obstacles?: readonly PlacedBox[];
   },
 ): LineLabelPlacement[] {
-  const collisionHeight = options.collisionHeight ?? 18;
+  const collisionHeight = options.collisionHeight ?? CHART_TYPE.lineLabel + 8;
   const placed: PlacedBox[] = [...(options.obstacles ?? [])];
   const result: LineLabelPlacement[] = [];
   const sorted = [...series].toSorted(
@@ -460,7 +461,7 @@ export function renderLineLabels(
           .attr('text-anchor', 'start')
           .attr('dominant-baseline', 'central')
           .attr('fill', 'white')
-          .attr('font-size', '10px')
+          .attr('font-size', px(CHART_TYPE.lineLabel))
           .attr('font-weight', '600');
         return labelGroup;
       },

@@ -166,6 +166,33 @@ describe('pill bounding box primitives', () => {
 });
 
 describe('clamped pills do not stack on their neighbours', () => {
+  it('renders larger text and measures its pill before clamping on render and zoom', () => {
+    Object.defineProperty(SVGElement.prototype, 'getBBox', {
+      configurable: true,
+      value(this: SVGElement) {
+        const fontSize = Number.parseFloat(this.getAttribute('font-size') ?? '0');
+        return new DOMRect(
+          0,
+          -fontSize / 2,
+          (this.textContent ?? '').length * fontSize * 0.6,
+          fontSize,
+        );
+      },
+    });
+    const { zoomGroup } = renderChart();
+    const label = placement('gpu', 395, 4, 'MI355X');
+    renderLineLabels(zoomGroup, [label], { seriesAttribute: 'data-hw-key' });
+
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('16px');
+    expect(Number(zoomGroup.select('.ll-bg').attr('height'))).toBe(22);
+    expect(Number(zoomGroup.select('.ll-bg').attr('width'))).toBeCloseTo(67.6);
+    expectInsidePlot(pillBox(zoomGroup, 'gpu'));
+
+    updateRenderedLineLabels(zoomGroup, [{ ...label, x: 398, y: 298 }]);
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('16px');
+    expectInsidePlot(pillBox(zoomGroup, 'gpu'));
+  });
+
   it('flips a pill below its anchor when the neighbour above was slid down onto it', () => {
     // Bugbot's case: `placeLineLabels` cleared these two anchors (they are
     // 26px apart, more than one collision height), but the top pill has to
