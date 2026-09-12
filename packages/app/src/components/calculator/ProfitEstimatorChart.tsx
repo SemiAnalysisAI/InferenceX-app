@@ -363,6 +363,10 @@ const REVENUE_LABEL_LADDER: readonly RevenueLabelStyle[] = [
 ];
 /** Bold glyphs run wider than the regular estimate; the revenue figure is weight 700. */
 const BOLD_WIDTH_FACTOR = 1.1;
+/** Rough rendered width of bold `text` at `fontPx`. */
+function boldWidth(text: string, fontPx: number): number {
+  return estimateTextWidth(text, fontPx) * BOLD_WIDTH_FACTOR;
+}
 
 /**
  * One style for every revenue figure in the chart: the richest rung of the
@@ -378,15 +382,96 @@ export function revenueLabelStyle(
   for (const style of REVENUE_LABEL_LADDER) {
     const widest = Math.max(
       0,
-      ...rows.map(
-        (row) =>
-          estimateTextWidth(formatProfitUsd(row.revenue, basis, style.digits), style.fontPx) *
-          BOLD_WIDTH_FACTOR,
+      ...rows.map((row) =>
+        boldWidth(formatProfitUsd(row.revenue, basis, style.digits), style.fontPx),
       ),
     );
     if (widest <= slotPx) return style;
   }
   return REVENUE_LABEL_SMALLEST;
+}
+
+/** How the loss figure under a losing bar is set: whether the word stays, and the compact-unit decimals. */
+export interface LossLabelStyle {
+  word: boolean;
+  digits: number;
+}
+
+/**
+ * Ways to set the loss figure, richest first. The word goes before the figure
+ * loses precision entirely: the hatch below the axis and the red fill already
+ * say "loss", while "Loss -$561.2M" under a phone-width bar ran into both
+ * neighbours and "Loss -$4.9B" under the last bar ran off the plot.
+ */
+const LOSS_LABEL_FULL: LossLabelStyle = { word: true, digits: 1 };
+const LOSS_LABEL_SMALLEST: LossLabelStyle = { word: false, digits: 0 };
+const LOSS_LABEL_LADDER: readonly LossLabelStyle[] = [
+  LOSS_LABEL_FULL,
+  { word: true, digits: 0 },
+  { word: false, digits: 1 },
+  LOSS_LABEL_SMALLEST,
+];
+
+/**
+ * The loss figure for one bar in `style`: "Loss -$561.2M", "Loss -$561M",
+ * "-$561.2M" or "-$561M". When the chart had to drop the decimal for its
+ * widest figure, a bar whose own figure still fits `slotPx` keeps it: loss
+ * figures hang at different depths, so they never compete for one line the
+ * way the revenue figures do, and "-$4.9B" says more than "-$5B". With no
+ * `slotPx` the style is applied as given.
+ */
+export function lossLabelText(
+  profit: number,
+  lossWord: string,
+  basis: ProfitBasis,
+  style: LossLabelStyle = LOSS_LABEL_FULL,
+  slotPx?: number,
+): string {
+  if (style.digits === 0 && slotPx !== undefined) {
+    const precise = lossTextIn(profit, lossWord, basis, { word: style.word, digits: 1 });
+    if (lossTextWidth(precise) <= slotPx) return precise;
+  }
+  return lossTextIn(profit, lossWord, basis, style);
+}
+
+/** The loss figure set exactly in `style`, with no fit test. */
+function lossTextIn(
+  profit: number,
+  lossWord: string,
+  basis: ProfitBasis,
+  style: LossLabelStyle,
+): string {
+  const amount = formatProfitUsd(profit, basis, style.digits);
+  return style.word ? `${lossWord} ${amount}` : amount;
+}
+
+/** Budgeted width of a loss figure: annotation size, weight 600, so measured like the bold revenue figure. */
+function lossTextWidth(text: string): number {
+  return boldWidth(text, CHART_TYPE.annotation);
+}
+
+/**
+ * One style for every loss figure in the chart: the richest rung of the ladder
+ * at which the widest figure still fits `slotPx`. Chosen per chart, as the
+ * revenue style is, so two losing bars read the same way. The figure is set
+ * at the annotation size in weight 600, so it is budgeted like the bold
+ * revenue figure.
+ */
+export function lossLabelStyle(
+  rows: readonly Pick<ProfitEstimatorRow, 'profit'>[],
+  lossWord: string,
+  basis: ProfitBasis,
+  slotPx: number = Number.POSITIVE_INFINITY,
+): LossLabelStyle {
+  const losing = rows.filter((row) => row.profit < 0);
+  for (const style of LOSS_LABEL_LADDER) {
+    const widest = Math.max(
+      0,
+      ...losing.map((row) => lossTextWidth(lossTextIn(row.profit, lossWord, basis, style))),
+    );
+    if (widest <= slotPx) return style;
+  }
+  return LOSS_LABEL_SMALLEST;
 }
 
 /**
@@ -829,6 +914,15 @@ export default function ProfitEstimatorChart({
           )
           .text((d) => d.text);
 
+        // The loss figure is fitted to the same slot as the revenue figure:
+        // unfitted, "Loss -$561.2M" under a phone-width bar overran both
+        // neighbours' bands.
+        const lossStyle = lossLabelStyle(
+          labelData.map((d) => d.row),
+          strings.loss,
+          basis,
+          labelSlot,
+        );
         group
           .selectAll<SVGTextElement, ProfitSegment>('.loss-label')
           .data(
@@ -843,7 +937,7 @@ export default function ProfitEstimatorChart({
           .attr('font-size', px(CHART_TYPE.annotation))
           .attr('font-weight', '600')
           .style('fill', LOSS_FILL)
-          .text((d) => `${strings.loss} ${formatProfitUsd(d.row.profit, basis)}`);
+          .text((d) => lossLabelText(d.row.profit, strings.loss, basis, lossStyle, labelSlot));
 
         return bars;
       },

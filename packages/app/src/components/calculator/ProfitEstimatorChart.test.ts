@@ -11,6 +11,8 @@ import {
   contrastingTextColor,
   generateProfitTooltipHTML,
   estimateTextWidth,
+  lossLabelStyle,
+  lossLabelText,
   slantedMargins,
   splitAxisLabel,
   splitHistoryLabel,
@@ -464,6 +466,90 @@ describe('revenueLabelStyle', () => {
     const style = revenueLabelStyle(rows, 'chip-hour', boldWidth('$3.96', CHART_TYPE.annotation));
     expect(style.fontPx).toBe(CHART_TYPE.annotation);
     expect(formatProfitUsd(3.96, 'chip-hour', style.digits)).toBe('$3.96');
+  });
+});
+
+describe('lossLabelStyle', () => {
+  // The DeepSeek V4.1 Flash chart on a phone: two of five bars lose money,
+  // one by $561.2M and the last by $4.9B, and "Loss -$561.2M" ran across
+  // both neighbouring bands.
+  const flashRows = [
+    row({ revenue: 14e9, profit: 5.14e9 }),
+    row({ revenue: 11.9e9, profit: 1.46e9 }),
+    row({ revenue: 9.7e9, profit: 1.01e9 }),
+    row({ revenue: 9e9, profit: -561.2e6 }),
+    row({ revenue: 2.9e9, profit: -4.9e9 }),
+  ];
+  const phoneSlot = barLabelSlotPx(38.2, 54.6);
+
+  it('keeps the word and the decimal when every loss figure fits its slot', () => {
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year')).toEqual({ word: true, digits: 1 });
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year', barLabelSlotPx(100, 143))).toEqual({
+      word: true,
+      digits: 1,
+    });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year')).toBe('Loss -$561.2M');
+  });
+
+  it('narrows every loss figure until the widest fits a phone-width slot', () => {
+    const style = lossLabelStyle(flashRows, 'Loss', 'gw-year', phoneSlot);
+    expect(style).not.toEqual({ word: true, digits: 1 });
+    for (const losing of flashRows.filter((r) => r.profit < 0)) {
+      const text = lossLabelText(losing.profit, 'Loss', 'gw-year', style, phoneSlot);
+      expect(boldWidth(text, CHART_TYPE.annotation)).toBeLessThanOrEqual(phoneSlot);
+      // The sign and the compact unit survive every rung.
+      expect(text).toMatch(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
+    }
+  });
+
+  it('lets a bar keep its decimal when only a wider neighbour had to lose it', () => {
+    const style = lossLabelStyle(flashRows, 'Loss', 'gw-year', phoneSlot);
+    expect(style).toEqual({ word: false, digits: 0 });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$561M');
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$4.9B');
+    // Without a slot to test against, the style is applied as given.
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', { word: true, digits: 0 })).toBe('Loss -$5B');
+  });
+
+  it('drops the decimal before the word, and the word before the last decimal', () => {
+    const rows = [row({ profit: -561.2e6 })];
+    const width = (style: { word: boolean; digits: number }) => {
+      const amount = formatProfitUsd(-561.2e6, 'gw-year', style.digits);
+      return boldWidth(style.word ? `Loss ${amount}` : amount, CHART_TYPE.annotation);
+    };
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: true, digits: 0 }))).toEqual({
+      word: true,
+      digits: 0,
+    });
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 1 }))).toEqual({
+      word: false,
+      digits: 1,
+    });
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 0 }))).toEqual({
+      word: false,
+      digits: 0,
+    });
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', { word: false, digits: 0 })).toBe('-$561M');
+  });
+
+  it('ignores profitable rows and falls back to the smallest style when nothing fits', () => {
+    expect(lossLabelStyle([row({ profit: 420 })], 'Loss', 'gw-year', 1)).toEqual({
+      word: true,
+      digits: 1,
+    });
+    expect(lossLabelStyle(flashRows, 'Loss', 'gw-year', 1)).toEqual({ word: false, digits: 0 });
+  });
+
+  it('only drops the word per chip-hour, where the formatter keeps its two decimals', () => {
+    const rows = [row({ profit: -0.57 })];
+    const style = lossLabelStyle(
+      rows,
+      'Loss',
+      'chip-hour',
+      boldWidth('-$0.57', CHART_TYPE.annotation),
+    );
+    expect(style.word).toBe(false);
+    expect(lossLabelText(-0.57, 'Loss', 'chip-hour', style)).toBe('-$0.57');
   });
 });
 
