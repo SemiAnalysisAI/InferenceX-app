@@ -147,6 +147,7 @@ const GPU_STRINGS = {
     logScale: 'Log Scale',
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
+    showAllMeasurements: 'Show all measurements',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
     powerOptimal:
@@ -170,6 +171,7 @@ const GPU_STRINGS = {
     logScale: '对数缩放',
     highContrast: '高对比度',
     optimalOnly: '仅最优',
+    showAllMeasurements: '显示全部测量点',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
     powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
@@ -216,6 +218,7 @@ const GPUGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: savedHideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       logScale,
       isLegendExpanded,
@@ -229,6 +232,7 @@ const GPUGraph = React.memo(
       toggleActiveDate,
       removeActiveDate,
       setHideNonOptimal,
+      setShowAllMeasurements,
       setShowPointLabels,
       setLogScale,
       setIsLegendExpanded,
@@ -435,24 +439,32 @@ const GPUGraph = React.memo(
       return result;
     }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
 
-    const optimalPointKeys = useMemo(() => {
+    const boundaryPointKeys = useMemo(() => {
       const keys = new Set<string>();
-      Object.values(paretoRooflines).forEach((pts) =>
+      Object.values(rooflines).forEach((pts) =>
         pts.forEach((p) => keys.add(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`)),
       );
       return keys;
-    }, [paretoRooflines]);
+    }, [rooflines]);
+
+    const activeData = useMemo(
+      () =>
+        Object.values(groupedData)
+          .flat()
+          .filter((p) => activeDates.has(`${p.date}_${p.hwKey}`)),
+      [groupedData, activeDates],
+    );
 
     const filteredData = useMemo(() => {
-      let pts = Object.values(groupedData)
-        .flat()
-        .filter((p) => activeDates.has(`${p.date}_${p.hwKey}`));
-      if (hideNonOptimal)
-        pts = pts.filter((p) =>
-          optimalPointKeys.has(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`),
+      if (hideNonOptimal || (powerEnvelopeMode && !showAllMeasurements))
+        return activeData.filter((p) =>
+          boundaryPointKeys.has(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`),
         );
-      return pts;
-    }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+      return activeData;
+    }, [activeData, hideNonOptimal, powerEnvelopeMode, showAllMeasurements, boundaryPointKeys]);
+
+    // Keep domains fixed so revealing off-boundary dots cannot move power curves.
+    const scaleData = powerEnvelopeMode ? activeData : filteredData;
 
     const powerTierCounts = useMemo(
       () => ({
@@ -561,14 +573,14 @@ const GPUGraph = React.memo(
 
     // Compute scale domains
     const xExtent = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const ext = d3.extent(filteredData, (d) => d.x) as [number, number];
+      if (scaleData.length === 0) return [0, 100] as [number, number];
+      const ext = d3.extent(scaleData, (d) => d.x) as [number, number];
       return [0, ext[1] * 1.05] as [number, number];
-    }, [filteredData]);
+    }, [scaleData]);
 
     const yDomain = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const yExtent = d3.extent(filteredData, (d) => d.y) as [number, number];
+      if (scaleData.length === 0) return [0, 100] as [number, number];
+      const yExtent = d3.extent(scaleData, (d) => d.y) as [number, number];
       const yRange = yExtent[1] - yExtent[0];
       let yMin: number;
       if (logScale) {
@@ -579,7 +591,7 @@ const GPUGraph = React.memo(
         yMin = Math.max(0, yExtent[0] - yRange * 0.05);
       }
       return [yMin, yExtent[1] * 1.05] as [number, number];
-    }, [filteredData, logScale]);
+    }, [scaleData, logScale]);
 
     const dataIdentity = useMemo(
       () =>
@@ -1144,7 +1156,14 @@ const GPUGraph = React.memo(
     // Dismiss on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
-    }, [selectedPrecisions, selectedYAxisMetric, selectedGPUs, selectedDates, selectedDateRange]);
+    }, [
+      selectedPrecisions,
+      selectedYAxisMetric,
+      selectedGPUs,
+      selectedDates,
+      selectedDateRange,
+      showAllMeasurements,
+    ]);
 
     // Hover dimming animates via the inline `transition: opacity 150ms ease`
     // onRender puts on dots and rooflines — a single style write per node. A
@@ -1521,6 +1540,19 @@ const GPUGraph = React.memo(
                       onCheckedChange: (c: boolean) => {
                         setHideNonOptimal(c);
                         track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                      },
+                    },
+                  ]
+                : []),
+              ...(powerEnvelopeMode
+                ? [
+                    {
+                      id: 'gpu-show-all-measurements',
+                      label: legendT.showAllMeasurements,
+                      checked: showAllMeasurements,
+                      onCheckedChange: (c: boolean) => {
+                        setShowAllMeasurements(c);
+                        track('gpu_timeseries_show_all_measurements_toggled', { enabled: c });
                       },
                     },
                   ]

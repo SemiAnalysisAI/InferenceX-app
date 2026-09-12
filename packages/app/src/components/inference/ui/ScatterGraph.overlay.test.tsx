@@ -17,7 +17,83 @@ import {
   rebuildCount,
 } from './ScatterGraph.test-harness';
 
+const measurements = (offset: number, runUrl?: string): InferenceData[] => [
+  { ...point('h100', 'fp8', 10, 900 + offset, 1), power_tier: 'legacy', run_url: runUrl },
+  { ...point('h100', 'fp8', 20, 200 + offset, 2), power_tier: 'legacy', run_url: runUrl },
+  { ...point('h100', 'fp8', 30, 700 + offset, 4), power_tier: 'certified', run_url: runUrl },
+];
+
 describe('ScatterGraph unofficial overlays', () => {
+  it('toggles off-boundary power markers for official data and each overlay without moving curves', () => {
+    const runUrls = [
+      'https://github.com/o/r/actions/runs/123',
+      'https://github.com/o/r/actions/runs/456',
+    ];
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y_measuredAvgPower',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { [runUrls[0]]: 0, [runUrls[1]]: 1 },
+      unofficialRunInfos: runUrls.map((url, index) => ({
+        id: index === 0 ? '123' : '456',
+        branch: `power-${index}`,
+        url,
+      })),
+    };
+
+    const { container, rerender, unmount } = mountChart({
+      data: measurements(0),
+      overlayData: {
+        data: [...measurements(-100, runUrls[0]), ...measurements(100, runUrls[1])],
+        hardwareConfig: { h100: { ...HARDWARE_CONFIG.h100, suffix: '' } },
+        label: 'power comparison',
+      },
+    });
+    const buildsAfterMount = rebuildCount();
+    const groups = [
+      ...container.querySelectorAll<SVGGElement>('.dot-group, .unofficial-overlay-pt'),
+    ];
+    const curves = [...container.querySelectorAll('.roofline-path, .overlay-roofline-path')];
+    const paths = curves.map((curve) => curve.getAttribute('d'));
+    const axes = [...container.querySelectorAll('.x-axis, .y-axis')];
+    const axisGeometry = axes.map((axis) => axis.innerHTML);
+    const positions = groups.map((group) => group.getAttribute('transform'));
+    expect(groups).toHaveLength(9);
+    expect(curves).toHaveLength(3);
+    expect(paths.every(Boolean)).toBe(true);
+
+    for (const showAllMeasurements of [false, true, false]) {
+      inferenceState.current = { ...inferenceState.current, showAllMeasurements };
+      rerender();
+      for (const group of groups) {
+        const datum = (group as SVGGElement & { __data__: InferenceData }).__data__;
+        const visible = showAllMeasurements || datum.x !== 20;
+        expect(group.style.opacity).toBe(visible ? '1' : '0');
+        expect(group.style.pointerEvents).toBe(visible ? 'auto' : 'none');
+        expect(Boolean(group.querySelector('.legacy-power-ring'))).toBe(
+          datum.power_tier === 'legacy',
+        );
+      }
+      expect(
+        container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
+      ).toContain(
+        showAllMeasurements
+          ? 'Showing 9 of 9 measured points: 3/3 validated · 6/6 historical.'
+          : 'Showing 6 of 9 measured points: 3/3 validated · 3/6 historical.',
+      );
+      expect(curves.map((curve) => curve.getAttribute('d'))).toEqual(paths);
+      expect(axes.map((axis) => axis.innerHTML)).toEqual(axisGeometry);
+      expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+      expect(rebuildCount()).toBe(buildsAfterMount);
+    }
+    unmount();
+  });
+
   it('includes unofficial measured points in the validated/historical coverage summary', () => {
     const runUrl = 'https://github.com/o/r/actions/runs/123';
     const overlayPoints = [

@@ -366,6 +366,7 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
@@ -398,6 +399,7 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
@@ -466,6 +468,7 @@ const ScatterGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: preferOptimalOnly,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -482,6 +485,7 @@ const ScatterGraph = React.memo(
       removeHwType,
       resolveComparisonSelection,
       setHideNonOptimal,
+      setShowAllMeasurements,
       setShowPointLabels,
       selectAllHwTypes,
       setHighContrast,
@@ -794,6 +798,18 @@ const ScatterGraph = React.memo(
 
     const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
 
+    const powerEnvelopePointKeys = useMemo(() => {
+      const keys = new Set<string>();
+      if (showPowerEnvelope) {
+        for (const points of Object.values(groupedData)) {
+          for (const segment of groupDisplayedPoints(points).values()) {
+            for (const point of segment) keys.add(optimalPointKey(point));
+          }
+        }
+      }
+      return keys;
+    }, [showPowerEnvelope, groupedData, groupDisplayedPoints]);
+
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
@@ -1093,15 +1109,26 @@ const ScatterGraph = React.memo(
       return set;
     }, [overlayRooflines]);
 
+    const overlayEnvelopePoints = useMemo(
+      () => new Set(Object.values(displayedOverlayRooflines).flatMap((group) => group.points)),
+      [displayedOverlayRooflines],
+    );
+
     // Overlay points respect the Optimal Only toggle exactly like official
     // points do — "optimal" = on the overlay run's drawn roofline. Without
     // this, an e2e-dominated overlay config (hidden on the official side) kept
     // its X marker sitting on the dashed roofline and read as a pareto point.
-    // Hardware/precision/quick filters are applied upstream in
-    // `processedOverlayData`, so optimality is the only condition here.
     const isOverlayPointVisible = useCallback(
-      (d: InferenceData) => !hideNonOptimal || overlayOptimalPoints.has(d),
-      [hideNonOptimal, overlayOptimalPoints],
+      (d: InferenceData) =>
+        (!hideNonOptimal || overlayOptimalPoints.has(d)) &&
+        (!showPowerEnvelope || showAllMeasurements || overlayEnvelopePoints.has(d)),
+      [
+        hideNonOptimal,
+        overlayOptimalPoints,
+        showPowerEnvelope,
+        showAllMeasurements,
+        overlayEnvelopePoints,
+      ],
     );
 
     // All official points for rendering (unfiltered — visibility via opacity)
@@ -1160,8 +1187,7 @@ const ScatterGraph = React.memo(
       if (pointsTableTarget.kind === 'official') {
         const { hwKey } = pointsTableTarget;
         const hwConfig = hardwareConfig[hwKey];
-        // Same visibility filters the chart applies (precision, Optimal Only),
-        // scoped to the clicked series.
+        // Keep hidden measurements accessible in the per-series table.
         const pts = pointsData.filter(
           (p) =>
             p.hwKey === hwKey &&
@@ -1177,13 +1203,11 @@ const ScatterGraph = React.memo(
         };
       }
       const { runIndex, runId, branch } = pointsTableTarget;
-      // Overlay series: this run's points, respecting the overlay hw toggles
-      // and Optimal Only (same visibility filters as the official branch above).
       const pts = processedOverlayData.filter(
         (p) =>
           overlayRunIndex(p.run_url ?? null, runIndexByUrl) === runIndex &&
           activeOverlayHwTypes.has(p.hwKey as string) &&
-          isOverlayPointVisible(p),
+          (!hideNonOptimal || overlayOptimalPoints.has(p)),
       );
       return {
         hw: `overlay-run-${runId}`,
@@ -1199,7 +1223,7 @@ const ScatterGraph = React.memo(
       selectedPrecisions,
       hideNonOptimal,
       optimalPointKeys,
-      isOverlayPointVisible,
+      overlayOptimalPoints,
       resolveColor,
       processedOverlayData,
       runIndexByUrl,
@@ -1246,14 +1270,17 @@ const ScatterGraph = React.memo(
       }
       // Overlay points hidden by Optimal Only are excluded from the domain too
       // so hidden outliers don't stretch the axes.
-      const overlayPts = processedOverlayData.filter(isOverlayPointVisible);
+      // Marker visibility must not rescale or move the power boundary.
+      const overlayPts = processedOverlayData.filter(
+        (point) => !hideNonOptimal || overlayOptimalPoints.has(point),
+      );
       return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
     }, [
       filteredData,
       processedOverlayData,
       hideNonOptimal,
       optimalPointKeys,
-      isOverlayPointVisible,
+      overlayOptimalPoints,
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -1391,8 +1418,19 @@ const ScatterGraph = React.memo(
       (d: InferenceData) =>
         effectiveActiveHwTypes.has(d.hwKey as string) &&
         selectedPrecisions.includes(d.precision) &&
-        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
-      [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
+        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))) &&
+        (!showPowerEnvelope ||
+          showAllMeasurements ||
+          powerEnvelopePointKeys.has(optimalPointKey(d))),
+      [
+        effectiveActiveHwTypes,
+        selectedPrecisions,
+        hideNonOptimal,
+        optimalPointKeys,
+        showPowerEnvelope,
+        showAllMeasurements,
+        powerEnvelopePointKeys,
+      ],
     );
 
     const powerTierCounts = useMemo(() => {
@@ -3416,7 +3454,14 @@ const ScatterGraph = React.memo(
     // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
-    }, [selectedPrecisions, selectedYAxisMetric, hideNonOptimal, overlayData, chartId]);
+    }, [
+      selectedPrecisions,
+      selectedYAxisMetric,
+      hideNonOptimal,
+      showAllMeasurements,
+      overlayData,
+      chartId,
+    ]);
 
     // Dismiss when pinned point's hardware becomes hidden
     useEffect(() => {
@@ -3683,6 +3728,19 @@ const ScatterGraph = React.memo(
                               infoTooltip: legendT.optimalInfo,
                             }
                           : {}),
+                      },
+                    ]
+                  : []),
+                ...(showPowerEnvelope
+                  ? [
+                      {
+                        id: 'scatter-show-all-measurements',
+                        label: legendT.showAllMeasurements,
+                        checked: showAllMeasurements,
+                        onCheckedChange: (checked: boolean) => {
+                          setShowAllMeasurements(checked);
+                          track('latency_show_all_measurements_toggled', { enabled: checked });
+                        },
                       },
                     ]
                   : []),

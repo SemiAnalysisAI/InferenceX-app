@@ -652,6 +652,7 @@ export interface InferenceDisplayContextType {
   scaleType: 'auto' | 'linear' | 'log';
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
+  showAllMeasurements: boolean;
   showPointLabels: boolean;
   highContrast: boolean;
   logScale: boolean;
@@ -697,6 +698,7 @@ export interface InferenceActionsContextType {
   setQuickFilterPower: (tiers: PowerTier[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
+  setShowAllMeasurements: (show: boolean) => void;
   setShowPointLabels: (show: boolean) => void;
   setHighContrast: (highContrast: boolean) => void;
   setLogScale: (logScale: boolean) => void;
