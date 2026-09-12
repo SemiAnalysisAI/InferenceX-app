@@ -1425,6 +1425,119 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
   });
+
+  it('clears perf rulers when the y-axis or x-axis metric changes', () => {
+    const chartId = 'test-scatter-perf-ruler-axis-reset';
+    // Distinct `conc` per point keeps the D3 join keys unique, as they are
+    // for real runs; the metric-change update matches marks by that key.
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 120 - index * 40,
+          conc: x,
+          precision: Precision.FP4,
+        }),
+      ),
+    );
+    const baseInference = createMockInferenceContextValues();
+
+    function AxisMetricHarness() {
+      const [yMetric, setYMetric] = useState('y_tpPerGpu');
+      const [xField, setXField] = useState('p90_e2el');
+      const chartDefinition = createMockChartDefinition({
+        chartType: 'interactivity',
+        x_scale_field: xField,
+        y_tpPerGpu_roofline: 'upper_left',
+        y_totalTokensPerDollarTco_roofline: 'upper_left',
+      });
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
+        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+        selectedYAxisMetric: yMetric,
+      };
+
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <button
+            data-testid="change-y-metric"
+            onClick={() => setYMetric('y_totalTokensPerDollarTco')}
+          >
+            Change y metric
+          </button>
+          <button data-testid="change-x-metric" onClick={() => setXField('p90_ttft')}>
+            Change x metric
+          </button>
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId={chartId}
+              modelLabel={Model.DeepSeek_V4_Pro}
+              data={officialData}
+              xLabel="P90 End-to-end Latency (s)"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={chartDefinition}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+
+    mountWithProviders(<AxisMetricHarness />, { unofficial: {} });
+
+    // Ruler mode exposes one widened hit stroke per visible roofline; clicking
+    // two of them completes a measurement.
+    const placeRuler = () => {
+      cy.get(`#${chartId} svg .perf-ruler-hit`).should('have.length', 2);
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(0).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(1).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
+    };
+
+    // Clearing the rulers also drops the "clear rulers" legend entry, which
+    // narrows the sidebar and rebuilds the chart while the metric-change
+    // tween is still running. Both three-point curves must still be drawn
+    // as real curves afterwards (a stale tween used to collapse them onto a
+    // single coordinate).
+    const expectCurvesIntact = () => {
+      cy.get(`#${chartId} svg .roofline-path`)
+        .should('have.length', 2)
+        .each(($path) => {
+          expect($path.attr('d')).to.match(/C/);
+        });
+    };
+
+    expectCurvesIntact();
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    placeRuler();
+
+    // Switching the y-axis metric redraws the curves in new units: the ruler
+    // must not survive. Ruler mode itself stays on so the user can measure
+    // again without re-enabling it.
+    cy.get('[data-testid="change-y-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+
+    // Same for the x-axis metric (the resolved `x_scale_field`).
+    cy.get('[data-testid="change-x-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+  });
 });
 
 describe('ChartDisplay responsive status notes', () => {
