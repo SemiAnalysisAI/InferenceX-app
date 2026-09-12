@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
-import type { ProfitEstimatorRow } from './profit-estimator';
+import { formatProfitUsd, type ProfitEstimatorRow } from './profit-estimator';
 import {
+  barLabelSlotPx,
   buildProfitSegments,
+  revenueLabelStyle,
   contrastingTextColor,
   generateProfitTooltipHTML,
   estimateTextWidth,
@@ -368,6 +371,99 @@ describe('contrastingTextColor', () => {
 
   it('falls back to white when the fill cannot be parsed', () => {
     expect(contrastingTextColor('var(--primary)')).toBe('#ffffff');
+  });
+});
+
+describe('barLabelSlotPx', () => {
+  it('lets a label overhang a wide bar by the gap allowance', () => {
+    // Desktop: 100px bars 43px apart; the allowance is the binding limit.
+    expect(barLabelSlotPx(100, 143)).toBe(112);
+  });
+
+  it('stops short of the neighbouring label when the gap is narrower than the allowance', () => {
+    // Phone: seven bars in a 273px plot, 26px wide and 11px apart. Two labels
+    // each borrowing 6px of an 11px gap would meet; the slot leaves air instead.
+    const slot = barLabelSlotPx(26.2, 37.4);
+    expect(slot).toBeLessThan(26.2 + 12);
+    expect(slot).toBeCloseTo(37.4 - 4);
+    // Neighbouring labels centred on their bars cannot overlap.
+    expect(slot).toBeLessThan(37.4);
+  });
+
+  it('is empty for an unmeasured bar and never wider than its own bar plus the allowance', () => {
+    expect(barLabelSlotPx(0, 40)).toBe(0);
+    expect(barLabelSlotPx(Number.NaN, 40)).toBe(0);
+    expect(barLabelSlotPx(30, Number.NaN)).toBe(26);
+  });
+});
+
+/** Width the chart budgets for a weight-700 revenue figure: the regular estimate plus 10%. */
+const boldWidth = (text: string, fontPx: number) => estimateTextWidth(text, fontPx) * 1.1;
+
+describe('revenueLabelStyle', () => {
+  // The bars from the phone screenshot that overlapped: three tall NVIDIA
+  // stacks within 30% of each other and three AMD stacks within 20%.
+  const phoneRows = [137.1e9, 110.3e9, 108.7e9, 38.5e9, 33.7e9, 32.7e9, 21.7e9].map((revenue) =>
+    row({ revenue }),
+  );
+
+  it('keeps full precision at the axis size when every figure fits its slot', () => {
+    expect(revenueLabelStyle(phoneRows, 'gw-year', barLabelSlotPx(100, 143))).toEqual({
+      digits: 1,
+      fontPx: CHART_TYPE.axisLabel,
+    });
+    expect(revenueLabelStyle(phoneRows, 'gw-year')).toEqual({
+      digits: 1,
+      fontPx: CHART_TYPE.axisLabel,
+    });
+  });
+
+  it('narrows every figure until the widest fits a phone-width slot', () => {
+    const slot = barLabelSlotPx(26.2, 37.4);
+    const style = revenueLabelStyle(phoneRows, 'gw-year', slot);
+    // "$110.3B" and "$108.7B" no longer fit side by side; the whole chart drops
+    // to one narrower style rather than mixing sizes between neighbours.
+    expect(style).not.toEqual({ digits: 1, fontPx: CHART_TYPE.axisLabel });
+    for (const r of phoneRows) {
+      const text = formatProfitUsd(r.revenue, 'gw-year', style.digits);
+      expect(boldWidth(text, style.fontPx)).toBeLessThanOrEqual(slot);
+    }
+  });
+
+  it('shrinks before it rounds, and rounds before it shrinks again', () => {
+    const rows = [row({ revenue: 110.3e9 })];
+    const width = (digits: number, fontPx: number) =>
+      boldWidth(formatProfitUsd(110.3e9, 'gw-year', digits), fontPx);
+    expect(revenueLabelStyle(rows, 'gw-year', width(1, CHART_TYPE.annotation))).toEqual({
+      digits: 1,
+      fontPx: CHART_TYPE.annotation,
+    });
+    expect(revenueLabelStyle(rows, 'gw-year', width(0, CHART_TYPE.axisLabel))).toEqual({
+      digits: 0,
+      fontPx: CHART_TYPE.axisLabel,
+    });
+    expect(revenueLabelStyle(rows, 'gw-year', width(0, CHART_TYPE.annotation))).toEqual({
+      digits: 0,
+      fontPx: CHART_TYPE.annotation,
+    });
+  });
+
+  it('falls back to the smallest style rather than failing when nothing fits', () => {
+    expect(revenueLabelStyle(phoneRows, 'gw-year', 1)).toEqual({
+      digits: 0,
+      fontPx: CHART_TYPE.annotation,
+    });
+    expect(revenueLabelStyle([], 'gw-year', 1)).toEqual({
+      digits: 1,
+      fontPx: CHART_TYPE.axisLabel,
+    });
+  });
+
+  it('only changes size per chip-hour, where the formatter keeps its two decimals', () => {
+    const rows = [row({ revenue: 3.96 })];
+    const style = revenueLabelStyle(rows, 'chip-hour', boldWidth('$3.96', CHART_TYPE.annotation));
+    expect(style.fontPx).toBe(CHART_TYPE.annotation);
+    expect(formatProfitUsd(3.96, 'chip-hour', style.digits)).toBe('$3.96');
   });
 });
 

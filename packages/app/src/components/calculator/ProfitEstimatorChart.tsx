@@ -94,8 +94,20 @@ function useViewportHeight(): number | undefined {
 const GLYPH_WIDTH_EM = 0.55;
 /** Horizontal breathing room a label needs inside its bar, in px. */
 const LABEL_SIDE_PAD_PX = 4;
-/** The margin line above a bar may borrow this much of the gap to each neighbour, in px. */
+/** The labels above a bar may borrow this much of the gap to each neighbour, in px. */
 const X_GAP_ALLOWANCE = 12;
+
+/**
+ * Horizontal room the labels above a bar may use, in px. A label may overhang
+ * its bar by up to `X_GAP_ALLOWANCE`, but never so far that two neighbours of
+ * similar height touch: on a phone the gap between bars is narrower than the
+ * allowance, so the band step, less a little air, is the real limit.
+ */
+export function barLabelSlotPx(bandwidthPx: number, stepPx: number): number {
+  if (!Number.isFinite(bandwidthPx) || bandwidthPx <= 0) return 0;
+  const step = Number.isFinite(stepPx) && stepPx > bandwidthPx ? stepPx : bandwidthPx;
+  return Math.max(0, Math.min(bandwidthPx + X_GAP_ALLOWANCE, step - LABEL_SIDE_PAD_PX));
+}
 
 /** Rough rendered width of `text` at `fontPx`, for fit tests before anything is drawn. */
 export function estimateTextWidth(text: string, fontPx: number): number {
@@ -327,6 +339,54 @@ export function contrastingTextColor(fill: string): string {
   const luminance =
     0.2126 * channel(parsed.r) + 0.7152 * channel(parsed.g) + 0.0722 * channel(parsed.b);
   return luminance > 0.45 ? '#111111' : '#ffffff';
+}
+
+/** How the revenue figure above every bar is set: compact-unit decimals and font size. */
+export interface RevenueLabelStyle {
+  digits: number;
+  fontPx: number;
+}
+
+/**
+ * Ways to set the revenue figure, richest first. The figure shrinks one step
+ * before it loses its decimal and loses the decimal before it shrinks again:
+ * "$110B" next to "$109B" still ranks the bars and the tooltip keeps the
+ * exact figure, while a figure wider than its slot runs into its neighbour.
+ */
+const REVENUE_LABEL_FULL: RevenueLabelStyle = { digits: 1, fontPx: CHART_TYPE.axisLabel };
+const REVENUE_LABEL_SMALLEST: RevenueLabelStyle = { digits: 0, fontPx: CHART_TYPE.annotation };
+const REVENUE_LABEL_LADDER: readonly RevenueLabelStyle[] = [
+  REVENUE_LABEL_FULL,
+  { digits: 1, fontPx: CHART_TYPE.annotation },
+  { digits: 0, fontPx: CHART_TYPE.axisLabel },
+  REVENUE_LABEL_SMALLEST,
+];
+/** Bold glyphs run wider than the regular estimate; the revenue figure is weight 700. */
+const BOLD_WIDTH_FACTOR = 1.1;
+
+/**
+ * One style for every revenue figure in the chart: the richest rung of the
+ * ladder at which the widest figure still fits `slotPx`. Chosen per chart, not
+ * per bar, so neighbouring figures share a size. Falls back to the last rung
+ * when nothing fits, which only happens below any sensible bar width.
+ */
+export function revenueLabelStyle(
+  rows: readonly Pick<ProfitEstimatorRow, 'revenue'>[],
+  basis: ProfitBasis,
+  slotPx: number = Number.POSITIVE_INFINITY,
+): RevenueLabelStyle {
+  for (const style of REVENUE_LABEL_LADDER) {
+    const widest = Math.max(
+      0,
+      ...rows.map(
+        (row) =>
+          estimateTextWidth(formatProfitUsd(row.revenue, basis, style.digits), style.fontPx) *
+          BOLD_WIDTH_FACTOR,
+      ),
+    );
+    if (widest <= slotPx) return style;
+  }
+  return REVENUE_LABEL_SMALLEST;
 }
 
 /**
@@ -569,6 +629,8 @@ export default function ProfitEstimatorChart({
         const xScale = ctx.xScale as d3.ScaleBand<string>;
         const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
         const bandwidth = xScale.bandwidth();
+        // Widest a label above a bar may be without meeting its neighbour's.
+        const labelSlot = barLabelSlotPx(bandwidth, xScale.step());
 
         // One diagonal-hatch pattern per losing SKU, in that SKU's colour, so a
         // loss reads as "same chip, below the line" rather than as a new colour.
@@ -697,6 +759,14 @@ export default function ProfitEstimatorChart({
         const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
         // Same size the y domain reserved headroom for (both derive from the band width).
         const iconHeight = barMarkHeight(bandwidth);
+        // One format and size for every revenue figure, chosen so the widest
+        // fits its slot: on a phone two bars of similar height used to print
+        // "$110.3B" and "$108.7B" over each other.
+        const revenueStyle = revenueLabelStyle(
+          labelData.map((d) => d.row),
+          basis,
+          labelSlot,
+        );
         group
           .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
           .data(
@@ -727,16 +797,20 @@ export default function ProfitEstimatorChart({
           .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
           .attr('y', revenueBaselineY)
           .attr('text-anchor', 'middle')
-          .attr('font-size', px(CHART_TYPE.axisLabel))
+          .attr('font-size', px(revenueStyle.fontPx))
           .attr('font-weight', '700')
           .style('fill', 'var(--foreground)');
         revenueText
           .selectAll<SVGTSpanElement, ProfitSegment>('tspan')
           .data((d) => [
-            { row: d.row, text: formatProfitUsd(d.row.revenue, basis), sub: false },
             {
               row: d.row,
-              text: operatorMarginLabel(d.row, strings.marginShort, bandwidth + X_GAP_ALLOWANCE),
+              text: formatProfitUsd(d.row.revenue, basis, revenueStyle.digits),
+              sub: false,
+            },
+            {
+              row: d.row,
+              text: operatorMarginLabel(d.row, strings.marginShort, labelSlot),
               sub: true,
             },
           ])
