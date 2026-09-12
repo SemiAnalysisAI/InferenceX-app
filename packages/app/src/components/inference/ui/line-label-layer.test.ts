@@ -82,6 +82,25 @@ describe('point-label plot bounding box primitives', () => {
 });
 
 describe('line-label placement', () => {
+  it('reserves enough vertical space for the larger line-label pills', () => {
+    const labels = placeLineLabels(
+      [
+        series('first', [{ x: 50, y: 50 }]),
+        series('second', [
+          { x: 0, y: 60 },
+          { x: 50, y: 70 },
+          { x: 100, y: 100 },
+        ]),
+      ],
+      identity,
+      identity,
+      { collisionWidth: 60 },
+    );
+
+    // A 20px gap cleared the old 18px threshold, but not a 13px label plus padding.
+    expect(labels[1]).toMatchObject({ x: 100, y: 100, visible: true });
+  });
+
   it('uses later candidates when the preferred anchor collides', () => {
     const labels = placeLineLabels(
       [

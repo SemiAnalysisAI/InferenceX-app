@@ -166,6 +166,47 @@ describe('pill bounding box primitives', () => {
 });
 
 describe('clamped pills do not stack on their neighbours', () => {
+  it('uses nearby rows when a dense cluster fills both mirrored positions', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      ['a', 'b', 'c', 'd', 'e'].map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const boxes = ['a', 'b', 'c', 'd', 'e'].map((key) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      expectInsidePlot(box);
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
+  it('renders larger text and measures its pill before clamping on render and zoom', () => {
+    Object.defineProperty(SVGElement.prototype, 'getBBox', {
+      configurable: true,
+      value(this: SVGElement) {
+        const fontSize = Number.parseFloat(this.getAttribute('font-size') ?? '0');
+        return new DOMRect(
+          0,
+          -fontSize / 2,
+          (this.textContent ?? '').length * fontSize * 0.6,
+          fontSize,
+        );
+      },
+    });
+    const { zoomGroup } = renderChart();
+    const label = placement('gpu', 395, 4, 'MI355X');
+    renderLineLabels(zoomGroup, [label], { seriesAttribute: 'data-hw-key' });
+
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('13px');
+    expect(Number(zoomGroup.select('.ll-bg').attr('height'))).toBe(19);
+    expect(Number(zoomGroup.select('.ll-bg').attr('width'))).toBeCloseTo(56.8);
+    expectInsidePlot(pillBox(zoomGroup, 'gpu'));
+
+    updateRenderedLineLabels(zoomGroup, [{ ...label, x: 398, y: 298 }]);
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('13px');
+    expectInsidePlot(pillBox(zoomGroup, 'gpu'));
+  });
+
   it('flips a pill below its anchor when the neighbour above was slid down onto it', () => {
     // Bugbot's case: `placeLineLabels` cleared these two anchors (they are
     // 26px apart, more than one collision height), but the top pill has to

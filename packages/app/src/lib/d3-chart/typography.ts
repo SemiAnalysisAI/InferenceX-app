@@ -23,6 +23,8 @@ export const CHART_TYPE = {
   annotationSub: 10,
   /** Small labels attached to marks (points, radar vertices, rulers). */
   dataLabel: 10,
+  /** Series-identifying line labels, shared by interactive charts and PNGs. */
+  lineLabel: 13,
   /** Smallest legible size, for dense diagram labels. */
   micro: 9,
   /** Unofficial-results watermark pattern text. */

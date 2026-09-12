@@ -24,15 +24,19 @@ describe('useChartExport failure messages', () => {
   let exportContainer: HTMLDivElement;
   let current: ReturnType<typeof useChartExport>;
   let originalFonts: PropertyDescriptor | undefined;
+  let hideLegend: boolean | undefined;
+  const setIsLegendExpanded = vi.fn();
 
   function HookProbe() {
-    current = useChartExport({ chartId: 'inference-chart' });
+    current = useChartExport({ chartId: 'inference-chart', hideLegend, setIsLegendExpanded });
     return null;
   }
 
   beforeEach(() => {
     exportMocks.pathname = '/inference';
     exportMocks.toPng.mockReset();
+    hideLegend = undefined;
+    setIsLegendExpanded.mockReset();
     originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
     Object.defineProperty(document, 'fonts', {
       configurable: true,
@@ -84,6 +88,67 @@ describe('useChartExport failure messages', () => {
     expect(current.isExporting).toBe(false);
     expect(exportContainer.childElementCount).toBe(0);
     expect(chart.textContent).toBe('DeepSeek R1');
+  });
+
+  it.each([true, false])(
+    'omits the legend column and keeps official/overlay labels when the sidebar is open=%s',
+    async (open) => {
+      chart.innerHTML = `
+        <div class="flex">
+          <div class="relative"><div class="relative">
+            <svg data-testid="d3-chart-svg">
+              <text class="line-label">B200</text>
+              <text class="line-label">Unofficial MI355X</text>
+            </svg>
+          </div></div>
+          <div data-slot="chart-legend-wrapper">
+            ${open ? '<div class="legend-container">Legend hardware</div>' : '<button data-testid="legend-open-button">Show legend</button>'}
+          </div>
+        </div>`;
+      const original = chart.innerHTML;
+      hideLegend = true;
+      act(() => root.render(createElement(HookProbe)));
+      const captured = new Error('stop after capture assertions');
+      let snapshot: HTMLElement;
+      exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+        snapshot = element.cloneNode(true) as HTMLElement;
+        throw captured;
+      });
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await act(() => current.exportToImage());
+      expect(exportMocks.toPng).toHaveBeenCalledOnce();
+      expect(snapshot!.querySelector('[data-slot="chart-legend-wrapper"]')).toBeNull();
+      expect(snapshot!.querySelector('.legend-container')).toBeNull();
+      expect(snapshot!.querySelector('[data-testid="legend-open-button"]')).toBeNull();
+      expect(
+        [...snapshot!.querySelectorAll('.line-label')].map((label) => label.textContent),
+      ).toEqual(['B200', 'Unofficial MI355X']);
+      expect(setIsLegendExpanded).not.toHaveBeenCalled();
+      expect(chart.innerHTML).toBe(original);
+      expect(exportContainer.childElementCount).toBe(0);
+      expect(current.isExporting).toBe(false);
+    },
+  );
+
+  it('includes the legend again after line labels are toggled off', async () => {
+    chart.innerHTML =
+      '<div data-slot="chart-legend-wrapper"><div class="legend-container">B200</div></div>';
+    hideLegend = true;
+    act(() => root.render(createElement(HookProbe)));
+    hideLegend = false;
+    act(() => root.render(createElement(HookProbe)));
+    let snapshot: HTMLElement;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      snapshot = element.cloneNode(true) as HTMLElement;
+      throw new Error('stop after capture assertions');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(snapshot!.querySelector('.legend-container')?.textContent).toBe('B200');
+    expect(chart.querySelector('.legend-container')?.textContent).toBe('B200');
   });
 });
 
