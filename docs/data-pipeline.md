@@ -491,3 +491,37 @@ requires a known, matching run attempt and leaves the row unchanged if those
 source values differ. Database recovery rejects the mismatch before writing.
 P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
 original average power, including when checking an already-applied correction.
+
+### Power Audit Provenance (`power_invalid_reasons`, `power_audit`)
+
+Producers (`aggregate_power.py`) annotate every aggregate result row with two optional provenance fields alongside the `power_valid` verdict:
+
+- **`power_invalid_reasons`** — array of snake_case reason-code strings explaining a withheld verdict (emitted when `power_valid == 0`), e.g. `sampling_gap_exceeded`, `expected_gpu_count_mismatch`.
+- **`power_audit`** — compact measurement-window audit object with optional fields: `window_start_unix`, `window_end_unix`, `expected_gpu_count`, `observed_gpu_count`, `sample_count`, `max_sample_gap_s`, `producer_sha`, `exporter_image_sha256`, `source`, `observed_gpu_ids`. `source` is a safe relative path inside the original artifact bundle, and device identifiers may be indices on older collectors. Present on valid and invalid rows alike.
+
+`mapBenchmarkRow()` narrows them defensively (`extractPowerInvalidReasons` / `extractPowerAudit`): reason codes must match `/^[a-z][a-z0-9_]*$/` (≤ 64 chars, deduplicated, capped at 32), audit numerics must be finite (counts: non-negative safe integers), shas collapse to `null` unless a non-empty string ≤ 128 chars, and unknown audit keys are dropped. A failed `benchmark_outcome.status` is rejected as a performance point, retaining its original artifact as evidence. An empty result maps to `undefined`, so the dedicated `benchmark_results.power_invalid_reasons` / `power_audit` JSONB columns (migration 015, mirroring the `workers` precedent from migration 006) store SQL NULL — never `[]` or `{}`. Legacy artifacts without the fields flow through every layer as NULL/undefined.
+
+Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns as `to_jsonb(br) -> 'power_invalid_reasons'` (and `lb` on the matview branch) rather than bare column references. A bare reference fails during query planning until the next ingest workflow applies the migration, because migrations run in the ingest workflows rather than at Vercel deploy. The key lookup degrades to NULL while the column is missing and is byte-identical once it exists, making deploy order irrelevant.
+
+### PowerX publication receipts
+
+The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
+8K/1K point records the mapped, override-adjusted metric contract, all configuration
+dimensions, original source run/attempt, structured audit, and input file SHA-256.
+Reused sweeps keep their original source identity. Failed or unmapped explicit 8K/1K
+results and database errors remain in the manifest; they cannot pass verification.
+
+After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
+power-publication.json` compares every expected point against the exact database
+run attempt and public `runId=…&exactRun=true` response. It checks missing values and
+withheld telemetry as well as numbers; legacy missing measurements remain missing.
+A `matched` receipt establishes transport fidelity, not collection coverage. An
+empty receipt says `no_8k1k_points`, never that power coverage was validated.
+The workflow retains both the input manifest and verification receipt. Cache
+invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
+ledger edits trigger the existing reviewed override workflow.
+
+The dashboard availability panel uses scoped points before Y-metric filtering,
+including visible unofficial overlays. It distinguishes schema-2 validation,
+other validated data, missing verdicts, withheld measurements, unavailable metrics,
+and non-applicable separate-pool metrics without filling missing values.

@@ -23,6 +23,12 @@
  */
 
 import fs from 'fs';
+import { createHash } from 'node:crypto';
+import {
+  powerPublicationPoint,
+  publicationIdentity,
+  type PowerPublicationPoint,
+} from './etl/power-publication';
 import os from 'os';
 import path from 'path';
 
@@ -84,6 +90,9 @@ import {
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
+const powerPublicationErrors: string[] = [];
+const tracker = createSkipTracker();
 const isDownloadMode = process.argv[2] === '--download';
 
 let artifactsDir: string;
@@ -269,7 +278,6 @@ function findJsonFiles(dir: string): string[] {
 
 async function main(): Promise<void> {
   validateRunBackfills();
-  const tracker = createSkipTracker();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
   const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN, [
@@ -486,11 +494,13 @@ async function main(): Promise<void> {
     for (const [fileIndex, file] of allBmkFiles.entries()) {
       const fileStart = Date.now();
       const relativeFile = path.relative(artifactsDir, file);
+      const artifactSha256 = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       console.log(
         `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
       );
       const data = readJson(file);
       if (!data) {
+        powerPublicationErrors.push(`Unreadable benchmark JSON: ${relativeFile}`);
         console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
         continue;
       }
@@ -508,7 +518,13 @@ async function main(): Promise<void> {
 
       const rows = rawRows
         .filter((r) => typeof r === 'object' && r !== null)
-        .map((r) => mapBenchmarkRow(r, tracker, undefined, runIdStr))
+        .map((r) => {
+          const mapped = mapBenchmarkRow(r, tracker, undefined, runIdStr);
+          if (!mapped && Number(r.isl) === 8192 && Number(r.osl) === 1024) {
+            powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
+          }
+          return mapped;
+        })
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -559,6 +575,13 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
+        const publication = powerPublicationPoint(
+          applied.point,
+          `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
+          { path: relativeFile, sha256: artifactSha256 },
+        );
+        if (publication)
+          powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
         toInsert.push(applied.point);
       }
       console.log(`    rows with resolved configs: ${toInsert.length}`);
@@ -998,6 +1021,26 @@ main()
     process.exitCode = 1;
   })
   .finally(() => {
+    const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
+    if (publicationPath) {
+      fs.writeFileSync(
+        publicationPath,
+        `${JSON.stringify(
+          {
+            version: 1,
+            runId: runIdNum,
+            runAttempt: runAttemptNum,
+            points: [...powerPublicationPoints.values()],
+            ingestErrors: [
+              ...powerPublicationErrors,
+              ...(tracker.skips.dbError ? [`${tracker.skips.dbError} database ingest errors`] : []),
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+    }
     if (tempDir) {
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });

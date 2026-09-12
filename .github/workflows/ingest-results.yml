@@ -75,6 +75,7 @@ jobs:
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
+          POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
         run: bun run admin:db:ingest:ci
 
@@ -94,7 +95,20 @@ jobs:
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: |
           curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
-            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
+            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET"
+
+      - name: Verify PowerX source, database and public API
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: bun packages/db/src/verify-power-publication.ts power-publication.json
+
+      - name: Retain PowerX publication receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: power-publication-${{ steps.artifacts.outputs.source-run-id }}
+          path: power-publication.json*
+          if-no-files-found: warn
 
       - name: Check for unmapped entities
         if: always()

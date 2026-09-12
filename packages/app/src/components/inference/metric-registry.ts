@@ -384,6 +384,7 @@ export const METRIC_REGISTRY = {
     labelZh: '实测平均功耗（TDP 占比）',
     title: 'Measured Average Power as Percent of TDP',
     titleZh: '实测平均功耗占 TDP 百分比',
+    polarity: 'lower',
   },
 } as const satisfies Record<string, MetricDefinition>;
 

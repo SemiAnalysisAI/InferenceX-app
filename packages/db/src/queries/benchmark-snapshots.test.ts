@@ -84,6 +84,7 @@ beforeAll(async () => {
   const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
   legacyCount = legacyRows.length;
   await db.exec(readFileSync(new URL('014_agentic_curve_snapshots.sql', dir), 'utf8'));
+  await db.exec(readFileSync(new URL('015_power_provenance.sql', dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM benchmark_results',
   );
@@ -106,6 +107,33 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(
       ids(await getAllBenchmarksForHistory(sql, 'glm5.2', null, null, 'agentic_traces')),
     ).toEqual([1, ...currentIds]);
+  });
+  it('retains power audits in materialized and dated snapshots without reviving replaced points', async () => {
+    await sql`UPDATE benchmark_results SET power_invalid_reasons = '["sampling_gap_exceeded"]'::jsonb,
+      power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
+    await db.exec(
+      readFileSync(new URL('../../migrations/015_power_provenance.sql', import.meta.url), 'utf8'),
+    );
+    for (const rows of [
+      await getLatestBenchmarks(sql, 'glm5.2'),
+      await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11'),
+    ]) {
+      expect(ids(rows)).toEqual(currentIds);
+      expect(rows.find((row) => Number(row.id) === 2)).toMatchObject({
+        power_invalid_reasons: ['sampling_gap_exceeded'],
+        power_audit: { expected_gpu_count: 16 },
+      });
+      expect(rows.find((row) => Number(row.id) === 3)).toMatchObject({
+        power_invalid_reasons: null,
+        power_audit: null,
+      });
+    }
+    const historicalRows = await getBenchmarksForRun(sql, 'glm5.2', 33219706372);
+    expect(historicalRows[0]).toMatchObject({
+      id: 1,
+      power_invalid_reasons: ['sampling_gap_exceeded'],
+      power_audit: { expected_gpu_count: 16 },
+    });
   });
   it('uses the same scope in SQL and TypeScript and preserves point attributes', async () => {
     const old = await getBenchmarksForRun(sql, 'glm5.2', 33219706372);

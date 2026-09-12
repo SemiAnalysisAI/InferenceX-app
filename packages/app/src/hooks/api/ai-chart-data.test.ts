@@ -67,7 +67,7 @@ describe('getAiMetricDirection', () => {
   });
 
   it('defaults a directionless metric to higher-is-better', () => {
-    expect(getAiMetricDirection('y_measuredPowerPercentTdp', chartDefinition)).toBe('higher');
+    expect(getAiMetricDirection('y_measuredPowerPercentTdp', {})).toBe('higher');
   });
 });
 

@@ -87,7 +87,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable.',
       zh: '仅供界面叠加非官方工作流产物。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。',
     },
-    sourceSha256: '3f6d0c4dbb1decb2c109ea8a572c1bb1b7db2b84652a4a2717ccb35b41995b5b',
+    sourceSha256: '39c7d93afe59aa7def2c196713735908907496552be9afc3ec736cbc7133d582',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -741,7 +741,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '96fb2be476ce05ee0384b55bbacf00b0e5e35af28f7080dbf003b578800b5b01',
+    sourceSha256: '5e3fec29e193c9b7964fa3faf2226112aa5ac30cc8f5e5fff13d298909cdd8fc',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
