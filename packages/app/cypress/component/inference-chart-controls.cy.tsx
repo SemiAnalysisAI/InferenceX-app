@@ -74,12 +74,12 @@ describe('Modeled system-power table', () => {
  */
 function mountWithPowerGroupsUnlocked() {
   cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
-  mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+  mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 }
 
 describe('Inference ChartControls', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
 
   afterEach(() => {
@@ -320,7 +320,10 @@ describe('Inference ChartControls', () => {
 
   it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
     cy.viewport(1280, 900);
-    mountWithProviders(<InferenceChartControls hideGpuComparison />, { inference: {} });
+    mountWithProviders(<InferenceChartControls hideGpuComparison />, {
+      inference: {},
+      unofficial: {},
+    });
     cy.get('[data-testid="x-axis-mode-selector"]').should('not.exist');
     cy.get('fieldset')
       .should('have.length', 2)
@@ -344,7 +347,7 @@ describe('Inference ChartControls', () => {
 
   it('keeps primary controls visible while secondary controls collapse on mobile', () => {
     cy.viewport(390, 844);
-    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 
     cy.get('#model-select').should('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -362,7 +365,7 @@ describe('Inference ChartControls', () => {
 
   it('shows secondary controls by default on desktop', () => {
     cy.viewport(1280, 900);
-    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 
     cy.get('[data-testid="inference-secondary-controls"] > button').should('not.be.visible');
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
@@ -374,7 +377,7 @@ describe('Inference ChartControls', () => {
       <PathnameContext.Provider value="/zh/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
-      { inference: {} },
+      { inference: {}, unofficial: {} },
     );
     // The count is derived from actual non-default settings, not merely present controls.
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -386,6 +389,7 @@ describe('Inference ChartControls', () => {
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
@@ -398,6 +402,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.DeepSeek_V4_Pro,
@@ -411,6 +416,7 @@ describe('Inference ChartControls cost metrics', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
     mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
@@ -424,6 +430,7 @@ describe('Inference ChartControls cost metrics', () => {
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
     it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
       mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+        unofficial: {},
         inference: {
           selectedYAxisMetric,
           selectedModel: Model.Qwen3_5,
@@ -438,6 +445,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   it('hides TCO for a cost metric when no TPU hardware is visible', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
@@ -489,6 +497,7 @@ describe('Inference ChartControls cost metrics', () => {
 describe('Inference ChartControls infrastructure tokens per dollar', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      unofficial: {},
       inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },
       globalFilters: {},
     });
@@ -512,6 +521,7 @@ describe('Inference ChartControls infrastructure tokens per dollar', () => {
 describe('Inference ChartControls with GPUs selected', () => {
   it('shows the date range picker when GPUs are selected', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      unofficial: {},
       inference: {
         selectedGPUs: ['h100'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -523,6 +533,7 @@ describe('Inference ChartControls with GPUs selected', () => {
 
   it('leaves the optional date range unflagged for a selected current config', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      unofficial: {},
       inference: {
         selectedGPUs: ['h100'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -537,6 +548,7 @@ describe('Inference ChartControls with GPUs selected', () => {
 
   it('leaves the date range unflagged when exact comparison entries are pinned', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, {
+      unofficial: {},
       inference: {
         selectedGPUs: ['b200_sglang', 'b200_vllm'],
         selectedDateRange: { startDate: '', endDate: '' },
@@ -551,6 +563,7 @@ describe('Inference ChartControls with GPUs selected', () => {
 describe('Inference ChartControls with hideGpuComparison', () => {
   it('hides GPU config selector when hideGpuComparison is true', () => {
     mountWithProviders(<InferenceChartControls hideGpuComparison />, {
+      unofficial: {},
       inference: {},
     });
 
@@ -567,6 +580,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       {
+        unofficial: {},
         inference: { selectedSequence: Sequence.AgenticTraces, selectedXAxisMode: 'interactivity' },
       },
     );
@@ -586,7 +600,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
 
 describe('Axis option help', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {} });
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
 
   for (const searchable of [true, false]) {
