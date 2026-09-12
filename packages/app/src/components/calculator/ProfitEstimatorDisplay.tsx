@@ -309,7 +309,7 @@ const STRINGS = {
     dateRangePlaceholder: 'Select date range',
     historyNote: (dates: string) =>
       `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier.`,
-    historyNoData: (entries: string) => `No run at the target on ${entries}.`,
+    historyNoData: (entries: string) => `No estimate at the target on ${entries}.`,
     csvDateHeader: 'Run date',
   },
   zh: {
@@ -423,7 +423,7 @@ const STRINGS = {
     dateRangePlaceholder: '选择日期范围',
     historyNote: (dates: string) =>
       `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致。`,
-    historyNoData: (entries: string) => `${entries} 在目标处无运行结果。`,
+    historyNoData: (entries: string) => `${entries} 在目标交互性下无法估算。`,
     csvDateHeader: '运行日期',
   },
 } as const;
@@ -599,7 +599,10 @@ function ProfitEstimatorInner({
     () => profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
-  const [powerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  const featureGateUnlocked = useFeatureGate();
+  const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
+  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
   useEffect(() => {
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
@@ -933,7 +936,6 @@ function ProfitEstimatorInner({
     track('profit_custom_cost_set', { gpu: base, value: raw });
   }, []);
 
-  const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
   const openRouterModelId = getOpenRouterModelId(selectedModel);
@@ -1338,6 +1340,22 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
+  const powerUnavailable = useMemo(
+    () =>
+      t.skipped(
+        fullEstimate.skipped
+          .map((row) => {
+            const label = rowLabel(
+              { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
+              hardwareConfig,
+            );
+            return `${label}: ${t.skipReason[row.reason]}`;
+          })
+          .join('; '),
+      ),
+    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
+  );
+
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
@@ -1354,7 +1372,7 @@ function ProfitEstimatorInner({
             targetValue,
           )}
         </Heading>
-        {basis === 'gw-year' && (
+        {powerControlsEnabled && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
             {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
@@ -1362,14 +1380,7 @@ function ProfitEstimatorInner({
         )}
         {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-unavailable">
-            {t.skipped(
-              fullEstimate.skipped
-                .map(
-                  (row) =>
-                    `${getDisplayLabel(hardwareConfig[row.hwKey])}: ${t.skipReason[row.reason]}`,
-                )
-                .join('; '),
-            )}
+            {powerUnavailable}
           </p>
         )}
         <ResultContext
@@ -1447,6 +1458,8 @@ function ProfitEstimatorInner({
   }, [
     pricing,
     powerBasis,
+    powerControlsEnabled,
+    powerUnavailable,
     fullEstimate.skipped,
     hardwareConfig,
     effectivePriceSource,
@@ -1497,7 +1510,7 @@ function ProfitEstimatorInner({
     const [sku, precision, ...rest] = t.csvHeaders[basis];
     exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
-      ...(basis === 'gw-year'
+      ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
             ...(powerBasis === 'provisioned' ? [] : [t.powerPreview]),
@@ -1513,6 +1526,7 @@ function ProfitEstimatorInner({
     basis,
     selectedRunDate,
     powerBasis,
+    powerControlsEnabled,
   ]);
 
   if (!loading && error) {
@@ -1580,7 +1594,7 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
-                  {basis === 'gw-year' && (
+                  {powerControlsEnabled && (
                     <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
                       <LabelWithTooltip
                         htmlFor="profit-power"
@@ -1870,15 +1884,7 @@ function ProfitEstimatorInner({
                     className="mb-3 text-xs text-muted-foreground"
                     data-testid="profit-power-unavailable"
                   >
-                    {t.powerPreview}{' '}
-                    {t.skipped(
-                      fullEstimate.skipped
-                        .map(
-                          (row) =>
-                            `${getDisplayLabel(hardwareConfig[row.hwKey])}: ${t.skipReason[row.reason]}`,
-                        )
-                        .join('; '),
-                    )}
+                    {t.powerPreview} {powerUnavailable}
                   </p>
                 )}
               <ChartButtons

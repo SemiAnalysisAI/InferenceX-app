@@ -168,6 +168,17 @@ describe('rowLabel', () => {
       'H200 (FP8) • 2026-06-14',
     );
   });
+
+  it('labels a historical omission without current hardware metadata or pricing', () => {
+    const skipped = {
+      hwKey: 'b300_vllm',
+      precision: 'fp8',
+      reason: 'no-measured-power',
+      date: '2026-06-14',
+      dateLabel: '2026-06-14 (run 2)',
+    };
+    expect(rowLabel(skipped, hardwareConfig)).toBe('B300 (vLLM) (FP8) • 2026-06-14 (run 2)');
+  });
 });
 
 describe('splitHistoryLabel', () => {

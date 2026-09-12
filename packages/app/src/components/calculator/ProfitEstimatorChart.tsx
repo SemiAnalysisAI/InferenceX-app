@@ -416,7 +416,10 @@ export function profitYDomain(
   return [bottom * 1.12, top === 0 ? 1 : top + headroom];
 }
 
-export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig): string {
+export function rowLabel(
+  row: Pick<ProfitEstimatorRow, 'hwKey' | 'precision' | 'powerLabel' | 'date' | 'dateLabel'>,
+  hardwareConfig: HardwareConfig,
+): string {
   const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
   const base = config ? getDisplayLabel(config) : row.hwKey;
   const precisionLabel = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
