@@ -132,12 +132,14 @@ describe('ProfitEstimatorChart revenue labels', () => {
     cy.get('[data-testid="profit-estimator-chart"] rect.bar')
       .first()
       .then(($bar) => {
-        const plot = (
-          $bar[0] as unknown as SVGRectElement
-        ).ownerSVGElement!.getBoundingClientRect();
+        const svg = ($bar[0] as unknown as SVGRectElement).ownerSVGElement!;
+        const plot = svg.getBoundingClientRect();
+        const axisTop = svg.querySelector('.x-axis path.domain')!.getBoundingClientRect().top;
         barColumns().then((columns) => {
           cy.get('[data-testid="profit-estimator-chart"] .loss-label').each(($label) => {
             const box = $label[0].getBoundingClientRect();
+            // The deepest loss reaches the domain floor; its figure must still clear the axis line.
+            expect(box.bottom, `"${$label.text()}" sits on the x axis`).to.be.lessThan(axisTop);
             const centre = (box.left + box.right) / 2;
             const own = columns.find((c) => c.left <= centre && centre <= c.right);
             expect(own, `no bar under "${$label.text()}"`).to.not.equal(undefined);

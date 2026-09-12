@@ -540,10 +540,21 @@ export function stackHeadroomPx(iconHeightPx = BAR_ICON_MIN_HEIGHT): number {
 /** Headroom with the smallest vendor mark; what a phone-width chart reserves. */
 export const STACK_HEADROOM_PX = stackHeadroomPx();
 
+/** Baseline of the loss figure below the bottom of its hatch, in px. */
+const LOSS_LABEL_DY = 14;
+/**
+ * Pixels the deepest loss needs below it: the loss figure's baseline offset
+ * plus a text line of clearance before the axis line. Without this the figure
+ * of a loss that reaches the domain floor sat on top of the x axis.
+ */
+export const LOSS_FOOTROOM_PX = LOSS_LABEL_DY + CHART_TYPE.annotation;
+
 /**
  * Y domain for the bars. The top is the tallest positive stack plus exactly the
- * pixel headroom its labels need (`headroomPx`), converted to data units through
- * `plotHeightPx` (a proportional 30% fallback when the plot has not been measured yet).
+ * pixel headroom its labels need (`headroomPx`); the bottom is the deepest loss
+ * plus the pixel footroom its figure needs (`LOSS_FOOTROOM_PX`, none when nothing
+ * loses money). Both are converted to data units through `plotHeightPx`, with a
+ * proportional fallback (30% above, 12% below) when the plot has not been measured yet.
  */
 export function profitYDomain(
   rows: readonly ProfitEstimatorRow[],
@@ -556,9 +567,13 @@ export function profitYDomain(
   const top = Math.max(0, ...rows.map(stackTopValue));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   const span = top - bottom;
-  const headroom =
-    plotHeightPx > headroomPx * 2 ? (span * headroomPx) / (plotHeightPx - headroomPx) : span * 0.3;
-  return [bottom * 1.12, top === 0 ? 1 : top + headroom];
+  const footroomPx = bottom < 0 ? LOSS_FOOTROOM_PX : 0;
+  const reservedPx = headroomPx + footroomPx;
+  if (plotHeightPx > reservedPx * 2) {
+    const unitsPerPx = span / (plotHeightPx - reservedPx);
+    return [bottom - unitsPerPx * footroomPx, top === 0 ? 1 : top + unitsPerPx * headroomPx];
+  }
+  return [bottom * 1.12, top === 0 ? 1 : top + span * 0.3];
 }
 
 export function rowLabel(
@@ -932,7 +947,7 @@ export default function ProfitEstimatorChart({
           .join('text')
           .attr('class', 'loss-label')
           .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', (d) => yScale(d.row.profit) + 14)
+          .attr('y', (d) => yScale(d.row.profit) + LOSS_LABEL_DY)
           .attr('text-anchor', 'middle')
           .attr('font-size', px(CHART_TYPE.annotation))
           .attr('font-weight', '600')

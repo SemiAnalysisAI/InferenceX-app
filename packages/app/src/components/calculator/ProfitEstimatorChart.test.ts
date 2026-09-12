@@ -18,6 +18,7 @@ import {
   splitHistoryLabel,
   xLabelLayout,
   operatorMarginLabel,
+  LOSS_FOOTROOM_PX,
   profitYDomain,
   BAR_ICON_MAX_HEIGHT,
   BAR_ICON_MIN_HEIGHT,
@@ -139,6 +140,24 @@ describe('profitYDomain', () => {
     const [, roomy] = profitYDomain([row()], 500, stackHeadroomPx(BAR_ICON_MAX_HEIGHT));
     expect(roomy).toBeGreaterThan(top);
     expect((roomy - 1000) * (500 / roomy)).toBeCloseTo(stackHeadroomPx(BAR_ICON_MAX_HEIGHT), 5);
+  });
+
+  it('reserves pixel footroom under the deepest loss once the plot height is known', () => {
+    const losing = row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 0, profit: -100 });
+    const [bottom, top] = profitYDomain([losing], 500);
+    const pxPerUnit = 500 / (top - bottom);
+    // The loss figure hangs LOSS_FOOTROOM_PX below the hatch, so the floor sits that far under it.
+    expect((-100 - bottom) * pxPerUnit).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
+    // The headroom above the stack is unchanged by the footroom.
+    expect((top - 400) * pxPerUnit).toBeCloseTo(STACK_HEADROOM_PX, 5);
+    // A loss that fills nearly the whole plot still keeps its figure clear of the axis.
+    const deep = row({ revenue: 100, tco: 2000, grossMargin: -1900, labCut: 0, profit: -1900 });
+    const [deepBottom, deepTop] = profitYDomain([deep], 300);
+    expect((-1900 - deepBottom) * (300 / (deepTop - deepBottom))).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
+  });
+
+  it('reserves no footroom when nothing loses money', () => {
+    expect(profitYDomain([row()], 500)[0]).toBe(0);
   });
 
   it('extends below zero when any SKU loses money, and covers TCO when it exceeds revenue', () => {
