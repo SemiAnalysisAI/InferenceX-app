@@ -197,13 +197,13 @@ describe('clamped pills do not stack on their neighbours', () => {
     const label = placement('gpu', 395, 4, 'MI355X');
     renderLineLabels(zoomGroup, [label], { seriesAttribute: 'data-hw-key' });
 
-    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('16px');
-    expect(Number(zoomGroup.select('.ll-bg').attr('height'))).toBe(22);
-    expect(Number(zoomGroup.select('.ll-bg').attr('width'))).toBeCloseTo(67.6);
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('13px');
+    expect(Number(zoomGroup.select('.ll-bg').attr('height'))).toBe(19);
+    expect(Number(zoomGroup.select('.ll-bg').attr('width'))).toBeCloseTo(56.8);
     expectInsidePlot(pillBox(zoomGroup, 'gpu'));
 
     updateRenderedLineLabels(zoomGroup, [{ ...label, x: 398, y: 298 }]);
-    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('16px');
+    expect(zoomGroup.select('.ll-text').attr('font-size')).toBe('13px');
     expectInsidePlot(pillBox(zoomGroup, 'gpu'));
   });
 

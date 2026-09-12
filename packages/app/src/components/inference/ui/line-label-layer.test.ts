@@ -97,7 +97,7 @@ describe('line-label placement', () => {
       { collisionWidth: 60 },
     );
 
-    // A 20px gap cleared the old 18px threshold, but not a 16px label plus padding.
+    // A 20px gap cleared the old 18px threshold, but not a 13px label plus padding.
     expect(labels[1]).toMatchObject({ x: 100, y: 100, visible: true });
   });
 
