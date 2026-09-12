@@ -36,6 +36,7 @@
 
 import {
   interceptProfitData,
+  profitBenchmarkRows,
   PROFIT_CHANGELOG_NOTES,
   PROFIT_DATE,
   PROFIT_HISTORY_DATE,
@@ -82,10 +83,153 @@ function suppressNudges(win: Cypress.AUTWindow): void {
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
 }
 
+function unlockPowerGate(win: Cypress.AUTWindow): void {
+  suppressNudges(win);
+  win.localStorage.setItem('inferencex-feature-gate', '1');
+}
+
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 /** The plot SVG itself, not the icon SVGs inside the export button. */
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
+
+describe('Profit estimator power option', () => {
+  it('ignores power URL overrides while locked and returns to provisioned estimates on relock', () => {
+    stubOpenRouter();
+    let rawRequests = 0;
+    cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+      if (req.query['view'] !== 'calculator') rawRequests++;
+      req.reply({
+        body: profitBenchmarkRows().map((row) => ({
+          ...row,
+          metrics: {
+            ...row.metrics,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+            avg_power_w: 500,
+            avg_total_gpu_power_w: 4000,
+          },
+        })),
+      });
+    });
+    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: (win) => {
+        suppressNudges(win);
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    chart().find('text.revenue-label').should('have.length', 4);
+    cy.get('#profit-power').should('not.exist');
+    cy.get('[data-testid="profit-power-note"]').should('not.exist');
+    cy.then(() => expect(rawRequests).to.equal(0));
+    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
+    cy.get('#profit-power').should('contain', 'Compare both');
+    chart().find('text.revenue-label').should('have.length', 6);
+    cy.window().then((win) => {
+      win.localStorage.removeItem('inferencex-feature-gate');
+      win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
+    });
+    cy.get('#profit-power').should('not.exist');
+    cy.get('[data-testid="profit-power-note"]').should('not.exist');
+    chart().find('text.revenue-label').should('have.length', 4);
+  });
+
+  for (const currentValid of [true, false]) {
+    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'empty chart'})`, () => {
+      stubOpenRouter();
+      cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+        const historical = req.query['date'] === PROFIT_HISTORY_DATE;
+        const rows = profitBenchmarkRows(
+          'kimik3',
+          historical ? PROFIT_HISTORY_DATE : PROFIT_DATE,
+        ).filter((row) => row.hardware === 'b200' || (historical && row.hardware === 'b300'));
+        req.reply({
+          body: rows.map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: !historical && currentValid ? 1 : 0,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+        });
+      });
+      cy.visit(
+        `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
+        { onBeforeLoad: unlockPowerGate },
+      );
+      cy.get('[data-testid="profit-power-unavailable"]').should(
+        'contain',
+        `B300 (vLLM) (FP4) • ${PROFIT_HISTORY_DATE}`,
+      );
+      cy.get('[data-testid="profit-power-unavailable"]').should(
+        'contain',
+        `B200 (SGLang) (FP4) • ${PROFIT_HISTORY_DATE}`,
+      );
+      if (currentValid) chart().find('text.revenue-label').should('have.length', 2);
+      else cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
+    });
+  }
+
+  it('loads full telemetry and compares matching hardware when opened from a share URL', () => {
+    stubOpenRouter();
+    cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+      const rows = profitBenchmarkRows();
+      if (req.query['view'] === 'calculator') {
+        req.reply({ body: rows });
+      } else {
+        req.alias = 'power-rows';
+        req.reply({
+          body: rows.map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+        });
+      }
+    });
+    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', { onBeforeLoad: unlockPowerGate });
+    cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
+    cy.get('#profit-power').should('contain', 'Compare both');
+    cy.get('#profit-target').should('have.value', '45');
+    chart().find('text.revenue-label').should('have.length', 6);
+    chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
+    chart().should('contain', 'Measured + modeled').and('contain', 'Provisioned');
+    cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
+  });
+
+  it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
+    stubOpenRouter();
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: unlockPowerGate });
+    bars().its('length').should('be.greaterThan', 0);
+    chart()
+      .invoke('text')
+      .then((original) => {
+        cy.get('#profit-power').click();
+        cy.get('[role="option"]').contains('Measured + modeled power').click();
+        // These existing fixtures intentionally have throughput but no validated power.
+        cy.get('[data-testid="profit-power-unavailable"]').should(
+          'contain',
+          'no usable measured power',
+        );
+        cy.get('#profit-target').should('have.value', '45');
+        cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
+        cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
+        cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
+        cy.get('#profit-power').click();
+        cy.get('[role="option"]').contains('Provisioned power').click();
+        bars().its('length').should('be.greaterThan', 0);
+        chart().should('have.text', original);
+      });
+  });
+});
 // The formula fold is collapsed by default; open it (if it is not already) before
 // reading the text. Tests share one page, so a previous test may have opened it.
 const openFormulaNotes = () =>

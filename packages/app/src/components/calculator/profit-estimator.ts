@@ -178,6 +178,7 @@ export const DEFAULT_UTILIZATION_PCT = 60;
 export type ProfitBasis = 'chip-hour' | 'gw-year';
 
 export interface ProfitEstimatorAssumptions {
+  powerBasis?: 'provisioned' | 'modeled' | 'compare';
   /** 0–100. Revenue is scaled by this share; TCO is not. */
   utilizationPct: number;
   /** 0–100. Share of revenue paid to the model lab. */
@@ -186,6 +187,8 @@ export interface ProfitEstimatorAssumptions {
 }
 
 export interface ProfitEstimatorRow {
+  /** Distinguish identical hardware bars when both power budgets are shown. */
+  powerLabel?: string;
   hwKey: string;
   resultKey: string;
   precision?: string;
@@ -223,6 +226,7 @@ export interface ProfitEstimatorRow {
  * for the same reason.
  */
 export type ProfitEstimatorSkipReason =
+  | 'no-measured-power'
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'

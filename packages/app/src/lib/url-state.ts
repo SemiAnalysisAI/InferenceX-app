@@ -95,6 +95,7 @@ const URL_STATE_KEYS = [
   'c_mtbi',
   'c_rec',
   'c_life',
+  'c_power',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -188,6 +189,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_price: '',
   c_oprice: '',
   c_life: '',
+  c_power: 'provisioned',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

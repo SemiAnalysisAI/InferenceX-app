@@ -81,6 +81,53 @@ schema and reports `validated-unversioned-single-node`; it does not upgrade the
 source or admit unversioned disaggregated power. The article receipt additionally
 pins the producer checkout and retains each original audit artifact.
 
+## Profit Estimator power basis
+
+The per-GW Profit Estimator offers provisioned power, measured + modeled power,
+and a paired comparison in Benchmark Config. Provisioned remains the default.
+The control uses the existing insider feature gate and is hidden while locked.
+Unlock with ↑↑↓↓ (`inferencex-feature-gate=1` in local storage). While locked,
+`c_power` cannot activate an alternative calculation or fetch full power rows;
+relocking restores provisioned estimates immediately.
+The alternative reuses the same hardware, P90 target, throughput frontier,
+token mix, prices, utilization, and per-GPU-hour costs. It changes only the
+facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
+compute expense, license fee, and profit scale together; profit margin does not
+change. Electricity expense is not recomputed separately.
+
+This opt-in AgentX estimate requires validated schema-v2 telemetry and a complete
+single-node eight-GPU chassis supported by the pinned model. Partial allocations,
+unsupported GB200/GB300 chassis, and missing/invalid measurements stay unavailable.
+The ordinary 8K/1K transformation keeps its existing admission policy.
+
+At an exact frontier point, use that point's modeled power. Between points,
+estimate power linearly using the same two knots as the existing throughput
+interpolation; never select a different point to fill a power gap. The estimate
+uses PUE 1.3 and an additional 10% planning margin. These assumptions, including
+the fixed CPU/DRAM utilization above, are not validated peak-load provisioning or
+AgentX system calibration. The UI and CSV label the estimate and its assumptions.
+`c_power=modeled` and `c_power=compare` preserve the selection in share URLs.
+Unavailable historical estimates use the hardware registry when a chip is absent
+from today's results and include the source date/run label.
+
+每 GW 利润估算器在基准测试配置中提供预配功耗、实测加建模功耗，以及两种方式的同口径
+对比；默认仍采用预配功耗。两种方式使用同一硬件、P90 目标、吞吐量前沿、token 比例、
+价格、利用率和每 GPU 小时成本，仅改变换算每 GW 容量时采用的设施功率。因此收入、
+计算成本、模型许可费和利润按相同比例变化，利润率不变；不会另行重新计算电费。
+
+该选项由现有内部功能开关控制，锁定时隐藏。按 ↑↑↓↓ 解锁（本地存储
+`inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
+数据请求；重新锁定后立即恢复预配功耗估算。
+
+AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求完整的单节点八卡机箱及适用模型。
+部分卡分配、GB200/GB300 等无匹配模型的机箱，以及缺失或无效功耗保持不可用。原有
+8K/1K 转换路径的接纳规则不变。精确前沿点使用自身的功耗；点间采用原吞吐量插值的
+同一对数据点线性估算功耗，不换用其他点填补缺失。PUE 取 1.3，另加 10% 功耗余量；
+这些假设和上述固定 CPU/DRAM 利用率尚未通过 AgentX 系统校准，也不构成峰值供电容量
+验证。界面与 CSV 会注明估算及其假设，分享链接通过 `c_power` 保留所选方式。
+历史估算不可用时，若当天结果不含该芯片，则从硬件注册表获取名称；提示会附上来源
+日期或运行标签，避免与当前结果混淆。
+
 ## Offline comparison export
 
 The exporter reads a local cohort envelope and writes a **new** output directory:
