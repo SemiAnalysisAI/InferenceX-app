@@ -84,7 +84,6 @@ import { getDisplayLabel } from '@/lib/utils';
 import {
   clampPercent,
   DEFAULT_UTILIZATION_PCT,
-  estimateProfitRows,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
@@ -94,6 +93,7 @@ import {
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
 import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
   historyFadeShare,
@@ -203,6 +203,17 @@ const STRINGS = {
       'chip-hour': 'Revenue & Profit Estimator',
     },
     benchmarkGroup: 'Benchmark Config',
+    powerLabel: 'Power Estimation',
+    powerTooltip:
+      'Change only the power budget used to scale the same benchmark result to one GW. Pricing, throughput, utilization and unit costs stay the same.',
+    powerOptions: {
+      provisioned: 'Provisioned power',
+      modeled: 'Measured + modeled power',
+      compare: 'Compare both (apples-to-apples)',
+    },
+    powerBarLabels: { provisioned: 'Provisioned', modeled: 'Measured + modeled' },
+    powerPreview:
+      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. AgentX system power is not yet qualified.',
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -283,6 +294,8 @@ const STRINGS = {
     skipReason: {
       'outside-measured-range': 'no measured point at the target interactivity',
       'no-power': 'no all-in power figure',
+      'no-measured-power':
+        'no usable measured power or supported system model for these benchmark points',
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
@@ -305,6 +318,17 @@ const STRINGS = {
       'chip-hour': '收入与利润估算器',
     },
     benchmarkGroup: '基准测试配置',
+    powerLabel: '功耗估算方式',
+    powerTooltip:
+      '仅更改将同一基准测试结果换算为每 GW 收益时采用的功耗预算。价格、吞吐量、利用率和单位成本保持不变。',
+    powerOptions: {
+      provisioned: '预配功耗',
+      modeled: '实测 GPU + 系统功耗估算',
+      compare: '同口径对比两种估算方式',
+    },
+    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算' },
+    powerPreview:
+      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。AgentX 系统功耗模型尚未完成验证。',
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -385,6 +409,7 @@ const STRINGS = {
     skipReason: {
       'outside-measured-range': '未在该交互性下实测',
       'no-power': '缺少全电源配置功率数据',
+      'no-measured-power': '同一组基准测试数据点缺少有效功耗或适用的系统模型',
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
@@ -574,6 +599,11 @@ function ProfitEstimatorInner({
     () => profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  const [powerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  useEffect(() => {
+    const value = getUrlParam('c_power');
+    setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
+  }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
     profitModelDefaults(selectedModel).labCutPct,
@@ -625,6 +655,7 @@ function ProfitEstimatorInner({
     true,
     'total',
     tcoBasis,
+    basis === 'gw-year' && powerBasis !== 'provisioned',
   );
 
   // ── Compare history ───────────────────────────────────────────────────────
@@ -780,6 +811,7 @@ function ProfitEstimatorInner({
     currentRunDate: selectedRunDate,
     currentRunIds: historyCurrentRunIds,
     enabled: hasData,
+    includePower: basis === 'gw-year' && powerBasis !== 'provisioned',
   });
   const historyActive = history.comparisonDates.length > 0;
   const historyRunNumbering = useMemo(() => {
@@ -937,8 +969,8 @@ function ProfitEstimatorInner({
   ]);
 
   const assumptions = useMemo(
-    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis }),
-    [utilization.value, labCut.value, basis],
+    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis, powerBasis }),
+    [utilization.value, labCut.value, basis, powerBasis],
   );
 
   // Price every SKU first, then build the legend from the ones that produced a
@@ -965,7 +997,7 @@ function ProfitEstimatorInner({
           }),
         ]
       : current;
-    const estimated = estimateProfitRows(
+    const estimated = estimateProfitByPower(
       results,
       (hwKey) => ({
         powerKwPerGpu: getGpuSpecs(hwKey).power,
@@ -973,6 +1005,9 @@ function ProfitEstimatorInner({
       }),
       pricing,
       assumptions,
+      powerBasis,
+      targetValue,
+      t.powerBarLabels,
     );
     if (!historyActive) return estimated;
     return {
@@ -985,6 +1020,8 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
+    powerBasis,
+    t.powerBarLabels,
     targetValue,
     mode,
     interpolationCostProvider,
@@ -1317,6 +1354,24 @@ function ProfitEstimatorInner({
             targetValue,
           )}
         </Heading>
+        {basis === 'gw-year' && (
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
+            {t.powerLabel}: {t.powerOptions[powerBasis]}
+            {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
+          </p>
+        )}
+        {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-unavailable">
+            {t.skipped(
+              fullEstimate.skipped
+                .map(
+                  (row) =>
+                    `${getDisplayLabel(hardwareConfig[row.hwKey])}: ${t.skipReason[row.reason]}`,
+                )
+                .join('; '),
+            )}
+          </p>
+        )}
         <ResultContext
           locale={locale}
           costTier={costTier}
@@ -1391,6 +1446,9 @@ function ProfitEstimatorInner({
     );
   }, [
     pricing,
+    powerBasis,
+    fullEstimate.skipped,
+    hardwareConfig,
     effectivePriceSource,
     listPricing,
     selectedModel,
@@ -1439,8 +1497,23 @@ function ProfitEstimatorInner({
     const [sku, precision, ...rest] = t.csvHeaders[basis];
     exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
+      ...(basis === 'gw-year'
+        ? [
+            `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
+            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview]),
+          ]
+        : []),
     ]);
-  }, [estimate.rows, hardwareConfig, exportFileName, t, assumptions, basis, selectedRunDate]);
+  }, [
+    estimate.rows,
+    hardwareConfig,
+    exportFileName,
+    t,
+    assumptions,
+    basis,
+    selectedRunDate,
+    powerBasis,
+  ]);
 
   if (!loading && error) {
     console.error(error);
@@ -1507,6 +1580,41 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
+                  {basis === 'gw-year' && (
+                    <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                      <LabelWithTooltip
+                        htmlFor="profit-power"
+                        label={t.powerLabel}
+                        tooltip={t.powerTooltip}
+                      />
+                      <div data-testid="profit-power-selector">
+                        <MultiSelect
+                          triggerId="profit-power"
+                          options={Object.entries(t.powerOptions).map(([value, label]) => ({
+                            value,
+                            label,
+                          }))}
+                          value={[powerBasis]}
+                          onChange={(values) => {
+                            const next = values[0];
+                            if (next !== 'provisioned' && next !== 'modeled' && next !== 'compare')
+                              return;
+                            setPowerBasis(next);
+                            setUrlParam('c_power', next === 'provisioned' ? '' : next);
+                            track('profit_power_basis_changed', { basis: next });
+                          }}
+                          open={openDropdown === 'power'}
+                          onOpenChange={handleDropdownOpenChange('power')}
+                          minSelections={1}
+                          maxSelections={1}
+                          showClearAll={false}
+                          searchable={false}
+                          plainSelectedText
+                          showSelectionSummary={false}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </ControlPanel>
                 <ControlPanel
                   legend={t.pricingGroup}
@@ -1755,6 +1863,24 @@ function ProfitEstimatorInner({
           )}
           {pricing ? (
             <figure data-testid="profit-figure" className="relative rounded-lg">
+              {basis === 'gw-year' &&
+                estimate.rows.length === 0 &&
+                powerBasis !== 'provisioned' && (
+                  <p
+                    className="mb-3 text-xs text-muted-foreground"
+                    data-testid="profit-power-unavailable"
+                  >
+                    {t.powerPreview}{' '}
+                    {t.skipped(
+                      fullEstimate.skipped
+                        .map(
+                          (row) =>
+                            `${getDisplayLabel(hardwareConfig[row.hwKey])}: ${t.skipReason[row.reason]}`,
+                        )
+                        .join('; '),
+                    )}
+                  </p>
+                )}
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"

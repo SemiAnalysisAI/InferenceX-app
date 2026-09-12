@@ -213,6 +213,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     groupMeta[groupKey] = meta;
 
     grouped[groupKey].push({
+      sourceRow: row,
       hwKey,
       interactivity:
         sequence === Sequence.AgenticTraces
@@ -274,6 +275,7 @@ export function useThroughputData(
   enabled = true,
   selectedTokenType: CostType = 'total',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  includePower = false,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -293,12 +295,15 @@ export function useThroughputData(
     enabled,
     undefined,
     undefined,
-    {
-      type: 'calculator',
-      sequence: selectedSequence,
-      ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
-    },
-    initialRows,
+    includePower
+      ? undefined
+      : {
+          type: 'calculator',
+          sequence: selectedSequence,
+          ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
+        },
+    // A calculator projection cannot seed the raw-power query cache.
+    includePower ? undefined : initialRows,
   );
 
   const loading = queryLoading || !allRows;

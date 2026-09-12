@@ -230,6 +230,7 @@ export function lossPatternId(resultKey: string): string {
 
 const STRINGS = {
   en: {
+    yAxisModeled: 'Revenue per all-in utility GW per year ($ USD)',
     yAxis: {
       'gw-year': 'Revenue per all-in provisioned utility GW per year ($ USD)',
       'chip-hour': 'Revenue per chip per hour ($ USD)',
@@ -255,6 +256,7 @@ const STRINGS = {
     noData: 'No SKU can be priced for the current selection.',
   },
   zh: {
+    yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
     yAxis: {
       'gw-year': '每全电源配置吉瓦每年收入（美元）',
       'chip-hour': '每芯片每小时收入（美元）',
@@ -417,7 +419,8 @@ export function profitYDomain(
 export function rowLabel(row: ProfitEstimatorRow, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
   const base = config ? getDisplayLabel(config) : row.hwKey;
-  const withPrecision = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
+  const precisionLabel = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
+  const withPrecision = row.powerLabel ? `${precisionLabel} (${row.powerLabel})` : precisionLabel;
   // A compare-history bar names the run date (and run number, when the day had
   // several) it was priced on, as the `/inference` legend does for its
   // "config • date" series.
@@ -917,11 +920,16 @@ export default function ProfitEstimatorChart({
   // chart uses the short form.
   const yAxisConfig = useMemo(
     () => ({
-      label: compact ? t.yAxisCompact[basis] : t.yAxis[basis],
+      label:
+        basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
+          ? t.yAxisModeled
+          : compact
+            ? t.yAxisCompact[basis]
+            : t.yAxis[basis],
       tickFormat: (d: d3.AxisDomain) => formatProfitUsd(Number(d), basis, 0),
       tickCount: 8,
     }),
-    [compact, basis, t.yAxis, t.yAxisCompact],
+    [compact, basis, assumptions.powerBasis, t.yAxis, t.yAxisCompact, t.yAxisModeled],
   );
 
   const onRender = useMemo(

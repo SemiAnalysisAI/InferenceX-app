@@ -1,3 +1,5 @@
+import type { BenchmarkRow } from '@/lib/api';
+
 export type CalculatorMode = 'interactivity_to_throughput' | 'throughput_to_interactivity';
 
 export type CostProvider = 'costh' | 'costr';
@@ -7,6 +9,8 @@ export type CostType = 'total' | 'input' | 'output';
 export type BarMetric = 'throughput' | 'power' | 'cost';
 
 export interface GPUDataPoint {
+  /** Preserve the source of each frontier knot for paired power estimates. */
+  sourceRow?: BenchmarkRow;
   hwKey: string;
   interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
   /**
