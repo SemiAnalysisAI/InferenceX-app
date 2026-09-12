@@ -144,7 +144,8 @@ interface PillLayoutItem {
  * mirror image below/above its anchor, the mirror image on the other side of
  * its anchor, and both mirrors together. Every candidate is clamped into
  * `bounds` before the overlap test, so nothing leaves the plot. When every
- * candidate collides the default spot is kept: an overlapped label is still
+ * mirrored candidate collides, nearby rows are tried before the default spot
+ * is kept: an overlapped label is still
  * better than a missing one, and the fallback matches what the anchor pass
  * already tolerates for pinned anchors.
  *
@@ -183,6 +184,14 @@ function layoutPills(
       [mirrorX, ty0],
       [mirrorX, mirrorY],
     ];
+    // Larger labels can fill both mirrored slots in a dense cluster. Try
+    // nearby rows using the measured pill height before accepting overlap.
+    const rowHeight = local.bottom - local.top + 4;
+    for (let row = 1; row <= 3; row++) {
+      for (const cx of [tx0, mirrorX]) {
+        candidates.push([cx, ty0 - row * rowHeight], [cx, ty0 + row * rowHeight]);
+      }
+    }
 
     const clamped = candidates.map(([cx, cy]) => {
       const shift = pillShiftIntoBounds(pillBoxAt(local, cx, cy), bounds);

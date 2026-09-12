@@ -166,6 +166,20 @@ describe('pill bounding box primitives', () => {
 });
 
 describe('clamped pills do not stack on their neighbours', () => {
+  it('uses nearby rows when a dense cluster fills both mirrored positions', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      ['a', 'b', 'c', 'd', 'e'].map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const boxes = ['a', 'b', 'c', 'd', 'e'].map((key) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      expectInsidePlot(box);
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
   it('renders larger text and measures its pill before clamping on render and zoom', () => {
     Object.defineProperty(SVGElement.prototype, 'getBBox', {
       configurable: true,
