@@ -96,6 +96,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34512984806, // 2026-09-10 | Reason: wrong results — the dsv41flash-fp4-gb300-vllm-agentic-dspark AgentX sweep for PR #2961 launched the vLLM server via srun without --cpus-per-task, and the GB300 Slurm cluster default allocated only 1 CPU core to the entire vLLM server, crippling throughput; infra launch bug on our side, not a vLLM or NVIDIA recipe issue. Fixed by #3017 (--cpus-per-task=144); results to be re-run
   34504981128, // 2026-09-13 | Reason: wrong configs ran
   34504985992, // 2026-09-13 | Reason: wrong configs ran
+  34488664680, // 2026-09-13 | Reason: wrong configs ran
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
