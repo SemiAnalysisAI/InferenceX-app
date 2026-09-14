@@ -267,6 +267,18 @@ export interface ChangelogBackfill extends AuditedBackfill {
  */
 export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
   {
+    id: 'run-34744429340-restore-append-only',
+    reason:
+      'Audited exception: PR #3046 replaced four existing Kimi-K3 GB300 aggregate points with measured-power results, so it was not an immutable-point append-only change; preserve those replacements while restoring nine compatible same-image disaggregated points from run 33701025625.',
+    githubRunId: 34744429340,
+    runAttempt: 1,
+    baseRef: '8ca602ebb5e2fa99f90583881bfa8783f9f67d8c',
+    headRef: '9242d18a33f73b9c673bb1134addb989a3cc44da',
+    set: {
+      appendOnly: true,
+    },
+  },
+  {
     id: 'run-32242794988-restore-append-only',
     reason:
       'PR #2676 produced an append-only delta sweep, but conflict resolution removed the marker before its artifacts were reused for merge ingestion.',

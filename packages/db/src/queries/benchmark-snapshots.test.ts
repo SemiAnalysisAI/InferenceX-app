@@ -169,6 +169,64 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([...currentIds, 8]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-13'))).toEqual(ids(rows));
   });
+  it('keeps the 13-point Kimi GB300 curve when four aggregate points are refreshed', async () => {
+    await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
+      INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+        is_multinode, prefill_tp, prefill_num_workers, decode_tp, decode_num_workers,
+        num_prefill_gpu, num_decode_gpu)
+      VALUES (5, 'kimik3', 'gb300', 'dynamo-vllm', 'fp4', 'mtp', false,
+          true, 8, 1, 8, 1, 8, 8),
+        (6, 'kimik3', 'gb300', 'dynamo-vllm', 'fp4', 'none', false,
+          true, 8, 1, 8, 1, 8, 8),
+        (7, 'kimik3', 'gb300', 'dynamo-vllm', 'fp4', 'mtp', true,
+          true, 8, 1, 8, 1, 8, 8),
+        (8, 'kimik3', 'gb300', 'dynamo-vllm', 'fp4', 'mtp', true,
+          true, 8, 1, 8, 2, 8, 16),
+        (9, 'kimik3', 'gb300', 'dynamo-vllm', 'fp4', 'mtp', true,
+          true, 8, 1, 8, 3, 8, 24);`);
+    await addRun(20, { date: '2026-09-12', githubId: 33701025625, attempt: 3 });
+    const image = 'vllm/vllm-openai:nightly-dev-arm64-cu13-3696c77';
+    const aggregate = [
+      [441055, 5, 1, '78c06441e0d4b36f799c18e85c74924c3c47f5e4ce41ca6fa7096dbb1ae3c5c0'],
+      [441056, 5, 4, '78c06441e0d4b36f799c18e85c74924c3c47f5e4ce41ca6fa7096dbb1ae3c5c0'],
+      [441054, 6, 48, '67563905f379e1c6f83fa12c355ed3299e7c6efbb40b311c0ec64f6da1064d53'],
+      [441065, 6, 70, '67563905f379e1c6f83fa12c355ed3299e7c6efbb40b311c0ec64f6da1064d53'],
+    ] as const;
+    const disaggregated = [
+      [441066, 7, 48, '6fd4e09344f47784e503f149eb5721d48d6ef46697dc5fdd64f70e8e97919769'],
+      [441064, 7, 52, '6fd4e09344f47784e503f149eb5721d48d6ef46697dc5fdd64f70e8e97919769'],
+      [441062, 7, 56, '6fd4e09344f47784e503f149eb5721d48d6ef46697dc5fdd64f70e8e97919769'],
+      [441058, 8, 32, '654ab7326aedae681b751505b125bc2303b9784ea3de15270a73541cb1f163a1'],
+      [441060, 8, 48, '654ab7326aedae681b751505b125bc2303b9784ea3de15270a73541cb1f163a1'],
+      [441061, 8, 64, '654ab7326aedae681b751505b125bc2303b9784ea3de15270a73541cb1f163a1'],
+      [441059, 9, 1, 'de789edf167f3d472b9d1ba8b9cec6b4de4b11ae0a59d674f03f0c909411b0d5'],
+      [441057, 9, 32, '6c780787606fa74f3ca74f785d1e35fb94f6e8b330f8c376e7a04631eb8b0b4e'],
+      [441063, 9, 48, '6c780787606fa74f3ca74f785d1e35fb94f6e8b330f8c376e7a04631eb8b0b4e'],
+    ] as const;
+    for (const [id, config, conc, fingerprint] of [...aggregate, ...disaggregated])
+      await addPoint(id, 20, config, conc, { image, fingerprint });
+
+    await addRun(21, { date: '2026-09-13', githubId: 34744429340, append: true });
+    const refreshed = aggregate.map((aggregatePoint, index) => {
+      const [, config, conc, fingerprint] = aggregatePoint;
+      return [441857 + index, config, conc, fingerprint] as const;
+    });
+    for (const [id, config, conc, fingerprint] of refreshed)
+      await addPoint(id, 21, config, conc, { image, fingerprint });
+    await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
+      WHERE workflow_run_id = 21`;
+    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+
+    const rows = await getLatestBenchmarks(sql, 'kimik3');
+    expect(ids(rows)).toEqual([
+      441057, 441058, 441059, 441060, 441061, 441062, 441063, 441064, 441066, 441857, 441858,
+      441859, 441860,
+    ]);
+    expect(rows.filter((row) => row.run_url?.includes('/34744429340/'))).toHaveLength(4);
+    expect(rows.filter((row) => row.run_url?.includes('/33701025625/'))).toHaveLength(9);
+    expect(rows.filter((row) => row.metrics.power_valid === 1)).toHaveLength(4);
+    expect(rows.every((row) => Number(row.curve_workflow_run_id) === 21)).toBe(true);
+  });
   it('stops append-only inheritance at an image change or new full snapshot', async () => {
     await addRun(12, { append: true });
     await addPoint(8, 12, 1, 300, { offload: 'off', image: 'trt:rc27' });
