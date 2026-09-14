@@ -51,6 +51,8 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
+  /** Search options may include aliases for the same value; groups owns the selected label. */
+  searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
@@ -80,6 +82,7 @@ interface SearchableSelectProps {
 
 export function SearchableSelect({
   groups,
+  searchGroups,
   value,
   onValueChange,
   placeholder: placeholderProp,
@@ -123,7 +126,9 @@ export function SearchableSelect({
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
   // A grid gives option selection and help their own cells/buttons. A listbox
   // option cannot contain another interactive action accessibly.
-  const hasOptionHelp = groups.some((group) => group.options.some((option) => option.help));
+  const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
+    group.options.some((option) => option.help),
+  );
 
   React.useEffect(() => {
     setMounted(true);
@@ -146,15 +151,20 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
-    return groups
+    const seen = new Set<string>();
+    return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
+        options: g.options.filter((opt) => {
+          const matches =
+            opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower);
+          if (!matches || seen.has(opt.value)) return false;
+          seen.add(opt.value);
+          return true;
+        }),
       }))
       .filter((g) => g.options.length > 0);
-  }, [groups, search]);
+  }, [groups, searchGroups, search]);
 
   const selectedLabel = React.useMemo(() => {
     for (const group of groups) {

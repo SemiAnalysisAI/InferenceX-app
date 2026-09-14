@@ -618,6 +618,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
 
     expectInteractivity();
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('input[aria-label="Search options"]').type('Measured Prefill Joules per Input Token');
     cy.contains('[data-select-option]', 'Measured Prefill Joules per Input Token')
       .scrollIntoView()
       .click();

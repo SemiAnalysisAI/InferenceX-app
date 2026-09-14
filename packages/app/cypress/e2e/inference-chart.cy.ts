@@ -10,7 +10,14 @@ import {
   interceptDerivedAgenticMetrics,
   selectXAxisMode,
 } from '../support/e2e';
-import { interceptOverlayRun, OVERLAY_RUN_ID, b300Rows } from '../support/overlay-fixtures';
+import {
+  interceptOverlayRun,
+  OVERLAY_RUN_ID,
+  OVERLAY_RUN_URL,
+  SINGLE_TURN_DATE,
+  b300Rows,
+  singleTurnRows,
+} from '../support/overlay-fixtures';
 
 function openYAxisHelp(metric: string) {
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
@@ -20,6 +27,82 @@ function openYAxisHelp(metric: string) {
   });
   cy.get('[data-testid="yaxis-metric-selector"]').click('right');
   cy.get(`[data-testid="option-help-${metric}"]`).scrollIntoView().click();
+}
+
+const measuredRows = (runUrl: string | null) =>
+  singleTurnRows(runUrl).map((row, index) => ({
+    ...row,
+    metrics: {
+      ...row.metrics,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 450 + index * 10,
+      p75_power_w: (runUrl ? 550 : 500) + index * 10,
+      joules_per_output_token: (runUrl ? 3 : 2) + index,
+    },
+  }));
+
+const boundaryRows = (runUrl: string | null) =>
+  measuredRows(runUrl).map((row, index) => ({
+    ...row,
+    metrics: {
+      ...row.metrics,
+      // C=8 lies below the power boundary and above the energy Pareto frontier.
+      avg_power_w: [900, 200, 700, 650][index] + (runUrl ? 50 : 0),
+      joules_per_output_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
+    },
+  }));
+
+function interceptMeasuredComparison(
+  official = measuredRows(null),
+  overlay = measuredRows(OVERLAY_RUN_URL),
+) {
+  cy.intercept('GET', '/api/v1/availability', { body: official.slice(0, 1) });
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: official });
+  cy.intercept('GET', '/api/v1/workflow-info*', {
+    body: { runs: [], changelogs: [], configs: [] },
+  });
+  cy.intercept('GET', '/api/unofficial-run*', {
+    body: {
+      runInfos: [
+        {
+          id: OVERLAY_RUN_ID,
+          name: 'measured-comparison',
+          branch: 'measured-comparison',
+          sha: 'abc000',
+          createdAt: `${SINGLE_TURN_DATE}T00:00:00Z`,
+          url: OVERLAY_RUN_URL,
+          conclusion: 'success',
+          status: 'completed',
+          isNonMainBranch: true,
+        },
+      ],
+      benchmarks: overlay,
+      evaluations: [],
+    },
+  }).as('measuredOverlay');
+}
+
+function assertMeasuredValues(selector: string, expected: number[]) {
+  cy.get<SVGElement & { __data__: { y: number } }>(
+    `[data-testid="inference-chart-display"] svg ${selector}`,
+  ).should(($points) => {
+    expect(Array.from($points, (point) => point.__data__.y).sort((a, b) => a - b)).to.deep.equal(
+      expected,
+    );
+  });
+}
+
+function assertVisibleMeasuredValues(selector: string, expected: number[]) {
+  cy.get<SVGElement & { __data__: { y: number } }>(
+    `[data-testid="inference-chart-display"] svg ${selector}`,
+  ).should(($points) => {
+    const values = [...$points]
+      .filter((point) => getComputedStyle(point).opacity === '1')
+      .map((point) => point.__data__.y)
+      .sort((a, b) => a - b);
+    expect(values).to.deep.equal(expected);
+  });
 }
 
 describe('Inference Chart', () => {
@@ -498,6 +581,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
 });
 
 it('hydrates a direct PowerX metric link and shows availability for the selected workload', () => {
+  cy.viewport(1440, 900);
   cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -505,7 +589,13 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
       cy.spy(win.console, 'error').as('powerLinkConsoleErrors');
     },
   });
-  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Percent of TDP');
+  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Power');
+  cy.get('[data-testid="measured-power-display"]').should('contain', 'TDP');
+  cy.get('[data-testid="measured-power-statistic-average"]').should(
+    'have.attr',
+    'aria-pressed',
+    'true',
+  );
   cy.get('[data-testid="power-metric-availability"]').should(
     'contain',
     'Current workload and hardware selection',
@@ -515,11 +605,105 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
     cy.contains('button', 'Measured P75 Fleet Power per Chip').should('contain', '/');
     cy.contains('button', 'Measured Joules per Output Token').click();
   });
-  cy.get('[data-testid="yaxis-metric-selector"]').should(
-    'contain',
-    'Measured Joules per Output Token',
-  );
+  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Energy');
+  cy.get('[data-testid="measured-energy-denominator"]').should('contain', 'Output');
   cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
+});
+
+it('replots measured settings for official and unofficial data and preserves overlay dismissal', () => {
+  interceptMeasuredComparison();
+  cy.viewport(1440, 900);
+  cy.visit(
+    `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
+    { onBeforeLoad: unlockAgenticGate },
+  );
+  cy.wait('@measuredOverlay');
+  cy.get('#scatter-hide-non-optimal').then(($toggle) => {
+    if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
+  });
+  cy.get('[data-testid="measured-power-statistic-p75"]').click();
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
+  assertMeasuredValues('.dot-group', [500, 510, 520, 530]);
+  assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+  cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
+    .scrollIntoView()
+    .click();
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
+  assertMeasuredValues('.unofficial-overlay-pt', [3, 4, 5, 6]);
+  cy.get('[aria-label="Dismiss measured-comparison"]').click();
+  cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('not.exist');
+  assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
+});
+
+it('uses Optimal Only to filter power boundary dots without replacing official or overlay curves', () => {
+  interceptMeasuredComparison(boundaryRows(null), boundaryRows(OVERLAY_RUN_URL));
+  cy.viewport(1440, 900);
+  cy.visit(
+    `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
+    { onBeforeLoad: unlockAgenticGate },
+  );
+  cy.wait('@measuredOverlay');
+  selectXAxisMode('interactivity');
+  cy.get('#scatter-hide-non-optimal').then(($toggle) => {
+    if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
+  });
+  cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+  cy.get('#scatter-show-all-measurements').should('not.exist');
+  assertVisibleMeasuredValues('.dot-group', [650, 700, 900]);
+  assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
+
+  const curves = '[data-testid="inference-chart-display"] .roofline-path, .overlay-roofline-path';
+  cy.get(curves)
+    .should('have.length', 2)
+    .and(($curves) => {
+      for (const curve of $curves) {
+        expect(curve.dataset.curveKind).to.equal('power-envelope');
+        expect(curve.getAttribute('d')).to.be.a('string');
+        expect(curve.getAttribute('d')).not.to.equal('');
+      }
+    })
+    .then(($curves) => {
+      const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
+      for (const optimalOnly of [false, true]) {
+        cy.get('#scatter-hide-non-optimal').click();
+        assertVisibleMeasuredValues(
+          '.dot-group',
+          optimalOnly ? [650, 700, 900] : [200, 650, 700, 900],
+        );
+        assertVisibleMeasuredValues(
+          '.unofficial-overlay-pt',
+          optimalOnly ? [700, 750, 950] : [250, 700, 750, 950],
+        );
+        cy.get(curves).should(($current) => {
+          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
+          for (const curve of $current) {
+            expect(curve.dataset.curveKind).to.equal('power-envelope');
+          }
+        });
+        cy.get('#scatter-show-all-measurements').should('not.exist');
+      }
+    });
+
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+  cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
+    .scrollIntoView()
+    .click();
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+  cy.get('#scatter-show-all-measurements').should('not.exist');
+  cy.get('[data-testid="power-curve-description"]').should('not.exist');
+  assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
+  assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
+  cy.get(curves)
+    .should('have.length', 2)
+    .and(($curves) => {
+      for (const curve of $curves) expect(curve.dataset.curveKind).to.equal('pareto');
+    });
+  cy.get('#scatter-hide-non-optimal').click();
+  assertVisibleMeasuredValues('.dot-group', [2, 4, 4.5, 5]);
+  assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 5.5, 6]);
 });
 
 describe('VR publication data compatibility', () => {

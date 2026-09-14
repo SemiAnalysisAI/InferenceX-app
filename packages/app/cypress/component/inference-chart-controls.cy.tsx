@@ -1,13 +1,19 @@
 import 'cypress-axe';
+import { useState } from 'react';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import { chartDefinitions } from '@/components/inference/metric-registry';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
-import { createMockInferenceData } from '../support/mock-data';
+import {
+  createMockInferenceContextValues,
+  createMockInferenceData,
+  type MockInferenceContextValues,
+} from '../support/mock-data';
 
 describe('Modeled system-power table', () => {
   it('shows validated eight-GPU topology separately from the configured 64-chip alias in both locales', () => {
@@ -77,6 +83,40 @@ function mountWithPowerGroupsUnlocked() {
   mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 }
 
+function StatefulMeasuredControls({ context }: { context: MockInferenceContextValues }) {
+  const [selectedYAxisMetric, setSelectedYAxisMetric] = useState(context.selectedYAxisMetric);
+  const value = {
+    ...context,
+    selectedYAxisMetric,
+    setSelectedYAxisMetric(metric: string) {
+      context.setSelectedYAxisMetric(metric);
+      setSelectedYAxisMetric(metric);
+    },
+  };
+  return (
+    <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+      <InferenceChartControls showXAxisMode />
+    </InferenceContextsProvider>
+  );
+}
+
+function mountMeasuredControls(metric = 'y_measuredAvgPower', locale = 'en') {
+  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+  mountWithProviders(
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+      <StatefulMeasuredControls
+        context={createMockInferenceContextValues({ selectedYAxisMetric: metric })}
+      />
+    </PathnameContext.Provider>,
+    { unofficial: {} },
+  );
+}
+
+function selectMeasuredSetting(control: string, value: string) {
+  cy.get(`[data-testid="measured-${control}"]`).click();
+  cy.get(`[role="option"][data-value="${value}"]`).click();
+}
+
 describe('Inference ChartControls', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
@@ -90,6 +130,7 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-content"]').should('exist');
     cy.contains('Throughput').should('exist');
+    cy.contains('Measured Power').should('not.exist');
     cy.contains('Measured Energy').should('not.exist');
     cy.contains('Modeled System Power').should('not.exist');
     cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').should('not.exist');
@@ -134,7 +175,7 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
   });
 
-  it('lists and selects the schema-v2 derived axes in the Measured Energy group', () => {
+  it('finds the existing schema-v2 metric names through search', () => {
     mountWithPowerGroupsUnlocked();
     const options = [
       {
@@ -153,14 +194,8 @@ describe('Inference ChartControls', () => {
 
     for (const option of options) {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-      cy.contains('Measured Energy')
-        .closest('[role="rowgroup"]')
-        .within(() => {
-          cy.contains('[data-slot="select-item"]', option.label)
-            .scrollIntoView()
-            .should('be.visible')
-            .click();
-        });
+      cy.get('input[aria-label="Search options"]').type(option.label);
+      cy.contains('[data-slot="select-item"]', option.label).should('be.visible').click();
       cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', option.key);
     }
   });
@@ -383,6 +418,246 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('contain.text', '更多图表设置')
       .and('contain.text', '项已更改');
+  });
+});
+
+describe('Inference ChartControls grouped measured metrics', () => {
+  afterEach(() => {
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+  });
+
+  it('offers two measured families without repeating all thirteen configurations', () => {
+    mountMeasuredControls('y_tpPerGpu');
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('[data-slot="select-item"]').then(($items) => {
+      const measured = [...$items]
+        .map((item) => item.textContent?.trim() ?? '')
+        .filter((label) => label.startsWith('Measured'));
+      expect(measured).to.deep.equal(['Measured Power', 'Measured Energy']);
+    });
+    cy.contains('[data-slot="select-item"]', /^Measured Power$/u)
+      .scrollIntoView()
+      .click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredAvgPower');
+    cy.get('[data-testid="measured-power-statistic-average"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
+      .scrollIntoView()
+      .click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
+    cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Output');
+  });
+
+  for (const [locale, power, energy, searchLabel, group, fullName] of [
+    [
+      'en',
+      'Measured Power',
+      'Measured Energy',
+      'Search options',
+      'Measured',
+      'Measured P75 Fleet Power per Chip',
+    ],
+    ['zh', '实测功率', '实测能耗', '搜索指标选项', '实测', '实测整组 GPU P75 功耗（按芯片均摊）'],
+  ]) {
+    it(`finds measured families by their displayed names without mixing power into energy (${locale})`, () => {
+      mountMeasuredControls('y_measuredP75Power', locale);
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.get(`input[aria-label="${searchLabel}"]`).type(group);
+      cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
+        const values = [...$options].map((option) => option.dataset.value);
+        expect(values).to.have.length(13);
+        expect(new Set(values).size).to.equal(13);
+      });
+      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', power)
+        .and('have.attr', 'data-value', 'y_measuredP75Power')
+        .and('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
+      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', energy)
+        .and('have.attr', 'data-value', 'y_measuredJPerOutputToken');
+      cy.get(`input[aria-label="${searchLabel}"]`).type('{downarrow}');
+      cy.get('[data-select-option]').should('have.focus').type('{enter}');
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('have.text', energy);
+      cy.get('[data-testid="measured-energy-denominator"]').should('be.visible');
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.get(`input[aria-label="${searchLabel}"]`).type(fullName);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', fullName)
+        .and('have.attr', 'data-value', 'y_measuredP75Power')
+        .click();
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
+    });
+  }
+
+  it('keeps P75 and P90 visible and selects their existing metric keys', () => {
+    mountMeasuredControls();
+    cy.get('[data-testid="measured-power-statistic-p75"]').should('be.visible').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
+    cy.get('[data-testid="measured-power-statistic-p75"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Power');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should('be.visible').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('resets a fleet percentile to role average and only enables TDP for the whole-fleet average', () => {
+    mountMeasuredControls('y_measuredP75Power');
+    selectMeasuredSetting('power-scope', 'prefill');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredPrefillAvgPower');
+    cy.get('[data-testid="measured-power-statistic-average"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="measured-power-statistic-p75"]').should('be.disabled');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should('be.disabled');
+    cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W/chip');
+    selectMeasuredSetting('power-scope', 'all');
+    selectMeasuredSetting('power-display', 'tdp');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredPowerPercentTdp');
+    cy.get('[data-testid="measured-power-statistic-p75"]').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
+    cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W/chip');
+  });
+
+  it('keeps energy normalization separate from role attribution when changing denominator', () => {
+    mountMeasuredControls('y_measuredJPerInputToken');
+    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
+    selectMeasuredSetting('energy-scope', 'prefill');
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_measuredPrefillJPerInputToken',
+    );
+    selectMeasuredSetting('energy-denominator', 'output');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
+    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
+    selectMeasuredSetting('energy-scope', 'decode');
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_measuredDecodeJPerOutputToken',
+    );
+    selectMeasuredSetting('energy-denominator', 'total');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerTotalToken');
+    cy.get('[data-testid="measured-energy-scope"]')
+      .should('be.disabled')
+      .and('contain.text', 'All GPUs');
+    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
+  });
+
+  it('switches successful-query J and Wh and restores J for token normalization', () => {
+    mountMeasuredControls('y_measuredJPerOutputToken');
+    selectMeasuredSetting('energy-denominator', 'query');
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_measuredJPerSuccessfulQuery',
+    );
+    selectMeasuredSetting('energy-unit', 'wattHours');
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_measuredWhPerSuccessfulQuery',
+    );
+    selectMeasuredSetting('energy-unit', 'joules');
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_measuredJPerSuccessfulQuery',
+    );
+    selectMeasuredSetting('energy-unit', 'wattHours');
+    selectMeasuredSetting('energy-denominator', 'input');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerInputToken');
+    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
+    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
+  });
+
+  for (const metric of ['y_measuredPrefillAvgPower', 'y_measuredDecodeAvgPower']) {
+    it(`hydrates ${metric} with only role-average statistics enabled`, () => {
+      mountMeasuredControls(metric);
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Power');
+      cy.get('[data-testid="measured-power-scope"]').should(
+        'contain.text',
+        metric.includes('Prefill') ? 'Prefill' : 'Decode',
+      );
+      cy.get('[data-testid="measured-power-statistic-average"]').should(
+        'have.attr',
+        'aria-pressed',
+        'true',
+      );
+      cy.get('[data-testid="measured-power-statistic-p75"]').should('be.disabled');
+      cy.get('[data-testid="measured-power-statistic-p90"]').should('be.disabled');
+      cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W');
+      cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    });
+  }
+
+  it('hydrates a selected P75 key while retaining the benchmark row and chart panel layout', () => {
+    cy.viewport(1280, 900);
+    mountMeasuredControls('y_measuredP75Power');
+    cy.get('[data-testid="measured-power-statistic-p75"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('fieldset').should('have.length', 3);
+    cy.get('#model-select').then(($model) => {
+      const benchmark = $model[0].closest('fieldset')!;
+      const modelTop = $model[0].getBoundingClientRect().top;
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].closest('fieldset')).to.equal(benchmark);
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(modelTop, 1);
+      });
+      cy.get('[data-testid="measured-metric-controls"]').should(($controls) => {
+        const chart = $controls[0].closest('fieldset')!;
+        expect(chart).not.to.equal(benchmark);
+        expect(chart.querySelector('#y-axis-select')).not.to.equal(null);
+        expect(chart.getBoundingClientRect().top).to.be.greaterThan(
+          benchmark.getBoundingClientRect().bottom,
+        );
+      });
+    });
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+  });
+
+  it('hydrates an existing successful-query Wh selection without changing its metric', () => {
+    mountMeasuredControls('y_measuredWhPerSuccessfulQuery');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
+    cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Successful');
+    cy.get('[data-testid="measured-energy-unit"]').should('contain.text', 'Wh');
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+  });
+
+  it('keeps Chinese P75 controls within the mobile chart panel', () => {
+    cy.viewport(390, 844);
+    mountMeasuredControls('y_measuredP75Power', 'zh');
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', '实测功率');
+    cy.get('[data-testid="measured-metric-controls"]').within(() => {
+      cy.get('button').each(($button) => {
+        const bounds = $button[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
+      cy.contains('button', 'P75').should('be.visible');
+      cy.contains('button', 'P90').should('be.visible').click();
+    });
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
   });
 });
 
