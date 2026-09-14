@@ -210,8 +210,18 @@ describe('Validated vs historical measured power', () => {
         svg.parentElement!.getBoundingClientRect().width,
       );
     });
-    cy.get<SVGPathElement>('.roofline-path')
+    cy.get<SVGPathElement & { __transition?: Record<string, { name?: string }> }>('.roofline-path')
       .should('have.length', 2)
+      .should(($curves) => {
+        for (const curve of $curves) {
+          expect(
+            Object.values(curve.__transition ?? {}).some(
+              (schedule) => schedule.name === 'data-update',
+            ),
+            'initial curve transition is complete',
+          ).to.equal(false);
+        }
+      })
       .then(($curves) => {
         const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
         expect(geometry.every((path) => path && !path.includes('NaN'))).to.equal(true);

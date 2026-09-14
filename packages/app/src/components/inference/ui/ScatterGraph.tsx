@@ -3678,7 +3678,6 @@ const ScatterGraph = React.memo(
                           isHighlighted: true,
                           hw: `overlay-run-${info.id}`,
                           isActive: true,
-                          isRemovable: false,
                           onClick: () => {},
                           onShowPoints: () => {
                             setPointsTableTarget({

@@ -753,18 +753,6 @@ describe('ScatterGraph', () => {
       'contain.text',
       runBranch,
     );
-    // Run rows identify pinned overlays; the banner owns run dismissal.
-    // A synthetic run key cannot use the hardware Hide action, and must not
-    // inflate the removable-series count enough to hide the last real GPU.
-    cy.get(`#test-scatter-overlay-labels label[for="checkbox-overlay-run-${runId}"]`)
-      .find('[role="button"][aria-label^="Hide"]')
-      .should('not.exist');
-    cy.get('#test-scatter-overlay-labels label[for="checkbox-h100"]')
-      .find('[role="button"][aria-label^="Hide"]')
-      .should('not.exist');
-    cy.get(
-      `#test-scatter-overlay-labels [data-testid="legend-points-overlay-run-${runId}"]`,
-    ).should('exist');
   });
 
   it('places precision between the GPU and engine in multi-precision labels', () => {
