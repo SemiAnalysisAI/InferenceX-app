@@ -22,8 +22,9 @@
  * CHANGELOG_BACKFILLS — correct stored changelog metadata for one exact run attempt
  * and base/head ref pair.
  *
- * BENCHMARK_POINT_BACKFILLS — correct metrics and/or offload identity for one exact
- * benchmark point. These are applied both during ingest and against existing DB rows.
+ * BENCHMARK_POINT_BACKFILLS — correct metrics, offload identity, and/or recipe
+ * identity for one exact benchmark point. These are applied both during ingest
+ * and against existing DB rows.
  *
  * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
  *       but we should keep them around for historical reference. You can find these on github (if available) by filling
@@ -267,6 +268,18 @@ export interface ChangelogBackfill extends AuditedBackfill {
  */
 export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
   {
+    id: 'run-34744300699-restore-append-only',
+    reason:
+      'Audited exception: PR #3044 refreshed the ten Kimi-K3 H200 TP16 latency points with measured power. Preserve those replacements while carrying forward the 25 same-image TP8 balanced and simple points from run 30781313910.',
+    githubRunId: 34744300699,
+    runAttempt: 1,
+    baseRef: '64c5b00a476f3d19921ecb680a2eaac7bed58c8d',
+    headRef: '91ac9c0bc26e062c6305c97241ed84688531eaa9',
+    set: {
+      appendOnly: true,
+    },
+  },
+  {
     id: 'run-34744429340-restore-append-only',
     reason:
       'Audited exception: PR #3046 replaced four existing Kimi-K3 GB300 aggregate points with measured-power results, so it was not an immutable-point append-only change; preserve those replacements while restoring nine compatible same-image disaggregated points from run 33701025625.',
@@ -323,6 +336,8 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   set: {
     /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
+    /** Audited producer recipe identity for a legacy row that predates fingerprints. */
+    recipeFingerprint?: string;
     /** Shallow JSONB merge; existing unrelated metrics are preserved. */
     metricsMerge?: Readonly<Record<string, JsonValue>>;
     /** Top-level metric keys to remove before metricsMerge is applied. */
@@ -422,6 +437,29 @@ const DSV4_GB300_DYNAMO_VLLM = {
   specMethod: 'mtp',
 } as const;
 
+const KIMI3_H200_VLLM_TP16: ConfigParams = {
+  hardware: 'h200',
+  framework: 'vllm',
+  model: 'kimik3',
+  precision: 'fp4',
+  specMethod: 'mtp',
+  disagg: false,
+  isMultinode: true,
+  prefillTp: 16,
+  prefillEp: 32,
+  prefillDpAttn: true,
+  prefillNumWorkers: 2,
+  decodeTp: 16,
+  decodeEp: 32,
+  decodeDpAttn: true,
+  decodeNumWorkers: 2,
+  numPrefillGpu: 32,
+  numDecodeGpu: 32,
+};
+
+const KIMI3_H200_VLLM_TP16_RECIPE =
+  'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5';
+
 /** Aggregated multi-node config where prefill and decode share one TP-only worker. */
 function aggregatedMultinodeConfig(
   base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
@@ -484,6 +522,40 @@ const GB300_CACHE_HIT_RATE_REASON =
 
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   ...QWEN35_P90_POWER_BACKFILLS,
+  // Run 34744300699 remeasured these exact same-image TP16 points with valid
+  // power. The earlier run predates recipe fingerprints, so backfill its ten
+  // audited identities; the existing snapshot DISTINCT then selects the newer
+  // replacements while retaining all 25 TP8 balanced and simple points.
+  ...(
+    [
+      [438866, 1, 67.62136],
+      [438864, 2, 56.78213],
+      [438869, 3, 74.38737],
+      [438873, 4, 77.1117],
+      [438895, 5, 91.94298],
+      [438871, 6, 104.97152],
+      [438890, 7, 121.47138],
+      [438872, 8, 126.20408],
+      [438877, 10, 126.53461],
+      [438874, 12, 78.83973],
+    ] as const
+  ).map(([productionBenchmarkId, conc, tputPerGpu]) => ({
+    id: `run-30781313910-kimi-h200-tp16-conc-${conc}-recipe-identity`,
+    reason:
+      'The same-image TP16 latency point has the same audited recipe as its measured-power replacement in run 34744300699; backfill the missing legacy fingerprint so the newer point supersedes it in the logical snapshot.',
+    githubRunId: 30781313910,
+    runAttempt: 3,
+    productionBenchmarkId,
+    config: KIMI3_H200_VLLM_TP16,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint: null,
+    expectedMetrics: { tput_per_gpu: tputPerGpu },
+    set: { recipeFingerprint: KIMI3_H200_VLLM_TP16_RECIPE },
+  })),
   // The source recipes in run 31633154542 attach MooncakeStoreConnector to
   // every disaggregated worker and allocate a 180 GB Mooncake segment per
   // node. The master matrix omitted the corresponding offload annotation.
@@ -1169,6 +1241,7 @@ function pointIdentity(
 function backfillPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string = backfill.offloadMode,
+  recipeFingerprint: string | null = backfill.recipeFingerprint ?? null,
 ): string {
   return JSON.stringify([
     backfill.githubRunId,
@@ -1179,13 +1252,14 @@ function backfillPointIdentity(
     backfill.osl,
     backfill.conc,
     offloadMode,
-    backfill.recipeFingerprint ?? null,
+    recipeFingerprint,
   ]);
 }
 
 function backfillProductionPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string,
+  recipeFingerprint: string | null,
   purgedConfigId: number,
 ): string {
   return pointIdentity({
@@ -1198,7 +1272,7 @@ function backfillProductionPointIdentity(
     osl: backfill.osl,
     conc: backfill.conc,
     offloadMode,
-    recipeFingerprint: backfill.recipeFingerprint,
+    recipeFingerprint,
   });
 }
 
@@ -1325,6 +1399,9 @@ export function validateRunBackfills(
     if (backfill.recipeFingerprint === '') {
       throw new Error(`${backfill.id}: recipeFingerprint must be null or non-empty`);
     }
+    if (backfill.set.recipeFingerprint === '') {
+      throw new Error(`${backfill.id}: set.recipeFingerprint must be non-empty`);
+    }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
     if (backfill.previousSet) {
       const previous = backfill.previousSet;
@@ -1341,6 +1418,7 @@ export function validateRunBackfills(
     const removeKeys = backfill.set.metricsRemove ?? [];
     if (
       backfill.set.offloadMode === undefined &&
+      backfill.set.recipeFingerprint === undefined &&
       mergeKeys.length === 0 &&
       removeKeys.length === 0
     ) {
@@ -1362,7 +1440,13 @@ export function validateRunBackfills(
     pointSourceIdentities.set(sourceIdentity, backfill.id);
 
     const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-    const desiredIdentity = backfillPointIdentity(backfill, desiredOffloadMode);
+    const desiredRecipeFingerprint =
+      backfill.set.recipeFingerprint ?? backfill.recipeFingerprint ?? null;
+    const desiredIdentity = backfillPointIdentity(
+      backfill,
+      desiredOffloadMode,
+      desiredRecipeFingerprint,
+    );
     if (pointDesiredIdentities.has(desiredIdentity)) {
       throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
     }
@@ -1373,9 +1457,19 @@ export function validateRunBackfills(
         const purgedIdentity = pointIdentity(purged);
         return (
           purgedIdentity ===
-            backfillProductionPointIdentity(backfill, backfill.offloadMode, purged.configId) ||
+            backfillProductionPointIdentity(
+              backfill,
+              backfill.offloadMode,
+              backfill.recipeFingerprint ?? null,
+              purged.configId,
+            ) ||
           purgedIdentity ===
-            backfillProductionPointIdentity(backfill, desiredOffloadMode, purged.configId)
+            backfillProductionPointIdentity(
+              backfill,
+              desiredOffloadMode,
+              desiredRecipeFingerprint,
+              purged.configId,
+            )
         );
       })
     ) {
@@ -1526,7 +1620,12 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   Object.assign(metrics, backfill.set.metricsMerge);
   const offloadMode = backfill.set.offloadMode ?? point.offloadMode;
   if (backfill.set.offloadMode !== undefined) metrics.offload_mode = offloadMode;
-  const patched = { ...point, offloadMode, metrics };
+  const patched = {
+    ...point,
+    offloadMode,
+    recipeFingerprint: backfill.set.recipeFingerprint ?? point.recipeFingerprint ?? null,
+    metrics,
+  };
   const desiredIdentity = JSON.stringify([
     patched.configId,
     patched.benchmarkType,

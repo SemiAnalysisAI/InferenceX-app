@@ -98,4 +98,31 @@ describe('benchmark point backfill recovery', () => {
       validateRunBackfills([], [{ ...backfill, previousSet: { offloadMode: 'off' } }]),
     ).toThrow('previousSet must identify the prior destination patch');
   });
+
+  it('backfills an audited legacy recipe identity idempotently', () => {
+    const recipeBackfill = {
+      ...backfill,
+      id: 'legacy-recipe-identity',
+      previousSet: undefined,
+      recipeFingerprint: null,
+      set: { recipeFingerprint: 'audited-recipe' },
+    };
+    const metrics = { output_tput_per_gpu: 42 };
+    expect(
+      planBenchmarkPointBackfill(
+        { offload_mode: backfill.offloadMode, recipe_fingerprint: null, metrics },
+        recipeBackfill,
+      ),
+    ).toEqual(metrics);
+    expect(
+      planBenchmarkPointBackfill(
+        {
+          offload_mode: backfill.offloadMode,
+          recipe_fingerprint: 'audited-recipe',
+          metrics,
+        },
+        recipeBackfill,
+      ),
+    ).toBeNull();
+  });
 });
