@@ -1493,3 +1493,34 @@ describe('VR publication economics', () => {
     }
   }
 });
+
+it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
+  interceptVrPublicationData(true);
+  cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+  cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+  cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
+  cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+    const rows = [...$bars].map(
+      (node) =>
+        (
+          node as unknown as {
+            __data__: {
+              row: {
+                hwKey: string;
+                revenue: number;
+                tco: number;
+              };
+            };
+          }
+        ).__data__.row,
+    );
+    const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
+    expect(vr).not.to.equal(undefined);
+    // September 10 is 75% of the original throughput with a 90% cache-hit rate.
+    const revenue =
+      (((12_600 * 0.75 * (0.1 * 1.32 + 0.9 * 0.044) + 5_400 * 0.75 * 3.96) * 3600) / 1_000_000) *
+      0.6;
+    expect(vr!.revenue).to.be.closeTo(revenue, 0.001);
+    expect(vr!.tco).to.equal(8.5);
+  });
+});

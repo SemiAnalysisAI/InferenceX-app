@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   loading: false,
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQueries: () => [] }));
+vi.mock('@tanstack/react-query', () => ({
+  useQueries: () => [],
+  useQuery: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock('@/hooks/api/use-benchmarks', () => ({
   benchmarkQueryOptions: vi.fn(),
   useBenchmarks: () => ({

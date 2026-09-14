@@ -278,7 +278,8 @@ export function InferenceProvider({
     setSelectedRunDate,
     setSelectedRunId,
   } = useGlobalFilterActions();
-  const { selectedRunDate, selectedRunId, effectiveRunDate } = useGlobalFilterRun();
+  const { selectedRunDate, selectedRunDateRev, selectedRunId, effectiveRunDate } =
+    useGlobalFilterRun();
   const {
     availableModels,
     availableSequences,
@@ -292,6 +293,16 @@ export function InferenceProvider({
   const { isUnofficialRun } = useUnofficialRun();
 
   const { getUrlParam, setUrlParams } = useUrlState();
+  const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
+    Boolean(getUrlParam('g_rundate') || getUrlParam('g_runid')),
+  );
+  const selectRunManually = useCallback(
+    (runId: string) => {
+      setHasExplicitRunSelection(true);
+      setSelectedRunId(runId);
+    },
+    [setSelectedRunId],
+  );
 
   const [overviewHistoryPair, setOverviewHistoryPair] = useState(() => {
     const currentConfigKey = getUrlParam('i_overview_current');
@@ -742,6 +753,11 @@ export function InferenceProvider({
     benchmarkQueryScope,
     selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
     tcoBasis,
+    activeTab === 'inference' &&
+      !autoSelectAllGpus &&
+      !isUnofficialRun &&
+      !hasExplicitRunSelection &&
+      selectedRunDateRev === 0,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -1891,7 +1907,7 @@ export function InferenceProvider({
     setSelectedDateRange: setSelectedDateRangeAndClear,
     setUserCosts,
     setSelectedRunDate,
-    setSelectedRunId,
+    setSelectedRunId: selectRunManually,
     setUserPowers,
     setHwFilter: setPendingHwFilter,
     setActivePresetId,
