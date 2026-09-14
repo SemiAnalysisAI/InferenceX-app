@@ -52,7 +52,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const TPU_RESULTS_URL = '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8';
+const RUBIN_RESULTS_URL = '/inference/deepseek-v4';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -322,7 +322,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
-    id: 'tpuv7-inference-banner',
+    id: 'rubin-agentic-inference-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -333,27 +333,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'TPUv7 Inference Performance',
-      titleZh: 'TPUv7 推理性能',
-      description: 'Compare TPUv7 versus Blackwell & Blackwell Ultra',
-      descriptionZh: '对比 TPUv7 与 Blackwell 及 Blackwell Ultra 的推理性能',
+      title: 'Rubin Agentic Inference Performance',
+      titleZh: 'Rubin 智能体推理性能',
+      description: '67x Faster than Blackwell Ultra',
+      descriptionZh: '速度达 Blackwell Ultra 的 67 倍',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      // Select the model, workload, and precision used by the TPUv7 snapshot.
-      href: TPU_RESULTS_URL,
+      href: RUBIN_RESULTS_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(TPU_RESULTS_URL);
+        window.location.href = localizedNudgeHref(RUBIN_RESULTS_URL);
       },
     },
     analytics: {
-      shown: 'inference_tpuv7_banner_shown',
-      dismissed: 'inference_tpuv7_banner_dismissed',
-      action: 'inference_tpuv7_banner_clicked',
+      shown: 'inference_rubin_banner_shown',
+      dismissed: 'inference_rubin_banner_dismissed',
+      action: 'inference_rubin_banner_clicked',
       properties: {
-        banner_id: 'tpuv7-inference',
+        banner_id: 'rubin-agentic-inference',
         destination: 'inference',
       },
     },
