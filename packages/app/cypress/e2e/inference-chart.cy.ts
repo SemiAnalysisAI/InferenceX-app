@@ -1,3 +1,4 @@
+import { interceptVrPublicationData, VR_FIXTURE_DATE } from '../support/vr-publication-fixtures';
 import {
   expectNoPageOverflow,
   unlockAgenticGate,
@@ -514,4 +515,41 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
     'Measured Joules per Output Token',
   );
   cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
+});
+
+describe('VR publication data compatibility', () => {
+  for (const locale of ['', '/zh']) {
+    it(`renders September TRTLLM data and cache metrics under ${locale || '/en'}`, () => {
+      interceptVrPublicationData();
+      cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
+      cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
+        const points = [...$dots].map(
+          (node) =>
+            (
+              node as unknown as {
+                __data__: {
+                  id: number;
+                  actualDate: string;
+                  hwKey: string;
+                  server_gpu_cache_hit_rate: number;
+                  theoretical_cache_hit_rate: number;
+                };
+              }
+            ).__data__,
+        );
+        const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
+        expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
+        for (const point of vr) {
+          expect(point.actualDate).to.equal(VR_FIXTURE_DATE);
+          expect(point.server_gpu_cache_hit_rate).to.equal(0.95);
+          expect(point.theoretical_cache_hit_rate).to.equal(0.97);
+        }
+        expect(points.some((point) => point.hwKey.startsWith('gb300_'))).to.equal(true);
+      });
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.get('[data-testid="vera-rubin-official-preview-notice"]')
+        .should('contain.text', 'Vera Rubin NVL72')
+        .and('not.contain.text', 'July');
+    });
+  }
 });

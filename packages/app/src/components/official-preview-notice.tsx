@@ -23,12 +23,12 @@ export const VERA_RUBIN_PREVIEW_STRINGS = {
   en: {
     title: 'InferenceX Official Preview',
     description:
-      'Vera Rubin (July) results are an official preview and may change as validation and publication continue.',
+      'Vera Rubin NVL72 results are an official preview and may change as validation and publication continue.',
     chartDetail: 'Results may change as validation and publication continue.',
   },
   zh: {
     title: 'InferenceX 官方预览',
-    description: 'Vera Rubin (July) 结果为官方预览；随着验证和发布工作的推进，数据可能会调整。',
+    description: 'Vera Rubin NVL72 结果为官方预览；随着验证和发布工作的推进，数据可能会调整。',
     chartDetail: '随着验证和发布工作的推进，结果可能会调整。',
   },
 } as const;

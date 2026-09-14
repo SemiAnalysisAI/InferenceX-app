@@ -1,3 +1,4 @@
+import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 // /profit-estimator: one stacked bar per SKU, US$ per all-in GW per year.
 // Behaviours worth locking down:
 //  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
@@ -1443,6 +1444,51 @@ describe('Profit Estimator — responsive control panels', () => {
         });
         cy.get('#profit-utilization').clear().type('50').blur();
         cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+      });
+    }
+  }
+});
+
+describe('VR publication economics', () => {
+  for (const locale of ['', '/zh']) {
+    for (const basis of ['chip-hour', 'gw-year']) {
+      it(`prices cached-input TRTLLM data per ${basis} under ${locale || '/en'}`, () => {
+        interceptVrPublicationData();
+        cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+        const page = basis === 'chip-hour' ? 'profit-estimator' : 'profit-estimator-per-gigawatt';
+        cy.visit(`${locale}/${page}/deepseek-v4`, {
+          onBeforeLoad: suppressNudges,
+        });
+        cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
+        cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+          const rows = [...$bars].map(
+            (node) =>
+              (
+                node as unknown as {
+                  __data__: {
+                    row: {
+                      hwKey: string;
+                      tco: number;
+                      revenue: number;
+                    };
+                  };
+                }
+              ).__data__.row,
+          );
+          const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
+          const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
+          expect(vr, 'VR is priced').not.to.equal(undefined);
+          expect(gb, 'GB300 remains priced').not.to.equal(undefined);
+          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
+          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
+          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
+          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+          // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
+          // 95% cache hit, DeepSeek list prices, 60% revenue utilization.
+          const revenuePerHour =
+            (((12_600 * (0.05 * 1.32 + 0.95 * 0.044) + 5_400 * 3.96) * 3600) / 1_000_000) * 0.6;
+          expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
+        });
       });
     }
   }
