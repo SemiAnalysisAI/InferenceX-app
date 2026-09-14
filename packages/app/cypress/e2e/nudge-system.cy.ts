@@ -48,8 +48,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'TPUv7 Inference Performance')
-      .and('contain.text', 'Compare TPUv7 versus Blackwell & Blackwell Ultra')
+      .and('contain.text', 'Rubin Agentic Inference Performance')
+      .and('contain.text', '67x Faster than Blackwell Ultra')
       .and('contain.text', 'View results');
     // Banner + header-nav badges, plus the four still-new AgentX hero ledger
     // rows (AGENTX_NEW_MODEL_SLUGS) — the shared pill must render at the same
@@ -96,14 +96,14 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       });
   });
 
-  it('localizes the TPUv7 banner title in Chinese', () => {
+  it('localizes the Rubin banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'TPUv7 推理性能')
-      .and('contain.text', '对比 TPUv7 与 Blackwell 及 Blackwell Ultra 的推理性能')
+      .and('contain.text', 'Rubin 智能体推理性能')
+      .and('contain.text', '速度达 Blackwell Ultra 的 67 倍')
       .and('contain.text', '查看结果');
   });
 
@@ -128,6 +128,19 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Landing nudges — banner', { testIsolation: true }, () => {
+  it('wraps the full Rubin title on mobile without clipping', () => {
+    cy.viewport(375, 812);
+    cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
+    cy.get('[data-testid="launch-banner"] p')
+      .first()
+      .should('contain.text', 'Rubin Agentic Inference Performance')
+      .and('have.css', 'white-space', 'normal')
+      .should(($title) => {
+        expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
+        expect($title[0].scrollHeight).to.be.at.most($title[0].clientHeight);
+      });
+  });
+
   it('shows launch banner on landing page', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
