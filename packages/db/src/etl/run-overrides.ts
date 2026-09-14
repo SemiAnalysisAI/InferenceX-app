@@ -98,6 +98,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34504981128, // 2026-09-13 | Reason: wrong configs ran
   34504985992, // 2026-09-13 | Reason: wrong configs ran
   34488664680, // 2026-09-13 | Reason: wrong configs ran
+  34729188311, // 2026-09-13 | Reason: partial GLM-5.2 GB200 aggregate power refresh replaced the complete curve; restore the prior aggregate + disaggregated snapshot until a full same-image power curve is published
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
