@@ -14,7 +14,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-tpuv7-banner-dismissed',
+    'inferencex-rubin-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -114,7 +114,10 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('contain.text', 'Rubin Agentic Inference Performance')
+      .and('contain.text', '67x Faster than Blackwell Ultra');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
@@ -160,7 +163,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -170,11 +173,10 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8');
+      .and('have.attr', 'href', '/inference/deepseek-v4');
     cy.get('[data-testid="launch-banner"]').click();
 
-    cy.location('pathname').should('eq', '/inference');
-    cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
+    cy.location('pathname').should('eq', '/inference/deepseek-v4');
 
     // Body click must not write the dismissal key — the banner should still
     // render after returning home and reloading the landing page.
@@ -182,7 +184,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-tpuv7-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -358,7 +360,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
