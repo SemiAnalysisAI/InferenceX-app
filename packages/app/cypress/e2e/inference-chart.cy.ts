@@ -1,4 +1,10 @@
 import {
+  interceptVrPublicationData,
+  VR_FIXTURE_DATE,
+  VR_LATEST_FIXTURE_DATE,
+  VR_LATEST_FIXTURE_RUN,
+} from '../support/vr-publication-fixtures';
+import {
   expectNoPageOverflow,
   unlockAgenticGate,
   interceptDerivedAgenticMetrics,
@@ -514,4 +520,125 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
     'Measured Joules per Output Token',
   );
   cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
+});
+
+describe('VR publication data compatibility', () => {
+  for (const locale of ['', '/zh']) {
+    it(`renders September TRTLLM data and cache metrics under ${locale || '/en'}`, () => {
+      interceptVrPublicationData();
+      cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
+      cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
+        const points = [...$dots].map(
+          (node) =>
+            (
+              node as unknown as {
+                __data__: {
+                  id: number;
+                  actualDate: string;
+                  hwKey: string;
+                  server_gpu_cache_hit_rate: number;
+                  theoretical_cache_hit_rate: number;
+                };
+              }
+            ).__data__,
+        );
+        const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
+        expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
+        for (const point of vr) {
+          expect(point.actualDate).to.equal(VR_FIXTURE_DATE);
+          expect(point.server_gpu_cache_hit_rate).to.equal(0.95);
+          expect(point.theoretical_cache_hit_rate).to.equal(0.97);
+        }
+        expect(points.some((point) => point.hwKey.startsWith('gb300_'))).to.equal(true);
+      });
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.get('[data-testid="vera-rubin-official-preview-notice"]')
+        .should('contain.text', 'Vera Rubin NVL72')
+        .and('not.contain.text', 'July');
+    });
+  }
+});
+
+function assertVrDate(expectedDate: string) {
+  cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
+    const points = [...$dots].map(
+      (node) =>
+        (
+          node as unknown as {
+            __data__: {
+              id: number;
+              hwKey: string;
+              actualDate: string;
+              server_gpu_cache_hit_rate: number;
+              physicalChips: number;
+            };
+          }
+        ).__data__,
+    );
+    const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
+    const latest = expectedDate === VR_LATEST_FIXTURE_DATE;
+    expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
+    for (const point of vr) {
+      expect(point.actualDate).to.equal(expectedDate);
+      expect(point.server_gpu_cache_hit_rate).to.equal(latest ? 0.9 : 0.95);
+      expect(point.physicalChips).to.equal(latest ? 16 : 32);
+      expect(Number(point.id)).to.be.within(latest ? 980200 : 980000, latest ? 980203 : 980003);
+    }
+    const gb = points.filter((point) => point.hwKey.startsWith('gb300_'));
+    expect(gb.length).to.be.greaterThan(0);
+    expect(gb.every((point) => point.actualDate === VR_LATEST_FIXTURE_DATE)).to.equal(true);
+  });
+}
+
+describe('VR default date preference', () => {
+  for (const locale of ['', '/zh']) {
+    it(`defaults only VR to September 9 under ${locale || '/en'}`, () => {
+      interceptVrPublicationData(true);
+      cy.intercept({
+        pathname: '/api/v1/benchmarks',
+        query: { date: VR_FIXTURE_DATE, exact: 'true' },
+      }).as('preferredSnapshot');
+      cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
+      cy.wait('@preferredSnapshot');
+      assertVrDate(VR_FIXTURE_DATE);
+    });
+
+    for (const query of [
+      `g_rundate=${VR_LATEST_FIXTURE_DATE}`,
+      `g_runid=${VR_LATEST_FIXTURE_RUN}`,
+    ]) {
+      it(`honors explicit ${query} under ${locale || '/en'}`, () => {
+        interceptVrPublicationData(true);
+        cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu&${query}`);
+        assertVrDate(VR_LATEST_FIXTURE_DATE);
+      });
+    }
+  }
+
+  it('honors a manual selection of the latest date after opening the default', () => {
+    interceptVrPublicationData(true);
+    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    assertVrDate(VR_FIXTURE_DATE);
+    cy.contains('button', 'Run Date:').click();
+    cy.get('[role="dialog"]').contains('button', 'Apply').click();
+    assertVrDate(VR_LATEST_FIXTURE_DATE);
+  });
+
+  it('keeps the latest official snapshot beside an unofficial comparison', () => {
+    interceptOverlayRun();
+    interceptVrPublicationData(true);
+    cy.visit(`/inference/deepseek-v4?i_metric=y_tpPerGpu&unofficialrun=${OVERLAY_RUN_ID}`);
+    cy.wait('@unofficialRun');
+    assertVrDate(VR_LATEST_FIXTURE_DATE);
+  });
+
+  it('falls back to the current curve when September 9 has not been imported', () => {
+    interceptVrPublicationData(true);
+    cy.intercept(
+      { pathname: '/api/v1/benchmarks', query: { date: VR_FIXTURE_DATE, exact: 'true' } },
+      { body: [] },
+    );
+    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    assertVrDate(VR_LATEST_FIXTURE_DATE);
+  });
 });

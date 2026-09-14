@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions, {
@@ -41,6 +41,7 @@ import {
   dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
 } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
+import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
@@ -267,6 +268,8 @@ export function useChartData(
   benchmarkQueryScope?: string,
   initialBenchmarkRows?: BenchmarkRow[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  /** Opt-in from the inference page only; explicit date/run/history views opt out. */
+  allowDefaultRunPreference = false,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -313,16 +316,40 @@ export function useChartData(
     error: runError,
   } = useBenchmarks(selectedModel, '', enabled && Boolean(selectedRunId), selectedRunId, true);
 
+  const preferVr =
+    allowDefaultRunPreference &&
+    VR_DEFAULT_RUN.enabled &&
+    selectedModel === VR_DEFAULT_RUN.model &&
+    selectedSequence === VR_DEFAULT_RUN.sequence &&
+    !queryDate &&
+    !asOfRunId &&
+    !compareGpuPair &&
+    !overviewHistoryPair &&
+    selectedDates.length === 0 &&
+    !selectedDateRange.startDate &&
+    !selectedDateRange.endDate &&
+    Boolean(baseRows?.some(isPreferredVrLine));
+  const { data: preferredRows, isLoading: preferredLoading } = useQuery(
+    benchmarkQueryOptions(selectedModel, VR_DEFAULT_RUN.date, enabled && preferVr, true),
+  );
+
   const allRows = useMemo(() => {
-    if (!selectedRunId) return baseRows;
     // Wait for the run rows before rendering a scoped view — rendering base
     // rows first would flash the un-scoped chart, then swap contested points.
-    if (!runRows) return undefined;
-    if (!baseRows) return runRows;
-    return mergeRunScopedRows(runRows, baseRows);
-  }, [selectedRunId, runRows, baseRows]);
+    let scopedRows = baseRows;
+    if (selectedRunId) {
+      if (!runRows) return undefined;
+      scopedRows = baseRows ? mergeRunScopedRows(runRows, baseRows) : runRows;
+    }
+    // A missing preferred run falls back to the existing chart. Keep source ids,
+    // dates, metrics and links intact; this is only a presentation preference.
+    return preferVr && scopedRows && preferredRows
+      ? preferVrDefaultRun(scopedRows, preferredRows)
+      : scopedRows;
+  }, [selectedRunId, runRows, baseRows, preferVr, preferredRows]);
 
-  const queryLoading = baseLoading || (Boolean(selectedRunId) && runLoading);
+  const queryLoading =
+    baseLoading || (Boolean(selectedRunId) && runLoading) || (preferVr && preferredLoading);
   const queryError = baseError ?? (selectedRunId ? runError : null);
 
   // GPU comparison: fetch data for each additional comparison date

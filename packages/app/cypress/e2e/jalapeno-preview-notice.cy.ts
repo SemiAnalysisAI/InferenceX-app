@@ -26,7 +26,7 @@ describe('official preview notices', () => {
       .and('not.contain.text', '\u2014');
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
-      .and('contain.text', 'Vera Rubin (July)')
+      .and('contain.text', 'Vera Rubin NVL72')
       .and('not.contain.text', '\u2014');
 
     cy.get(
@@ -63,7 +63,7 @@ describe('official preview notices', () => {
       .blur();
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
-      .and('contain.text', 'Vera Rubin (July) results are an official preview');
+      .and('contain.text', 'Vera Rubin NVL72 results are an official preview');
   });
 
   it('appears with Jalapeño historical trend lines', () => {
@@ -83,7 +83,7 @@ describe('official preview notices', () => {
       .and('contain.text', 'InferenceX Official Preview');
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
-      .and('contain.text', 'Vera Rubin (July) results are an official preview');
+      .and('contain.text', 'Vera Rubin NVL72 results are an official preview');
   });
 
   it('keeps the July Vera Rubin notice off unsupported historical metrics', () => {
@@ -109,7 +109,7 @@ describe('official preview notices', () => {
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
-      .and('contain.text', 'Vera Rubin (July) results are an official preview')
+      .and('contain.text', 'Vera Rubin NVL72 results are an official preview')
       .and('not.contain.text', '\u2014');
   });
 
@@ -121,7 +121,7 @@ describe('official preview notices', () => {
       .and('contain.text', '随着验证和发布工作的推进，结果可能会调整。');
     cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
       .should('be.visible')
-      .and('contain.text', 'Vera Rubin (July)')
+      .and('contain.text', 'Vera Rubin NVL72')
       .and('contain.text', '随着验证和发布工作的推进，结果可能会调整。')
       .and('not.contain.text', '\u2014');
 

@@ -130,6 +130,22 @@ availability to the effective model and precisions. `effectiveSelectedRunId` is
 validated within that set but is not written back through the global run action, so a
 precision-specific fallback cannot replace the user's global run intent.
 
+### Default VR snapshot
+
+`InferenceProvider` opts the default inference page into the preference in
+`components/inference/default-run-preference.ts`. DeepSeek V4 Pro agentic VR200 /
+TRTLLM / FP4 / disaggregated / offload-off results default to the September 9
+snapshot. `useChartData` requests that exact date through the existing benchmark
+query, then replaces only that VR line. The database reader selects the logical
+curve; imported public result IDs and per-point source dates/metrics stay intact.
+The model-level latest date can therefore differ from the VR points' source date.
+
+Explicit date/run selection, history/comparison ranges, embedded charts, other
+models/workloads, and unofficial comparisons opt out. Other chips keep their
+normal latest results. Profit estimators do not opt in. If the preferred snapshot
+is absent or its request fails, the current curve remains available. Set the
+registry's `enabled` flag to false when a newer default is approved.
+
 ---
 
 ### EvaluationProvider
