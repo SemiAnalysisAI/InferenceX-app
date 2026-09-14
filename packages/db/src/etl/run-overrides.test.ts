@@ -121,6 +121,26 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills()).not.toThrow();
   });
 
+  it('restores Kimi GB300 append-only metadata only for the published merge identity', () => {
+    const changelog = {
+      baseRef: '8ca602ebb5e2fa99f90583881bfa8783f9f67d8c',
+      headRef: '9242d18a33f73b9c673bb1134addb989a3cc44da',
+      entries: [
+        {
+          configKeys: ['kimik3-fp4-gb300-dynamo-vllm-agentic-mooncake-dcp8-agg'],
+          description: 'Kimi-K3 GB300 aggregate power',
+          prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/3046',
+          appendOnly: false,
+        },
+      ],
+    };
+
+    const applied = applyChangelogBackfills(34744429340, 1, [changelog]);
+    expect(applied.backfillIds).toEqual(['run-34744429340-restore-append-only']);
+    expect(applied.changelogs[0].entries[0].appendOnly).toBe(true);
+    expect(applyChangelogBackfills(34744429340, 2, [changelog]).backfillIds).toEqual([]);
+  });
+
   it('corrects only the six Qwen metrics-refresh recipes without changing measurements', () => {
     const backfills = BENCHMARK_POINT_BACKFILLS.filter((b) => b.githubRunId === 33219708211);
     expect(backfills.map((b) => [b.productionConfigId, b.conc, b.recipeFingerprint])).toEqual([
