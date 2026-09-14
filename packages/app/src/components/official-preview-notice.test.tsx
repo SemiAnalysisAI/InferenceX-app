@@ -78,7 +78,7 @@ describe('official preview notices', () => {
       'vera-rubin-official-preview-notice',
     );
     expect(rubinNotice?.getAttribute('role')).toBe('note');
-    expect(rubinNotice?.textContent).toContain('Vera Rubin (July) results are an official preview');
+    expect(rubinNotice?.textContent).toContain('Vera Rubin NVL72 results are an official preview');
   });
 
   it('renders natural Simplified Chinese copy under /zh', () => {
@@ -89,7 +89,7 @@ describe('official preview notices', () => {
     );
 
     expect(notice?.getAttribute('aria-label')).toBe('InferenceX 官方预览');
-    expect(notice?.textContent).toContain('Vera Rubin (July) 结果为官方预览');
+    expect(notice?.textContent).toContain('Vera Rubin NVL72 结果为官方预览');
     expect(notice?.textContent).toContain('随着验证和发布工作的推进');
   });
 });

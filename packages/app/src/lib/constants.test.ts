@@ -131,10 +131,14 @@ describe('getHardwareConfig', () => {
 
   it('labels the July Vera Rubin snapshot without the hosting provider', () => {
     const config = getHardwareConfig('vr200_rubin-july');
-    expect(config.label).toBe('Vera Rubin');
+    expect(config.label).toBe('Vera Rubin NVL72');
     expect(config.suffix).toBe('(July)');
     expect(config.alwaysShowPrecision).toBe(true);
     expect(getHardwareConfig('vr200_coreweave-vera-rubin').suffix).toBe('');
+    expect(getHardwareConfig('vr200_trt')).toMatchObject({
+      label: 'Vera Rubin NVL72',
+      suffix: '(TRTLLM)',
+    });
   });
 
   it('uses the OpenAI vendor while preserving the Teacup framework', () => {
