@@ -141,6 +141,53 @@ describe('audited run backfills', () => {
     expect(applyChangelogBackfills(34744429340, 2, [changelog]).backfillIds).toEqual([]);
   });
 
+  it('restores the Kimi H200 snapshot by identifying its ten legacy latency points', () => {
+    const changelog = {
+      baseRef: '64c5b00a476f3d19921ecb680a2eaac7bed58c8d',
+      headRef: '91ac9c0bc26e062c6305c97241ed84688531eaa9',
+      entries: [
+        {
+          configKeys: ['kimik3-fp4-h200-vllm-agentic-latency'],
+          description: 'Kimi-K3 H200 latency power',
+          prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/3044',
+          appendOnly: false,
+        },
+      ],
+    };
+    const applied = applyChangelogBackfills(34744300699, 1, [changelog]);
+    expect(applied.backfillIds).toEqual(['run-34744300699-restore-append-only']);
+    expect(applied.changelogs[0].entries[0].appendOnly).toBe(true);
+
+    const pointBackfills = BENCHMARK_POINT_BACKFILLS.filter(
+      (backfill) => backfill.githubRunId === 30781313910,
+    );
+    expect(pointBackfills.map((backfill) => backfill.conc)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
+    ]);
+    for (const backfill of pointBackfills) {
+      expect(backfill.recipeFingerprint).toBeNull();
+      expect(backfill.set).toEqual({
+        recipeFingerprint: 'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5',
+      });
+      const appliedPoint = applyBenchmarkPointBackfill(30781313910, 3, {
+        configId: 999,
+        config: backfill.config,
+        benchmarkType: backfill.benchmarkType,
+        isl: backfill.isl,
+        osl: backfill.osl,
+        conc: backfill.conc,
+        offloadMode: backfill.offloadMode,
+        recipeFingerprint: backfill.recipeFingerprint ?? null,
+        metrics: { ...backfill.expectedMetrics },
+      });
+      expect(appliedPoint.backfillId).toBe(backfill.id);
+      expect(appliedPoint.point.recipeFingerprint).toBe(
+        'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5',
+      );
+      expect(appliedPoint.point.metrics).toEqual(backfill.expectedMetrics);
+    }
+  });
+
   it('corrects only the six Qwen metrics-refresh recipes without changing measurements', () => {
     const backfills = BENCHMARK_POINT_BACKFILLS.filter((b) => b.githubRunId === 33219708211);
     expect(backfills.map((b) => [b.productionConfigId, b.conc, b.recipeFingerprint])).toEqual([

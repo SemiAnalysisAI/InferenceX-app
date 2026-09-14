@@ -4,6 +4,7 @@ import type { BenchmarkPointBackfill } from '../etl/run-overrides.js';
 
 interface BackfillRow {
   offload_mode: unknown;
+  recipe_fingerprint?: unknown;
   metrics: unknown;
 }
 
@@ -36,6 +37,11 @@ function metricsPatch(backfill: BenchmarkPointBackfill): Record<string, unknown>
 function isApplied(row: BackfillRow, backfill: BenchmarkPointBackfill): boolean {
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   if (row.offload_mode !== desiredOffloadMode) return false;
+  if (
+    backfill.set.recipeFingerprint !== undefined &&
+    (row.recipe_fingerprint ?? null) !== backfill.set.recipeFingerprint
+  )
+    return false;
   const metrics = asMetricsRecord(row.metrics);
   if (!metrics) return false;
   return (

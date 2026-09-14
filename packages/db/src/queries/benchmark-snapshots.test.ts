@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
+import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
 let db: PGlite;
@@ -43,19 +44,20 @@ async function addPoint(
   options: {
     image?: string | null;
     offload?: string;
-    fingerprint?: string;
+    fingerprint?: string | null;
     error?: string;
     type?: string;
     isl?: number | null;
     osl?: number | null;
+    tput?: number;
   } = {},
 ) {
   await sql`INSERT INTO benchmark_results
     (id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, offload_mode, image, recipe_fingerprint, metrics, error)
     SELECT ${id}, id, ${config}, ${options.type ?? 'agentic_traces'}, date,
       ${options.isl ?? null}, ${options.osl ?? null}, ${conc}, ${options.offload ?? 'on'},
-      ${options.image === undefined ? 'trt:rc26' : options.image}, ${options.fingerprint ?? `recipe-${id}`},
-      '{"tput_per_gpu":100}'::jsonb, ${options.error ?? null}
+      ${options.image === undefined ? 'trt:rc26' : options.image}, ${options.fingerprint === undefined ? `recipe-${id}` : options.fingerprint},
+      jsonb_build_object('tput_per_gpu', ${options.tput ?? 100}::numeric), ${options.error ?? null}
     FROM workflow_runs WHERE id = ${run}`;
 }
 async function seed() {
@@ -226,6 +228,100 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(rows.filter((row) => row.run_url?.includes('/33701025625/'))).toHaveLength(9);
     expect(rows.filter((row) => row.metrics.power_valid === 1)).toHaveLength(4);
     expect(rows.every((row) => Number(row.curve_workflow_run_id) === 21)).toBe(true);
+  });
+  it('keeps 35 Kimi H200 points while ten identified latency points are refreshed', async () => {
+    await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
+      INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+        is_multinode, prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers,
+        decode_tp, decode_ep, decode_dp_attention, decode_num_workers,
+        num_prefill_gpu, num_decode_gpu)
+      VALUES (10, 'kimik3', 'h200', 'vllm', 'fp4', 'mtp', false,
+          true, 16, 32, true, 2, 16, 32, true, 2, 32, 32),
+        (11, 'kimik3', 'h200', 'vllm', 'fp4', 'mtp', false,
+          true, 8, 32, true, 4, 8, 32, true, 4, 32, 32);`);
+    const image = 'vllm/vllm-openai:kimi-k3';
+    const latencyRecipe = 'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5';
+    const latencyPoints = [
+      [438866, 1, 67.62136],
+      [438864, 2, 56.78213],
+      [438869, 3, 74.38737],
+      [438873, 4, 77.1117],
+      [438895, 5, 91.94298],
+      [438871, 6, 104.97152],
+      [438890, 7, 121.47138],
+      [438872, 8, 126.20408],
+      [438877, 10, 126.53461],
+      [438874, 12, 78.83973],
+    ] as const;
+    const balancedConcurrencies = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
+    const simpleConcurrencies = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32];
+    const latencyConfig = {
+      hardware: 'h200',
+      framework: 'vllm',
+      model: 'kimik3',
+      precision: 'fp4',
+      specMethod: 'mtp',
+      disagg: false,
+      isMultinode: true,
+      prefillTp: 16,
+      prefillEp: 32,
+      prefillDpAttn: true,
+      prefillNumWorkers: 2,
+      decodeTp: 16,
+      decodeEp: 32,
+      decodeDpAttn: true,
+      decodeNumWorkers: 2,
+      numPrefillGpu: 32,
+      numDecodeGpu: 32,
+    } as const;
+
+    await addRun(30, { date: '2026-09-12', githubId: 30781313910, attempt: 3 });
+    for (const [id, conc, tput] of latencyPoints) {
+      const applied = applyBenchmarkPointBackfill(30781313910, 3, {
+        configId: 10,
+        config: latencyConfig,
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        offloadMode: 'off',
+        recipeFingerprint: null,
+        metrics: { tput_per_gpu: tput },
+      });
+      expect(applied.backfillId).toBe(
+        `run-30781313910-kimi-h200-tp16-conc-${conc}-recipe-identity`,
+      );
+      await addPoint(id, 30, 10, conc, {
+        image,
+        fingerprint: applied.point.recipeFingerprint,
+        offload: 'off',
+        tput,
+      });
+    }
+    for (const [index, conc] of balancedConcurrencies.entries())
+      await addPoint(510 + index, 30, 11, conc, { image, fingerprint: null, offload: 'off' });
+    for (const [index, conc] of simpleConcurrencies.entries())
+      await addPoint(522 + index, 30, 11, conc, { image, fingerprint: null, offload: 'on' });
+
+    await addRun(31, { date: '2026-09-13', githubId: 34744300699, append: true });
+    for (const [index, [, conc]] of latencyPoints.entries())
+      await addPoint(600 + index, 31, 10, conc, {
+        image,
+        fingerprint: latencyRecipe,
+        offload: 'off',
+      });
+    await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
+      WHERE workflow_run_id = 31`;
+    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+
+    const rows = await getLatestBenchmarks(sql, 'kimik3');
+    expect(rows).toHaveLength(35);
+    expect(rows.filter((row) => row.run_url?.includes('/34744300699/'))).toHaveLength(10);
+    expect(rows.filter((row) => row.run_url?.includes('/30781313910/'))).toHaveLength(25);
+    expect(rows.filter((row) => row.metrics.power_valid === 1)).toHaveLength(10);
+    expect(rows.every((row) => Number(row.curve_workflow_run_id) === 31)).toBe(true);
+    expect(await getBenchmarksForRun(sql, 'kimik3', 30781313910)).toHaveLength(35);
+    expect(await getLatestBenchmarks(sql, 'kimik3', '2026-09-12')).toHaveLength(35);
   });
   it('stops append-only inheritance at an image change or new full snapshot', async () => {
     await addRun(12, { append: true });
