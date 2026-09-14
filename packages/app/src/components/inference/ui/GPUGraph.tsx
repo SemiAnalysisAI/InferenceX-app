@@ -47,6 +47,7 @@ import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
+  isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -149,6 +150,8 @@ const GPU_STRINGS = {
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
     showAllMeasurements: 'Show all measurements',
+    powerBoundaryInfo:
+      'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
     powerOptimal:
@@ -173,6 +176,8 @@ const GPU_STRINGS = {
     highContrast: '高对比度',
     optimalOnly: '仅最优',
     showAllMeasurements: '显示全部测量点',
+    powerBoundaryInfo:
+      '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
     powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
@@ -219,7 +224,7 @@ const GPUGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: savedHideNonOptimal,
-      showAllMeasurements,
+      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       logScale,
       isLegendExpanded,
@@ -255,7 +260,9 @@ const GPUGraph = React.memo(
     ] as ParetoDirection | undefined;
     const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
     const powerCurveMetric = isPowerCurveMetric(selectedYAxisMetric);
-    const powerEnvelopeMode = powerCurveMetric && !hideNonOptimal;
+    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
+    const powerEnvelopeMode = powerCurveMetric && (isMeasuredPowerAxis || !hideNonOptimal);
+    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
     const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
@@ -1547,6 +1554,7 @@ const GPUGraph = React.memo(
                       id: 'gpu-hide-non-optimal',
                       label: legendT.optimalOnly,
                       checked: hideNonOptimal,
+                      ...(isMeasuredPowerAxis ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
                       onCheckedChange: (c: boolean) => {
                         setHideNonOptimal(c);
                         track('interactivity_hide_non_optimal_toggled', { enabled: c });
@@ -1554,7 +1562,7 @@ const GPUGraph = React.memo(
                     },
                   ]
                 : []),
-              ...(powerEnvelopeMode
+              ...(powerEnvelopeMode && !isMeasuredPowerAxis
                 ? [
                     {
                       id: 'gpu-show-all-measurements',

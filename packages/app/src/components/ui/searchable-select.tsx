@@ -51,6 +51,8 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
+  /** Full-name options used only while searching; groups still owns the selected label. */
+  searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
@@ -80,6 +82,7 @@ interface SearchableSelectProps {
 
 export function SearchableSelect({
   groups,
+  searchGroups,
   value,
   onValueChange,
   placeholder: placeholderProp,
@@ -123,7 +126,9 @@ export function SearchableSelect({
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
   // A grid gives option selection and help their own cells/buttons. A listbox
   // option cannot contain another interactive action accessibly.
-  const hasOptionHelp = groups.some((group) => group.options.some((option) => option.help));
+  const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
+    group.options.some((option) => option.help),
+  );
 
   React.useEffect(() => {
     setMounted(true);
@@ -146,7 +151,7 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
-    return groups
+    return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
         options: g.options.filter(
@@ -154,7 +159,7 @@ export function SearchableSelect({
         ),
       }))
       .filter((g) => g.options.length > 0);
-  }, [groups, search]);
+  }, [groups, searchGroups, search]);
 
   const selectedLabel = React.useMemo(() => {
     for (const group of groups) {

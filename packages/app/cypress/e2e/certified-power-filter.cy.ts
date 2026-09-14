@@ -80,9 +80,9 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
   })),
 );
 
-function visitCertifiedPowerChart(extraParams = '') {
+function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks) {
   cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: powerBenchmarks }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -117,7 +117,7 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="legacy-power-key"]').should('not.exist');
 
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
+    cy.contains('[data-slot="select-item"]', 'Measured Power')
       .scrollIntoView()
       .should('be.visible')
       .click();
@@ -184,25 +184,49 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
   });
 
-  it('defaults to boundary measurements and restores the independent show-all preference', () => {
-    const powerView = '&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0';
-    visitCertifiedPowerChart(powerView);
-    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
-    visiblePowerPoints().should('have.length', 2);
+  it('uses Optimal Only for measured markers while preserving the power boundary', () => {
+    // Each chip has two boundary vertices and one lower-power interior point.
+    const curveBenchmarks = powerBenchmarks.map((row) => ({
+      ...row,
+      metrics: {
+        ...row.metrics,
+        avg_power_w: row.metrics.avg_power_w + (row.conc === 64 ? 100 : row.conc === 128 ? 50 : 0),
+      },
+    }));
+    const powerView = '&i_metric=y_measuredAvgPower&i_best=0';
+    visitCertifiedPowerChart(`${powerView}&i_optimal=1&i_allpoints=1`, curveBenchmarks);
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+    visiblePowerPoints().should('have.length', 4);
     cy.get('[data-testid="measured-power-summary"]').should(
       'contain.text',
-      'Showing 2 of 6 measured points',
+      'Showing 4 of 6 measured points',
     );
 
-    cy.get('#scatter-show-all-measurements').click();
-    visiblePowerPoints().should('have.length', 6);
-    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+    cy.get<SVGPathElement>('.roofline-path')
+      .should('have.length', 2)
+      .then(($curves) => {
+        const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
+        expect(geometry.every((path) => path && !path.includes('NaN'))).to.equal(true);
 
-    visitCertifiedPowerChart(`${powerView}&i_allpoints=1`);
-    cy.get('#scatter-show-all-measurements').should('have.attr', 'data-state', 'checked');
+        cy.get('#scatter-hide-non-optimal').click();
+        visiblePowerPoints().should('have.length', 6);
+        cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+        cy.get<SVGPathElement>('.roofline-path').should(($current) => {
+          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
+        });
+
+        cy.get('#scatter-hide-non-optimal').click();
+        visiblePowerPoints().should('have.length', 4);
+        visiblePowerPoints().find('.legacy-power-ring').should('have.length', 2);
+        cy.get<SVGPathElement>('.roofline-path').should(($current) => {
+          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
+        });
+      });
+
+    visitCertifiedPowerChart(`${powerView}&i_optimal=0&i_allpoints=0`, curveBenchmarks);
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
     visiblePowerPoints().should('have.length', 6);
-    cy.get('#scatter-show-all-measurements').click();
-    visiblePowerPoints().should('have.length', 2);
-    visiblePowerPoints().find('.legacy-power-ring').should('have.length', 1);
   });
 });
