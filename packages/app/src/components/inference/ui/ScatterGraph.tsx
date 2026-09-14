@@ -384,7 +384,7 @@ const SCATTER_STRINGS = {
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
-      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
+      'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
@@ -418,7 +418,7 @@ const SCATTER_STRINGS = {
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
-      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
+      '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
@@ -1553,7 +1553,7 @@ const ScatterGraph = React.memo(
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
     const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = preferPerfRulerMode && !showPowerEnvelope;
+    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Changing the x- or y-axis metric (including the x percentile, which
     // `x_scale_field` encodes) clears every ruler: the curves are redrawn
@@ -1647,23 +1647,21 @@ const ScatterGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // Points sit on curves: a ruler-mode click on a data point behaves like
-    // clicking the point's curve at that point's x. Candidates cover the
-    // single- vs multi-date roofline class variants; the first one present
-    // in the DOM wins. Ruler-mode clicks measure INSTEAD of pinning the
-    // tooltip, so drop the pin the shared click handler applied just before
-    // this callback ran.
+    // Point clicks select their series' rendered curve at that point's x,
+    // including off-boundary measurements. Candidates cover the single-
+    // and multi-date variants, including date-scoped power overlay paths.
+    // Ruler-mode clicks measure instead of pinning the tooltip, so drop
+    // the pin the shared click handler applied just before this callback.
     const handlePerfRulerPointClick = useCallback(
       (point: InferenceData, source: 'official' | 'overlay') => {
         const ctx = perfRulerDrawCtxRef.current;
         if (!ctx) return;
-        const base = `${String(point.hwKey)}_${point.precision}`;
-        const candidates =
+        const series = `${String(point.hwKey)}_${point.precision}`;
+        const base =
           source === 'overlay'
-            ? [
-                `overlay-roofline-${base}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`,
-              ]
-            : [`roofline-${base}`, `roofline-${base}__${point.date}`];
+            ? `overlay-roofline-${series}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`
+            : `roofline-${series}`;
+        const candidates = [`${base}__${encodeURIComponent(point.date)}`, base];
         const curve = candidates.find(
           (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
         );
@@ -3680,6 +3678,7 @@ const ScatterGraph = React.memo(
                           isHighlighted: true,
                           hw: `overlay-run-${info.id}`,
                           isActive: true,
+                          isRemovable: false,
                           onClick: () => {},
                           onShowPoints: () => {
                             setPointsTableTarget({
@@ -3880,7 +3879,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope
+                ...(showPowerEnvelope && !isMeasuredPowerAxis
                   ? []
                   : [
                       {

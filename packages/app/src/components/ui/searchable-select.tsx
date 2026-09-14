@@ -51,7 +51,7 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
-  /** Full-name options used only while searching; groups still owns the selected label. */
+  /** Search options may include aliases for the same value; groups owns the selected label. */
   searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
@@ -151,12 +151,17 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
+    const seen = new Set<string>();
     return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
+        options: g.options.filter((opt) => {
+          const matches =
+            opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower);
+          if (!matches || seen.has(opt.value)) return false;
+          seen.add(opt.value);
+          return true;
+        }),
       }))
       .filter((g) => g.options.length > 0);
   }, [groups, searchGroups, search]);

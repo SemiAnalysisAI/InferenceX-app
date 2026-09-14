@@ -452,6 +452,54 @@ describe('Inference ChartControls grouped measured metrics', () => {
     cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Output');
   });
 
+  for (const [locale, power, energy, searchLabel, group, fullName] of [
+    [
+      'en',
+      'Measured Power',
+      'Measured Energy',
+      'Search options',
+      'Measured',
+      'Measured P75 Fleet Power per Chip',
+    ],
+    ['zh', '实测功率', '实测能耗', '搜索指标选项', '实测', '实测整组 GPU P75 功耗（按芯片均摊）'],
+  ]) {
+    it(`finds measured families by their displayed names without mixing power into energy (${locale})`, () => {
+      mountMeasuredControls('y_measuredP75Power', locale);
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.get(`input[aria-label="${searchLabel}"]`).type(group);
+      cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
+        const values = [...$options].map((option) => option.dataset.value);
+        expect(values).to.have.length(13);
+        expect(new Set(values).size).to.equal(13);
+      });
+      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', power)
+        .and('have.attr', 'data-value', 'y_measuredP75Power')
+        .and('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
+      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', energy)
+        .and('have.attr', 'data-value', 'y_measuredJPerOutputToken');
+      cy.get(`input[aria-label="${searchLabel}"]`).type('{downarrow}');
+      cy.get('[data-select-option]').should('have.focus').type('{enter}');
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('have.text', energy);
+      cy.get('[data-testid="measured-energy-denominator"]').should('be.visible');
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.get(`input[aria-label="${searchLabel}"]`).type(fullName);
+      cy.get('[data-select-option]')
+        .should('have.length', 1)
+        .and('have.text', fullName)
+        .and('have.attr', 'data-value', 'y_measuredP75Power')
+        .click();
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
+    });
+  }
+
   it('keeps P75 and P90 visible and selects their existing metric keys', () => {
     mountMeasuredControls();
     cy.get('[data-testid="measured-power-statistic-p75"]').should('be.visible').click();

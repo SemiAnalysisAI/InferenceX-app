@@ -74,7 +74,7 @@ const STRINGS = {
   en: {
     measuredPower: 'Measured Power',
     measuredEnergy: 'Measured Energy',
-    measuredGroup: 'Measured Power & Energy',
+    measuredGroup: 'Measured',
     tcoBasis: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
@@ -119,7 +119,7 @@ const STRINGS = {
   zh: {
     measuredPower: '实测功率',
     measuredEnergy: '实测能耗',
-    measuredGroup: '实测功率与能耗',
+    measuredGroup: '实测',
     tcoBasis: 'TCO 口径',
     tcoBasisTooltip:
       '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
@@ -546,9 +546,12 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: g.options,
                   }))}
-                  searchGroups={searchableYAxisOptions.map((g) => ({
+                  searchGroups={groupedYAxisOptions.map((g, index) => ({
                     label: g.groupLabel,
-                    options: g.options,
+                    options: [
+                      ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
+                      ...searchableYAxisOptions[index].options,
+                    ],
                   }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
                   searchAriaLabel={locale === 'zh' ? '搜索指标选项' : undefined}

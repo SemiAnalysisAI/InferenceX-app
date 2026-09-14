@@ -77,10 +77,9 @@ describe('Historical Trends — Content & Interactions', () => {
       cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
       cy.wait('@benchmarks');
       cy.wait('@history');
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Measured Prefill Joules per Input Token',
-      );
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
+      cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Input token');
+      cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'Prefill GPUs');
       cy.get('[data-testid="historical-target-slider"]').should('be.visible');
       cy.get('[data-testid="historical-trend-figure"]')
         .should('be.visible')

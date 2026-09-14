@@ -203,6 +203,13 @@ describe('Validated vs historical measured power', () => {
       'Showing 4 of 6 measured points',
     );
 
+    // Let the initial ResizeObserver update reach the SVG before saving geometry.
+    cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
+      const svg = $svg[0];
+      expect(svg.getBoundingClientRect().width, 'chart matches its container width').to.equal(
+        svg.parentElement!.getBoundingClientRect().width,
+      );
+    });
     cy.get<SVGPathElement>('.roofline-path')
       .should('have.length', 2)
       .then(($curves) => {

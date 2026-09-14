@@ -162,7 +162,7 @@ const GPU_STRINGS = {
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
-      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
+      'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
@@ -187,7 +187,7 @@ const GPU_STRINGS = {
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
-      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数——既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
+      '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
@@ -771,7 +771,7 @@ const GPUGraph = React.memo(
     // chip configs on the same date, or a mix — which is the point of this
     // view: quantify the multiple between comparison series at a glance.
     const [savedPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = savedPerfRulerMode && !powerEnvelopeMode;
+    const perfRulerMode = savedPerfRulerMode && (!powerEnvelopeMode || isMeasuredPowerAxis);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Changing the x- or y-axis metric clears every ruler: the curves are
     // redrawn in different units, so a ruler that persisted would measure a
@@ -858,8 +858,8 @@ const GPUGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // Points sit on curves: a ruler-mode click on a data point behaves like
-    // clicking the point's (date, chip, precision) curve at that point's x.
+    // A point click selects its (date, chip, precision) curve at that point's
+    // x, including when the measurement itself is off the power boundary.
     // Ruler-mode clicks measure INSTEAD of pinning the tooltip, so drop the
     // pin the shared click handler applied just before this callback ran.
     const handlePerfRulerPointClick = useCallback(
@@ -1621,7 +1621,7 @@ const GPUGraph = React.memo(
                   if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
-              ...(powerEnvelopeMode
+              ...(powerEnvelopeMode && !isMeasuredPowerAxis
                 ? []
                 : [
                     {

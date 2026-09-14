@@ -753,6 +753,18 @@ describe('ScatterGraph', () => {
       'contain.text',
       runBranch,
     );
+    // Run rows identify pinned overlays; the banner owns run dismissal.
+    // A synthetic run key cannot use the hardware Hide action, and must not
+    // inflate the removable-series count enough to hide the last real GPU.
+    cy.get(`#test-scatter-overlay-labels label[for="checkbox-overlay-run-${runId}"]`)
+      .find('[role="button"][aria-label^="Hide"]')
+      .should('not.exist');
+    cy.get('#test-scatter-overlay-labels label[for="checkbox-h100"]')
+      .find('[role="button"][aria-label^="Hide"]')
+      .should('not.exist');
+    cy.get(
+      `#test-scatter-overlay-labels [data-testid="legend-points-overlay-run-${runId}"]`,
+    ).should('exist');
   });
 
   it('places precision between the GPU and engine in multi-precision labels', () => {
@@ -2397,6 +2409,160 @@ describe('Power envelopes', () => {
       </InferenceContextsProvider>
     );
   }
+
+  it('measures displayed power boundaries across official and dated overlay runs', () => {
+    const runUrls = [101, 102].map(
+      (id) => `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`,
+    );
+    const samples = [
+      [100, 400],
+      [70, 600],
+      [40, 800],
+      [60, 100], // An off-boundary measurement must select its curve, not its raw y.
+    ];
+    const official = samples.map(([x, y], index) =>
+      createMockInferenceData({ hwKey: 'h100', x, y, conc: index + 1 }),
+    );
+    const overlay = runUrls.flatMap((runUrl, run) =>
+      official.map((point) => ({
+        ...point,
+        y: point.conc === 4 ? 75 : point.y / (run === 0 ? 2 : 4),
+        date: `2026-09-${10 + run}`,
+        run_url: runUrl,
+      })),
+    );
+    function PowerRulerHarness() {
+      const [optimal, setOptimal] = useState(false);
+      const [visible, setVisible] = useState(true);
+      const [dismissed, setDismissed] = useState(false);
+      const value = createMockInferenceContextValues({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        hideNonOptimal: optimal,
+        setHideNonOptimal: setOptimal,
+        selectedPrecisions: [Precision.FP4],
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['h100']),
+        hwTypesWithData: new Set(['h100']),
+      });
+      const unofficial = createMockUnofficialRunContext({
+        activeOverlayHwTypes: new Set(visible ? ['h100'] : []),
+        allOverlayHwTypes: new Set(['h100']),
+        runIndexByUrl: { [runUrls[0]]: 0, '101': 0, [runUrls[1]]: 1, '102': 1 },
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <UnofficialRunContext.Provider value={unofficial}>
+            <button onClick={() => setVisible((current) => !current)}>Toggle overlay</button>
+            <button onClick={() => setDismissed(true)}>Dismiss overlay</button>
+            <div style={{ width: 1000, height: 600 }}>
+              <ScatterGraph
+                chartId="power-ruler"
+                modelLabel="Qwen3.5 397B"
+                data={official}
+                xLabel="Interactivity"
+                yLabel="Power"
+                chartDefinition={createMockChartDefinition({
+                  chartType: 'interactivity',
+                  y_measuredAvgPower_roofline: 'lower_right',
+                })}
+                overlayData={
+                  dismissed
+                    ? undefined
+                    : {
+                        data: overlay,
+                        hardwareConfig: hwConfig,
+                        label: 'Power replay',
+                        runUrl: runUrls[0],
+                      }
+                }
+                transitionDuration={0}
+              />
+            </div>
+          </UnofficialRunContext.Provider>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(<PowerRulerHarness />);
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .dot-group').last().click({ force: true });
+    cy.get('#power-ruler .unofficial-overlay-pt').eq(3).click({ force: true });
+
+    const chartId = 'power-ruler';
+    const expectBoundaryRuler = () => {
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '2.00x');
+      cy.get<SVGSVGElement>('#power-ruler svg').should(($svg) => {
+        const svg = $svg[0];
+        const line = svg.querySelector<SVGLineElement>('.pr-line')!;
+        const endpoints = [Number(line.getAttribute('y1')), Number(line.getAttribute('y2'))];
+        const x = Number(line.getAttribute('x1'));
+        const paths = [
+          svg.querySelector<SVGPathElement>('.roofline-path')!,
+          svg.querySelector<SVGPathElement>('.overlay-roofline-path')!,
+        ];
+        // Sample native SVG geometry independently of the ruler's interpolation helper.
+        for (const [index, path] of paths.entries()) {
+          const length = path.getTotalLength();
+          const distance = Math.min(
+            ...Array.from({ length: 1001 }, (_, step) => {
+              const point = path.getPointAtLength((length * step) / 1000);
+              return Math.hypot(point.x - x, point.y - endpoints[index]);
+            }),
+          );
+          expect(distance, 'ruler endpoint lies on the drawn upper boundary').to.be.lessThan(2);
+        }
+      });
+    };
+    expectBoundaryRuler();
+    cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').then(($paths) => {
+      const geometry = [...$paths].map((path) => path.getAttribute('d'));
+      cy.get('#scatter-hide-non-optimal').click({ force: true });
+      cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').should(
+        ($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        },
+      );
+      expectBoundaryRuler();
+    });
+    cy.get('#power-ruler .roofline-path')
+      .invoke('attr', 'd')
+      .then((before) => {
+        cy.get('#power-ruler svg').then(($svg) => {
+          const bounds = $svg[0].getBoundingClientRect();
+          $svg[0].dispatchEvent(
+            new WheelEvent('wheel', {
+              deltaY: -120,
+              clientX: bounds.x + bounds.width / 2,
+              clientY: bounds.y + bounds.height / 2,
+              shiftKey: true,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        });
+        cy.get('#power-ruler .roofline-path').invoke('attr', 'd').should('not.equal', before);
+      });
+    expectBoundaryRuler();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Dismiss overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+  });
 
   it('colors measured-power boundaries by configuration without changing their geometry', () => {
     mountWithProviders(<PowerHarness />, { unofficial: {} });

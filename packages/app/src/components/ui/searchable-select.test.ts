@@ -196,6 +196,51 @@ describe('SearchableSelect', () => {
     expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(0);
   });
 
+  it('keeps family aliases and full-name search without duplicate values or help buttons', () => {
+    const power = {
+      value: 'y_measuredP75Power',
+      label: 'Measured Power',
+      help: 'Time-weighted fleet power percentile.',
+    };
+    const energy = { value: 'y_measuredJPerOutputToken', label: 'Measured Energy' };
+    const handle = vi.fn();
+    render({
+      value: power.value,
+      onValueChange: handle,
+      groups: [{ label: 'Measured', options: [power, energy] }],
+      searchGroups: [
+        {
+          label: 'Measured',
+          options: [
+            power,
+            energy,
+            { ...power, label: 'Measured P75 Fleet Power per Chip' },
+            { ...energy, label: 'Measured Joules per Output Token' },
+          ],
+        },
+      ],
+    });
+    openMenu();
+    setSearchValue('Measured');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(2);
+    expect(
+      document.body.querySelectorAll('[data-testid="option-help-y_measuredP75Power"]'),
+    ).toHaveLength(1);
+    setSearchValue('Measured Power');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-select-option]')?.textContent).toBe('Measured Power');
+    setSearchValue('Measured Energy');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-select-option]')?.textContent).toBe(
+      'Measured Energy',
+    );
+    setSearchValue('Measured P75 Fleet Power per Chip');
+    const option = document.body.querySelector<HTMLElement>('[data-select-option]')!;
+    expect(option.textContent).toBe('Measured P75 Fleet Power per Chip');
+    act(() => option.click());
+    expect(handle).toHaveBeenCalledExactlyOnceWith('y_measuredP75Power');
+  });
+
   it('shows a "No results" message when nothing matches', () => {
     render();
     openMenu();
