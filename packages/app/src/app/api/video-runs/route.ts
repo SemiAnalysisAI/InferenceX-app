@@ -6,7 +6,10 @@ import {
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github-artifacts';
+import { loadFixture } from '@/lib/test-fixtures';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
+  publishedVideoHistory,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
@@ -38,13 +41,26 @@ export async function GET(request: NextRequest) {
   const runId = query.get('run');
   const artifactId = query.get('artifact');
   const page = query.get('page') ?? '1';
+  const history = query.get('format') === 'history';
   const publishedOnly = query.get('format') === 'published';
   const media = query.get('format') === 'media' || publishedOnly;
-  if ((runId && !id(runId)) || (artifactId && (!runId || !id(artifactId))) || !id(page))
+  if (
+    (runId && !id(runId)) ||
+    (artifactId && (!runId || !id(artifactId))) ||
+    !id(page) ||
+    (history && (runId || artifactId || !Number.isSafeInteger(Number(page))))
+  )
     return NextResponse.json(
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
+  if (history && process.env.E2E_FIXTURES === '1') {
+    const fixture = loadFixture<VideoHistoryPage>('video-history');
+    return NextResponse.json(
+      Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
+      { headers: { ...headers, 'X-VideoGenX-Replay': '1' } },
+    );
+  }
   const deadline = AbortSignal.timeout(270000);
   try {
     if (
@@ -54,6 +70,7 @@ export async function GET(request: NextRequest) {
     ) {
       // Production checks repository visibility; local reads must never publish on a cache miss.
       const url = new URL('/api/video-runs', SITE_URL);
+      if (history) url.searchParams.set('format', 'history');
       if (runId) url.searchParams.set('run', runId);
       if (artifactId) {
         url.searchParams.set('artifact', artifactId);
@@ -82,9 +99,11 @@ export async function GET(request: NextRequest) {
           )
             throw new Error('Published artifact identity mismatch');
         } else if (
-          runId
-            ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
-            : !Array.isArray(data.runs)
+          history
+            ? data.schemaVersion !== 1 || !Array.isArray(data.entries)
+            : runId
+              ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
+              : !Array.isArray(data.runs)
         ) {
           throw new Error('Published run identity mismatch');
         }
@@ -99,6 +118,7 @@ export async function GET(request: NextRequest) {
         { error: 'Public H3 repository unavailable' },
         { status: 503, headers },
       );
+    if (history) return NextResponse.json(await publishedVideoHistory(Number(page)), { headers });
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
@@ -207,7 +227,11 @@ export async function GET(request: NextRequest) {
     );
   } catch {
     return NextResponse.json(
-      { error: 'GitHub is unavailable; retry shortly' },
+      {
+        error: history
+          ? 'Published video history is unavailable; retry shortly'
+          : 'GitHub is unavailable; retry shortly',
+      },
       { status: 502, headers },
     );
   }

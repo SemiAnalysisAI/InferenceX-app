@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
+import VideoHistory from './VideoHistory';
 import FidelityResults from './FidelityResults';
 import VideoSelect from './VideoSelect';
 import { servingCells } from './serving';
@@ -23,6 +24,7 @@ const STRINGS = {
     title: 'H3 video benchmark',
     results: 'Videos & result',
     tradeoffs: 'Hardware tradeoffs',
+    history: 'Performance history',
     view: 'Benchmark view',
     preparing: 'Loading results and preparing media. The first publication of a run takes longer.',
     downloading: 'Downloading CI archive',
@@ -53,6 +55,7 @@ const STRINGS = {
     title: 'H3 视频基准测试',
     results: '视频与结果',
     tradeoffs: '硬件延迟与效率权衡',
+    history: '性能历史',
     view: '基准测试视图',
     preparing: '正在加载结果并准备媒体。首次发布该运行的产物需要更多时间。',
     downloading: '正在下载 CI 产物',
@@ -92,9 +95,11 @@ function share(runId: number, artifactId?: number, source?: string, cell?: strin
   const url = new URL(location.href);
   const view = url.searchParams.get('view');
   const comparison = url.searchParams.get('compare');
+  const historyFilters = [...url.searchParams].filter(([key]) => key.startsWith('history-'));
   url.search = '';
-  if (view === 'tradeoff') url.searchParams.set('view', view);
+  if (view === 'tradeoff' || view === 'history') url.searchParams.set('view', view);
   if (comparison) url.searchParams.set('compare', comparison);
+  for (const [key, value] of historyFilters) url.searchParams.set(key, value);
   url.searchParams.set('run', String(runId));
   if (artifactId) url.searchParams.set('artifact', String(artifactId));
   if (source) url.searchParams.set('source', source);
@@ -124,7 +129,7 @@ export default function VideoCIRuns() {
   const [direct, setDirect] = useState('');
   const [manual, setManual] = useState(false);
   const [cellId, setCellId] = useState('');
-  const [view, setView] = useState('results');
+  const [view, setView] = useState('');
   const [compared, setCompared] = useState<TradeoffRun[]>([]);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState(false);
@@ -132,7 +137,7 @@ export default function VideoCIRuns() {
   const changeView = (value: string) => {
     setView(value);
     const url = new URL(location.href);
-    if (value === 'tradeoff') url.searchParams.set('view', 'tradeoff');
+    if (value === 'tradeoff' || value === 'history') url.searchParams.set('view', value);
     else url.searchParams.delete('view');
     history.replaceState(null, '', url);
   };
@@ -399,12 +404,14 @@ export default function VideoCIRuns() {
   }
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('view') === 'tradeoff') setView('tradeoff');
+    const initialView = params.get('view') ?? (params.has('run') ? 'results' : 'history');
+    setView(['history', 'tradeoff'].includes(initialView) ? initialView : 'results');
     if (params.has('compare')) void restoreComparison();
     const directRun = params.get('run');
     if (directRun)
       void selectRun(directRun, params.get('artifact'), params.get('source'), params.get('cell'));
-    else void list(1, true);
+    else if (initialView === 'results') void list(1, true);
+
     return () => {
       request.current++;
       download.current?.abort();
@@ -415,7 +422,7 @@ export default function VideoCIRuns() {
   const selectedSource = sources.find((item) => item.id === sourceId);
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-ci-runs">
-      <Card className="min-w-0 gap-3 p-4 md:p-4">
+      <Card hidden={view === 'history'} className="min-w-0 gap-3 p-4 md:p-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <Heading as="h1" level="section">
             {s.title}
@@ -560,9 +567,19 @@ export default function VideoCIRuns() {
         <Button
           variant={view === 'results' ? 'default' : 'outline'}
           aria-pressed={view === 'results'}
-          onClick={() => changeView('results')}
+          onClick={() => {
+            changeView('results');
+            if (!run) void list(1, true);
+          }}
         >
           {s.results}
+        </Button>
+        <Button
+          variant={view === 'history' ? 'default' : 'outline'}
+          aria-pressed={view === 'history'}
+          onClick={() => changeView('history')}
+        >
+          {s.history}
         </Button>
         <Button
           variant={view === 'tradeoff' ? 'default' : 'outline'}
@@ -572,6 +589,14 @@ export default function VideoCIRuns() {
           {s.tradeoffs}
         </Button>
       </div>
+      {view === 'history' && (
+        <VideoHistory
+          onOpen={(runId, artifactId, source, cell) => {
+            changeView('results');
+            void selectRun(runId, artifactId, source, cell);
+          }}
+        />
+      )}
       <div hidden={view !== 'tradeoff'}>
         {comparisonLoading && (
           <p role="status" className="mb-3 text-sm text-muted-foreground">
