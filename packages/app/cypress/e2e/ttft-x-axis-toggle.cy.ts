@@ -378,9 +378,7 @@ describe('Default scenario', () => {
     cy.get('h2 [data-testid="scenario-selector"]').first().click();
     cy.contains('[data-select-option]', '8K / 1K').click();
     cy.contains('No measurements to plot for this selection.').should('be.visible');
-    cy.get('h2 [data-testid="scenario-selector"]')
-      .should('contain.text', '8K / 1K')
-      .click();
+    cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', '8K / 1K').click();
     cy.contains('[data-select-option]', 'Agentic').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
