@@ -332,6 +332,7 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
+  variant?: 'field' | 'title';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
@@ -352,6 +353,7 @@ interface ScenarioSelectorProps {
  * there is no alternative workload to choose.
  */
 export function ScenarioSelector({
+  variant = 'field',
   id = 'scenario-select',
   value,
   onChange,
@@ -369,7 +371,10 @@ export function ScenarioSelector({
     getSequenceCategoryForModel(s as Sequence, model),
   );
   if (availableSequences.length === 0) return null;
-  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  // A title trigger keeps its one-option menu available so workload help is
+  // reachable; ordinary fields already expose selected-option help directly.
+  const isOnlySelectedScenario =
+    variant !== 'title' && availableSequences.length === 1 && availableSequences[0] === value;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
@@ -401,11 +406,29 @@ export function ScenarioSelector({
         </>
       ),
   });
+  const Container = variant === 'title' ? 'span' : 'div';
 
   return (
-    <div className="flex flex-col space-y-1.5 lg:col-span-1">
-      <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
+    <Container
+      className={
+        variant === 'title'
+          ? 'inline-flex max-w-full align-middle'
+          : 'flex flex-col space-y-1.5 lg:col-span-1'
+      }
+    >
+      {variant !== 'title' && (
+        <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
+      )}
       <SearchableSelect
+        inline={variant === 'title'}
+        triggerAriaLabel={
+          variant === 'title' ? `${t.scenario}: ${scenarioLabel(value)}` : undefined
+        }
+        className={
+          variant === 'title'
+            ? 'h-auto min-h-8 w-auto gap-1 rounded-sm border-transparent bg-transparent px-1 py-0 text-base font-semibold shadow-none hover:bg-muted disabled:opacity-100 dark:bg-transparent'
+            : undefined
+        }
         key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
         disabled={isOnlySelectedScenario}
         value={value}
@@ -430,7 +453,7 @@ export function ScenarioSelector({
           },
         ].filter((group) => group.options.length > 0)}
       />
-    </div>
+    </Container>
   );
 }
 
