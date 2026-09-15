@@ -3,7 +3,11 @@ import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
-import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
+import {
+  agentxDashboardHref,
+  FEATURED_AGENTX_MODELS,
+  isNewAgentxModel,
+} from '@/lib/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
@@ -15,6 +19,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
  */
 const MODEL_LOGOS: Record<string, string> = {
   'kimi-k3': '/logos/kimi-color.svg',
+  'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
   // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
   // mark rather than the Zhipu corporate dot cluster.
@@ -555,7 +560,9 @@ export function AgentXCompareHero({
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
                         <span className="min-w-0">{model.label}</span>
-                        <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                        {isNewAgentxModel(model) && (
+                          <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                        )}
                       </span>
                       <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
                         AgentX

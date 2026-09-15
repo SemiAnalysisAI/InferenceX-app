@@ -37,8 +37,8 @@ describe('metric registry', () => {
     expect(e2e.y_tokensPerDollarH_roofline).toBe('upper_right');
     expect(interactivity.y_costh_roofline).toBe('lower_right');
     expect(e2e.y_costh_roofline).toBe('lower_left');
-    expect(interactivity.y_measuredPowerPercentTdp_roofline).toBeUndefined();
-    expect(e2e.y_measuredPowerPercentTdp_roofline).toBeUndefined();
+    expect(interactivity.y_measuredPowerPercentTdp_roofline).toBe('lower_right');
+    expect(e2e.y_measuredPowerPercentTdp_roofline).toBe('lower_left');
   });
 
   it('preserves metric-specific x overrides and bilingual labels', () => {

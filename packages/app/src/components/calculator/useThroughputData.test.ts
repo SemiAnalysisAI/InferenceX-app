@@ -1316,36 +1316,6 @@ describe('buildGpuGroups', () => {
       expect(Object.values(grouped)[0][0].inputTokenShare).toBeCloseTo(0.9, 9);
     });
 
-    it('preserves the calculator baseline while retaining full power provenance', () => {
-      const source = makeRow({
-        disagg: true,
-        benchmark_type: 'agentic_traces',
-        isl: null,
-        osl: null,
-        metrics: {
-          p90_itl: 1 / 50,
-          tput_per_gpu: 300,
-          input_tput_per_gpu: 400,
-          output_tput_per_gpu: 100,
-          total_prompt_tokens: 9000,
-          total_generation_tokens: 1000,
-          power_valid: 1,
-          avg_power_w: 500,
-          avg_total_gpu_power_w: 4000,
-        },
-      });
-      const { grouped } = buildGpuGroups([source], {
-        sequence: Sequence.AgenticTraces,
-        precisions: ['fp4'],
-        classify: singlePrecisionClassify,
-        calculatorProjection: true,
-      });
-      const point = Object.values(grouped)[0][0];
-      expect(point.inputTokenShare).toBeUndefined();
-      expect(point.benchmarkRow).toBe(source);
-      expect(point.benchmarkRow?.metrics.avg_total_gpu_power_w).toBe(4000);
-    });
-
     it('leaves the share unknown when disaggregated rates have no trustworthy mix', () => {
       const { grouped } = buildGpuGroups(
         [

@@ -341,11 +341,22 @@ describe('parseTokenPriceInput', () => {
 });
 
 describe('profitModelDefaults', () => {
-  it('opens Kimi K3 on 45 tok/s/user, the OpenRouter catalog, and a 30% license fee', () => {
-    expect(profitModelDefaults(Model.Kimi_K3)).toEqual({
-      interactivity: DEFAULT_PROFIT_INTERACTIVITY,
-      listPricing: null,
-      labCutPct: DEFAULT_LAB_CUT_PCT,
+  it('opens Kimi K3 on 45 tok/s/user, the Moonshot list price, and a 30% license fee', () => {
+    const defaults = profitModelDefaults(Model.Kimi_K3);
+    expect(defaults.interactivity).toBe(DEFAULT_PROFIT_INTERACTIVITY);
+    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
+    expect(defaults.listPricing).toEqual({
+      vendor: 'Moonshot',
+      inputPerMillion: 3,
+      cachedInputPerMillion: 0.3,
+      outputPerMillion: 15,
+      sourceUrl: 'https://platform.kimi.ai/docs/pricing/chat-k3',
+    });
+    expect(listPricingToTokenRevenuePricing(defaults.listPricing!)).toEqual({
+      source: 'normalized',
+      inputPerMillion: 3,
+      cachedInputPerMillion: 0.3,
+      outputPerMillion: 15,
     });
   });
 
@@ -381,10 +392,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 5% license fee', () => {
+  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
     expect(defaults.interactivity).toBe(24);
-    expect(defaults.labCutPct).toBe(5);
+    expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
       inputPerMillion: 1.32,
@@ -397,6 +408,25 @@ describe('profitModelDefaults', () => {
       inputPerMillion: 1.32,
       cachedInputPerMillion: 0.044,
       outputPerMillion: 3.96,
+    });
+  });
+
+  it('opens DeepSeek V4.1 Flash on 125 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
+    const defaults = profitModelDefaults(Model.DeepSeek_V4_1_Flash);
+    expect(defaults.interactivity).toBe(125);
+    expect(defaults.labCutPct).toBe(0);
+    expect(defaults.listPricing).toEqual({
+      vendor: 'DeepSeek',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.006,
+      outputPerMillion: 1.2,
+      sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
+    });
+    expect(listPricingToTokenRevenuePricing(defaults.listPricing!)).toEqual({
+      source: 'normalized',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.006,
+      outputPerMillion: 1.2,
     });
   });
 

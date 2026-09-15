@@ -289,6 +289,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedPercentile,
     selectedXAxisMode,
     tokenRevenuePricing,
+    showLineLabels,
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
@@ -937,6 +938,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       }
                       hideImageExport={getViewMode(graphIndex) === 'table'}
                       setIsLegendExpanded={setIsLegendExpanded}
+                      hideLegendOnExport={showLineLabels}
                       exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                       onExportMp4={
                         replayAvailable

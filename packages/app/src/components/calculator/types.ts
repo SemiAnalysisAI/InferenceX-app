@@ -9,8 +9,8 @@ export type CostType = 'total' | 'input' | 'output';
 export type BarMetric = 'throughput' | 'power' | 'cost';
 
 export interface GPUDataPoint {
-  /** Source observation retained for power/throughput matching; never interpolate telemetry. */
-  benchmarkRow?: BenchmarkRow;
+  /** Preserve the source of each frontier knot for paired power estimates. */
+  sourceRow?: BenchmarkRow;
   hwKey: string;
   interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
   /**

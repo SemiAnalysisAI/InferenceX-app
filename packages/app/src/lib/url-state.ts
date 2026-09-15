@@ -38,6 +38,7 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
+  'i_allpoints',
   'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
@@ -77,8 +78,6 @@ const URL_STATE_KEYS = [
   'r_legend',
   'r_active',
   // Calculator (fleet planner)
-  'c_profit_target',
-  'c_profit_power',
   'c_mw',
   'c_costcap',
   // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
@@ -96,6 +95,7 @@ const URL_STATE_KEYS = [
   'c_mtbi',
   'c_rec',
   'c_life',
+  'c_power',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -150,6 +150,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
+  i_allpoints: '',
   i_best: '',
   i_label: '',
   i_nolabel: '',
@@ -179,8 +180,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_hc: '',
   r_legend: '',
   r_active: '',
-  c_profit_target: '',
-  c_profit_power: 'provisioned',
   c_mw: DEFAULT_FLEET_MW,
   c_costcap: '',
   // Empty means "use the component's default", which for these two is derived
@@ -190,6 +189,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_price: '',
   c_oprice: '',
   c_life: '',
+  c_power: 'provisioned',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

@@ -66,6 +66,7 @@ const NON_METRIC_KEYS = new Set([
   'num_gpus',
   'num_prefill_gpu',
   'num_decode_gpu',
+  'num_aggregate_gpu',
   // agentic scenario
   'scenario_type',
   'users',
@@ -89,6 +90,11 @@ const NON_METRIC_KEYS = new Set([
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
+  // Keep structured provenance outside flat numeric metrics. Explicitly
+  // excluding the keys also blocks Number(['5']) coercion.
+  'power_invalid_reasons',
+  'power_audit',
+  'benchmark_outcome',
 ]);
 
 /**
@@ -129,6 +135,25 @@ export interface WorkerPower {
   avg_mem_used_mb?: number;
 }
 
+/**
+ * Narrowed measurement-window audit. Fields are optional because malformed
+ * numerics are omitted; producer identity is null when unavailable.
+ */
+export interface PowerAudit {
+  window_start_unix?: number;
+  window_end_unix?: number;
+  expected_gpu_count?: number;
+  observed_gpu_count?: number;
+  sample_count?: number;
+  max_sample_gap_s?: number;
+  producer_sha?: string | null;
+  exporter_image_sha256?: string | null;
+  /** Relative path within the source run artifact bundle. */
+  source?: string;
+  /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
+  observed_gpu_ids?: string[];
+}
+
 export interface BenchmarkParams {
   config: ConfigParams;
   benchmarkType: BenchmarkType;
@@ -151,6 +176,8 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
+  powerInvalidReasons?: string[];
+  powerAudit?: PowerAudit;
 }
 
 /**
@@ -181,6 +208,11 @@ export function mapBenchmarkRow(
   // first so the rest of the mapper (auto-capture, intvty invariant, guards)
   // is version-agnostic. No-op for v1/v2 rows.
   row = normalizeLegacyTpuRow(flattenAgenticAggRow(row), runId);
+  // Failed-client JSON is retained as evidence, never as a performance point.
+  if (row.benchmark_outcome?.status === 'failed') {
+    tracker.skips.failedRun++;
+    return null;
+  }
 
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
@@ -361,6 +393,9 @@ export function mapBenchmarkRow(
   // narrowing — anything other than a non-empty array of objects is dropped,
   // and a withheld power verdict drops the payload entirely.
   const workers = powerWithheld ? undefined : extractWorkers(row.workers);
+  // Audit metadata is independent of the verdict so valid-row provenance is retained.
+  const powerInvalidReasons = extractPowerInvalidReasons(row.power_invalid_reasons);
+  const powerAudit = extractPowerAudit(row.power_audit);
 
   return {
     config: {
@@ -382,6 +417,8 @@ export function mapBenchmarkRow(
     recipeFingerprint,
     metrics,
     workers,
+    powerInvalidReasons,
+    powerAudit,
   };
 }
 
@@ -586,4 +623,90 @@ export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
     out.push(w);
   }
   return out.length > 0 ? out : undefined;
+}
+
+const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
+const MAX_POWER_REASON_CODES = 32;
+const MAX_POWER_REASON_LENGTH = 64;
+const MAX_POWER_AUDIT_SHA_LENGTH = 128;
+
+/**
+ * Empty results become undefined so persistence stores SQL NULL, not `[]`.
+ */
+export function extractPowerInvalidReasons(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const code = entry.trim();
+    if (code.length === 0 || code.length > MAX_POWER_REASON_LENGTH) continue;
+    if (!POWER_REASON_CODE_RE.test(code) || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+    if (out.length >= MAX_POWER_REASON_CODES) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** parseNum accepts Infinity, which cannot describe a measurement window. */
+function auditFiniteNum(v: unknown): number | undefined {
+  const n = parseNum(v);
+  return n !== undefined && Number.isFinite(n) ? n : undefined;
+}
+
+function auditCount(v: unknown): number | undefined {
+  const n = parseInt2(v);
+  return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+}
+
+function auditSha(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= MAX_POWER_AUDIT_SHA_LENGTH ? s : null;
+}
+
+/**
+ * Missing or malformed audit values must not become a fabricated measurement;
+ * SQL NULL distinguishes absent evidence from an empty recorded object.
+ */
+export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const audit: PowerAudit = {};
+
+  const window_start_unix = auditFiniteNum(e.window_start_unix);
+  if (window_start_unix !== undefined) audit.window_start_unix = window_start_unix;
+  const window_end_unix = auditFiniteNum(e.window_end_unix);
+  if (window_end_unix !== undefined) audit.window_end_unix = window_end_unix;
+  const max_sample_gap_s = auditFiniteNum(e.max_sample_gap_s);
+  if (max_sample_gap_s !== undefined) audit.max_sample_gap_s = max_sample_gap_s;
+  const expected_gpu_count = auditCount(e.expected_gpu_count);
+  if (expected_gpu_count !== undefined) audit.expected_gpu_count = expected_gpu_count;
+  const observed_gpu_count = auditCount(e.observed_gpu_count);
+  if (observed_gpu_count !== undefined) audit.observed_gpu_count = observed_gpu_count;
+  const sample_count = auditCount(e.sample_count);
+  if (sample_count !== undefined) audit.sample_count = sample_count;
+  if (
+    typeof e.source === 'string' &&
+    e.source.length <= 512 &&
+    /^[a-zA-Z0-9_./-]+$/u.test(e.source) &&
+    !e.source.startsWith('/') &&
+    !e.source.split('/').includes('..')
+  )
+    audit.source = e.source;
+  if (Array.isArray(e.observed_gpu_ids)) {
+    const ids = e.observed_gpu_ids.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 128,
+    );
+    if (ids.length > 0) audit.observed_gpu_ids = [...new Set(ids)].slice(0, 1024);
+  }
+  const hasNumericField = Object.keys(audit).length > 0;
+
+  audit.producer_sha = auditSha(e.producer_sha);
+  audit.exporter_image_sha256 = auditSha(e.exporter_image_sha256);
+  if (!hasNumericField && audit.producer_sha === null && audit.exporter_image_sha256 === null) {
+    return undefined;
+  }
+  return audit;
 }

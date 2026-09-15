@@ -92,8 +92,13 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
 export function modelSystemPower(
   row: BenchmarkRow,
   pue: number = AIR_COOLED_SYSTEM_PUE,
+  /** Opt in so AgentX estimates do not widen the ordinary 8K/1K chart policy. */
+  allowAgenticPreview = false,
 ): SystemPowerEstimate {
-  if (row.benchmark_type !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024) {
+  if (
+    !(allowAgenticPreview && row.benchmark_type === 'agentic_traces') &&
+    (row.benchmark_type !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024)
+  ) {
     return unavailable('workload');
   }
   if (typeof row.hardware !== 'string') return unavailable('hardware');

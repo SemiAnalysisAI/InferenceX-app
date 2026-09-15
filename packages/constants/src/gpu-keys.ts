@@ -25,12 +25,12 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
   vr200: {
     vendor: 'NVIDIA',
     arch: 'Vera Rubin',
-    label: 'Vera Rubin',
+    label: 'Vera Rubin NVL72',
     sort: -1,
     tdp: 1800,
     power: 3.3,
     costh: 3.61,
-    costr: 3.61,
+    costr: 8.5,
   },
   h100: {
     vendor: 'NVIDIA',

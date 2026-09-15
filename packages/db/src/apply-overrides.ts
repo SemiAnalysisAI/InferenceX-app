@@ -216,9 +216,11 @@ async function previewBenchmarkPointBackfill(
 ): Promise<BenchmarkPointBackfillTarget | null> {
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   const offloadModes = [...new Set([backfill.offloadMode, desiredOffloadMode])];
+  const sourceRecipeFingerprint = backfill.recipeFingerprint ?? null;
+  const desiredRecipeFingerprint = backfill.set.recipeFingerprint ?? sourceRecipeFingerprint;
   const { config } = backfill;
   const rows = await sql`
-    SELECT br.id, br.offload_mode, br.metrics
+    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     JOIN configs c ON c.id = br.config_id
@@ -246,7 +248,10 @@ async function previewBenchmarkPointBackfill(
       AND br.osl IS NOT DISTINCT FROM ${backfill.osl}
       AND br.conc = ${backfill.conc}
       AND br.offload_mode = ANY(${offloadModes})
-      AND br.recipe_fingerprint IS NOT DISTINCT FROM ${backfill.recipeFingerprint ?? null}
+      AND (
+        br.recipe_fingerprint IS NOT DISTINCT FROM ${sourceRecipeFingerprint}
+        OR br.recipe_fingerprint IS NOT DISTINCT FROM ${desiredRecipeFingerprint}
+      )
   `;
   if (rows.length !== 1) {
     throw new Error(
@@ -258,7 +263,11 @@ async function previewBenchmarkPointBackfill(
   console.log(`    ${backfill.id}: ${benchmarkPointDescription(backfill)}`);
   console.log(`      reason: ${backfill.reason}`);
   const metrics = planBenchmarkPointBackfill(
-    { offload_mode: row.offload_mode, metrics: row.metrics },
+    {
+      offload_mode: row.offload_mode,
+      recipe_fingerprint: row.recipe_fingerprint,
+      metrics: row.metrics,
+    },
     backfill,
   );
   if (metrics === null) {
@@ -282,9 +291,12 @@ async function applyBenchmarkPointBackfillToDatabase(
 ): Promise<void> {
   const { backfill, resultId, metrics } = target;
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  const desiredRecipeFingerprint =
+    backfill.set.recipeFingerprint ?? backfill.recipeFingerprint ?? null;
   const [updated] = await sql`
     UPDATE benchmark_results
     SET offload_mode = ${desiredOffloadMode},
+        recipe_fingerprint = ${desiredRecipeFingerprint},
         metrics = ${jsonbParam(sql, metrics)}
     WHERE id = ${resultId}
     RETURNING id

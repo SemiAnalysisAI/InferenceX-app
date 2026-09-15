@@ -7,7 +7,6 @@ import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-c
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
@@ -165,8 +164,6 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
-    /** Retain the existing calculator inputs while carrying full telemetry separately. */
-    calculatorProjection?: boolean;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -187,11 +184,8 @@ export function buildGpuGroups<M extends GroupMeta>(
   const groupMeta: Record<string, M> = {};
   const hwConfigMap: HardwareConfig = {};
 
-  for (const sourceRow of rows) {
-    if (rowToSequence(sourceRow) !== sequence) continue;
-    const row = options.calculatorProjection
-      ? toCalculatorBenchmarkRows([sourceRow], sequence)[0]
-      : sourceRow;
+  for (const row of rows) {
+    if (rowToSequence(row) !== sequence) continue;
     if (!precisions.includes(row.precision)) continue;
     if (!supportsTokenMetric(row, tokenType)) continue;
 
@@ -219,7 +213,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     groupMeta[groupKey] = meta;
 
     grouped[groupKey].push({
-      benchmarkRow: sourceRow,
+      sourceRow: row,
       hwKey,
       interactivity:
         sequence === Sequence.AgenticTraces
@@ -281,7 +275,7 @@ export function useThroughputData(
   enabled = true,
   selectedTokenType: CostType = 'total',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
-  includePowerTelemetry = false,
+  includePower = false,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -301,14 +295,15 @@ export function useThroughputData(
     enabled,
     undefined,
     undefined,
-    includePowerTelemetry
+    includePower
       ? undefined
       : {
           type: 'calculator',
           sequence: selectedSequence,
           ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
         },
-    initialRows,
+    // A calculator projection cannot seed the raw-power query cache.
+    includePower ? undefined : initialRows,
   );
 
   const loading = queryLoading || !allRows;
@@ -346,7 +341,6 @@ export function useThroughputData(
       percentile: selectedPercentile,
       tokenType: selectedTokenType,
       tcoBasis,
-      calculatorProjection: includePowerTelemetry,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -404,7 +398,6 @@ export function useThroughputData(
     tcoBasis,
     overlayRows,
     runIndexByUrl,
-    includePowerTelemetry,
   ]);
 
   // All available GPU hardware keys from data, ordered by hardwareConfig (HARDWARE_CONFIG order)

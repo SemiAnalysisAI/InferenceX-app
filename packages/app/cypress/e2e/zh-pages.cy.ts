@@ -42,8 +42,9 @@ describe('Chinese (/zh) pages', () => {
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         // Ledger NEW pills localize to 新 on the Chinese landing page.
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-          .should('have.length', 6)
+          .should('have.length', 4)
           .each(($badge) => expect($badge.text()).to.equal('新'));
       });
     });

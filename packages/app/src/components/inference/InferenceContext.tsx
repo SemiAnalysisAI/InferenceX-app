@@ -278,7 +278,8 @@ export function InferenceProvider({
     setSelectedRunDate,
     setSelectedRunId,
   } = useGlobalFilterActions();
-  const { selectedRunDate, selectedRunId, effectiveRunDate } = useGlobalFilterRun();
+  const { selectedRunDate, selectedRunDateRev, selectedRunId, effectiveRunDate } =
+    useGlobalFilterRun();
   const {
     availableModels,
     availableSequences,
@@ -292,6 +293,16 @@ export function InferenceProvider({
   const { isUnofficialRun } = useUnofficialRun();
 
   const { getUrlParam, setUrlParams } = useUrlState();
+  const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
+    Boolean(getUrlParam('g_rundate') || getUrlParam('g_runid')),
+  );
+  const selectRunManually = useCallback(
+    (runId: string) => {
+      setHasExplicitRunSelection(true);
+      setSelectedRunId(runId);
+    },
+    [setSelectedRunId],
+  );
 
   const [overviewHistoryPair, setOverviewHistoryPair] = useState(() => {
     const currentConfigKey = getUrlParam('i_overview_current');
@@ -545,6 +556,9 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
+  const [showAllMeasurements, setShowAllMeasurements] = useState(
+    () => getUrlParam('i_allpoints') === '1',
+  );
   // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
   // mode follows the model + scenario default, so charts that open with every
   // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
@@ -739,6 +753,11 @@ export function InferenceProvider({
     benchmarkQueryScope,
     selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
     tcoBasis,
+    activeTab === 'inference' &&
+      !autoSelectAllGpus &&
+      !isUnofficialRun &&
+      !hasExplicitRunSelection &&
+      selectedRunDateRev === 0,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -1543,6 +1562,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
+      i_allpoints: showAllMeasurements ? '1' : '',
       i_best:
         bestPerSkuChoice === null || bestPerSkuChoice === bestPerSkuDefault
           ? ''
@@ -1579,6 +1599,7 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
+      showAllMeasurements,
       bestPerSkuChoice,
       bestPerSkuDefault,
       showPointLabels,
@@ -1719,6 +1740,7 @@ export function InferenceProvider({
       hwTypesWithData,
       hardwareConfig,
       graphs,
+      selectionPoints,
       loading,
       refreshing,
       error,
@@ -1736,6 +1758,7 @@ export function InferenceProvider({
       hwTypesWithData,
       hardwareConfig,
       graphs,
+      selectionPoints,
       loading,
       refreshing,
       error,
@@ -1810,6 +1833,7 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1832,6 +1856,7 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1868,6 +1893,7 @@ export function InferenceProvider({
     setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
+    setShowAllMeasurements,
     setShowPointLabels,
     setHighContrast,
     setLogScale,
@@ -1881,7 +1907,7 @@ export function InferenceProvider({
     setSelectedDateRange: setSelectedDateRangeAndClear,
     setUserCosts,
     setSelectedRunDate,
-    setSelectedRunId,
+    setSelectedRunId: selectRunManually,
     setUserPowers,
     setHwFilter: setPendingHwFilter,
     setActivePresetId,

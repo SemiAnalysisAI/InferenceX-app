@@ -117,7 +117,7 @@ describe('First-load navigation', () => {
         // on first load, and its corner card would sit over the footer links
         // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-tpuv7-banner-dismissed');
+        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
       },
     });
 
@@ -166,7 +166,7 @@ describe('First-load navigation', () => {
         .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
       // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
@@ -174,6 +174,7 @@ describe('First-load navigation', () => {
         );
         expect(slugs).to.deep.equal([
           'kimi-k3',
+          'deepseek-v41-flash',
           'deepseek-v4',
           'glm-5-3',
           'minimax-m3',
@@ -181,10 +182,23 @@ describe('First-load navigation', () => {
           'qwen-3-8-flash-next',
         ]);
       });
-      // Every featured ledger row carries the NEW pill.
+      // Only the still-new rows carry the NEW pill — see AGENTX_NEW_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-        .should('have.length', 6)
+        .should('have.length', 4)
         .each(($badge) => expect($badge.text()).to.equal('NEW'));
+      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'qwen-3-8-flash-next']) {
+        cy.get(
+          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
+        ).should('exist');
+      }
+      for (const slug of ['deepseek-v4', 'minimax-m3', 'qwen-3-5']) {
+        cy.get(
+          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
+        ).should('not.exist');
+      }
+      cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
+        .should('have.attr', 'href', '/inference/deepseek-v41-flash')
+        .and('contain.text', 'DeepSeek V4.1 Flash 552B');
     });
     cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
@@ -196,22 +210,38 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('TPUv7 launch banner', { testIsolation: true }, () => {
+describe('Rubin launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens the TPUv7 FP8 results from ${locale || '/'} landing page`, () => {
+    it(`opens DeepSeek V4 results from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
-          win.localStorage.removeItem('inferencex-tpuv7-banner-dismissed');
+          // Dismissing the previous launch must not hide the Rubin banner.
+          win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
+          win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
       cy.get('[data-testid="launch-banner"]')
-        .should(
-          'have.attr',
-          'href',
-          `${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`,
+        .should('have.attr', 'href', `${locale}/inference/deepseek-v4`)
+        .and(
+          'contain.text',
+          locale ? 'Rubin 智能体推理性能' : 'Rubin Agentic Inference Performance',
+        )
+        .and(
+          'contain.text',
+          locale ? '速度达 Blackwell Ultra 的 67 倍' : '67x Faster than Blackwell Ultra',
         )
         .click();
+      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v4`);
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+    });
+  }
+});
+
+describe('TPUv7 results', { testIsolation: true }, () => {
+  for (const locale of ['', '/zh']) {
+    it(`preserves TPUv7 FP8 cost basis in ${locale || '/'} share URLs`, () => {
+      cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
       cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);

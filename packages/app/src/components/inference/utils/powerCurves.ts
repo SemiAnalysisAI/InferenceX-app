@@ -21,6 +21,10 @@ export function isPowerCurveMetric(metric: string): boolean {
   return POWER_CURVE_METRICS.has(metric);
 }
 
+export function isMeasuredPowerCurveMetric(metric: string): boolean {
+  return isPowerCurveMetric(metric) && metric !== 'y_modeledChassisPowerPerGpu';
+}
+
 /** No declared direction means there is no Pareto frontier to draw or filter by. */
 export function chartFrontier(
   points: InferenceData[],

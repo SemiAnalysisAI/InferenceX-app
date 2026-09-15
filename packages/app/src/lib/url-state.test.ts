@@ -445,6 +445,33 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     expect(readUrlParams().g_model).toBeUndefined();
   });
+
+  it('preserves all-measurement visibility across metric changes and shared links', async () => {
+    const { location } = setupWindow('?i_optimal=0', '/inference');
+    const { readUrlParams, writeUrlParams, buildShareUrl, refreshUrlParams } =
+      await import('@/lib/url-state');
+
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+
+    writeUrlParams({ i_allpoints: '1', i_metric: 'y_measuredAvgPower' });
+    const powerUrl = new URL(buildShareUrl());
+    expect(powerUrl.searchParams.get('i_allpoints')).toBe('1');
+    expect(powerUrl.searchParams.get('i_optimal')).toBe('0');
+
+    writeUrlParams({ i_metric: 'y_tpPerGpu' });
+    location.search = new URL(buildShareUrl()).search;
+    expect(refreshUrlParams()).toMatchObject({
+      i_allpoints: '1',
+      i_metric: 'y_tpPerGpu',
+      i_optimal: '0',
+    });
+
+    writeUrlParams({ i_allpoints: '' });
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(readUrlParams().i_optimal).toBe('0');
+  });
 });
 
 describe('SSR safety', () => {
@@ -539,37 +566,6 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).toContain('c_mw=20');
     expect(url).toContain('c_costcap=0.5');
     expect(url).not.toContain('r_range');
-  });
-
-  it.each(['', '/zh'])(
-    'shares modeled power and an exact fixed-workload point for %s',
-    async (locale) => {
-      setupWindow('', `${locale}/profit-estimator-per-gigawatt/qwen-3-5`);
-      const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
-      writeUrlParams({
-        i_seq: '8k/1k',
-        c_profit_target: '222.68672965491135',
-        c_profit_power: 'modeled',
-      });
-      await vi.advanceTimersByTimeAsync(200);
-      const url = new URL(buildShareUrl());
-      expect(url.pathname).toBe(`${locale}/profit-estimator-per-gigawatt/qwen-3-5`);
-      expect(url.searchParams.get('i_seq')).toBe('8k/1k');
-      expect(url.searchParams.get('c_profit_target')).toBe('222.68672965491135');
-      expect(url.searchParams.get('c_profit_power')).toBe('modeled');
-      const { resolveCalculatorUrlSeed } = await import('@/components/calculator/url-seed');
-      expect(resolveCalculatorUrlSeed(Object.fromEntries(url.searchParams))).toMatchObject({
-        profitTarget: 222.68672965491135,
-        profitPowerBasis: 'modeled',
-      });
-    },
-  );
-
-  it('omits the default provisioned power basis after switching back from modeled', async () => {
-    setupWindow('?c_profit_power=modeled', '/profit-estimator-per-gigawatt/qwen-3-5');
-    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
-    writeUrlParams({ c_profit_power: 'provisioned' });
-    expect(new URL(buildShareUrl()).searchParams.has('c_profit_power')).toBe(false);
   });
 
   it('defaults to inference tab prefixes when on root path', async () => {

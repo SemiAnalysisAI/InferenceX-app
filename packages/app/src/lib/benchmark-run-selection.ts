@@ -1,12 +1,10 @@
+import {
+  benchmarkCurveScope,
+  type BenchmarkCurveInput,
+} from '@semianalysisai/inferencex-constants';
+
 /** Fields needed to select one workflow run for a rendered benchmark series. */
-export interface BenchmarkSeriesRow {
-  hardware: string;
-  framework: string;
-  spec_method: string;
-  disagg: boolean;
-  precision: string;
-  offload_mode?: string | null;
-  benchmark_type?: string;
+export interface BenchmarkSeriesRow extends BenchmarkCurveInput {
   date: string;
   workflow_run_id?: number;
   run_started_at?: string | null;
@@ -23,10 +21,17 @@ export const benchmarkCurveWorkflowRunId = (row: BenchmarkSeriesRow): number | u
 export const benchmarkCurveRunStartedAt = (row: BenchmarkSeriesRow): string | null | undefined =>
   row.curve_run_started_at ?? row.run_started_at;
 
-const seriesKey = (row: BenchmarkSeriesRow): string => {
-  const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
-  return `${row.hardware}|${row.framework}|${specMethod}|${row.disagg}|${row.precision}|${row.offload_mode ?? 'off'}`;
-};
+const seriesKey = (row: BenchmarkSeriesRow): string =>
+  row.benchmark_type === 'agentic_traces'
+    ? benchmarkCurveScope(row)
+    : JSON.stringify([
+        row.hardware,
+        row.framework,
+        row.spec_method,
+        row.disagg,
+        row.precision,
+        row.offload_mode ?? 'off',
+      ]);
 
 function isLaterRun(candidate: BenchmarkSeriesRow, current: BenchmarkSeriesRow): boolean {
   const startedAt = benchmarkCurveRunStartedAt(candidate) ?? '';

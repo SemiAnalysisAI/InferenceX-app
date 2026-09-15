@@ -12,6 +12,8 @@ const STRINGS = {
 interface UseChartExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  /** Omit the legend from the PNG without changing the interactive chart. */
+  hideLegend?: boolean;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
 }
@@ -271,6 +273,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
 export function useChartExport({
   chartId,
   setIsLegendExpanded,
+  hideLegend = false,
   exportFileName,
 }: UseChartExportOptions) {
   const locale = useLocale();
@@ -284,7 +287,7 @@ export function useChartExport({
     // .legend-container), so temporarily open it for the clone and restore
     // the closed state right after.
     let wasClosed = false;
-    if (setIsLegendExpanded) {
+    if (setIsLegendExpanded && !hideLegend) {
       const el = document.querySelector(`#${chartId}`);
       wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
       if (wasClosed) {
@@ -307,6 +310,15 @@ export function useChartExport({
       // Remove duplicate export container from the clone to avoid DOM id conflicts
       const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
       if (nestedExport) nestedExport.remove();
+      if (hideLegend) {
+        // Remove the entire column, including its spacing and closed-state
+        // reopen button. Labels already identify the series in the plot.
+        for (const legend of clone.querySelectorAll(
+          '[data-slot="chart-legend-wrapper"], .legend-container',
+        )) {
+          legend.remove();
+        }
+      }
 
       // Bake computed text colors on the figcaption — html-to-image can't resolve
       // CSS custom properties (e.g. text-muted-foreground → var(--muted-foreground)).
@@ -527,7 +539,7 @@ export function useChartExport({
       const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
       if (exportElement) exportElement.innerHTML = '';
     }
-  }, [chartId, setIsLegendExpanded, t]);
+  }, [chartId, setIsLegendExpanded, hideLegend, exportFileName, t]);
 
   return { isExporting, exportToImage };
 }

@@ -1424,6 +1424,119 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
   });
+
+  it('clears perf rulers when the y-axis or x-axis metric changes', () => {
+    const chartId = 'test-scatter-perf-ruler-axis-reset';
+    // Distinct `conc` per point keeps the D3 join keys unique, as they are
+    // for real runs; the metric-change update matches marks by that key.
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 120 - index * 40,
+          conc: x,
+          precision: Precision.FP4,
+        }),
+      ),
+    );
+    const baseInference = createMockInferenceContextValues();
+
+    function AxisMetricHarness() {
+      const [yMetric, setYMetric] = useState('y_tpPerGpu');
+      const [xField, setXField] = useState('p90_e2el');
+      const chartDefinition = createMockChartDefinition({
+        chartType: 'interactivity',
+        x_scale_field: xField,
+        y_tpPerGpu_roofline: 'upper_left',
+        y_totalTokensPerDollarTco_roofline: 'upper_left',
+      });
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
+        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+        selectedYAxisMetric: yMetric,
+      };
+
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <button
+            data-testid="change-y-metric"
+            onClick={() => setYMetric('y_totalTokensPerDollarTco')}
+          >
+            Change y metric
+          </button>
+          <button data-testid="change-x-metric" onClick={() => setXField('p90_ttft')}>
+            Change x metric
+          </button>
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId={chartId}
+              modelLabel={Model.DeepSeek_V4_Pro}
+              data={officialData}
+              xLabel="P90 End-to-end Latency (s)"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={chartDefinition}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+
+    mountWithProviders(<AxisMetricHarness />, { unofficial: {} });
+
+    // Ruler mode exposes one widened hit stroke per visible roofline; clicking
+    // two of them completes a measurement.
+    const placeRuler = () => {
+      cy.get(`#${chartId} svg .perf-ruler-hit`).should('have.length', 2);
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(0).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(1).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
+    };
+
+    // Clearing the rulers also drops the "clear rulers" legend entry, which
+    // narrows the sidebar and rebuilds the chart while the metric-change
+    // tween is still running. Both three-point curves must still be drawn
+    // as real curves afterwards (a stale tween used to collapse them onto a
+    // single coordinate).
+    const expectCurvesIntact = () => {
+      cy.get(`#${chartId} svg .roofline-path`)
+        .should('have.length', 2)
+        .each(($path) => {
+          expect($path.attr('d')).to.match(/C/);
+        });
+    };
+
+    expectCurvesIntact();
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    placeRuler();
+
+    // Switching the y-axis metric redraws the curves in new units: the ruler
+    // must not survive. Ruler mode itself stays on so the user can measure
+    // again without re-enabling it.
+    cy.get('[data-testid="change-y-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+
+    // Same for the x-axis metric (the resolved `x_scale_field`).
+    cy.get('[data-testid="change-x-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+  });
 });
 
 describe('ChartDisplay responsive status notes', () => {
@@ -2146,11 +2259,20 @@ describe('ChartDisplay engine comparison guard', () => {
   });
 });
 
-// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, so the true
-// Pareto frontier is one point, but show-all still draws a smooth power envelope.
+// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, while the
+// upper power boundary shows measured power across operating configurations.
 describe('Power envelopes', () => {
+  const powerMetrics = [
+    ['y_measuredAvgPower', 'Watts'],
+    ['y_measuredP75Power', 'P75'],
+    ['y_measuredP90Power', 'P90'],
+    ['y_measuredPrefillAvgPower', 'Prefill'],
+    ['y_measuredDecodeAvgPower', 'Decode'],
+    ['y_measuredPowerPercentTdp', 'Percent TDP'],
+  ] as const;
+
   for (const optimal of [false, true]) {
-    it(`${optimal ? 'preserves Pareto' : 'suppresses power-envelope'} clipping continuations with Optimal Only ${optimal ? 'on' : 'off'}`, () => {
+    it(`suppresses power-envelope clipping continuations with Optimal Only ${optimal ? 'on' : 'off'}`, () => {
       const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
       const visible = createMockInferenceData({
         hwKey: 'b200_trt',
@@ -2201,36 +2323,49 @@ describe('Power envelopes', () => {
         },
       );
       cy.get('#power-clipped .dot-group').should('have.length', 1);
-      if (optimal) {
-        cy.get('#power-clipped .official-overflow-continuation').should('have.length', 1);
-        cy.get('#power-clipped .overlay-overflow-continuation').should('have.length', 1);
-      } else {
-        cy.get('#power-clipped .overflow-continuation').should('not.exist');
-      }
+      cy.get('#power-clipped .overflow-continuation').should('not.exist');
     });
   }
 
-  function PowerHarness() {
+  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
     const [optimal, setOptimal] = useState(true);
+    const [gradientLabels, setGradientLabels] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const power = metric !== 'y_measuredJPerOutputToken';
+    const powerScale = metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1;
     const rows = [1, 8, 32].map((conc, i) =>
       createMockInferenceData({
         hwKey: 'b200_trt',
+        tp: singleConfiguration || i === 0 ? 2 : 4,
         conc,
         x: 100 - i * 30,
-        y: power ? 400 + i * 200 : 4 - i,
+        y: power ? (400 + i * 200) * powerScale : 4 - i,
         measuredAvgPower: { y: 400 + i * 200, roof: false },
         measuredPowerPercentTdp: { y: 40 + i * 20, roof: false },
         measuredJPerOutputToken: { y: 4 - i, roof: false },
         run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
-        power_tier: 'certified',
+        power_tier: i === 1 ? 'legacy' : 'certified',
+      }),
+    );
+    rows.push(
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        tp: 8,
+        conc: 16,
+        x: 60,
+        y: power ? 500 * powerScale : 3.5,
+        measuredAvgPower: { y: 500, roof: false },
+        measuredPowerPercentTdp: { y: 50, roof: false },
+        measuredJPerOutputToken: { y: 3.5, roof: false },
+        power_tier: 'legacy',
       }),
     );
     const value = createMockInferenceContextValues({
       selectedYAxisMetric: metric,
       hideNonOptimal: optimal,
       setHideNonOptimal: setOptimal,
+      showGradientLabels: gradientLabels,
+      setShowGradientLabels: setGradientLabels,
       selectedPrecisions: [Precision.FP4],
       hardwareConfig: hwConfig,
       activeHwTypes: new Set(['b200_trt']),
@@ -2238,12 +2373,15 @@ describe('Power envelopes', () => {
     });
     const definition = createMockChartDefinition({
       chartType: 'interactivity',
-      y_measuredAvgPower_roofline: 'lower_right',
-      y_measuredJPerOutputToken_roofline: 'lower_right',
+      [`${metric}_roofline`]: 'lower_right',
     });
     return (
       <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
-        <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
+        {powerMetrics.map(([key, label]) => (
+          <button key={key} onClick={() => setMetric(key)}>
+            {label}
+          </button>
+        ))}
         <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
         <div style={{ width: 1000, height: 600 }}>
           <ScatterGraph
@@ -2260,33 +2398,346 @@ describe('Power envelopes', () => {
     );
   }
 
-  it('draws a smooth power envelope when Optimal Only is off and preserves energy frontiers', () => {
+  it('measures displayed power boundaries across official and dated overlay runs', () => {
+    const runUrls = [101, 102].map(
+      (id) => `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`,
+    );
+    const samples = [
+      [100, 400],
+      [70, 600],
+      [40, 800],
+      [60, 100], // An off-boundary measurement must select its curve, not its raw y.
+    ];
+    const official = samples.map(([x, y], index) =>
+      createMockInferenceData({ hwKey: 'h100', x, y, conc: index + 1 }),
+    );
+    const overlay = runUrls.flatMap((runUrl, run) =>
+      official.map((point) => ({
+        ...point,
+        y: point.conc === 4 ? 75 : point.y / (run === 0 ? 2 : 4),
+        date: `2026-09-${10 + run}`,
+        run_url: runUrl,
+      })),
+    );
+    function PowerRulerHarness() {
+      const [optimal, setOptimal] = useState(false);
+      const [visible, setVisible] = useState(true);
+      const [dismissed, setDismissed] = useState(false);
+      const value = createMockInferenceContextValues({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        hideNonOptimal: optimal,
+        setHideNonOptimal: setOptimal,
+        selectedPrecisions: [Precision.FP4],
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['h100']),
+        hwTypesWithData: new Set(['h100']),
+      });
+      const unofficial = createMockUnofficialRunContext({
+        activeOverlayHwTypes: new Set(visible ? ['h100'] : []),
+        allOverlayHwTypes: new Set(['h100']),
+        runIndexByUrl: { [runUrls[0]]: 0, '101': 0, [runUrls[1]]: 1, '102': 1 },
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <UnofficialRunContext.Provider value={unofficial}>
+            <button onClick={() => setVisible((current) => !current)}>Toggle overlay</button>
+            <button onClick={() => setDismissed(true)}>Dismiss overlay</button>
+            <div style={{ width: 1000, height: 600 }}>
+              <ScatterGraph
+                chartId="power-ruler"
+                modelLabel="Qwen3.5 397B"
+                data={official}
+                xLabel="Interactivity"
+                yLabel="Power"
+                chartDefinition={createMockChartDefinition({
+                  chartType: 'interactivity',
+                  y_measuredAvgPower_roofline: 'lower_right',
+                })}
+                overlayData={
+                  dismissed
+                    ? undefined
+                    : {
+                        data: overlay,
+                        hardwareConfig: hwConfig,
+                        label: 'Power replay',
+                        runUrl: runUrls[0],
+                      }
+                }
+                transitionDuration={0}
+              />
+            </div>
+          </UnofficialRunContext.Provider>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(<PowerRulerHarness />);
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .dot-group').last().click({ force: true });
+    cy.get('#power-ruler .unofficial-overlay-pt').eq(3).click({ force: true });
+
+    const chartId = 'power-ruler';
+    const expectBoundaryRuler = () => {
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '2.00x');
+      cy.get<SVGSVGElement>('#power-ruler svg').should(($svg) => {
+        const svg = $svg[0];
+        const line = svg.querySelector<SVGLineElement>('.pr-line')!;
+        const endpoints = [Number(line.getAttribute('y1')), Number(line.getAttribute('y2'))];
+        const x = Number(line.getAttribute('x1'));
+        const paths = [
+          svg.querySelector<SVGPathElement>('.roofline-path')!,
+          svg.querySelector<SVGPathElement>('.overlay-roofline-path')!,
+        ];
+        // Sample native SVG geometry independently of the ruler's interpolation helper.
+        for (const [index, path] of paths.entries()) {
+          const length = path.getTotalLength();
+          const distance = Math.min(
+            ...Array.from({ length: 1001 }, (_, step) => {
+              const point = path.getPointAtLength((length * step) / 1000);
+              return Math.hypot(point.x - x, point.y - endpoints[index]);
+            }),
+          );
+          expect(distance, 'ruler endpoint lies on the drawn upper boundary').to.be.lessThan(2);
+        }
+      });
+    };
+    expectBoundaryRuler();
+    cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').then(($paths) => {
+      const geometry = [...$paths].map((path) => path.getAttribute('d'));
+      cy.get('#scatter-hide-non-optimal').click({ force: true });
+      cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').should(
+        ($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        },
+      );
+      expectBoundaryRuler();
+    });
+    cy.get('#power-ruler .roofline-path')
+      .invoke('attr', 'd')
+      .then((before) => {
+        cy.get('#power-ruler svg').then(($svg) => {
+          const bounds = $svg[0].getBoundingClientRect();
+          $svg[0].dispatchEvent(
+            new WheelEvent('wheel', {
+              deltaY: -120,
+              clientX: bounds.x + bounds.width / 2,
+              clientY: bounds.y + bounds.height / 2,
+              shiftKey: true,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        });
+        cy.get('#power-ruler .roofline-path').invoke('attr', 'd').should('not.equal', before);
+      });
+    expectBoundaryRuler();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Dismiss overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+  });
+
+  it('colors measured-power boundaries by configuration without changing their geometry', () => {
     mountWithProviders(<PowerHarness />, { unofficial: {} });
-    cy.get('#power-sweep .roofline-path').should('not.exist');
-    cy.get('[data-testid="power-curve-description"]').should('contain', 'single point');
-    cy.get('#scatter-hide-non-optimal').click({ force: true });
+    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#power-sweep .roofline-path')
+      .invoke('attr', 'd')
+      .then((boundary) => {
+        cy.get('#scatter-gradient-labels').click({ force: true });
+        cy.get('#power-sweep .roofline-path')
+          .should('have.attr', 'd', boundary)
+          .and('have.attr', 'stroke')
+          .and('match', /^url\(#roofline-gradient-/u);
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
+          expect([...$labels].map((label) => label.textContent)).to.have.members(['TP2', 'TP4']);
+        });
+        cy.get('#power-sweep linearGradient[id^="roofline-gradient-"] stop').should(($stops) => {
+          expect(new Set([...$stops].map((stop) => stop.getAttribute('stop-color'))).size).to.equal(
+            2,
+          );
+        });
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 4);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('#scatter-gradient-labels').click({ force: true });
+        cy.get('#power-sweep .roofline-path')
+          .should('have.attr', 'd', boundary)
+          .and('have.attr', 'stroke')
+          .and('not.match', /^url\(/u);
+        cy.get('#power-sweep .parallelism-label').should('not.exist');
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+      });
+    cy.get('#scatter-gradient-labels').click({ force: true });
+    for (const [, label] of powerMetrics) {
+      cy.contains('button', label).click();
+      cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
+        .should('have.attr', 'stroke')
+        .and('match', /^url\(#roofline-gradient-/u);
+      cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
+        expect([...$labels].map((node) => node.textContent)).to.have.members(['TP2', 'TP4']);
+      });
+    }
+    cy.get('#power-sweep svg').then(($svg) => {
+      const svg = $svg[0];
+      const beforePath = svg.querySelector('.roofline-path')!.getAttribute('d');
+      const beforeLabels = [...svg.querySelectorAll('.parallelism-label')].map((node) =>
+        node.getAttribute('transform'),
+      );
+      const bounds = svg.getBoundingClientRect();
+      svg.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -240,
+          clientX: bounds.x + bounds.width / 2,
+          clientY: bounds.y + bounds.height / 2,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      cy.get('#power-sweep .roofline-path')
+        .should('not.have.attr', 'd', beforePath)
+        .and('have.attr', 'stroke')
+        .and('match', /^url\(#roofline-gradient-/u);
+      cy.get('#power-sweep .parallelism-label')
+        .should(($labels) => {
+          expect([...$labels].map((node) => node.getAttribute('transform'))).not.to.deep.equal(
+            beforeLabels,
+          );
+        })
+        .then(($labels) => {
+          const zoomedLabels = [...$labels].map((node) => node.getAttribute('transform'));
+          cy.get('#power-sweep .roofline-path')
+            .invoke('attr', 'd')
+            .then((zoomedPath) => {
+              cy.get('#scatter-gradient-labels').click({ force: true });
+              cy.get('#power-sweep .parallelism-label').should('not.exist');
+              cy.get('#power-sweep .roofline-path').should('have.attr', 'd', zoomedPath);
+              cy.get('#scatter-gradient-labels').click({ force: true });
+              cy.get('#power-sweep .roofline-path')
+                .should('have.attr', 'd', zoomedPath)
+                .and('have.attr', 'stroke')
+                .and('match', /^url\(#roofline-gradient-/u);
+              cy.get('#power-sweep .parallelism-label').should(($restored) => {
+                expect([...$restored].map((node) => node.getAttribute('transform'))).to.deep.equal(
+                  zoomedLabels,
+                );
+              });
+            });
+        });
+    });
+    cy.contains('button', 'Energy').click();
+    cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]')
+      .should('have.attr', 'stroke')
+      .and('match', /^url\(#roofline-gradient-/u);
+    cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
+  });
+
+  it('keeps a single-configuration power boundary solid with its configuration label', () => {
+    mountWithProviders(<PowerHarness singleConfiguration />, { unofficial: {} });
+    cy.get('#scatter-gradient-labels').click({ force: true });
+    cy.get('#power-sweep .roofline-path')
+      .should('have.attr', 'stroke')
+      .and('not.match', /^url\(/u);
+    cy.get('#power-sweep linearGradient[id^="roofline-gradient-"]').should('not.exist');
+    cy.get('#power-sweep .parallelism-label .pl-text')
+      .should('have.length', 1)
+      .and('have.text', 'TP2');
+  });
+
+  it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
+    mountWithProviders(<PowerHarness />, { unofficial: {} });
+    cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]').should(
+      'have.length',
+      1,
+    );
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
       .should('have.length', 1)
       .invoke('attr', 'd')
       .should('match', /^M[^C]+C/u);
     cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
       .should('have.length', 3)
       .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
-    cy.get('#scatter-hide-non-optimal').click({ force: true });
-    cy.get('#power-sweep .roofline-path').should('not.exist');
-    cy.contains('button', 'Percent TDP').click();
-    cy.get('#scatter-hide-non-optimal').should('not.exist');
-    cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
-      .should('have.length', 1)
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 3 of 4 measured points')
+      .and('contain.text', '1/2 historical');
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .find('.legacy-power-ring')
+      .should('have.length', 1);
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity === '0')
+      .should('have.css', 'pointer-events', 'none');
+    cy.get('#power-sweep .roofline-path')
       .invoke('attr', 'd')
-      .should('match', /^M[^C]+C/u);
-    cy.get('#power-sweep .dot-group').each(($point) =>
-      cy.wrap($point).should('have.css', 'opacity', '1'),
-    );
+      .then((boundary) => {
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .should('have.length', 4)
+          .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('[data-testid="measured-power-summary"]').should(
+          'contain.text',
+          'Showing 4 of 4 measured points',
+        );
+        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
+        cy.get('#scatter-show-all-measurements').should('not.exist');
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+      });
+    for (const [, label] of powerMetrics) {
+      cy.contains('button', label).click();
+      cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+      cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
+        .should('have.length', 1)
+        .invoke('attr', 'd')
+        .should('match', /^M[^C]+C/u);
+      cy.get('#power-sweep .dot-group')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 3);
+      cy.get('#scatter-show-all-measurements').should('not.exist');
+    }
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
     cy.get('[data-testid="power-curve-description"]').should('not.exist');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 
   for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
@@ -2332,45 +2783,51 @@ describe('Power envelopes', () => {
           run_url: secondRunUrl,
         }),
       );
-      mountWithProviders(
-        <div style={{ width: 1000, height: 600 }}>
-          <ScatterGraph
-            chartId="power-overlay"
-            modelLabel="Qwen3.5 397B"
-            data={rows}
-            xLabel="Interactivity"
-            yLabel="Power"
-            chartDefinition={createMockChartDefinition({
-              chartType: 'interactivity',
-              [`y_${metric}_roofline`]: 'lower_right',
-            })}
-            overlayData={{
-              data: [...rows, ...secondRunRows],
-              hardwareConfig: hwConfig,
-              label: 'Power replay',
-              runUrl,
-            }}
-            transitionDuration={0}
-          />
-        </div>,
-        {
-          inference: {
-            selectedYAxisMetric: `y_${metric}`,
-            hideNonOptimal: false,
-            selectedModel: Model.Qwen3_5,
-            selectedSequence: Sequence.EightK_OneK,
-            selectedPrecisions: [Precision.FP8],
-            hardwareConfig: hwConfig,
-            activeHwTypes: new Set(['h100']),
-            hwTypesWithData: new Set(['h100']),
-          },
-          unofficial: {
-            activeOverlayHwTypes: new Set(['h100']),
-            allOverlayHwTypes: new Set(['h100']),
-            runIndexByUrl: { [runUrl]: 0, '101': 0, [secondRunUrl]: 1, '102': 1 },
-          },
+      function OverlayPowerHarness() {
+        const [optimal, setOptimal] = useState(true);
+        const value = createMockInferenceContextValues({
+          selectedYAxisMetric: `y_${metric}`,
+          hideNonOptimal: optimal,
+          setHideNonOptimal: setOptimal,
+          selectedModel: Model.Qwen3_5,
+          selectedSequence: Sequence.EightK_OneK,
+          selectedPrecisions: [Precision.FP8],
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['h100']),
+          hwTypesWithData: new Set(['h100']),
+        });
+        return (
+          <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+            <div style={{ width: 1000, height: 600 }}>
+              <ScatterGraph
+                chartId="power-overlay"
+                modelLabel="Qwen3.5 397B"
+                data={rows}
+                xLabel="Interactivity"
+                yLabel="Power"
+                chartDefinition={createMockChartDefinition({
+                  chartType: 'interactivity',
+                  [`y_${metric}_roofline`]: 'lower_right',
+                })}
+                overlayData={{
+                  data: [...rows, ...secondRunRows],
+                  hardwareConfig: hwConfig,
+                  label: 'Power replay',
+                  runUrl,
+                }}
+                transitionDuration={0}
+              />
+            </div>
+          </InferenceContextsProvider>
+        );
+      }
+      mountWithProviders(<OverlayPowerHarness />, {
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100']),
+          allOverlayHwTypes: new Set(['h100']),
+          runIndexByUrl: { [runUrl]: 0, '101': 0, [secondRunUrl]: 1, '102': 1 },
         },
-      );
+      });
       const officialSelector = '#power-overlay .roofline-path[data-curve-kind="power-envelope"]';
       const overlaySelector =
         '#power-overlay .overlay-roofline-path[data-curve-kind="power-envelope"]';
@@ -2397,10 +2854,37 @@ describe('Power envelopes', () => {
       cy.get(overlaySelector).should('have.length', 2);
       cy.get('#power-overlay .dot-group').should('have.length', 9);
       cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
-      cy.get('#power-overlay .dot-group, #power-overlay .unofficial-overlay-pt').each(($point) =>
-        cy.wrap($point).should('have.css', 'opacity', '1'),
-      );
+      cy.get('#power-overlay .dot-group')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 6);
+      cy.get('#power-overlay .unofficial-overlay-pt')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 9);
       assertEnvelopes();
+      cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
+        const geometry = [...$paths].map((path) => path.getAttribute('d'));
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#scatter-show-all-measurements').should('not.exist');
+        cy.get('#power-overlay .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 9);
+        cy.get('#power-overlay .unofficial-overlay-pt')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 12);
+        cy.get(`${officialSelector}, ${overlaySelector}`).should(($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        });
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-overlay .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 6);
+        cy.get('#power-overlay .unofficial-overlay-pt')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 9);
+        cy.get(`${officialSelector}, ${overlaySelector}`).should(($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        });
+      });
       cy.get(officialSelector)
         .invoke('attr', 'd')
         .then((beforeZoom) => {

@@ -60,8 +60,10 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. Kimi K3 opens on 45 tok/s/user and OpenRouter, where
- * Moonshot's price holds across hosts. GLM 5.2/5.3 opens on Z.ai's list price
+ * Per-model defaults. Kimi K3 opens on 45 tok/s/user and Moonshot's list
+ * price ($3.00 / $0.30 cached / $15.00 per M tok, flat at any context length)
+ * because third-party hosts undercut it on OpenRouter, where the catalog
+ * aggregate sits near $1.80 / $9.00. GLM 5.2/5.3 opens on Z.ai's list price
  * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
  * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
  * no priced SKU has a measured point that low yet, so the nearest round
@@ -75,15 +77,22 @@ export interface ProfitModelDefaults {
  * 20%, instead of the 30% the other models assume. DeepSeek V4 Pro opens on
  * DeepSeek's peak-hour list price ($1.32 / $0.044 cached / $3.96 per M tok;
  * off-peak is half that) because third-party hosts undercut it on OpenRouter,
- * on 24 tok/s/user, the speed DeepSeek's own API serves at, and on a 5% model
- * license fee. The B200, B300, and MI355X agentic curves reach that point; the
+ * on 24 tok/s/user, the speed DeepSeek's own API serves at, and on a 0% model
+ * license fee: the weights ship under the MIT license, so there is no lab cut
+ * to model. The B200, B300, and MI355X agentic curves reach that point; the
  * GB200, GB300, and H200 curves bottom out above it and list as not priced
- * until a lower-interactivity run lands.
+ * until a lower-interactivity run lands. DeepSeek V4.1 Flash opens on the
+ * `deepseek-flash` peak-hour list price ($0.30 / $0.006 cached / $1.20 per M
+ * tok; off-peak is half that) from the same pricing page, on 125 tok/s/user,
+ * the speed DeepSeek's own API serves the Flash tier at, and on the same 0%
+ * MIT license fee. It entered the fleet on AgentX only, so the
+ * estimator serves it from day zero; SKUs whose curves stop short of 125
+ * tok/s/user list as not priced rather than extrapolated.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 24,
-    labCutPct: 5,
+    labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
       inputPerMillion: 1.32,
@@ -92,10 +101,27 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
       sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
     },
   },
+  [Model.DeepSeek_V4_1_Flash]: {
+    interactivity: 125,
+    labCutPct: 0,
+    listPricing: {
+      vendor: 'DeepSeek',
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.006,
+      outputPerMillion: 1.2,
+      sourceUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
+    },
+  },
   [Model.Kimi_K3]: {
     interactivity: DEFAULT_PROFIT_INTERACTIVITY,
-    listPricing: null,
     labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: {
+      vendor: 'Moonshot',
+      inputPerMillion: 3,
+      cachedInputPerMillion: 0.3,
+      outputPerMillion: 15,
+      sourceUrl: 'https://platform.kimi.ai/docs/pricing/chat-k3',
+    },
   },
   [Model.GLM_5_2]: {
     interactivity: 100,
@@ -152,6 +178,7 @@ export const DEFAULT_UTILIZATION_PCT = 60;
 export type ProfitBasis = 'chip-hour' | 'gw-year';
 
 export interface ProfitEstimatorAssumptions {
+  powerBasis?: 'provisioned' | 'modeled' | 'compare';
   /** 0–100. Revenue is scaled by this share; TCO is not. */
   utilizationPct: number;
   /** 0–100. Share of revenue paid to the model lab. */
@@ -160,6 +187,8 @@ export interface ProfitEstimatorAssumptions {
 }
 
 export interface ProfitEstimatorRow {
+  /** Distinguish identical hardware bars when both power budgets are shown. */
+  powerLabel?: string;
   hwKey: string;
   resultKey: string;
   precision?: string;
@@ -197,6 +226,7 @@ export interface ProfitEstimatorRow {
  * for the same reason.
  */
 export type ProfitEstimatorSkipReason =
+  | 'no-measured-power'
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'
@@ -231,8 +261,6 @@ export function gpuHoursPerGwYear(powerKwPerGpu: number): number | null {
 }
 
 export interface ProfitEstimatorSpecs {
-  /** Explicit whole-fleet GPU-hours for capacity planning; absent keeps the provisioned baseline. */
-  gpuHours?: number;
   /** All-in kW per GPU (chip plus its share of node, network, cooling). */
   powerKwPerGpu: number;
   /** Tier $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. */
@@ -262,12 +290,8 @@ export function estimateSkuProfit(
   };
   if (result.clamped) return { ...base, reason: 'outside-measured-range' };
   // Per chip-hour the denominator is one GPU-hour, so power never enters.
-  const gpuHours =
-    assumptions.basis === 'chip-hour'
-      ? 1
-      : (specs.gpuHours ?? gpuHoursPerGwYear(specs.powerKwPerGpu));
-  if (gpuHours === null || !Number.isFinite(gpuHours) || gpuHours <= 0)
-    return { ...base, reason: 'no-power' };
+  const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
+  if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
 
   const revenuePerGpuHour = tokenRevenueFromRatesPerGpuHour(
@@ -361,9 +385,10 @@ export function formatProfitUsd(value: number, basis: ProfitBasis, digits?: numb
 
 /**
  * Models that have AgentX (agentic-trace) rows in the availability table, in
- * the order of `models`. The AgentX view uses measured token/cache mixes;
- * the separate fixed-workload planning view explicitly labels its synthetic
- * mix. `dbKeysFor` maps a display model to its DB model keys.
+ * the order of `models`. The estimator only prices agentic workloads: fixed
+ * ISL/OSL scenarios have no cache-hit telemetry and their token mix is
+ * synthetic, so a $/GW-year figure built on them would not describe a real
+ * serving fleet. `dbKeysFor` maps a display model to its DB model keys.
  */
 export function modelsWithAgenticData<M extends string>(
   models: readonly M[],

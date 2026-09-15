@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) =>
     getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId),
-  'benchmarks-agentic-run-metadata',
+  'benchmarks-agentic-curve-scope-v2',
   { blobOnly: true },
 );
 
@@ -30,14 +30,14 @@ const getCachedBenchmarks = cachedQuery(
 // distinct key prefix so it never collides with the latest/as-of query.
 const getCachedBenchmarksForRun = cachedQuery(
   (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
-  'benchmarks-run-agentic-run-metadata',
+  'benchmarks-run-agentic-curve-scope-v2',
   { blobOnly: true },
 );
 
 const getCachedCalculatorBenchmarks = cachedQuery(
   async (dbModelKeys: string[], sequence: string, date?: string) =>
     toCalculatorBenchmarkRows(await getLatestBenchmarks(getDb(), dbModelKeys, date), sequence),
-  'benchmarks-calculator-agentic-run-metadata',
+  'benchmarks-calculator-agentic-curve-scope-v2',
   { blobOnly: true },
 );
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   // Numeric GitHub run id only — anything else is ignored (treated as "latest").
   const runIdParam = params.get('runId');
   const runId = runIdParam && /^\d+$/u.test(runIdParam) ? runIdParam : undefined;
-  // exactRun=true → return exactly this run's results (GPU comparison of same-day runs).
+  // exactRun=true → return this run's logical snapshot, including append-only ancestors.
   const exactRun = params.get('exactRun') === 'true';
   const view = params.get('view');
   const sequence = params.get('sequence') ?? '';

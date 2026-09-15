@@ -175,6 +175,7 @@ export function createMockInferenceContextValues(
 ): MockInferenceContextValues {
   const hwConfig = createMockHardwareConfig();
   return {
+    selectionPoints: [],
     activeHwTypes: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
     hwTypesWithData: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
     toggleHwType: namedStub('toggleHwType'),
@@ -242,6 +243,8 @@ export function createMockInferenceContextValues(
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
     setHideNonOptimal: namedStub('setHideNonOptimal'),
+    showAllMeasurements: false,
+    setShowAllMeasurements: namedStub('setShowAllMeasurements'),
     showPointLabels: false,
     setShowPointLabels: namedStub('setShowPointLabels'),
     highContrast: false,

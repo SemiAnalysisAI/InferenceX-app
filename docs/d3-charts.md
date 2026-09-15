@@ -75,21 +75,27 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 ## Power curves and optimal filtering
 
-Power axes use the same Pareto directions as other metrics while **Optimal Only** is on. A frontier can legitimately contain one point: the fastest measured configuration can also draw the least power. Turning the switch off connects the concurrency measurements for each serving configuration, date, and run with straight segments. These operating curves do not represent a Pareto frontier and must never connect unrelated configurations or runs.
+The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. These views use no separate **Show all measurements** switch. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
 
-Measured power as a percentage of TDP has no preferred direction, so it always shows all measurements and operating curves; its optimal switch is hidden. Charts preserve the saved optimal preference when switching to another metric. Energy per token retains its existing Pareto behavior.
+Modeled chassis power retains its existing behavior: **Optimal Only** on shows the minimum-power Pareto frontier, which can legitimately contain one point. Turning it off draws the upper power boundary. In that mode, the separate **Show all measurements** switch (`i_allpoints=1`) reveals off-boundary points without changing the curve.
 
-Operating curves use linear interpolation, including after zoom, and disable gradient strategy labels and the performance ruler. Repeated conflicting measurements at the same concurrency break a curve rather than choosing a winner or bridging the conflict. The same grouping applies to unofficial-run overlays.
+Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison. Historical rings remain attached to visible historical points.
+
+Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
+
+**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
 
 ## Gradient Roofline Labels
 
-Parallelism strategy labels (TP4, TEP8, DPAEP4) are rendered as gradient stops along roofline paths, not as individual text labels. The reasoning:
+Parallelism strategies (TP4, TEP8, DPAEP4) color roofline paths with gradient stops and use one label per contiguous strategy segment. The reasoning:
 
 - A roofline may have 8+ points with different strategies. Individual labels would overlap.
 - Gradient coloring shows strategy territories: "this segment of the curve uses TP8, that segment uses EP4"
 - Blend zones (5-20% of gap between label changes) create smooth transitions between strategies
 
 The territory rule: each point "owns" the region ±50% to its neighbors. When adjacent points share a label, they merge into a single color band.
+
+Measured-power gradient labels use the displayed upper-boundary points, with the same single-date restriction as other gradient curves. They describe configuration changes, not numeric slope or efficiency. A boundary with one configuration keeps a solid line and its configuration label. Unofficial overlays also use one label per contiguous configuration segment, while their strokes and labels retain the run color shown in the legend.
 
 ## Axis Domains from Visible Data Only
 

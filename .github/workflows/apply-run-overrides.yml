@@ -5,6 +5,8 @@ on:
     branches: [main, master]
     paths:
       - 'packages/db/src/etl/run-overrides.ts'
+      - 'packages/db/src/etl/power-p90-backfills.ts'
+      - 'docs/data/power-p90-backfill.json'
       - '.github/workflows/apply-run-overrides.yml'
   workflow_dispatch:
     inputs:

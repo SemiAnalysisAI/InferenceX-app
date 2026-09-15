@@ -301,6 +301,25 @@ describe('rowToAggDataEntry', () => {
     expect(entry.joules_per_output_token).toBe(8.4);
   });
 
+  it('passes through producer power_invalid_reasons on withheld rows', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: { power_valid: 0 },
+        power_invalid_reasons: ['thermal_throttle', 'sample_gap'],
+      }),
+    );
+    expect(entry.power_invalid_reasons).toEqual(['thermal_throttle', 'sample_gap']);
+  });
+
+  it.each([
+    ['legacy row without the field', {}],
+    ['API null (SQL NULL column)', { power_invalid_reasons: null }],
+    ['empty array', { power_invalid_reasons: [] }],
+  ])('leaves power_invalid_reasons undefined for %s', (_name, overrides) => {
+    const entry = rowToAggDataEntry(makeRow({ metrics: {}, ...overrides }));
+    expect(entry.power_invalid_reasons).toBeUndefined();
+  });
+
   it('passes through versioned whole-deployment joules per successful query', () => {
     const entry = rowToAggDataEntry(
       makeRow({
@@ -1664,7 +1683,7 @@ describe('rowToAggDataEntry — id coercion', () => {
 // ---------------------------------------------------------------------------
 // mergeRunScopedRows — offload-aware scoping (data-loss guard)
 // ---------------------------------------------------------------------------
-describe('mergeRunScopedRows — offload variants are distinct series', () => {
+describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () => {
   const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
     makeRow({
       model: 'dsr1',
@@ -1677,16 +1696,16 @@ describe('mergeRunScopedRows — offload variants are distinct series', () => {
       ...over,
     });
 
-  it('a run row for offload=on does NOT claim/suppress the base offload=off rows', () => {
-    // The selected run produced only the offload=on variant. The offload=off base
-    // rows are a separate series and must carry forward, not vanish.
+  it('a full run snapshot replaces old points across offload variants', () => {
+    // A selected AgentX snapshot already contains its complete point set.
+    // A removed offload-off point must not be borrowed from the base snapshot.
     const runRows = [agenticRow({ id: 10, offload_mode: 'on' })];
     const baseRows = [
       agenticRow({ id: 90, offload_mode: 'on' }), // same series as the run → replaced
-      agenticRow({ id: 91, offload_mode: 'off' }), // distinct series → kept
+      agenticRow({ id: 91, offload_mode: 'off' }), // old point → replaced
     ];
     const merged = mergeRunScopedRows(runRows, baseRows);
-    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10]);
   });
 
   it('a run covering both offload variants pins both', () => {

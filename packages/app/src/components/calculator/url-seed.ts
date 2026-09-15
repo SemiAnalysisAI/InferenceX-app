@@ -9,8 +9,6 @@ import {
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
 
-export type ProfitPowerBasis = 'provisioned' | 'modeled';
-
 export interface CalculatorUrlSeed {
   model?: Model;
   sequence?: Sequence;
@@ -18,8 +16,6 @@ export interface CalculatorUrlSeed {
   percentile?: Percentile;
   runDate?: string;
   runId?: string;
-  profitTarget?: number;
-  profitPowerBasis?: ProfitPowerBasis;
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -61,14 +57,6 @@ export function resolveCalculatorUrlSeed(
   const percentileParam = pickString(sp.i_pctl);
   if (percentileParam && (PERCENTILE_OPTIONS as readonly string[]).includes(percentileParam)) {
     seed.percentile = percentileParam as Percentile;
-  }
-
-  const profitTarget = Number(pickString(sp.c_profit_target));
-  if (Number.isFinite(profitTarget) && profitTarget > 0) seed.profitTarget = profitTarget;
-
-  const profitPowerBasis = pickString(sp.c_profit_power);
-  if (profitPowerBasis === 'provisioned' || profitPowerBasis === 'modeled') {
-    seed.profitPowerBasis = profitPowerBasis;
   }
 
   const runDateParam = pickString(sp.g_rundate);

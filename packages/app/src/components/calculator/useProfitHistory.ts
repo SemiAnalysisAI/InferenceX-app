@@ -33,6 +33,7 @@ export function useProfitHistory(options: {
   /** Per chip, the run behind its main bar; a pin that adds no bar is dropped. */
   currentRunIds?: Readonly<Record<string, string>>;
   enabled?: boolean;
+  includePower?: boolean;
 }): {
   /** Comparison entries in fetch order (dates or `date~r<runId>` runs). */
   comparisonDates: string[];
@@ -49,6 +50,7 @@ export function useProfitHistory(options: {
     currentRunDate,
     currentRunIds = EMPTY_RUN_IDS,
     enabled = true,
+    includePower = false,
   } = options;
 
   const comparisonDates = useMemo(
@@ -61,7 +63,10 @@ export function useProfitHistory(options: {
     [selectedGPUs, selectedDates, dateRange, currentRunDate, currentRunIds],
   );
 
-  const view = useMemo(() => ({ type: 'calculator' as const, sequence }), [sequence]);
+  const view = useMemo(
+    () => (includePower ? undefined : { type: 'calculator' as const, sequence }),
+    [sequence, includePower],
+  );
 
   const queries = useQueries({
     queries: comparisonDates.map((entry) => {

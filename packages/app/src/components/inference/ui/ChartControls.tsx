@@ -58,6 +58,13 @@ import {
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
+import { PowerMetricAvailability } from './PowerMetricAvailability';
+import { MeasuredMetricControls } from './MeasuredMetricControls';
+import {
+  getMeasuredMetricConfig,
+  MEASURED_METRIC_DEFAULTS,
+  type MeasuredMetricFamily,
+} from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -65,6 +72,9 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
+    measuredPower: 'Measured Power',
+    measuredEnergy: 'Measured Energy',
+    measuredGroup: 'Measured',
     tcoBasis: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
@@ -107,6 +117,9 @@ const STRINGS = {
     changed: 'changed',
   },
   zh: {
+    measuredPower: '实测功率',
+    measuredEnergy: '实测能耗',
+    measuredGroup: '实测',
     tcoBasis: 'TCO 口径',
     tcoBasisTooltip:
       '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
@@ -232,11 +245,20 @@ export default function ChartControls({
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
-  // Gated groups appear only after the feature gate unlocks.
+  // Gated groups appear only after the feature gate unlocks. A gated metric
+  // that arrived through a shared URL keeps its own group visible while the
+  // gate is locked so the selector never shows an option it cannot name;
+  // this mirrors how tab-nav keeps a gated route's tab for the current page.
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
-    () => METRIC_GROUPS.filter((g) => !g.gated || featureGateUnlocked),
-    [featureGateUnlocked],
+    () =>
+      METRIC_GROUPS.filter(
+        (g) =>
+          !g.gated ||
+          featureGateUnlocked ||
+          (g.metrics as readonly string[]).includes(selectedYAxisMetric),
+      ),
+    [featureGateUnlocked, selectedYAxisMetric],
   );
   const metricGroupMap = useMemo(
     () =>
@@ -253,7 +275,7 @@ export default function ChartControls({
   // Values: the tier is picked in the chart caption, not here.
   const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
 
-  const groupedYAxisOptions = useMemo(() => {
+  const searchableYAxisOptions = useMemo(() => {
     // Shared across groups so a family listed under Custom User Values does
     // not reappear after its published entry.
     const seenFamilies = new Set<CostMetricFamilyId>();
@@ -297,6 +319,36 @@ export default function ChartControls({
       })
       .filter((g) => g.options.length > 0);
   }, [visibleGroups, locale, carriedTier]);
+
+  // Keep the existing metric key in state and shared URLs. Only the menu's
+  // default presentation collapses; full metric names remain searchable.
+  const groupedYAxisOptions = useMemo(() => {
+    const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
+    const seen = new Set<MeasuredMetricFamily>();
+    return searchableYAxisOptions.map((group) => ({
+      ...group,
+      groupLabel: group.options.some((option) => getMeasuredMetricConfig(option.value))
+        ? t.measuredGroup
+        : group.groupLabel,
+      options: group.options.flatMap((option) => {
+        const config = getMeasuredMetricConfig(option.value);
+        if (!config) return [option];
+        if (seen.has(config.family)) return [];
+        seen.add(config.family);
+        const value =
+          selectedConfig?.family === config.family
+            ? selectedYAxisMetric
+            : MEASURED_METRIC_DEFAULTS[config.family];
+        return [
+          {
+            value,
+            label: config.family === 'power' ? t.measuredPower : t.measuredEnergy,
+            help: <MetricExplanation metricKey={value.replace(/^y_/u, '') as MetricKey} />,
+          },
+        ];
+      }),
+    }));
+  }, [searchableYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -494,12 +546,40 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: g.options,
                   }))}
+                  searchGroups={groupedYAxisOptions.map((g, index) => ({
+                    label: g.groupLabel,
+                    options: [
+                      ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
+                      ...searchableYAxisOptions[index].options,
+                    ],
+                  }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
                   searchAriaLabel={locale === 'zh' ? '搜索指标选项' : undefined}
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
+                {mounted && !getMeasuredMetricConfig(selectedYAxisMetric) && (
+                  <PowerMetricAvailability
+                    metric={selectedYAxisMetric}
+                    onSelect={handleYAxisMetricChange}
+                  />
+                )}
               </div>
+
+              {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
+                <>
+                  <MeasuredMetricControls
+                    metric={selectedYAxisMetric}
+                    onChange={handleYAxisMetricChange}
+                  />
+                  <div className="col-span-full">
+                    <PowerMetricAvailability
+                      metric={selectedYAxisMetric}
+                      onSelect={handleYAxisMetricChange}
+                    />
+                  </div>
+                </>
+              )}
 
               {tcoVisible && (
                 <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">

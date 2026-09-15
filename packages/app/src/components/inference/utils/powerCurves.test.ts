@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import { chartDefinitions } from '@/components/inference/metric-registry';
+import type { ParetoDirection } from '@/lib/chart-utils';
 
 import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
 
@@ -24,6 +26,38 @@ function point(conc: number, x: number, y: number, overrides: Partial<InferenceD
 }
 
 describe('power chart semantics', () => {
+  it.each(chartDefinitions)(
+    'keeps watts and percent TDP on the same $chartType frontier within a hardware series',
+    (definition) => {
+      const samples = [
+        point(1, 200, 600),
+        point(4, 160, 400),
+        point(8, 120, 500),
+        point(16, 100, 300),
+      ].map((sample) => ({
+        ...sample,
+        x: definition.chartType === 'e2e' ? 1000 / sample.x : sample.x,
+      }));
+      const watts = chartFrontier(
+        samples,
+        definition.y_measuredAvgPower_roofline as ParetoDirection | undefined,
+      );
+      expect(watts.map((sample) => sample.conc).toSorted((a, b) => a - b)).toEqual([1, 4, 16]);
+      // TDP is fixed within each hardware series. Converting its watts to a
+      // percentage must neither admit the dominated point nor drop a tradeoff.
+      for (const tdp of [700, 1000, 1400]) {
+        const percentages = samples.map((sample) => ({ ...sample, y: (sample.y / tdp) * 100 }));
+        const percentFrontier = chartFrontier(
+          percentages,
+          definition.y_measuredPowerPercentTdp_roofline as ParetoDirection | undefined,
+        );
+        expect(percentFrontier.map((sample) => sample.conc)).toEqual(
+          watts.map((sample) => sample.conc),
+        );
+      }
+    },
+  );
+
   it('selects power gauges without changing energy chart semantics', () => {
     expect(isPowerCurveMetric('y_measuredAvgPower')).toBe(true);
     expect(isPowerCurveMetric('y_measuredP75Power')).toBe(true);

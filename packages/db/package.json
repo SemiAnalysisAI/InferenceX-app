@@ -44,6 +44,7 @@
     "stream-json": "^3.6.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.4.0",
     "@types/stream-json": "^1.7.8",

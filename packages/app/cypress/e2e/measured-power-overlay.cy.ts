@@ -8,32 +8,42 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.visit('/inference?unofficialrun=26312107787', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
+        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
-    cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
-  it('exposes the Measured Energy dropdown group and renders overlay points', () => {
+  it('exposes both measured families and selects average power on the overlay view', () => {
     // Open Y-axis dropdown
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-content"]').should('exist');
 
-    // Verify the "Measured Energy" group + both options. The select list is a
-    // scroll container (max-h-72 overflow-y-auto), and this group sits below the fold,
-    // so scroll each target into view before asserting visibility.
-    cy.contains('[data-slot="select-content"]', 'Measured Energy')
+    // The grouped family choices sit below the fold in the scrollable menu.
+    cy.contains('[data-slot="select-item"]', /^Measured Power$/u)
       .scrollIntoView()
       .should('be.visible');
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
-      .scrollIntoView()
-      .should('be.visible');
-    cy.contains('[data-slot="select-item"]', 'Measured Joules per Output Token')
+    cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
       .scrollIntoView()
       .should('be.visible');
 
     // Select the power option
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').click();
+    cy.contains('[data-slot="select-item"]', /^Measured Power$/u)
+      .scrollIntoView()
+      .click();
     cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[data-testid="measured-power-scope"]').should('contain.text', 'All GPUs');
+    cy.get('[data-testid="measured-power-statistic-average"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W/chip');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'Measured Average Power per Chip',
+    );
 
     // Initial-load screenshot
     cy.screenshot('measured-power-selected', { capture: 'viewport' });
@@ -41,13 +51,22 @@ describe('Measured power on unofficial-run overlay', () => {
     // The chart should now contain SVG <path> + <circle>/<polygon> elements
     // (overlay points typically render as triangles). Existence is enough —
     // visual correctness is reviewed in the screenshot.
-    cy.get('[data-testid="inference-chart-display"] svg', { timeout: 10_000 }).should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
   });
 
   it('switches to Measured Joules per Output Token without errors', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Measured Joules per Output Token').click();
+    cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
+      .scrollIntoView()
+      .click();
     cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Output token');
+    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
+    cy.get('[data-testid="measured-energy-unit"]').should('contain.text', 'J');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'Measured Joules per Output Token',
+    );
     cy.screenshot('measured-joules-selected', { capture: 'viewport' });
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
   });

@@ -83,6 +83,7 @@ import {
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
+import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -102,6 +103,7 @@ import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
+  isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -366,7 +368,10 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
+    powerBoundaryInfo:
+      'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
     powerOptimal:
@@ -379,7 +384,7 @@ const SCATTER_STRINGS = {
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
-      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
+      'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
@@ -398,7 +403,10 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
+    powerBoundaryInfo:
+      '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
     powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
@@ -410,7 +418,7 @@ const SCATTER_STRINGS = {
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
-      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
+      '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
@@ -466,6 +474,7 @@ const ScatterGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: preferOptimalOnly,
+      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -482,6 +491,7 @@ const ScatterGraph = React.memo(
       removeHwType,
       resolveComparisonSelection,
       setHideNonOptimal,
+      setShowAllMeasurements,
       setShowPointLabels,
       selectAllHwTypes,
       setHighContrast,
@@ -502,8 +512,13 @@ const ScatterGraph = React.memo(
       | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const showPowerEnvelope = isPowerAxis && !hideNonOptimal;
-    const showGradientLabels = preferGradientLabels && !showPowerEnvelope;
+    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
+    // Measured power describes the load sweep. Keep its boundary fixed while
+    // Optimal Only changes marker visibility, as on the other scatter charts.
+    const showPowerEnvelope = isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
+    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
+    const supportsGradientLabels = !showPowerEnvelope || isMeasuredPowerAxis;
+    const showGradientLabels = preferGradientLabels && supportsGradientLabels;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
         const groups = groupPointsByDate(points);
@@ -794,11 +809,24 @@ const ScatterGraph = React.memo(
 
     const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
 
+    const powerEnvelopePointKeys = useMemo(() => {
+      const keys = new Set<string>();
+      if (showPowerEnvelope) {
+        for (const points of Object.values(groupedData)) {
+          for (const segment of groupDisplayedPoints(points).values()) {
+            for (const point of segment) keys.add(optimalPointKey(point));
+          }
+        }
+      }
+      return keys;
+    }, [showPowerEnvelope, groupedData, groupDisplayedPoints]);
+
     const optimalPointKeys = useMemo(() => {
+      if (isMeasuredPowerAxis) return powerEnvelopePointKeys;
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
       return keys;
-    }, [rooflines]);
+    }, [rooflines, isMeasuredPowerAxis, powerEnvelopePointKeys]);
 
     const effectiveActiveHwTypes = useMemo(() => {
       if (showAllHardwareTypes) {
@@ -1087,21 +1115,52 @@ const ScatterGraph = React.memo(
     // across runs sharing a (hw, precision, tp, conc) tuple.
     const overlayOptimalPoints = useMemo(() => {
       const set = new Set<InferenceData>();
-      for (const group of Object.values(overlayRooflines)) {
+      for (const group of Object.values(
+        isMeasuredPowerAxis ? displayedOverlayRooflines : overlayRooflines,
+      )) {
         for (const p of group.points) set.add(p);
       }
       return set;
-    }, [overlayRooflines]);
+    }, [overlayRooflines, isMeasuredPowerAxis, displayedOverlayRooflines]);
+
+    const overlayEnvelopePoints = useMemo(
+      () => new Set(Object.values(displayedOverlayRooflines).flatMap((group) => group.points)),
+      [displayedOverlayRooflines],
+    );
+
+    const overlayGradientLabelPoints = useMemo(() => {
+      const labels = new Set<InferenceData>();
+      for (const { points } of Object.values(displayedOverlayRooflines)) {
+        if (points.length < 2) continue;
+        let start = 0;
+        for (let end = 1; end <= points.length; end++) {
+          if (
+            end === points.length ||
+            getParetoLabel(points[end]) !== getParetoLabel(points[start])
+          ) {
+            labels.add(points[Math.floor((start + end) / 2)]);
+            start = end;
+          }
+        }
+      }
+      return labels;
+    }, [displayedOverlayRooflines]);
 
     // Overlay points respect the Optimal Only toggle exactly like official
     // points do — "optimal" = on the overlay run's drawn roofline. Without
     // this, an e2e-dominated overlay config (hidden on the official side) kept
     // its X marker sitting on the dashed roofline and read as a pareto point.
-    // Hardware/precision/quick filters are applied upstream in
-    // `processedOverlayData`, so optimality is the only condition here.
     const isOverlayPointVisible = useCallback(
-      (d: InferenceData) => !hideNonOptimal || overlayOptimalPoints.has(d),
-      [hideNonOptimal, overlayOptimalPoints],
+      (d: InferenceData) =>
+        (!hideNonOptimal || overlayOptimalPoints.has(d)) &&
+        (!showPowerEnvelope || showAllMeasurements || overlayEnvelopePoints.has(d)),
+      [
+        hideNonOptimal,
+        overlayOptimalPoints,
+        showPowerEnvelope,
+        showAllMeasurements,
+        overlayEnvelopePoints,
+      ],
     );
 
     // All official points for rendering (unfiltered — visibility via opacity)
@@ -1160,8 +1219,7 @@ const ScatterGraph = React.memo(
       if (pointsTableTarget.kind === 'official') {
         const { hwKey } = pointsTableTarget;
         const hwConfig = hardwareConfig[hwKey];
-        // Same visibility filters the chart applies (precision, Optimal Only),
-        // scoped to the clicked series.
+        // Keep hidden measurements accessible in the per-series table.
         const pts = pointsData.filter(
           (p) =>
             p.hwKey === hwKey &&
@@ -1177,13 +1235,11 @@ const ScatterGraph = React.memo(
         };
       }
       const { runIndex, runId, branch } = pointsTableTarget;
-      // Overlay series: this run's points, respecting the overlay hw toggles
-      // and Optimal Only (same visibility filters as the official branch above).
       const pts = processedOverlayData.filter(
         (p) =>
           overlayRunIndex(p.run_url ?? null, runIndexByUrl) === runIndex &&
           activeOverlayHwTypes.has(p.hwKey as string) &&
-          isOverlayPointVisible(p),
+          (!hideNonOptimal || overlayOptimalPoints.has(p)),
       );
       return {
         hw: `overlay-run-${runId}`,
@@ -1199,7 +1255,7 @@ const ScatterGraph = React.memo(
       selectedPrecisions,
       hideNonOptimal,
       optimalPointKeys,
-      isOverlayPointVisible,
+      overlayOptimalPoints,
       resolveColor,
       processedOverlayData,
       runIndexByUrl,
@@ -1212,7 +1268,14 @@ const ScatterGraph = React.memo(
       const globalLabelColorMap = new Map<string, string>();
       let globalColorIdx = 0;
       const result: Record<string, ParetoPointLabel[]> = {};
-      Object.entries(rooflines).forEach(([key, rooflinePoints]) => {
+      Object.entries(displayedRooflines).forEach(([key, points]) => {
+        let rooflinePoints = points;
+        if (showPowerEnvelope) {
+          const byDate = groupDisplayedPoints(points);
+          // Gradient labels share the path's single-date scope.
+          if (byDate.size !== 1) return;
+          rooflinePoints = byDate.values().next().value!;
+        }
         if (rooflinePoints.length < 2) return;
         rooflinePoints.forEach((pt) => {
           const label = getParetoLabel(pt);
@@ -1227,7 +1290,7 @@ const ScatterGraph = React.memo(
         result[key] = computeParetoPointLabels(rooflinePoints, globalLabelColorMap);
       });
       return result;
-    }, [rooflines]);
+    }, [displayedRooflines, showPowerEnvelope, groupDisplayedPoints]);
 
     // Point → gradient color lookup (for coloring points by parallelism strategy)
     const gradientColorByPoint = useMemo(
@@ -1241,19 +1304,23 @@ const ScatterGraph = React.memo(
     // outliers can have wildly different x values).
     const visiblePoints = useMemo(() => {
       let pts = filteredData;
-      if (hideNonOptimal) {
+      if (hideNonOptimal && !showPowerEnvelope) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
       // Overlay points hidden by Optimal Only are excluded from the domain too
       // so hidden outliers don't stretch the axes.
-      const overlayPts = processedOverlayData.filter(isOverlayPointVisible);
+      // Marker visibility must not rescale or move the power boundary.
+      const overlayPts = processedOverlayData.filter(
+        (point) => !hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point),
+      );
       return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
     }, [
       filteredData,
       processedOverlayData,
       hideNonOptimal,
       optimalPointKeys,
-      isOverlayPointVisible,
+      overlayOptimalPoints,
+      showPowerEnvelope,
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -1391,8 +1458,19 @@ const ScatterGraph = React.memo(
       (d: InferenceData) =>
         effectiveActiveHwTypes.has(d.hwKey as string) &&
         selectedPrecisions.includes(d.precision) &&
-        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
-      [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
+        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))) &&
+        (!showPowerEnvelope ||
+          showAllMeasurements ||
+          powerEnvelopePointKeys.has(optimalPointKey(d))),
+      [
+        effectiveActiveHwTypes,
+        selectedPrecisions,
+        hideNonOptimal,
+        optimalPointKeys,
+        showPowerEnvelope,
+        showAllMeasurements,
+        powerEnvelopePointKeys,
+      ],
     );
 
     const powerTierCounts = useMemo(() => {
@@ -1469,13 +1547,23 @@ const ScatterGraph = React.memo(
     // Curve-to-curve ISO-X semantics: each measurement is two CURVES
     // (rendered roofline path class tokens) plus a freely chosen iso-x
     // stored in DATA space (xScale.invert of the click), so measurements
-    // survive zoom and metric changes. BOTH ruler ends are interpolated on
+    // survive zoom (axis-metric changes clear them; see
+    // usePerfRulerAxisReset). BOTH ruler ends are interpolated on
     // the curves' rendered paths at the iso-x — neither end needs to be a
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
     const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = preferPerfRulerMode && !showPowerEnvelope;
+    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Changing the x- or y-axis metric (including the x percentile, which
+    // `x_scale_field` encodes) clears every ruler: the curves are redrawn
+    // in different units, so a ruler that persisted would measure a ratio
+    // the user never placed. Runs before the draw pass so no stale ruler
+    // ever paints over the new curves.
+    usePerfRulerAxisReset(
+      perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
+      setPerfRulerState,
+    );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass — lines/labels must never
     // linger a frame after the switch flips (Bugbot report on PR #853).
@@ -1559,23 +1647,21 @@ const ScatterGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // Points sit on curves: a ruler-mode click on a data point behaves like
-    // clicking the point's curve at that point's x. Candidates cover the
-    // single- vs multi-date roofline class variants; the first one present
-    // in the DOM wins. Ruler-mode clicks measure INSTEAD of pinning the
-    // tooltip, so drop the pin the shared click handler applied just before
-    // this callback ran.
+    // Point clicks select their series' rendered curve at that point's x,
+    // including off-boundary measurements. Candidates cover the single-
+    // and multi-date variants, including date-scoped power overlay paths.
+    // Ruler-mode clicks measure instead of pinning the tooltip, so drop
+    // the pin the shared click handler applied just before this callback.
     const handlePerfRulerPointClick = useCallback(
       (point: InferenceData, source: 'official' | 'overlay') => {
         const ctx = perfRulerDrawCtxRef.current;
         if (!ctx) return;
-        const base = `${String(point.hwKey)}_${point.precision}`;
-        const candidates =
+        const series = `${String(point.hwKey)}_${point.precision}`;
+        const base =
           source === 'overlay'
-            ? [
-                `overlay-roofline-${base}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`,
-              ]
-            : [`roofline-${base}`, `roofline-${base}__${point.date}`];
+            ? `overlay-roofline-${series}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`
+            : `roofline-${series}`;
+        const candidates = [`${base}__${encodeURIComponent(point.date)}`, base];
         const curve = candidates.find(
           (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
         );
@@ -2617,6 +2703,52 @@ const ScatterGraph = React.memo(
         keyFn: buildPointId,
       };
 
+      const updateOverlayLabels = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+      ) => {
+        const overlayPoints = zoomGroup.selectAll<SVGGElement, InferenceData>(
+          '.unofficial-overlay-pt',
+        );
+        const powerLabels = isMeasuredPowerAxis && showGradientLabels;
+        const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
+        overlayPoints.each(function (d) {
+          const lines = (
+            powerLabels
+              ? getParetoLabel(d)
+              : pointLabelText(d, useAdvancedLabels, showConcurrencyLabels)
+          ).split('\n');
+          const text = d3
+            .select(this)
+            .selectAll<SVGTextElement, boolean>('.overlay-label')
+            .data([true])
+            .join('text')
+            .attr('class', 'overlay-label')
+            .attr('text-anchor', 'middle')
+            .style(
+              'display',
+              showLabels && (!powerLabels || overlayGradientLabelPoints.has(d)) ? '' : 'none',
+            )
+            .style('opacity', showLabels ? 1 : 0)
+            .style(
+              'fill',
+              powerLabels
+                ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
+                : 'var(--foreground)',
+            )
+            .attr('font-size', '10px')
+            .attr('font-weight', '700')
+            .attr('pointer-events', 'none');
+          const firstDy = -(1 + (lines.length - 1) * 1.1);
+          text
+            .selectAll<SVGTSpanElement, string>('tspan')
+            .data(lines)
+            .join('tspan')
+            .attr('x', 0)
+            .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
+            .text((l) => l);
+        });
+      };
+
       // ── Layer 2: Overlay (rooflines + X-shape points) ──
       const overlayLayer: CustomLayerConfig | null = overlayData
         ? {
@@ -2725,36 +2857,7 @@ const ScatterGraph = React.memo(
                 renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
-              // Labels
-              const showLabels = showPointLabels && !showGradientLabels;
-              overlayPoints.each(function (d) {
-                const lines = pointLabelText(d, useAdvancedLabels, showConcurrencyLabels).split(
-                  '\n',
-                );
-                const text = d3
-                  .select(this)
-                  .selectAll<SVGTextElement, boolean>('.overlay-label')
-                  .data([true])
-                  .join('text')
-                  .attr('class', 'overlay-label')
-                  .attr('text-anchor', 'middle')
-                  .style('fill', 'var(--foreground)')
-                  .attr('font-size', '10px')
-                  .attr('font-weight', '700')
-                  .attr('pointer-events', 'none');
-                const firstDy = -(1 + (lines.length - 1) * 1.1);
-                text
-                  .selectAll<SVGTSpanElement, string>('tspan')
-                  .data(lines)
-                  .join('tspan')
-                  .attr('x', 0)
-                  .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
-                  .text((l) => l);
-              });
-              overlayPoints
-                .selectAll('.overlay-label')
-                .style('display', showLabels ? '' : 'none')
-                .style('opacity', showLabels ? 1 : 0);
+              updateOverlayLabels(zoomGroup);
 
               // Overlay marker content/coordinates stay chart-local; the shared
               // helper owns the hover, pin, ruler, and marker-state lifecycle.
@@ -2821,13 +2924,7 @@ const ScatterGraph = React.memo(
                 },
               });
             },
-            onDisplayUpdate: (zoomGroup) => {
-              const showLabels = showPointLabels && !showGradientLabels;
-              zoomGroup
-                .selectAll('.unofficial-overlay-pt .overlay-label')
-                .style('display', showLabels ? '' : 'none')
-                .style('opacity', showLabels ? 1 : 0);
-            },
+            onDisplayUpdate: updateOverlayLabels,
             onZoom: (zoomGroup, ctx) => {
               const newXScale = ctx.newXScale as ContinuousScale;
               const newYScale = ctx.newYScale as ContinuousScale;
@@ -3074,6 +3171,8 @@ const ScatterGraph = React.memo(
       showLineLabels,
       pinLineLabels,
       gradientColorByPoint,
+      overlayGradientLabelPoints,
+      isMeasuredPowerAxis,
       chartId,
       pointsData,
       showPointLabels,
@@ -3416,7 +3515,14 @@ const ScatterGraph = React.memo(
     // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
-    }, [selectedPrecisions, selectedYAxisMetric, hideNonOptimal, overlayData, chartId]);
+    }, [
+      selectedPrecisions,
+      selectedYAxisMetric,
+      hideNonOptimal,
+      showAllMeasurements,
+      overlayData,
+      chartId,
+    ]);
 
     // Dismiss when pinned point's hardware becomes hidden
     useEffect(() => {
@@ -3677,12 +3783,26 @@ const ScatterGraph = React.memo(
                           setHideNonOptimal(checked);
                           track('latency_hide_non_optimal_toggled', { enabled: checked });
                         },
-                        // Every agentic axis shares the normalized north-star set.
-                        ...(selectedSequence === Sequence.AgenticTraces
+                        ...(isMeasuredPowerAxis || selectedSequence === Sequence.AgenticTraces
                           ? {
-                              infoTooltip: legendT.optimalInfo,
+                              infoTooltip: isMeasuredPowerAxis
+                                ? legendT.powerBoundaryInfo
+                                : legendT.optimalInfo,
                             }
                           : {}),
+                      },
+                    ]
+                  : []),
+                ...(showPowerEnvelope && !isMeasuredPowerAxis
+                  ? [
+                      {
+                        id: 'scatter-show-all-measurements',
+                        label: legendT.showAllMeasurements,
+                        checked: showAllMeasurements,
+                        onCheckedChange: (checked: boolean) => {
+                          setShowAllMeasurements(checked);
+                          track('latency_show_all_measurements_toggled', { enabled: checked });
+                        },
                       },
                     ]
                   : []),
@@ -3717,7 +3837,7 @@ const ScatterGraph = React.memo(
                     // Parallelism labels are point labels; turning them on is
                     // pointless if labels are hidden, so auto-enable Labels.
                     if (checked && !showPointLabels) setShowPointLabels(true);
-                    if (checked && !showGradientLabels && !showPowerEnvelope) {
+                    if (checked && !showGradientLabels && supportsGradientLabels) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
                           detail: {
@@ -3735,9 +3855,8 @@ const ScatterGraph = React.memo(
                     }
                   },
                 },
-                ...(showPowerEnvelope
-                  ? []
-                  : [
+                ...(supportsGradientLabels
+                  ? [
                       {
                         id: 'scatter-gradient-labels',
                         label: legendT.gradientLabels,
@@ -3747,7 +3866,8 @@ const ScatterGraph = React.memo(
                           track('latency_gradient_labels_toggled', { enabled: checked });
                         },
                       },
-                    ]),
+                    ]
+                  : []),
                 {
                   id: 'scatter-line-labels',
                   label: legendT.lineLabels,
@@ -3758,7 +3878,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope
+                ...(showPowerEnvelope && !isMeasuredPowerAxis
                   ? []
                   : [
                       {

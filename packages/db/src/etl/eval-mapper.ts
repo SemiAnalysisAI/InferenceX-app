@@ -108,6 +108,9 @@ export function mapEvalRow(
   );
 
   const nSamples = results['n-samples'] as Record<string, any> | undefined;
+  // AgentX uses zero for variable sequence lengths; eval rows represent these as NULL.
+  const isl = parseInt2(meta.isl) ?? null;
+  const osl = parseInt2(meta.osl) ?? null;
 
   return taskEntries.map(([taskName, rawMetrics]) => {
     // Collect numeric metrics; rename lm-eval keys to standardized names.
@@ -128,8 +131,8 @@ export function mapEvalRow(
     return {
       config,
       task: taskName.toLowerCase(),
-      isl: parseInt2(meta.isl) ?? null,
-      osl: parseInt2(meta.osl) ?? null,
+      isl: isl === 0 ? null : isl,
+      osl: osl === 0 ? null : osl,
       conc: parseInt2(meta.conc) ?? null,
       lmEvalVersion,
       metrics,

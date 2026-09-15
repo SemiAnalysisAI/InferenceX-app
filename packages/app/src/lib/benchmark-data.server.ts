@@ -17,7 +17,7 @@ export const getCachedBenchmarks = cachedQuery(
 
     return getLatestBenchmarks(getDb(), dbModelKeys).then(agenticWorkflowMetadataOnly);
   },
-  'benchmarks-agentic-run-metadata',
+  'benchmarks-agentic-curve-scope-v2',
   { blobOnly: true },
 );
 
@@ -29,6 +29,6 @@ export const getCachedBenchmarksAsOf = cachedQuery(
 
     return getLatestBenchmarks(getDb(), dbModelKeys, date).then(agenticWorkflowMetadataOnly);
   },
-  'benchmarks-as-of-agentic-run-metadata',
+  'benchmarks-as-of-agentic-curve-scope-v2',
   { blobOnly: true },
 );
