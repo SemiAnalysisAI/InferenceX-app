@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import {
+  publishedVideoHistory,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
@@ -10,6 +11,9 @@ import {
 
 vi.mock('@/lib/video-storage', () => ({
   videoStorageEnabled: vi.fn(() => false),
+  publishedVideoHistory: vi.fn(() =>
+    Promise.resolve({ schemaVersion: 1, entries: [], nextPage: null }),
+  ),
   storedArtifacts: vi.fn(() => Promise.resolve([])),
   readStoredArtifact: vi.fn(),
   storeVideoArtifact: vi.fn(),
@@ -22,6 +26,7 @@ afterEach(() => {
   fetchMock.mockReset();
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
+  vi.mocked(publishedVideoHistory).mockClear();
   vi.mocked(readStoredArtifact).mockReset();
   vi.mocked(storeVideoArtifact).mockClear();
   vi.unstubAllEnvs();
@@ -29,6 +34,15 @@ afterEach(() => {
 });
 
 describe('H3 CI artifact access', () => {
+  it('discovers old published results without scanning unrelated recent Actions or publishing', async () => {
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?format=history&page=2'));
+    expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
+    expect(publishedVideoHistory).toHaveBeenCalledWith(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
   it('discovers benchmark runs without including branch-named unit jobs', async () => {
     fetchMock.mockResolvedValueOnce(response({ private: false })).mockResolvedValueOnce(
       response({

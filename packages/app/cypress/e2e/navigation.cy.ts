@@ -1,5 +1,6 @@
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
+import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact, videoRun } from '../support/video-artifacts';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
@@ -361,6 +362,34 @@ describe('TPUv7 results', { testIsolation: true }, () => {
 describe('H3 video artifact viewer', () => {
   beforeEach(() => {
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
+    });
+  });
+  it('opens old published entries by default and restores history filters after reload', () => {
+    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [entry],
+      nextPage: null,
+    }).as('history');
+    cy.visit('/video');
+    cy.wait('@history');
+    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('[role="option"]', 'C2').click();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2');
+    cy.reload();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2')
+      .and('contain', '240 / —');
+    cy.location('search').should('contain', 'history-concurrency=2');
   });
   it('shares a comparison built by opening two CI runs through the page', () => {
     for (const saved of [
@@ -437,7 +466,7 @@ describe('H3 video artifact viewer', () => {
   });
   it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
     cy.viewport(1440, 1000);
-    cy.visit('/video', {
+    cy.visit('/video?view=results', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
@@ -451,14 +480,14 @@ describe('H3 video artifact viewer', () => {
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
   it('shows a recoverable load error and the Chinese empty state', () => {
-    cy.visit('/video');
+    cy.visit('/video?view=results');
     cy.contains('summary', 'Local artifact tools').click();
     cy.get('[data-testid="video-benchmark"]').contains('summary', 'Manifest URL').click();
     cy.get('input[aria-label="Manifest URL"]').type('https://example.com/wrong.json');
     cy.contains('button', 'Load manifest').click();
     cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
     cy.get('video[data-role]').should('not.exist');
-    cy.visit('/zh/video');
+    cy.visit('/zh/video?view=results');
     cy.get('[data-testid="video-ci-runs"]').should('contain', '本页 GitHub 历史中没有 H3 运行');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });

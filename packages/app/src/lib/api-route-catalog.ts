@@ -73,10 +73,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for live public CI runs and checksum-verified artifact ZIPs; uses the backend result contract rather than a published data API.',
-      zh: '供隐藏的 H3 查看器实时读取公开 CI 运行及校验和已验证的产物 ZIP；依赖后端结果契约，不作为公开数据 API 发布。',
+      en: 'Hidden H3 viewer transport for live public CI runs, checksum-verified artifact ZIPs, and read-only published history (format=history). History projects existing immutable indexes without publishing media; these UI contracts are not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP，以及只读的已发布历史（format=history）。历史视图从既有不可变索引生成，不发布媒体；这些界面契约不作为公开数据 API。',
     },
-    sourceSha256: '51278d05e223947e6a9c7b89b5f79a67afcd941ca091dbd794d3816c26805327',
+    sourceSha256: 'ca3150209360f3943a0fd8afe4a8d8a7f4d20daf42929a09dae2b2b3178e0e44',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
