@@ -1,5 +1,4 @@
 import GPUGraph from '@/components/inference/ui/GPUGraph';
-import { chartDefinitions } from '@/components/inference/metric-registry';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { useState } from 'react';
 import { mountWithProviders } from '../support/test-utils';
@@ -494,7 +493,6 @@ describe('GPUGraph', () => {
 describe('GPU comparison power envelopes', () => {
   function PowerComparison({ latency = false }: { latency?: boolean }) {
     const [optimal, setOptimal] = useState(true);
-    const [showAllMeasurements, setShowAllMeasurements] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
     const rows = ['2026-09-09', '2026-09-10'].flatMap((date) =>
@@ -511,7 +509,10 @@ describe('GPU comparison power envelopes', () => {
             tp,
             conc,
             x: latency ? 1000 / interactivity : interactivity,
-            y: metric === 'y_measuredJPerOutputToken' ? 4 - index : 350 + index * 200 + tp,
+            y:
+              metric === 'y_measuredJPerOutputToken'
+                ? 4 - index
+                : (350 + index * 200 + tp) * (metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1),
             run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date}`,
             power_tier: tp === 4 ? 'legacy' : 'certified',
           });
@@ -522,8 +523,6 @@ describe('GPU comparison power envelopes', () => {
       selectedYAxisMetric: metric,
       hideNonOptimal: optimal,
       setHideNonOptimal: setOptimal,
-      showAllMeasurements,
-      setShowAllMeasurements,
       selectedGPUs: ['h100'],
       selectedDates: ['2026-09-09', '2026-09-10'],
       selectedDateRange: { startDate: '', endDate: '' },
@@ -535,6 +534,8 @@ describe('GPU comparison power envelopes', () => {
     return (
       <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
         <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
+        <button onClick={() => setMetric('y_measuredP75Power')}>P75</button>
+        <button onClick={() => setMetric('y_measuredP90Power')}>P90</button>
         <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
         <button onClick={() => setActiveDates(new Set(['2026-09-10_h100']))}>
           Hide older date
@@ -548,10 +549,7 @@ describe('GPU comparison power envelopes', () => {
             yLabel="Power"
             chartDefinition={createMockChartDefinition({
               chartType: latency ? 'e2e' : 'interactivity',
-              y_measuredAvgPower_roofline: latency ? 'lower_left' : 'lower_right',
-              y_measuredJPerOutputToken_roofline: latency ? 'lower_left' : 'lower_right',
-              y_measuredPowerPercentTdp_roofline:
-                chartDefinitions[latency ? 1 : 0].y_measuredPowerPercentTdp_roofline,
+              [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
             })}
           />
         </div>
@@ -561,11 +559,7 @@ describe('GPU comparison power envelopes', () => {
 
   it('reveals off-boundary measurements and historical rings without changing power envelopes or axes', () => {
     mountWithProviders(<PowerComparison />);
-    cy.get('#gpu-power-curves .roofline-path').should('not.exist');
     cy.get('#gpu-show-all-measurements').should('not.exist');
-    cy.get('[data-testid="power-curve-description"]').should('contain', 'single point');
-    cy.get('#gpu-hide-non-optimal').click({ force: true });
-    cy.get('#gpu-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
     cy.get('[data-testid="measured-power-summary"]')
@@ -586,7 +580,7 @@ describe('GPU comparison power envelopes', () => {
         $svg[0].querySelectorAll('.x-axis, .y-axis'),
         (axis) => axis.innerHTML,
       );
-      cy.get('#gpu-show-all-measurements').click({ force: true });
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
       cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 6);
       cy.get('[data-testid="measured-power-summary"]').should(
@@ -602,23 +596,59 @@ describe('GPU comparison power envelopes', () => {
           Array.from($current[0].querySelectorAll('.x-axis, .y-axis'), (axis) => axis.innerHTML),
         ).to.deep.equal(axes);
       });
-      cy.get('#gpu-show-all-measurements').click({ force: true });
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
       cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
     });
     cy.get('#gpu-power-curves .line-label').should('have.length', 2);
     cy.get('[data-testid="legend-advanced-toggle"]').click();
-    cy.get('#gpu-perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('exist');
     cy.contains('button', 'Hide older date').click();
     cy.get('#gpu-power-curves .roofline-path').should('have.length', 1);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 3);
     cy.get('#gpu-power-curves .line-label').should('have.length', 1);
   });
 
+  it('measures power boundaries by comparison date and resets rulers when the metric changes', () => {
+    mountWithProviders(<PowerComparison />);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    const chartId = 'gpu-power-curves';
+    const placeRuler = () => {
+      cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 2);
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(0).click({ force: true });
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(1).click({ force: true });
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    };
+    placeRuler();
+    cy.get('#gpu-hide-non-optimal').click({ force: true });
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    cy.get('#gpu-power-curves svg').should(($svg) => {
+      const paths = [...$svg[0].querySelectorAll('.roofline-path')].map((path) =>
+        path.getAttribute('d'),
+      );
+      const hits = [...$svg[0].querySelectorAll('.perf-ruler-hit')].map((path) =>
+        path.getAttribute('d'),
+      );
+      expect(hits, 'ruler targets the drawn upper boundaries').to.deep.equal(paths);
+    });
+    cy.contains('button', 'P75').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Energy').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Hide older date').click();
+    cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 1);
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+  });
+
   it('keeps boundary measurements by default toward lower latency', () => {
     mountWithProviders(<PowerComparison latency />);
-    cy.get('#gpu-power-curves .roofline-path').should('not.exist');
-    cy.get('#gpu-hide-non-optimal').click({ force: true });
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)
@@ -628,27 +658,26 @@ describe('GPU comparison power envelopes', () => {
       .and('contain.text', 'not efficiency frontiers');
   });
 
-  it('applies %TDP Pareto filtering and localizes its independent measurement toggle', () => {
+  it('uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto', () => {
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">
         <PowerComparison />
       </PathnameContext.Provider>,
     );
-    cy.contains('button', 'Percent TDP').click();
-    cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-    cy.get('#gpu-power-curves .dot-group').should('have.length', 2);
-    cy.get('#gpu-power-curves .roofline-path').should('not.exist');
-    cy.get('[data-testid="power-curve-description"]').should('contain', '只有一个点');
-    cy.get('#gpu-show-all-measurements').should('not.exist');
-    cy.get('#gpu-hide-non-optimal').click({ force: true });
-    cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
-    cy.contains('显示全部测量点').should('be.visible');
-    cy.get('#gpu-show-all-measurements').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#gpu-show-all-measurements').click({ force: true });
-    cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
-    cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
-    cy.get('[data-testid="power-curve-description"]').should('contain', '不代表能效 Pareto 前沿');
-    cy.get('#gpu-hide-non-optimal').click({ force: true });
+    for (const label of ['Percent TDP', 'P75', 'P90']) {
+      cy.contains('button', label).click();
+      cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+      cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+      cy.get('[data-testid="power-curve-description"]').should('contain', '不代表能效 Pareto 前沿');
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+      cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+    }
     cy.contains('button', 'Energy').click();
     cy.get('#gpu-show-all-measurements').should('not.exist');
     cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');

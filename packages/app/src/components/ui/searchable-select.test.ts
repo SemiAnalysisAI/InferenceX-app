@@ -142,6 +142,105 @@ describe('SearchableSelect', () => {
     expect(items[0]?.textContent).toContain('Cost per Million Total Tokens (Hyperscaler)');
   });
 
+  it('keeps the collapsed menu and selected label while full-name search selects an exact metric', () => {
+    const handle = vi.fn();
+    render({
+      value: 'y_measuredAvgPower',
+      onValueChange: handle,
+      groups: [
+        {
+          label: 'Measured',
+          options: [
+            { value: 'y_measuredAvgPower', label: 'Measured Power' },
+            { value: 'y_measuredJPerOutputToken', label: 'Measured Energy' },
+          ],
+        },
+      ],
+      searchGroups: [
+        {
+          label: 'Measured',
+          options: [
+            { value: 'y_measuredAvgPower', label: 'Measured Average Power per Chip' },
+            { value: 'y_measuredP75Power', label: 'Measured P75 Fleet Power per Chip' },
+            {
+              value: 'y_measuredP90Power',
+              label: 'Measured P90 Fleet Power per Chip',
+              help: 'Time-weighted fleet power percentile.',
+            },
+          ],
+        },
+      ],
+    });
+    const trigger = container.querySelector('[data-testid="yaxis"]')!;
+    expect(trigger.textContent).toBe('Measured Power');
+    expect(trigger.getAttribute('aria-haspopup')).toBe('grid');
+    openMenu();
+    expect(
+      [...document.body.querySelectorAll('[data-select-option]')].map((item) => item.textContent),
+    ).toEqual(['Measured Power', 'Measured Energy']);
+    expect(document.body.querySelector('[role="grid"]')).not.toBeNull();
+
+    setSearchValue('P90 Fleet');
+    const matches = document.body.querySelectorAll('[data-select-option]');
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.textContent).toBe('Measured P90 Fleet Power per Chip');
+    expect(document.body.querySelector('[role="grid"]')).not.toBeNull();
+    expect(trigger.textContent).toBe('Measured Power');
+
+    setSearchValue('');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(2);
+    setSearchValue('Measured P75 Fleet Power per Chip');
+    const option = document.body.querySelector<HTMLElement>('[data-select-option]')!;
+    act(() => option.click());
+    expect(handle).toHaveBeenCalledExactlyOnceWith('y_measuredP75Power');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(0);
+  });
+
+  it('keeps family aliases and full-name search without duplicate values or help buttons', () => {
+    const power = {
+      value: 'y_measuredP75Power',
+      label: 'Measured Power',
+      help: 'Time-weighted fleet power percentile.',
+    };
+    const energy = { value: 'y_measuredJPerOutputToken', label: 'Measured Energy' };
+    const handle = vi.fn();
+    render({
+      value: power.value,
+      onValueChange: handle,
+      groups: [{ label: 'Measured', options: [power, energy] }],
+      searchGroups: [
+        {
+          label: 'Measured',
+          options: [
+            power,
+            energy,
+            { ...power, label: 'Measured P75 Fleet Power per Chip' },
+            { ...energy, label: 'Measured Joules per Output Token' },
+          ],
+        },
+      ],
+    });
+    openMenu();
+    setSearchValue('Measured');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(2);
+    expect(
+      document.body.querySelectorAll('[data-testid="option-help-y_measuredP75Power"]'),
+    ).toHaveLength(1);
+    setSearchValue('Measured Power');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-select-option]')?.textContent).toBe('Measured Power');
+    setSearchValue('Measured Energy');
+    expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-select-option]')?.textContent).toBe(
+      'Measured Energy',
+    );
+    setSearchValue('Measured P75 Fleet Power per Chip');
+    const option = document.body.querySelector<HTMLElement>('[data-select-option]')!;
+    expect(option.textContent).toBe('Measured P75 Fleet Power per Chip');
+    act(() => option.click());
+    expect(handle).toHaveBeenCalledExactlyOnceWith('y_measuredP75Power');
+  });
+
   it('shows a "No results" message when nothing matches', () => {
     render();
     openMenu();

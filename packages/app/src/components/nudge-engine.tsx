@@ -645,7 +645,7 @@ function BannerRenderer({
         </span>
         <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight truncate">
+            <p className="text-sm font-semibold leading-tight break-words">
               <span className="align-middle">
                 {localized(locale, content.title, content.titleZh)}
               </span>
@@ -655,7 +655,7 @@ function BannerRenderer({
                 </NewBadge>
               )}
             </p>
-            <p className="text-xs text-muted-foreground leading-snug truncate">
+            <p className="text-xs text-muted-foreground leading-snug break-words">
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>

@@ -11,6 +11,7 @@ interface SegmentedToggleOptionBase<TValue extends string> {
   title?: string;
   testId?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 type SegmentedToggleOptionContent =
@@ -75,6 +76,7 @@ export function SegmentedToggle<TValue extends string>({
           aria-pressed={role === 'group' ? value === option.value : undefined}
           aria-label={option.ariaLabel}
           title={option.title}
+          disabled={option.disabled}
           className={cn(
             // Match the outer curve after its border/padding inset, including square themes.
             'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-[max(0px,calc(var(--radius)-var(--segmented-inset)))] px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
