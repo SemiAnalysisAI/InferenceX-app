@@ -96,6 +96,42 @@ function dirtyPowerPayload(): Record<string, any> {
 }
 
 describe('mapBenchmarkRow', () => {
+  describe('Kimi GB200 publication scope', () => {
+    const row = makeAgenticRow({
+      infmax_model_prefix: 'kimik3',
+      hw: 'cluster:gb200-nv',
+      framework: 'dynamo-vllm',
+      disagg: false,
+      is_multinode: true,
+      spec_decoding: 'none',
+      users: 8,
+      tp: 16,
+      num_gpus: 16,
+    });
+
+    it.each([34836531846, '34836531846'])(
+      'excludes non-DSpark publication from reused source %s without altering raw evidence',
+      (runId) => {
+        const raw = structuredClone(row);
+        expect(mapBenchmarkRow(row, createSkipTracker(), undefined, runId)).toBeNull();
+        expect(row).toEqual(raw);
+      },
+    );
+
+    it.each([
+      [{ spec_decoding: 'mtp' }, 34836531846],
+      [{}, 32424103771],
+      [{}, undefined],
+      [{ infmax_model_prefix: 'dsv4' }, 34836531846],
+      [{ hw: 'cluster:gb300-nv' }, 34836531846],
+      [{ scenario_type: 'fixed-seq-len', isl: 8192, osl: 1024, conc: 8 }, 34836531846],
+    ])('retains other methods, sources and scopes: %j', (changes, runId) => {
+      expect(
+        mapBenchmarkRow({ ...row, ...changes }, createSkipTracker(), undefined, runId),
+      ).toMatchObject({ conc: 8 });
+    });
+  });
+
   describe('v1 schema', () => {
     it('maps a valid v1 row to BenchmarkParams', () => {
       const tracker = createSkipTracker();

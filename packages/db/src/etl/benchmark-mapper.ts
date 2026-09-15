@@ -280,6 +280,19 @@ export function mapBenchmarkRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
+  // PR #3045 reuses a mixed sweep, but only DSpark belongs in its published
+  // Kimi GB200 curve. Filter by source run so older measurements remain intact.
+  if (
+    String(runId) === '34836531846' &&
+    modelKey === 'kimik3' &&
+    gpuKey === 'gb200' &&
+    isAgentic &&
+    specMethod === 'none'
+  ) {
+    console.info(`Skipping non-DSpark Kimi GB200 publication: run ${runId}, conc ${conc}`);
+    return null;
+  }
+
   let parallelism = resolveParallelism(row, frameworkDisagg);
   // An explicit non-disagg Dynamo artifact is authoritative for direct
   // deployments such as one distributed vLLM server. A non-zero decode worker
