@@ -19,6 +19,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
+  ScenarioSelector,
   PercentileSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
@@ -183,6 +184,8 @@ const METRIC_TITLE_ZH_MAP = new Map(
 );
 
 interface ChartControlsProps {
+  /** Hide only when the parent provides a scenario selector in its chart title. */
+  hideScenario?: boolean;
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
@@ -192,6 +195,7 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({
+  hideScenario = false,
   hideGpuComparison = false,
   tcoSource = 'inference',
   showTcoBasis = false,
@@ -215,6 +219,7 @@ export default function ChartControls({
     dateRangeAvailableDates,
     isCheckingAvailableDates,
     availablePrecisions,
+    availableSequences,
     availableModels,
   } = useInferenceData();
   const {
@@ -231,6 +236,7 @@ export default function ChartControls({
   } = useInferenceDisplay();
   const {
     setSelectedModel,
+    setSelectedSequence,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
     setTokenRevenuePriceSource,
@@ -448,6 +454,13 @@ export default function ChartControls({
     showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
+  const benchmarkColumns = hideScenario
+    ? showPercentile
+      ? 'md:grid-cols-4'
+      : 'md:grid-cols-3'
+    : showPercentile
+      ? 'md:grid-cols-5'
+      : 'md:grid-cols-4';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -456,9 +469,7 @@ export default function ChartControls({
           legend={t.benchmarkControls}
           className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
-          <div
-            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
-          >
+          <div className={`grid min-w-0 grid-cols-2 items-start gap-3 ${benchmarkColumns}`}>
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
@@ -471,6 +482,21 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
+            {!hideScenario && (
+              <ScenarioSelector
+                value={selectedSequence}
+                onChange={(sequence) => {
+                  setSelectedSequence(sequence);
+                  track('inference_sequence_selected', { sequence });
+                  setTimeout(trackCombinedFilters, 0);
+                }}
+                open={openDropdown === 'sequence'}
+                onOpenChange={handleDropdownOpenChange('sequence')}
+                availableSequences={availableSequences}
+                model={selectedModel}
+                data-testid="scenario-selector"
+              />
+            )}
             <PrecisionSelector
               value={selectedPrecisions}
               onChange={handlePrecisionChange}

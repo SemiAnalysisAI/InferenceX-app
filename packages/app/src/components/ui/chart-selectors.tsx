@@ -371,7 +371,10 @@ export function ScenarioSelector({
     getSequenceCategoryForModel(s as Sequence, model),
   );
   if (availableSequences.length === 0) return null;
-  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  // A title trigger keeps its one-option menu available so workload help is
+  // reachable; ordinary fields already expose selected-option help directly.
+  const isOnlySelectedScenario =
+    variant !== 'title' && availableSequences.length === 1 && availableSequences[0] === value;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'

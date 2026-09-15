@@ -1263,6 +1263,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     actions={<ShareButton />}
                   />
                   <ChartControls
+                    hideScenario
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                   />

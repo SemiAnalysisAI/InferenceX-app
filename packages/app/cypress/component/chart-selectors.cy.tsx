@@ -37,6 +37,24 @@ function TitleScenarioHarness() {
 }
 
 describe('Scenario in the chart title', () => {
+  it('keeps the AgentX explanation reachable when only Agentic is available', () => {
+    cy.mount(
+      <TooltipProvider>
+        <h2>
+          <ScenarioSelector
+            variant="title"
+            value={Sequence.AgenticTraces}
+            availableSequences={[Sequence.AgenticTraces]}
+            onChange={() => {}}
+            data-testid="title-scenario"
+          />
+        </h2>
+      </TooltipProvider>,
+    );
+    cy.get('[data-testid="title-scenario"]').should('be.enabled').click();
+    cy.get('[data-testid="option-help-agentic-traces"]').click();
+    cy.get('[data-testid="scenario-agentic-info-link"]').should('have.attr', 'href', '/agentx');
+  });
   for (const width of [375, 1280]) {
     it(`switches scenarios with keyboard and keeps help in the menu at ${width}px`, () => {
       cy.viewport(width, 844);
