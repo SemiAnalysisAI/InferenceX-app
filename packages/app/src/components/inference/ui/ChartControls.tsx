@@ -19,7 +19,6 @@ import {
 } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
-  ScenarioSelector,
   PercentileSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
@@ -216,7 +215,6 @@ export default function ChartControls({
     dateRangeAvailableDates,
     isCheckingAvailableDates,
     availablePrecisions,
-    availableSequences,
     availableModels,
   } = useInferenceData();
   const {
@@ -233,7 +231,6 @@ export default function ChartControls({
   } = useInferenceDisplay();
   const {
     setSelectedModel,
-    setSelectedSequence,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
     setTokenRevenuePriceSource,
@@ -381,14 +378,6 @@ export default function ChartControls({
     setTimeout(trackCombinedFilters, 0);
   };
 
-  const handleSequenceChange = (value: Sequence) => {
-    setSelectedSequence(value);
-    track('inference_sequence_selected', {
-      sequence: value,
-    });
-    setTimeout(trackCombinedFilters, 0);
-  };
-
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
@@ -468,7 +457,7 @@ export default function ChartControls({
           className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
           <div
-            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
           >
             <div className="min-w-0 col-span-2">
               <ModelSelector
@@ -482,15 +471,6 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            <ScenarioSelector
-              value={selectedSequence}
-              onChange={handleSequenceChange}
-              open={openDropdown === 'sequence'}
-              onOpenChange={handleDropdownOpenChange('sequence')}
-              availableSequences={availableSequences}
-              model={selectedModel}
-              data-testid="scenario-selector"
-            />
             <PrecisionSelector
               value={selectedPrecisions}
               onChange={handlePrecisionChange}

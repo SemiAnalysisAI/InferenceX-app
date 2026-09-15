@@ -102,6 +102,7 @@ import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
+import { TitleScenarioSelector } from './TitleScenarioSelector';
 import { CostTierSelector } from './CostTierSelector';
 import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
@@ -819,8 +820,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             <Card
               key="empty-0"
               data-testid="chart-empty-state"
-              className="flex min-h-[320px] items-center justify-center"
+              className="flex min-h-[320px] flex-col items-center justify-center gap-3"
             >
+              {!embedded && !minimalChrome && (
+                <Heading as="h2" level="card">
+                  {getModelLabel(selectedModel as Model)} <TitleScenarioSelector />
+                </Heading>
+              )}
               <p className="max-w-md text-center text-sm text-muted-foreground">
                 {isModeledSystemPowerConfigKey(selectedYAxisMetric)
                   ? t.noSystemPowerData
@@ -1008,7 +1014,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 className="mr-2 size-6 align-[-0.3em]"
                               />
                               {getModelLabel(graph.model as Model)}{' '}
-                              {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
+                              {embedded || minimalChrome ? (
+                                getSequenceLabel(graph.sequence as Sequence, locale)
+                              ) : (
+                                <TitleScenarioSelector />
+                              )}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
                                 const xField = graph.chartDefinition.x_scale_field;

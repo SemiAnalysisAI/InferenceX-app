@@ -59,6 +59,8 @@ interface SearchableSelectProps {
   /** Hydration-safe label for selectors with a known server-side default. */
   initialLabel?: string;
   className?: string;
+  /** Compact phrasing-content trigger for inline chart headings. Help stays in the menu. */
+  inline?: boolean;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
@@ -88,6 +90,7 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
+  inline = false,
   contentClassName,
   triggerId,
   triggerAriaLabel,
@@ -222,9 +225,11 @@ export function SearchableSelect({
     }
   };
 
+  const TriggerContainer = inline ? 'span' : 'div';
+
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      <div className="relative">
+      <TriggerContainer className={cn('relative', inline && 'inline-flex max-w-full align-middle')}>
         <PopoverTrigger asChild>
           <button
             ref={triggerRef}
@@ -258,7 +263,7 @@ export function SearchableSelect({
             <span
               className={cn(
                 'flex-1 text-left truncate',
-                selectedHelp && 'mr-7',
+                selectedHelp && !inline && 'mr-7',
                 (mounted ? !selectedLabel : !initialLabel) && 'text-muted-foreground',
               )}
               title={triggerLabel}
@@ -273,7 +278,7 @@ export function SearchableSelect({
             />
           </button>
         </PopoverTrigger>
-        {selectedHelp && selectedOption && !isOpen && (
+        {!inline && selectedHelp && selectedOption && !isOpen && (
           <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
             {/* Mirror the label's width so help follows short labels and stays
                 inside long ones. This copy is only a layout spacer; the real
@@ -521,7 +526,7 @@ export function SearchableSelect({
             ))}
           </div>
         </PopoverContent>
-      </div>
+      </TriggerContainer>
     </Popover>
   );
 }
