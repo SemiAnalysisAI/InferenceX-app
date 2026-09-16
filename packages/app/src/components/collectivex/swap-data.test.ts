@@ -64,3 +64,11 @@ it('selects one-way host or read-plus-write HBM ceilings and deduplicates visibl
   expect(swapRooflines([{ sku: 'unknown' }], 'd2h')).toEqual([]);
   expect(swapRooflines([], 'h2d')).toEqual([]);
 });
+
+it('applies AMD rooflines to current Slurm pool names', () => {
+  const points = [{ sku: 'mi300x' }, { sku: 'mi325x' }];
+  expect(swapRooflines(points, 'h2d').map((r) => [r.gbps, r.devices])).toEqual([
+    [64, ['MI300X', 'MI325X']],
+  ]);
+  expect(swapRooflines(points, 'd2d').map((r) => r.gbps)).toEqual([2650, 3000]);
+});

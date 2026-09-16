@@ -60,7 +60,9 @@ const SWAP_GPU_NAMES: Record<string, string> = {
   b300: 'B300 SXM',
   gb200: 'GB200 NVL72',
   gb300: 'GB300 NVL72',
+  mi300x: 'MI300X',
   'mi300x-tw': 'MI300X',
+  mi325x: 'MI325X',
   'mi325x-tw': 'MI325X',
   mi355x: 'MI355X',
 };
