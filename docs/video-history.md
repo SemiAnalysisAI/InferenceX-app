@@ -1,6 +1,6 @@
 # Video performance history
 
-`/video` and `/zh/video` default to **Performance history**. Explicit run/artifact/source/cell URLs retain the existing video viewer. `?view=results` opens the CI browser; `?view=history` restores history. History filters use `history-hardware`, `history-concurrency`, and `history-query` in the URL.
+`/video` and `/zh/video` default to **Performance history**. Explicit run/artifact/source/cell URLs retain the existing video viewer. `?view=results` opens the first readable artifact/source from the newest published page; `?view=history` restores history. History filters use `history-hardware`, `history-concurrency`, and `history-query` in the URL. Videos & result follows the same published-first path when no run is selected; empty or failed reads show a recoverable message. Browse CI runs explicitly opens legacy Actions discovery. Returning to History cancels pending result selection; Refresh and reload preserve the selected artifact/source/cell.
 
 ## Read path
 
@@ -22,7 +22,7 @@ The projection groups all cells under the original source inside one artifact en
 
 ## 中文说明
 
-`/video` 与 `/zh/video` 默认打开“性能历史”。原有 run/artifact/source/cell 链接仍打开对应结果；`?view=results` 进入 CI 浏览器。历史筛选条件保存在 URL，刷新后恢复。
+`/video` 与 `/zh/video` 默认打开“性能历史”。原有 run/artifact/source/cell 链接仍打开对应结果；`?view=results` 打开最新发布页面中首个可读取的产物与原始运行；未选择运行时，“视频与结果”也使用该入口。空列表或读取失败会显示可恢复的提示；只有点击“浏览 CI 运行”才扫描 GitHub Actions。返回性能历史会取消正在进行的结果选择；刷新和重新加载保留产物、原始运行及并发配置。历史筛选条件保存在 URL，刷新后恢复。
 
 历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。
 

@@ -3632,6 +3632,60 @@
       ]
     },
     {
+      "spec": "cypress/component/video-results-navigation.cy.tsx",
+      "duration": 1708,
+      "tests": [
+        {
+          "title": [
+            "Published video result navigation",
+            "opens published videos from History when recent Actions contain no H3 runs"
+          ],
+          "duration": 359,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Published video result navigation",
+            "shows the Chinese published empty state and scans CI only after an explicit request"
+          ],
+          "duration": 473,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Published video result navigation",
+            "retries a failed published read and skips unreadable sources without scanning CI"
+          ],
+          "duration": 136,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Published video result navigation",
+            "does not select a stale published response after returning to History"
+          ],
+          "duration": 148,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Published video result navigation",
+            "retries the shared C4 selection after a refresh metadata failure"
+          ],
+          "duration": 311,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Published video result navigation",
+            "resumes the selected artifact when media loading was cancelled by returning to History"
+          ],
+          "duration": 250,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/video-serving-results.cy.tsx",
       "duration": 2301,
       "tests": [
