@@ -45,7 +45,7 @@ export function swapChartPoints(
           seriesId: `${dataset.run.run_id}__${result.result_id}__${row.num_blocks}`,
           colorKey: `${result.sku}:${row.num_blocks}`,
           runId: dataset.run.run_id,
-          device: result.runtime.device,
+          device: result.runtime.device.trim() || SWAP_GPU_NAMES[result.sku] || result.sku,
           sku: result.sku,
           row,
         })),
