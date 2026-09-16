@@ -616,7 +616,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/lib/operatorx-ingest.ts',
-    sourceSha256: 'a2a6a0f5ba77fba29129d5c7dea08e3fa106043f5a160372380f205395566adc',
+    sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',
     reviewArea: {
       en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU dense GEMM throughput.',
       zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况及单卡稠密 GEMM 性能。',

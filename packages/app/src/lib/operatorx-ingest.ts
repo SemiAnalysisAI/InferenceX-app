@@ -277,8 +277,11 @@ export async function discoverOperatorXRuns(
           break;
         }
         try {
-          await ensureRun(String(run.id));
-          changed++;
+          const imported = await ensureRun(String(run.id));
+          // A failed upgrade may serve an older durable attempt. That is not
+          // progress: counting it would repeatedly exhaust the batch before
+          // later runs are reached and keep the client's discovery poll alive.
+          if (imported.run.run_attempt >= run.run_attempt) changed++;
         } catch (error) {
           if (!(error instanceof OperatorXError && error.status === 404)) throw error;
         }
