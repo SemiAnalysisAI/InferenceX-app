@@ -55,3 +55,54 @@ export function makeOperatorXBundle(): OperatorXBundle {
     ],
   };
 }
+
+/** A mixed run with independently specified GEMM, MHA/GQA and MLA measurements. */
+export function makeOperatorXAttentionBundle(): OperatorXBundle {
+  const bundle = makeOperatorXBundle();
+  const manifest = bundle.manifest as { include: { cases: unknown[] }[] };
+  const doc = bundle.shards[0].docs[0] as { rows: unknown[] };
+  const shapes = [
+    {
+      type: 'attention_mha',
+      args: {
+        batch_size: 8,
+        seq_len_q: 1,
+        seq_len_kv: 4096,
+        num_heads: 32,
+        num_heads_kv: 8,
+        head_dim: 128,
+        dtype_q: 'bf16',
+        dtype_k: 'bf16',
+        dtype_v: 'bf16',
+        dtype_o: 'bf16',
+        causal: true,
+      },
+    },
+    {
+      type: 'attention_mla',
+      args: {
+        batch_size: 8,
+        seq_len_q: 1,
+        seq_len_kv: 4096,
+        num_heads: 128,
+        head_dim_qk_nope: 128,
+        head_dim_qk_rope: 64,
+        head_dim_v: 128,
+        kv_lora_rank: 512,
+        dtype_q: 'bf16',
+        dtype_kv: 'bf16',
+        dtype_o: 'bf16',
+      },
+    },
+  ];
+  shapes.forEach((shape, index) => {
+    manifest.include[0].cases.push({ testlist: 'attention', shape });
+    doc.rows.push({
+      op: { ...shape, backend: 'torch' },
+      testlist: 'attention',
+      status: 'ok',
+      metrics: { latency_us: index === 0 ? 12.5 : 5.5 },
+    });
+  });
+  return bundle;
+}

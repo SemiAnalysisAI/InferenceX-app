@@ -13,7 +13,26 @@ export interface OperatorXBundle {
   shards: { id: string; attempt: number; docs: unknown[] }[];
 }
 export type OperatorXStatus = 'ok' | 'unsupported' | 'error' | 'missing';
+export type OperatorXKind = 'gemm' | 'attention_mha' | 'attention_mla';
+export interface OperatorXAttention {
+  batch_size: number;
+  seq_len_q: number;
+  seq_len_kv: number;
+  num_heads: number;
+  num_heads_kv: number;
+  head_dim_qk: number;
+  head_dim_v: number;
+  kv_lora_rank: number | null;
+  dtype_q: string;
+  dtype_k: string;
+  dtype_v: string;
+  dtype_o: string;
+  causal: boolean;
+}
 export interface OperatorXPoint {
+  type: OperatorXKind;
+  args: Record<string, unknown>;
+  attention: OperatorXAttention | null;
   id: string;
   shard: string;
   attempt: number | null;
@@ -21,12 +40,12 @@ export interface OperatorXPoint {
   backend: string;
   testlist: string;
   name: string | null;
-  m: number;
-  n: number;
-  k: number;
-  dtype_a: string;
-  dtype_b: string;
-  dtype_out: string;
+  m: number | null;
+  n: number | null;
+  k: number | null;
+  dtype_a: string | null;
+  dtype_b: string | null;
+  dtype_out: string | null;
   status: OperatorXStatus;
   message: string | null;
   latency_us: number | null;
@@ -42,7 +61,7 @@ export interface OperatorXRunSummary extends OperatorXRunMeta {
   testlists: string[];
 }
 export interface OperatorXDataset {
-  version: 1;
+  version: 2;
   run: OperatorXRunSummary;
   points: OperatorXPoint[];
 }
@@ -62,7 +81,8 @@ function text(value: unknown): string {
   return value;
 }
 function dimension(value: unknown): number {
-  if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error('Invalid GEMM dimension');
+  if (!Number.isSafeInteger(value) || Number(value) < 0)
+    throw new Error('Invalid operator dimension');
   return Number(value);
 }
 function canonical(value: unknown): string {
@@ -134,8 +154,8 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
     for (const [index, caseValue] of array(cell.cases).entries()) {
       const entry = object(caseValue);
       const shape = object(entry.shape);
-      if (shape.type !== 'gemm') continue; // Version 1 dashboard covers dense, single-GPU GEMM only.
-      if (cell.world_size !== 1) throw new Error('Dense GEMM must use world_size=1');
+      if (!['gemm', 'attention_mha', 'attention_mla'].includes(String(shape.type))) continue;
+      if (cell.world_size !== 1) throw new Error('GEMM and attention must use world_size=1');
       const args = object(shape.args);
       for (const backend of array(cell.backends)) {
         const row = results
@@ -149,9 +169,35 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
           status === 'ok' &&
           (typeof latency !== 'number' || !Number.isFinite(latency) || latency <= 0)
         ) {
-          throw new Error('Successful GEMM has invalid latency');
+          throw new Error('Successful operator has invalid latency');
         }
+        const gemm = shape.type === 'gemm';
+        const mla = shape.type === 'attention_mla';
+        const attention: OperatorXAttention | null = gemm
+          ? null
+          : {
+              batch_size: dimension(args.batch_size),
+              seq_len_q: dimension(args.seq_len_q),
+              seq_len_kv: dimension(args.seq_len_kv),
+              num_heads: dimension(args.num_heads),
+              num_heads_kv: dimension(mla ? args.num_heads : args.num_heads_kv),
+              head_dim_qk: mla
+                ? dimension(args.head_dim_qk_nope) + dimension(args.head_dim_qk_rope)
+                : dimension(args.head_dim),
+              head_dim_v: dimension(mla ? args.head_dim_v : args.head_dim),
+              kv_lora_rank: mla ? dimension(args.kv_lora_rank) : null,
+              dtype_q: text(args.dtype_q),
+              dtype_k: text(mla ? args.dtype_kv : args.dtype_k),
+              dtype_v: text(mla ? args.dtype_kv : args.dtype_v),
+              dtype_o: text(args.dtype_o),
+              causal: args.causal === undefined ? true : args.causal === true,
+            };
+        if (attention && args.causal !== undefined && typeof args.causal !== 'boolean')
+          throw new Error('Invalid attention causality');
         const point: OperatorXPoint = {
+          type: shape.type as OperatorXKind,
+          args,
+          attention,
           id: `${id}:${index}:${backend}`,
           shard: id,
           attempt: selected?.attempt ?? null,
@@ -159,30 +205,36 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
           backend: text(backend),
           testlist: text(entry.testlist),
           name: typeof shape.name === 'string' ? shape.name : null,
-          m: dimension(args.m),
-          n: dimension(args.n),
-          k: dimension(args.k),
-          dtype_a: text(args.dtype_a),
-          dtype_b: text(args.dtype_b),
-          dtype_out: text(args.dtype_out),
+          m: gemm ? dimension(args.m) : null,
+          n: gemm ? dimension(args.n) : null,
+          k: gemm ? dimension(args.k) : null,
+          dtype_a: gemm ? text(args.dtype_a) : null,
+          dtype_b: gemm ? text(args.dtype_b) : null,
+          dtype_out: gemm ? text(args.dtype_out) : null,
           status: status as OperatorXStatus,
           message: typeof row?.message === 'string' ? row.message : null,
           latency_us: status === 'ok' ? Number(latency) : null,
           tflops: null,
         };
-        if (point.latency_us !== null)
-          point.tflops = gemmTflops(point.m, point.n, point.k, point.latency_us);
+        if (gemm && point.latency_us !== null)
+          point.tflops = gemmTflops(point.m!, point.n!, point.k!, point.latency_us);
         points.push(point);
       }
     }
     // Reject unexpected/duplicate result rows rather than inflate measured coverage.
-    if ([...results.values()].some((rows) => rows.some((row) => object(row.op).type === 'gemm'))) {
-      throw new Error('Unexpected or duplicate GEMM result');
+    if (
+      [...results.values()].some((rows) =>
+        rows.some((row) =>
+          ['gemm', 'attention_mha', 'attention_mla'].includes(String(object(row.op).type)),
+        ),
+      )
+    ) {
+      throw new Error('Unexpected or duplicate operator result');
     }
   }
   const count = (status: OperatorXStatus) => points.filter((p) => p.status === status).length;
   return {
-    version: 1,
+    version: 2,
     run: {
       ...bundle.run,
       requested: points.length,

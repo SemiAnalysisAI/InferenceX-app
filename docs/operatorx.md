@@ -1,19 +1,30 @@
 # OperatorX
 
+**English** | [中文](operatorx_zh.md)
+
 OperatorX is a feature-gated dashboard alongside CollectiveX in **Hidden**. The
 existing ↑↑↓↓ unlock exposes both tabs. `/operatorx` and `/zh/operatorx` share the
 same reader, chart, filters, and coverage. `?run=<GitHub Actions run ID>` opens a
 specific run, including a feature-branch run.
 
-The initial view covers dense, single-GPU GEMM from `gemm` and `gemm_perf`. The
+The view covers single-GPU GEMM (`gemm`, `gemm_perf`), MHA/GQA and materialized
+MLA (`attention`, `attention_perf`) on NVIDIA and AMD, including the AMD AITER backend. The
 reader matches every requested case/backend against its newest shard attempt,
 retains earlier shards in partial reruns, validates source/run/attempt/cluster
 metadata, and separates measured, unsupported, failed, and missing rows. Zero-size
-GEMMs have no throughput value. Non-GEMM operators are outside this view's scope.
+GEMMs have no throughput value. Attention reports latency in µs, with null TFLOPS. MLA measures materialized Q/K/V
+attention only; cache projection and RoPE are excluded. PyTorch expands grouped KV
+before timing; AITER retains native grouped heads. Compare identical shapes,
+precisions, and backends. Other operators remain outside this view.
 
 TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
-backend, cluster, source commit, run identity, and diagnostic messages. The chart
+backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family separate. Attention defaults
+to latency versus batch size and preserves query/KV lengths, head counts, head
+dimensions, KV rank, causality, and Q/K/V/output precision. API dataset version 2
+adds `type`, original `args`, and nullable `attention`; GEMM-specific fields are
+null for attention. Existing raw bundles are read without schema migration; old GEMM-only summary caches
+are rebuilt from persisted documents on the next run-list read. The chart
 shows successful measurements; the status filter exposes the other cases.
 
 ## Persistence and deployment

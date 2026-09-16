@@ -67,9 +67,9 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
       'Detailed chip specifications for AI inference. Compare NVIDIA, AMD, and Intel chips — memory bandwidth, FLOPS, interconnects, and topology.',
   },
   operatorx: {
-    title: 'OperatorX GEMM Benchmarks',
+    title: 'OperatorX GEMM and Attention Benchmarks',
     description:
-      'Measured dense GEMM latency and per-GPU TFLOPS from OperatorX, with shape, precision, backend, and run coverage.',
+      'Measured GEMM TFLOPS and attention latency from OperatorX, with shape, precision, backend, and run coverage.',
   },
   collectivex: {
     title: 'CollectiveX Communication Benchmarks',

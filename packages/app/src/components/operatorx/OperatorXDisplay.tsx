@@ -13,7 +13,18 @@ import { Heading } from '@/components/ui/heading';
 
 const STRINGS = {
   en: {
-    description: 'Dense GEMM performance from OperatorX GitHub Actions runs.',
+    description: 'GEMM and attention performance from OperatorX GitHub Actions runs.',
+    operator: 'Operator',
+    attention_mha: 'MHA / GQA',
+    attention_mla: 'MLA (materialized Q/K/V)',
+    gemm: 'GEMM',
+    attentionPrecision: 'Precision (Q / K / V → output)',
+    attentionShape: 'Attention shape',
+    attentionChart: 'Measured attention latency',
+    batchAxis: 'Batch size (log scale)',
+    lowest: 'Lowest latency in selection',
+    attentionMethod:
+      'Attention is reported as latency in µs. MLA measures attention on materialized Q/K/V; cache projection and RoPE are excluded. PyTorch expands grouped KV before timing; AITER uses native grouped heads. Compare identical shapes, precisions, and backends. GEMM TFLOPS does not apply to attention.',
     run: 'Run',
     refresh: 'Refresh',
     loading: 'Loading OperatorX results…',
@@ -54,7 +65,18 @@ const STRINGS = {
     note: 'Coverage counts refer to the entire selected run. Unsupported, failed, and missing cases have no TFLOPS value.',
   },
   zh: {
-    description: '来自 OperatorX GitHub Actions 运行的稠密 GEMM 性能数据。',
+    description: '来自 OperatorX GitHub Actions 运行的 GEMM 和 attention 性能数据。',
+    operator: '算子',
+    attention_mha: 'MHA / GQA',
+    attention_mla: 'MLA（物化 Q/K/V）',
+    gemm: 'GEMM',
+    attentionPrecision: '精度（Q / K / V → 输出）',
+    attentionShape: 'Attention 形状',
+    attentionChart: 'Attention 实测延迟',
+    batchAxis: 'Batch size（对数坐标）',
+    lowest: '当前筛选结果最低延迟',
+    attentionMethod:
+      'Attention 以 µs 为单位显示延迟。MLA 只测量物化 Q/K/V 的 attention，不包含缓存投影或 RoPE。PyTorch 在计时前展开分组 KV，AITER 使用原生分组 head。比较时需保持形状、精度和后端一致。GEMM 的 TFLOPS 公式不适用于 attention。',
     run: '运行',
     refresh: '刷新',
     loading: '正在加载 OperatorX 结果…',
@@ -105,8 +127,18 @@ const colors: Record<string, string> = {
   int4: '#f97316',
 };
 function precision(p: OperatorXPoint) {
-  return `${p.dtype_a} / ${p.dtype_b} → ${p.dtype_out}`;
+  const a = p.attention;
+  return a
+    ? `${a.dtype_q} / ${a.dtype_k} / ${a.dtype_v} → ${a.dtype_o}`
+    : `${p.dtype_a} / ${p.dtype_b} → ${p.dtype_out}`;
 }
+function shape(p: OperatorXPoint, withBatch = false) {
+  const a = p.attention;
+  if (!a) return withBatch ? `${p.m} × ${p.n} × ${p.k}` : `${p.n} × ${p.k}`;
+  return `${withBatch ? `B=${a.batch_size} · ` : ''}Q=${a.seq_len_q} KV=${a.seq_len_kv} · H=${a.num_heads}/${a.num_heads_kv} · D=${a.head_dim_qk}/${a.head_dim_v}${a.kv_lora_rank === null ? '' : ` · R=${a.kv_lora_rank}`} · causal=${a.causal}`;
+}
+const x = (p: OperatorXPoint) => p.attention?.batch_size ?? p.m ?? 0;
+const pointDtype = (p: OperatorXPoint) => p.attention?.dtype_q ?? p.dtype_a ?? '';
 const selectClass = 'bg-background border-input h-10 w-full rounded-md border px-3 text-sm';
 const format = (value: number | null) =>
   value === null
@@ -162,34 +194,52 @@ export default function OperatorXDisplay() {
     status: 'ok',
   });
   const [metric, setMetric] = useState('tflops');
+  const [operator, setOperator] = useState('');
   const [page, setPage] = useState(0);
   const points = query.data?.points;
+  const kinds = [...new Set((points ?? []).map((p) => p.type))];
+  const selectedOperator = kinds.find((kind) => kind === operator) ?? kinds[0] ?? 'gemm';
+  const isAttention = selectedOperator !== 'gemm';
+  const visibleMetric = isAttention ? 'latency' : metric;
+  const precisionLabel = isAttention ? t.attentionPrecision : t.precision;
+  const shapeLabel = isAttention ? t.attentionShape : t.shape;
   const filtered = useMemo(
     () =>
       (points ?? [])
         .filter(
           (p) =>
+            p.type === selectedOperator &&
             (!filters.precision || precision(p) === filters.precision) &&
-            (!filters.shape || `${p.n} × ${p.k}` === filters.shape) &&
+            (!filters.shape || shape(p) === filters.shape) &&
             (!filters.backend || p.backend === filters.backend) &&
             (!filters.cluster || p.cluster === filters.cluster) &&
             (!filters.status || p.status === filters.status),
         )
-        .sort((a, b) => (b.tflops ?? -1) - (a.tflops ?? -1)),
-    [points, filters],
+        .sort((a, b) =>
+          isAttention
+            ? (a.latency_us ?? Infinity) - (b.latency_us ?? Infinity)
+            : (b.tflops ?? -1) - (a.tflops ?? -1),
+        ),
+    [points, filters, selectedOperator, isAttention],
   );
   const plotted = useMemo(
-    () => filtered.filter((p) => p.status === 'ok' && p.tflops !== null && p.m > 0),
-    [filtered],
+    () =>
+      filtered.filter(
+        (p) =>
+          p.status === 'ok' &&
+          x(p) > 0 &&
+          (isAttention ? p.latency_us !== null : p.tflops !== null),
+      ),
+    [filtered, isAttention],
   );
   const displayedPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 100) - 1));
   const options = (key: 'precision' | 'shape' | 'backend' | 'cluster') => [
     { value: '', label: t.all },
     ...[
       ...new Set(
-        (points ?? []).map((p) =>
-          key === 'precision' ? precision(p) : key === 'shape' ? `${p.n} × ${p.k}` : p[key],
-        ),
+        (points ?? [])
+          .filter((p) => p.type === selectedOperator)
+          .map((p) => (key === 'precision' ? precision(p) : key === 'shape' ? shape(p) : p[key])),
       ),
     ]
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -200,13 +250,15 @@ export default function OperatorXDisplay() {
     setPage(0);
     track('operatorx_filter_changed', { filter: key, value });
   };
-  const y = (p: OperatorXPoint) => (metric === 'tflops' ? p.tflops! : p.latency_us!);
-  const xValues = plotted.map((p) => p.m);
+  const y = (p: OperatorXPoint) => (visibleMetric === 'tflops' ? p.tflops! : p.latency_us!);
+  const xValues = plotted.map(x);
   const yValues = plotted.map(y);
   const minX = xValues.length > 0 ? Math.min(...xValues) : 1;
   const maxX = Math.max(...xValues, 2);
   const maxY = Math.max(...yValues, 1);
-  const peak = Math.max(...plotted.map((p) => p.tflops!), 0);
+  const peak = isAttention
+    ? Math.min(...plotted.map((p) => p.latency_us!))
+    : Math.max(...plotted.map((p) => p.tflops!), 0);
   const run = query.data?.run;
   return (
     <div className="space-y-6" data-testid="operatorx-display">
@@ -284,10 +336,23 @@ export default function OperatorXDisplay() {
           </section>
           <Card className="space-y-4 p-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Filter
+                label={t.operator}
+                value={selectedOperator}
+                options={kinds.map((value) => ({ value, label: t[value] }))}
+                onChange={(value) => {
+                  setOperator(value);
+                  setFilters({ precision: '', shape: '', backend: '', cluster: '', status: 'ok' });
+                  setPage(0);
+                  track('operatorx_operator_changed', { value });
+                }}
+              />
               {(['precision', 'shape', 'backend', 'cluster'] as const).map((key) => (
                 <Filter
                   key={key}
-                  label={t[key]}
+                  label={
+                    key === 'precision' ? precisionLabel : key === 'shape' ? shapeLabel : t[key]
+                  }
                   value={filters[key]}
                   options={options(key)}
                   onChange={(value) => change(key, value)}
@@ -304,11 +369,15 @@ export default function OperatorXDisplay() {
               />
               <Filter
                 label={t.metric}
-                value={metric}
-                options={[
-                  { value: 'tflops', label: t.tflops },
-                  { value: 'latency', label: t.latency },
-                ]}
+                value={visibleMetric}
+                options={
+                  isAttention
+                    ? [{ value: 'latency', label: t.latency }]
+                    : [
+                        { value: 'tflops', label: t.tflops },
+                        { value: 'latency', label: t.latency },
+                      ]
+                }
                 onChange={(value) => {
                   setMetric(value);
                   track('operatorx_metric_changed', { value });
@@ -329,9 +398,10 @@ export default function OperatorXDisplay() {
           </Card>
           <Card className="overflow-hidden p-3 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Heading as="h2">{t.chart}</Heading>
+              <Heading as="h2">{isAttention ? t.attentionChart : t.chart}</Heading>
               <p data-testid="operatorx-peak" className="text-xl font-semibold tabular-nums">
-                {t.peak}: {plotted.length > 0 ? format(peak) : '—'} TFLOPS / GPU
+                {isAttention ? t.lowest : t.peak}: {plotted.length > 0 ? format(peak) : '—'}{' '}
+                {isAttention ? 'µs' : 'TFLOPS / GPU'}
                 {plotted[0] && (
                   <span className="text-muted-foreground ml-2 text-sm">
                     {precision(plotted[0])}
@@ -340,7 +410,7 @@ export default function OperatorXDisplay() {
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-4 text-sm">
-              {[...new Set(plotted.map((p) => p.dtype_a))].sort().map((dtype) => (
+              {[...new Set(plotted.map(pointDtype))].sort().map((dtype) => (
                 <span key={dtype}>
                   <span aria-hidden="true" style={{ color: colors[dtype] ?? '#888' }}>
                     ●{' '}
@@ -351,7 +421,7 @@ export default function OperatorXDisplay() {
             </div>
             {plotted.length > 0 ? (
               <D3Chart<OperatorXPoint>
-                chartId="operatorx-gemm"
+                chartId={`operatorx-${selectedOperator}`}
                 testId="operatorx-chart"
                 data={plotted}
                 height={440}
@@ -359,8 +429,8 @@ export default function OperatorXDisplay() {
                 watermark="logo"
                 xScale={{ type: 'log', domain: [minX, maxX * 1.1] }}
                 yScale={{ type: 'linear', domain: [0, maxY * 1.08] }}
-                xAxis={{ label: t.xAxis, tickCount: 7 }}
-                yAxis={{ label: metric === 'tflops' ? t.tflops : t.latency, tickCount: 5 }}
+                xAxis={{ label: isAttention ? t.batchAxis : t.xAxis, tickCount: 7 }}
+                yAxis={{ label: visibleMetric === 'tflops' ? t.tflops : t.latency, tickCount: 5 }}
                 layers={[
                   {
                     type: 'point',
@@ -368,9 +438,9 @@ export default function OperatorXDisplay() {
                     config: {
                       getCx: () => 0,
                       getCy: () => 0,
-                      getX: (p) => p.m,
+                      getX: x,
                       getY: y,
-                      getColor: (p) => colors[p.dtype_a] ?? '#888',
+                      getColor: (p) => colors[pointDtype(p)] ?? '#888',
                       getRadius: () => 3.5,
                       keyFn: (p) => p.id,
                       maxPoints: Infinity,
@@ -383,13 +453,15 @@ export default function OperatorXDisplay() {
                   rulerType: 'crosshair',
                   attachToLayer: 0,
                   content: (p) =>
-                    `<div class="rounded border bg-background p-3 text-sm">M × N × K: ${p.m} × ${p.n} × ${p.k}<br/>${format(p.tflops)} TFLOPS / GPU<br/>${format(p.latency_us)} µs</div>`,
+                    `<div class="rounded border bg-background p-3 text-sm">${shape(p, true)}<br/>${p.type === 'gemm' ? `${format(p.tflops)} TFLOPS / GPU<br/>` : ''}${format(p.latency_us)} µs</div>`,
                 }}
               />
             ) : (
               <p className="py-16 text-center text-muted-foreground">{t.noPoints}</p>
             )}
-            <p className="text-muted-foreground mt-4 text-sm">{t.method}</p>
+            <p className="text-muted-foreground mt-4 text-sm">
+              {isAttention ? t.attentionMethod : t.method}
+            </p>
           </Card>
           <Card className="p-5">
             <Heading as="h2">
@@ -400,10 +472,10 @@ export default function OperatorXDisplay() {
                 <thead>
                   <tr className="border-b">
                     {[
-                      'M × N × K',
-                      t.precision,
+                      isAttention ? t.attentionShape : 'M × N × K',
+                      precisionLabel,
                       t.backend,
-                      t.tflops,
+                      ...(isAttention ? [] : [t.tflops]),
                       t.latency,
                       t.status,
                       t.details,
@@ -417,16 +489,16 @@ export default function OperatorXDisplay() {
                 <tbody>
                   {filtered.slice(displayedPage * 100, (displayedPage + 1) * 100).map((p) => (
                     <tr key={p.id} className="border-b">
-                      <td className="px-3 py-2 whitespace-nowrap font-mono">
-                        {p.m} × {p.n} × {p.k}
-                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap font-mono">{shape(p, true)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{precision(p)}</td>
                       <td className="px-3 py-2">{p.backend}</td>
-                      <td className="px-3 py-2 tabular-nums">{format(p.tflops)}</td>
+                      {!isAttention && (
+                        <td className="px-3 py-2 tabular-nums">{format(p.tflops)}</td>
+                      )}
                       <td className="px-3 py-2 tabular-nums">{format(p.latency_us)}</td>
                       <td className="px-3 py-2">{t[p.status]}</td>
                       <td className="max-w-sm px-3 py-2">
-                        {p.message && (
+                        {(p.message || p.attention) && (
                           <details>
                             <summary
                               className="cursor-pointer"
@@ -435,7 +507,7 @@ export default function OperatorXDisplay() {
                               {t.details}
                             </summary>
                             <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs">
-                              {p.message}
+                              {p.message ?? JSON.stringify(p.args, null, 2)}
                             </pre>
                           </details>
                         )}

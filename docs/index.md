@@ -27,4 +27,4 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
 
-- [OperatorX](./operatorx.md) — hidden dense GEMM explorer, per-GPU TFLOPS, raw artifact persistence, and local verification
+- [OperatorX](./operatorx.md) — hidden GEMM and attention explorer, per-GPU TFLOPS, raw artifact persistence, and local verification
