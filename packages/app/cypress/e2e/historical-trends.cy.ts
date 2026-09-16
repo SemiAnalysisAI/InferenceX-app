@@ -123,8 +123,8 @@ describe('Historical Trends — Content & Interactions', () => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
-    cy.get('[data-testid="scenario-selector"]').should('be.visible');
-    cy.get('[data-testid="scenario-selector"]').click();
+    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('fieldset [data-testid="scenario-selector"]').click('right');
     cy.get('[data-select-option]').should('have.length.greaterThan', 0);
     cy.get('body').type('{esc}');
   });

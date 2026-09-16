@@ -33,7 +33,7 @@ try {
     join workflow_runs wr on wr.id = br.workflow_run_id
     where wr.github_run_id = ${manifest.runId} and wr.run_attempt = ${manifest.runAttempt}
       and (br.benchmark_type = 'agentic_traces' or
-        (br.benchmark_type = 'single_turn' and br.isl = 8192 and br.osl = 1024))
+        (br.benchmark_type = 'single_turn' and br.isl in (1024, 8192) and br.osl = 1024))
   `;
   const errors = [
     ...(manifest.ingestErrors ?? []),

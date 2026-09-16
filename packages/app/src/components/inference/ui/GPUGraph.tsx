@@ -19,6 +19,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
@@ -139,7 +140,7 @@ const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): Rende
 // lookup misses (legacy data).
 function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
   const hwKey = String(pts[0].hwKey);
-  const cfg = getHardwareConfig(hwKey, pts[0].model);
+  const cfg = getInferenceHardwareConfig(hwKey, pts[0].model, pts);
   const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
   return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
@@ -1212,6 +1213,7 @@ const GPUGraph = React.memo(
     if (data.length === 0) {
       return (
         <div className="relative w-full p-3">
+          {caption}
           <div className="flex flex-col items-center justify-center min-h-100 text-center">
             <div className="text-muted-foreground">
               <svg

@@ -451,7 +451,7 @@ export function useChartData(
     return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
   }, [rows, selectedPercentile, tcoBasis]);
 
-  // Sort hardware config — stabilize reference when keys haven't changed.
+  // Sort hardware config — stabilize reference when keys and labels haven't changed.
   // Different sequences for the same model often have the same GPU configs,
   // so avoid creating a new object (which cascades to Effect 2 deps).
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
@@ -464,7 +464,7 @@ export function useChartData(
     const sortedKeys = hwKeys.toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
-    const newKey = sortedKeys.join(',');
+    const newKey = JSON.stringify(sortedKeys.map((key) => [key, rawHardwareConfig[key]]));
     if (newKey === prevHardwareConfigRef.current.key) {
       return prevHardwareConfigRef.current.config;
     }

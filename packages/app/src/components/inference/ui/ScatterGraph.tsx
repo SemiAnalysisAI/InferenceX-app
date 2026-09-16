@@ -47,6 +47,7 @@ import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
 import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
+import { getInferenceHardwareConfig, getInferenceRunLabel } from '@/lib/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -351,8 +352,9 @@ const lineLabelText = (
   precision: string,
   includePrecision: boolean,
   model?: string,
+  points: InferenceData[] = [],
 ): string => {
-  const config = getHardwareConfig(hwKey, model);
+  const config = getInferenceHardwareConfig(hwKey, model, points);
   if (config.alwaysShowPrecision) {
     return [getDisplayLabel(config), getPrecisionLabel(precision as Precision)].join(' ');
   }
@@ -2390,7 +2392,13 @@ const ScatterGraph = React.memo(
             ].map((entry) => ({
               key: entry.key,
               seriesId: entry.hw,
-              label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
+              label: lineLabelText(
+                entry.hw,
+                entry.precision,
+                multiPrecision,
+                modelLabel,
+                entry.points,
+              ),
               color: ir.getCssColor(ir.resolveColor(entry.hw)),
               points: entry.points,
               keepVisibleOnCollision: entry.points.length === 1,
@@ -2401,11 +2409,14 @@ const ScatterGraph = React.memo(
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
+              const runLabel = info
+                ? getInferenceRunLabel(`✕ ${info.branch || `run ${info.id}`}`, group.points)
+                : '';
               const label = info
                 ? multiPrecision
-                  ? `✕ ${info.branch || `run ${info.id}`} ${getPrecisionLabel(precision as Precision)}`
-                  : `✕ ${info.branch || `run ${info.id}`}`
-                : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel);
+                  ? `${runLabel} ${getPrecisionLabel(precision as Precision)}`
+                  : runLabel
+                : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel, group.points);
               return [
                 {
                   key: `overlay-${overlayKey}`,
@@ -2436,7 +2447,13 @@ const ScatterGraph = React.memo(
               lineLabels.push({
                 key: entry.key,
                 seriesId: entry.hw,
-                label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
+                label: lineLabelText(
+                  entry.hw,
+                  entry.precision,
+                  multiPrecision,
+                  modelLabel,
+                  entry.points,
+                ),
                 color: ir.getCssColor(ir.resolveColor(entry.hw)),
                 x: xScale(entry.points[0].x),
                 y: yScale(entry.points[0].y),
@@ -2467,7 +2484,11 @@ const ScatterGraph = React.memo(
               const isHardwareLabel =
                 label.label === hardwareLabel || label.label.startsWith(`${config.label} `);
               const remainingLabel = isHardwareLabel ? label.label.slice(config.label.length) : '';
-              const engineLabel = config.suffix ? ` ${config.suffix}` : '';
+              // Use this curve's resolved suffix, not the generic hwKey label:
+              // official and overlay curves can share a key but differ by run.
+              const engineLabel =
+                remainingLabel.match(/ \([^()]*\)$/u)?.[0] ??
+                (config.suffix ? ` ${config.suffix}` : '');
               const precisionLabel =
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
@@ -2485,7 +2506,7 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
-                    ...(config.suffix
+                    ...(engineLabel
                       ? [
                           {
                             className: 'll-engine',
@@ -3589,6 +3610,7 @@ const ScatterGraph = React.memo(
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
+          {caption}
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           <QuickFiltersDialog
             open={quickFiltersOpen}
@@ -3672,7 +3694,14 @@ const ScatterGraph = React.memo(
                         const branch = info.branch || `run ${info.id}`;
                         return {
                           name: `✕ unofficial-run-${info.id}`,
-                          label: `✕ ${branch}`,
+                          label: getInferenceRunLabel(
+                            `✕ ${branch}`,
+                            overlayData.data.filter(
+                              (point) =>
+                                overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                selectedPrecisions.includes(point.precision),
+                            ),
+                          ),
                           color: overlayRunColor(idx),
                           title: legendT.unofficialTitle(branch),
                           isHighlighted: true,

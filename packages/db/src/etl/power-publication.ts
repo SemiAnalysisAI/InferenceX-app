@@ -63,7 +63,9 @@ export function powerPublicationPoint(
 ): PowerPublicationPoint | null {
   if (
     row.benchmarkType !== 'agentic_traces' &&
-    (row.benchmarkType !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024)
+    (row.benchmarkType !== 'single_turn' ||
+      (row.isl !== 1024 && row.isl !== 8192) ||
+      row.osl !== 1024)
   )
     return null;
   const identity: Record<string, unknown> = Object.fromEntries(

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { mapBenchmarkRow, type BenchmarkParams } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
-import { REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
+import { CHANGELOG_ARTIFACT_NAME, REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
 
 type JsonRow = Record<string, unknown>;
 export interface RequiredPowerSource {
@@ -167,7 +167,17 @@ export function verifyRequiredPowerArtifacts(
   source: RequiredPowerSource,
 ): BenchmarkParams[] {
   const manifestDir = path.join(root, REQUIRED_POWER_MANIFEST);
-  if (!fs.existsSync(manifestDir)) return [];
+  if (!fs.existsSync(manifestDir)) {
+    const metadataDir = path.join(root, CHANGELOG_ARTIFACT_NAME);
+    if (fs.existsSync(metadataDir)) {
+      for (const name of fs.readdirSync(metadataDir).filter((file) => file.endsWith('.json'))) {
+        const metadata = JSON.parse(fs.readFileSync(path.join(metadataDir, name), 'utf8'));
+        if (metadata?.['require-power'] === true)
+          throw new Error('Required power: sweep manifest missing for required changelog scope');
+      }
+    }
+    return [];
+  }
   const manifest = JSON.parse(
     fs.readFileSync(path.join(manifestDir, 'sweep_manifest.json'), 'utf8'),
   );

@@ -61,6 +61,22 @@ afterEach(() => {
 });
 
 describe('required power publication preflight', () => {
+  it.each([true, false, undefined])(
+    'requires the manifest when changelog metadata declares power: %s',
+    (declaredRequired) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'required-power-'));
+      dirs.push(dir);
+      fs.mkdirSync(path.join(dir, 'changelog-metadata'));
+      fs.writeFileSync(
+        path.join(dir, 'changelog-metadata', 'changelog_metadata.json'),
+        JSON.stringify({ 'require-power': declaredRequired, entries: [] }),
+      );
+      if (declaredRequired)
+        expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('sweep manifest missing');
+      else expect(verifyRequiredPowerArtifacts(dir, source)).toEqual([]);
+    },
+  );
+
   it('matches the canonical AgentX users value instead of a conflicting raw conc', () => {
     const scope = {
       ...manifest(),

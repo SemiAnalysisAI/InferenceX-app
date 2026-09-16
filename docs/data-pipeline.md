@@ -97,9 +97,11 @@ the declaration.
 
 The manifest must name the source run and head. A successful earlier attempt of
 that same run may supply the scope and retained points when failed jobs are
-rerun; ingestion logs both declared and current attempts. Sweeps without this
-optional manifest keep historical behavior. The separate PowerX publication
-receipt compares ingested 8K/1K and AgentX measurements with the database and
+rerun; ingestion logs both declared and current attempts. Changelog metadata with
+`require-power: true` also requires the manifest, so losing that artifact cannot
+silently downgrade a required scope. Legacy bundles without either declaration
+retain optional-power behavior. The separate PowerX publication
+receipt compares ingested 1K/1K, 8K/1K and AgentX measurements with the database and
 public API after cache invalidation; it does not assert browser rendering.
 
 ### Append-Only Curve Extensions
