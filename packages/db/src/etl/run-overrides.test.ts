@@ -622,6 +622,15 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it('purges every attempt of run 34926284365 with uninitialized MTP weights', () => {
+    expect(PURGED_RUNS.has(34926284365)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(34926284365, attempt)).toBe(true);
+    }
+    expect(isRunAttemptPurged(34926284364, 1)).toBe(false);
+    expect(isRunAttemptPurged(34926284366, 1)).toBe(false);
+  });
+
   it('returns true for runs in PURGED_RUNS regardless of attempt', () => {
     const [first] = PURGED_RUNS;
     if (first === undefined) return;

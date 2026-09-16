@@ -11,6 +11,18 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('selects only the whole-run purge for the uninitialized MTP run', () => {
+    expect(selectRunOverrides(['--run-id', '34926284365', '--yes'])).toEqual({
+      runId: 34926284365,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34926284365]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('makes an unregistered ingest a no-op without touching historical rows', () => {
     expect(
       selectRunOverrides(['--run-id', '33721476500', '--allow-unregistered-run', '--yes']),
