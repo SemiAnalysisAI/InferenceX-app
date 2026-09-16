@@ -371,20 +371,37 @@ describe('X-axis mode URL param', () => {
 });
 
 describe('Default scenario', () => {
-  it('switches from the title and can recover when the other scenario has no rows', () => {
+  for (const width of [1280, 375]) {
+    it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
+      cy.viewport(width, 800);
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference');
+      cy.get('fieldset [data-testid="scenario-selector"]')
+        .should('be.visible')
+        .and('contain.text', 'Agentic');
+      cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
+      cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
+      cy.get('fieldset [data-testid="scenario-selector"]').click('right', {
+        scrollBehavior: 'center',
+      });
+      cy.contains('[data-select-option]', '8K / 1K').click();
+      cy.contains('No measurements to plot for this selection.').should('be.visible');
+      cy.get('fieldset [data-testid="scenario-selector"]')
+        .should('contain.text', '8K / 1K')
+        .click('right', { scrollBehavior: 'center' });
+      cy.contains('[data-select-option]', 'Agentic').click();
+      cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Agentic');
+      cy.get('fieldset [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    });
+  }
+
+  it('restores the labeled scenario field on the Chinese dashboard', () => {
     interceptAgenticData();
-    interceptDerivedAgenticMetrics();
-    cy.visit('/inference');
-    cy.get('h2 [data-testid="scenario-selector"]').first().click();
-    cy.contains('[data-select-option]', '8K / 1K').click();
-    cy.contains('No measurements to plot for this selection.').should('be.visible');
-    cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', '8K / 1K').click();
-    cy.contains('[data-select-option]', 'Agentic').click();
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="chart-figure"] h2 .export-only')
-      .should('have.text', 'Agentic')
-      .and('not.be.visible');
+    cy.visit('/zh/inference');
+    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
+    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
   });
 
   it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
@@ -398,13 +415,8 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    // Workload switching lives in the title; explanations stay inside the menu.
-    cy.get('fieldset [data-testid="scenario-selector"]').should('not.exist');
-    cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
-    cy.get('[data-testid="scenario-selector"]').first().click();
-    cy.get('[data-testid="option-help-agentic-traces"]').should('be.visible');
-    cy.get('body').type('{esc}');
+    // The explainer sits beside the trigger, linking out to the dataset page.
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
@@ -438,8 +450,7 @@ describe('Default scenario', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('h2 [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
+    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
   });
 });
 
