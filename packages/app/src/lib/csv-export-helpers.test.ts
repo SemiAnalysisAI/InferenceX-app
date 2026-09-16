@@ -53,6 +53,33 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
 });
 
 describe('inferenceChartToCsv', () => {
+  it('preserves canonical CSV framework and hardware keys for UMBP official and overlay points', () => {
+    const target = makePoint({
+      hwKey: 'mi355x_mori-sglang',
+      framework: 'mori-sglang',
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1',
+    });
+    const historical = {
+      ...target,
+      run_url: target.run_url!.replace('34926284365', '34926284364'),
+    };
+    const { headers, rows } = inferenceChartToCsv(
+      [target, historical],
+      'DeepSeek-V4-Pro',
+      '1k/1k',
+      [target, historical],
+    );
+    expect(rows.map((row) => row[headers.indexOf('Framework')])).toEqual([
+      'mori-sglang',
+      'mori-sglang',
+      'mori-sglang',
+      'mori-sglang',
+    ]);
+    expect(rows.map((row) => row[headers.indexOf('Hardware Key')])).toEqual(
+      Array.from({ length: 4 }, () => 'mi355x_mori-sglang'),
+    );
+  });
+
   it('exports benchmark summary fields', () => {
     const data = [makePoint()];
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');

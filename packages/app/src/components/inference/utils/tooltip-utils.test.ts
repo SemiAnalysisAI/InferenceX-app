@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import {
   getPointLabel,
   generateTooltipContent,
@@ -87,6 +88,42 @@ const systemPower = {
   chassisBasis: 'full',
   telemetryBasis: 'validated-v2',
 } satisfies SystemPowerEstimate;
+
+describe('run-specific framework tooltip labels', () => {
+  it.each(['en', 'zh'] as const)('uses point provenance in all tooltip paths (%s)', (locale) => {
+    const hwKey = 'mi355x_mori-sglang';
+    const target = pt({
+      hwKey,
+      framework: 'mori-sglang',
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1',
+    });
+    const historical = {
+      ...target,
+      run_url: target.run_url!.replace('34926284365', '34926284364'),
+    };
+    const hardwareConfig = {
+      [hwKey]: getInferenceHardwareConfig(hwKey, undefined, [target, historical]),
+    };
+    for (const point of [target, historical]) {
+      const config = tooltipConfig({ data: point, hardwareConfig, locale });
+      const outputs = [
+        generateTooltipContent(config),
+        generateGPUGraphTooltipContent(config),
+        generateOverlayTooltipContent({
+          ...config,
+          overlayData: { data: [target, historical], hardwareConfig, label: 'test-run' },
+        }),
+      ];
+      for (const html of outputs) {
+        expect(html).toContain(
+          point === target ? 'MI355X (MoRI UMBP SGLang)' : 'MI355X (MoRI SGLang)',
+        );
+        expect(html).not.toContain('MoRI SGLang / MoRI UMBP SGLang');
+        if (point === historical) expect(html).not.toContain('MoRI UMBP SGLang');
+      }
+    }
+  });
+});
 
 describe('modeled system-power tooltip', () => {
   const config = (overrides: Partial<TooltipConfig> = {}) =>

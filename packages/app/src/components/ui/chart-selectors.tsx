@@ -349,8 +349,8 @@ interface ScenarioSelectorProps {
  * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
- * A single selected scenario stays visible in the same control, disabled when
- * there is no alternative workload to choose.
+ * A sole selected scenario is plain text in chart titles, with separate help.
+ * Ordinary fields retain their disabled control and selected-option help.
  */
 export function ScenarioSelector({
   variant = 'field',
@@ -371,10 +371,7 @@ export function ScenarioSelector({
     getSequenceCategoryForModel(s as Sequence, model),
   );
   if (availableSequences.length === 0) return null;
-  // A title trigger keeps its one-option menu available so workload help is
-  // reachable; ordinary fields already expose selected-option help directly.
-  const isOnlySelectedScenario =
-    variant !== 'title' && availableSequences.length === 1 && availableSequences[0] === value;
+  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
@@ -406,6 +403,17 @@ export function ScenarioSelector({
         </>
       ),
   });
+  if (variant === 'title' && isOnlySelectedScenario) {
+    const option = toScenarioOption(value);
+    return (
+      <span className="inline-flex max-w-full items-center align-middle">
+        <span data-testid={testId}>{option.label}</span>
+        <InfoHelp label={option.label} value={value}>
+          {option.help}
+        </InfoHelp>
+      </span>
+    );
+  }
   const Container = variant === 'title' ? 'span' : 'div';
 
   return (
