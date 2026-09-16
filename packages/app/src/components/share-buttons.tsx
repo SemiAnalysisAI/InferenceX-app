@@ -26,7 +26,7 @@ function getShareUrl(): string {
   return window.location.href;
 }
 
-export function ShareTwitterButton({ text }: { text?: string }) {
+export function ShareTwitterButton({ text, url }: { text?: string; url?: string }) {
   const t = STRINGS[useLocale()];
   return (
     <Button
@@ -36,9 +36,9 @@ export function ShareTwitterButton({ text }: { text?: string }) {
       title={t.twitter}
       data-testid="share-twitter"
       onClick={() => {
-        const url = getShareUrl();
+        const targetUrl = url ?? getShareUrl();
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? t.shareText)}&url=${encodeURIComponent(url)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? t.shareText)}&url=${encodeURIComponent(targetUrl)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=400',
         );
@@ -52,7 +52,7 @@ export function ShareTwitterButton({ text }: { text?: string }) {
   );
 }
 
-export function ShareLinkedInButton() {
+export function ShareLinkedInButton({ url }: { url?: string } = {}) {
   const t = STRINGS[useLocale()];
   return (
     <Button
@@ -62,9 +62,9 @@ export function ShareLinkedInButton() {
       title={t.linkedin}
       data-testid="share-linkedin"
       onClick={() => {
-        const url = getShareUrl();
+        const targetUrl = url ?? getShareUrl();
         window.open(
-          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(targetUrl)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=600',
         );

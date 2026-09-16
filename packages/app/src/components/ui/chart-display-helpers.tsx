@@ -186,8 +186,13 @@ function getCostValues(
   return publishedCostsForTier(tier ?? 'rental', tcoBasis);
 }
 
-export function ChartShareActions() {
-  return <ShareButton />;
+export function ChartShareActions(
+  props: {
+    getShareUrl?: () => string;
+    disabled?: boolean;
+  } = {},
+) {
+  return <ShareButton {...props} />;
 }
 
 export function MetricAssumptionNotes({

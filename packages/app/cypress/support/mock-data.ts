@@ -212,6 +212,8 @@ export function createMockInferenceContextValues(
     refreshing: false,
     error: null,
     selectedYAxisMetric: 'y_tpPerGpu',
+    measuredComparison: 'single',
+    setMeasuredComparison: namedStub('setMeasuredComparison'),
     setSelectedYAxisMetric: namedStub('setSelectedYAxisMetric'),
     tokenRevenuePriceSource: 'normalized',
     tokenRevenuePricing: {

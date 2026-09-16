@@ -188,7 +188,7 @@ describe('PowerX Chinese route', () => {
       '显示模式',
     );
     cy.get('[data-testid="gpu-metrics-chart-container"]').should('contain.text', '图表控制');
-    cy.get('[data-testid="gpu-metrics-share-button"]').should('have.attr', 'title', '复制分享链接');
+    cy.get('[data-testid="share-button"]').should('have.attr', 'title', '分享当前视图');
     cy.get('[data-testid="gpu-metrics-display"]')
       .should('contain.text', '2026/8/23')
       .and('contain.text', 'GPU metrics test')

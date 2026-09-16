@@ -1,98 +1,74 @@
-# PowerX in Measured Power and Measured Energy
+# PowerX charts in the existing Dashboard
 
-PowerX extends the existing **Measured Power** and **Measured Energy** families in
-`/inference` and `/zh/inference`. Their existing ↑↑↓↓ feature gate, Y-axis menu,
-filters, chart controls and sharing remain the entry point. A **Boundary** select
-adds GPU provisioned, all-in utility provisioned and all-in utility modeled to
-GPU measured. `/gpu-metrics` remains the upstream raw run-telemetry dashboard.
+[中文](./powerx-permanent-view_zh.md)
 
-## Data flow
+PowerX extends the existing gated **Measured Power / Measured Energy** controls in `/inference` and the existing `/gpu-metrics` page. The goal is to make article comparisons directly capturable from the Dashboard, with share links that restore the chosen data and graph. There is no separate article page or frozen article dataset in the app.
+
+## Article graph coverage
+
+| Comparison                                                 | Existing Dashboard control                                                                                                                             |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| H200 measured versus provisioned energy/power              | Measured Power or Energy → Compare → Power boundaries; four boundaries on the same axes, with adjacent power/energy panels                             |
+| B200/MI355X, B200/B300, GB200/GB300 at equal service speed | Existing hardware filters and Interactivity, TTFT or E2E axes; native Perf Ruler on single-metric plots, or an on-chart ISO marker in comparison plots |
+| Prefill versus decode power and role-local energy          | Compare → Prefill and decode; role labels retain input/output-token denominators                                                                       |
+| Complete-request energy and prefill fraction               | Compare → Request energy split; paired role-power/share panels and common-output-token contributions below                                             |
+| Relative hardware power/output/energy changes              | Compare → Relative hardware comparison; choose baseline and comparator configuration/run; shared service-level X, no concurrency matching              |
+| GB200/GB300 power over the formal serving window           | GPU Metrics → Serving-window power; choose run, artifact and window, then a second run                                                                 |
+
+The original single-metric plot retains its measured scope, average/P75/P90, percent-of-TDP and energy denominator/unit controls. Returning from a provisioned boundary restores the previous measured selection.
+
+Repeated-run means and min/max bands require an explicitly selected repeat cohort; a latest benchmark row is not an N=3 average. Extra-analysis regression plots are outside this milestone.
+
+## Data path
 
 ```mermaid
 flowchart LR
-  Sweep[InferenceX benchmark + formal-window GPU telemetry] --> Artifact[agg_bmk + power audit artifacts]
-  Artifact --> ETL[Main publication dispatch + App ETL]
-  ETL --> DB[Canonical Neon benchmark rows]
-  DB --> API[benchmarks / availability / workflow-info]
-  API --> Query[React Query + shared Dashboard providers]
-  Query --> Fields[buildDerivedChartFields]
-  Fields --> Chart[Existing filtered ScatterGraph + native curves]
-  Chart --> ISO[Rendered curve intersection + ISO table / CSV]
-  Chart --> Export[Existing tooltip / table / CSV / PNG / share]
+  B[Benchmark and collectors] --> A[Results and power-audit artifacts]
+  A --> I[Existing benchmark ingestion]
+  I --> DB[Neon benchmarks and metrics]
+  DB --> API[Existing benchmark API]
+  API --> T[Shared benchmark transforms]
+  T --> M[Measured Power / Energy]
+  A --> G[Existing GPU Metrics API: power-audit source]
+  G --> W[Validated serving-window role traces]
 ```
 
-No new endpoint, DB column, provider, route or frozen article dataset is required.
-Official and unofficial data use the same field builder and their existing
-visibility rules. The [article and Oren's comments](https://docs.google.com/document/d/16Evxj4yuAqYWRHmkz-CIL7CKDIU-DPBiklrTs2QpnJM/edit)
-supply the four boundaries and matched-interactivity requirement.
+Comparison plots consume the same workload, precision, date/run, hardware and unofficial-run selections. They start before selected-Y-metric coverage filtering so a missing measured value cannot remove a valid provisioned point. Missing series values leave gaps; they are never zeros. Lines connect adjacent observations within their configuration, date and source run and are explicitly distinct from Pareto frontiers. ISO markers use linear interpolation only between valid neighboring observations, without extrapolation or ambiguous duplicate-X selection. Single-metric Perf Ruler continues to measure native rendered curves.
 
-## Boundaries and controls
+Single-metric power views share the existing Measured Power behavior: **Optimal Only** shows boundary points when on and all points when off, without changing the curve, axis domain, zoom or ruler. This applies to measured, modeled chassis and provisioned/modeled facility watts in both chart layouts and unofficial overlays. Constant modeled/provisioned watts retain the tested X range. Energy views retain their lower-energy Pareto frontiers.
 
-| Boundary            | Power                                     | Energy                                           |
-| ------------------- | ----------------------------------------- | ------------------------------------------------ |
-| GPU measured        | Existing mean/P75/P90/role watts or %TDP  | Existing input/output/total/query J and query Wh |
-| GPU provisioned     | Registry GPU TDP, W/chip                  | TDP / all-GPU output throughput                  |
-| Utility provisioned | Registry facility kW/chip × 1000          | Facility W/chip / all-GPU output throughput      |
-| Utility modeled     | Modeled deployment facility W / GPU count | GPU J/output token × modeled/measured GPU W      |
+## Four boundaries
 
-The original 13 GPU telemetry keys, Scope/Statistic/Display/Per/Unit controls,
-legacy admission and validity indicators are retained. The other boundaries add
-six derived metric keys and use whole-deployment W/chip or J/output token. They
-appear in the same two families, with the boundary encoded by `i_metric`.
+| Boundary            | Power                                               | Energy per successful output token                                    |
+| ------------------- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| GPU measured        | Producer GPU-board measurement                      | Producer same-window integrated GPU energy / successful output tokens |
+| GPU provisioned     | Hardware-registry TDP                               | TDP / output throughput per all allocated GPUs                        |
+| Utility provisioned | Hardware-registry facility allocation per GPU       | Allocation / output throughput per all allocated GPUs                 |
+| Utility modeled     | Existing supported system model, including PUE once | Measured GPU J/output-token × modeled facility W / measured GPU W     |
 
-Fixed-sequence disaggregation reports throughput per decode GPU. Provisioned
-energy first multiplies throughput by `decode / (prefill + decode)`; both pool
-counts must be known. AgentX throughput already uses all GPUs. Aggregate serving
-does not sum mirrored role counts. Provisioned values are registry assumptions,
-independent of telemetry validity and separate from configured GPU power caps.
+Registry TDP, a runtime-configured power cap, and measured draw are different values. Modeled watts also reuse the shared model’s explicitly validated historical single-node power contract; modeled energy still requires schema-2 same-window evidence. Each panel reports missing series coverage. Facility modeling remains an estimate with the existing model revision, chassis/calibration coverage and CPU/DRAM/PUE assumptions. Unsupported hardware/workloads do not borrow another model. Fixed-sequence disaggregated throughput is normalized from decode GPUs to all allocated GPUs; AgentX throughput already uses the full allocation.
 
-Utility modeled requires valid schema-2 telemetry and a supported existing
-chassis model. It applies the model's PUE once; partial chassis retain its
-allocation rule. It is a mean-input estimate, not facility-meter telemetry or
-integrated wall energy. Model revision, PUE and exclusions remain visible in
-metric explanations; see [system-power assumptions](powerx-system-power.md).
-No GB200/GB300 chassis model or AgentX calibration is added. Missing, invalid,
-nonpositive, nonfinite or unsupported derived values are omitted, never zero-filled.
-The existing measured availability treatment remains authoritative for GPU telemetry.
+Role energy reconstruction requires validated schema-2 disaggregation and positive aggregate/role energy metrics. Because aggregate J/input and J/output share one energy numerator, their ratio recovers the actual successful input/output-token ratio. Multiply prefill J/input by that ratio before combining it with decode J/output. Missing either role or denominator produces no reconstructed total or fraction. This is not a nominal request-length assumption.
 
-## Native curves and ISO
+## Serving-window telemetry
 
-The existing power envelope / energy Pareto curves, logarithmic scales, percentile,
-Optimal Only and Best per SKU behavior remain available. New provisioned watt
-curves keep their flat support over the observed X range. The ISO section below
-each chart reads the **actual displayed SVG curve** using the native performance
-ruler's `intersectPathAtX`, then inverts the current Y scale. It does not install
-a second interpolation policy or regroup the existing frontier by recipe.
+`/api/gpu-metrics?runId=…&source=power-audit` reads existing `power_audit_*` artifacts. GitHub retention bounds historical availability: expiring or removed artifacts need a durable archive before these links can serve as permanent publication evidence. The default raw GPU-metrics API/view remains available. The audit response retains artifact identity, manifest, samples, serving windows and validation data; the browser performs the chart transformation.
 
-Only currently visible official/overlay dated series participate. Exact chart
-knots retain their values and source evidence; interior values are labeled curve
-estimates, not new measurements. Missing curves, ambiguous coordinates and targets
-outside tested support return unavailable. A singleton supports only its exact
-X coordinate. Source points and runs are retained in the ISO CSV. Native frontier
-construction may select different configurations across a hardware curve: the ISO
-result compares that displayed boundary, not a controlled fixed-configuration experiment.
+Devices are identified by host and device index and assigned to roles from the manifest. Samples must bracket the formal serving window with the expected device coverage. Each device is clipped/interpolated at the exact window endpoints, integrated, and checked against accepted validation energy before role aggregation. A missing device, role mismatch, invalid window or unusable sampling coverage is shown as unavailable, not a partial pool.
 
-`i_iso` is the only new share parameter. Existing metric, X-axis, percentile,
-model, workload, precision, hardware, date/run and overlay parameters are reused.
-Changing X field clears the target because its units may have changed. Shared
-links selecting gated metrics continue rendering while the picker is locked,
-as upstream already permits.
+Each panel starts at its own serving-window zero and shows pool GPU count, duration, mean watts, sampled maximum and source artifact. Both panels share a power scale. Prefill is dashed and decode solid. The TDP reference uses the current hardware registry and is labeled separately from recorded draw or a historical runtime cap. Sampled maxima do not establish sub-sample electrical peaks.
 
-With either family selected, a visible unpinned latest view refreshes availability
-and active benchmark/workflow queries every five minutes and on focus. Date/run
-pins and historical comparisons disable refresh. Existing filter and URL state
-are not cleared. New eligible canonical rows need no frontend rebuild; successful
-upstream ingestion, read-model refresh and server cache invalidation remain prerequisites.
+## Sharing, freshness and screenshots
 
-## Acceptance and delivery
+- Inference share state uses `i_mcompare` for comparison mode, `i_mstat` for X statistic, `i_iso` plus `i_iso_axis` for the target and resolved X field (for example `mean_intvty`), and `i_mbase` / `i_mcomp` for exact relative-comparison configuration/date/run/overlay identities. A target without a matching axis signature is not restored. Native ruler pairs/targets remain in `i_rulers` with their own axis signature.
+- GPU Metrics share state records source view, both run IDs, artifact names and immutable `gm_artifactId` / `gm_compareArtifactId` pins, and window identities. Missing pinned artifacts/windows show unavailable rather than falling back to another selection. Links contain no credentials or embedded telemetry.
+- Latest measured views revalidate availability and active benchmark queries on focus and every five minutes while visible. Explicit run/date/history views remain pinned. Upstream collection, ingestion and API-cache publication are separate from this client refresh.
+- For stable article links, pin **Run Date** before selecting a relative source pair and sharing. Latest links intentionally follow the newest population; an exact saved source that is absent after refresh becomes unavailable rather than being replaced.
+- Captions name the actual statistic and measurement boundary. Model estimates, reconstructed role values and interpolated ISO values are labeled accordingly.
+- Exact historical article numbers require the article's runs, statistic, fixed-power reference and repeat-aggregation rule. Selecting current data supports the same graph capability without claiming the same cohort or conclusion.
 
-- Four boundaries roundtrip through the existing two families, URL and exports;
-  all original telemetry controls and gated/shared-link behavior remain usable.
-- Numeric tests cover all-GPU normalization, supported model inputs, missing values
-  and the distinction between measured, provisioned and modeled values.
-- ISO tests compare returned values to native rendered paths, including log scales,
-  exact/singleton/out-of-range cases, filtered and dismissed unofficial curves.
-- Browser checks cover new-point refresh, pinned history, filters, sharing, native
-  telemetry regression, desktop and mobile English/Chinese layouts.
-- Fixtures prove frontend behavior. Saved artifact → isolated DB → API → page
-  replay and production cache/publication verification remain separate release gates.
+## Acceptance
+
+Focused unit and browser tests cover boundary arithmetic, all-GPU disaggregated normalization, missing/invalid input, role reconstruction, role-time integration, curve interpolation bounds, existing filter/overlay behavior, shared-view restoration and desktop/mobile layouts. Real artifact comparisons must reproduce known durations, role means and sampled peaks before screenshot delivery. The feature remains behind the existing gate; no new deployment or publication path is introduced.
+
+Relative comparison keeps source configurations and runs separate. It interpolates both values at the same X before calculating percent changes: `(comparator − baseline) / baseline` for power and output, `(baseline − comparator) / baseline` for energy reduction. Derived comparisons use the union of tested X values and the chosen ISO target inside overlapping coverage. Missing or ambiguous duplicate-X values leave gaps. Source identities and numeric direction remain visible in screenshots and CSV exports.

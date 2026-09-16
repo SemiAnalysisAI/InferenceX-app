@@ -85,11 +85,18 @@ export function powerValue(
       : { value: null, reason: 'missing' };
   }
   if (point.power_valid === 0) return { value: null, reason: 'invalid' };
-  if (point.power_valid !== 1 || point.power_metric_schema_version !== 2)
+  const model = point.modeledSystemPower;
+  // Reuse the shared model's audited historical single-node power contract.
+  // That contract alone does not validate a same-window energy denominator.
+  const validatedLegacyPower =
+    quantity === 'watts' &&
+    point.power_metric_schema_version === undefined &&
+    model?.status === 'supported' &&
+    model.telemetryBasis === 'validated-unversioned-single-node';
+  if (point.power_valid !== 1 || (point.power_metric_schema_version !== 2 && !validatedLegacyPower))
     return { value: null, reason: 'unverified' };
   const measured = quantity === 'watts' ? point.avg_power_w : point.joules_per_output_token;
   if (!positive(measured)) return { value: null, reason: 'missing' };
-  const model = point.modeledSystemPower;
   if (model?.status !== 'supported') return { value: null, reason: 'unsupported' };
   if (
     !positive(model.deploymentFacilityWatts) ||

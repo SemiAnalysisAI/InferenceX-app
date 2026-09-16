@@ -29,7 +29,7 @@ export function isMeasuredPowerCurveMetric(metric: string): boolean {
 }
 
 export function isDerivedPowerCurveMetric(metric: string): boolean {
-  return isPowerCurveMetric(metric) && metric.startsWith('y_powerx');
+  return isPowerCurveMetric(metric) && !isMeasuredPowerCurveMetric(metric);
 }
 
 /** No declared direction means there is no Pareto frontier to draw or filter by. */

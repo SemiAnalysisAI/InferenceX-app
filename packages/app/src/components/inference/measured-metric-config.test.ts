@@ -5,9 +5,17 @@ import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
+  resolveMeasuredComparison,
 } from './measured-metric-config';
 
 describe('measured metric configuration', () => {
+  it('restores supported comparison modes and defaults unknown shared values', () => {
+    for (const mode of ['single', 'boundaries', 'roles', 'role-energy', 'relative'] as const) {
+      expect(resolveMeasuredComparison(mode)).toBe(mode);
+    }
+    expect(resolveMeasuredComparison(undefined)).toBe('single');
+    expect(resolveMeasuredComparison('article')).toBe('single');
+  });
   it.each(MEASURED_ENERGY_METRIC_CONFIG_KEYS)(
     'round-trips the existing share-link metric %s',
     (key) => {

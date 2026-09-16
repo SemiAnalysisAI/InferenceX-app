@@ -85,9 +85,12 @@ function mountWithPowerGroupsUnlocked() {
 
 function StatefulMeasuredControls({ context }: { context: MockInferenceContextValues }) {
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState(context.selectedYAxisMetric);
+  const [measuredComparison, setMeasuredComparison] = useState(context.measuredComparison);
   const value = {
     ...context,
     selectedYAxisMetric,
+    measuredComparison,
+    setMeasuredComparison,
     setSelectedYAxisMetric(metric: string) {
       context.setSelectedYAxisMetric(metric);
       setSelectedYAxisMetric(metric);
@@ -118,6 +121,28 @@ function selectMeasuredSetting(control: string, value: string) {
 }
 
 describe('Inference ChartControls', () => {
+  it('returns to the chosen P90 metric after comparing a provisioned boundary', () => {
+    mountMeasuredControls('y_measuredP90Power');
+    selectMeasuredSetting('power-boundary', 'gpu-provisioned');
+    selectMeasuredSetting('power-boundary', 'gpu-measured');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('changes graph comparison mode without replacing the selected measured metric', () => {
+    mountMeasuredControls('y_measuredP90Power');
+    selectMeasuredSetting('comparison', 'boundaries');
+    cy.get('[data-testid="measured-power-boundary"]').should('not.exist');
+    selectMeasuredSetting('comparison', 'single');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+  });
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
@@ -546,7 +571,7 @@ describe('Inference ChartControls grouped measured metrics', () => {
         .click();
       cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', power);
       selectMeasuredSetting('power-boundary', 'gpu-measured');
-      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredAvgPower');
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
       cy.get('[data-testid="measured-power-statistic-p90"]').should('be.visible');
       cy.get('[data-testid="measured-boundary-assumptions"]').should('not.exist');
     });

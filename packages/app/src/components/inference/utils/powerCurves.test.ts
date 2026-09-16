@@ -117,6 +117,7 @@ describe('upper power envelope', () => {
     expect(upperPowerEnvelope(samples, true, true).map((p) => p.x)).toEqual([50, 75, 100]);
     expect(upperPowerEnvelope(samples, false, true).map((p) => p.x)).toEqual([50, 75, 100]);
     for (const metric of [
+      'y_modeledChassisPowerPerGpu',
       'y_powerxGpuProvisionedWatts',
       'y_powerxUtilityProvisionedWatts',
       'y_powerxUtilityModeledWatts',

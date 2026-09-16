@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SYSTEM_POWER_ASSUMPTIONS } from '@/lib/system-power-model';
+import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
 
 import {
   METRIC_EXPLANATIONS,
@@ -61,7 +61,7 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     for (const key of ['powerxUtilityModeledWatts', 'powerxUtilityModeledEnergy'] as const) {
       for (const locale of ['en', 'zh'] as const) {
         expect(METRIC_EXPLANATIONS[key].description[locale]).toContain(
-          `PUE ${SYSTEM_POWER_ASSUMPTIONS.pue}`,
+          `PUE ${AIR_COOLED_SYSTEM_PUE}`,
         );
       }
     }

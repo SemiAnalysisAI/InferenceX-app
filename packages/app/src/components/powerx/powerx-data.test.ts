@@ -66,6 +66,25 @@ describe('PowerX boundaries', () => {
     };
     expect(powerValue(modeled, 'utility-modeled', 'watts', specs)).toEqual({ value: 650 });
     expect(powerValue(modeled, 'utility-modeled', 'energy', specs)).toEqual({ value: 13 });
+    const legacy = {
+      ...modeled,
+      power_metric_schema_version: undefined,
+      modeledSystemPower: {
+        ...modeled.modeledSystemPower!,
+        telemetryBasis: 'validated-unversioned-single-node' as const,
+      },
+    } as Partial<InferenceData>;
+    // The shared chassis model validates this historical power contract;
+    // it does not establish the same-window energy denominator.
+    expect(powerValue(legacy, 'utility-modeled', 'watts', specs)).toEqual({ value: 650 });
+    expect(powerValue(legacy, 'utility-modeled', 'energy', specs)).toEqual({
+      value: null,
+      reason: 'unverified',
+    });
+    expect(powerValue({ ...legacy, power_valid: 0 }, 'utility-modeled', 'watts', specs)).toEqual({
+      value: null,
+      reason: 'invalid',
+    });
   });
   it.each([undefined, 0, -1, NaN, Infinity])(
     'does not turn missing/invalid values into zero (%s)',

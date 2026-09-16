@@ -415,12 +415,19 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(url).toContain('i_seq=b');
   });
 
-  it('preserves an explicit ISO target of 75 when sharing and reloading a latency axis', async () => {
+  it('restores the multi-boundary chart from a shared URL', async () => {
     setupWindow();
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
-    writeUrlParams({ i_metric: 'y_measuredAvgPower', i_xmode: 'ttft', i_iso: '75' });
+    writeUrlParams({
+      i_metric: 'y_measuredAvgPower',
+      i_xmode: 'ttft',
+      i_mcompare: 'boundaries',
+      i_iso_axis: 'mean_ttft',
+      i_mbase: 'h200|fp8|8|date|run-1|official',
+      i_mcomp: 'b200|fp8|4|date|run-2|official',
+    });
     const shared = new URL(buildShareUrl());
-    expect(shared.searchParams.get('i_iso')).toBe('75');
+    expect(shared.searchParams.get('i_mcompare')).toBe('boundaries');
 
     vi.resetModules();
     setupWindow(shared.search, shared.pathname);
@@ -428,7 +435,10 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(readUrlParams()).toMatchObject({
       i_metric: 'y_measuredAvgPower',
       i_xmode: 'ttft',
-      i_iso: '75',
+      i_mcompare: 'boundaries',
+      i_iso_axis: 'mean_ttft',
+      i_mbase: 'h200|fp8|8|date|run-1|official',
+      i_mcomp: 'b200|fp8|4|date|run-2|official',
     });
   });
 

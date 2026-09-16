@@ -20,6 +20,8 @@ import {
   perfRulerCurveSet,
   prunePerfRulers,
   renderPerfRulers,
+  restorePerfRulers,
+  serializePerfRulers,
   type PerfRulerEndInput,
   type PerfRulerGeometry,
   type PerfRulerLabelLayoutOptions,
@@ -31,6 +33,36 @@ import {
 // ── Fixtures ─────────────────────────────────────────
 
 const ISO_X = 100;
+describe('shared ruler state', () => {
+  it('restores the curve pair and ISO target without persisting a half-selected draft', () => {
+    const state: PerfRulerState = {
+      rulers: [{ id: 4, curveA: 'roofline-h200_fp8', curveB: 'roofline-b200_fp8', isoX: 75 }],
+      draft: { curve: 'roofline-mi355x_fp8', isoX: 20 },
+      nextId: 5,
+    };
+    const encoded = serializePerfRulers(state, 'median_intvty\u0000y_measuredJPerOutputToken');
+    expect(restorePerfRulers(encoded, 'median_intvty\u0000y_measuredJPerOutputToken')).toEqual({
+      rulers: [{ ...state.rulers[0], id: 1 }],
+      draft: null,
+      nextId: 2,
+    });
+    expect(restorePerfRulers(encoded, 'p90_ttft\u0000y_measuredJPerOutputToken')).toBe(
+      EMPTY_PERF_RULER_STATE,
+    );
+    expect(serializePerfRulers(EMPTY_PERF_RULER_STATE, 'x')).toBe('');
+  });
+
+  it.each([
+    'broken',
+    '{"axis":"x","rulers":{}}',
+    JSON.stringify({ axis: 'x', rulers: [['a', 'b', null]] }),
+    JSON.stringify({ axis: 'x', rulers: [['a', 'a', 75]] }),
+    JSON.stringify({ axis: 'x', rulers: [['a', 'b', '75']] }),
+    JSON.stringify({ axis: 'x', rulers: Array.from({ length: 9 }, () => ['a', 'b', 75]) }),
+  ])('rejects invalid shared rulers: %s', (saved) => {
+    expect(restorePerfRulers(saved, 'x')).toBe(EMPTY_PERF_RULER_STATE);
+  });
+});
 const END_A: PerfRulerEndInput = { py: 50, rawY: 400 };
 const END_B: PerfRulerEndInput = { py: 150, rawY: 197 };
 

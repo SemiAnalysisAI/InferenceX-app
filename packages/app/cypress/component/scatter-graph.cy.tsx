@@ -2266,6 +2266,10 @@ describe('Power envelopes', () => {
     ['y_measuredAvgPower', 'Watts'],
     ['y_measuredP75Power', 'P75'],
     ['y_measuredP90Power', 'P90'],
+    ['y_modeledChassisPowerPerGpu', 'Chassis AC'],
+    ['y_powerxGpuProvisionedWatts', 'GPU provisioned'],
+    ['y_powerxUtilityProvisionedWatts', 'Utility provisioned'],
+    ['y_powerxUtilityModeledWatts', 'Utility modeled'],
     ['y_measuredPrefillAvgPower', 'Prefill'],
     ['y_measuredDecodeAvgPower', 'Decode'],
     ['y_measuredPowerPercentTdp', 'Percent TDP'],
@@ -2673,7 +2677,7 @@ describe('Power envelopes', () => {
       .and('have.text', 'TP2');
   });
 
-  it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
+  it('keeps power boundaries fixed while Optimal Only changes point visibility', () => {
     mountWithProviders(<PowerHarness />, { unofficial: {} });
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]').should(
       'have.length',
@@ -2740,7 +2744,11 @@ describe('Power envelopes', () => {
     cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 
-  for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
+  for (const metric of [
+    'measuredAvgPower',
+    'measuredP75Power',
+    'modeledChassisPowerPerGpu',
+  ] as const) {
     it(`smooths ${metric} across configurations and preserves overlay runs through zoom`, () => {
       const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
       const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';

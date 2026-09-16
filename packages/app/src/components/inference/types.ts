@@ -6,6 +6,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
+import type { MeasuredComparison } from './measured-metric-config';
 
 export type { WorkerPower };
 
@@ -651,6 +652,7 @@ export interface InferenceFiltersContextType {
 /** Axis choices and visual presentation state. */
 export interface InferenceDisplayContextType {
   selectedYAxisMetric: string;
+  measuredComparison: MeasuredComparison;
   tokenRevenuePriceSource: TokenRevenuePriceSource;
   tokenRevenuePricing: TokenRevenuePricing | null;
   openRouterModelId: string | null;
@@ -695,6 +697,7 @@ export interface InferenceActionsContextType {
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
+  setMeasuredComparison: (comparison: MeasuredComparison) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setSelectedPercentile: (percentile: string) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;

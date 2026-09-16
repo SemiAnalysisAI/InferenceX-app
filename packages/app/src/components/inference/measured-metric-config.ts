@@ -2,6 +2,17 @@ import type { MetricConfigKey } from './metric-registry';
 import type { PowerBasis } from '../powerx/powerx-data';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
+export const MEASURED_COMPARISONS = [
+  'single',
+  'boundaries',
+  'roles',
+  'role-energy',
+  'relative',
+] as const;
+export type MeasuredComparison = (typeof MEASURED_COMPARISONS)[number];
+export function resolveMeasuredComparison(value: string | undefined): MeasuredComparison {
+  return MEASURED_COMPARISONS.find((mode) => mode === value) ?? 'single';
+}
 type MeasuredScope = 'all' | 'prefill' | 'decode';
 
 export type MeasuredMetricConfig = (

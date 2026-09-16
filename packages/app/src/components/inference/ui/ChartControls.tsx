@@ -224,6 +224,7 @@ export default function ChartControls({
   } = useInferenceData();
   const {
     selectedYAxisMetric,
+    measuredComparison,
     tokenRevenuePriceSource,
     tokenRevenuePricing,
     openRouterModelId,
@@ -239,6 +240,7 @@ export default function ChartControls({
     setSelectedSequence,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
+    setMeasuredComparison,
     setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedGPUs,
@@ -577,13 +579,17 @@ export default function ChartControls({
                   <MeasuredMetricControls
                     metric={selectedYAxisMetric}
                     onChange={handleYAxisMetricChange}
+                    comparison={measuredComparison}
+                    onComparisonChange={setMeasuredComparison}
                   />
-                  <div className="col-span-full">
-                    <PowerMetricAvailability
-                      metric={selectedYAxisMetric}
-                      onSelect={handleYAxisMetricChange}
-                    />
-                  </div>
+                  {measuredComparison === 'single' && (
+                    <div className="col-span-full">
+                      <PowerMetricAvailability
+                        metric={selectedYAxisMetric}
+                        onSelect={handleYAxisMetricChange}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 
