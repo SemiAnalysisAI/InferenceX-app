@@ -5,12 +5,12 @@ import { useMemo } from 'react';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { chipCounts } from '@/lib/chip-counts';
-import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
@@ -71,8 +71,9 @@ export default function InferenceTable({
     () => [
       {
         header: headers.chip,
-        cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
-        sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
+        cell: (row) => getDisplayLabel(getInferenceHardwareConfig(row.hwKey, row.model, [row])),
+        sortValue: (row) =>
+          getDisplayLabel(getInferenceHardwareConfig(row.hwKey, row.model, [row])),
         className: 'font-medium whitespace-nowrap',
         importance: 'key',
         pinned: true,
