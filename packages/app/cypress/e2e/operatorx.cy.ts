@@ -90,6 +90,10 @@ describe('OperatorX attention selection', () => {
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '5.50 µs');
     cy.get('select[aria-label="Operator"]').select('gemm');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '2.00 TFLOPS / GPU');
+    cy.get('select[aria-label="Precision (A / B → output)"]').select('bf16 / bf16 → bf16');
+    cy.get('select[aria-label="Run"]').select('456');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
+    cy.get('select[aria-label="Operator"]').should('have.value', 'attention_mha');
   });
   it('defaults an attention-only run to latency in Chinese on mobile', () => {
     const mixed = readOperatorXBundle(makeOperatorXAttentionBundle());

@@ -288,6 +288,8 @@ export default function OperatorXDisplay() {
           }))}
           onChange={(value) => {
             setSelected(value);
+            setOperator('');
+            setFilters({ precision: '', shape: '', backend: '', cluster: '', status: 'ok' });
             setPage(0);
             track('operatorx_run_selected', { run_id: value });
           }}
