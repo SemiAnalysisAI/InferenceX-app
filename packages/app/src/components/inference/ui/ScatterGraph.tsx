@@ -2,7 +2,14 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { useEphemeralUrlState } from '@/hooks/useUrlState';
+import { useEphemeralUrlState, useUrlState } from '@/hooks/useUrlState';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import PowerXComparison from '@/components/powerx/PowerXComparison';
+import {
+  evaluateRenderedIso,
+  type RenderedIsoRow,
+  type RenderedIsoSeries,
+} from '@/components/powerx/rendered-iso';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -105,6 +112,7 @@ import {
   upperPowerEnvelope,
   isPowerCurveMetric,
   isMeasuredPowerCurveMetric,
+  isDerivedPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -372,10 +380,14 @@ const SCATTER_STRINGS = {
     optimalOnly: 'Optimal Only',
     showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
+    derivedPowerBoundaryInfo:
+      'Show only tested points on the modeled or provisioned upper power boundary. Turn off to show all points; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
+    derivedPowerCurves:
+      'Lines trace the upper modeled or provisioned power boundary across tested configurations. Values are estimates; flat segments retain the tested interactivity range.',
     powerOptimal:
       'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
@@ -407,10 +419,14 @@ const SCATTER_STRINGS = {
     optimalOnly: '仅最优',
     showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
+    derivedPowerBoundaryInfo:
+      '仅显示估算或额定功耗上边界的测试数据点。关闭后显示全部数据点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
+    derivedPowerCurves:
+      '曲线勾勒测试配置的估算或额定功耗上边界。数值来自计算；水平线段仅覆盖实际测试的交互性范围。',
     powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     highContrast: '高对比度',
@@ -514,24 +530,28 @@ const ScatterGraph = React.memo(
       | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
+    const isDerivedPowerAxis = isDerivedPowerCurveMetric(selectedYAxisMetric);
+    const isLoadPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric) || isDerivedPowerAxis;
     // Measured power describes the load sweep. Keep its boundary fixed while
     // Optimal Only changes marker visibility, as on the other scatter charts.
-    const showPowerEnvelope = isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
-    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const supportsGradientLabels = !showPowerEnvelope || isMeasuredPowerAxis;
+    const showPowerEnvelope = isPowerAxis && (isLoadPowerAxis || !hideNonOptimal);
+    const showAllMeasurements = isLoadPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
+    const supportsGradientLabels = !showPowerEnvelope || isLoadPowerAxis;
     const showGradientLabels = preferGradientLabels && supportsGradientLabels;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
         const groups = groupPointsByDate(points);
         if (showPowerEnvelope) {
           for (const [date, samples] of groups) {
-            groups.set(date, upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e'));
+            groups.set(
+              date,
+              upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e', isDerivedPowerAxis),
+            );
           }
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType],
+      [showPowerEnvelope, chartDefinition.chartType, isDerivedPowerAxis],
     );
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
@@ -552,6 +572,35 @@ const ScatterGraph = React.memo(
       unofficialRunInfos,
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
+    const isoEnabled = Boolean(getMeasuredMetricConfig(selectedYAxisMetric)) && !minimalChrome;
+    const isoAxis = String(chartDefinition.x_scale_field ?? chartDefinition.x);
+    const { getUrlParam, setUrlParam } = useUrlState();
+    const [isoSelection, setIsoSelection] = useState(() => ({
+      axis: isoAxis,
+      target: getUrlParam('i_iso') ?? (isoAxis.endsWith('_intvty') ? '75' : ''),
+    }));
+    // A target in tok/s/user cannot become a latency target in seconds.
+    if (isoSelection.axis !== isoAxis) setIsoSelection({ axis: isoAxis, target: '' });
+    const isoTarget = isoSelection.axis === isoAxis ? isoSelection.target : '';
+    const isoUrlRef = useRef({ axis: isoAxis, hasTarget: Boolean(getUrlParam('i_iso')) });
+    useEffect(() => {
+      if (isoUrlRef.current.axis !== isoAxis && isoUrlRef.current.hasTarget) {
+        setUrlParam('i_iso', '');
+        isoUrlRef.current.hasTarget = false;
+      }
+      isoUrlRef.current.axis = isoAxis;
+    }, [isoAxis, setUrlParam]);
+    const changeIsoTarget = (target: string) => {
+      setIsoSelection({ axis: isoAxis, target });
+      setUrlParam('i_iso', target);
+      isoUrlRef.current.hasTarget = Boolean(target);
+    };
+    const [isoResult, setIsoResult] = useState<{
+      metric: string;
+      target: string;
+      series: readonly RenderedIsoSeries[];
+      rows: readonly RenderedIsoRow[];
+    } | null>(null);
 
     // Pinned line-label anchors (data-space x) keyed by line-label key. Persists
     // across renders so each label keeps a stable spot along its line during
@@ -824,11 +873,11 @@ const ScatterGraph = React.memo(
     }, [showPowerEnvelope, groupedData, groupDisplayedPoints]);
 
     const optimalPointKeys = useMemo(() => {
-      if (isMeasuredPowerAxis) return powerEnvelopePointKeys;
+      if (isLoadPowerAxis) return powerEnvelopePointKeys;
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
       return keys;
-    }, [rooflines, isMeasuredPowerAxis, powerEnvelopePointKeys]);
+    }, [rooflines, isLoadPowerAxis, powerEnvelopePointKeys]);
 
     const effectiveActiveHwTypes = useMemo(() => {
       if (showAllHardwareTypes) {
@@ -1118,12 +1167,12 @@ const ScatterGraph = React.memo(
     const overlayOptimalPoints = useMemo(() => {
       const set = new Set<InferenceData>();
       for (const group of Object.values(
-        isMeasuredPowerAxis ? displayedOverlayRooflines : overlayRooflines,
+        isLoadPowerAxis ? displayedOverlayRooflines : overlayRooflines,
       )) {
         for (const p of group.points) set.add(p);
       }
       return set;
-    }, [overlayRooflines, isMeasuredPowerAxis, displayedOverlayRooflines]);
+    }, [overlayRooflines, isLoadPowerAxis, displayedOverlayRooflines]);
 
     const overlayEnvelopePoints = useMemo(
       () => new Set(Object.values(displayedOverlayRooflines).flatMap((group) => group.points)),
@@ -1555,7 +1604,7 @@ const ScatterGraph = React.memo(
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
     const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
+    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isLoadPowerAxis);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Changing the x- or y-axis metric (including the x percentile, which
     // `x_scale_field` encodes) clears every ruler: the curves are redrawn
@@ -1824,6 +1873,66 @@ const ScatterGraph = React.memo(
       [],
     );
 
+    const isoFrameRef = useRef<number | null>(null);
+    useEffect(
+      () => () => {
+        if (isoFrameRef.current !== null) cancelAnimationFrame(isoFrameRef.current);
+      },
+      [],
+    );
+
+    // Use the very same dated curves and hardware selection as the roofline
+    // layers. Keeping singleton series lets an exact tested X remain comparable.
+    const isoSeries = useMemo(() => {
+      const series: RenderedIsoSeries[] = [];
+      if (!isoEnabled) return series;
+      for (const [key, points] of Object.entries(displayedRooflines)) {
+        const hw = key.split('_').slice(0, -1).join('_');
+        const precision = key.split('_').pop()!;
+        if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(precision as Precision))
+          continue;
+        const dates = groupDisplayedPoints(points);
+        for (const [date, samples] of dates) {
+          const entryKey = dates.size === 1 ? key : `${key}__${encodeURIComponent(date)}`;
+          series.push({ key: `roofline-${entryKey}`, points: samples });
+        }
+      }
+      for (const [key, group] of Object.entries(displayedOverlayRooflines)) {
+        if (!activeOverlayHwTypes.has(group.hwKey)) continue;
+        series.push({
+          key: `overlay-roofline-${key}`,
+          points: group.points,
+          overlayIndex: group.runIndex,
+        });
+      }
+      return series;
+    }, [
+      isoEnabled,
+      displayedRooflines,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      groupDisplayedPoints,
+      displayedOverlayRooflines,
+      activeOverlayHwTypes,
+    ]);
+    const isoReadRef = useRef({
+      enabled: isoEnabled,
+      metric: selectedYAxisMetric,
+      target: isoTarget,
+      series: isoSeries,
+    });
+    isoReadRef.current = {
+      enabled: isoEnabled,
+      metric: selectedYAxisMetric,
+      target: isoTarget,
+      series: isoSeries,
+    };
+    const isoPending =
+      isoResult?.metric !== selectedYAxisMetric ||
+      isoResult.target !== isoTarget ||
+      isoResult.series !== isoSeries;
+    const isoRows = isoPending ? [] : isoResult.rows;
+
     // Draw (or clear) the hit strokes and all rulers for the current draw
     // pass. Stable callback so the custom layer can live outside the
     // perf-ruler state dependencies — render/zoom passes read mode, rulers,
@@ -1838,6 +1947,64 @@ const ScatterGraph = React.memo(
         height: number,
       ) => {
         perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
+        const iso = isoReadRef.current;
+        const isoTransitioning =
+          iso.enabled &&
+          zoomGroup
+            .selectAll<SVGPathElement, unknown>('.roofline-path, .overlay-roofline-path')
+            .nodes()
+            .some((node) => hasNamedTransition(node, 'data-update'));
+        if (isoTransitioning && isoFrameRef.current === null) {
+          // A data update animates old path geometry under the new scales.
+          // Read the final path after that transition, using the latest context.
+          isoFrameRef.current = requestAnimationFrame(() => {
+            isoFrameRef.current = null;
+            const ctx = perfRulerDrawCtxRef.current;
+            if (ctx)
+              drawPerfRulerRef.current?.(
+                ctx.zoomGroup,
+                ctx.xScale,
+                ctx.yScale,
+                ctx.width,
+                ctx.height,
+              );
+          });
+        }
+        if (iso.enabled && !isoTransitioning) {
+          const rows = iso.series.flatMap((series) => {
+            const path = zoomGroup.select<SVGPathElement>(`.${CSS.escape(series.key)}`).node();
+            if (path && !isPerfRulerCurveVisible(path.style.opacity)) return [];
+            const measurablePath = path && typeof path.getTotalLength === 'function' ? path : null;
+            return [
+              evaluateRenderedIso(
+                series,
+                Number(iso.target),
+                measurablePath,
+                xScale,
+                yScale.invert,
+              ),
+            ];
+          });
+          // Target/visibility updates mutate only the ruler layer. Do not turn
+          // its readback into a React -> full chart render feedback loop.
+          setIsoResult((previous) =>
+            previous?.metric === iso.metric &&
+            previous.target === iso.target &&
+            previous.series === iso.series &&
+            previous.rows.length === rows.length &&
+            rows.every((row, index) => {
+              const prior = previous.rows[index];
+              return (
+                row.key === prior.key &&
+                row.points === prior.points &&
+                row.value === prior.value &&
+                row.status === prior.status
+              );
+            })
+              ? previous
+              : { metric: iso.metric, target: iso.target, series: iso.series, rows },
+          );
+        }
         syncPerfRulerHitPaths(zoomGroup);
         const state = perfRulerStateRef.current;
         const entries: PerfRulerRenderEntry[] = [];
@@ -2730,7 +2897,7 @@ const ScatterGraph = React.memo(
         const overlayPoints = zoomGroup.selectAll<SVGGElement, InferenceData>(
           '.unofficial-overlay-pt',
         );
-        const powerLabels = isMeasuredPowerAxis && showGradientLabels;
+        const powerLabels = isLoadPowerAxis && showGradientLabels;
         const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
         overlayPoints.each(function (d) {
           const lines = (
@@ -3193,7 +3360,7 @@ const ScatterGraph = React.memo(
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
-      isMeasuredPowerAxis,
+      isLoadPowerAxis,
       chartId,
       pointsData,
       showPointLabels,
@@ -3525,6 +3692,8 @@ const ScatterGraph = React.memo(
       getDisplaySelection,
       perfRulerMode,
       perfRulerState,
+      isoTarget,
+      isoSeries,
       drawPerfRuler,
       dataIdentity,
       effectiveActiveHwTypes,
@@ -3612,6 +3781,18 @@ const ScatterGraph = React.memo(
         <div className="relative w-full p-3">
           {caption}
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
+          {isoEnabled && (
+            <PowerXComparison
+              rows={[]}
+              metric={selectedYAxisMetric}
+              xField={isoAxis}
+              xLabel={xLabel}
+              yLabel={yLabel}
+              chartId={chartId}
+              target={isoTarget}
+              onTargetChange={changeIsoTarget}
+            />
+          )}
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
@@ -3646,7 +3827,11 @@ const ScatterGraph = React.memo(
                   data-testid="power-curve-description"
                   className="mt-2 text-2xs text-muted-foreground"
                 >
-                  {showPowerEnvelope ? legendT.powerCurves : legendT.powerOptimal}
+                  {showPowerEnvelope
+                    ? isDerivedPowerAxis
+                      ? legendT.derivedPowerCurves
+                      : legendT.powerCurves
+                    : legendT.powerOptimal}
                 </p>
               </>
             ) : (
@@ -3812,17 +3997,19 @@ const ScatterGraph = React.memo(
                           setHideNonOptimal(checked);
                           track('latency_hide_non_optimal_toggled', { enabled: checked });
                         },
-                        ...(isMeasuredPowerAxis || selectedSequence === Sequence.AgenticTraces
+                        ...(isLoadPowerAxis || selectedSequence === Sequence.AgenticTraces
                           ? {
-                              infoTooltip: isMeasuredPowerAxis
-                                ? legendT.powerBoundaryInfo
+                              infoTooltip: isLoadPowerAxis
+                                ? isDerivedPowerAxis
+                                  ? legendT.derivedPowerBoundaryInfo
+                                  : legendT.powerBoundaryInfo
                                 : legendT.optimalInfo,
                             }
                           : {}),
                       },
                     ]
                   : []),
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
+                ...(showPowerEnvelope && !isLoadPowerAxis
                   ? [
                       {
                         id: 'scatter-show-all-measurements',
@@ -3907,7 +4094,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
+                ...(showPowerEnvelope && !isLoadPowerAxis
                   ? []
                   : [
                       {
@@ -3989,6 +4176,19 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        {isoEnabled && (
+          <PowerXComparison
+            rows={isoRows}
+            pending={isoPending}
+            metric={selectedYAxisMetric}
+            xField={isoAxis}
+            xLabel={xLabel}
+            yLabel={yLabel}
+            chartId={chartId}
+            target={isoTarget}
+            onTargetChange={changeIsoTarget}
+          />
+        )}
         {isMeasuredEnergyAxis && (
           <MeasuredPowerSummary
             total={powerTierCounts.total}

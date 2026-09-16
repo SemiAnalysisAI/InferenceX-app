@@ -415,6 +415,23 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(url).toContain('i_seq=b');
   });
 
+  it('preserves an explicit ISO target of 75 when sharing and reloading a latency axis', async () => {
+    setupWindow();
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    writeUrlParams({ i_metric: 'y_measuredAvgPower', i_xmode: 'ttft', i_iso: '75' });
+    const shared = new URL(buildShareUrl());
+    expect(shared.searchParams.get('i_iso')).toBe('75');
+
+    vi.resetModules();
+    setupWindow(shared.search, shared.pathname);
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams()).toMatchObject({
+      i_metric: 'y_measuredAvgPower',
+      i_xmode: 'ttft',
+      i_iso: '75',
+    });
+  });
+
   it('flushes pending writes synchronously when buildShareUrl is called', async () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');

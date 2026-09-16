@@ -1,5 +1,8 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { useQueryClient } from '@tanstack/react-query';
+import { readUrlParams } from '@/lib/url-state';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
@@ -294,6 +297,50 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  const measuredFamily = Boolean(getMeasuredMetricConfig(selectedYAxisMetric));
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!measuredFamily || embedded || minimalChrome) return;
+    const refreshLatest = async () => {
+      const pins = readUrlParams();
+      // The existing Dashboard owns run/history intent. Never clear it on mount.
+      if (
+        document.visibilityState !== 'visible' ||
+        pins.g_rundate ||
+        pins.g_runid ||
+        selectedGPUs.length > 0 ||
+        selectedDates.length > 0 ||
+        selectedDateRange.startDate ||
+        selectedDateRange.endDate
+      )
+        return;
+      await queryClient.invalidateQueries({ queryKey: ['availability'] });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['benchmarks', selectedModel],
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['workflow-info'], refetchType: 'active' }),
+      ]);
+    };
+    const update = () => void refreshLatest();
+    const timer = window.setInterval(update, 300_000);
+    window.addEventListener('focus', update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', update);
+    };
+  }, [
+    measuredFamily,
+    embedded,
+    minimalChrome,
+    queryClient,
+    selectedModel,
+    selectedGPUs.length,
+    selectedDates.length,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+  ]);
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =

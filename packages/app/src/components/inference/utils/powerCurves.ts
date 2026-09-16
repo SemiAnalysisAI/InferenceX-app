@@ -15,6 +15,9 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
   'y_modeledChassisPowerPerGpu',
+  'y_powerxGpuProvisionedWatts',
+  'y_powerxUtilityProvisionedWatts',
+  'y_powerxUtilityModeledWatts',
 ]);
 
 export function isPowerCurveMetric(metric: string): boolean {
@@ -22,7 +25,11 @@ export function isPowerCurveMetric(metric: string): boolean {
 }
 
 export function isMeasuredPowerCurveMetric(metric: string): boolean {
-  return isPowerCurveMetric(metric) && metric !== 'y_modeledChassisPowerPerGpu';
+  return isPowerCurveMetric(metric) && metric.startsWith('y_measured');
+}
+
+export function isDerivedPowerCurveMetric(metric: string): boolean {
+  return isPowerCurveMetric(metric) && metric.startsWith('y_powerx');
 }
 
 /** No declared direction means there is no Pareto frontier to draw or filter by. */
@@ -45,13 +52,17 @@ export function chartFrontier(
 export function upperPowerEnvelope(
   points: readonly InferenceData[],
   maximizeX: boolean,
+  retainPlateaus = false,
 ): InferenceData[] {
   const sorted = points
     .filter((point) => isFrontierEligible(point) && Number.isFinite(point.y) && point.y > 0)
     .sort((a, b) => (maximizeX ? b.x - a.x : a.x - b.x) || b.y - a.y);
   let maxY = -Infinity;
+  let previousX: number | undefined;
   const envelope = sorted.filter((point) => {
-    if (point.y <= maxY) return false;
+    if (point.y < maxY || (!retainPlateaus && point.y === maxY) || point.x === previousX)
+      return false;
+    previousX = point.x;
     maxY = point.y;
     return true;
   });

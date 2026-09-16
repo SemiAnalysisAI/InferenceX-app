@@ -1,3 +1,5 @@
+import { POWERX_METRICS, type PowerXMetricKey } from '@/components/powerx/powerx-data';
+import { POWERX_STRINGS } from '@/components/powerx/powerx-copy';
 /**
  * @file axis-metric-explanations.ts
  * @description Bilingual plain-English explanations (and, for y-axis metrics,
@@ -287,6 +289,41 @@ function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanati
  * the glossary entries for throughput, cost per million tokens, tokens per
  * dollar, tokens per megawatt, and energy per token.
  */
+
+function powerxExplanation(key: PowerXMetricKey): MetricExplanation {
+  const { basis, quantity } = POWERX_METRICS[key];
+  const note = basis === 'utility-modeled' ? 'model' : 'provisioned';
+  const watts = {
+    'gpu-provisioned': ['GPU nameplate TDP', 'GPU 额定 TDP'],
+    'utility-provisioned': ['registry facility watts per GPU', '注册表中的每 GPU 全设施配置功率'],
+    'utility-modeled': [
+      'modeled deployment facility watts ÷ measured GPU count',
+      '部署级全设施功率估算 ÷ 实测 GPU 数',
+    ],
+  }[basis];
+  const energy = {
+    'gpu-provisioned': [
+      'GPU TDP ÷ output tokens/s/all allocated GPU',
+      'GPU TDP ÷ 每 GPU 输出吞吐量（计入全部 GPU）',
+    ],
+    'utility-provisioned': [
+      'facility watts/GPU ÷ output tokens/s/all allocated GPU',
+      '全设施配置 W/GPU ÷ 每 GPU 输出吞吐量（计入全部 GPU）',
+    ],
+    'utility-modeled': [
+      'measured GPU J/output token × modeled facility W/GPU ÷ measured GPU W/GPU',
+      'GPU 实测 J/输出 token × 全设施估算 W/GPU ÷ GPU 实测 W/GPU',
+    ],
+  }[basis];
+  return {
+    description: { en: POWERX_STRINGS.en[note], zh: POWERX_STRINGS.zh[note] },
+    formula: {
+      en: `${quantity === 'watts' ? 'W/GPU' : 'J/output token'} = ${(quantity === 'watts' ? watts : energy)[0]}`,
+      zh: (quantity === 'watts' ? watts : energy)[1],
+    },
+  };
+}
+
 export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
@@ -350,6 +387,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   jTotal: provisionedJoules('total'),
   jOutput: provisionedJoules('output'),
   jInput: provisionedJoules('input'),
+  powerxGpuProvisionedWatts: powerxExplanation('powerxGpuProvisionedWatts'),
+  powerxGpuProvisionedEnergy: powerxExplanation('powerxGpuProvisionedEnergy'),
+  powerxUtilityProvisionedWatts: powerxExplanation('powerxUtilityProvisionedWatts'),
+  powerxUtilityProvisionedEnergy: powerxExplanation('powerxUtilityProvisionedEnergy'),
+  powerxUtilityModeledWatts: powerxExplanation('powerxUtilityModeledWatts'),
+  powerxUtilityModeledEnergy: powerxExplanation('powerxUtilityModeledEnergy'),
   measuredAvgPower: measuredPower('run'),
   measuredP75Power: {
     description: {

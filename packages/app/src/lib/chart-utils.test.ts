@@ -841,6 +841,41 @@ describe('createChartDataPoint', () => {
 });
 
 describe('buildDerivedChartFields', () => {
+  it('adds provisioned fields while retaining the native measured fields', () => {
+    const e = entry({
+      output_tput_per_gpu: 50,
+      disagg: true,
+      benchmark_type: 'single_turn',
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 350,
+      joules_per_output_token: 7,
+    });
+    const fields = buildDerivedChartFields(e, 'h200', [
+      'powerxGpuProvisionedEnergy',
+      'measuredJPerOutputToken',
+      'measuredAvgPower',
+    ]);
+    expect(fields).toEqual({
+      powerxGpuProvisionedEnergy: { y: 28, roof: false },
+      measuredJPerOutputToken: { y: 7, roof: false },
+      measuredAvgPower: { y: 350, roof: false },
+    });
+    expect(
+      buildDerivedChartFields({ ...e, power_valid: 0 }, 'h200', [
+        'powerxGpuProvisionedEnergy',
+        'powerxUtilityModeledEnergy',
+      ]),
+    ).toEqual({ powerxGpuProvisionedEnergy: { y: 28, roof: false } });
+    expect(
+      buildDerivedChartFields({ ...e, benchmark_type: 'agentic_traces' }, 'h200', [
+        'powerxGpuProvisionedEnergy',
+      ]),
+    ).toEqual({ powerxGpuProvisionedEnergy: { y: 14, roof: false } });
+  });
+
   it('matches full inference formulas while emitting only requested history fields', () => {
     const e = entry({
       tput_per_gpu: 900,

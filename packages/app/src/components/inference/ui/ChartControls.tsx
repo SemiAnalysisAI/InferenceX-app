@@ -62,7 +62,7 @@ import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import {
   getMeasuredMetricConfig,
-  MEASURED_METRIC_DEFAULTS,
+  changeMeasuredMetricConfig,
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
@@ -341,7 +341,7 @@ export default function ChartControls({
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
-            : MEASURED_METRIC_DEFAULTS[config.family];
+            : changeMeasuredMetricConfig(selectedYAxisMetric, { family: config.family });
         return [
           {
             value,

@@ -320,6 +320,13 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
+  powerxGpuProvisionedWatts?: { y: number; roof: boolean };
+  powerxGpuProvisionedEnergy?: { y: number; roof: boolean };
+  powerxUtilityProvisionedWatts?: { y: number; roof: boolean };
+  powerxUtilityProvisionedEnergy?: { y: number; roof: boolean };
+  powerxUtilityModeledWatts?: { y: number; roof: boolean };
+  powerxUtilityModeledEnergy?: { y: number; roof: boolean };
+
   // All-in provisioned Joules per token
   jTotal?: { y: number; roof: boolean };
   jOutput?: { y: number; roof: boolean };
