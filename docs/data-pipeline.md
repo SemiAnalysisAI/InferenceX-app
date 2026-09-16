@@ -211,6 +211,32 @@ Unmapped models/hardware are tracked (not silently dropped) so operators can see
 
 ### Server-Metric Orchestrator Adapters
 
+SGLang KV capacity is reconstructed during trace ingestion from
+`sglang:max_total_num_tokens` when the raw series carry an explicit worker or
+endpoint and TP rank. Tensor, pipeline, and expert shard labels describe copies
+of a logical pool; DP rank and the remaining labels retain independent pools.
+Distinct anonymous endpoints remain distinct workers even when their other
+labels match. Every observed pool must have constant positive integer capacity,
+including agreement across shard copies and warmup/profiling phases. Missing or
+ambiguous observations leave the producer's metric unchanged. The correction
+updates only `benchmark_results.metrics.kv_cache_pool_tokens`; throughput,
+utilization curves, and raw artifacts remain unchanged.
+
+This fixes the TP4 point in producer run `34738529222`: two logical role pools of
+3,211,776 and 3,126,272 tokens total 6,338,048, instead of summing four copies of
+each for 25,352,192. The same run's DP8 point retains all sixteen independent
+role/DP pools, totaling 241,231,872. The regression fixture stores their exact
+capacity-series labels and constant CSV averages in the equivalent JSON shape.
+
+Existing linked sidecars are not recomputed by ordinary idempotent ingestion.
+Preview retained-artifact corrections with
+`bun run --cwd packages/db db:backfill-sglang-kv-capacity --run-id 34738529222`;
+add `--apply` only after reviewing the printed before/after values. The command
+validates all candidates before an atomic write, verifies stored values, and
+refreshes latest benchmarks. Invalidate application caches after applying a
+historical correction. This is a reusable artifact-derived repair, not a
+hardcoded run override; no historical database is modified by deploying it.
+
 AIPerf defines the `server_metrics_export.json` envelope, but labels such as worker role and rank belong to the serving orchestrator. The chart-series ETL therefore normalizes raw series through an orchestrator-specific adapter before exposing per-worker metrics. For example, the Dynamo adapter maps `dynamo_component=prefill|backend` to canonical `prefill|decode` roles and uses the endpoint, worker ID, DP rank, and engine together as the source identity.
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.

@@ -1,0 +1,438 @@
+{
+  "4": {
+    "sglang:max_total_num_tokens": {
+      "series": [
+        {
+          "endpoint_url": "10.24.112.107:8000",
+          "labels": {
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3211776.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.107:8000",
+          "labels": {
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "1"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3211776.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.107:8000",
+          "labels": {
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "2"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3211776.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.107:8000",
+          "labels": {
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "3"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3211776.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.110:8000",
+          "labels": {
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3126272.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.110:8000",
+          "labels": {
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "1"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3126272.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.110:8000",
+          "labels": {
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "2"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3126272.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.110:8000",
+          "labels": {
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "3"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 3126272.0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "256": {
+    "sglang:max_total_num_tokens": {
+      "series": [
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "0",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "1",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "1"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "2",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "2"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "3",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "3"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "4",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "4"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "5",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "5"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "6",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "6"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.105:8000",
+          "labels": {
+            "dp_rank": "7",
+            "engine_type": "prefill",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "7"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15125760.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "0",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "0"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "1",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "1"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "2",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "2"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "3",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "3"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "4",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "4"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "5",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "5"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "6",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "6"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        },
+        {
+          "endpoint_url": "10.24.112.120:8000",
+          "labels": {
+            "dp_rank": "7",
+            "engine_type": "decode",
+            "model_name": "/models/DeepSeek-V4-Pro-0813",
+            "moe_ep_rank": "0",
+            "pp_rank": "0",
+            "tp_rank": "7"
+          },
+          "timeslices": [
+            {
+              "start_ns": 0,
+              "end_ns": 1000000000,
+              "avg": 15028224.0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

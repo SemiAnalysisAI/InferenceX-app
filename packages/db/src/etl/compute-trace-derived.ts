@@ -22,12 +22,17 @@ import { computeRequestTimeline, type RequestTimeline } from './compute-request-
 import { collectMetricPhases } from './gzip-json-stream.js';
 import { ATOM_KV_BLOCKS_METRIC, atomKvCacheBlocksFromMetricPhases } from './atom-kv-capacity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters.js';
+import {
+  SGLANG_KV_CAPACITY_METRIC,
+  sglangKvCachePoolTokensFromMetricPhases,
+} from './sglang-kv-capacity.js';
 
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
   chartSeries: ChartSeries | null;
   requestTimeline: RequestTimeline | null;
   atomKvCacheBlocks: number | null;
+  sglangKvCachePoolTokens: number | null;
 }
 
 export interface TraceDerivedComputeOptions {
@@ -39,6 +44,7 @@ const DERIVED_SERVER_METRIC_KEYS = new Set([
   ...CHART_METRIC_KEYS,
   ...AGGREGATE_SERVER_METRIC_KEYS,
   ATOM_KV_BLOCKS_METRIC,
+  SGLANG_KV_CAPACITY_METRIC,
 ]);
 
 function selectMetrics(metrics: MetricsMap, wanted: ReadonlySet<string>): MetricsMap {
@@ -107,6 +113,9 @@ export async function computeTraceDerivedPayloads(
     requestTimeline,
     atomKvCacheBlocks: phases
       ? atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics)
+      : null,
+    sglangKvCachePoolTokens: phases
+      ? sglangKvCachePoolTokensFromMetricPhases(phases.metrics, phases.warmupMetrics)
       : null,
   };
 }

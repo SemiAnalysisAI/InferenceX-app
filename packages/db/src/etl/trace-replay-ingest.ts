@@ -15,6 +15,7 @@ import { createGzip, gzipSync } from 'node:zlib';
 import type postgres from 'postgres';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
+import { updateSglangKvCachePoolTokens } from './sglang-kv-capacity.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
@@ -65,6 +66,7 @@ export interface PreparedTraceReplay {
   cacheHitRates: { gpu: number; cpu: number | null } | null;
   fullResponseMetrics: Record<string, number>;
   atomKvCacheBlocks?: number | null;
+  sglangKvCachePoolTokens?: number | null;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -196,8 +198,13 @@ export async function prepareTraceReplay(
   const compressionMs = Date.now() - compressionStart;
 
   const computeStart = Date.now();
-  const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
-    await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
+  const {
+    aggregateStats,
+    chartSeries,
+    requestTimeline,
+    atomKvCacheBlocks,
+    sglangKvCachePoolTokens,
+  } = await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -218,6 +225,7 @@ export async function prepareTraceReplay(
     cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
     fullResponseMetrics,
     atomKvCacheBlocks,
+    sglangKvCachePoolTokens,
   };
 }
 
@@ -386,6 +394,11 @@ export async function persistPreparedTraceReplay(
       tx,
       unlinked.map((row) => row.id),
       prepared.atomKvCacheBlocks ?? null,
+    );
+    await updateSglangKvCachePoolTokens(
+      tx,
+      unlinked.map((row) => row.id),
+      prepared.sglangKvCachePoolTokens ?? null,
     );
   });
   if (linkedCount > 0) log(`inserted trace_replay payload (${elapsed(insertStart)})`);
