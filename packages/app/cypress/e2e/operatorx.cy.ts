@@ -68,7 +68,16 @@ describe('OperatorX hidden GEMM explorer', () => {
 describe('OperatorX attention selection', () => {
   it('switches from GEMM throughput to MHA and MLA latency with complete shapes', () => {
     const mixed = readOperatorXBundle(makeOperatorXAttentionBundle());
-    cy.intercept('GET', '/api/v1/operatorx/runs', { runs: [mixed.run], discovery_complete: true });
+    const attentionOnly = {
+      ...mixed,
+      run: { ...mixed.run, run_id: '456', requested: 1, measured: 1 },
+      points: mixed.points.filter((p) => p.type === 'attention_mha'),
+    };
+    cy.intercept('GET', '/api/v1/operatorx/runs/456', attentionOnly);
+    cy.intercept('GET', '/api/v1/operatorx/runs', {
+      runs: [mixed.run, attentionOnly.run],
+      discovery_complete: true,
+    });
     cy.intercept('GET', '/api/v1/operatorx/runs/123', mixed);
     cy.visit('/operatorx?run=123');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '2.00 TFLOPS / GPU');
