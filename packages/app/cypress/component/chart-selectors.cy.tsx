@@ -19,15 +19,21 @@ import { Model, Sequence } from '@/lib/data-mappings';
 
 function TitleScenarioHarness() {
   const [sequence, setSequence] = useState(Sequence.AgenticTraces);
+  const [singleScenario, setSingleScenario] = useState(false);
   return (
     <TooltipProvider>
+      <button onClick={() => setSingleScenario((single) => !single)}>
+        Toggle available scenarios
+      </button>
       <h2 className="text-base font-semibold">
         DeepSeek-V4-Pro{' '}
         <ScenarioSelector
           variant="title"
           value={sequence}
           onChange={setSequence}
-          availableSequences={[Sequence.AgenticTraces, Sequence.EightK_OneK]}
+          availableSequences={
+            singleScenario ? [sequence] : [Sequence.AgenticTraces, Sequence.EightK_OneK]
+          }
           data-testid="title-scenario"
         />{' '}
         Output Throughput vs. Interactivity
@@ -51,11 +57,36 @@ describe('Scenario in the chart title', () => {
         </h2>
       </TooltipProvider>,
     );
-    cy.get('[data-testid="title-scenario"]').should('be.enabled').click();
+    cy.get('[data-testid="title-scenario"]').should('have.prop', 'tagName', 'SPAN');
+    cy.get('h2 [role="combobox"]').should('not.exist');
     cy.get('[data-testid="option-help-agentic-traces"]').click();
     cy.get('[data-testid="scenario-agentic-info-link"]').should('have.attr', 'href', '/agentx');
   });
   for (const width of [375, 1280]) {
+    it(`removes an open selector when only one scenario remains at ${width}px`, () => {
+      cy.viewport(width, 844);
+      cy.mount(<TitleScenarioHarness />);
+      cy.get('[data-testid="title-scenario"]').click();
+      cy.contains('Fixed Sequence Length').should('be.visible');
+      cy.contains('button', 'Toggle available scenarios').click();
+      cy.get('h2 [role="combobox"]').should('not.exist');
+      cy.get('[data-select-option]').should('not.exist');
+      cy.get('[data-testid="title-scenario"]').should('have.text', 'Agentic');
+      cy.get('[data-testid="option-help-agentic-traces"]').click();
+      cy.get('[data-testid="scenario-agentic-info-link"]').should('be.visible');
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="option-help-agentic-traces"]').should('have.focus');
+      cy.press(Cypress.Keyboard.Keys.SPACE);
+      cy.get('[data-testid="scenario-agentic-info-link"]').should('be.visible');
+      cy.get('body').type('{esc}');
+      cy.contains('button', 'Toggle available scenarios').click();
+      cy.get('[data-testid="title-scenario"]').click();
+      cy.contains('[data-select-option]', '8K / 1K').click();
+      cy.get('[data-testid="title-scenario"]').should('have.text', '8K / 1K');
+      cy.contains('button', 'Toggle available scenarios').click();
+      cy.get('h2 [role="combobox"]').should('not.exist');
+      cy.get('[data-testid="title-scenario"]').should('have.text', '8K / 1K');
+    });
     it(`switches scenarios with keyboard and keeps help in the menu at ${width}px`, () => {
       cy.viewport(width, 844);
       cy.mount(<TitleScenarioHarness />);
