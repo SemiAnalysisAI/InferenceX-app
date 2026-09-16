@@ -79,6 +79,20 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it.each(['1', '2'])(
+    'keeps Pareto highlights opt-in and preserves mode %s in share links',
+    async (mode) => {
+      setupWindow(`?i_frontier=${mode}&i_hinterland=${mode}`);
+      const { PARAM_DEFAULTS, readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      expect(PARAM_DEFAULTS.i_frontier).toBe('');
+      expect(PARAM_DEFAULTS.i_hinterland).toBe('');
+      expect(readUrlParams()).toMatchObject({ i_frontier: mode, i_hinterland: mode });
+      const url = new URL(buildShareUrl());
+      expect(url.searchParams.get('i_frontier')).toBe(mode);
+      expect(url.searchParams.get('i_hinterland')).toBe(mode);
+    },
+  );
+
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
