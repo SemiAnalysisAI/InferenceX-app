@@ -72,3 +72,19 @@ it('applies AMD rooflines to current Slurm pool names', () => {
   ]);
   expect(swapRooflines(points, 'd2d').map((r) => r.gbps)).toEqual([2650, 3000]);
 });
+
+it('labels a GPU whose runtime reports an empty device name using its recorded SKU', () => {
+  const dataset = buildDatasetFromNeutral(swapMatrix, [makeSwapDoc()], swapMeta);
+  const result = dataset.swap_blocks![0];
+  result.runtime.device = '  ';
+  result.sku = 'mi355x';
+  const selection = {
+    direction: 'h2d' as const,
+    layout: 'contiguous' as const,
+    metric: 'bandwidth' as const,
+    percentile: 'p50' as const,
+  };
+  expect(swapChartPoints([dataset], selection).map((p) => p.device)).toEqual(['MI355X', 'MI355X']);
+  result.sku = 'future-gpu';
+  expect(swapChartPoints([dataset], selection)[0].device).toBe('future-gpu');
+});
