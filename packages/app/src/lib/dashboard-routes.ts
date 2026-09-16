@@ -195,6 +195,17 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
   {
+    key: 'operatorx',
+    path: '/operatorx',
+    canonicalPath: '/operatorx',
+    navGroup: 'feature-gated',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_'],
+  },
+
+  {
     key: 'collectivex',
     path: '/collectivex',
     canonicalPath: '/collectivex',

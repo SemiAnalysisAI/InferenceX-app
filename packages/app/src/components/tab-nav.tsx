@@ -52,6 +52,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   reliability: 'Reliability',
   'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',
+  operatorx: 'OperatorX',
   collectivex: 'CollectiveX',
   'ai-chart': 'AI Chart',
   'gpu-metrics': 'PowerX',
