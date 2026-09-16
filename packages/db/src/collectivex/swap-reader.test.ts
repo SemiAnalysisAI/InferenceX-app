@@ -54,3 +54,31 @@ describe('standalone swap_blocks artifacts', () => {
     );
   });
 });
+
+it('keeps identical measurements from separate GPU pools and rejects ambiguous provenance', () => {
+  const matrix = {
+    include: [
+      { backend: 'swap-blocks', sku: 'h200-dgxc' },
+      { backend: 'swap-blocks', sku: 'mi355x' },
+    ],
+  };
+  const first = makeSwapDoc();
+  const docs = ['h200-dgxc', 'mi355x'].map((sku) => ({
+    ...first,
+    runtime: { ...first.runtime, sku },
+  }));
+  const dataset = buildDatasetFromNeutral(matrix, docs, swapMeta);
+  expect(dataset.swap_blocks?.map((r) => [r.sku, r.points[0].latency_us.p50])).toEqual([
+    ['h200-dgxc', 2],
+    ['mi355x', 2],
+  ]);
+  expect(new Set(dataset.swap_blocks?.map((r) => r.result_id)).size).toBe(2);
+  expect(() => buildDatasetFromNeutral(matrix, [first], swapMeta)).toThrow('GPU pool');
+  expect(() =>
+    buildDatasetFromNeutral(
+      matrix,
+      [{ ...first, runtime: { ...first.runtime, sku: 'unknown' } }],
+      swapMeta,
+    ),
+  ).toThrow('GPU pool');
+});

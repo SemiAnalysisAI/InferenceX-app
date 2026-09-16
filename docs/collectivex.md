@@ -120,7 +120,7 @@ same shared transform across the wire.
 **English** | [中文](./collectivex-swap-blocks_zh.md)
 
 Standalone `backend=swap-blocks` sweep runs are discovered through the same matrix/shard
-artifact path. Their execution-only matrix (`include` with one swap-blocks cell) maps to
+artifact path. Their execution-only matrix (`include` with one or more swap-blocks cells) maps to
 app contract version 1. The shared reader validates `collectivex-swap-blocks-v1` documents,
 including correctness, payload arithmetic, finite positive ordered latency percentiles,
 sample counts and the run's source SHA. EP/KV documents keep their existing reader path.
@@ -136,3 +136,23 @@ plots block bytes in B/KiB/MiB/GiB, and keeps bandwidth linear with a zero basel
 Latency is logarithmic. Bandwidth is copied payload divided by host-observed latency,
 including submission and CUDA synchronization, counting payload once even for d2d.
 Both `/collectivex` and `/zh/collectivex` expose the controls and tooltips.
+
+Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs, including across
+checked comparison runs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
+registered x86 pools (including HGX B300's CPU uplink). GB200/GB300 use **225 GB/s per GPU
+per direction**: the 900 GB/s bidirectional Grace C2C link is split across two GPUs.
+Same-GPU copies use half the GPU Specs HBM bandwidth because each payload byte is read
+and written. These are hardware references, not measured limits: warm-cache copies may
+exceed the HBM reference; host memory, placement and protocol overhead reduce host rates.
+Unknown SKUs get no assumed roofline. Rooflines disappear in latency mode or when all
+matching series are hidden; bandwidth stays linear and includes the reference in its domain.
+
+References: [H200 specifications](https://www.nvidia.com/en-us/data-center/h200/),
+[AMD MI355X specifications](https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html),
+[Grace C2C ports per GPU](https://docs.nvidia.com/dccpu/grace-perf-tuning-guide/measuring-performance.html#nvlink-c2c-maximum-transport-request-utilization),
+[GB200 bidirectional C2C](https://developer.nvidia.com/blog/nvidia-gb200-nvl72-delivers-trillion-parameter-llm-training-and-real-time-inference/),
+[HGX CPU uplink topology](https://docs.nvidia.com/enterprise-reference-architectures/whitepaper/hgx-servers-and-spectrum-x.pdf).
+
+Multi-pool artifacts must carry `runtime.sku` matching a requested matrix cell. Older
+single-pool artifacts may omit it. Measurement identity includes SKU so equivalent grid
+points from different GPU pools remain independent.

@@ -29,10 +29,19 @@ it('keeps comparison runs independently toggleable and distinguishes their lines
         lines[1].getAttribute('stroke-dasharray'),
       );
     });
+  cy.get('[data-testid="swap-roofline-legend"]').should('contain', '64 GB/s');
+  cy.get('.roofline-path')
+    .should('have.length', 1)
+    .invoke('attr', 'd')
+    .should('match', /^M[\d.]+,(?<y>[\d.]+)L[\d.]+,\k<y>$/);
+  cy.get('[data-testid="swap-metric"]').contains('Latency').click();
+  cy.get('[data-testid="swap-roofline-legend"]').should('not.exist');
+  cy.get('[data-testid="swap-metric"]').contains('Bandwidth').click();
   cy.get('[data-testid="chart-legend"] input[type="checkbox"]').eq(1).uncheck({ force: true });
   cy.get('[data-testid="collectivex-swap-chart"] .point').should('have.length', 2);
   cy.get('[data-testid="chart-legend"] input[type="checkbox"]').eq(0).uncheck({ force: true });
   cy.get('[data-testid="collectivex-swap-chart"] .point').should('have.length', 0);
+  cy.get('[data-testid="swap-roofline-legend"]').should('not.exist');
   cy.contains('No measured swap-block points match this selection.').should('be.visible');
   cy.get('[data-testid="chart-legend"] input[type="checkbox"]').eq(1).check({ force: true });
   cy.get('[data-testid="collectivex-swap-chart"] .point').should('have.length', 2);

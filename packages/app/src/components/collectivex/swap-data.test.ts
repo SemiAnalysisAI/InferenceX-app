@@ -5,7 +5,7 @@ import {
   swapMatrix,
   swapMeta,
 } from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
-import { formatSwapBytes, swapChartPoints } from './swap-data';
+import { formatSwapBytes, swapChartPoints, swapRooflines } from './swap-data';
 
 it('formats byte units without losing the 1 GiB endpoint', () => {
   expect([257, 1024, 262144, 1048576, 1073741824].map(formatSwapBytes)).toEqual([
@@ -52,4 +52,15 @@ it('selects direction, layout and percentile and separates comparison runs', () 
       percentile: 'p50',
     }),
   ).toEqual([]);
+});
+
+it('selects one-way host or read-plus-write HBM ceilings and deduplicates visible GPUs', () => {
+  const points = [{ sku: 'h200-dgxc' }, { sku: 'h200-dgxc' }, { sku: 'gb200' }];
+  expect(swapRooflines(points, 'h2d').map((r) => [r.path, r.gbps, r.devices])).toEqual([
+    ['PCIe 5.0 x16', 64, ['H200 SXM']],
+    ['NVLink-C2C', 225, ['GB200 NVL72']],
+  ]);
+  expect(swapRooflines(points, 'd2d').map((r) => r.gbps)).toEqual([2400, 4000]);
+  expect(swapRooflines([{ sku: 'unknown' }], 'd2h')).toEqual([]);
+  expect(swapRooflines([], 'h2d')).toEqual([]);
 });

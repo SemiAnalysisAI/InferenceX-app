@@ -9,9 +9,8 @@ export function isSwapMatrix(value: unknown): boolean {
   return (
     matrix?.version === undefined &&
     Array.isArray(matrix?.include) &&
-    matrix.include.length === 1 &&
-    matrix.include[0]?.backend === 'swap-blocks' &&
-    typeof matrix.include[0]?.sku === 'string'
+    matrix.include.length > 0 &&
+    matrix.include.every((cell) => cell?.backend === 'swap-blocks' && typeof cell?.sku === 'string')
   );
 }
 
@@ -40,7 +39,7 @@ export function readSwapResults(
   sourceSha: string,
 ): CollectiveXSwapResult[] {
   if (!isSwapMatrix(matrix)) return [];
-  const sku = (matrix as { include: { sku: string }[] }).include[0].sku;
+  const skus = (matrix as { include: { sku: string }[] }).include.map((cell) => cell.sku);
   const seen = new Set<string>();
   return docs.flatMap((doc) => {
     const raw = doc as {
@@ -49,7 +48,7 @@ export function readSwapResults(
       timing?: string;
       warmup: number;
       iterations: number;
-      runtime: CollectiveXSwapResult['runtime'];
+      runtime: CollectiveXSwapResult['runtime'] & { sku?: string };
       selection?: { max_payload_bytes: number; skipped_cases: unknown[] };
       cases: (Omit<
         CollectiveXSwapPoint,
@@ -76,8 +75,12 @@ export function readSwapResults(
     ) {
       throw new TypeError('invalid swap_blocks artifact or provenance');
     }
+    // Legacy single-pool artifacts did not record SKU; multi-pool runs must identify it.
+    const sku = raw.runtime.sku ?? (skus.length === 1 ? skus[0] : undefined);
+    if (!sku || !skus.includes(sku)) throw new TypeError('invalid swap_blocks GPU pool');
     const points = raw.cases.map((row): CollectiveXSwapPoint => {
       const key = JSON.stringify([
+        sku,
         row.direction,
         row.layout,
         row.block_bytes,
@@ -124,7 +127,7 @@ export function readSwapResults(
     });
     return [
       {
-        result_id: `swap-${points[0].layout}-${points[0].seed}`,
+        result_id: `swap-${sku}-${points[0].layout}-${points[0].seed}`,
         sku,
         runtime: raw.runtime,
         timing: raw.timing,

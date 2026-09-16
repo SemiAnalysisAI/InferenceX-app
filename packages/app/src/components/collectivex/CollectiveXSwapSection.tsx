@@ -15,7 +15,7 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { collectiveXRunDasharray } from './data';
-import { formatSwapBytes, swapChartPoints, type SwapChartPoint } from './swap-data';
+import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } from './swap-data';
 
 const STRINGS = {
   en: {
@@ -35,6 +35,9 @@ const STRINGS = {
     run: 'Run',
     description:
       'Host-observed copy latency includes submission and CUDA synchronization. Bandwidth counts copied payload once (GB/s, linear). Each line holds the number of blocks fixed.',
+    roofline: 'Nominal hardware roofline',
+    rooflineNote:
+      'Host transfers use one-way link bandwidth per GPU. Same-GPU copies use HBM bandwidth ÷ 2 (read + write); warm-cache points can exceed that HBM reference. Actual throughput also depends on host memory and placement.',
     yLatency: 'Latency',
     yBandwidth: 'Payload bandwidth',
     noData: 'No measured swap-block points match this selection.',
@@ -61,6 +64,9 @@ const STRINGS = {
     run: '运行',
     description:
       '主机侧观测的复制延迟包含提交和 CUDA 同步时间。带宽按复制的有效载荷计算一次（GB/s，线性坐标）。每条线对应固定的块数量。',
+    roofline: '标称硬件带宽上限',
+    rooflineNote:
+      '主机与 GPU 之间的传输按每个 GPU 的单向链路带宽计算。同一 GPU 内的复制按 HBM 带宽 ÷ 2（读 + 写）计算；缓存命中的数据点可能高于这一 HBM 参考线。实际吞吐量还受主机内存和内存放置位置影响。',
     yLatency: '延迟',
     yBandwidth: '有效载荷带宽',
     noData: '当前筛选条件下没有实测块交换数据。',
@@ -119,7 +125,8 @@ export function CollectiveXSwapSection({
   const xValues = [...new Set(points.map((p) => p.x))].sort((a, b) => a - b);
   const xMin = xValues[0] ?? 1;
   const xMax = xValues.at(-1) ?? 10;
-  const yMax = d3.max(points, (p) => p.y) ?? 1;
+  const rooflines = metric === 'bandwidth' ? swapRooflines(points, direction) : [];
+  const yMax = Math.max(d3.max(points, (p) => p.y) ?? 1, ...rooflines.map((r) => r.gbps));
   const yMin = d3.min(points, (p) => p.y) ?? 1;
   const results = datasets.flatMap((d) => d.swap_blocks ?? []);
   if (results.length === 0) return null;
@@ -197,6 +204,21 @@ export function CollectiveXSwapSection({
           testId="swap-percentile"
         />
       </div>
+      {rooflines.length > 0 && (
+        <div data-testid="swap-roofline-legend" className="mb-3 text-xs text-muted-foreground">
+          {rooflines.map((roof) => (
+            <p key={roof.id} title={roof.devices.join(', ')}>
+              <span
+                aria-hidden="true"
+                className="mr-2 inline-block w-5 border-t-2 border-dashed border-current align-middle"
+              />
+              {t.roofline}: {roof.gbps.toLocaleString()} GB/s · {roof.path} ·{' '}
+              {roof.devices.join(', ')}
+            </p>
+          ))}
+          <p className="mt-1">{t.rooflineNote}</p>
+        </div>
+      )}
       <D3Chart<SwapChartPoint>
         chartId="collectivex-swap"
         testId="collectivex-swap-chart"
@@ -268,6 +290,25 @@ export function CollectiveXSwapSection({
               strokeWidth: 1,
               keyFn: (p) => `${p.seriesId}:${p.x}`,
               maxPoints: Infinity,
+            },
+          },
+          {
+            type: 'roofline',
+            key: 'swap-rooflines',
+            rooflines: Object.fromEntries(
+              rooflines.map((roof) => [
+                roof.id,
+                [
+                  { x: xMin / 1.2, y: roof.gbps },
+                  { x: xMax * 1.2, y: roof.gbps },
+                ],
+              ]),
+            ),
+            config: {
+              getColor: () => 'var(--muted-foreground)',
+              strokeDasharray: '6 4',
+              strokeWidth: 1.5,
+              curve: d3.curveLinear,
             },
           },
         ]}
