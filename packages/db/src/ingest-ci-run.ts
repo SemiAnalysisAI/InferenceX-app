@@ -232,10 +232,6 @@ if (reusedIngestMetadata) {
 }
 
 const runIdNum = parseInt(runIdStr, 10);
-if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
-  console.log(`  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`);
-  process.exit(0);
-}
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
@@ -281,6 +277,14 @@ function findJsonFiles(dir: string): string[] {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Return through the finalizer so skipped runs still write their publication manifest.
+  if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
+    console.log(
+      `  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`,
+    );
+    return;
+  }
+
   validateRunBackfills();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
