@@ -114,3 +114,25 @@ instead of raw rows. The reader is shared between the app and the CLI through th
 package (`@semianalysisai/inferencex-db/collectivex/*`), so ingest-time validation and
 read-time assembly can never drift; shipping raw docs to the client would only move the
 same shared transform across the wire.
+
+## vLLM swap_blocks
+
+**English** | [中文](./collectivex-swap-blocks_zh.md)
+
+Standalone `backend=swap-blocks` sweep runs are discovered through the same matrix/shard
+artifact path. Their execution-only matrix (`include` with one swap-blocks cell) maps to
+app contract version 1. The shared reader validates `collectivex-swap-blocks-v1` documents,
+including correctness, payload arithmetic, finite positive ordered latency percentiles,
+sample counts and the run's source SHA. EP/KV documents keep their existing reader path.
+No database migration is needed: raw JSON documents remain the source of truth.
+
+The additive `swap_blocks` dataset field holds runtime provenance and measured points;
+`swap_cases` labels their run summaries separately from EP/KV. One verified artifact counts
+as one case; each measured (direction, layout, block bytes, block count, seed) is one point.
+Budget-excluded combinations are reported separately and are never plotted as measurements.
+The run-table suite filter includes swap_blocks; checked runs share the normal comparison
+selection and run dash styles. The chart selects direction, layout and latency percentile,
+plots block bytes in B/KiB/MiB/GiB, and keeps bandwidth linear with a zero baseline.
+Latency is logarithmic. Bandwidth is copied payload divided by host-observed latency,
+including submission and CUDA synchronization, counting payload once even for d2d.
+Both `/collectivex` and `/zh/collectivex` expose the controls and tooltips.
