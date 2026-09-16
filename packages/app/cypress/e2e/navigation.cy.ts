@@ -391,6 +391,35 @@ describe('H3 video artifact viewer', () => {
       .and('contain', '240 / —');
     cy.location('search').should('contain', 'history-concurrency=2');
   });
+  it('opens the first published result directly and preserves the selection on refresh and reload', () => {
+    const saved = servingArtifact();
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [videoHistoryEntry(saved, null)],
+      nextPage: null,
+    }).as('published');
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null }).as('recent');
+    cy.intercept('GET', '/api/video-runs?run=123', {
+      run: videoRun(123, 'success'),
+      artifacts: [saved.artifact],
+    }).as('run');
+    cy.intercept('GET', '**/api/video-runs*format=media', saved);
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.visit('/video?view=results');
+    cy.get('[data-testid="serving-selected-metrics"]').should('be.visible').and('contain', 'C1');
+    cy.contains('[data-testid="serving-matrix"] button', 'C4').click();
+    cy.get('@published.all').then((requests) => {
+      const initialReads = requests.length;
+      cy.contains('button', 'Refresh').click();
+      cy.get('[data-testid="serving-selected-metrics"]').should('be.visible').and('contain', 'C4');
+      cy.get('@published.all').should('have.length', initialReads);
+    });
+    cy.location('search').should('contain', 'view=results').and('contain', 'cell=c4');
+    cy.reload();
+    cy.get('[data-testid="serving-selected-metrics"]').should('be.visible').and('contain', 'C4');
+    cy.contains('button', 'Videos & result').should('have.attr', 'aria-pressed', 'true');
+    cy.get('@recent.all').should('have.length', 0);
+  });
   it('shares a comparison built by opening two CI runs through the page', () => {
     for (const saved of [
       servingArtifact(123, 40, 'NVIDIA H200'),
@@ -471,6 +500,7 @@ describe('H3 video artifact viewer', () => {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
+    cy.contains('button', 'Browse CI runs').click();
     cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
@@ -488,6 +518,7 @@ describe('H3 video artifact viewer', () => {
     cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
     cy.get('video[data-role]').should('not.exist');
     cy.visit('/zh/video?view=results');
+    cy.contains('button', '浏览 CI 运行').click();
     cy.get('[data-testid="video-ci-runs"]').should('contain', '本页 GitHub 历史中没有 H3 运行');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });

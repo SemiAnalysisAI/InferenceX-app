@@ -8,6 +8,11 @@ import { servingArtifact, videoRun as run } from '../support/video-artifacts';
 describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
   beforeEach(() => {
     cy.intercept('GET', '**/api/video-runs*format=media', { statusCode: 204 });
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
+    });
     cy.window().then((win) =>
       win.history.replaceState(null, '', `${win.location.pathname}?view=results`),
     );
@@ -108,7 +113,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.get('[role="listbox"]').should('not.exist');
     cy.get('[role="combobox"]').should('have.focus');
   });
-  it('loads the newest run automatically and switches to a failed run without inventing media', () => {
+  it('browses CI runs explicitly and switches to a failed run without inventing media', () => {
     cy.intercept('GET', '/api/video-runs?page=1', {
       runs: [run(20, 'success'), run(10, 'failure')],
       nextPage: null,
@@ -124,6 +129,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.wait('@latest');
     cy.contains('No result artifact for this run yet').should('be.visible');
     cy.get('[role="combobox"][aria-label="CI run"]').click();
@@ -282,6 +288,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.wrap(null).should(() => expect(releaseList).to.be.a('function'));
     cy.contains('summary', 'Run details and artifact selection').click();
     cy.get('input[aria-label="GitHub run ID"]').type('30');
@@ -353,6 +360,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.get('[data-testid="result-summary"]')
       .should('contain', 'Media stored for direct playback')
       .and('contain', 'uncalibrated');
@@ -466,6 +474,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.get('[role="alert"]').should('contain', 'Expired');
     cy.get('video').should('not.exist');
     cy.get('[role="combobox"][aria-label="Result artifact"]').should(
