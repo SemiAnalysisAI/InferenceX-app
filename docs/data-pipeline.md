@@ -82,6 +82,28 @@ contract; this change does not infer completion from a missing config or workflo
 conclusion. A normal partial sweep still replaces its curve, so intentional deltas
 must use the append-only contract below.
 
+### Required Power Publication
+
+Ordinary sweeps that opt into `require-power` upload the producer's
+`required-power-sweep-manifest/sweep_manifest.json`. Before any CI ingest upsert,
+the app matches its required benchmark rows by recipe fingerprint, concurrency,
+and scenario/sequence lengths, then requires valid v2 power and positive energy.
+Disaggregated recipes also require both role energy measurements. Identical
+per-job and collected artifact copies are allowed; conflicting copies fail.
+Matching uses the ingest mapper's canonical identity, including AgentX `users`
+precedence over `conc`. After benchmark writes, any required point omitted by a
+purge or another filter fails the run; purged data is never restored to satisfy
+the declaration.
+
+The manifest must name the source run and head. A successful earlier attempt of
+that same run may supply the scope and retained points when failed jobs are
+rerun; ingestion logs both declared and current attempts. Changelog metadata with
+`require-power: true` also requires the manifest, so losing that artifact cannot
+silently downgrade a required scope. Legacy bundles without either declaration
+retain optional-power behavior. The separate PowerX publication
+receipt compares ingested 1K/1K, 8K/1K and AgentX measurements with the database and
+public API after cache invalidation; it does not assert browser rendering.
+
 ### Append-Only Curve Extensions
 
 Normal workflow runs are complete line snapshots: the latest run for a line replaces

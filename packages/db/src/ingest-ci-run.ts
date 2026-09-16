@@ -59,7 +59,11 @@ import {
   flattenReusedIngestArtifactBundle,
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
-import { mapBenchmarkRow } from './etl/benchmark-mapper';
+import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import {
+  assertRequiredPowerPointsRetained,
+  verifyRequiredPowerArtifacts,
+} from './etl/required-power-publication';
 import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
@@ -325,6 +329,14 @@ async function main(): Promise<void> {
     }
   }
 
+  const requiredPowerPoints = verifyRequiredPowerArtifacts(artifactsDir, {
+    runId,
+    runAttempt: runAttemptNum,
+    headSha: ghInfo?.headSha ?? null,
+  });
+  if (requiredPowerPoints.length > 0)
+    console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
+
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
 
@@ -390,6 +402,8 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  if (evalsOnly && requiredPowerPoints.length > 0)
+    throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -447,6 +461,7 @@ async function main(): Promise<void> {
   // ── Ingest benchmark results ──────────────────────────────────────────
 
   console.log('\n--- Benchmark Results ---');
+  const retainedPowerPoints: BenchmarkParams[] = [];
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -601,6 +616,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
+          if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
           for (const r of toInsert) {
@@ -741,6 +757,7 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
+    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints);
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
@@ -1017,6 +1034,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error) => {
+    powerPublicationErrors.push(error instanceof Error ? error.message : String(error));
     console.error('ingest-ci-run failed:', error);
     process.exitCode = 1;
   })

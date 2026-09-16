@@ -61,7 +61,13 @@ export function powerPublicationPoint(
   runUrl: string,
   artifact: PowerPublicationPoint['artifact'],
 ): PowerPublicationPoint | null {
-  if (row.benchmarkType !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024) return null;
+  if (
+    row.benchmarkType !== 'agentic_traces' &&
+    (row.benchmarkType !== 'single_turn' ||
+      (row.isl !== 1024 && row.isl !== 8192) ||
+      row.osl !== 1024)
+  )
+    return null;
   const identity: Record<string, unknown> = Object.fromEntries(
     Object.entries(CONFIG_FIELDS).map(([source, target]) => [
       target,
