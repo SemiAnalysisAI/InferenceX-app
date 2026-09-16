@@ -69,6 +69,30 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it.each([1, undefined])(
+    'keeps canonical identity but labels UMBP for official/overlay rows (DB id %s)',
+    (id) => {
+      const run_url =
+        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1';
+      const row = makeRow({ id, hardware: 'mi355x', framework: 'mori-sglang', run_url });
+      const { chartData, hardwareConfig } = transformBenchmarkRows([row]);
+      expect(Object.keys(hardwareConfig)).toEqual(['mi355x_mori-sglang']);
+      expect(hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI UMBP SGLang)');
+      for (const points of chartData) {
+        expect(points).toHaveLength(1);
+        expect(points[0]).toMatchObject({
+          hwKey: 'mi355x_mori-sglang',
+          framework: 'mori-sglang',
+          run_url,
+        });
+      }
+      const historical = transformBenchmarkRows([
+        { ...row, run_url: run_url.replace('34926284365', '34926284364') },
+      ]);
+      expect(historical.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang)');
+    },
+  );
+
   it.each(['p75_power_w', 'p90_power_w'] as const)(
     'only exposes %s from validated schema-2 rows, including overlays without DB IDs',
     (metric) => {
