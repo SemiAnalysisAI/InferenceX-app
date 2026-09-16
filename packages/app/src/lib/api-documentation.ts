@@ -9,7 +9,13 @@ import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
-export type ApiGroupId = 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics';
+export type ApiGroupId =
+  | 'core'
+  | 'external'
+  | 'datasets'
+  | 'collectivex'
+  | 'operatorx'
+  | 'diagnostics';
 export type ApiHttpMethod = 'GET';
 export type ApiParameterLocation = 'path' | 'query';
 export type ApiAudience = 'public';
@@ -612,6 +618,56 @@ const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
 
+const operatorXRunSchema = objectSchema({
+  run_id: stringSchema,
+  run_attempt: numberSchema,
+  source_sha: stringSchema,
+  source_branch: { type: ['string', 'null'] },
+  generated_at: stringSchema,
+  conclusion: { type: ['string', 'null'] },
+  requested: numberSchema,
+  measured: numberSchema,
+  unsupported: numberSchema,
+  failed: numberSchema,
+  missing: numberSchema,
+  clusters: arraySchema(stringSchema),
+  testlists: arraySchema(stringSchema),
+});
+const operatorXPointSchema = objectSchema({
+  id: stringSchema,
+  shard: stringSchema,
+  attempt: nullableNumberSchema,
+  cluster: stringSchema,
+  backend: stringSchema,
+  testlist: stringSchema,
+  name: { type: ['string', 'null'] },
+  m: numberSchema,
+  n: numberSchema,
+  k: numberSchema,
+  dtype_a: stringSchema,
+  dtype_b: stringSchema,
+  dtype_out: stringSchema,
+  status: { type: 'string', enum: ['ok', 'unsupported', 'error', 'missing'] },
+  message: { type: ['string', 'null'] },
+  latency_us: nullableNumberSchema,
+  tflops: nullableNumberSchema,
+});
+const operatorXExampleRun = {
+  run_id: '123456789',
+  run_attempt: 1,
+  source_sha: '0123456789abcdef',
+  source_branch: 'example',
+  generated_at: '2026-09-16T12:00:00Z',
+  conclusion: 'success',
+  requested: 1,
+  measured: 1,
+  unsupported: 0,
+  failed: 0,
+  missing: 0,
+  clusters: ['h100_dgxc_8x'],
+  testlists: ['gemm'],
+};
+
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
     id: 'core',
@@ -646,6 +702,14 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     ),
   },
   {
+    id: 'operatorx',
+    title: text('OperatorX', 'OperatorX'),
+    description: text(
+      'Dense GEMM measurements and complete run coverage.',
+      '稠密 GEMM 实测数据和完整运行覆盖情况。',
+    ),
+  },
+  {
     id: 'diagnostics',
     title: text('Diagnostic reads', '诊断读取'),
     description: text(
@@ -656,6 +720,131 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 export const apiOperations: readonly ApiOperation[] = [
+  {
+    id: 'list-operatorx-runs',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs',
+    summary: text('List OperatorX runs', '列出 OperatorX 运行'),
+    description: text(
+      'Lists stored completed manual OperatorX sweeps from any branch, newest first. Lazily imports at most four runs per request from the last 44 days; discovery_complete=false requests another pass. Raw documents persist beyond artifact expiry. Cached for 60 seconds when discovery completes; incomplete responses are not cached. Requires server-side GitHub access and DATABASE_OPERATORX_WRITE_URL. Development on loopback hosts can explicitly read downloaded bundles through OPERATORX_LOCAL_ARTIFACT_DIR; production never reads local files.',
+      '列出已存储的手动 OperatorX 运行，按运行 ID 从新到旧排序，不限制分支。每次请求最多从最近 44 天的记录导入四次运行；discovery_complete=false 表示需要继续获取。原始文档在产物过期后仍会保留。发现完成时缓存 60 秒，未完成时不缓存。服务端需要 GitHub 访问权限和 DATABASE_OPERATORX_WRITE_URL。本机开发环境可通过 OPERATORX_LOCAL_ARTIFACT_DIR 显式读取已下载的数据；生产环境不读取本地文件。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [],
+    responses: [
+      success(
+        'Run summaries.',
+        '运行摘要。',
+        objectSchema({
+          runs: arraySchema(operatorXRunSchema),
+          discovery_complete: { type: 'boolean' },
+        }),
+        { runs: [operatorXExampleRun], discovery_complete: true },
+      ),
+      errorResponse('404', 'Workflow unavailable.', '工作流不可用。', 'OperatorX unavailable'),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage or configuration unavailable.',
+        '存储或配置不可用。',
+        'OperatorX unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXRunList',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs`,
+  },
+  {
+    id: 'get-operatorx-run',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs/{runId}',
+    summary: text('Read an OperatorX run', '读取 OperatorX 运行'),
+    description: text(
+      'Reads dense GEMM cases matched against the requested manifest. Newest shard attempts replace older results, while untouched shards survive partial reruns. Source/run/attempt/cluster provenance is validated. TFLOPS = 2*M*N*K/(latency_us*1e6), per GPU; unsupported, failed, missing, or zero-sized cases have null TFLOPS. A completed failed run may still contain measurements. The server lazily stores raw artifacts and serves stored data during a GitHub outage. Cached for 60 seconds. The same explicit loopback development preview as the runs endpoint is available.',
+      '按执行清单读取稠密 GEMM 测试。每个分片采用最新尝试的结果，局部重跑时保留未重跑分片的数据。校验源码、运行、尝试次数和集群来源。单卡 TFLOPS = 2*M*N*K/(latency_us*1e6)；不支持、失败、缺失或零维度测试的 TFLOPS 为 null。已结束但失败的运行仍可能包含实测数据。服务端按需保存原始产物，GitHub 不可用时返回已存储结果，缓存 60 秒。支持与运行列表相同的本机开发预览。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'runId',
+        'path',
+        true,
+        'integer',
+        'Positive GitHub Actions run ID.',
+        'GitHub Actions 正整数运行 ID。',
+        positiveIdSchema,
+        123456789,
+      ),
+    ],
+    responses: [
+      success(
+        'Run coverage and measurements.',
+        '运行覆盖情况和测量结果。',
+        objectSchema({
+          version: { type: 'integer', enum: [1] },
+          run: operatorXRunSchema,
+          points: arraySchema(operatorXPointSchema),
+        }),
+        {
+          version: 1,
+          run: operatorXExampleRun,
+          points: [
+            {
+              id: 'shard:0:torch',
+              shard: 'shard',
+              attempt: 1,
+              cluster: 'h100_dgxc_8x',
+              backend: 'torch',
+              testlist: 'gemm',
+              name: null,
+              m: 1000,
+              n: 1000,
+              k: 1000,
+              dtype_a: 'bf16',
+              dtype_b: 'bf16',
+              dtype_out: 'bf16',
+              status: 'ok',
+              message: null,
+              latency_us: 1000,
+              tflops: 2,
+            },
+          ],
+        },
+      ),
+      errorResponse('400', 'Invalid run ID.', '运行 ID 无效。', 'OperatorX run unavailable'),
+      errorResponse(
+        '404',
+        'Run or artifacts not found.',
+        '找不到运行或产物。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX run unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage, configuration, or artifact validation failed.',
+        '存储、配置或产物校验失败。',
+        'OperatorX run unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXDataset',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs/123456789`,
+  },
+
   {
     id: 'get-availability',
     group: 'core',

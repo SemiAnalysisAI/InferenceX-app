@@ -46,6 +46,23 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/operatorx/runs/route.ts',
+    path: '/api/v1/operatorx/runs',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'list-operatorx-runs',
+    sourceSha256: 'f8e7049d1f3d16e3f4b6005b3c18eb9d1d427078b193e198d754a4e72fb516f7',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
+    path: '/api/v1/operatorx/runs/{runId}',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-run',
+    sourceSha256: '8337605725c6aefab2df6853f1a04446fdfcf6083c536fd8cce49c2abd771262',
+  },
+
+  {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
     method: 'GET',
@@ -597,6 +614,30 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/lib/operatorx-ingest.ts',
+    sourceSha256: 'a2a6a0f5ba77fba29129d5c7dea08e3fa106043f5a160372380f205395566adc',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU dense GEMM throughput.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况及单卡稠密 GEMM 性能。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/reader.ts',
+    sourceSha256: 'dc58074aab8b0d20f95a18149c06b9cc4543d424db49323706955e9d60ef4856',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU dense GEMM throughput.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况及单卡稠密 GEMM 性能。',
+    },
+  },
+  {
+    source: '../db/src/queries/operatorx.ts',
+    sourceSha256: '543b750bf5eb753dccf87d347616298bc56a96ec9e3af83b31ac881bffb5a486',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU dense GEMM throughput.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况及单卡稠密 GEMM 性能。',
+    },
+  },
   {
     source: 'src/lib/api-cache.ts',
     sourceSha256: 'b710c4ce4c2dd0a6eb3b662c9e426e301aee3afe3d64fba35745b9323be39ddd',
