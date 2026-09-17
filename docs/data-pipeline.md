@@ -525,12 +525,15 @@ Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns 
 
 ### PowerX Telemetry Digest (`gpu_metric_*`, migration 016)
 
-Every benchmark job samples `nvidia-smi` / `amd-smi` once per second for its
-whole lifetime and uploads the CSV as `gpu_metrics_<suffix>` next to
-`bmk_<suffix>` (agentic jobs: `bmk_agentic_<suffix>`, still paired by the bare
-suffix). The PowerX explorer used to download and parse those artifacts from
-GitHub on every request and lost them after GitHub's 90-day retention. CI ingest
-now digests them at ingest time, in the same step that links server logs:
+Every single-node benchmark job (`benchmark-tmpl.yml`) samples `nvidia-smi` /
+`amd-smi` once per second for its whole lifetime and uploads the CSV as
+`gpu_metrics_<suffix>` next to `bmk_<suffix>` (agentic jobs: `bmk_agentic_<suffix>`,
+still paired by the bare suffix). The multinode template uploads no `gpu_metrics_`
+artifact — its telemetry travels only inside `power_audit_` — so multinode and
+disaggregated points have no series here and their per-point PowerX tab stays
+empty. The PowerX explorer used to download and parse the artifacts from GitHub
+on every request and lost them after GitHub's 90-day retention. CI ingest now
+digests them at ingest time, in the same step that links server logs:
 
 - `gpu_metric_series` — one row per (workflow run, artifact, CSV path): vendor,
   CSV sha256, sample count, GPU count, recorded window, median cadence, and the
@@ -555,8 +558,13 @@ interval is a reader concern; the raw series deliberately includes server
 start-up and warm-up so both phases can be inspected.
 
 `bun run admin:db:backfill-gpu-metrics --all --yes` attaches telemetry for runs
-ingested before this migration. The GCS backup only mirrors `bmk_`/`server_logs_`
-uploads, so the reachable history is bounded by GitHub's 90-day retention.
+ingested before this migration. The reachable history is bounded by GitHub's
+90-day artifact retention (the upload step sets no `retention-days`) because the
+GCS backup, which keeps every artifact name, only mirrors `schedule` and `push`
+runs on `main`; PR sweeps and manual dispatches — nearly every telemetry-bearing
+run — are never copied. Our own GCS reader (`lib/gcs-artifacts.ts`) additionally
+ignores everything but `bmk_`/`server_logs_` objects, so widening the mirror's run
+filter would also need a reader change before backfill could use it.
 
 Readers: `/api/gpu-metrics?runId=` serves the digest when the run is stored and
 falls back to live GitHub artifacts otherwise (in-progress runs), and
