@@ -32,7 +32,8 @@ try {
     from benchmark_results br join configs c on c.id = br.config_id
     join workflow_runs wr on wr.id = br.workflow_run_id
     where wr.github_run_id = ${manifest.runId} and wr.run_attempt = ${manifest.runAttempt}
-      and br.benchmark_type = 'single_turn' and br.isl = 8192 and br.osl = 1024
+      and (br.benchmark_type = 'agentic_traces' or
+        (br.benchmark_type = 'single_turn' and br.isl = 8192 and br.osl = 1024))
   `;
   const errors = [
     ...(manifest.ingestErrors ?? []),
@@ -50,7 +51,12 @@ try {
       runId: String(manifest.runId),
       exactRun: 'true',
     }).toString();
-    const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(30_000),
+      headers: process.env.CACHE_PROTECTION_BYPASS_SECRET
+        ? { 'x-vercel-protection-bypass': process.env.CACHE_PROTECTION_BYPASS_SECRET }
+        : undefined,
+    });
     if (!response.ok)
       throw new Error(`Public PowerX verification returned HTTP ${response.status}: ${url}`);
     const body: unknown = await response.json();
@@ -78,7 +84,7 @@ try {
     points: manifest.points.length,
     counts,
     status:
-      errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_8k1k_points',
+      errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
     errors,
   };
   fs.writeFileSync(`${manifestPath}.verification.json`, `${JSON.stringify(receipt, null, 2)}\n`);
