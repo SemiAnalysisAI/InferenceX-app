@@ -14,7 +14,7 @@ export async function getOperatorXBundle(
 }
 export async function listOperatorXRuns(sql: DbClient): Promise<OperatorXRunSummary[]> {
   const rows = await sql`SELECT summary,
-    CASE WHEN summary->>'_reader_version' = '2' THEN NULL ELSE bundle END AS legacy_bundle
+    CASE WHEN summary->>'_reader_version' = '3' THEN NULL ELSE bundle END AS legacy_bundle
     FROM opx_runs ORDER BY run_id DESC`;
   const summaries: OperatorXRunSummary[] = [];
   for (const row of rows) {
@@ -23,12 +23,12 @@ export async function listOperatorXRuns(sql: DbClient): Promise<OperatorXRunSumm
     };
     let run = storedRun;
     if (row.legacy_bundle) {
-      // Rebuild old GEMM-only summaries from durable raw data, even after artifact expiry.
+      // Rebuild older operator coverage summaries from durable raw data, even after artifact expiry.
       run = readOperatorXBundle(row.legacy_bundle as OperatorXBundle).run;
-      const summary = { ...run, _reader_version: 2 };
+      const summary = { ...run, _reader_version: 3 };
       await sql`UPDATE opx_runs SET summary = ${summary}::jsonb
         WHERE run_id = ${run.run_id} AND run_attempt = ${run.run_attempt}
-          AND summary->>'_reader_version' IS DISTINCT FROM '2'`;
+          AND summary->>'_reader_version' IS DISTINCT FROM '3'`;
     }
     summaries.push(run);
   }
@@ -36,7 +36,7 @@ export async function listOperatorXRuns(sql: DbClient): Promise<OperatorXRunSumm
 }
 export async function saveOperatorXBundle(sql: DbClient, bundle: OperatorXBundle): Promise<void> {
   const { run } = readOperatorXBundle(bundle);
-  const summary = { ...run, _reader_version: 2 };
+  const summary = { ...run, _reader_version: 3 };
   await sql`INSERT INTO opx_runs (run_id, run_attempt, bundle, summary)
     VALUES (${run.run_id}, ${run.run_attempt}, ${bundle}::jsonb, ${summary}::jsonb)
     ON CONFLICT (run_id) DO UPDATE SET run_attempt = EXCLUDED.run_attempt,

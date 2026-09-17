@@ -13,7 +13,24 @@ export interface OperatorXBundle {
   shards: { id: string; attempt: number; docs: unknown[] }[];
 }
 export type OperatorXStatus = 'ok' | 'unsupported' | 'error' | 'missing';
-export type OperatorXKind = 'gemm' | 'attention_mha' | 'attention_mla';
+export type OperatorXKind = 'gemm' | 'attention_mha' | 'attention_mla' | 'moe_gemm';
+const OPERATOR_KINDS: readonly string[] = ['gemm', 'attention_mha', 'attention_mla', 'moe_gemm'];
+export interface OperatorXMoe {
+  num_tokens: number;
+  hidden: number;
+  intermediate: number;
+  local_intermediate: number;
+  num_experts: number;
+  local_experts: number;
+  top_k: number;
+  expert_parallel_size: number;
+  routed_tensor_parallel_size: number;
+  shared_tensor_parallel_size: number;
+  n_shared_experts: number;
+  dtype_act: string;
+  dtype_weight: string;
+  expert_distribution: string;
+}
 export interface OperatorXAttention {
   batch_size: number;
   seq_len_q: number;
@@ -33,6 +50,7 @@ export interface OperatorXPoint {
   type: OperatorXKind;
   args: Record<string, unknown>;
   attention: OperatorXAttention | null;
+  moe: OperatorXMoe | null;
   id: string;
   shard: string;
   attempt: number | null;
@@ -61,7 +79,7 @@ export interface OperatorXRunSummary extends OperatorXRunMeta {
   testlists: string[];
 }
 export interface OperatorXDataset {
-  version: 2;
+  version: 3;
   run: OperatorXRunSummary;
   points: OperatorXPoint[];
 }
@@ -84,6 +102,34 @@ function dimension(value: unknown): number {
   if (!Number.isSafeInteger(value) || Number(value) < 0)
     throw new Error('Invalid operator dimension');
   return Number(value);
+}
+function shardFactor(value: unknown): number {
+  const factor = dimension(value ?? 1);
+  if (factor === 0) throw new Error('Invalid MoE shard factor');
+  return factor;
+}
+function moeShape(args: Record<string, unknown>): OperatorXMoe {
+  const experts = dimension(args.num_experts);
+  const intermediate = dimension(args.intermediate);
+  const ep = shardFactor(args.expert_parallel_size);
+  const tp = shardFactor(args.routed_tensor_parallel_size);
+  if (experts % ep || intermediate % tp) throw new Error('Invalid MoE shard dimensions');
+  return {
+    num_tokens: dimension(args.num_tokens),
+    hidden: dimension(args.hidden),
+    intermediate,
+    local_intermediate: intermediate / tp,
+    num_experts: experts,
+    local_experts: experts / ep,
+    top_k: dimension(args.top_k),
+    expert_parallel_size: ep,
+    routed_tensor_parallel_size: tp,
+    shared_tensor_parallel_size: shardFactor(args.shared_tensor_parallel_size),
+    n_shared_experts: dimension(args.n_shared_experts ?? 0),
+    dtype_act: text(args.dtype_act),
+    dtype_weight: text(args.dtype_weight),
+    expert_distribution: text(args.expert_distribution ?? 'uniform'),
+  };
 }
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -115,6 +161,18 @@ function attentionTflops(a: OperatorXAttention, latencyUs: number): number | nul
   const rows = Math.min(q, k);
   const pairs = a.causal ? (rows * (2 * k - rows + 1)) / 2 : q * k;
   const result = (2 * b * h * pairs * (a.head_dim_qk + a.head_dim_v)) / (latencyUs * 1e6);
+  return Number.isFinite(result) ? result : null;
+}
+
+function moeTflops(m: OperatorXMoe, latencyUs: number): number | null {
+  if (![m.num_tokens, m.hidden, m.local_intermediate, m.local_experts, m.top_k].every((v) => v > 0))
+    return null;
+  if (m.top_k > m.local_experts) return null;
+  const work =
+    m.top_k * m.local_intermediate +
+    (m.n_shared_experts * m.intermediate) / m.shared_tensor_parallel_size;
+  // Gate + up + down matmuls; local routing already accounts for the expert shard.
+  const result = (6 * m.num_tokens * m.hidden * work) / (latencyUs * 1e6);
   return Number.isFinite(result) ? result : null;
 }
 
@@ -166,8 +224,8 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
     for (const [index, caseValue] of array(cell.cases).entries()) {
       const entry = object(caseValue);
       const shape = object(entry.shape);
-      if (!['gemm', 'attention_mha', 'attention_mla'].includes(String(shape.type))) continue;
-      if (cell.world_size !== 1) throw new Error('GEMM and attention must use world_size=1');
+      if (!OPERATOR_KINDS.includes(String(shape.type))) continue;
+      if (cell.world_size !== 1) throw new Error('Displayed operators must use world_size=1');
       const args = object(shape.args);
       for (const backend of array(cell.backends)) {
         const row = results
@@ -185,31 +243,34 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
         }
         const gemm = shape.type === 'gemm';
         const mla = shape.type === 'attention_mla';
-        const attention: OperatorXAttention | null = gemm
-          ? null
-          : {
-              batch_size: dimension(args.batch_size),
-              seq_len_q: dimension(args.seq_len_q),
-              seq_len_kv: dimension(args.seq_len_kv),
-              num_heads: dimension(args.num_heads),
-              num_heads_kv: dimension(mla ? args.num_heads : args.num_heads_kv),
-              head_dim_qk: mla
-                ? dimension(args.head_dim_qk_nope) + dimension(args.head_dim_qk_rope)
-                : dimension(args.head_dim),
-              head_dim_v: dimension(mla ? args.head_dim_v : args.head_dim),
-              kv_lora_rank: mla ? dimension(args.kv_lora_rank) : null,
-              dtype_q: text(args.dtype_q),
-              dtype_k: text(mla ? args.dtype_kv : args.dtype_k),
-              dtype_v: text(mla ? args.dtype_kv : args.dtype_v),
-              dtype_o: text(args.dtype_o),
-              causal: args.causal === undefined ? true : args.causal === true,
-            };
+        const moe = shape.type === 'moe_gemm' ? moeShape(args) : null;
+        const attention: OperatorXAttention | null =
+          gemm || moe
+            ? null
+            : {
+                batch_size: dimension(args.batch_size),
+                seq_len_q: dimension(args.seq_len_q),
+                seq_len_kv: dimension(args.seq_len_kv),
+                num_heads: dimension(args.num_heads),
+                num_heads_kv: dimension(mla ? args.num_heads : args.num_heads_kv),
+                head_dim_qk: mla
+                  ? dimension(args.head_dim_qk_nope) + dimension(args.head_dim_qk_rope)
+                  : dimension(args.head_dim),
+                head_dim_v: dimension(mla ? args.head_dim_v : args.head_dim),
+                kv_lora_rank: mla ? dimension(args.kv_lora_rank) : null,
+                dtype_q: text(args.dtype_q),
+                dtype_k: text(mla ? args.dtype_kv : args.dtype_k),
+                dtype_v: text(mla ? args.dtype_kv : args.dtype_v),
+                dtype_o: text(args.dtype_o),
+                causal: args.causal === undefined ? true : args.causal === true,
+              };
         if (attention && args.causal !== undefined && typeof args.causal !== 'boolean')
           throw new Error('Invalid attention causality');
         const point: OperatorXPoint = {
           type: shape.type as OperatorXKind,
           args,
           attention,
+          moe,
           id: `${id}:${index}:${backend}`,
           shard: id,
           attempt: selected?.attempt ?? null,
@@ -229,18 +290,18 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
           tflops: null,
         };
         if (point.latency_us !== null)
-          point.tflops = attention
-            ? attentionTflops(attention, point.latency_us)
-            : gemmTflops(point.m!, point.n!, point.k!, point.latency_us);
+          point.tflops = moe
+            ? moeTflops(moe, point.latency_us)
+            : attention
+              ? attentionTflops(attention, point.latency_us)
+              : gemmTflops(point.m!, point.n!, point.k!, point.latency_us);
         points.push(point);
       }
     }
     // Reject unexpected/duplicate result rows rather than inflate measured coverage.
     if (
       [...results.values()].some((rows) =>
-        rows.some((row) =>
-          ['gemm', 'attention_mha', 'attention_mla'].includes(String(object(row.op).type)),
-        ),
+        rows.some((row) => OPERATOR_KINDS.includes(String(object(row.op).type))),
       )
     ) {
       throw new Error('Unexpected or duplicate operator result');
@@ -248,7 +309,7 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
   }
   const count = (status: OperatorXStatus) => points.filter((p) => p.status === status).length;
   return {
-    version: 2,
+    version: 3,
     run: {
       ...bundle.run,
       requested: points.length,

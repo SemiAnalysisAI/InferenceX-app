@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { it, expect } from 'vitest';
 import type { DbClient } from '../connection';
-import { makeOperatorXBundle, makeOperatorXAttentionBundle } from '../operatorx/test-fixture';
+import { makeOperatorXBundle, makeOperatorXMoeBundle } from '../operatorx/test-fixture';
 import { getOperatorXBundle, listOperatorXRuns, saveOperatorXBundle } from './operatorx';
 
 it('persists raw documents atomically and cannot replace a newer attempt with stale results', async () => {
@@ -35,14 +35,14 @@ it('persists raw documents atomically and cannot replace a newer attempt with st
       { run_id: '123', run_attempt: 2, measured: 1 },
     ]);
     expect(await getOperatorXBundle(sql, '999')).toBeNull();
-    const legacy = makeOperatorXAttentionBundle();
+    const legacy = makeOperatorXMoeBundle();
     await sql`UPDATE opx_runs SET bundle = ${legacy}::jsonb, run_attempt = 1,
-      summary = ${legacy.run}::jsonb WHERE run_id = '123'`;
-    expect(await listOperatorXRuns(sql)).toMatchObject([{ requested: 3, measured: 3 }]);
+      summary = ${{ ...legacy.run, _reader_version: 2, requested: 3, measured: 3 }}::jsonb WHERE run_id = '123'`;
+    expect(await listOperatorXRuns(sql)).toMatchObject([{ requested: 4, measured: 4 }]);
     const refreshed = await db.query<{ summary: Record<string, unknown> }>(
       'SELECT summary FROM opx_runs',
     );
-    expect(refreshed.rows[0].summary).toMatchObject({ _reader_version: 2, measured: 3 });
+    expect(refreshed.rows[0].summary).toMatchObject({ _reader_version: 3, measured: 4 });
     const summaries = await listOperatorXRuns(sql);
     expect(summaries[0]).not.toHaveProperty('_reader_version');
   } finally {

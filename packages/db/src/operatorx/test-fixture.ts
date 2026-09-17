@@ -106,3 +106,46 @@ export function makeOperatorXAttentionBundle(): OperatorXBundle {
   });
   return bundle;
 }
+
+export function makeOperatorXMoeBundle(): OperatorXBundle {
+  const bundle = makeOperatorXAttentionBundle();
+  const manifest = bundle.manifest as { include: { cases: unknown[]; [key: string]: unknown }[] };
+  const doc = structuredClone(bundle.shards[0].docs[0]) as {
+    rows: unknown[];
+    run: { env: Record<string, string> };
+  };
+  doc.rows = [];
+  doc.run.env.OPERATORX_SHARD_ID = 'b';
+  const shape = {
+    type: 'moe_gemm',
+    name: 'Controlled routed expert profile',
+    args: {
+      num_tokens: 128,
+      hidden: 1024,
+      intermediate: 2048,
+      num_experts: 64,
+      top_k: 4,
+      expert_parallel_size: 8,
+      routed_tensor_parallel_size: 2,
+      shared_tensor_parallel_size: 1,
+      n_shared_experts: 0,
+      dtype_act: 'bf16',
+      dtype_weight: 'bf16',
+      expert_distribution: 'uniform',
+    },
+  };
+  manifest.include.push({
+    ...manifest.include[0],
+    id: 'b',
+    backends: ['vllm'],
+    cases: [{ testlist: 'moe_fixture', shape }],
+  });
+  bundle.shards.push({ id: 'b', attempt: 1, docs: [doc] });
+  doc.rows.push({
+    op: { ...shape, backend: 'vllm' },
+    testlist: 'moe_fixture',
+    status: 'ok',
+    metrics: { latency_us: 100 },
+  });
+  return bundle;
+}
