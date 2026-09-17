@@ -29,8 +29,9 @@ export interface TelemetryDisplayState {
   series: TelemetrySeriesMode;
 }
 
+/** Rolling average is the default: at 1 s cadence the raw points read as noise. */
 export const DEFAULT_TELEMETRY_DISPLAY: TelemetryDisplayState = {
-  mode: 'points',
+  mode: 'rolling',
   windowS: 30,
   series: 'chips',
 };
