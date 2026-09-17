@@ -63,6 +63,14 @@ export const apiRouteCatalog = [
   },
 
   {
+    source: 'src/app/api/v1/pareto/route.ts',
+    path: '/api/v1/pareto',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-pareto',
+    sourceSha256: '40f350f1b947d223597132effb351960658494549ec35201aa13491d21d9f94d',
+  },
+  {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
     method: 'GET',
@@ -636,6 +644,22 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM and attention throughput, and latency.',
       zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM 和 attention 单卡吞吐量及延迟。',
+    },
+  },
+  {
+    source: 'src/lib/pareto-api.ts',
+    sourceSha256: '6854dc8b0d883503bdcdd6edf3022386c4a3b0e54f4b6b100e921d534d228c72',
+    reviewArea: {
+      en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
+      zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
+    },
+  },
+  {
+    source: 'src/lib/pareto-frontier.ts',
+    sourceSha256: '03a09b631f9dd933d21189e684ea729259e9a228274d55b1da65d2af102a9a4a',
+    reviewArea: {
+      en: 'Shared chart/API dominance directions, tie handling and boundary ordering.',
+      zh: '图表与 API 共用的支配方向、同坐标处理和边界排序。',
     },
   },
   {

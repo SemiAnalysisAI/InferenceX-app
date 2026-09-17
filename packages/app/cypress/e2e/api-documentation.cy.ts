@@ -5,6 +5,90 @@ import PUBLISHED_SKILL from '../../src/lib/published-inferencex-skills.json';
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  it('returns both Pareto boundaries and documents them in both languages', () => {
+    const query =
+      '/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max';
+    cy.request<BenchmarkRow[]>('/api/v1/benchmarks?model=DeepSeek-R1-0528').then(
+      ({ body: rows }) => {
+        const selected = rows.filter(
+          (row) =>
+            row.model === 'dsr1' &&
+            row.benchmark_type === 'single_turn' &&
+            row.isl === 1024 &&
+            row.osl === 1024,
+        );
+        const eligible = selected.filter(
+          (row) =>
+            Number.isFinite(row.metrics.median_intvty) &&
+            Number.isFinite(row.metrics.output_tput_per_gpu),
+        );
+        // Legacy snapshots omit benchmark_type. They must not be silently
+        // promoted into an explicitly requested single_turn workload.
+        expect(rows.length).to.be.greaterThan(0);
+        cy.request(query).then(({ body, status }) => {
+          expect(status).to.equal(200);
+          expect(body.counts).to.deep.equal({
+            returned: rows.length,
+            selected: selected.length,
+            eligible: eligible.length,
+            missing_or_nonfinite: selected.length - eligible.length,
+          });
+          for (const [boundary, direction] of [
+            ['frontier', 1],
+            ['hinterland', -1],
+          ] as const) {
+            const expected = eligible
+              .filter(
+                (row) =>
+                  !eligible.some((other) => {
+                    const dx =
+                      direction * (other.metrics.median_intvty - row.metrics.median_intvty);
+                    const dy =
+                      direction *
+                      (other.metrics.output_tput_per_gpu - row.metrics.output_tput_per_gpu);
+                    return dx >= 0 && dy >= 0 && (dx > 0 || dy > 0);
+                  }),
+              )
+              .map((row) => row.id)
+              .sort((a, b) => a - b);
+            const actual = body[boundary]
+              .flatMap((point: { observations: BenchmarkRow[] }) =>
+                point.observations.map((row) => row.id),
+              )
+              .sort((a: number, b: number) => a - b);
+            expect(actual).to.deep.equal(expected);
+          }
+        });
+      },
+    );
+    cy.request({ url: `${query}&i_frontier=1`, failOnStatusCode: false })
+      .its('status')
+      .should('eq', 400);
+    cy.request(`${query}&hardware=not-a-hardware`).then(({ body }) => {
+      expect(body.frontier).to.deep.equal([]);
+      expect(body.hinterland).to.deep.equal([]);
+      expect(body.counts.selected).to.equal(0);
+    });
+    for (const locale of ['/api', '/zh/api']) {
+      cy.visit(locale);
+      cy.get('[data-testid="api-endpoint-get-pareto"] summary').click();
+      cy.get('[data-testid="api-endpoint-get-pareto"]')
+        .should('contain.text', '/api/v1/pareto')
+        .and('contain.text', 'i_frontier/i_hinterland=1')
+        .and('contain.text', 'observations')
+        .and('contain.text', 'xDirection');
+    }
+    cy.request('/api/openapi.json').then(({ body }) => {
+      expect(body.paths['/api/v1/pareto'].get.operationId).to.equal('get-pareto');
+      expect(body.components.schemas.ParetoBoundaries.properties).to.have.keys(
+        'source_url',
+        'selection',
+        'counts',
+        'frontier',
+        'hinterland',
+      );
+    });
+  });
   for (const locale of [
     {
       path: '/api',
