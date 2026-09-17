@@ -23,6 +23,37 @@ interface HistoryWrite {
   pathname: string;
 }
 
+describe('landing model curation', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`shows the curated ledger on ${prefix || '/'} without changing compare coverage`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
+          expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
+            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3', 'qwen-3-5'].map(
+              (slug) => `${prefix}/inference/${slug}`,
+            ),
+          );
+        });
+        cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
+      });
+
+      cy.visit(`${prefix}/compare`);
+      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
+          cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
+            'have.attr',
+            'href',
+            `${prefix}/inference/${slug}`,
+          );
+        }
+      });
+    });
+  }
+});
+
 describe('landing → full dashboard navigation', () => {
   const isChromium = Cypress.browser.family === 'chromium';
 

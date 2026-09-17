@@ -166,8 +166,8 @@ describe('First-load navigation', () => {
         .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
-      // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      // Landing curation preserves the relative editorial order.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
@@ -175,23 +175,21 @@ describe('First-load navigation', () => {
         expect(slugs).to.deep.equal([
           'kimi-k3',
           'deepseek-v41-flash',
-          'deepseek-v4',
           'glm-5-3',
           'minimax-m3',
           'qwen-3-5',
-          'qwen-3-8-flash-next',
         ]);
       });
       // Only the still-new rows carry the NEW pill — see AGENTX_NEW_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-        .should('have.length', 4)
+        .should('have.length', 3)
         .each(($badge) => expect($badge.text()).to.equal('NEW'));
-      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'qwen-3-8-flash-next']) {
+      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3']) {
         cy.get(
           `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
         ).should('exist');
       }
-      for (const slug of ['deepseek-v4', 'minimax-m3', 'qwen-3-5']) {
+      for (const slug of ['minimax-m3', 'qwen-3-5']) {
         cy.get(
           `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
         ).should('not.exist');
