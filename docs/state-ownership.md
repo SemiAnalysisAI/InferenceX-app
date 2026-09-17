@@ -360,3 +360,15 @@ Dashboard scope membership is declared by `shareParamScopes` in
 `packages/app/src/lib/dashboard-routes.ts`. Tests enforce completeness and route-specific
 share behavior, so this document deliberately does not duplicate a manually maintained
 parameter table.
+
+One entry needs a note on its encoding: `i_rulers` (inference scope, default `''`) is
+`serializePerfRulers` output — `isoX|curveA|curveB` per ruler joined by `;`, where the
+curve ids are the rendered roofline path identity classes (`roofline-<hwKey>_<precision>`,
+`overlay-roofline-<hwKey>_<precision>_run<N>`, optionally `__<encoded date>`) and the
+iso-x is in DATA space rounded to four significant digits. `parsePerfRulers` only accepts
+curve ids of that identity-class shape — the shared `roofline-path` marker class or any
+other zoom-group node would match many paths and draw a ruler between arbitrary curves.
+Only committed rulers are serialized (never the draft or still-pending link rulers), and
+the chart prunes them against the rendered curves, so a link written from one data set
+degrades to fewer rulers, never to an error. Overlay ids depend on the run order in `unofficialruns`, which the share
+link already carries.

@@ -89,6 +89,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
   });
 
+  it('has an empty default for perf rulers (none placed)', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_rulers).toBe('');
+  });
+
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');
@@ -125,6 +130,17 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.g_model).toBe('llama-3');
     expect(params.i_seq).toBe('2k/4k');
+  });
+
+  it('reads perf rulers decoded, with curve ids and separators intact', async () => {
+    const encoded = new URLSearchParams({
+      i_rulers: '41.5|roofline-b200_trt_fp8|overlay-roofline-h100_vllm_fp8_run1__2026-09%2F11',
+    }).toString();
+    setupWindow(`?${encoded}`);
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().i_rulers).toBe(
+      '41.5|roofline-b200_trt_fp8|overlay-roofline-h100_vllm_fp8_run1__2026-09%2F11',
+    );
   });
 
   it('reads the Internal TCO basis from the URL', async () => {
@@ -354,6 +370,17 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     const url = buildShareUrl();
     expect(url).not.toContain('g_model');
+  });
+
+  it('drops i_rulers from the share link once the last ruler is cleared', async () => {
+    setupWindow('?i_rulers=41.5%7Croofline-a%7Croofline-b', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    expect(buildShareUrl()).toContain('i_rulers=');
+
+    writeUrlParams({ i_rulers: '' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).not.toContain('i_rulers');
   });
 
   it('removes the revenue source instead of emitting an empty query param off-metric', async () => {
@@ -623,6 +650,28 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).toMatch(/i_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('e_active');
     expect(url).not.toContain('r_active');
+  });
+
+  it('shares i_rulers on /inference and its compare routes but not on other tabs', async () => {
+    const rulers = '41.5|roofline-b200_trt_fp8|roofline-mi355x_sglang_fp4';
+    for (const pathname of ['/inference', '/zh/inference', '/compare/b200-vs-mi355x']) {
+      vi.resetModules();
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      writeUrlParams({ i_rulers: rulers });
+      await vi.advanceTimersByTimeAsync(200);
+      const url = buildShareUrl();
+      expect(url, pathname).toContain('i_rulers=');
+      expect(new URL(url).searchParams.get('i_rulers'), pathname).toBe(rulers);
+    }
+    for (const pathname of ['/evaluation', '/reliability']) {
+      vi.resetModules();
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      writeUrlParams({ i_rulers: rulers });
+      await vi.advanceTimersByTimeAsync(200);
+      expect(buildShareUrl(), pathname).not.toContain('i_rulers');
+    }
   });
 
   it('includes e_active on /evaluation but not i_active or r_active', async () => {

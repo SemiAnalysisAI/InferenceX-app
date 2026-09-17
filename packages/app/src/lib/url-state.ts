@@ -61,6 +61,9 @@ const URL_STATE_KEYS = [
   'i_spec',
   // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
   'i_power',
+  // Completed Perf Rulers on the primary inference chart: `isoX|curveA|curveB`
+  // entries joined by `;` (see serializePerfRulers in d3-chart/layers/perf-ruler).
+  'i_rulers',
   // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
@@ -167,6 +170,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_disagg: '',
   i_spec: '',
   i_power: '',
+  i_rulers: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',

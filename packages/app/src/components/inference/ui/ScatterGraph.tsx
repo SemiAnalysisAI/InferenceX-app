@@ -16,6 +16,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import { usePerfRulerStore } from '@/components/inference/perf-ruler-store';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -75,6 +76,7 @@ import {
   renderPerfRulers,
   type PerfRulerEndInput,
   type PerfRulerGeometry,
+  type PerfRulerMeasurement,
   type PerfRulerRenderEntry,
   type PerfRulerState,
 } from '@/lib/d3-chart/layers/perf-ruler';
@@ -1554,17 +1556,39 @@ const ScatterGraph = React.memo(
     // the curves' rendered paths at the iso-x — neither end needs to be a
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
-    const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
+    //
+    // The primary chart's rulers live in the InferenceProvider store so they
+    // ride along in share links (`i_rulers`) and survive a remount (table
+    // view toggle). Every other instance — the replay chart, which draws the
+    // same curve classes, and harnesses mounted without the provider — keeps
+    // component-local state. Both paths share one `[state, setState]` pair
+    // below, so the reducers, refs, and draw passes are path-agnostic.
+    const perfRulerStore = usePerfRulerStore();
+    const persistedRulers = perfRulerStore?.chartId === chartId ? perfRulerStore : undefined;
+    // Rulers only render while the mode is on (and the mode-off effect below
+    // clears them), so restored share-link rulers — pending or already
+    // committed by a previous mount — switch the mode on for this instance.
+    const [preferPerfRulerMode, setPerfRulerMode] = useState(
+      () =>
+        persistedRulers !== undefined &&
+        (persistedRulers.pending !== null || persistedRulers.state.rulers.length > 0),
+    );
     const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
-    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    const [localPerfRulerState, setLocalPerfRulerState] =
+      useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
+    const setPerfRulerState = persistedRulers ? persistedRulers.setState : setLocalPerfRulerState;
     // Changing the x- or y-axis metric (including the x percentile, which
     // `x_scale_field` encodes) clears every ruler: the curves are redrawn
     // in different units, so a ruler that persisted would measure a ratio
     // the user never placed. Runs before the draw pass so no stale ruler
-    // ever paints over the new curves.
+    // ever paints over the new curves. Render-time adjustment is only legal
+    // for this component's own state, so the hook targets the local state;
+    // the store applies the same reset to persisted rulers inside the
+    // provider (see usePerfRulerStoreValue).
     usePerfRulerAxisReset(
       perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
-      setPerfRulerState,
+      setLocalPerfRulerState,
     );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass — lines/labels must never
@@ -1630,6 +1654,51 @@ const ScatterGraph = React.memo(
       [],
     );
 
+    // Share-link rulers commit only once BOTH curve paths are in the DOM —
+    // otherwise the prune pass would eat them before their data (i_gpus,
+    // comparison dates, overlay runs) has arrived. Hidden curves (opacity 0)
+    // count as present, like for prune. The iso-x is clamped to the pair's
+    // overlap through the drawn paths, so a rounded or since-shifted iso-x
+    // still renders; a pair with disjoint spans can never be measured on
+    // these axes and is dropped. This runs from the draw pass rather than a
+    // React effect: the chart first draws in a D3Chart-local re-render
+    // (dimensions are measured after mount), which re-renders nothing here,
+    // so an effect keyed on our props could miss the first draw and leave
+    // resolvable rulers pending for the rest of the session. The store is
+    // read through a ref for the same reason the draw passes read the ruler
+    // state through refs. Nothing commits while the mode is off (forced off
+    // by the power envelope, or switched off by the user) — the mode-off
+    // effect discards pending rulers, and the analytics event must not
+    // report a restore nobody saw. Draw passes can repeat before React has
+    // applied a commit, so the pending list handed over is remembered by
+    // identity and skipped until the store replaces it.
+    const persistedRulersRef = useRef(persistedRulers);
+    persistedRulersRef.current = persistedRulers;
+    const committedPendingRef = useRef<readonly PerfRulerMeasurement[] | null>(null);
+    const commitPendingPerfRulers = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        const store = persistedRulersRef.current;
+        const pending = store?.pending ?? null;
+        if (!store || !pending || !perfRulerModeRef.current) return;
+        if (committedPendingRef.current === pending) return;
+        const curveExists = (cls: string) => !zoomGroup.select(`.${CSS.escape(cls)}`).empty();
+        const resolved: PerfRulerMeasurement[] = [];
+        const remaining: PerfRulerMeasurement[] = [];
+        for (const ruler of pending) {
+          if (!curveExists(ruler.curveA) || !curveExists(ruler.curveB)) {
+            remaining.push(ruler);
+            continue;
+          }
+          const isoX = clampPerfRulerIsoXToOverlap(ruler.curveA, ruler.curveB, ruler.isoX);
+          if (isoX !== null) resolved.push({ ...ruler, isoX });
+        }
+        if (remaining.length === pending.length) return;
+        committedPendingRef.current = pending;
+        store.commitPending(resolved, remaining.length > 0 ? remaining : null);
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+
     // Curve click (widened hit strokes): iso-x is the click's x pixel
     // through the CURRENT rendered x scale, stored in data space.
     const handlePerfRulerCurveClick = useCallback(
@@ -1688,8 +1757,12 @@ const ScatterGraph = React.memo(
     // the switch handler also clears synchronously, this covers
     // programmatic mode changes). `clearPerfRulers` bails out with the same
     // reference when there is nothing to clear.
+    // Share-link rulers still waiting for their curves go too — the user
+    // switched the tool off, so nothing should surface later.
     useEffect(() => {
-      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
+      if (perfRulerMode) return;
+      setPerfRulerState(clearPerfRulers);
+      persistedRulers?.discardPending();
     }, [perfRulerMode]);
 
     // Invisible widened hit strokes over every rendered roofline path
@@ -1839,6 +1912,7 @@ const ScatterGraph = React.memo(
       ) => {
         perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
         syncPerfRulerHitPaths(zoomGroup);
+        commitPendingPerfRulers(zoomGroup);
         const state = perfRulerStateRef.current;
         const entries: PerfRulerRenderEntry[] = [];
         if (perfRulerModeRef.current && state.rulers.length > 0) {
@@ -1892,7 +1966,7 @@ const ScatterGraph = React.memo(
         );
         if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
       },
-      [syncPerfRulerHitPaths, perfRulerDrag],
+      [syncPerfRulerHitPaths, commitPendingPerfRulers, perfRulerDrag],
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
@@ -3517,7 +3591,9 @@ const ScatterGraph = React.memo(
       // brings a hidden ruler back); curves whose paths left the DOM
       // entirely are truly gone from the data, so prune each ruler (and the
       // draft) that references one. `prunePerfRulers` bails out with the
-      // same reference when nothing changed.
+      // same reference when nothing changed. Share-link rulers still
+      // pending are not state yet, so prune cannot touch them; drawPerfRuler
+      // above committed those whose curves now exist.
       setPerfRulerState((prev) =>
         prunePerfRulers(prev, (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty()),
       );
@@ -3922,7 +3998,10 @@ const ScatterGraph = React.memo(
                           // the pre-paint decoration effect then removes the rulers
                           // and the curve hit strokes before the next frame (no
                           // lingering lines after toggle-off).
-                          if (!checked) setPerfRulerState(clearPerfRulers);
+                          if (!checked) {
+                            setPerfRulerState(clearPerfRulers);
+                            persistedRulers?.discardPending();
+                          }
                           track('latency_perf_ruler_toggled', { enabled: checked });
                         },
                       },
@@ -3970,6 +4049,7 @@ const ScatterGraph = React.memo(
                             count: perfRulerState.rulers.length,
                           });
                           setPerfRulerState(clearPerfRulers);
+                          persistedRulers?.discardPending();
                         },
                       },
                     ]

@@ -55,6 +55,13 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
+import {
+  PERSISTED_PERF_RULER_CHART_ID,
+  PerfRulerStoreContext,
+  persistedPerfRulerAxisKey,
+  usePerfRulerStoreValue,
+} from '@/components/inference/perf-ruler-store';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -1023,6 +1030,21 @@ export function InferenceProvider({
   const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
+  // ── Perf rulers (persisted chart) ────────────────────────────────────────
+  // The axis identity follows the graph ChartDisplay renders as `chart-0`
+  // (picked by x mode, like `bestHwTypes` below), so an x-mode switch that
+  // swaps the rendered chart or its x units clears the rulers the same way
+  // the chart's own `usePerfRulerAxisReset` does for local state.
+  const perfRulerStore = usePerfRulerStoreValue(
+    PERSISTED_PERF_RULER_CHART_ID,
+    getUrlParam('i_rulers'),
+    persistedPerfRulerAxisKey(graphs, selectedXAxisMode, selectedYAxisMetric),
+  );
+  const iRulersStr = useMemo(
+    () => serializePerfRulers(perfRulerStore.state),
+    [perfRulerStore.state],
+  );
+
   // ── Toggle sets ───────────────────────────────────────────────────────────
 
   const {
@@ -1587,6 +1609,7 @@ export function InferenceProvider({
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
       i_power: quickFilterPower.join(','),
+      i_rulers: iRulersStr,
     },
     [
       selectedYAxisMetric,
@@ -1616,6 +1639,7 @@ export function InferenceProvider({
       quickFilterDeployment,
       quickFilterSpec,
       quickFilterPower,
+      iRulersStr,
     ],
   );
 
@@ -1921,7 +1945,9 @@ export function InferenceProvider({
         display={displayValue}
         actions={actionsValue}
       >
-        {children}
+        <PerfRulerStoreContext.Provider value={perfRulerStore}>
+          {children}
+        </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
         detail={isUnofficialRun ? null : engineConflict}
