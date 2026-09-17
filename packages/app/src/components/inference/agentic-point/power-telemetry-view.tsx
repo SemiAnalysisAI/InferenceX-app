@@ -24,7 +24,6 @@ import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -34,6 +33,8 @@ import {
 } from '@/components/ui/select';
 import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-metrics-point';
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
+
+import { availableOverlaySources, overlaySourceLabel } from './overlay-sources';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
@@ -56,14 +57,14 @@ const STRINGS = {
     chip: 'Chip',
     secondsUnit: 's',
     resetFilter: 'Show all chips',
-    overlayToggle: 'Overlay decode throughput',
-    decodeTps: 'Decode throughput',
+    overlayToggle: 'Overlay server metric',
+    overlayNone: 'None',
     overlayLoading: 'Loading server metrics…',
-    overlayError: 'Server metrics failed to load; the overlay is unavailable.',
-    overlayUnavailable: 'This point has no decode-throughput server metrics to overlay.',
-    overlayAligned: 'Decode throughput is aligned to the telemetry by wall-clock timestamps.',
+    overlayError: 'Server metrics failed to load; overlays are unavailable.',
+    overlayUnavailable: 'This point has no server-metric series to overlay.',
+    overlayAligned: 'The overlay is aligned to the telemetry by wall-clock timestamps.',
     overlayRelative:
-      'The trace has no wall-clock timestamps, so decode throughput starts at the telemetry start (both at t=0).',
+      'The trace has no wall-clock timestamps, so the overlay and the telemetry are both aligned at their own t=0.',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
@@ -83,19 +84,18 @@ const STRINGS = {
     chip: '芯片',
     secondsUnit: '秒',
     resetFilter: '显示全部芯片',
-    overlayToggle: '叠加 decode 吞吐量',
-    decodeTps: 'Decode 吞吐量',
+    overlayToggle: '叠加服务端指标',
+    overlayNone: '无',
     overlayLoading: '正在加载服务端指标……',
     overlayError: '服务端指标加载失败，无法叠加显示。',
-    overlayUnavailable: '该数据点没有可叠加的 decode 吞吐量服务端指标。',
-    overlayAligned: 'Decode 吞吐量已按绝对时间戳与遥测数据对齐。',
-    overlayRelative: 'trace 缺少绝对时间戳，因此 decode 吞吐量与遥测数据均从各自的 t=0 开始对齐。',
+    overlayUnavailable: '该数据点没有可叠加的服务端指标序列。',
+    overlayAligned: '叠加曲线已按绝对时间戳与遥测数据对齐。',
+    overlayRelative: 'trace 缺少绝对时间戳，因此叠加曲线与遥测数据均从各自的 t=0 开始对齐。',
   },
 } as const;
 
 const VENDOR_LABEL: Record<string, string> = { nvidia: 'nvidia-smi', amd: 'amd-smi' };
 /** Violet: outside the Tableau10 chip palette and the foreground mean line. */
-const OVERLAY_COLOR = '#8b5cf6';
 
 interface Props {
   id: number;
@@ -166,32 +166,37 @@ export function PowerTelemetryView({ id, enabled }: Props) {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
 
-  // Decode-throughput overlay: fetched only once the switch is on.
-  const [overlayEnabled, setOverlayEnabled] = useState(false);
-  const metricsQuery = useTraceServerMetrics(id, enabled && overlayEnabled);
+  // Server-metric overlay. The series are fetched as soon as the tab opens so
+  // the menu can list exactly the metrics this point has; one source at a time.
+  const metricsQuery = useTraceServerMetrics(id, enabled);
   const serverMetrics = metricsQuery.data;
-  const decodeTps = serverMetrics?.decodeTps ?? [];
+  const overlaySources = useMemo(() => availableOverlaySources(serverMetrics), [serverMetrics]);
+  const [overlaySelection, setOverlaySelection] = useState<{ id: number; key: string } | null>(
+    null,
+  );
+  const overlayKey = overlaySelection?.id === id ? overlaySelection.key : 'none';
+  const overlaySource = overlaySources.find((source) => source.key === overlayKey) ?? null;
   // Trace timeslices carry epoch-ns starts, so both series can share wall-clock
   // time. A zero startNs means the trace only has relative time.
   const overlayAbsolute = Boolean(serverMetrics && serverMetrics.startNs > 0);
   const overlay = useMemo<TelemetryOverlaySeries | null>(() => {
-    if (!overlayEnabled || !serverMetrics || !selectedSeries || decodeTps.length === 0) return null;
+    if (!overlaySource || !serverMetrics || !selectedSeries) return null;
     const originMs = overlayAbsolute
       ? serverMetrics.startNs / 1e6
       : new Date(selectedSeries.startedAt).getTime();
     return {
-      key: 'decodeTps',
-      label: t.decodeTps,
-      unit: 'tok/s',
-      color: OVERLAY_COLOR,
-      points: toAbsoluteMs(decodeTps, originMs),
+      key: overlaySource.key,
+      label: overlaySourceLabel(overlaySource, locale),
+      unit: overlaySource.unit,
+      color: overlaySource.color,
+      points: toAbsoluteMs(overlaySource.points(serverMetrics), originMs),
     };
-  }, [overlayEnabled, serverMetrics, selectedSeries, decodeTps, overlayAbsolute, t.decodeTps]);
+  }, [overlaySource, serverMetrics, selectedSeries, overlayAbsolute, locale]);
   const overlayNote = ((): string | null => {
-    if (!overlayEnabled) return null;
     if (metricsQuery.isLoading) return t.overlayLoading;
     if (metricsQuery.isError) return t.overlayError;
-    if (!overlay) return t.overlayUnavailable;
+    if (overlaySources.length === 0) return t.overlayUnavailable;
+    if (!overlay) return null;
     return overlayAbsolute ? t.overlayAligned : t.overlayRelative;
   })();
 
@@ -328,24 +333,37 @@ export function PowerTelemetryView({ id, enabled }: Props) {
           idPrefix="power-telemetry-display"
           className="mt-3 border-t border-border/60 pt-3"
         />
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="power-telemetry-overlay"
-              data-testid="power-telemetry-overlay-switch"
-              checked={overlayEnabled}
-              onCheckedChange={(checked) => {
-                track('inference_agentic_power_overlay_toggled', { id, enabled: checked });
-                setOverlayEnabled(checked);
+        <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+          <div className="space-y-1">
+            <Label htmlFor="power-telemetry-overlay">{t.overlayToggle}</Label>
+            <Select
+              value={overlayKey}
+              disabled={overlaySources.length === 0}
+              onValueChange={(value) => {
+                track('inference_agentic_power_overlay_changed', { id, source: value });
+                setOverlaySelection({ id, key: value });
               }}
-            />
-            <Label htmlFor="power-telemetry-overlay" className="cursor-pointer">
-              {t.overlayToggle}
-            </Label>
+            >
+              <SelectTrigger
+                id="power-telemetry-overlay"
+                data-testid="power-telemetry-overlay-select"
+                className="w-full sm:w-64"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t.overlayNone}</SelectItem>
+                {overlaySources.map((source) => (
+                  <SelectItem key={source.key} value={source.key}>
+                    {overlaySourceLabel(source, locale)} ({source.unit})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {overlayNote && (
             <span
-              className="text-xs text-muted-foreground"
+              className="pb-2 text-xs text-muted-foreground"
               data-testid="power-telemetry-overlay-note"
             >
               {overlayNote}
