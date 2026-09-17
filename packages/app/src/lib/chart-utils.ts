@@ -11,6 +11,7 @@ import type {
   AggDataEntry,
   ChartDefinition,
   InferenceData,
+  PowerBasisFieldKey,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import {
@@ -20,6 +21,7 @@ import {
 import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
+import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power-basis';
 
 // ---------------------------------------------------------------------------
 // High-contrast color generation (iwanthue — k-means in CIELab)
@@ -289,7 +291,9 @@ export function buildAvailabilityHwKey(
   return hwKey;
 }
 
-export type DerivedMetricKey = BenchmarkMetricKey;
+// Power-boundary fields are derived here before the registry exposes them as
+// axes; the union collapses once METRIC_REGISTRY carries the same keys.
+export type DerivedMetricKey = BenchmarkMetricKey | PowerBasisFieldKey;
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
 const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
@@ -411,6 +415,11 @@ export function buildDerivedChartFields(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
+  // jOutput keeps the historical per-GPU normalization: for disaggregated rows
+  // output_tput_per_gpu is per decode GPU, so this is all-in W of one decode GPU
+  // per output token and ignores the prefill pool. The power-boundary field
+  // utilityProvisionedJPerOutputToken uses the same all-in W but counts every
+  // allocated GPU, so the two differ on disaggregated rows by (P + D) / D.
   if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
@@ -421,6 +430,14 @@ export function buildDerivedChartFields(
   const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
   for (const [key, value] of Object.entries(measured) as [
     keyof MeasuredPowerChartFields,
+    { y: number; roof: boolean },
+  ][]) {
+    if (wants(key)) fields[key] = value;
+  }
+
+  const powerBasis = buildPowerBasisChartFields(entry, specs);
+  for (const [key, value] of Object.entries(powerBasis) as [
+    keyof PowerBasisChartFields,
     { y: number; roof: boolean },
   ][]) {
     if (wants(key)) fields[key] = value;

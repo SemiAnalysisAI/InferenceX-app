@@ -386,6 +386,66 @@ export const METRIC_REGISTRY = {
     titleZh: '实测平均功耗占 TDP 百分比',
     polarity: 'lower',
   },
+  // Power boundaries beyond GPU-measured telemetry (`lib/power-basis.ts`).
+  // Each boundary publishes W per allocated GPU and J per output token; the
+  // Boundary select in the Measured controls resolves to these keys, so the
+  // metric key alone carries the boundary in share links. Keys deliberately
+  // lack the `measured` prefix: they are spec constants or model output, not
+  // telemetry, so the telemetry-only decorations must not treat them as such.
+  gpuProvisionedWatts: {
+    field: 'gpuProvisionedWatts.y',
+    label: 'GPU Provisioned Power per Chip (TDP, W)',
+    labelZh: '每芯片 GPU 额定功耗（TDP，W）',
+    title: 'GPU Provisioned Power per Chip (TDP)',
+    titleZh: '每芯片 GPU 额定功耗（TDP）',
+    polarity: 'lower',
+  },
+  gpuProvisionedJPerOutputToken: {
+    field: 'gpuProvisionedJPerOutputToken.y',
+    label: 'GPU Provisioned J per Output Token (TDP, J/tok)',
+    labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
+    title: 'GPU Provisioned Joules per Output Token (TDP)',
+    titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
+    polarity: 'lower',
+  },
+  utilityProvisionedWatts: {
+    field: 'utilityProvisionedWatts.y',
+    label: 'Utility Provisioned Power per Chip (all-in, W)',
+    labelZh: '每芯片全电源配置功耗（all-in，W）',
+    title: 'Utility Provisioned Power per Chip (all-in)',
+    titleZh: '每芯片全电源配置功耗（all-in）',
+    polarity: 'lower',
+  },
+  // Unlike the ungated `jOutput`, which divides by output tokens per decode
+  // GPU, this normalizes by every allocated GPU (prefill + decode).
+  utilityProvisionedJPerOutputToken: {
+    field: 'utilityProvisionedJPerOutputToken.y',
+    label: 'Utility Provisioned J per Output Token, all GPUs (all-in, J/tok)',
+    labelZh: '每输出 token 全电源配置能耗，按全部 GPU 归一（all-in，J/tok）',
+    title: 'Utility Provisioned Joules per Output Token, all GPUs (all-in)',
+    titleZh: '每输出 token 全电源配置焦耳能耗，按全部 GPU 归一（all-in）',
+    polarity: 'lower',
+  },
+  // zh vocabulary shared with the Boundary select, its help text and the chart
+  // caption: B3 “全电源配置” (as the ungated jOutput/jTotal already say for
+  // all-in), B4 “数据中心建模” (measured GPU power carried through the chassis
+  // model to the utility meter).
+  utilityModeledWatts: {
+    field: 'utilityModeledWatts.y',
+    label: 'Utility Modeled Power per Chip (PUE, W)',
+    labelZh: '每芯片数据中心建模功耗（含 PUE，W）',
+    title: 'Utility Modeled Power per Chip (PUE)',
+    titleZh: '每芯片数据中心建模功耗（含 PUE）',
+    polarity: 'lower',
+  },
+  utilityModeledJPerOutputToken: {
+    field: 'utilityModeledJPerOutputToken.y',
+    label: 'Utility Modeled J per Output Token (PUE, J/tok)',
+    labelZh: '每输出 token 数据中心建模能耗（含 PUE，J/tok）',
+    title: 'Utility Modeled Joules per Output Token (PUE)',
+    titleZh: '每输出 token 数据中心建模焦耳能耗（含 PUE）',
+    polarity: 'lower',
+  },
 } as const satisfies Record<string, MetricDefinition>;
 
 export type MetricKey = keyof typeof METRIC_REGISTRY;
@@ -618,6 +678,31 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
   return ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
+/**
+ * The derived power-boundary y-axes (GPU provisioned, utility provisioned,
+ * utility modeled) that share the gated Measured Energy group and its
+ * Boundary select. They are kept out of `MEASURED_ENERGY_METRIC_CONFIG_KEYS`
+ * on purpose: spec constants and model output carry no telemetry tier, so the
+ * legacy-power ring, tier tooltip line, and footer key do not apply to them.
+ */
+export const POWER_BASIS_METRIC_CONFIG_KEYS = [
+  'y_gpuProvisionedWatts',
+  'y_gpuProvisionedJPerOutputToken',
+  'y_utilityProvisionedWatts',
+  'y_utilityProvisionedJPerOutputToken',
+  'y_utilityModeledWatts',
+  'y_utilityModeledJPerOutputToken',
+] as const satisfies readonly MetricConfigKey[];
+
+const POWER_BASIS_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+);
+
+/** Whether a y-axis config key plots a derived power boundary (B2–B4). */
+export function isPowerBasisConfigKey(configKey: string): boolean {
+  return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
 export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
 
 /** Whether a y-axis config key plots the modeled chassis AC power metric. */
@@ -671,10 +756,13 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   // Runner power telemetry and the chassis model built on it are still being
   // validated, so both groups stay behind the ↑↑↓↓ feature gate until the
   // measurements are stable enough to publish.
+  // The derived boundaries ride along so the same gate and the same
+  // shared-URL exception (a gated metric selected by `i_metric` still renders
+  // while locked) apply to them.
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+    metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
     gated: true,
   },
   {

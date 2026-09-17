@@ -347,7 +347,40 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };
+
+  // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
+  // W per allocated GPU plus J per successful output token, normalized by every
+  // allocated GPU (prefill + decode for disaggregation). Emitted only when the
+  // value is finite and positive; see lib/power-basis.ts and
+  // docs/data-transforms.md "Power boundaries".
+  /** B2 W/GPU: HW_REGISTRY tdp. */
+  gpuProvisionedWatts?: { y: number; roof: boolean };
+  /** B2 J/out: tdp × N_alloc ÷ total output tok/s. */
+  gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B3 W/GPU: HW_REGISTRY all-in power (kW × 1000). */
+  utilityProvisionedWatts?: { y: number; roof: boolean };
+  /**
+   * B3 J/out: all-in W × N_alloc ÷ total output tok/s. Unlike `jOutput`, which
+   * divides one decode GPU's all-in W by that GPU's output, this counts every
+   * allocated GPU, so it is (P + D) / D × `jOutput` on disaggregated rows.
+   */
+  utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B4 W/GPU: modeled deployment facility watts (chassis AC × PUE, applied once) ÷ measured GPUs. */
+  utilityModeledWatts?: { y: number; roof: boolean };
+  /** B4 J/out: B1 `joules_per_output_token` × (B4 W ÷ B1 W); inherits B1's token denominator. */
+  utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
+
+/** InferenceData keys carrying the B2–B4 power-boundary readings. */
+export type PowerBasisFieldKey =
+  | 'gpuProvisionedWatts'
+  | 'gpuProvisionedJPerOutputToken'
+  | 'utilityProvisionedWatts'
+  | 'utilityProvisionedJPerOutputToken'
+  | 'utilityModeledWatts'
+  | 'utilityModeledJPerOutputToken';
+
+export type { PowerBasis } from '@/lib/power-basis';
 
 /** Why a chart-ready point was intentionally excluded from the visible plot. */
 export type ChartClipReason = 'cost' | 'latency';
