@@ -19,11 +19,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
-import { createSkipTracker } from './etl/skip-tracker.js';
 import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
 import {
   downloadGcsArtifact,
@@ -32,11 +30,9 @@ import {
 } from './lib/gcs-artifacts.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
+import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
-import {
-  pairServerLogArtifacts,
-  resolveServerLogResultCandidates,
-} from './lib/server-log-backfill.js';
+import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const RETENTION_DAYS = 90;
@@ -92,86 +88,6 @@ function parseBackfillFlags(): BackfillFlags {
     dryRun: process.argv.includes('--dry-run'),
     source,
   };
-}
-
-function findJsonFiles(root: string): string[] {
-  const files: string[] = [];
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const pathname = path.join(root, entry.name);
-    if (entry.isDirectory()) files.push(...findJsonFiles(pathname));
-    else if (entry.isFile() && entry.name.endsWith('.json')) files.push(pathname);
-  }
-  return files.toSorted();
-}
-
-function readMappedRows(root: string): BenchmarkParams[] {
-  const tracker = createSkipTracker();
-  const rows: BenchmarkParams[] = [];
-  for (const file of findJsonFiles(root)) {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-    const rawRows = Array.isArray(parsed) ? parsed : [parsed];
-    for (const raw of rawRows) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
-      const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker);
-      if (mapped) rows.push(mapped);
-    }
-  }
-  return rows;
-}
-
-async function findBenchmarkResultIds(
-  run: CandidateRun,
-  rows: readonly BenchmarkParams[],
-): Promise<number[]> {
-  const ids = new Set<number>();
-  for (const row of rows) {
-    const c = row.config;
-    const candidates = await sql<{ id: number; offload_mode: string }[]>`
-      select br.id, br.offload_mode
-      from benchmark_results br
-      join workflow_runs wr on wr.id = br.workflow_run_id
-      join configs cfg on cfg.id = br.config_id
-      where wr.github_run_id = ${run.github_run_id}
-        and wr.run_attempt = ${run.run_attempt}
-        and cfg.hardware = ${c.hardware}
-        and cfg.framework = ${c.framework}
-        and cfg.model = ${c.model}
-        and cfg.precision = ${c.precision}
-        and cfg.spec_method = ${c.specMethod}
-        and cfg.disagg = ${c.disagg}
-        and cfg.is_multinode = ${c.isMultinode}
-        and cfg.prefill_tp = ${c.prefillTp}
-        and cfg.prefill_ep = ${c.prefillEp}
-        and cfg.prefill_dp_attention = ${c.prefillDpAttn}
-        and cfg.prefill_num_workers = ${c.prefillNumWorkers}
-        and cfg.decode_tp = ${c.decodeTp}
-        and cfg.decode_ep = ${c.decodeEp}
-        and cfg.decode_dp_attention = ${c.decodeDpAttn}
-        and cfg.decode_num_workers = ${c.decodeNumWorkers}
-        and cfg.num_prefill_gpu = ${c.numPrefillGpu}
-        and cfg.num_decode_gpu = ${c.numDecodeGpu}
-        and br.benchmark_type = ${row.benchmarkType}
-        and br.isl is not distinct from ${row.isl}
-        and br.osl is not distinct from ${row.osl}
-        and br.conc = ${row.conc}
-        and br.recipe_fingerprint is not distinct from ${row.recipeFingerprint}
-    `;
-    const resolution = resolveServerLogResultCandidates(
-      candidates.map((candidate) => ({
-        id: Number(candidate.id),
-        offloadMode: candidate.offload_mode,
-      })),
-      row.offloadMode,
-    );
-    if (resolution.usedUniqueFallback) {
-      console.warn(
-        `  [WARN] benchmark result ${resolution.ids[0]} uses a historical offload label; ` +
-          `matched uniquely without offload_mode`,
-      );
-    }
-    for (const id of resolution.ids) ids.add(id);
-  }
-  return [...ids];
 }
 
 async function resultLogsAreComplete(resultIds: readonly number[]): Promise<boolean> {
@@ -311,8 +227,13 @@ async function main(): Promise<void> {
               : await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
                   downloadArtifact(pair.benchmarks, tempDir),
                 );
-          const mappedRows = readMappedRows(benchmarkDir);
-          const resultIds = await findBenchmarkResultIds(run, mappedRows);
+          const mappedRows = readMappedBenchmarkRows(benchmarkDir);
+          const resultIds = await findBenchmarkResultIds(sql, run, mappedRows, (id) =>
+            console.warn(
+              `  [WARN] benchmark result ${id} uses a historical offload label; ` +
+                `matched uniquely without offload_mode`,
+            ),
+          );
           if (resultIds.length === 0) {
             unmatchedArtifacts++;
             console.warn(`  [WARN] ${pair.serverLogs.name}: no matching benchmark rows`);

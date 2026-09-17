@@ -28,6 +28,18 @@ vi.mock('@/components/gpu-power/types', () => ({
   parseCsvData: mockParseCsvData,
 }));
 
+const { mockGetGpuMetricsForRun } = vi.hoisted(() => ({
+  mockGetGpuMetricsForRun: vi.fn(),
+}));
+
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  getDb: () => ({}),
+}));
+
+vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+  getGpuMetricsForRun: mockGetGpuMetricsForRun,
+}));
+
 vi.mock('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
@@ -44,11 +56,12 @@ vi.mock('adm-zip', () => {
   return { default: MockAdmZip };
 });
 
-import { GET } from './route';
+import { databasePayloadToResponse, GET } from './route';
 import { NextRequest } from 'next/server';
 
 const originalFetch = globalThis.fetch;
 let origToken: string | undefined;
+let origReadonlyUrl: string | undefined;
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
@@ -57,7 +70,11 @@ function req(url: string): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   origToken = process.env.GITHUB_TOKEN;
+  origReadonlyUrl = process.env.DATABASE_READONLY_URL;
   process.env.GITHUB_TOKEN = 'test-gh-token';
+  // No readonly URL: the GitHub fallback is exercised unless a test opts in.
+  delete process.env.DATABASE_READONLY_URL;
+  mockGetGpuMetricsForRun.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -67,6 +84,210 @@ afterEach(() => {
   } else {
     process.env.GITHUB_TOKEN = origToken;
   }
+  if (origReadonlyUrl === undefined) {
+    delete process.env.DATABASE_READONLY_URL;
+  } else {
+    process.env.DATABASE_READONLY_URL = origReadonlyUrl;
+  }
+});
+
+const storedRunPayload = {
+  workflowRun: {
+    id: 7,
+    githubRunId: 34557177019,
+    runAttempt: 1,
+    name: 'Run Sweep - dsr1 fp4 b200',
+    date: '2026-09-11',
+    htmlUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34557177019',
+    headBranch: 'main',
+    headSha: 'deadbeef',
+    conclusion: 'success',
+    status: 'completed',
+    createdAt: '2026-09-11T04:00:00.000Z',
+  },
+  series: [
+    {
+      id: 1,
+      artifactName: 'gpu_metrics_dsr1_conc32_b200-x_0',
+      configKey: 'dsr1_conc32_b200-x_0',
+      fileName: 'gpu_metrics.csv',
+      vendor: 'nvidia',
+      sampleIntervalS: 1,
+      sampleCount: 2,
+      gpuCount: 1,
+      startedAt: '2026-09-11T04:19:41.982Z',
+      endedAt: '2026-09-11T04:19:42.990Z',
+      sidecars: {},
+      benchmarkResultIds: [10],
+      stats: [],
+      data: [
+        {
+          timestamp: '2026-09-11T04:19:41.982Z',
+          index: 0,
+          power: 187.8,
+          temperature: 33,
+          smClock: 120,
+          memClock: 3996,
+          gpuUtil: 0,
+          memUtil: 0,
+        },
+        {
+          timestamp: '2026-09-11T04:19:42.990Z',
+          index: 0,
+          power: 912.1,
+          temperature: 61,
+          smClock: 1965,
+          memClock: 3996,
+          gpuUtil: 98,
+          memUtil: 74,
+        },
+      ],
+    },
+    {
+      id: 2,
+      artifactName: 'gpu_metrics_multinode_b200-x_0',
+      configKey: 'multinode_b200-x_0',
+      fileName: 'results/gpu_metrics_rank0.csv',
+      vendor: 'nvidia',
+      sampleIntervalS: 1,
+      sampleCount: 0,
+      gpuCount: 0,
+      startedAt: '2026-09-11T04:19:41.982Z',
+      endedAt: '2026-09-11T04:19:41.982Z',
+      sidecars: {},
+      benchmarkResultIds: [11],
+      stats: [],
+      data: [],
+    },
+    {
+      id: 3,
+      artifactName: 'gpu_metrics_multinode_b200-x_0',
+      configKey: 'multinode_b200-x_0',
+      fileName: 'results/gpu_metrics_rank1.csv',
+      vendor: 'nvidia',
+      sampleIntervalS: 1,
+      sampleCount: 0,
+      gpuCount: 0,
+      startedAt: '2026-09-11T04:19:41.982Z',
+      endedAt: '2026-09-11T04:19:41.982Z',
+      sidecars: {},
+      benchmarkResultIds: [11],
+      stats: [],
+      data: [],
+    },
+  ],
+};
+
+describe('databasePayloadToResponse', () => {
+  it('shapes the stored digest like the GitHub payload and disambiguates multinode CSVs', () => {
+    const response = databasePayloadToResponse(storedRunPayload);
+    expect(response.source).toBe('database');
+    expect(response.runInfo).toEqual({
+      id: 34557177019,
+      name: 'Run Sweep - dsr1 fp4 b200',
+      branch: 'main',
+      sha: 'deadbeef',
+      createdAt: '2026-09-11T04:00:00.000Z',
+      url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34557177019',
+      conclusion: 'success',
+      status: 'completed',
+    });
+    expect(response.artifacts.map((artifact) => artifact.name)).toEqual([
+      'gpu_metrics_dsr1_conc32_b200-x_0',
+      'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank0.csv',
+      'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank1.csv',
+    ]);
+    expect(response.artifacts[0]!.data).toHaveLength(2);
+    expect(response.artifacts[0]!.series?.benchmarkResultIds).toEqual([10]);
+    expect(response.artifacts[0]!.series).not.toHaveProperty('data');
+  });
+
+  it('fills missing run metadata with the run date and canonical run URL', () => {
+    const response = databasePayloadToResponse({
+      ...storedRunPayload,
+      workflowRun: {
+        ...storedRunPayload.workflowRun,
+        htmlUrl: null,
+        headBranch: null,
+        headSha: null,
+        conclusion: null,
+        status: null,
+        createdAt: null,
+      },
+    });
+    expect(response.runInfo.createdAt).toBe('2026-09-11T00:00:00Z');
+    expect(response.runInfo.url).toBe(
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34557177019',
+    );
+    expect(response.runInfo.branch).toBe('');
+  });
+});
+
+describe('GET /api/gpu-metrics — database first', () => {
+  it('serves the stored digest without touching GitHub when the run is ingested', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
+    globalThis.fetch = vi.fn();
+
+    const res = await GET(req('/api/gpu-metrics?runId=34557177019'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.source).toBe('database');
+    expect(body.artifacts).toHaveLength(3);
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to GitHub when the database has no series for the run', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(null);
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 99,
+            name: 'In progress',
+            head_branch: 'main',
+            head_sha: 'abc',
+            created_at: '2026-09-17T00:00:00Z',
+            html_url: 'https://github.com/TestOwner/TestRepo/actions/runs/99',
+            conclusion: null,
+            status: 'in_progress',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              { id: 1, name: 'gpu_metrics_live', archive_download_url: 'https://example.com/dl/1' },
+            ],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Length': '1024' }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+
+    const res = await GET(req('/api/gpu-metrics?runId=99'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.source).toBe('github');
+    expect(body.artifacts[0].name).toBe('gpu_metrics_live');
+  });
+
+  it('falls back to GitHub when the database lookup throws', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
+
+    const res = await GET(req('/api/gpu-metrics?runId=99'));
+    expect(res.status).toBe(500);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('GET /api/gpu-metrics', () => {

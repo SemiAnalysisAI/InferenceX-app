@@ -76,6 +76,7 @@ API routes (`packages/app/src/app/api/v1/`):
 - `reliability` — raw `ReliabilityRow[]`
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
+- `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU digest) linked to one benchmark point
 - `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
 - `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
   from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
