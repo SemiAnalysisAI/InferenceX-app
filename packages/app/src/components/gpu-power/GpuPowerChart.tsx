@@ -4,13 +4,17 @@ import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/use-locale';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
   estimateSampleIntervalMs,
   meanAcrossSeries,
+  nearestSample,
   rollingTimeAverage,
   type TelemetryDisplayState,
+  type TimedSample,
 } from './telemetry-smoothing';
 import {
   type GpuMetricKey,
@@ -35,6 +39,7 @@ const STRINGS = {
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
+    rightAxis: 'right axis',
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -48,8 +53,19 @@ const STRINGS = {
     rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
+    rightAxis: '右轴',
   },
 } as const;
+
+/** A second time series drawn over the telemetry on its own right-hand axis. */
+export interface TelemetryOverlaySeries {
+  key: string;
+  label: string;
+  unit: string;
+  color: string;
+  /** Absolute-time samples; the chart re-bases them onto its own t=0. */
+  points: TimedSample[];
+}
 
 interface ParsedPoint {
   seconds: number;
@@ -74,6 +90,8 @@ interface GpuMetricsChartProps {
   maxPoints?: number;
   /** Raw samples vs. time-window rolling average. Defaults to raw samples. */
   display?: TelemetryDisplayState;
+  /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
+  overlay?: TelemetryOverlaySeries | null;
 }
 
 function parseTimestamp(raw: string): Date | null {
@@ -158,6 +176,80 @@ function colorFor(gpuIndex: number): string {
 }
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
+/** Room for the overlay's right axis ticks and rotated title. */
+const MARGIN_WITH_OVERLAY = { ...MARGIN, right: 84 };
+
+interface OverlayPoint {
+  x: number;
+  y: number;
+}
+
+function overlayYScale(points: OverlayPoint[], height: number): d3.ScaleLinear<number, number> {
+  const max = d3.max(points, (p) => p.y) ?? 0;
+  return d3
+    .scaleLinear()
+    .domain([0, max > 0 ? max * 1.05 : 1])
+    .range([height, 0])
+    .nice();
+}
+
+function overlayLine(
+  xScale: d3.ScaleLinear<number, number>,
+  yScale: d3.ScaleLinear<number, number>,
+): d3.Line<OverlayPoint> {
+  return d3
+    .line<OverlayPoint>()
+    .x((p) => xScale(p.x))
+    .y((p) => yScale(p.y))
+    .curve(d3.curveMonotoneX);
+}
+
+/**
+ * Draw the overlay path inside the clipped zoom group and its axis in the
+ * unclipped root group. Both are removed first so toggling the overlay off
+ * (or re-rendering) never leaves a stale axis behind.
+ */
+function renderOverlay(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  ctx: RenderContext,
+  overlay: TelemetryOverlaySeries | null | undefined,
+  points: OverlayPoint[],
+): void {
+  group.selectAll('.telemetry-overlay').remove();
+  ctx.layout.g.selectAll('.telemetry-overlay-axis').remove();
+  if (!overlay || points.length === 0) return;
+  const xScale = ctx.xScale as d3.ScaleLinear<number, number>;
+  const yScale = overlayYScale(points, ctx.height);
+  group
+    .append('path')
+    .attr('class', 'telemetry-overlay')
+    .attr('fill', 'none')
+    .attr('stroke', overlay.color)
+    .attr('stroke-width', 1.75)
+    .attr('opacity', 0.9)
+    .attr('pointer-events', 'none')
+    .attr('d', overlayLine(xScale, yScale)(points));
+
+  const axis = ctx.layout.g
+    .append('g')
+    .attr('class', 'telemetry-overlay-axis')
+    .attr('transform', `translate(${ctx.width},0)`)
+    .call(d3.axisRight(yScale).ticks(6).tickSize(4).tickFormat(d3.format('~s')));
+  axis.select('.domain').attr('stroke', overlay.color);
+  axis.selectAll('.tick line').attr('stroke', overlay.color);
+  axis
+    .selectAll('.tick text')
+    .attr('fill', overlay.color)
+    .attr('font-size', px(CHART_TYPE.axisLabel));
+  axis
+    .append('text')
+    .attr('class', 'telemetry-overlay-axis-label')
+    .attr('transform', `translate(${ctx.layout.margin.right - 14},${ctx.height / 2}) rotate(90)`)
+    .attr('text-anchor', 'middle')
+    .attr('fill', overlay.color)
+    .attr('font-size', px(CHART_TYPE.axisLabel))
+    .text(`${overlay.label} (${overlay.unit})`);
+}
 
 const GpuMetricsChart = React.memo(
   ({
@@ -169,6 +261,7 @@ const GpuMetricsChart = React.memo(
     caption,
     maxPoints,
     display = DEFAULT_TELEMETRY_DISPLAY,
+    overlay,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -214,22 +307,51 @@ const GpuMetricsChart = React.memo(
       return result;
     }, [groupedData]);
 
+    // Overlay samples, smoothed with the same window as the chip lines when
+    // averaging so both series answer the same "how much over N seconds"
+    // question, then re-based onto the telemetry's t=0.
+    const overlaySamples = useMemo<TimedSample[]>(() => {
+      if (!overlay) return [];
+      return rolling ? rollingTimeAverage(overlay.points, display.windowS * 1000) : overlay.points;
+    }, [overlay, rolling, display.windowS]);
+    const overlayPoints = useMemo<OverlayPoint[]>(
+      () => overlaySamples.map((p) => ({ x: (p.ms - t0Ms) / 1000, y: p.value })),
+      [overlaySamples, t0Ms],
+    );
+    const hasOverlay = Boolean(overlay) && overlayPoints.length > 0;
+
     const hasMeanLine = groupedData.has(MEAN_INDEX);
-    const keyRow = hasMeanLine ? (
-      <div
-        className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
-        data-testid="gpu-metrics-chart-keys"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="inline-block h-0.5 w-4 rounded"
-            style={{ background: MEAN_COLOR }}
-          />
-          {t.meanChips}
-        </span>
-      </div>
-    ) : null;
+    const keyRow =
+      hasMeanLine || hasOverlay ? (
+        <div
+          className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+          data-testid="gpu-metrics-chart-keys"
+        >
+          {hasMeanLine && (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="inline-block h-0.5 w-4 rounded"
+                style={{ background: MEAN_COLOR }}
+              />
+              {t.meanChips}
+            </span>
+          )}
+          {hasOverlay && overlay && (
+            <span
+              className="inline-flex items-center gap-1.5"
+              data-testid="gpu-metrics-overlay-key"
+            >
+              <span
+                aria-hidden
+                className="inline-block h-0.5 w-4 rounded"
+                style={{ background: overlay.color }}
+              />
+              {overlay.label} ({overlay.unit} · {t.rightAxis})
+            </span>
+          )}
+        </div>
+      ) : null;
     const resolvedCaption =
       caption || keyRow ? (
         <>
@@ -270,7 +392,7 @@ const GpuMetricsChart = React.memo(
         chartId={CHART_ID}
         data={allPoints}
         height={600}
-        margin={MARGIN}
+        margin={hasOverlay ? MARGIN_WITH_OVERLAY : MARGIN}
         watermark="logo"
         testId="gpu-metrics-chart-svg"
         grabCursor={true}
@@ -339,6 +461,24 @@ const GpuMetricsChart = React.memo(
               maxPoints,
             },
           },
+          // Secondary series on a right-hand axis (e.g. decode throughput)
+          {
+            type: 'custom',
+            key: 'telemetry-overlay',
+            render: (group, ctx) => {
+              renderOverlay(group, ctx, hasOverlay ? overlay : null, overlayPoints);
+            },
+            onZoom: (group, ctx) => {
+              if (!hasOverlay) return;
+              const xScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+              group
+                .select<SVGPathElement>('.telemetry-overlay')
+                .attr(
+                  'd',
+                  overlayLine(xScale, overlayYScale(overlayPoints, ctx.height))(overlayPoints),
+                );
+            },
+          },
         ]}
         zoom={{
           enabled: true,
@@ -355,6 +495,13 @@ const GpuMetricsChart = React.memo(
               d.gpuIndex === MEAN_INDEX
                 ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
                 : `${t.chip} ${d.gpuIndex}`;
+            const overlayAt = hasOverlay ? nearestSample(overlaySamples, d.ms) : null;
+            const overlayRow =
+              overlay && overlayAt
+                ? `<div class="mt-1" style="color: ${overlay.color}">${overlay.label}${sep} ${
+                    overlayAt.value >= 100 ? overlayAt.value.toFixed(0) : overlayAt.value.toFixed(1)
+                  } ${overlay.unit}</div>`
+                : '';
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
               ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
               <div class="font-semibold mb-1" style="color: ${color}">${title}</div>
@@ -368,6 +515,7 @@ const GpuMetricsChart = React.memo(
               <div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
                   : ''
               }
+              ${overlayRow}
             </div>`;
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.seconds),

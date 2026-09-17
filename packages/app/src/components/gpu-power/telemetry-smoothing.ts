@@ -131,3 +131,29 @@ export function meanAcrossSeries(
     return { ms: ref.ms, value: sum / count, count };
   });
 }
+
+/**
+ * Convert a relative-seconds series (`t` from its own start) to absolute
+ * milliseconds so it can share an x-axis with wall-clock telemetry.
+ */
+export function toAbsoluteMs(
+  points: readonly { t: number; value: number }[],
+  originMs: number,
+): TimedSample[] {
+  return points.map((p) => ({ ms: originMs + p.t * 1000, value: p.value }));
+}
+
+/** Sample nearest to `ms` (earlier one on a tie), or null when the series is empty. */
+export function nearestSample(samples: readonly TimedSample[], ms: number): TimedSample | null {
+  if (samples.length === 0) return null;
+  let lo = 0;
+  let hi = samples.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid]!.ms < ms) lo = mid + 1;
+    else hi = mid;
+  }
+  const after = samples[lo]!;
+  const before = lo > 0 ? samples[lo - 1]! : after;
+  return Math.abs(before.ms - ms) <= Math.abs(after.ms - ms) ? before : after;
+}

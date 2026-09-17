@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   estimateSampleIntervalMs,
   meanAcrossSeries,
+  nearestSample,
   rollingTimeAverage,
+  toAbsoluteMs,
   type TimedSample,
 } from './telemetry-smoothing';
 
@@ -158,5 +160,44 @@ describe('meanAcrossSeries', () => {
     expect(meanAcrossSeries([chip0, everySecond([10, 10])], -1).every((p) => p.count === 2)).toBe(
       true,
     );
+  });
+});
+
+describe('toAbsoluteMs', () => {
+  it('offsets relative seconds from the given origin', () => {
+    // Trace startNs from a real point, as the API returns it.
+    const originMs = 1789508185611923200 / 1e6;
+    expect(
+      toAbsoluteMs(
+        [
+          { t: 0, value: 0 },
+          { t: 1.5, value: 42 },
+        ],
+        originMs,
+      ),
+    ).toEqual([
+      { ms: originMs, value: 0 },
+      { ms: originMs + 1500, value: 42 },
+    ]);
+    expect(toAbsoluteMs([], originMs)).toEqual([]);
+  });
+});
+
+describe('nearestSample', () => {
+  const samples = everySecond([1, 2, 3, 4]);
+
+  it('returns null for an empty series', () => {
+    expect(nearestSample([], T0)).toBeNull();
+  });
+
+  it('returns the closest sample, clamping outside the series range', () => {
+    expect(nearestSample(samples, T0 - 5000)).toEqual(samples[0]);
+    expect(nearestSample(samples, T0 + 99_000)).toEqual(samples[3]);
+    expect(nearestSample(samples, T0 + 1400)).toEqual(samples[1]);
+    expect(nearestSample(samples, T0 + 1600)).toEqual(samples[2]);
+  });
+
+  it('prefers the earlier sample on an exact tie', () => {
+    expect(nearestSample(samples, T0 + 1500)).toEqual(samples[1]);
   });
 });

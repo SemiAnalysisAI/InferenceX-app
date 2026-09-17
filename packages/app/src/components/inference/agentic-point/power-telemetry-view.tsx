@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from 'react';
 
-import GpuMetricsChart, { GPU_COLORS } from '@/components/gpu-power/GpuPowerChart';
+import GpuMetricsChart, {
+  GPU_COLORS,
+  type TelemetryOverlaySeries,
+} from '@/components/gpu-power/GpuPowerChart';
 import GpuStatsTable from '@/components/gpu-power/GpuStatsTable';
 import { TelemetryDisplayControls } from '@/components/gpu-power/TelemetryDisplayControls';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
+  toAbsoluteMs,
   type TelemetryDisplayState,
 } from '@/components/gpu-power/telemetry-smoothing';
 import {
@@ -20,6 +24,7 @@ import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -28,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-metrics-point';
+import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
@@ -50,6 +56,14 @@ const STRINGS = {
     chip: 'Chip',
     secondsUnit: 's',
     resetFilter: 'Show all chips',
+    overlayToggle: 'Overlay decode throughput',
+    decodeTps: 'Decode throughput',
+    overlayLoading: 'Loading server metrics…',
+    overlayError: 'Server metrics failed to load; the overlay is unavailable.',
+    overlayUnavailable: 'This point has no decode-throughput server metrics to overlay.',
+    overlayAligned: 'Decode throughput is aligned to the telemetry by wall-clock timestamps.',
+    overlayRelative:
+      'The trace has no wall-clock timestamps, so decode throughput starts at the telemetry start (both at t=0).',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
@@ -69,10 +83,19 @@ const STRINGS = {
     chip: '芯片',
     secondsUnit: '秒',
     resetFilter: '显示全部芯片',
+    overlayToggle: '叠加 decode 吞吐量',
+    decodeTps: 'Decode 吞吐量',
+    overlayLoading: '正在加载服务端指标……',
+    overlayError: '服务端指标加载失败，无法叠加显示。',
+    overlayUnavailable: '该数据点没有可叠加的 decode 吞吐量服务端指标。',
+    overlayAligned: 'Decode 吞吐量已按绝对时间戳与遥测数据对齐。',
+    overlayRelative: 'trace 缺少绝对时间戳，因此 decode 吞吐量与遥测数据均从各自的 t=0 开始对齐。',
   },
 } as const;
 
 const VENDOR_LABEL: Record<string, string> = { nvidia: 'nvidia-smi', amd: 'amd-smi' };
+/** Violet: outside the Tableau10 chip palette and the foreground mean line. */
+const OVERLAY_COLOR = '#8b5cf6';
 
 interface Props {
   id: number;
@@ -142,6 +165,35 @@ export function PowerTelemetryView({ id, enabled }: Props) {
   };
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
+
+  // Decode-throughput overlay: fetched only once the switch is on.
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
+  const metricsQuery = useTraceServerMetrics(id, enabled && overlayEnabled);
+  const serverMetrics = metricsQuery.data;
+  const decodeTps = serverMetrics?.decodeTps ?? [];
+  // Trace timeslices carry epoch-ns starts, so both series can share wall-clock
+  // time. A zero startNs means the trace only has relative time.
+  const overlayAbsolute = Boolean(serverMetrics && serverMetrics.startNs > 0);
+  const overlay = useMemo<TelemetryOverlaySeries | null>(() => {
+    if (!overlayEnabled || !serverMetrics || !selectedSeries || decodeTps.length === 0) return null;
+    const originMs = overlayAbsolute
+      ? serverMetrics.startNs / 1e6
+      : new Date(selectedSeries.startedAt).getTime();
+    return {
+      key: 'decodeTps',
+      label: t.decodeTps,
+      unit: 'tok/s',
+      color: OVERLAY_COLOR,
+      points: toAbsoluteMs(decodeTps, originMs),
+    };
+  }, [overlayEnabled, serverMetrics, selectedSeries, decodeTps, overlayAbsolute, t.decodeTps]);
+  const overlayNote = ((): string | null => {
+    if (!overlayEnabled) return null;
+    if (metricsQuery.isLoading) return t.overlayLoading;
+    if (metricsQuery.isError) return t.overlayError;
+    if (!overlay) return t.overlayUnavailable;
+    return overlayAbsolute ? t.overlayAligned : t.overlayRelative;
+  })();
 
   if (!enabled) return null;
 
@@ -276,6 +328,30 @@ export function PowerTelemetryView({ id, enabled }: Props) {
           idPrefix="power-telemetry-display"
           className="mt-3 border-t border-border/60 pt-3"
         />
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="power-telemetry-overlay"
+              data-testid="power-telemetry-overlay-switch"
+              checked={overlayEnabled}
+              onCheckedChange={(checked) => {
+                track('inference_agentic_power_overlay_toggled', { id, enabled: checked });
+                setOverlayEnabled(checked);
+              }}
+            />
+            <Label htmlFor="power-telemetry-overlay" className="cursor-pointer">
+              {t.overlayToggle}
+            </Label>
+          </div>
+          {overlayNote && (
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="power-telemetry-overlay-note"
+            >
+              {overlayNote}
+            </span>
+          )}
+        </div>
       </Card>
 
       <Card className="relative" data-testid="power-telemetry-chart">
@@ -286,6 +362,7 @@ export function PowerTelemetryView({ id, enabled }: Props) {
           artifactName={selectedSeries.artifactName}
           maxPoints={2000}
           display={display}
+          overlay={overlay}
           legendElement={
             <ChartLegend
               variant="sidebar"
