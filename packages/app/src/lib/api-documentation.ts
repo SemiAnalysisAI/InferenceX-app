@@ -9,7 +9,13 @@ import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
-export type ApiGroupId = 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics';
+export type ApiGroupId =
+  | 'core'
+  | 'external'
+  | 'datasets'
+  | 'collectivex'
+  | 'operatorx'
+  | 'diagnostics';
 export type ApiHttpMethod = 'GET';
 export type ApiParameterLocation = 'path' | 'query';
 export type ApiAudience = 'public';
@@ -565,14 +571,43 @@ const collectiveXDatasetSchema = objectSchema(
         terminal_points: integerSchema,
         measured_points: integerSchema,
         covered_skus: arraySchema(stringSchema),
+        swap_requested_cases: integerSchema,
+        swap_measured_cases: integerSchema,
         kv_requested_cases: integerSchema,
         kv_measured_cases: integerSchema,
       },
-      ['kv_requested_cases', 'kv_measured_cases'],
+      ['kv_requested_cases', 'kv_measured_cases', 'swap_requested_cases', 'swap_measured_cases'],
     ),
     coverage: arraySchema(anyObjectSchema),
     series: arraySchema(anyObjectSchema),
     kv: arraySchema(anyObjectSchema),
+    swap_blocks: arraySchema(
+      objectSchema({
+        result_id: stringSchema,
+        sku: stringSchema,
+        runtime: anyObjectSchema,
+        timing: stringSchema,
+        warmup: integerSchema,
+        iterations: integerSchema,
+        max_payload_bytes: { oneOf: [integerSchema, { type: 'null' }] },
+        skipped_points: integerSchema,
+        points: arraySchema(
+          objectSchema({
+            direction: { type: 'string', enum: ['h2d', 'd2h', 'd2d'] },
+            layout: { type: 'string', enum: ['contiguous', 'random'] },
+            block_bytes: integerSchema,
+            num_blocks: integerSchema,
+            payload_bytes: integerSchema,
+            seed: integerSchema,
+            host_memory: stringSchema,
+            api: stringSchema,
+            sample_count: integerSchema,
+            latency_us: anyObjectSchema,
+            payload_gbps_at_latency_percentile: anyObjectSchema,
+          }),
+        ),
+      }),
+    ),
   },
   ['version', 'run', 'coverage', 'series'],
 );
@@ -592,12 +627,13 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
       unsupported: integerSchema,
       failed: integerSchema,
     }),
+    swap_cases: objectSchema({ requested: integerSchema, measured: integerSchema }),
     kv_cases: objectSchema({
       requested: integerSchema,
       measured: integerSchema,
     }),
   },
-  ['kv_cases'],
+  ['kv_cases', 'swap_cases'],
 );
 const percentileSchema = objectSchema({
   mean: numberSchema,
@@ -611,6 +647,77 @@ const percentileSchema = objectSchema({
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
+
+const operatorXRunSchema = objectSchema({
+  run_id: stringSchema,
+  run_attempt: numberSchema,
+  source_sha: stringSchema,
+  source_branch: { type: ['string', 'null'] },
+  generated_at: stringSchema,
+  conclusion: { type: ['string', 'null'] },
+  requested: numberSchema,
+  measured: numberSchema,
+  unsupported: numberSchema,
+  failed: numberSchema,
+  missing: numberSchema,
+  clusters: arraySchema(stringSchema),
+  testlists: arraySchema(stringSchema),
+});
+const operatorXAttentionSchema = {
+  ...objectSchema({
+    batch_size: numberSchema,
+    seq_len_q: numberSchema,
+    seq_len_kv: numberSchema,
+    num_heads: numberSchema,
+    num_heads_kv: numberSchema,
+    head_dim_qk: numberSchema,
+    head_dim_v: numberSchema,
+    kv_lora_rank: nullableNumberSchema,
+    dtype_q: stringSchema,
+    dtype_k: stringSchema,
+    dtype_v: stringSchema,
+    dtype_o: stringSchema,
+    causal: { type: 'boolean' },
+  }),
+  type: ['object', 'null'],
+} satisfies ApiSchema;
+const operatorXPointSchema = objectSchema({
+  type: { type: 'string', enum: ['gemm', 'attention_mha', 'attention_mla'] },
+  args: anyObjectSchema,
+  attention: operatorXAttentionSchema,
+  id: stringSchema,
+  shard: stringSchema,
+  attempt: nullableNumberSchema,
+  cluster: stringSchema,
+  backend: stringSchema,
+  testlist: stringSchema,
+  name: { type: ['string', 'null'] },
+  m: nullableNumberSchema,
+  n: nullableNumberSchema,
+  k: nullableNumberSchema,
+  dtype_a: { type: ['string', 'null'] },
+  dtype_b: { type: ['string', 'null'] },
+  dtype_out: { type: ['string', 'null'] },
+  status: { type: 'string', enum: ['ok', 'unsupported', 'error', 'missing'] },
+  message: { type: ['string', 'null'] },
+  latency_us: nullableNumberSchema,
+  tflops: nullableNumberSchema,
+});
+const operatorXExampleRun = {
+  run_id: '123456789',
+  run_attempt: 1,
+  source_sha: '0123456789abcdef',
+  source_branch: 'example',
+  generated_at: '2026-09-16T12:00:00Z',
+  conclusion: 'success',
+  requested: 1,
+  measured: 1,
+  unsupported: 0,
+  failed: 0,
+  missing: 0,
+  clusters: ['h100_dgxc_8x'],
+  testlists: ['gemm'],
+};
 
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
@@ -646,6 +753,14 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     ),
   },
   {
+    id: 'operatorx',
+    title: text('OperatorX', 'OperatorX'),
+    description: text(
+      'Dense GEMM measurements and complete run coverage.',
+      '稠密 GEMM 实测数据和完整运行覆盖情况。',
+    ),
+  },
+  {
     id: 'diagnostics',
     title: text('Diagnostic reads', '诊断读取'),
     description: text(
@@ -656,6 +771,141 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 export const apiOperations: readonly ApiOperation[] = [
+  {
+    id: 'list-operatorx-runs',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs',
+    summary: text('List OperatorX runs', '列出 OperatorX 运行'),
+    description: text(
+      'Lists stored completed manual OperatorX sweeps from any branch, newest first. Lazily imports at most four runs per request from the last 44 days; discovery_complete=false requests another pass. Raw documents persist beyond artifact expiry. Old GEMM-only summary caches are rebuilt from stored documents when listing runs. Cached for 60 seconds when discovery completes; incomplete responses are not cached. Requires server-side GitHub access and DATABASE_OPERATORX_WRITE_URL. Development on loopback hosts can explicitly read downloaded bundles through OPERATORX_LOCAL_ARTIFACT_DIR; production never reads local files.',
+      '列出已存储的手动 OperatorX 运行，按运行 ID 从新到旧排序，不限制分支。每次请求最多从最近 44 天的记录导入四次运行；discovery_complete=false 表示需要继续获取。原始文档在产物过期后仍会保留。列出运行时，根据已保存文档重建旧版仅统计 GEMM 的摘要缓存。发现完成时缓存 60 秒，未完成时不缓存。服务端需要 GitHub 访问权限和 DATABASE_OPERATORX_WRITE_URL。本机开发环境可通过 OPERATORX_LOCAL_ARTIFACT_DIR 显式读取已下载的数据；生产环境不读取本地文件。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [],
+    responses: [
+      success(
+        'Run summaries.',
+        '运行摘要。',
+        objectSchema({
+          runs: arraySchema(operatorXRunSchema),
+          discovery_complete: { type: 'boolean' },
+        }),
+        { runs: [operatorXExampleRun], discovery_complete: true },
+      ),
+      errorResponse('404', 'Workflow unavailable.', '工作流不可用。', 'OperatorX unavailable'),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage or configuration unavailable.',
+        '存储或配置不可用。',
+        'OperatorX unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXRunList',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs`,
+  },
+  {
+    id: 'get-operatorx-run',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs/{runId}',
+    summary: text('Read an OperatorX run', '读取 OperatorX 运行'),
+    description: text(
+      'Reads GEMM, MHA/GQA, and materialized MLA cases matched against the requested manifest. Version 2 adds type, original args, and attention dimensions/precisions; GEMM-only fields are null for attention. Attention reports latency_us and null tflops. MLA excludes cache projection and RoPE. Newest shard attempts replace older results, while untouched shards survive partial reruns. Source/run/attempt/cluster provenance is validated. TFLOPS = 2*M*N*K/(latency_us*1e6), per GPU; unsupported, failed, missing, or zero-sized cases have null TFLOPS. A completed failed run may still contain measurements. The server lazily stores raw artifacts and serves stored data during a GitHub outage. Cached for 60 seconds. The same explicit loopback development preview as the runs endpoint is available.',
+      '按执行清单读取 GEMM、MHA/GQA 和物化 MLA 测试。版本 2 增加 type、原始 args 及 attention 维度和精度；attention 的 GEMM 专用字段为 null。Attention 返回 latency_us，tflops 为 null。MLA 不包含缓存投影或 RoPE。每个分片采用最新尝试的结果，局部重跑时保留未重跑分片的数据。校验源码、运行、尝试次数和集群来源。单卡 TFLOPS = 2*M*N*K/(latency_us*1e6)；不支持、失败、缺失或零维度测试的 TFLOPS 为 null。已结束但失败的运行仍可能包含实测数据。服务端按需保存原始产物，GitHub 不可用时返回已存储结果，缓存 60 秒。支持与运行列表相同的本机开发预览。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'runId',
+        'path',
+        true,
+        'integer',
+        'Positive GitHub Actions run ID.',
+        'GitHub Actions 正整数运行 ID。',
+        positiveIdSchema,
+        123456789,
+      ),
+    ],
+    responses: [
+      success(
+        'Run coverage and measurements.',
+        '运行覆盖情况和测量结果。',
+        objectSchema({
+          version: { type: 'integer', enum: [2] },
+          run: operatorXRunSchema,
+          points: arraySchema(operatorXPointSchema),
+        }),
+        {
+          version: 2,
+          run: operatorXExampleRun,
+          points: [
+            {
+              type: 'gemm',
+              args: {
+                m: 1000,
+                n: 1000,
+                k: 1000,
+                dtype_a: 'bf16',
+                dtype_b: 'bf16',
+                dtype_out: 'bf16',
+              },
+              attention: null,
+              id: 'shard:0:torch',
+              shard: 'shard',
+              attempt: 1,
+              cluster: 'h100_dgxc_8x',
+              backend: 'torch',
+              testlist: 'gemm',
+              name: null,
+              m: 1000,
+              n: 1000,
+              k: 1000,
+              dtype_a: 'bf16',
+              dtype_b: 'bf16',
+              dtype_out: 'bf16',
+              status: 'ok',
+              message: null,
+              latency_us: 1000,
+              tflops: 2,
+            },
+          ],
+        },
+      ),
+      errorResponse('400', 'Invalid run ID.', '运行 ID 无效。', 'OperatorX run unavailable'),
+      errorResponse(
+        '404',
+        'Run or artifacts not found.',
+        '找不到运行或产物。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX run unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage, configuration, or artifact validation failed.',
+        '存储、配置或产物校验失败。',
+        'OperatorX run unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXDataset',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs/123456789`,
+  },
+
   {
     id: 'get-availability',
     group: 'core',
@@ -1591,8 +1841,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。',
+      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1636,6 +1886,7 @@ export const apiOperations: readonly ApiOperation[] = [
           coverage: [],
           series: [],
           kv: [],
+          swap_blocks: [],
         },
       ),
       errorResponse(
@@ -1815,6 +2066,7 @@ export const apiOperations: readonly ApiOperation[] = [
           coverage: [],
           series: [],
           kv: [],
+          swap_blocks: [],
         },
       ),
       errorResponse(

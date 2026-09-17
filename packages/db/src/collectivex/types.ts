@@ -162,6 +162,41 @@ export interface CollectiveXKvCase {
   rows: CollectiveXKvRow[];
 }
 
+export interface CollectiveXSwapPoint {
+  direction: 'h2d' | 'd2h' | 'd2d';
+  layout: 'contiguous' | 'random';
+  block_bytes: number;
+  num_blocks: number;
+  payload_bytes: number;
+  seed: number;
+  host_memory: string;
+  api: string;
+  sample_count: number;
+  latency_us: CollectiveXPercentiles;
+  payload_gbps_at_latency_percentile: CollectiveXPercentiles;
+}
+
+/** One verified swap_blocks artifact, with runtime provenance retained. */
+export interface CollectiveXSwapResult {
+  result_id: string;
+  sku: string;
+  runtime: {
+    device: string;
+    torch: string;
+    vllm: string;
+    cuda: string | null;
+    hip: string | null;
+    image: string;
+    source_sha: string;
+  };
+  timing: string;
+  warmup: number;
+  iterations: number;
+  max_payload_bytes: number | null;
+  skipped_points: number;
+  points: CollectiveXSwapPoint[];
+}
+
 export interface CollectiveXRun {
   run_id: string;
   run_attempt: number;
@@ -178,6 +213,8 @@ export interface CollectiveXRun {
   measured_points: number;
   covered_skus: string[];
   /** kv-transfer case counts; absent on datasets read before the kv suite. */
+  swap_requested_cases?: number;
+  swap_measured_cases?: number;
   kv_requested_cases?: number;
   kv_measured_cases?: number;
 }
@@ -189,6 +226,7 @@ export interface CollectiveXDataset {
   series: CollectiveXSeries[];
   /** kv-transfer cases; absent on datasets captured before the kv suite. */
   kv?: CollectiveXKvCase[];
+  swap_blocks?: CollectiveXSwapResult[];
 }
 
 export interface CollectiveXRunSummary {
@@ -204,4 +242,5 @@ export interface CollectiveXRunSummary {
   terminal_counts: { measured: number; unsupported: number; failed: number };
   /** kv-transfer case counts; absent on summaries stored before the kv suite. */
   kv_cases?: { requested: number; measured: number };
+  swap_cases?: { requested: number; measured: number };
 }

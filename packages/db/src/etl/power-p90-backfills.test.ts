@@ -24,8 +24,12 @@ function sourcePoint(backfill = QWEN35_P90_POWER_BACKFILLS[0]) {
 }
 
 describe('Qwen3.5 measured P75 and P90 backfills', () => {
-  it('ties all 34 exact selectors and values to their raw audit evidence', () => {
-    expect(QWEN35_P90_POWER_BACKFILLS).toHaveLength(34);
+  it('ties every exact selector and value to its raw audit evidence', () => {
+    expect(
+      QWEN35_P90_POWER_BACKFILLS.map((backfill) => backfill.productionBenchmarkId).toSorted(),
+    ).toEqual(
+      evidence.records.map((record: { row_id: string }) => Number(record.row_id)).toSorted(),
+    );
     for (const backfill of QWEN35_P90_POWER_BACKFILLS) {
       const record = evidence.records.find(
         (r: { row_id: string }) => Number(r.row_id) === backfill.productionBenchmarkId,
